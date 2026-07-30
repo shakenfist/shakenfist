@@ -92,11 +92,18 @@ claimed atomically against every concurrent scheduler. If it
 places zero rows, the candidate set was empty and the request
 can be held, retried, or rejected.
 
-The reservation is consumed when the instance transitions
-into the `building` state, explicitly released on instance
-create failure, and auto-expired via a leased
-`expires_at TIMESTAMP` modelled on the `cluster_locks`
-pattern so stranded reservations cannot leak capacity.
+The reservation is consumed when the instance is durably
+placed (`Instance.place_instance()`) — note the instance
+state machine is `initial → preflight → creating → created`;
+there is no `building` state, and the 2026-07-30 phase 0
+review decided against adding one (it would not improve
+atomicity, which comes from doing the claim consumption in
+the same database transaction as an existing transition).
+Reservations are explicitly released on instance create
+failure, with a leased `expires_at TIMESTAMP` modelled on
+the `cluster_locks` pattern as a crash backstop only — not
+the routine release mechanism — so stranded reservations
+cannot leak capacity.
 
 This design was chosen in preference to two alternatives:
 
@@ -135,7 +142,10 @@ Concretely, after this plan lands:
 - Scheduling decisions are conditional INSERTs that either
   place a reservation atomically or return "no candidate."
 - The instance lifecycle gains a "reservation consumed" point
-  (instance enters `building`) and an explicit release on
+  (working position: at `place_instance()`, with
+  allocation-denominated accounting from the database, so the
+  reservation window is seconds in the normal case and only
+  stretches for batch creates) and an explicit release on
   create failure.
 - A reservation reaper handles abandoned reservations whose
   `expires_at` has passed without consumption.
@@ -162,8 +172,20 @@ overdue application of both.
 ## Open questions
 
 This plan is light on detail because almost every concrete
-decision depends on a phase 0 research pass. The open
-questions include at least:
+decision depends on a phase 0 research pass. A design
+discussion on 2026-07-30 added a further set of questions
+(14-19, recorded in the phase 0 plan): the conductor and
+manual-tenant use cases want a **namespace-scoped capacity
+claim** -- created before any instance exists, drawn down as
+instances are created, doubling as an enforceable quota
+ceiling -- alongside or instead of the per-decision
+reservation described here. A conductor-side capacity ledger
+was considered as a stopgap and rejected because its claims
+would be invisible to SF's scheduler, so any second scheduler
+(most concretely the operator hand-building a test cloud)
+races in-flight claims; that multi-scheduler condition is
+what justifies the DB-atomic primitive. The questions below
+include at least:
 
 1. **Conditional INSERT vs SELECT FOR UPDATE.** Both shapes
    work for the atomicity guarantee. Conditional INSERT is the
@@ -179,11 +201,24 @@ questions include at least:
    fields the row carries and how they participate in the
    constraint query.
 3. **Reservation lifecycle states.** When precisely is a
-   reservation "consumed"? Proposed: when the instance
-   transitions to `building`. Alternatives: at the moment of
-   instance create success; at first heartbeat on the target
-   node; at libvirt domain define. Each has different failure
-   modes around partial creates.
+   reservation "consumed"? The instance state machine is
+   `initial → preflight → creating → created` — the
+   `building` state this plan originally named does not
+   exist, and the 2026-07-30 review decided against adding
+   one: consumption atomicity comes from doing the claim
+   decrement in the same database transaction as an existing
+   write, so a new state adds upgrade and test churn without
+   improving the guarantee. Working position: consume at
+   `place_instance()`, with allocation-denominated
+   accounting from the database (placed, non-dead instances
+   count as allocation). Alternatives phase 0 must still
+   weigh: at `preflight` (target node re-admission) or
+   `creating` (hypervisor build start). Whatever is chosen
+   must tolerate placement changing without a scheduling
+   decision — preflight can redirect to another node, and
+   the cleaner rewrites placement for locally-found domains
+   (`daemons/cleaner/scheduled_tasks.py`) — and each option
+   has different failure modes around partial creates.
 4. **Reservation TTL.** What's the right default lease? Long
    enough that a slow-starting instance doesn't lose its
    capacity claim mid-create; short enough that abandoned
@@ -276,7 +311,7 @@ questions include at least:
     value) whose contribution to effective load decays as the
     instance ages and its real demand becomes visible in
     measured load — a demand claim consumed over time,
-    analogous to the capacity claim consumed at `building`.
+    analogous to the capacity claim consumed at placement.
     Phase 0 must decide whether the reservation schema
     carries an expected-demand field and a decay /
     consumption rule from day one (cheap now, painful to
@@ -285,24 +320,107 @@ questions include at least:
     delivers the static stopgap (load-per-core ordering,
     core-denominated system reservations, a measured
     overcommit default) and the tracking groundwork the
-    learner will need.
+    learner will need. The 00a-1 sfcbr measurements (see the
+    Measurements appendix in the phase 00a plan) chose
+    `CPU_OVERCOMMIT_RATIO = 3.0` — observed viable packing on
+    plain nodes was 2.3-3.0 vCPUs per thread, with RAM binding
+    first — and confirmed `SCHEDULER_TARGET_LOAD = 0.75`; the
+    observed demand-per-vCPU range is the seed constant for
+    the learner. None of this is exotic: it is demand-based
+    scheduling of the kind VMware DRS and Borg have run for
+    years (2026-07-17 design discussion), arrived at from the
+    CI failure mode rather than the literature, and the
+    static ratio is the degenerate case of the learned model,
+    so nothing phase 00a shipped is thrown away when the
+    learner arrives.
 
 ## Execution
 
-Provisional, to be re-cut after phase 0.
+Re-cut 2026-07-30 from the phase 0 decisions
+(PLAN-scheduler-reservations-phase-00-decisions.md, Decisions
+section). The headline change from the original provisional
+cut: there is no `node_reservations` row-per-decision table
+and no conditional-INSERT primitive — phase 0's benchmark
+disproved both — so the schema phases now build materialised
+capacity counters, namespace claims, and a reconciler
+instead, and the batch-create phase is deferred out of the
+table entirely (decision D8).
 
 | Phase | Plan | Status |
 |-------|------|--------|
 | 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Not started |
-| 1. `node_reservations` schema and migration | PLAN-scheduler-reservations-phase-01-schema.md | Not started |
-| 2. Conditional-INSERT scheduling primitive | PLAN-scheduler-reservations-phase-02-primitive.md | Not started |
-| 3. Reservation lifecycle (consume, release, reap) | PLAN-scheduler-reservations-phase-03-lifecycle.md | Not started |
-| 4. Migrate existing scheduler callers | PLAN-scheduler-reservations-phase-04-callers.md | Not started |
-| 5. Batch-create API | PLAN-scheduler-reservations-phase-05-batch.md | Not started |
+| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum due ~2026-08-13 (revises sizing constants only, does not gate phases 1-3) |
+| 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Not started |
+| 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Not started |
+| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Not started |
+| 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Not started |
+| 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
+
+### Phase scope stubs
+
+Each stub is the seed for that phase's plan file; decisions
+referenced as D-numbers are in the phase 0 decisions document.
+
+**Phase 1 — typed capacity columns.** `node_metrics` stores
+capacity in a schemaless `metrics_json` column; SQL-side
+capacity arithmetic needs the ~11 capacity-relevant fields
+(cpu counts, load, memory totals/available, disk
+totals/available, per-host reservations, overcommit inputs)
+promoted to typed columns maintained by the resources daemon.
+Includes fixing the dead disk-bandwidth checks found in phase
+0 (the `_per_sec` / `_per_second` / `_seconds` spelling
+three-way) or removing them explicitly. Pure widening: no
+behaviour change to scheduling.
+
+**Phase 2 — capacity tables.** Create
+`scheduler_node_capacity`, `namespace_claims` and
+`cluster_capacity` per D2, the reconciler in the cluster
+daemon's elected-leader loop per D5, and the
+`ensure-mariadb-schema` migration. Counters are maintained
+and reconciled but **nothing consumes them for admission
+yet** — this phase is observable-but-inert, so it can soak on
+sfcbr while phase 3 is built.
+
+**Phase 3 — claim primitive and placement.** The guarded-
+UPDATE admission RPC in `sf-database` (D1), consumption at
+`place_instance()` in the same transaction as the placement
+write (D3), release on `hard_delete()` and failed create,
+preflight-redirect and cleaner placement-rewrite paths moved
+onto the primitive, the demand feedforward term (D13), and
+the scheduler's pick-then-claim loop (D7). The concurrent-
+scheduling test from the review checklist lands here.
+
+**Phase 4 — namespace claims API.** The claim as a
+first-class object with REST CRUD and client verbs (D15),
+advisory-mode ceiling enforcement with structured events
+(D16), opt-in semantics and best-effort accounting for
+unclaimed namespaces (D14/D17). The conductor-side
+integration (D18) lands in private-ci once this phase ships.
+
+**Phase 5 — caller migration and hard ceiling.** Migrate the
+three `Scheduler()` call sites per D11 (queue worker to the
+claim-consuming path; API-side feasibility precheck;
+admin capacity view), remove the legacy in-Python capacity
+filtering, and flip the ceiling from advisory to hard one
+release after phase 4 (D16).
+
+**Phase 6 — affinity rework.** Binary soft affinity plus
+hard require constraints, weighted-form deprecation mapping,
+ranking precedence above load ordering (D6). Closes the
+issue-3565 flake class.
+
+**Phase 7 — diagnostics.** Failure-path verbose diagnostic
+against the same snapshot, success-path drawdown events,
+ceiling-rejection events (D9). Confirm CI triage tooling
+reads the new events.
+
+**Phase 8 — documentation.** Operator guide for claims and
+capacity (including the two service classes and the
+reconciler), developer-guide write-up of the guarded-UPDATE
+idiom (D10), user-facing affinity migration notes.
 
 ## Dependencies on other plans
 
@@ -313,6 +431,20 @@ Provisional, to be re-cut after phase 0.
   phase 0 should read the pushdown plan's decisions document
   before deciding the conditional-INSERT shape so the two
   approaches stay coherent.
+- **`PLAN-per-host-resource-reservations` (complete) is landed
+  groundwork.** It generalised phase 00a's cluster-global
+  reservation knobs into per-host settings:
+  `NODE_RAM_RESERVATION_GB`, `NODE_CPU_RESERVATION_THREADS`
+  (thread-denominated — a semantics change from 00a's cores)
+  and `NODE_DISK_RESERVATION_GB` (which took over
+  `MINIMUM_FREE_DISK` and is published as a
+  `disk_reservation_gb` node metric, so remote evaluators
+  judge a node by that node's own reservation rather than
+  their local config). The reservations table's
+  effective-capacity query must subtract these published
+  per-host reservations; conceptually this plan extends the
+  same "capacity the scheduler may not use" idea from static
+  per-host configuration to dynamic per-claim rows.
 - **`PLAN-remove-primary` does not block this plan** and this
   plan does not block `PLAN-remove-primary`. They are
   compatible by design — the reservations-via-DB-atomicity
@@ -473,12 +605,14 @@ because the following statements will be true:
   model's ORDER BY / tie-break surface (open questions 6-7)
   rather than being bolted on as a parallel heuristic. Diagnose
   with `tools/sfcbr-capacity.sh` in the 33fl repo (per-node
-  load-per-core plus infra-role tags). **Status: being
-  delivered as phase 00a** (load-per-core ordering, coarse
-  buckets to preserve burst spreading, core-denominated system
+  load-per-core plus infra-role tags). **Status: delivered as
+  phase 00a** (load-per-core ordering, coarse buckets to
+  preserve burst spreading, core-denominated system
   reservations for the OS and infra-role daemons, headroom-
   weighted selection, CPU topology tracking, and a measured
-  overcommit default).
+  overcommit default); the reservation knobs were subsequently
+  generalised per host by
+  `PLAN-per-host-resource-reservations` (see Dependencies).
 - **Demand-based adaptive overcommit (the learning loop).**
   The end-state sketched in open question 13: each node's
   expected demand-per-vCPU is *learned* from observed
