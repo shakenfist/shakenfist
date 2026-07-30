@@ -49,6 +49,8 @@ occystrap process registry://docker.io/library/python:3.11 tar://python.tar \
 - [Use Cases](/components/occystrap/use-cases/) - Common scenarios and examples
 - [Performance Tuning](/components/occystrap/performance/) - Parallelism flags, connection
   efficiency, and recommended settings
+- [Development](/components/occystrap/development/) - Setup, tests, releasing, and the PR
+  bot commands
 
 ## Key Concepts
 

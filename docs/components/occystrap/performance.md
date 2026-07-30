@@ -44,7 +44,9 @@ Lower values are safer when:
 
 Sets a **requests-per-second cap** across all threads. When set, occystrap
 limits the rate of HTTP requests to avoid triggering registry rate limits
-(HTTP 429).
+(HTTP 429). The rate limiter uses a token-bucket algorithm and is
+thread-safe, so it correctly throttles requests across parallel
+download/upload threads.
 
 Recommended starting values:
 - **Docker Hub:** 2.0 (anonymous) or 5.0 (authenticated)
@@ -59,6 +61,14 @@ Controls how many times occystrap retries a failed request with
 Increase to 5-7 for unreliable networks or registries that occasionally
 return transient errors.
 
+Retry behavior:
+
+- **429 (Too Many Requests)**: Retried, respects the `Retry-After` header
+  when present, otherwise uses exponential backoff
+- **5xx (Server Errors)**: Retried with exponential backoff
+- **Connection errors**: Retried with exponential backoff
+- **Other errors**: Not retried
+
 ## Connection Efficiency
 
 Occystrap uses [httpx](https://www.python-httpx.org/) with HTTP/2 support.
@@ -72,6 +82,10 @@ This provides:
   where the server supports it, falling back to HTTP/1.1 transparently.
 
 These optimisations apply automatically. No user configuration is needed.
+
+Note: Docker daemon communication (docker:// and dockerpush:// inputs,
+docker:// output) still uses requests-unixsocket for Unix domain socket
+access. The httpx optimisations apply only to registry HTTP traffic.
 
 ## Output-Specific Behaviour
 
