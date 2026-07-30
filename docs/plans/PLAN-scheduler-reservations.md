@@ -162,8 +162,20 @@ overdue application of both.
 ## Open questions
 
 This plan is light on detail because almost every concrete
-decision depends on a phase 0 research pass. The open
-questions include at least:
+decision depends on a phase 0 research pass. A design
+discussion on 2026-07-30 added a further set of questions
+(14-19, recorded in the phase 0 plan): the conductor and
+manual-tenant use cases want a **namespace-scoped capacity
+claim** -- created before any instance exists, drawn down as
+instances are created, doubling as an enforceable quota
+ceiling -- alongside or instead of the per-decision
+reservation described here. A conductor-side capacity ledger
+was considered as a stopgap and rejected because its claims
+would be invisible to SF's scheduler, so any second scheduler
+(most concretely the operator hand-building a test cloud)
+races in-flight claims; that multi-scheduler condition is
+what justifies the DB-atomic primitive. The questions below
+include at least:
 
 1. **Conditional INSERT vs SELECT FOR UPDATE.** Both shapes
    work for the atomicity guarantee. Conditional INSERT is the
@@ -285,7 +297,19 @@ questions include at least:
     delivers the static stopgap (load-per-core ordering,
     core-denominated system reservations, a measured
     overcommit default) and the tracking groundwork the
-    learner will need.
+    learner will need. The 00a-1 sfcbr measurements (see the
+    Measurements appendix in the phase 00a plan) chose
+    `CPU_OVERCOMMIT_RATIO = 3.0` — observed viable packing on
+    plain nodes was 2.3-3.0 vCPUs per thread, with RAM binding
+    first — and confirmed `SCHEDULER_TARGET_LOAD = 0.75`; the
+    observed demand-per-vCPU range is the seed constant for
+    the learner. None of this is exotic: it is demand-based
+    scheduling of the kind VMware DRS and Borg have run for
+    years (2026-07-17 design discussion), arrived at from the
+    CI failure mode rather than the literature, and the
+    static ratio is the degenerate case of the learned model,
+    so nothing phase 00a shipped is thrown away when the
+    learner arrives.
 
 ## Execution
 
@@ -294,7 +318,7 @@ Provisional, to be re-cut after phase 0.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Not started |
+| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | In progress |
 | 1. `node_reservations` schema and migration | PLAN-scheduler-reservations-phase-01-schema.md | Not started |
 | 2. Conditional-INSERT scheduling primitive | PLAN-scheduler-reservations-phase-02-primitive.md | Not started |
 | 3. Reservation lifecycle (consume, release, reap) | PLAN-scheduler-reservations-phase-03-lifecycle.md | Not started |
@@ -313,6 +337,20 @@ Provisional, to be re-cut after phase 0.
   phase 0 should read the pushdown plan's decisions document
   before deciding the conditional-INSERT shape so the two
   approaches stay coherent.
+- **`PLAN-per-host-resource-reservations` (complete) is landed
+  groundwork.** It generalised phase 00a's cluster-global
+  reservation knobs into per-host settings:
+  `NODE_RAM_RESERVATION_GB`, `NODE_CPU_RESERVATION_THREADS`
+  (thread-denominated — a semantics change from 00a's cores)
+  and `NODE_DISK_RESERVATION_GB` (which took over
+  `MINIMUM_FREE_DISK` and is published as a
+  `disk_reservation_gb` node metric, so remote evaluators
+  judge a node by that node's own reservation rather than
+  their local config). The reservations table's
+  effective-capacity query must subtract these published
+  per-host reservations; conceptually this plan extends the
+  same "capacity the scheduler may not use" idea from static
+  per-host configuration to dynamic per-claim rows.
 - **`PLAN-remove-primary` does not block this plan** and this
   plan does not block `PLAN-remove-primary`. They are
   compatible by design — the reservations-via-DB-atomicity
@@ -473,12 +511,14 @@ because the following statements will be true:
   model's ORDER BY / tie-break surface (open questions 6-7)
   rather than being bolted on as a parallel heuristic. Diagnose
   with `tools/sfcbr-capacity.sh` in the 33fl repo (per-node
-  load-per-core plus infra-role tags). **Status: being
-  delivered as phase 00a** (load-per-core ordering, coarse
-  buckets to preserve burst spreading, core-denominated system
+  load-per-core plus infra-role tags). **Status: delivered as
+  phase 00a** (load-per-core ordering, coarse buckets to
+  preserve burst spreading, core-denominated system
   reservations for the OS and infra-role daemons, headroom-
   weighted selection, CPU topology tracking, and a measured
-  overcommit default).
+  overcommit default); the reservation knobs were subsequently
+  generalised per host by
+  `PLAN-per-host-resource-reservations` (see Dependencies).
 - **Demand-based adaptive overcommit (the learning loop).**
   The end-state sketched in open question 13: each node's
   expected demand-per-vCPU is *learned* from observed
