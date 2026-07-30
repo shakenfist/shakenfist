@@ -21,6 +21,7 @@ from shakenfist.constants import EVENT_TYPE_RESOURCES
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
+from shakenfist.constants import METRICS_DELTA_PER_SECOND_SUFFIX
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
@@ -299,7 +300,7 @@ class Monitor(daemon.Daemon):
 
                     delta = new_counter_value - old_counter_value
                     retval[f'{counter}_delta'] = delta
-                    retval[f'{counter}_delta_per_second'] = \
+                    retval[counter + METRICS_DELTA_PER_SECOND_SUFFIX] = \
                         delta / spacing
             else:
                 LOG.info('Skipping delta metrics as we have no previous reading')

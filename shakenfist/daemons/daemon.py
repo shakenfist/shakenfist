@@ -16,6 +16,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.baseobject import get_maximum_object_version
 from shakenfist.baseobject import get_minimum_object_version
 from shakenfist.config import config
+from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
@@ -636,8 +637,8 @@ class WorkerPoolDaemon(Daemon):
 
         if num_workers <= max_workers - 2:
             # Refresh disk metrics on the same 30 s cadence as before.
-            # ``disk_busy_time_delta_per_second`` reports milliseconds
-            # per second; a value over 800 (~80%) gates ``high_io``
+            # ``DISK_BUSY_PER_SECOND_METRIC`` reports milliseconds per
+            # second; a value over 800 (~80%) gates ``high_io``
             # background work so a saturated disk doesn't get more
             # piled onto it.
             if time.time() - self.metrics_acquired_at > 30:
@@ -651,7 +652,7 @@ class WorkerPoolDaemon(Daemon):
 
             metrics_values = self.metrics.get('metrics', {})
             disk_busy = float(metrics_values.get(
-                'disk_busy_time_delta_per_second', '0'))
+                DISK_BUSY_PER_SECOND_METRIC, 0))
             for queue_name in get_all_background_node_queues(
                     config.NODE_UUID):
                 if 'high_io' in queue_name and disk_busy > 800:
