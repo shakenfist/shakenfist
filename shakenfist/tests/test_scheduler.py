@@ -175,7 +175,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free_instances': 200*GiB,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12,
-            'disk_busy_time_delta_per_sec': 2000
+            'disk_busy_time_delta_per_second': 2000.5
         })
 
         fake_inst = self.mock_mariadb.create_instance(
@@ -190,6 +190,30 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_disk',
             str(exc))
+
+    def test_disk_bandwidth_below_threshold(self):
+        # The resources daemon publishes this metric as a float (delta divided
+        # by sample spacing), which may round-trip as a string like '16.6'.
+        # int() would raise ValueError here, so ensure we parse it as a float.
+        self.mock_mariadb.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 200*GiB,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12,
+            'disk_busy_time_delta_per_second': '16.6'
+        })
+
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', disk_spec=[{
+                'base': 'cirros',
+                'size': 21
+            }])
+
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
 
     def test_ok(self):
         self.mock_mariadb.set_node_metrics_same()
