@@ -753,6 +753,68 @@ p50/p95/p99/max; (4) `Innodb_deadlocks` delta + app-side
 `Handler_read_*` deltas (exposes idiom 1's lock footprint
 growth with K).
 
+#### Step 2 benchmark results (run 2026-07-30)
+
+Executed as designed: threaded Python (pymysql), one
+connection per worker, `threading.Barrier` start, 8 s cells,
+against dockerised `mariadb:10.6` and `mariadb:11.8` with
+`innodb_lock_wait_timeout=3`. 96 cells: idioms {i1
+conditional INSERT...SELECT, i2 FOR-UPDATE-aggregate, i3
+guarded UPDATE, i3t guarded UPDATEs in a canonical-order
+transaction, i2b FOR UPDATE NOWAIT then UPDATE} × patterns
+P1-P5 × {RR, RC} × {10.6, 11.8×snapshot ON, 11.8×snapshot
+OFF} × workers {4, 8, 32}. Violations were detected two ways:
+an app-side weighted outstanding counter whose peak can only
+exceed the limit if the database really overshot
+(increment-after-grant, decrement-before-release), and a
+monitor thread sampling committed usage at 100 ms.
+
+Headline matrix (worst cells per idiom):
+
+| Idiom | RR | RC |
+|---|---|---|
+| i1 INSERT...SELECT | **livelock**: hot key at W=32 granted 2-15 ops in 8 s with 6,730-14,476 deadlocks (all versions) | **silently wrong**: up to 2,103 violation events per cell, committed usage observed 16 units over a limit of 16 (100% overshoot) |
+| i2 FOR UPDATE aggregate | livelock at W=32 (12,215 deadlocks, 1 grant) on 10.6; 2,110 deadlocks on 11.8 | wrong: violations in every RC cell (up to 194) |
+| i3 guarded UPDATE | **0 deadlocks, 0 violations, all 96 cells** | identical — isolation-independent |
+| i3t multi-key txn | 0 deadlocks, 0 violations; 13,900-14,700 grants/8 s at W=32 | identical |
+| i2b FOR UPDATE NOWAIT | correct but ~50,000 NOWAIT retries (1205) at W=32 collapse throughput ~9× vs i3t (1,600 vs 14,700 grants) | identical |
+
+Additional observations:
+
+- **ER_CHECKREAD (1020) never fired**, including i3t explicit
+  transactions on 11.8 with `innodb_snapshot_isolation=ON`.
+  The guarded UPDATE is the transaction's first statement, so
+  the snapshot is established by the DML itself and there is
+  no stale-snapshot window. The risk returns if a plain
+  SELECT precedes the guarded UPDATE inside the same RR
+  transaction — keep 1020 in the retryable set anyway.
+- i3 P3 (pick-best-of-20 then claim, the production shape
+  from D7) granted 12,000-15,000 ops/8 s with reject rates
+  under 1.5% and zero anomalies; i1 P3 managed 146-722
+  grants with ~1,000 deadlocks per cell under RR.
+- i3 P4 (concurrent reaper deletes) showed no interaction:
+  the reaper's range DELETEs never deadlocked the PK-equality
+  guarded UPDATE. i1 P4 was its worst cell (livelock, 14,476
+  deadlocks), confirming the delete/insert gap-lock
+  interaction.
+- Latency for i3/i3t stayed p95 ≤ 8.5 ms in every cell
+  including W=32 hot-key; i1/i2 RR cells hit p95 of 8
+  **seconds** (lock-wait-timeout storms).
+- Non-zero `residual_after_quiesce` in i1/i2 error cells is
+  reservation rows leaked by releases that themselves died in
+  deadlock storms — an operational footgun in its own right
+  (a real deployment would strand capacity until a reaper
+  ran), not an additional invariant violation.
+
+**Conclusion: unchanged from the indicative probes, now with
+real overlap and at scale — the guarded single-row UPDATE
+(and its canonical-order transactional extension for
+multi-row claims) is the only idiom that is simultaneously
+correct at both isolation levels, deadlock-free, and fastest.
+Decision D1 stands on this evidence.** Throwaway harness:
+scratchpad `bench/bench.py` + `run_matrix.sh` (not committed,
+per plan); raw results preserved in the session transcript.
+
 ### B. OpenStack Placement
 
 Providers form a tree; resource classes (`VCPU`,

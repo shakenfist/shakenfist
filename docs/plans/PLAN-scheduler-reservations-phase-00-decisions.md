@@ -198,16 +198,292 @@ re-cut phase plans' scopes.
     batch-create then primarily the manual-tenant / general-API
     story? Re-scope phase 5 accordingly.
 
+## Decisions
+
+Drafted 2026-07-30 from the step 1 findings
+(PLAN-scheduler-reservations-phase-00-findings.md) and the
+step 2 benchmark. Status: **draft pending operator review**
+(step 7). Numbers that depend on step 3's `peak_allocated_*`
+data are marked *revisit when data lands* and are recorded as
+provisional defaults, not blockers.
+
+### The design in one paragraph
+
+Three materialised-counter tables replace the master plan's
+`node_reservations` row-per-decision design:
+`scheduler_node_capacity` (one row per hypervisor: limits
+derived from promoted `node_metrics` columns minus per-host
+reservations, times overcommit; `used_*` maintained by guarded
+UPDATEs), `namespace_claims` (one row per claim: a first-class
+SF object that is simultaneously guaranteed floor and quota
+ceiling), and a `cluster_capacity` singleton (totals, sum of
+claim limits, and best-effort usage, so both claim admission
+and unclaimed-create admission are single-row guards). Every
+admission — instance placement, claim creation, claim growth —
+is a guarded single-row `UPDATE ... WHERE used + x <= limit`
+(or a short canonical-order transaction of them inside one
+`sf-database` RPC), with `rowcount == 0` meaning "did not
+fit". There are **no per-decision reservation rows**: the
+placed instance itself is the record of the drawdown, releases
+are explicit guarded decrements at `hard_delete()` / failed
+create, and a periodic reconciler recomputes counters from
+placed instances to correct drift, so nothing can leak
+capacity for longer than one reconciler period.
+
+### Master plan questions 1-13
+
+**D1 (Q1, atomicity primitive): guarded single-row UPDATE on
+materialised counters — neither of the question's two
+candidates.** The step 1 probes and step 2 benchmark disprove
+both offered shapes: conditional `INSERT ... SELECT` is
+silently wrong under READ COMMITTED (the aggregate guard reads
+a snapshot) and livelocks under REPEATABLE READ (32-way: 6,730
+deadlocks in 8 s, 15 grants); `SELECT SUM(...) FOR UPDATE` is
+wrong under RC and deadlocks under RR at 2-way. The guarded
+UPDATE has statement-level atomicity in autocommit, behaves
+identically at RR and RC (a real property for BYO-MariaDB
+operators), takes only an index-record lock (PK equality), and
+is already house style (`_direct_acquire_cluster_lock`,
+`_direct_refresh_cluster_lock`). Multi-row admission (node row
+plus claim row) is a transaction of guarded UPDATEs in
+canonical order (`cluster_capacity`, then `namespace_claims`
+by uuid, then `scheduler_node_capacity` by node uuid) executed
+entirely inside a single `sf-database` RPC, retrying on
+1213/1205/1020. Implementation notes carried from findings:
+no `UPDATE ... RETURNING` in MariaDB, so post-claim state is a
+follow-up PK SELECT; unit-test the driver's `rowcount`
+semantics; reject zero-sized claims.
+
+**D2 (Q2, schema): no reservation rows, so the question
+dissolves into the three-table schema.**
+`scheduler_node_capacity(node_uuid PK, limit_cpus,
+limit_memory_mb, limit_disk_gb, used_cpus, used_memory_mb,
+used_disk_gb, expected_demand, updated_at)`;
+`namespace_claims(uuid PK, namespace, limit_*, used_*, state,
+expires_at)`; `cluster_capacity(id=1, total_*, claimed_*,
+unclaimed_used_*)`. Affinity-relevant fields are not needed on
+any capacity row: with no pending-reservation rows, affinity
+is evaluated against placed instances (via
+`object_references` and metadata), exactly as today. Disk is
+claimed as virtual size from `disk_spec` (the one dimension a
+running VM can grow). All three tables use the undashed
+CHAR(32) uuid form for keys and the reconciler's SQL handles
+the dashed/undashed join explicitly (pitfall 6).
+
+**D3 (Q3, consumption point): at `place_instance()`, in the
+same transaction as the placement write.** A dedicated
+`sf-database` RPC performs the guarded capacity UPDATEs and
+the placement attribute write atomically, so there is no
+grant-then-crash leak window at all. Placement changes without
+a scheduling decision go through the same primitive: a
+preflight redirect or a cleaner placement rewrite
+(`daemons/cleaner/scheduled_tasks.py`) releases the old node
+row and claims the new one; if the new node's guard fails,
+that is a genuine reschedule, not an error to paper over.
+`preflight`- or `creating`-time consumption were weighed and
+rejected: both add a second bookkeeping step between decision
+and placement that the reconciler would have to understand,
+for no additional guarantee.
+
+**D4 (Q4, TTL): no per-reservation TTL exists because no
+per-reservation rows exist.** The only lease is
+`namespace_claims.expires_at`, and it is a crash backstop, not
+the release mechanism (the Kubernetes assumed-pod-TTL
+double-placement lesson). Provisional default 24 hours,
+caller-settable; the conductor sets roughly twice its workflow
+timeout. Extending expiry is a plain update (not an admission
+decision — only growing dimensions is, per D15). On expiry the
+claim lapses to best-effort: floor and ceiling both end, the
+reconciler transitions the claim to an expired state and logs
+a loud event. *Revisit defaults when step 3 data lands.*
+
+**D5 (Q5, reaper): a reconciler, not a reaper.** A periodic
+task in the cluster daemon's elected-leader loop (existing
+pattern, SPOF-free via the lock lease) recomputes every
+counter from ground truth in set-based SQL: node `used_*` from
+placed non-dead instances, claim `used_*` from each
+namespace's instances, `cluster_capacity` from both; corrects
+drift and logs it loudly (drift indicates a bug); expires
+claims past `expires_at`. The `cluster_locks` steal model is
+inapplicable — there are no abandoned rows to steal, and
+counters plus authoritative recompute is strictly simpler.
+Provisional period: 5 minutes.
+
+**D6 (Q6, affinity model): adopt the binary form; deprecate
+arbitrary weights.** Hard `require_with_tag` /
+`require_without_tag` become filters; soft `prefer_with_tag` /
+`prefer_without_tag` contribute ±1 per matching co-located
+instance. Existing weighted specs map mechanically (positive
+weight → prefer_with, negative → prefer_without) for one
+transition release, then the weighted form is removed. Soft
+affinity is applied as the ranking term **above** load
+ordering (hard filters → affinity score → load), which also
+resolves the issue-3565 class of flake where soft affinity
+loses to CPU-headroom ordering. *Operator confirmation
+requested: is anything beyond the CI suite using numeric
+weights?*
+
+**D7 (Q7, SQL vs Python split): filter and order in SQL,
+score affinity and tie-break in Python, admit via guarded
+UPDATE.** The scheduling loop becomes: one read-only SQL query
+returns candidate nodes (hard constraints as WHERE over the
+promoted typed columns, load-bucket ORDER BY); Python scores
+affinity over that small candidate list and picks; admission
+is the optimistic guarded UPDATE on the chosen node; on
+`rowcount == 0` move to the next candidate (bounded retries) —
+the benchmark's P3 shape, which showed no pathology. Pushing
+affinity scoring into SQL was rejected: it needs
+metadata/tag joins against placed instances, candidate sets
+are small, and the Python side preserves diagnosability.
+
+**D8 (Q8 and Q19, batch create): the claim is the
+all-or-nothing unit; the batch-create API is deferred.** CI —
+the lead motivation — gets whole-job capacity assurance from
+the namespace claim before the first instance is created, so
+per-request batch admission is no longer on the critical path.
+Partial-fill and hold-until-fittable are rejected outright
+(each adds queue-state surface SF doesn't want; deferral
+lives in the caller, and the conductor already has deferral
+mechanics). A future all-or-nothing multi-instance create can
+be added without schema change using the benchmarked
+multi-row transaction shape, so deferring costs nothing.
+
+**D9 (Q9, audit logging): confirmed as proposed.** Success
+path logs "node N won" plus a drawdown event on the claim.
+Failure path runs today's verbose Python diagnostic against
+the same metrics snapshot to produce per-node,
+per-resource reasons at the current depth. Ceiling rejections
+(D16) additionally log a structured event on the claim
+carrying limit, used and shortfall — that event is the signal
+a workflow's declared footprint needs revision. No existing
+audit consumer breaks; events remain the interface.
+
+**D10 (Q10, generality): scheduling-specific tables; the
+idiom is the reusable artifact.** Guarded-UPDATE +
+materialised counters + reconciler gets a developer-guide
+write-up so future finite-resource claims (per-session
+floating IPs, etc.) can copy the pattern, but no generic
+claims framework is built: VXLAN IDs already have a UNIQUE
+constraint, IPAM has its own reservation path, and there is
+no second consumer today to design against.
+
+**D11 (Q11, caller migration): all three callers move in one
+phase, to two different surfaces.** The queue worker
+(`node_inst_netdesc_op.py`) is the real admission point and
+migrates to the claim-consuming placement path.
+`external_api/instance.py` keeps a read-only feasibility
+precheck (fail obviously-unfittable requests early, claim
+nothing). `admin.py`'s capacity view becomes a read over the
+typed capacity columns. No transition period runs two
+placement deciders — two uncoordinated schedulers is the
+disease this plan cures.
+
+**D12 (Q12, content-aware placement): explicitly deferred,
+seam preserved.** Ranking lives in Python over a candidate
+list (D7), so blob locality later becomes another ranking
+term; no capacity-row context is needed because there are no
+reservation rows — workload context stays on the instance and
+artifact objects where it already lives.
+
+**D13 (Q13, demand feedforward): the schema carries it from
+day one; the learner stays future work.**
+`scheduler_node_capacity.expected_demand` accumulates the
+decayed demand estimate of recently-placed instances:
+placement adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` (seed 2.5
+from the 00a-1 measurements), and the reconciler recomputes
+the node's total each pass as a linear decay to zero over
+`SCHEDULER_DEMAND_DECAY_SECONDS` (provisional 600) of
+instance age. Admission asks `measured_load +
+expected_demand <= SCHEDULER_TARGET_LOAD × schedulable
+threads`. This is the feedforward term that closes the
+actuation-to-observation gap for correlated CI bursts; the
+per-namespace learned demand value replaces the constant
+later without schema change.
+
+### Namespace-claim questions 14-19
+
+**D14 (claims vs per-decision reservations): the per-decision
+reservation is subsumed; claims are cluster-wide.** An
+instance create inside a claimed namespace draws down the
+claim and the node row in one transaction; a create outside
+any claim draws down the `cluster_capacity` best-effort
+guard (`unclaimed_used + x <= total - claimed`) and the node
+row. Claim admission itself is the mirror-image guard
+(`claimed + delta <= total - unclaimed_used`), so claims can
+never oversubscribe the cluster. Claims carry **no node
+affinity**: a claim guarantees aggregate capacity, not a
+placement, and the stranding case (fits in aggregate, not on
+any single node) is accepted for CI-sized instances — the
+create fails with the normal no-candidate diagnostic and the
+capacity remains claimed. *Revisit if step 3 data shows
+claim-sized instances approaching node size.*
+
+**D15 (claim lifecycle and API): the 2026-07-30 working
+position is confirmed.** Claims are first-class mutable SF
+objects (uuid, namespace, dimensions, expiry, events,
+`hard_delete()`) with REST CRUD and `sf-client reservation
+create/show/update/delete`. Growing a claim is an admission
+decision using the same guarded primitive with the same
+failure mode as creation; shrinking is always allowed,
+floored at current drawdown (guarded by `used <= new
+limit`); no auto-grow, ever — a stretching ceiling stops
+keeping declared footprints honest. Claim creation is
+**admin-only initially** (cluster capacity is an operator
+resource; the conductor already holds admin credentials);
+delegated per-namespace caps are future work. Namespace
+`hard_delete()` deletes the namespace's claims, returning the
+capacity via the cluster-row decrement.
+
+**D16 (ceiling enforcement): admission-time accounting only;
+advisory for one release, then hard.** As per the working
+position: no runtime mechanism (VMs are not porous; qemu RAM
+is fixed at start; disk is closed by claiming virtual size;
+`memtune` hard limits ruled out; cgroup partitions are
+future per-host QoS, not quota). The advisory release admits
+over-ceiling creates but logs the D9 structured event so
+learned footprints calibrate before rejections start. The
+hard form returns HTTP 403 with a structured body naming the
+claim uuid, per-dimension limit, current drawdown and
+shortfall, so "grow the claim by X" is mechanical.
+
+**D17 (unclaimed namespaces): opt-in claims; unclaimed is
+best-effort.** Confirmed as the working position: two service
+classes (claimed capacity honoured absolutely; unclaimed
+workloads compete for `total - claimed` and can be squeezed),
+no migration default problem, operator one-liner for manual
+test clouds, today's behaviour preserved when no claims
+exist. Operator-imposed claims on tenants remain future work.
+
+**D18 (conductor contract):** at runner-namespace creation
+the conductor creates a claim sized
+`max(size-label default, ceil(1.2 × worst observed
+peak_allocated_* for that workflow))` with expiry about twice
+the workflow timeout (*constants revisit when step 3 data
+lands*). If the claim is denied, the runner is deferred via
+the existing deferral mechanics and retried; anti-starvation
+policy lives conductor-side (provisional: once a queued job
+has waited 15 minutes, stop admitting larger-claim jobs
+ahead of it). Teardown deletes the claim explicitly before
+`remove_namespace()` for prompt release (namespace
+`hard_delete()` is the backstop). The dashboard gains claim
+size vs measured peak per workflow, denial counts, and
+queue-wait age. SF exposes nothing conductor-specific: the
+contract is claim CRUD plus the D9/D16 events.
+
+**D19 (batch create rescope):** folded into D8 — the claim
+is CI's all-or-nothing unit; the batch API is re-scoped to a
+deferred manual-tenant convenience.
+
 ## Execution
 
 | Step | Description | Status |
 |------|-------------|--------|
 | 1 | Codebase and conductor research pass; write up current-state findings | Complete — see PLAN-scheduler-reservations-phase-00-findings.md |
-| 2 | Benchmark claim idioms under contention (throwaway harness) | Designed (findings Part 3: threaded-with-barrier harness, 5 patterns, isolation matrix); indicative 2-way and 32-way probes already run — guarded UPDATE won, conditional INSERT broken under RC and 34% deadlocks under RR |
+| 2 | Benchmark claim idioms under contention (throwaway harness) | Complete — 96-cell matrix run 2026-07-30 (findings Part 3, "Step 2 benchmark results"): guarded UPDATE 0 deadlocks / 0 violations everywhere and fastest; conditional INSERT silently violates under RC and livelocks under RR; FOR-UPDATE variants wrong or 9× slower |
 | 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Blocked on data — collection deployed 2026-07-30, needs ~2 weeks of runs |
-| 4 | Draft decisions for master-plan questions 1-13 | Not started |
-| 5 | Draft decisions for questions 14-19 (namespace claims) | Not started |
-| 6 | Re-cut the master plan phase table; write scope stubs for phases 1+ | Not started |
+| 4 | Draft decisions for master-plan questions 1-13 | Drafted (Decisions section below) — pending step 7 review |
+| 5 | Draft decisions for questions 14-19 (namespace claims) | Drafted (Decisions section below) — pending step 7 review |
+| 6 | Re-cut the master plan phase table; write scope stubs for phases 1+ | Done — master plan Execution section re-cut with per-phase scope stubs |
 | 7 | Operator review of the decisions document | Not started |
 
 ## Administration and logistics

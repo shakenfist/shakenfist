@@ -311,7 +311,7 @@ include at least:
     value) whose contribution to effective load decays as the
     instance ages and its real demand becomes visible in
     measured load — a demand claim consumed over time,
-    analogous to the capacity claim consumed at `building`.
+    analogous to the capacity claim consumed at placement.
     Phase 0 must decide whether the reservation schema
     carries an expected-demand field and a decay /
     consumption rule from day one (cheap now, painful to
@@ -336,20 +336,91 @@ include at least:
 
 ## Execution
 
-Provisional, to be re-cut after phase 0.
+Re-cut 2026-07-30 from the phase 0 decisions
+(PLAN-scheduler-reservations-phase-00-decisions.md, Decisions
+section). The headline change from the original provisional
+cut: there is no `node_reservations` row-per-decision table
+and no conditional-INSERT primitive — phase 0's benchmark
+disproved both — so the schema phases now build materialised
+capacity counters, namespace claims, and a reconciler
+instead, and the batch-create phase is deferred out of the
+table entirely (decision D8).
 
 | Phase | Plan | Status |
 |-------|------|--------|
 | 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | In progress |
-| 1. `node_reservations` schema and migration | PLAN-scheduler-reservations-phase-01-schema.md | Not started |
-| 2. Conditional-INSERT scheduling primitive | PLAN-scheduler-reservations-phase-02-primitive.md | Not started |
-| 3. Reservation lifecycle (consume, release, reap) | PLAN-scheduler-reservations-phase-03-lifecycle.md | Not started |
-| 4. Migrate existing scheduler callers | PLAN-scheduler-reservations-phase-04-callers.md | Not started |
-| 5. Batch-create API | PLAN-scheduler-reservations-phase-05-batch.md | Not started |
+| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Decisions drafted; awaiting operator review and step 3 data addendum |
+| 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Not started |
+| 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Not started |
+| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Not started |
+| 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Not started |
+| 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
+
+### Phase scope stubs
+
+Each stub is the seed for that phase's plan file; decisions
+referenced as D-numbers are in the phase 0 decisions document.
+
+**Phase 1 — typed capacity columns.** `node_metrics` stores
+capacity in a schemaless `metrics_json` column; SQL-side
+capacity arithmetic needs the ~11 capacity-relevant fields
+(cpu counts, load, memory totals/available, disk
+totals/available, per-host reservations, overcommit inputs)
+promoted to typed columns maintained by the resources daemon.
+Includes fixing the dead disk-bandwidth checks found in phase
+0 (the `_per_sec` / `_per_second` / `_seconds` spelling
+three-way) or removing them explicitly. Pure widening: no
+behaviour change to scheduling.
+
+**Phase 2 — capacity tables.** Create
+`scheduler_node_capacity`, `namespace_claims` and
+`cluster_capacity` per D2, the reconciler in the cluster
+daemon's elected-leader loop per D5, and the
+`ensure-mariadb-schema` migration. Counters are maintained
+and reconciled but **nothing consumes them for admission
+yet** — this phase is observable-but-inert, so it can soak on
+sfcbr while phase 3 is built.
+
+**Phase 3 — claim primitive and placement.** The guarded-
+UPDATE admission RPC in `sf-database` (D1), consumption at
+`place_instance()` in the same transaction as the placement
+write (D3), release on `hard_delete()` and failed create,
+preflight-redirect and cleaner placement-rewrite paths moved
+onto the primitive, the demand feedforward term (D13), and
+the scheduler's pick-then-claim loop (D7). The concurrent-
+scheduling test from the review checklist lands here.
+
+**Phase 4 — namespace claims API.** The claim as a
+first-class object with REST CRUD and client verbs (D15),
+advisory-mode ceiling enforcement with structured events
+(D16), opt-in semantics and best-effort accounting for
+unclaimed namespaces (D14/D17). The conductor-side
+integration (D18) lands in private-ci once this phase ships.
+
+**Phase 5 — caller migration and hard ceiling.** Migrate the
+three `Scheduler()` call sites per D11 (queue worker to the
+claim-consuming path; API-side feasibility precheck;
+admin capacity view), remove the legacy in-Python capacity
+filtering, and flip the ceiling from advisory to hard one
+release after phase 4 (D16).
+
+**Phase 6 — affinity rework.** Binary soft affinity plus
+hard require constraints, weighted-form deprecation mapping,
+ranking precedence above load ordering (D6). Closes the
+issue-3565 flake class.
+
+**Phase 7 — diagnostics.** Failure-path verbose diagnostic
+against the same snapshot, success-path drawdown events,
+ceiling-rejection events (D9). Confirm CI triage tooling
+reads the new events.
+
+**Phase 8 — documentation.** Operator guide for claims and
+capacity (including the two service classes and the
+reconciler), developer-guide write-up of the guarded-UPDATE
+idiom (D10), user-facing affinity migration notes.
 
 ## Dependencies on other plans
 
