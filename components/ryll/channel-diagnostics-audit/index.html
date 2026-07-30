@@ -4918,6 +4918,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 9: full cross-repo end-to-end lane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -6871,10 +6899,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#todays-audit-matrix" class="md-nav__link">
+  <a href="#current-audit-matrix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Today's audit matrix
+        Current audit matrix
       
     </span>
   </a>
@@ -6894,10 +6922,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#transport-common-already-universal" class="md-nav__link">
+  <a href="#transport-common-universal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transport common (already universal)
+        Transport common (universal)
       
     </span>
   </a>
@@ -6905,10 +6933,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#new-baseline-additions-phases-4b4e" class="md-nav__link">
+  <a href="#baseline-additions-landed-in-phases-4b4e" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New baseline additions (phases 4B–4E)
+        Baseline additions (landed in phases 4B–4E)
       
     </span>
   </a>
@@ -6921,15 +6949,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#per-channel-wish-lists" class="md-nav__link">
+  <a href="#per-channel-state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-channel wish-lists
+        Per-channel state
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Per-channel wish-lists">
+    <nav class="md-nav" aria-label="Per-channel state">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -7283,7 +7311,7 @@
   <span class="md-ellipsis">
     
   
-    Multi-mode parity matrix
+    Multi-mode feature parity
   
 
     
@@ -10415,10 +10443,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#todays-audit-matrix" class="md-nav__link">
+  <a href="#current-audit-matrix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Today's audit matrix
+        Current audit matrix
       
     </span>
   </a>
@@ -10438,10 +10466,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#transport-common-already-universal" class="md-nav__link">
+  <a href="#transport-common-universal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transport common (already universal)
+        Transport common (universal)
       
     </span>
   </a>
@@ -10449,10 +10477,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#new-baseline-additions-phases-4b4e" class="md-nav__link">
+  <a href="#baseline-additions-landed-in-phases-4b4e" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New baseline additions (phases 4B–4E)
+        Baseline additions (landed in phases 4B–4E)
       
     </span>
   </a>
@@ -10465,15 +10493,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#per-channel-wish-lists" class="md-nav__link">
+  <a href="#per-channel-state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-channel wish-lists
+        Per-channel state
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Per-channel wish-lists">
+    <nav class="md-nav" aria-label="Per-channel state">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -10613,78 +10641,85 @@ lands. It was spun out of phase 4 of the
 driven by sessions 002d/002e where audio went silent during video
 playback and the bug report contained no packet counts, no decoder
 errors, and no device-side stats to distinguish between competing
-hypotheses.</p>
-<h2 id="todays-audit-matrix">Today's audit matrix<a class="headerlink" href="#todays-audit-matrix" title="Permanent link">&para;</a></h2>
-<p>The table below is a snapshot of the state at phase-4 plan-write time
-(2026-05-18). Update the <strong>Fields</strong> and <strong>Gap</strong> columns when a channel's
-snapshot is expanded.</p>
+hypotheses. Phase 4 is now complete (verified in session 002g), and
+every gap identified in the original audit has been closed; the
+sections below describe the shipped state.</p>
+<h2 id="current-audit-matrix">Current audit matrix<a class="headerlink" href="#current-audit-matrix" title="Permanent link">&para;</a></h2>
+<p>The table below reflects the state after phase 4 landed (last
+refreshed 2026-07-30). Field counts are the number of public fields on
+the channel's snapshot struct in
+<code>shakenfist-spice-renderer/src/snapshots.rs</code>. Update the <strong>Fields</strong>
+and <strong>Notes</strong> columns when a channel's snapshot changes.</p>
 <table>
 <thead>
 <tr>
 <th>Channel</th>
 <th>Fields</th>
 <th>Channel-specific signals</th>
-<th>Gap</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>display</td>
-<td>40</td>
-<td>rich (post-phase-3)</td>
-<td>none</td>
+<td>55</td>
+<td>rich: per-stream counters, decoder backends, decode rings, STREAM_REPORT, destroyed-streams ring</td>
+<td>no per-opcode maps — deliberate, see below</td>
 </tr>
 <tr>
 <td>main</td>
-<td>15</td>
+<td>24</td>
 <td>mm_time, session_id, keepalive_timeout_fired</td>
-<td>OK</td>
+<td>complete</td>
 </tr>
 <tr>
 <td>inputs</td>
-<td>14</td>
-<td>motion_count, recent_events</td>
-<td>OK</td>
+<td>18</td>
+<td>motion_count, recent_events, KEY_MODIFIERS restatement counters</td>
+<td>complete</td>
 </tr>
 <tr>
 <td>cursor</td>
-<td>14</td>
+<td>18</td>
 <td>cache_entries, cache_contents</td>
-<td>OK</td>
+<td>complete</td>
 </tr>
 <tr>
-<td><strong>playback</strong></td>
-<td>8</td>
-<td><strong>none</strong></td>
-<td><strong>all audio-side state</strong></td>
+<td>playback</td>
+<td>28</td>
+<td>full session / decode / device pipeline</td>
+<td>complete (phase 4C)</td>
 </tr>
 <tr>
-<td><strong>usbredir</strong></td>
-<td>8</td>
-<td><strong>none</strong></td>
-<td><strong>all USB-side state</strong></td>
+<td>usbredir</td>
+<td>18</td>
+<td>caps handshake, redirected-device list, connect/disconnect totals</td>
+<td>complete (phase 4D)</td>
 </tr>
 <tr>
-<td><strong>webdav</strong></td>
-<td>8</td>
-<td><strong>none</strong></td>
-<td><strong>all HTTP-side state</strong></td>
+<td>webdav</td>
+<td>18</td>
+<td>HTTP request/response counters</td>
+<td>complete (phase 4E)</td>
 </tr>
 <tr>
 <td>record</td>
 <td>0</td>
 <td>channel skipped at link time</td>
-<td>document the skip</td>
+<td>intentional — see below</td>
 </tr>
 </tbody>
 </table>
 <h2 id="minimum-diagnostic-baseline">Minimum diagnostic baseline<a class="headerlink" href="#minimum-diagnostic-baseline" title="Permanent link">&para;</a></h2>
-<p>Every channel snapshot should publish the transport common eight fields
-(already universal across all channels) plus four new baseline additions.
-The baseline additions are added inline per snapshot struct rather than
+<p>Every channel snapshot publishes the transport common eight fields
+plus the four baseline additions that landed in phases 4B–4E. The one
+exception is display, which carries the transport common fields but
+not the per-opcode maps — phase 4 judged its per-stream
+instrumentation sufficient (see the display section below). The
+baseline fields are declared inline per snapshot struct rather than
 via a shared <code>#[serde(flatten)]</code>'d struct — less DRY but avoids the
-serde-flatten footgun and is consistent with today's pattern.</p>
-<h3 id="transport-common-already-universal">Transport common (already universal)<a class="headerlink" href="#transport-common-already-universal" title="Permanent link">&para;</a></h3>
+serde-flatten footgun and is consistent with the rest of the file.</p>
+<h3 id="transport-common-universal">Transport common (universal)<a class="headerlink" href="#transport-common-universal" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -10727,11 +10762,10 @@ serde-flatten footgun and is consistent with today's pattern.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="new-baseline-additions-phases-4b4e">New baseline additions (phases 4B–4E)<a class="headerlink" href="#new-baseline-additions-phases-4b4e" title="Permanent link">&para;</a></h3>
-<p>These four fields should be added to every channel snapshot that does
-not already have them. Phase 4B adds them to inputs, cursor, and main;
-phases 4C–4E add them to playback, usbredir, and webdav alongside
-channel-specific fields.</p>
+<h3 id="baseline-additions-landed-in-phases-4b4e">Baseline additions (landed in phases 4B–4E)<a class="headerlink" href="#baseline-additions-landed-in-phases-4b4e" title="Permanent link">&para;</a></h3>
+<p>Phase 4B added these four fields to inputs, cursor, and main; phases
+4C–4E added them to playback, usbredir, and webdav alongside the
+channel-specific fields described below.</p>
 <table>
 <thead>
 <tr>
@@ -10763,122 +10797,128 @@ event" rows) was discussed as a fifth baseline addition but is deferred
 — display's <code>recent_decodes</code> is the only precedent and promoting it to
 every channel adds complexity without a clear immediate payoff. Revisit
 if a future channel needs a time-ordered event log.</p>
-<h2 id="per-channel-wish-lists">Per-channel wish-lists<a class="headerlink" href="#per-channel-wish-lists" title="Permanent link">&para;</a></h2>
+<p>Every snapshot has a serialiser test in <code>ryll/src/bugreport.rs</code>
+(<code>test_&lt;channel&gt;_snapshot_serialises</code>) that constructs a fully
+populated snapshot, serialises it to JSON, and asserts each field is
+present — catching serde renames before they reach a real bug report.</p>
+<h2 id="per-channel-state">Per-channel state<a class="headerlink" href="#per-channel-state" title="Permanent link">&para;</a></h2>
 <h3 id="display">display<a class="headerlink" href="#display" title="Permanent link">&para;</a></h3>
-<p>The display channel already meets the baseline and, post phase 3, carries
-rich channel-specific instrumentation: per-stream packet/decode/frame
-counters, the active video decoder backend (exposed as <code>video_decoder_backend</code>
-per stream, e.g. "MJPEG (ImageIO)" or "H264 (openh264)"), recent decode-duration
-rings, STREAM_REPORT fields, and a <code>streams_recently_destroyed</code> ring that feeds
-the phase-7 flap-notification work. Phase 6 adds H.264 support and per-stream
-decoder backend identification. No additions needed in phase 4.</p>
+<p>The display channel carries rich channel-specific instrumentation:
+per-stream packet/decode/frame counters, the active video decoder
+backend (exposed as <code>video_decoder_backend</code> per stream, e.g.
+"MJPEG (ImageIO)" or "H264 (openh264)"), recent decode-duration
+rings, STREAM_REPORT fields, and a <code>streams_recently_destroyed</code> ring
+that feeds the phase-7 flap notifications. Phase 6 added H.264 support
+and the per-stream decoder backend identification.</p>
+<p>Display is the one channel without the four per-opcode baseline
+fields. Phase 4 judged that its per-stream counters already answer the
+"what did the server send?" question in more useful terms than a flat
+opcode map would, and no additions were made. Revisit if an
+unknown-opcode question ever arises on display.</p>
 <h3 id="main">main<a class="headerlink" href="#main" title="Permanent link">&para;</a></h3>
-<p>Main already has session identity (<code>session_id</code>), multimedia clock state
-(<code>mm_time</code>, <code>mm_time_recv_ts_secs</code>), and keepalive-timeout bookkeeping
-(<code>keepalive_timeout_fired</code>). The <code>client_keepalive_send_count</code> and
+<p>Main has session identity (<code>session_id</code>), multimedia clock state
+(<code>mm_time</code>, <code>mm_time_recv_ts_secs</code>), keepalive-timeout bookkeeping
+(<code>keepalive_timeout_fired</code>), and the four baseline fields (added in
+phase 4B). The <code>client_keepalive_send_count</code> and
 <code>last_client_keepalive_send_ts_secs</code> fields described in earlier
 revisions of this audit were removed in phase 11A — the main-channel
 spurious-PONG keepalive they tracked was a K1 band-aid made redundant
 by the <code>370d8ce5</code> fix. (The inputs channel retains the same field
-names — see the "inputs" section above — to track its KEY_MODIFIERS
+names — see the "inputs" section below — to track its KEY_MODIFIERS
 idle restatement, kept on the cross-channel-idleness hypothesis;
-see PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md.) The
-four new baseline fields (<code>messages_recv_by_opcode</code> etc.) will be
-added in phase 4B.</p>
+see PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md.)</p>
 <p>One nuance: the per-opcode map is less useful on main than on other
 channels because the agent-related opcodes (<code>VD_AGENT_*</code>) are nested
 under main's payload framing — a flat opcode map at the main-channel
-level won't distinguish agent message subtypes. This is acceptable for
-now; agent observability is a separate concern covered by the vdagent
-probe in phase 8.</p>
+level won't distinguish agent message subtypes. This is acceptable;
+agent observability is a separate concern covered by the phase-8
+vdagent probe.</p>
 <h3 id="inputs">inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h3>
-<p>Inputs already has <code>motion_count</code> and a <code>recent_events</code> ring that
-records the last N input events with timestamps. The four new baseline
-fields will be added in phase 4B. No channel-specific gaps identified.</p>
+<p>Inputs has <code>motion_count</code>, a <code>recent_events</code> ring that records the
+last N input events with timestamps, the KEY_MODIFIERS idle
+restatement counters (<code>client_keepalive_send_count</code>,
+<code>last_client_keepalive_send_ts_secs</code> — see the main section above for
+why these survive phase 11A), and the four baseline fields (added in
+phase 4B). No channel-specific gaps identified.</p>
 <h3 id="cursor">cursor<a class="headerlink" href="#cursor" title="Permanent link">&para;</a></h3>
-<p>Cursor already has <code>cache_entries</code> (current number of cached cursors)
-and <code>cache_contents</code> (a summary of what is cached). The four new
-baseline fields will be added in phase 4B. No channel-specific gaps
-identified.</p>
+<p>Cursor has <code>cache_entries</code> (current number of cached cursors),
+<code>cache_contents</code> (a summary of what is cached), and the four baseline
+fields (added in phase 4B). No channel-specific gaps identified.</p>
 <h3 id="playback">playback<a class="headerlink" href="#playback" title="Permanent link">&para;</a></h3>
-<p>Playback today has only the eight transport common fields. An operator
-reading a playback snapshot cannot tell whether the server sent any
-audio data, whether the client decoded it, or whether the audio device
-actually consumed it. The target shape after phase 4C should include:</p>
+<p>Playback gained its channel-specific fields in phase 4C, closing the
+gap that motivated this audit: before, an operator reading a playback
+snapshot could not tell whether the server sent any audio data,
+whether the client decoded it, or whether the audio device actually
+consumed it. The snapshot now surfaces:</p>
 <p><strong>Session metadata:</strong>
-- Whether a playback session is currently active and, if so, when it
-  started and what multimedia clock value the server assigned at start
-- Cumulative count of <code>PLAYBACK_START</code> messages received since session
-  open (each start begins a new audio session)
-- Cumulative count of <code>PLAYBACK_STOP</code> messages received
-- The codec in use for the current session (Opus, raw PCM, or an
+- <code>current_session</code> — populated while a playback session is active:
+  when it started (<code>started_at_secs</code>), the multimedia clock value the
+  server assigned at start (<code>mm_time_at_start</code>), and the negotiated
+  <code>sample_rate_hz</code>, <code>channels</code>, and <code>codec</code> (Opus, raw PCM, or an
   unrecognised codec number)
-- The sample rate and channel count negotiated at the most recent start
-- The last volume levels per channel and the last mute flag, as set
-  by the server
-- The last latency hint the server sent (in milliseconds)</p>
+- <code>start_count</code> / <code>stop_count</code> — cumulative <code>PLAYBACK_START</code> /
+  <code>PLAYBACK_STOP</code> messages received since session open
+- <code>last_volume_per_channel</code>, <code>last_mute</code>, <code>last_latency_ms</code> — the
+  most recent volume, mute, and latency-hint values set by the server</p>
 <p><strong>Data plumbing:</strong>
-- Count of <code>PLAYBACK_DATA</code> packets received from the server
-- Count of those packets successfully decoded
-- Count of those packets that failed to decode
-- Total compressed bytes received (sum of DATA payload lengths)
-- Total PCM bytes produced by the decoder
-- A recent ring of per-packet decode durations in microseconds
-  (capacity ~64; useful for spotting decode-latency spikes)</p>
+- <code>data_packets_received</code> / <code>data_packets_decoded</code> /
+  <code>data_packets_decode_failed</code> — <code>PLAYBACK_DATA</code> packet counters
+- <code>data_bytes_received</code> — total compressed bytes received
+- <code>pcm_bytes_produced</code> — total PCM bytes produced by the decoder
+- <code>recent_decode_durations_us</code> — a recent ring of per-packet decode
+  durations in microseconds, for spotting decode-latency spikes</p>
 <p><strong>Device pipeline (fed from audio-thread atomics):</strong>
-- Total cpal output-callback invocations since the most recent
-  device open (proves the audio device is pulling)
-- Count of callbacks where the ring buffer had zero ready samples
-  at callback entry — these are true underruns where we handed
-  the device silence
-- Count of times decoded samples were dropped because the ring
-  buffer was full (encoder running ahead of the device clock)
-- Total samples consumed by the device since the most recent
-  device open</p>
-<p>These counters together let an operator answer: "did the server send
-audio? did we decode it? did the device pull it?" — the three
-questions the 002d/002e audio-silence bug required.</p>
+- <code>device_callbacks_total</code> — cpal output-callback invocations since
+  the most recent device open (proves the audio device is pulling)
+- <code>device_underrun_count</code> — callbacks where the ring buffer had zero
+  ready samples at entry: true underruns where we handed the device
+  silence
+- <code>ring_overflow_count</code> — decoded samples dropped because the ring
+  buffer was full (decoder running ahead of the device clock)
+- <code>samples_consumed_total</code> — samples consumed by the device since the
+  most recent device open</p>
+<p>Together these answer: "did the server send audio? did we decode it?
+did the device pull it?" — the three questions the 002d/002e
+audio-silence bug required. Phase 4G verified the instrumentation
+against a live session (002g) and confirmed it distinguishes the four
+failure modes as designed.</p>
 <h3 id="usbredir">usbredir<a class="headerlink" href="#usbredir" title="Permanent link">&para;</a></h3>
-<p>Usbredir today has only the eight transport common fields. A bug report
-for a USB redirect problem gives no information about which devices are
-currently forwarded or whether any data is flowing. The target shape
-after phase 4D should include:</p>
+<p>Usbredir gained its channel-specific fields in phase 4D:</p>
 <p><strong>Handshake:</strong>
-- The server capability bitmap observed during the usbredir hello
-  exchange
-- The client capability bitmap we sent</p>
+- <code>server_caps</code> / <code>client_caps</code> — the capability bitmaps observed and
+  sent during the usbredir hello exchange</p>
 <p><strong>Device tracking:</strong>
-- The list of currently-redirected devices; for each device: USB
-  vendor ID, product ID, device class, time the redirect was
-  established, bytes transferred to the guest, and bytes received
-  from the guest
-- Cumulative count of device-connect events since channel open
-- Cumulative count of device-disconnect events since channel open
-- Timestamp of the most recent device connect or disconnect event</p>
+- <code>redirected_devices</code> — the list of currently-redirected devices;
+  each entry carries the USB vendor ID, product ID, device class,
+  the time the redirect was established, and bytes transferred in
+  each direction (<code>bytes_to_guest</code> / <code>bytes_from_guest</code>)
+- <code>device_connect_total</code> / <code>device_disconnect_total</code> — cumulative
+  device connect/disconnect events since channel open
+- <code>last_device_event_ts_secs</code> — timestamp of the most recent device
+  connect or disconnect event</p>
 <h3 id="webdav">webdav<a class="headerlink" href="#webdav" title="Permanent link">&para;</a></h3>
-<p>Webdav today has only the eight transport common fields. A bug report
-for a guest file-sharing problem gives no information about whether any
-HTTP requests have been processed. The target shape after phase 4E
-should include:</p>
+<p>Webdav gained its channel-specific fields in phase 4E:</p>
 <ul>
-<li>Count of HTTP requests received over the spice-vmc transport</li>
-<li>Total bytes sent in HTTP response bodies</li>
-<li>Number of currently-open HTTP connection objects (active sessions)</li>
-<li>Timestamp of the most recent HTTP request received</li>
-<li>Timestamp of the most recent HTTP response sent</li>
-<li>Count of times the decompressed-size limit was exceeded (currently
-  a warn-only path; surfacing the count lets operators know the limit
-  is being hit)</li>
+<li><code>http_requests_received</code> — HTTP requests received over the
+  spice-vmc transport</li>
+<li><code>http_response_bytes_sent</code> — total bytes sent in HTTP response
+  bodies</li>
+<li><code>active_session_count</code> — currently-open HTTP connection objects</li>
+<li><code>last_request_ts_secs</code> / <code>last_response_ts_secs</code> — timestamps of
+  the most recent HTTP request received and response sent</li>
+<li><code>decompressed_size_limit_exceeded_count</code> — times the
+  decompressed-size limit was exceeded (a warn-only path; the count
+  lets operators know the limit is being hit)</li>
 </ul>
 <h3 id="record">record<a class="headerlink" href="#record" title="Permanent link">&para;</a></h3>
-<p>The record channel is skipped at link time in <code>main_channel.rs</code> (the
-handler logs <code>Skipping channel: record</code> and does not establish the
-channel). There is no user-visible surface for microphone capture today
-and no <code>RecordSnapshot</code> struct. This is explicitly in scope for phase
-4 to document rather than implement — the channel stays skipped with
-a one-line comment explaining why. If microphone capture is added in
-a future phase, a <code>RecordSnapshot</code> should be created at that point
-following the baseline template in this document.</p>
+<p>The record channel is not established: it falls through to the
+generic skip arm in <code>session.rs</code>'s channel dispatch (the handler logs
+<code>Skipping channel: record</code>). There is no user-visible surface for
+microphone capture today and no <code>RecordSnapshot</code> struct. This is
+intentional — documenting the skip here was the phase-4 deliverable
+for this channel. If microphone capture is added in a future phase, a
+<code>RecordSnapshot</code> should be created at that point following the
+baseline template in this document.</p>
 <h2 id="how-to-add-a-new-channel">How to add a new channel<a class="headerlink" href="#how-to-add-a-new-channel" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Define a snapshot struct</strong> in
@@ -10904,9 +10944,10 @@ following the baseline template in this document.</p>
    with all fields populated, serialise to JSON, and assert that each
    field is present with the expected value. This catches serde
    renames and flatten footguns before they reach a real bug report.</li>
-<li><strong>Update this document</strong>: add a new section under
-   <em>Per-channel wish-lists</em> with a brief description of what the new
-   channel surfaces and what gaps (if any) remain.</li>
+<li><strong>Update this document</strong>: refresh the audit matrix and add or
+   update the channel's section under <em>Per-channel state</em> with a
+   brief description of what it surfaces and what gaps (if any)
+   remain.</li>
 </ol>
 
 

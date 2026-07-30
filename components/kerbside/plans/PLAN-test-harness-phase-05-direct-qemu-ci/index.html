@@ -4922,6 +4922,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 9: full cross-repo end-to-end lane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -7330,7 +7358,7 @@
   <span class="md-ellipsis">
     
   
-    Multi-mode parity matrix
+    Multi-mode feature parity
   
 
     
@@ -11135,7 +11163,80 @@ the work you intend to do aligns with that step's brief.</p>
   Phase 5 explicitly does not change the OpenStack lane.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>(None yet.)</p>
+<p>The first wave of CI runs surfaced a chain of latent bugs across
+kerbside, ryll, and the lane glue.  The kerbside-side fixes were
+made in passing during the phase 5 work and merged to develop via
+PR #80; the ryll-side fixes landed in shakenfist/ryll via two
+separate PRs:</p>
+<p><strong>kerbside-side</strong></p>
+<ul>
+<li><code>SpiceListener.accept()</code> (<code>kerbside/proxy.py</code>) called
+  <code>ssl_context.wrap_socket(conn, server_side=True)</code> with no
+  try/except, so any failed TLS handshake crashed the entire
+  proxy mainloop and took every other session down with it.
+  Wrapped the call to log a warning and continue.</li>
+<li><code>tools/direct-qemu/generate-tls.sh</code> produced X.509 v1 certs
+  (<code>openssl x509 -req</code> without <code>-extfile</code> ⇒ no extensions ⇒ v1),
+  which rustls's webpki verifier rejects outright with
+  <code>UnsupportedCertVersion</code>.  Switched to <code>-addext</code> on the CA and
+  <code>-extfile</code> on the proxy cert so both land as v3, with a SAN
+  covering <code>IP:127.0.0.1, DNS:localhost</code>.</li>
+<li><code>tools/direct-qemu/start-qemu.sh</code> was incompatible with the
+  Sextant qcow2 fixture in three ways simultaneously: missing
+  <code>-vga qxl</code> (so the SPICE server advertised only the <code>inputs</code>
+  channel and ryll's <code>surfaces</code> stayed empty), <code>-drive ... if=virtio</code>
+  (Sextant is a bare UEFI app with no virtio block driver), and
+  <code>-nodefaults</code> (strips the implicit ich9-ahci on q35, so the
+  IDE-attached disk had nowhere to live).  Also picked the 2M
+  OVMF when Sextant's own <code>verify-release.sh</code> validates against
+  the 4M variant.  Aligned the QEMU recipe with
+  <code>uncalibrated-sextant/scripts/verify-release.sh</code>.</li>
+<li><code>tools/direct-qemu/smoke-client.py</code> asserted
+  <code>agent_connected=true</code> within 30 s, which is unsatisfiable:
+  the Sextant fixture is deliberately a vdagent-less guest
+  (<code>uncalibrated-sextant/README.md:120</code> and <code>spice-ryll.sh</code>
+  exist for exactly this scenario).  Dropped the assertion,
+  kept the field printed for diagnostics.</li>
+<li>The boot-banner assertion was a one-shot <code>grep</code> running 3.7 s
+  after QEMU launch; OVMF on KVM routinely takes longer than
+  that to enumerate buses and hand off.  Moved the loop into
+  <code>tools/direct-qemu/wait-for-banner.sh</code> (mirrors
+  <code>verify-release.sh:54-65</code>) and the workflow step now calls
+  that with a 30 s budget.</li>
+<li>The original diagnostics commit set
+  <code>RUST_LOG=debug,rustls=info</code> on the ryll launch.  ryll does
+  not honour <code>RUST_LOG</code>: it gates DEBUG behind its own
+  <code>--verbose</code> CLI flag (<code>ryll/src/main.rs:151</code>).  Switched the
+  lane to <code>ryll --verbose</code> so the DEBUG log
+  <code>client.rs:186</code> actually emits.</li>
+</ul>
+<p><strong>ryll-side</strong> (two separate PRs against <code>shakenfist/ryll</code>'s
+default branch)</p>
+<ul>
+<li><code>shakenfist-spice-renderer/src/session.rs</code> matched the SPICE
+  connection task's <code>JoinHandle</code> with <code>_ = &amp;mut connection_handle</code>
+  and only ever logged "Connection task completed", silently
+  discarding whatever <code>Err</code> the task carried.  Replaced with a
+  <code>match</code> that logs <code>Ok(Ok(()))</code> as before, <code>Ok(Err(e))</code> at
+  error level with the anyhow chain (<code>{:#}</code>), and a <code>JoinError</code>
+  as a panic.  This is what finally surfaced the rustls
+  <code>UnsupportedCertVersion</code> error and the SPICE auth
+  <code>peer closed connection without sending TLS close_notify</code>.</li>
+<li><code>shakenfist-spice-protocol/src/link.rs::encrypt_password</code>
+  RSA-encrypted the raw password bytes with no NUL terminator,
+  contradicting the universal SPICE auth convention.  Verified
+  against three reference implementations in
+  <code>/srv/src-reference/spice/</code>:
+  spice-gtk encrypts <code>strlen(password) + 1</code> bytes
+  (<code>spice-channel.c:1265,1273,1282</code>),
+  spice-html5 sends <code>this.password + String.fromCharCode(0)</code>
+  (<code>spiceconn.js:274</code>),
+  spice-server appends <code>password[len] = '\0'</code> before <code>strcmp</code>
+  (<code>reds.cpp:2086</code>).  ryll was the outlier; fixed to push a NUL
+  before <code>pub_key.encrypt</code>.  This was the root cause of the
+  kerbside "Client token is invalid" rejection at the SPICE
+  link-auth step.</li>
+</ul>
 
 
 

@@ -4918,6 +4918,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 9: full cross-repo end-to-end lane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -7543,7 +7571,7 @@
   <span class="md-ellipsis">
     
   
-    Multi-mode parity matrix
+    Multi-mode feature parity
   
 
     
@@ -11126,9 +11154,10 @@
 mode and any external driver that connects to its Unix-domain control
 socket. It is the load-bearing contract for all of phase 3 of the
 kerbside automated-SPICE-test-harness plan. Downstream work — the
-phase 4 latency loadtest port, the phase 6 <code>digest_updated</code> event
-layer, and the phase 7 Sextant scenario tempest test — all implement
-against this document. Read the whole document before writing a client
+phase 4 latency loadtest port and the phase 7 Sextant scenario
+tempest test — implements against this document; the phase 6
+<code>digest_updated</code> event layer has landed and shipped as protocol
+v1.1. Read the whole document before writing a client
 or implementing a verb.</p>
 <p>Protocol version: <strong>1.1</strong></p>
 <p>Version history:</p>
@@ -11181,11 +11210,13 @@ or implementing a verb.</p>
 </ul>
 <h3 id="what-this-protocol-does-not-cover-phase-3-non-goals">What this protocol does NOT cover (phase 3 non-goals)<a class="headerlink" href="#what-this-protocol-does-not-cover-phase-3-non-goals" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Digest events.</strong> The <code>digest_updated</code> event is reserved for phase</li>
-<li>It will be added as a new event name in a minor version bump
-  (v1.1) without changing any existing envelope or verb. Clients that
-  ask to subscribe to <code>digest_updated</code> in v1.0 will receive an empty
-  <code>subscribed</code> list for that name; this is intentional.</li>
+<li><strong>Digest events.</strong> The <code>digest_updated</code> event was reserved for
+  phase 6 and has since been added, exactly as planned, as a new
+  event name in the v1.1 minor version bump without changing any
+  existing envelope or verb (see the event reference). Clients that
+  ask to subscribe to <code>digest_updated</code> on a v1.0 server — or on a
+  v1.1 server built without the <code>digest-decode</code> feature — receive an
+  empty <code>subscribed</code> list for that name; this is intentional.</li>
 <li><strong>Mouse and USB-redirection verbs.</strong> The latency loadtest and first
   Sextant scenarios do not need them. They will be added as new minor-
   version verbs when a test that requires them arrives.</li>
@@ -11866,9 +11897,11 @@ wire, except that the server writes each line atomically.</p>
 <p><strong>Unknown event names are silently ignored</strong> and will not appear in the
 <code>subscribed</code> result. This is intentional forward-compatibility
 behaviour: a client compiled against a newer version of this document
-may ask for <code>digest_updated</code> (a phase 6 event) while talking to a v1.0
-server that does not know the name. Rather than failing the call, the
-server silently drops unrecognised names from the result. The client
+may ask for <code>digest_updated</code> (a v1.1 event, feature-gated) while
+talking to a v1.0 server, or to a v1.1 server built without the
+<code>digest-decode</code> feature, and neither knows the name. Rather than
+failing the call, the server silently drops unrecognised names from
+the result. The client
 can check <code>subscribed</code> to discover which names were actually accepted,
 and fall back gracefully if a name it needs is not present.</p>
 <p>Params:</p>
@@ -11910,8 +11943,9 @@ and fall back gracefully if a name it needs is not present.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>→ {&quot;id&quot;: 8, &quot;method&quot;: &quot;subscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;, &quot;digest_updated&quot;]}}
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>← {&quot;id&quot;: 8, &quot;ok&quot;: true, &quot;result&quot;: {&quot;subscribed&quot;: [&quot;latency&quot;]}}
 </code></pre></div>
-<p>In this example <code>digest_updated</code> was silently dropped (not yet
-implemented in v1.0).</p>
+<p>In this example <code>digest_updated</code> was silently dropped — the server
+is either a v1.0 build or a v1.1 build without the <code>digest-decode</code>
+feature.</p>
 <hr />
 <h3 id="unsubscribe"><code>unsubscribe</code><a class="headerlink" href="#unsubscribe" title="Permanent link">&para;</a></h3>
 <p>Cancel delivery of one or more named events. After a successful
@@ -11970,8 +12004,10 @@ has subscribed to. All events share the same envelope shape:
 <h3 id="latency"><code>latency</code><a class="headerlink" href="#latency" title="Permanent link">&para;</a></h3>
 <p>Emitted on every PING/PONG return path through the SPICE main channel.
 The latency is the round-trip time from when Ryll sent the PING to when
-it received the PONG, measured in milliseconds. This is the same metric
-the <code>--latency-file</code> flag writes to disk in headless mode.</p>
+it received the PONG, measured in milliseconds. (The <code>--latency-file</code>
+flag was intended to write this metric to disk in headless mode, but
+is currently declared and unused — this event stream is the working
+way to collect latency samples.)</p>
 <p>High-frequency callers (the phase 4 loadtest) should subscribe to this
 event and accumulate samples client-side rather than polling with
 <code>status</code> calls.</p>
@@ -12301,7 +12337,8 @@ rather than adding a second <code>dropped</code> entry.</p>
 </code></pre></div>
 <p>The <code>code</code> field is a stable, machine-readable string. Do not parse
 <code>message</code> programmatically; it may change between minor versions.</p>
-<p>The following error codes are defined in v1.0:</p>
+<p>The following error codes are defined in v1.x (all were present in
+v1.0; v1.1 added no new codes):</p>
 <table>
 <thead>
 <tr>
@@ -12348,7 +12385,7 @@ rather than adding a second <code>dropped</code> entry.</p>
 </tr>
 <tr>
 <td><code>not_implemented</code></td>
-<td>The method is recognised but not yet implemented. Used during incremental rollout (steps 3b–3g) before each verb is fully wired. Should not appear in a complete v1.0 implementation.</td>
+<td>The method is recognised but not yet implemented. Used during incremental rollout (steps 3b–3g) before each verb is fully wired. Should not appear in a complete implementation; retained in the code so partial builds have a stable code to return.</td>
 </tr>
 <tr>
 <td><code>internal_error</code></td>
@@ -12365,7 +12402,7 @@ domain-specific codes.</p>
 <hr />
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
 <p>The protocol version is a dotted <code>major.minor</code> string. The current
-version is <strong>1.0</strong>.</p>
+version is <strong>1.1</strong>.</p>
 <p>Rules:</p>
 <ul>
 <li>A <strong>major</strong> version bump (e.g. 1.x → 2.0) indicates a breaking
@@ -12392,8 +12429,9 @@ version is <strong>1.0</strong>.</p>
   error rather than panicking. Servers must also silently ignore unknown
   event names in <code>subscribe</code>/<code>unsubscribe</code> params.</li>
 </ul>
-<p>Version 1.0 is the first published version. No prior published version
-exists.</p>
+<p>Version 1.0 was the first published version. Version 1.1 (the
+current version) added the <code>surface_drawn</code> and <code>digest_updated</code>
+events; see the version history at the top of this document.</p>
 <hr />
 <h2 id="end-to-end-worked-example">End-to-end worked example<a class="headerlink" href="#end-to-end-worked-example" title="Permanent link">&para;</a></h2>
 <p>The following transcript shows a complete client session: connect,
@@ -12401,7 +12439,7 @@ hello, status, subscribe, a latency event arriving, a key press, a
 paste with async completion, and then disconnect. Arrow direction
 indicates the sender: <code>→</code> is client-to-server, <code>←</code> is server-to-client.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>→ {&quot;id&quot;: 1, &quot;method&quot;: &quot;hello&quot;, &quot;params&quot;: {&quot;client_name&quot;: &quot;demo-client&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;}}
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {&quot;id&quot;: 1, &quot;ok&quot;: true, &quot;result&quot;: {&quot;server_name&quot;: &quot;ryll&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;, &quot;supported_methods&quot;: [&quot;hello&quot;, &quot;status&quot;, &quot;send_key&quot;, &quot;paste&quot;, &quot;screenshot&quot;, &quot;subscribe&quot;, &quot;unsubscribe&quot;], &quot;supported_events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;, &quot;dropped&quot;]}}
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {&quot;id&quot;: 1, &quot;ok&quot;: true, &quot;result&quot;: {&quot;server_name&quot;: &quot;ryll&quot;, &quot;protocol_version&quot;: &quot;1.1&quot;, &quot;supported_methods&quot;: [&quot;hello&quot;, &quot;status&quot;, &quot;send_key&quot;, &quot;paste&quot;, &quot;screenshot&quot;, &quot;subscribe&quot;, &quot;unsubscribe&quot;], &quot;supported_events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;, &quot;dropped&quot;, &quot;surface_drawn&quot;]}}
 <a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>→ {&quot;id&quot;: 2, &quot;method&quot;: &quot;status&quot;, &quot;params&quot;: {}}
 <a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>← {&quot;id&quot;: 2, &quot;ok&quot;: true, &quot;result&quot;: {&quot;spice_connected&quot;: true, &quot;agent_connected&quot;: true, &quot;surfaces&quot;: [{&quot;channel_id&quot;: 1, &quot;surface_id&quot;: 0, &quot;width&quot;: 1024, &quot;height&quot;: 768}]}}
 <a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>→ {&quot;id&quot;: 3, &quot;method&quot;: &quot;subscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
@@ -12422,7 +12460,10 @@ listening for the next client.</p>
 <p>Key observations from this transcript:</p>
 <ul>
 <li>The <code>hello</code> handshake always comes first and its response lists the
-  full verb and event catalogue.</li>
+  full verb and event catalogue. Note the minor-version interop at
+  work: the client requested <code>"1.0"</code> and the v1.1 server accepted it,
+  responding with the version <em>it</em> speaks and advertising
+  <code>surface_drawn</code>, which this v1.0 client simply never subscribes to.</li>
 <li><code>status</code> gives a snapshot of the session state at that instant. The
   surfaces list shows one surface, which is all that most single-monitor
   guests present.</li>

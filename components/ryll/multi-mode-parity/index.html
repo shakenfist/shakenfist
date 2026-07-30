@@ -27,7 +27,7 @@
     
     
       
-        <title>Multi-mode parity matrix - Shaken Fist</title>
+        <title>Multi-mode feature parity - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#multi-mode-parity-matrix" class="md-skip">
+        <a href="#multi-mode-feature-parity" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Multi-mode parity matrix
+              Multi-mode feature parity
             
           </span>
         </div>
@@ -4918,6 +4918,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 9: full cross-repo end-to-end lane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -7061,6 +7089,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-mode feature parity
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -7068,7 +7114,7 @@
   <span class="md-ellipsis">
     
   
-    Multi-mode parity matrix
+    Multi-mode feature parity
   
 
     
@@ -7077,6 +7123,69 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-the-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read the matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maintenance-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance protocol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parity-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parity matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -10183,6 +10292,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-the-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read the matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maintenance-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance protocol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parity-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parity matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -10202,35 +10363,104 @@
   
 
 
-<!-- Multi-mode parity audit for ryll.
-
-     This matrix records the availability of every user-facing ryll
-     feature across the three supported (or planned) delivery modes:
-     GUI (egui/eframe desktop window), Headless (stdout + metrics,
-     no GUI), and Web (browser via WebRTC, planned).
-
-     Maintainers: reviewers are expected to keep this honest.
-     When a feature is added, add a row.  When a mode gains or loses
-     a feature, update the cell.  When a "missing"/"partial" gap is
-     closed, update the cell and remove the source link.
-
-     This document is a baseline — it does not propose fixes.
-     Gap-closing work is tracked separately in
-     docs/plans/PLAN-multi-mode-parity-driveup.md (to be written
-     after this baseline lands).  The Web column reflects the MVP
-     scope declared in docs/plans/PLAN-web-frontend.md §Mission;
-     out-of-MVP items are marked "missing" with a note pointing to
-     the Out of MVP scope list in that document.
-
-     Cell values:
-       available         — feature is fully reachable in this mode
-       partial           — only some of the feature is reachable
-       missing           — feature is not reachable today
-       n/a — intrinsic   — feature physically cannot exist in this
-                           mode (justification in parentheses)
--->
-
-<h1 id="multi-mode-parity-matrix">Multi-mode parity matrix<a class="headerlink" href="#multi-mode-parity-matrix" title="Permanent link">&para;</a></h1>
+<h1 id="multi-mode-feature-parity">Multi-mode feature parity<a class="headerlink" href="#multi-mode-feature-parity" title="Permanent link">&para;</a></h1>
+<p>Ryll is one binary with three delivery modes: a <strong>GUI</strong> desktop window
+(egui/eframe), a <strong>headless</strong> mode (no window; stdout, metrics, and an
+optional control socket), and a <strong>web</strong> mode (browser client over
+WebRTC via <code>--web</code>). Features usually land in one mode first and reach
+the others later — or never, when a mode physically can't support them.
+This page is the honest ledger of that drift: a per-feature matrix of
+what is reachable in each mode today.</p>
+<p>Use it two ways:</p>
+<ul>
+<li><strong>Choosing a mode.</strong> "Can I do X in headless?" is answered by one
+  cell lookup rather than by reading three documents or trying it.</li>
+<li><strong>Reviewing changes.</strong> A new feature that only works in the mode its
+  author happened to test in is a parity regression waiting to be
+  discovered by a user. The matrix makes that visible at review time.</li>
+</ul>
+<h2 id="the-three-modes">The three modes<a class="headerlink" href="#the-three-modes" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Invocation</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GUI</td>
+<td>(default)</td>
+<td>Desktop window with menus, status bar, panels. See <a href="/components/ryll/features/">Features</a>.</td>
+</tr>
+<tr>
+<td>Headless</td>
+<td><code>--headless</code></td>
+<td>No window. Frames are counted, stats print every 10 s, and an optional <a href="/components/ryll/control-socket-protocol/">control socket</a> (<code>--control-socket</code>) lets an external driver send input, take screenshots, and subscribe to events.</td>
+</tr>
+<tr>
+<td>Web</td>
+<td><code>--web</code></td>
+<td>Serves a browser client over WebRTC. Shipped; the MVP scope was declared in <a href="/components/ryll/plans/PLAN-web-frontend/">PLAN-web-frontend.md</a> and items outside it are marked below. See the <a href="/components/ryll/web-frontend/">web frontend operator guide</a>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-to-read-the-matrix">How to read the matrix<a class="headerlink" href="#how-to-read-the-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Cell value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>available</td>
+<td>Feature is fully reachable in this mode</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Only some of the feature is reachable</td>
+</tr>
+<tr>
+<td>missing</td>
+<td>Feature is not reachable today</td>
+</tr>
+<tr>
+<td>n/a — intrinsic</td>
+<td>Feature physically cannot exist in this mode (justification in parentheses)</td>
+</tr>
+</tbody>
+</table>
+<p>Notes on the annotations:</p>
+<ul>
+<li><strong>Source references</strong> (<code>file.rs:line</code>) point at the evidence for a
+  "partial" or "missing" verdict. They are point-in-time: correct as
+  of the audit that added them, and removed when the gap closes.</li>
+<li><strong>"Out of MVP scope"</strong> in the Web column means the feature was
+  deliberately excluded from the shipped web MVP; the list lives in
+  PLAN-web-frontend.md §Out of MVP scope. These are future work, not
+  oversights.</li>
+<li>Several headless cells are reachable only through the control
+  socket, which requires launching with <code>--control-socket &lt;path&gt;</code>.
+  Those cells say so explicitly.</li>
+</ul>
+<h2 id="maintenance-protocol">Maintenance protocol<a class="headerlink" href="#maintenance-protocol" title="Permanent link">&para;</a></h2>
+<p>Reviewers are expected to keep this matrix honest:</p>
+<ul>
+<li>When a feature is added, add a row.</li>
+<li>When a mode gains or loses a feature, update the cell.</li>
+<li>When a "missing"/"partial" gap is closed, update the cell and remove
+  the source link.</li>
+</ul>
+<p>This document records the baseline; it does not propose fixes. There
+is no standing gap-closure plan — gaps get closed by mode-specific
+work (the <a href="/components/ryll/plans/PLAN-web-frontend/">web frontend plan</a> closed the
+Web column's MVP set; the control socket work gave headless an
+interactive driving surface). Last full audit: post-Phase-8 web
+frontend sweep; control-socket cells refreshed 2026-07-30.</p>
+<h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10278,6 +10508,30 @@
 <td>available</td>
 </tr>
 <tr>
+<td><strong>Control socket</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Control socket (<code>--control-socket</code>)</td>
+<td>n/a — intrinsic (requires <code>--headless</code>; combining with the GUI is a CLI error)</td>
+<td>available</td>
+<td>n/a — intrinsic (requires <code>--headless</code>; combining with <code>--web</code> is a CLI error)</td>
+</tr>
+<tr>
+<td>Session state query (<code>status</code> verb)</td>
+<td>n/a — intrinsic</td>
+<td>available</td>
+<td>n/a — intrinsic</td>
+</tr>
+<tr>
+<td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>digest_updated</code>)</td>
+<td>n/a — intrinsic</td>
+<td>available (<code>digest_updated</code> needs the <code>digest-decode</code> build feature)</td>
+<td>n/a — intrinsic</td>
+</tr>
+<tr>
 <td><strong>Display</strong></td>
 <td></td>
 <td></td>
@@ -10286,7 +10540,7 @@
 <tr>
 <td>Display framebuffer (render SPICE draw ops)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3513-3516</code> — headless counts frames but never paints; surface helpers are never called)</td>
+<td>partial (<code>ryll/src/app.rs:3513-3516</code> — headless counts frames but never paints continuously; with <code>--control-socket</code>, a <code>SurfaceMirror</code> renders draw ops on demand for the <code>screenshot</code> verb, instantiated on first use)</td>
 <td>available (single monitor, MVP)</td>
 </tr>
 <tr>
@@ -10298,7 +10552,7 @@
 <tr>
 <td>Full draw-op coverage (FILL, COPY, BLEND, etc.)</td>
 <td>available</td>
-<td>partial (same as display framebuffer — channel runs but output is discarded)</td>
+<td>partial (same as display framebuffer — channel runs but output is discarded outside the control-socket mirror)</td>
 <td>available (inherited from shared framebuffer)</td>
 </tr>
 <tr>
@@ -10376,7 +10630,7 @@
 <tr>
 <td>Volume control (slider + mute)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:1843-1856</code> — <code>VolumeControl</code> Arc is wired in but no CLI flag or stdout interface exposes it in headless)</td>
+<td>missing (<code>ryll/src/app.rs:1843-1856</code> — <code>VolumeControl</code> Arc is wired in but no CLI flag, stdout interface, or control-socket verb exposes it in headless)</td>
 <td>missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP)</td>
 </tr>
 <tr>
@@ -10394,13 +10648,13 @@
 <tr>
 <td>Keyboard input (key down/up, scancodes)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3388-3389</code> — <code>input_tx</code> exists but nothing in headless feeds it except cadence and paste-text; interactive keyboard is not available)</td>
+<td>available (via the control socket <code>send_key</code> verb — down/up/press with AT-set-1 scancodes; without <code>--control-socket</code> only cadence and <code>--paste-text</code> generate input)</td>
 <td>available (MVP; browser-side scancode table, Phase 5a)</td>
 </tr>
 <tr>
 <td>Mouse input (position and buttons)</td>
 <td>available</td>
-<td>n/a — intrinsic (no pointer device in headless)</td>
+<td>missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless)</td>
 <td>available (MVP; Phase 5a)</td>
 </tr>
 <tr>
@@ -10412,7 +10666,7 @@
 <tr>
 <td>Extended key prefix (E0 for nav cluster)</td>
 <td>available</td>
-<td>partial (sent correctly when cadence fires, but cadence only sends scancode 0x39 space; full mapping is GUI-only via <code>key_to_scancode</code>)</td>
+<td>available (the control socket <code>send_key</code> verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space)</td>
 <td>available (browser shell builds its own AT table; Phase 5a)</td>
 </tr>
 <tr>
@@ -10448,7 +10702,7 @@
 <tr>
 <td>Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V)</td>
 <td>available</td>
-<td>n/a — intrinsic (no GUI; use <code>--paste-text</code> instead)</td>
+<td>available (via the control socket <code>paste</code> verb; Ctrl+Alt+V itself is GUI-only)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10460,7 +10714,7 @@
 <tr>
 <td>Paste-as-keystrokes (inter-character delay <code>--paste-char-delay-ms</code>)</td>
 <td>available</td>
-<td>available</td>
+<td>available (also settable per-request via the control socket <code>paste</code> verb's <code>char_delay_ms</code>)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10472,7 +10726,7 @@
 <tr>
 <td>Paste character validation / error dialog</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3553-3556</code> — PasteFailed logged and causes non-zero exit; no interactive dialog)</td>
+<td>partial (<code>ryll/src/app.rs:3553-3556</code> — PasteFailed logged and causes non-zero exit; control-socket clients get a <code>paste_failed</code> event; no interactive dialog)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10580,7 +10834,7 @@
 <tr>
 <td>Latency sparkline (inter-PING interval graph)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3518-3521</code> — bytes_in/bytes_out tracked; Latency events arrive but are not handled in headless event loop)</td>
+<td>partial (no graph; raw latency samples are reachable as control-socket <code>latency</code> events, and bytes_in/bytes_out are tracked, <code>ryll/src/app.rs:3518-3521</code>)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10591,8 +10845,8 @@
 </tr>
 <tr>
 <td><code>--latency-file</code> latency measurements export</td>
-<td>missing (<code>ryll/src/config.rs:43</code> — flag declared but never read or acted upon anywhere in the codebase)</td>
-<td>missing (same — flag is declared but unused)</td>
+<td>missing (<code>ryll/src/config.rs:65</code> — flag declared but never read or acted upon anywhere in the codebase)</td>
+<td>missing (same — flag is declared but unused; control-socket <code>latency</code> events are the working alternative)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10664,7 +10918,7 @@
 <tr>
 <td>Bug report trigger-time screenshot capture</td>
 <td>available</td>
-<td>n/a — intrinsic (no display)</td>
+<td>n/a — intrinsic (no continuously-painted display)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10682,13 +10936,13 @@
 <tr>
 <td>Screenshot (F8 / Menu → Screenshot)</td>
 <td>available</td>
-<td>n/a — intrinsic (no display to capture)</td>
+<td>available (via the control socket <code>screenshot</code> verb — PNG or raw RGBA of any live surface; the backing <code>SurfaceMirror</code> is created on first use)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope "Recording / capture")</td>
 </tr>
 <tr>
 <td>Multi-surface screenshot (suffix <code>-1</code>, <code>-2</code>, …)</td>
 <td>available</td>
-<td>n/a — intrinsic (no display)</td>
+<td>available (the <code>screenshot</code> verb takes a <code>surface_id</code> parameter; one call per surface)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -10856,7 +11110,7 @@
 <tr>
 <td>VDAgent connection status (agent_connected flag)</td>
 <td>available</td>
-<td>available (AgentConnected event handled and logged)</td>
+<td>available (AgentConnected event handled and logged; also a control-socket event and <code>status</code> field)</td>
 <td>available (wired through same channel path)</td>
 </tr>
 <tr>

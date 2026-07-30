@@ -4922,6 +4922,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 9: full cross-repo end-to-end lane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -7269,7 +7297,7 @@
   <span class="md-ellipsis">
     
   
-    Multi-mode parity matrix
+    Multi-mode feature parity
   
 
     
@@ -10919,32 +10947,34 @@ you intend to do aligns with that step's brief.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <p>Items deliberately deferred from phase 4:</p>
 <ul>
-<li><strong>Restore keypress-to-screen latency semantics (committed for
-  phase 6+).</strong> PING/PONG round-trip is a stand-in, not the metric
-  the operator actually wants. The operator's goal is to measure
-  whether Kerbside introduces user-perceivable latency on
-  sessions, which requires measuring end-to-end keypress-to-screen
-  time, not just the underlying SPICE channel round-trip. Phase 6
-  must add a <code>surface_drawn</code> (or equivalently-named) control-
-  socket event that fires when a draw operation lands on the
-  display surface, and the orchestrator here gets a follow-up to
-  switch the CSV back to the legacy metric semantics. The CSV
-  shape (one float per line, seconds) stays the same across both
-  switches so downstream consumers don't have to change. This is
-  not "nice to have" — phase 6's success criteria should include
-  it.</li>
-<li><strong>Shrink the loadtest image via a ryll <code>headless</code> Cargo
-  feature (committed for phase 6).</strong> Ryll has no headless
-  Cargo feature today, so the binary unconditionally links
-  eframe / egui / egui-winit / cpal and the runtime image
-  carries libgl1, libx11-6, libxcb1, libxkbcommon0,
-  libwayland-client0, and libasound2. Phase 4 just accepts
-  the bloat. Phase 6 adds a <code>headless</code> feature flag to ryll's
-  Cargo.toml that gates the GUI/audio modules behind it, and
-  the loadtest Dockerfile here switches its stage-1 build to
-  <code>cargo build --release --no-default-features --features
-  headless</code> and the stage-2 runtime layer drops those system
-  libs. Tracked in the master plan's phase 6 row.</li>
+<li>~~<strong>Restore keypress-to-screen latency semantics (committed for
+  phase 6+).</strong>~~ <strong>Resolved in phase 6 step 6d</strong> (merged to
+  develop via PR #110).  ryll v1.1 added a
+  <code>surface_drawn</code> control-socket event (phase 6 step 6b) that
+  fires once per display draw command; the orchestrator now
+  subscribes to it, FIFO-pairs each <code>surface_drawn</code> with the
+  oldest pending keypress wallclock_us, and writes the
+  resulting delta as keypress-to-screen latency in seconds to
+  the CSV.  The CSV shape (one float per line) is unchanged,
+  so downstream consumers see the same column with the
+  intended metric.  Hard-fails at startup if the server does
+  not advertise <code>surface_drawn</code> in <code>supported_events</code> (no
+  PING/PONG fallback by design).</li>
+<li>~~<strong>Shrink the loadtest image via a ryll <code>headless</code> Cargo
+  feature (committed for phase 6).</strong>~~ <strong>Resolved in phase 6
+  steps 6a + 6d.</strong>  ryll's GUI and audio stacks are now gated
+  behind default-on <code>gui</code> and <code>audio</code> Cargo features.
+  <code>cargo build --release --no-default-features -p ryll</code> drops
+  eframe / egui / egui-winit / arboard / rfd / cpal /
+  opus-decoder / rtrb / winit from the dependency tree.
+  Phase 6 step 6d switches <code>loadtests/latency/Dockerfile</code>
+  stage 2 to that build and drops libasound2, libgl1,
+  libx11-6, libxcb1, libxkbcommon0, libwayland-client0 from
+  the runtime apt-get list.  The phase 5 direct-qemu CI lane
+  workflow shrinks identically.  The features are named
+  <code>gui</code> / <code>audio</code> (additive) rather than <code>headless</code>
+  (subtractive) to keep <code>cargo build --all-features</code> working;
+  the user-facing effect is identical.</li>
 <li><strong>Wiring the latency loadtest into GitHub Actions.</strong> Today
   it's run out-of-band; CI integration is a separate piece of
   work.</li>
