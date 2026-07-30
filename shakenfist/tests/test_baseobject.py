@@ -53,6 +53,19 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
                          State(value=DatabaseBackedObject.STATE_CREATED,
                                update_time=10))
 
+    def test_unique_label_uuid_is_str(self):
+        """unique_label() must return a str uuid, not a uuid.UUID.
+
+        The tuple is logged as event 'extra' (baseoperation.defer's
+        waiting_on list) and compared against str uuids (the unroute
+        API); a raw uuid.UUID is not JSON serialisable and never
+        compares equal to its string form (issue 3573).
+        """
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        object_type, object_uuid = d.unique_label()
+        self.assertIsInstance(object_uuid, str)
+        self.assertEqual('12345678-1234-4321-8234-123456789012', object_uuid)
+
     def test_property_state_object_full(self):
         s = State(value='state1', update_time=3.0)
 

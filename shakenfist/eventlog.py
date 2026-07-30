@@ -1,4 +1,3 @@
-import copy
 import time
 import uuid
 from typing import Any
@@ -64,11 +63,16 @@ def add_event_multi(
             continue
         simpler_objects.append((obj.object_type, str(obj.uuid)))
 
-    # If we alter extra, we don't want that to leak back to the caller.
+    # If we alter extra, we don't want that to leak back to the caller. The
+    # JSON round trip both deep copies and normalises values that are not
+    # JSON serialisable (a raw uuid.UUID being the common case) to strings.
+    # Like the object uuid above, extra flows into the 'Added event' log
+    # fields below, where an unserialisable value makes the log shipper's
+    # JSON formatter raise mid-emit and drop the record (issue 3573).
     if not extra:
         extra = {}
     else:
-        extra = copy.deepcopy(extra)
+        extra = util_json.json_sanitise(extra)
 
     # Per-event identity for idempotent RecordEventBatch retries against the
     # events table's primary key.

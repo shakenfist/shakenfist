@@ -11,6 +11,7 @@ under v0.9.0 it is the library's instance. We assert *type*
 import json
 import logging
 import tempfile
+import uuid
 from logging.handlers import SysLogHandler
 from unittest import mock
 
@@ -82,6 +83,46 @@ class HandlerEmitTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
             # Must not raise.
             self.handler.emit(self._record())
         he.assert_called_once()
+
+    def test_emit_ships_record_with_unserialisable_extra_fields(self):
+        # Issue 3573: a raw uuid.UUID in the record's extra_fields made
+        # format() raise TypeError, routing the record to handleError (a
+        # ~60 line raw traceback in syslog) and dropping it. The handler
+        # must instead stringify the offending field and ship the record.
+        net_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
+        record = self._record('added event with uuid extra')
+        record.extra_fields = {
+            'extra': {'network_uuid': net_uuid},
+            'plain': 'untouched',
+        }
+
+        with mock.patch.object(self.handler, 'handleError') as he:
+            self.handler.emit(record)
+        he.assert_not_called()
+
+        batch = logship_spool.get_spool().dequeue_batch(10)
+        self.assertEqual(1, len(batch))
+        parsed = json.loads(batch[0][2])
+        self.assertEqual('added event with uuid extra', parsed['message'])
+        self.assertEqual(str(net_uuid), parsed['extra']['network_uuid'])
+        self.assertEqual('untouched', parsed['plain'])
+
+    def test_emit_ships_record_when_default_str_also_fails(self):
+        # A dict with a non-string key can't be encoded even with a
+        # default= fallback (keys don't pass through default). The last
+        # resort stringifies the whole field value; the record still ships.
+        record = self._record('pathological extra')
+        record.extra_fields = {'weird': {uuid.uuid4(): 'value'}}
+
+        with mock.patch.object(self.handler, 'handleError') as he:
+            self.handler.emit(record)
+        he.assert_not_called()
+
+        batch = logship_spool.get_spool().dequeue_batch(10)
+        self.assertEqual(1, len(batch))
+        parsed = json.loads(batch[0][2])
+        self.assertEqual('pathological extra', parsed['message'])
+        self.assertIsInstance(parsed['weird'], str)
 
 
 class FormatterTestCase(_SpoolRootMixin, base.ShakenFistTestCase):

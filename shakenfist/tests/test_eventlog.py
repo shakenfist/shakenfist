@@ -203,3 +203,55 @@ class AddEventMultiSpoolPayloadTestCase(
         # The spool payload agrees.
         payload = self._dequeue_one()
         self.assertEqual(str(obj_uuid), payload['objects'][0]['object_uuid'])
+
+    def test_uuid_values_in_extra_are_sanitised(self):
+        """Raw uuid.UUID values in extra must be stringified before logging.
+
+        Issue 3573: the instance-create path logs a netdesc with a raw
+        uuid.UUID network_uuid, and baseoperation.defer() logs unique_label
+        tuples containing one. Unsanitised, they made the log shipper's
+        JSON formatter raise mid-emit, dumping a ~60 line raw traceback to
+        syslog for every affected event and dropping the structured record.
+        """
+        emitted = []
+
+        class _RecordingLogger:
+            def __init__(self, fields=None):
+                self._fields = dict(fields or {})
+
+            def with_fields(self, fields):
+                merged = dict(self._fields)
+                merged.update(fields)
+                return _RecordingLogger(merged)
+
+            def info(self, _message):
+                emitted.append(self._fields)
+
+            def error(self, _message):
+                emitted.append(self._fields)
+
+        net_uuid = uuid.UUID('87654321-4321-8765-4321-876543218765')
+        extra = {
+            'network_uuid': net_uuid,
+            'waiting_on': [('network', net_uuid)],
+        }
+        with mock.patch.object(eventlog, 'LOG', _RecordingLogger()):
+            eventlog.add_event_multi(
+                'audit', [('instance', 'inst-uuid-8')], 'extra sanitise',
+                extra=extra)
+
+        self.assertEqual(1, len(emitted))
+        logged_extra = emitted[0]['extra']
+        self.assertEqual(str(net_uuid), logged_extra['network_uuid'])
+        self.assertEqual(
+            ['network', str(net_uuid)], logged_extra['waiting_on'][0])
+        # The log shipper JSON-encodes these fields; this must not raise.
+        json.dumps(emitted[0])
+
+        # The caller's dict was not mutated.
+        self.assertIs(net_uuid, extra['network_uuid'])
+
+        # The spool payload agrees.
+        payload = self._dequeue_one()
+        self.assertEqual(
+            str(net_uuid), json.loads(payload['extra'])['network_uuid'])
