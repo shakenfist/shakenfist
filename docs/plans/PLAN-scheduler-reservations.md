@@ -349,7 +349,7 @@ table entirely (decision D8).
 | Phase | Plan | Status |
 |-------|------|--------|
 | 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Decisions drafted; awaiting operator review and step 3 data addendum |
+| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum due ~2026-08-13 (revises sizing constants only, does not gate phases 1-3) |
 | 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Not started |
 | 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Not started |
 | 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Not started |

@@ -202,10 +202,12 @@ re-cut phase plans' scopes.
 
 Drafted 2026-07-30 from the step 1 findings
 (PLAN-scheduler-reservations-phase-00-findings.md) and the
-step 2 benchmark. Status: **draft pending operator review**
-(step 7). Numbers that depend on step 3's `peak_allocated_*`
-data are marked *revisit when data lands* and are recorded as
-provisional defaults, not blockers.
+step 2 benchmark. Status: **reviewed and approved by the
+operator 2026-07-30** (step 7). Numbers that depend on step
+3's `peak_allocated_*` data are marked *revisit when data
+lands* and are recorded as provisional defaults, not
+blockers; the step 3 analysis (~2026-08-13) lands as an
+addendum revising those constants only.
 
 ### The design in one paragraph
 
@@ -480,11 +482,11 @@ deferred manual-tenant convenience.
 |------|-------------|--------|
 | 1 | Codebase and conductor research pass; write up current-state findings | Complete — see PLAN-scheduler-reservations-phase-00-findings.md |
 | 2 | Benchmark claim idioms under contention (throwaway harness) | Complete — 96-cell matrix run 2026-07-30 (findings Part 3, "Step 2 benchmark results"): guarded UPDATE 0 deadlocks / 0 violations everywhere and fastest; conditional INSERT silently violates under RC and livelocks under RR; FOR-UPDATE variants wrong or 9× slower |
-| 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Blocked on data — collection deployed 2026-07-30, needs ~2 weeks of runs |
+| 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Blocked on data — collection deployed 2026-07-30, analyse from ~2026-08-13. Outcome lands as an addendum revising only the *revisit when data lands* constants (D4, D14, D18); it does not gate phases 1-3 |
 | 4 | Draft decisions for master-plan questions 1-13 | Drafted (Decisions section below) — pending step 7 review |
 | 5 | Draft decisions for questions 14-19 (namespace claims) | Drafted (Decisions section below) — pending step 7 review |
 | 6 | Re-cut the master plan phase table; write scope stubs for phases 1+ | Done — master plan Execution section re-cut with per-phase scope stubs |
-| 7 | Operator review of the decisions document | Not started |
+| 7 | Operator review of the decisions document | Complete — reviewed and approved 2026-07-30 (D1-D19 as drafted; D6's "does anything use numeric affinity weights?" drew no known users, to be re-confirmed against real deployments during phase 6) |
 
 ## Administration and logistics
 
