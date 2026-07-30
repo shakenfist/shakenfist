@@ -91,6 +91,7 @@ both ends of the traffic through the proxy. This would allow:
 - [Configuration](/components/ryll/configuration/) - CLI options and .vv file format
 - [Web frontend](/components/ryll/web-frontend/) - Operator guide for `--web` mode
 - [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools
+- [Multi-mode feature parity](/components/ryll/multi-mode-parity/) - Which features work in GUI, headless, and web modes
 - [Development](/components/ryll/development/) - Building, testing, CI, and contributing
 - [macOS Development](/components/ryll/development-macos/) - Build and test locally on macOS
 - [Troubleshooting](/components/ryll/troubleshooting/) - Common issues and debugging

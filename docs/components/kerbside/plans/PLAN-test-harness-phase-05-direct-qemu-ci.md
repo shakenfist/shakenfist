@@ -429,4 +429,77 @@ Items deliberately deferred from phase 5:
 
 ### Bugs fixed during this work
 
-(None yet.)
+The first wave of CI runs surfaced a chain of latent bugs across
+kerbside, ryll, and the lane glue.  The kerbside-side fixes were
+made in passing during the phase 5 work and merged to develop via
+PR #80; the ryll-side fixes landed in shakenfist/ryll via two
+separate PRs:
+
+**kerbside-side**
+
+- `SpiceListener.accept()` (`kerbside/proxy.py`) called
+  `ssl_context.wrap_socket(conn, server_side=True)` with no
+  try/except, so any failed TLS handshake crashed the entire
+  proxy mainloop and took every other session down with it.
+  Wrapped the call to log a warning and continue.
+- `tools/direct-qemu/generate-tls.sh` produced X.509 v1 certs
+  (`openssl x509 -req` without `-extfile` ⇒ no extensions ⇒ v1),
+  which rustls's webpki verifier rejects outright with
+  `UnsupportedCertVersion`.  Switched to `-addext` on the CA and
+  `-extfile` on the proxy cert so both land as v3, with a SAN
+  covering `IP:127.0.0.1, DNS:localhost`.
+- `tools/direct-qemu/start-qemu.sh` was incompatible with the
+  Sextant qcow2 fixture in three ways simultaneously: missing
+  `-vga qxl` (so the SPICE server advertised only the `inputs`
+  channel and ryll's `surfaces` stayed empty), `-drive ... if=virtio`
+  (Sextant is a bare UEFI app with no virtio block driver), and
+  `-nodefaults` (strips the implicit ich9-ahci on q35, so the
+  IDE-attached disk had nowhere to live).  Also picked the 2M
+  OVMF when Sextant's own `verify-release.sh` validates against
+  the 4M variant.  Aligned the QEMU recipe with
+  `uncalibrated-sextant/scripts/verify-release.sh`.
+- `tools/direct-qemu/smoke-client.py` asserted
+  `agent_connected=true` within 30 s, which is unsatisfiable:
+  the Sextant fixture is deliberately a vdagent-less guest
+  (`uncalibrated-sextant/README.md:120` and `spice-ryll.sh`
+  exist for exactly this scenario).  Dropped the assertion,
+  kept the field printed for diagnostics.
+- The boot-banner assertion was a one-shot `grep` running 3.7 s
+  after QEMU launch; OVMF on KVM routinely takes longer than
+  that to enumerate buses and hand off.  Moved the loop into
+  `tools/direct-qemu/wait-for-banner.sh` (mirrors
+  `verify-release.sh:54-65`) and the workflow step now calls
+  that with a 30 s budget.
+- The original diagnostics commit set
+  `RUST_LOG=debug,rustls=info` on the ryll launch.  ryll does
+  not honour `RUST_LOG`: it gates DEBUG behind its own
+  `--verbose` CLI flag (`ryll/src/main.rs:151`).  Switched the
+  lane to `ryll --verbose` so the DEBUG log
+  `client.rs:186` actually emits.
+
+**ryll-side** (two separate PRs against `shakenfist/ryll`'s
+default branch)
+
+- `shakenfist-spice-renderer/src/session.rs` matched the SPICE
+  connection task's `JoinHandle` with `_ = &mut connection_handle`
+  and only ever logged "Connection task completed", silently
+  discarding whatever `Err` the task carried.  Replaced with a
+  `match` that logs `Ok(Ok(())) ` as before, `Ok(Err(e))` at
+  error level with the anyhow chain (`{:#}`), and a `JoinError`
+  as a panic.  This is what finally surfaced the rustls
+  `UnsupportedCertVersion` error and the SPICE auth
+  `peer closed connection without sending TLS close_notify`.
+- `shakenfist-spice-protocol/src/link.rs::encrypt_password`
+  RSA-encrypted the raw password bytes with no NUL terminator,
+  contradicting the universal SPICE auth convention.  Verified
+  against three reference implementations in
+  `/srv/src-reference/spice/`:
+  spice-gtk encrypts `strlen(password) + 1` bytes
+  (`spice-channel.c:1265,1273,1282`),
+  spice-html5 sends `this.password + String.fromCharCode(0)`
+  (`spiceconn.js:274`),
+  spice-server appends `password[len] = '\0'` before `strcmp`
+  (`reds.cpp:2086`).  ryll was the outlier; fixed to push a NUL
+  before `pub_key.encrypt`.  This was the root cause of the
+  kerbside "Client token is invalid" rejection at the SPICE
+  link-auth step.

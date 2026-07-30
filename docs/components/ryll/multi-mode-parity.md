@@ -1,32 +1,68 @@
-<!-- Multi-mode parity audit for ryll.
+# Multi-mode feature parity
 
-     This matrix records the availability of every user-facing ryll
-     feature across the three supported (or planned) delivery modes:
-     GUI (egui/eframe desktop window), Headless (stdout + metrics,
-     no GUI), and Web (browser via WebRTC, planned).
+Ryll is one binary with three delivery modes: a **GUI** desktop window
+(egui/eframe), a **headless** mode (no window; stdout, metrics, and an
+optional control socket), and a **web** mode (browser client over
+WebRTC via `--web`). Features usually land in one mode first and reach
+the others later — or never, when a mode physically can't support them.
+This page is the honest ledger of that drift: a per-feature matrix of
+what is reachable in each mode today.
 
-     Maintainers: reviewers are expected to keep this honest.
-     When a feature is added, add a row.  When a mode gains or loses
-     a feature, update the cell.  When a "missing"/"partial" gap is
-     closed, update the cell and remove the source link.
+Use it two ways:
 
-     This document is a baseline — it does not propose fixes.
-     Gap-closing work is tracked separately in
-     docs/plans/PLAN-multi-mode-parity-driveup.md (to be written
-     after this baseline lands).  The Web column reflects the MVP
-     scope declared in docs/plans/PLAN-web-frontend.md §Mission;
-     out-of-MVP items are marked "missing" with a note pointing to
-     the Out of MVP scope list in that document.
+- **Choosing a mode.** "Can I do X in headless?" is answered by one
+  cell lookup rather than by reading three documents or trying it.
+- **Reviewing changes.** A new feature that only works in the mode its
+  author happened to test in is a parity regression waiting to be
+  discovered by a user. The matrix makes that visible at review time.
 
-     Cell values:
-       available         — feature is fully reachable in this mode
-       partial           — only some of the feature is reachable
-       missing           — feature is not reachable today
-       n/a — intrinsic   — feature physically cannot exist in this
-                           mode (justification in parentheses)
--->
+## The three modes
 
-# Multi-mode parity matrix
+| Mode | Invocation | Description |
+|------|-----------|-------------|
+| GUI | (default) | Desktop window with menus, status bar, panels. See [Features](/components/ryll/features/). |
+| Headless | `--headless` | No window. Frames are counted, stats print every 10 s, and an optional [control socket](/components/ryll/control-socket-protocol/) (`--control-socket`) lets an external driver send input, take screenshots, and subscribe to events. |
+| Web | `--web` | Serves a browser client over WebRTC. Shipped; the MVP scope was declared in [PLAN-web-frontend.md](/components/ryll/plans/PLAN-web-frontend/) and items outside it are marked below. See the [web frontend operator guide](/components/ryll/web-frontend/). |
+
+## How to read the matrix
+
+| Cell value | Meaning |
+|------------|---------|
+| available | Feature is fully reachable in this mode |
+| partial | Only some of the feature is reachable |
+| missing | Feature is not reachable today |
+| n/a — intrinsic | Feature physically cannot exist in this mode (justification in parentheses) |
+
+Notes on the annotations:
+
+- **Source references** (`file.rs:line`) point at the evidence for a
+  "partial" or "missing" verdict. They are point-in-time: correct as
+  of the audit that added them, and removed when the gap closes.
+- **"Out of MVP scope"** in the Web column means the feature was
+  deliberately excluded from the shipped web MVP; the list lives in
+  PLAN-web-frontend.md §Out of MVP scope. These are future work, not
+  oversights.
+- Several headless cells are reachable only through the control
+  socket, which requires launching with `--control-socket <path>`.
+  Those cells say so explicitly.
+
+## Maintenance protocol
+
+Reviewers are expected to keep this matrix honest:
+
+- When a feature is added, add a row.
+- When a mode gains or loses a feature, update the cell.
+- When a "missing"/"partial" gap is closed, update the cell and remove
+  the source link.
+
+This document records the baseline; it does not propose fixes. There
+is no standing gap-closure plan — gaps get closed by mode-specific
+work (the [web frontend plan](/components/ryll/plans/PLAN-web-frontend/) closed the
+Web column's MVP set; the control socket work gave headless an
+interactive driving surface). Last full audit: post-Phase-8 web
+frontend sweep; control-socket cells refreshed 2026-07-30.
+
+## Parity matrix
 
 | Feature | GUI | Headless | Web |
 |---------|-----|----------|-----|
@@ -36,10 +72,14 @@
 | Connect via direct host:port (`--direct`) | available | available | available |
 | TLS / secure channel (inline CA from .vv) | available | available | available |
 | Password authentication | available | available | available |
+| **Control socket** | | | |
+| Control socket (`--control-socket`) | n/a — intrinsic (requires `--headless`; combining with the GUI is a CLI error) | available | n/a — intrinsic (requires `--headless`; combining with `--web` is a CLI error) |
+| Session state query (`status` verb) | n/a — intrinsic | available | n/a — intrinsic |
+| Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | n/a — intrinsic |
 | **Display** | | | |
-| Display framebuffer (render SPICE draw ops) | available | partial (`ryll/src/app.rs:3513-3516` — headless counts frames but never paints; surface helpers are never called) | available (single monitor, MVP) |
+| Display framebuffer (render SPICE draw ops) | available | partial (`ryll/src/app.rs:3513-3516` — headless counts frames but never paints continuously; with `--control-socket`, a `SurfaceMirror` renders draw ops on demand for the `screenshot` verb, instantiated on first use) | available (single monitor, MVP) |
 | Multi-monitor (`--monitors N`) | available | partial (`ryll/src/app.rs:3513-3516` — channel connects but frames are silently dropped; surfaces are never created in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
-| Full draw-op coverage (FILL, COPY, BLEND, etc.) | available | partial (same as display framebuffer — channel runs but output is discarded) | available (inherited from shared framebuffer) |
+| Full draw-op coverage (FILL, COPY, BLEND, etc.) | available | partial (same as display framebuffer — channel runs but output is discarded outside the control-socket mirror) | available (inherited from shared framebuffer) |
 | SPICE streaming / MJPEG | available | partial (decoded messages counted as frames, not rendered) | available (inherited) |
 | Display capabilities advertisement (COMPOSITE, MONITORS_CONFIG, etc.) | available | available | available |
 | Window auto-resize to surface size | available | n/a — intrinsic (no window; resize channel exists but resize_tx is never connected to a window, `ryll/src/app.rs:3391`) | n/a — intrinsic (browser viewport is user-controlled) |
@@ -52,23 +92,23 @@
 | Default arrow fallback cursor | available | n/a — intrinsic (no display) | available |
 | **Audio** | | | |
 | Audio playback (PCM and Opus decoding) | available | partial (`ryll/src/channels/playback.rs:156-292` — `PlaybackChannel` connects and decodes, but spawns a cpal thread that will fail silently if no audio device is present; no headless-safe "discard" path exists) | available (MVP; Opus passthrough preferred, PCM→Opus fallback, Phase 5c) |
-| Volume control (slider + mute) | available | missing (`ryll/src/app.rs:1843-1856` — `VolumeControl` Arc is wired in but no CLI flag or stdout interface exposes it in headless) | missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP) |
+| Volume control (slider + mute) | available | missing (`ryll/src/app.rs:1843-1856` — `VolumeControl` Arc is wired in but no CLI flag, stdout interface, or control-socket verb exposes it in headless) | missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP) |
 | Audio volume/mute persisted across reconnect | available | n/a — intrinsic (no GUI; VolumeControl is re-created on reconnect anyway) | missing (out of MVP scope) |
 | **Keyboard / Mouse Input** | | | |
-| Keyboard input (key down/up, scancodes) | available | missing (`ryll/src/app.rs:3388-3389` — `input_tx` exists but nothing in headless feeds it except cadence and paste-text; interactive keyboard is not available) | available (MVP; browser-side scancode table, Phase 5a) |
-| Mouse input (position and buttons) | available | n/a — intrinsic (no pointer device in headless) | available (MVP; Phase 5a) |
+| Keyboard input (key down/up, scancodes) | available | available (via the control socket `send_key` verb — down/up/press with AT-set-1 scancodes; without `--control-socket` only cadence and `--paste-text` generate input) | available (MVP; browser-side scancode table, Phase 5a) |
+| Mouse input (position and buttons) | available | missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless) | available (MVP; Phase 5a) |
 | Mouse mode negotiation (CLIENT/SERVER) | available | available (negotiation runs in `MainChannel` regardless of mode) | available (absolute coordinates only in MVP without Pointer Lock; see PLAN-web-frontend.md §Resolutions §9) |
-| Extended key prefix (E0 for nav cluster) | available | partial (sent correctly when cadence fires, but cadence only sends scancode 0x39 space; full mapping is GUI-only via `key_to_scancode`) | available (browser shell builds its own AT table; Phase 5a) |
+| Extended key prefix (E0 for nav cluster) | available | available (the control socket `send_key` verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space) | available (browser shell builds its own AT table; Phase 5a) |
 | Modifier state tracking (Ctrl/Shift/Alt) | available | partial (`ryll/src/channels/inputs.rs:77-82` — tracked internally but only used by paste state machine; cadence does not restore modifiers) | available (MVP) |
 | **Cadence mode** | | | |
 | Cadence mode (`--cadence`) | available | available | missing (out of MVP scope; no test-automation use case in browser) |
 | **Paste-as-keystrokes** | | | |
 | Paste-as-keystrokes (enable flag) | available | available (`--enable-paste-as-keystrokes`) | missing (out of MVP scope; clipboard sync is in Future work list in PLAN-web-frontend.md) |
-| Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V) | available | n/a — intrinsic (no GUI; use `--paste-text` instead) | missing (out of MVP scope) |
+| Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V) | available | available (via the control socket `paste` verb; Ctrl+Alt+V itself is GUI-only) | missing (out of MVP scope) |
 | Paste-as-keystrokes (headless `--paste-text`) | n/a — intrinsic (GUI reads clipboard; `--paste-text` is headless-only per README) | available | missing (out of MVP scope) |
-| Paste-as-keystrokes (inter-character delay `--paste-char-delay-ms`) | available | available | missing (out of MVP scope) |
+| Paste-as-keystrokes (inter-character delay `--paste-char-delay-ms`) | available | available (also settable per-request via the control socket `paste` verb's `char_delay_ms`) | missing (out of MVP scope) |
 | Paste-as-keystrokes (vdagent auto-disable) | available (`ryll/src/app.rs:1077-1078`) | available (AgentConnected event logged; `enable_paste` flag passed through) | missing (out of MVP scope) |
-| Paste character validation / error dialog | available | partial (`ryll/src/app.rs:3553-3556` — PasteFailed logged and causes non-zero exit; no interactive dialog) | missing (out of MVP scope) |
+| Paste character validation / error dialog | available | partial (`ryll/src/app.rs:3553-3556` — PasteFailed logged and causes non-zero exit; control-socket clients get a `paste_failed` event; no interactive dialog) | missing (out of MVP scope) |
 | **USB Redirection** | | | |
 | USB redirection channel (protocol layer) | available | available (`--usb-disk`, `--usb-disk-ro` CLI flags work in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
 | USB interactive panel (Menu → USB) | available | n/a — intrinsic (no GUI) | missing (out of MVP scope) |
@@ -86,9 +126,9 @@
 | **Statistics and Instrumentation** | | | |
 | FPS tracking (sliding window from DisplayMark) | available | partial (`ryll/src/app.rs:3516` — frame count incremented but FPS not computed; only raw count printed every 10 s) | missing (out of MVP scope; no stats panel in browser MVP) |
 | Bandwidth sparkline (rolling bytes/sec graph) | available | missing (`ryll/src/app.rs:3392-3394` — `byte_counter` wired in but never sampled or reported in headless) | missing (out of MVP scope) |
-| Latency sparkline (inter-PING interval graph) | available | partial (`ryll/src/app.rs:3518-3521` — bytes_in/bytes_out tracked; Latency events arrive but are not handled in headless event loop) | missing (out of MVP scope) |
+| Latency sparkline (inter-PING interval graph) | available | partial (no graph; raw latency samples are reachable as control-socket `latency` events, and bytes_in/bytes_out are tracked, `ryll/src/app.rs:3518-3521`) | missing (out of MVP scope) |
 | Periodic stats to stdout (headless only) | n/a — intrinsic (GUI shows live stats in status bar) | available (every 10 s: frames, bytes_in, bytes_out) | n/a — intrinsic (browser context) |
-| `--latency-file` latency measurements export | missing (`ryll/src/config.rs:43` — flag declared but never read or acted upon anywhere in the codebase) | missing (same — flag is declared but unused) | missing (out of MVP scope) |
+| `--latency-file` latency measurements export | missing (`ryll/src/config.rs:65` — flag declared but never read or acted upon anywhere in the codebase) | missing (same — flag is declared but unused; control-socket `latency` events are the working alternative) | missing (out of MVP scope) |
 | Channel state snapshots (for bug reports) | available | available | missing (out of MVP scope) |
 | Traffic ring buffer (always active) | available | available | missing (out of MVP scope) |
 | **Protocol Gap Tracking** | | | |
@@ -100,11 +140,11 @@
 | Bug report dialog (F12 / Menu → Report) | available | n/a — intrinsic (no GUI) | missing (out of MVP scope) |
 | Bug report zip assembly (metadata, pcap, screenshot, metrics) | available | partial (`ryll/src/app.rs:3419` — `--pedantic` zips have empty app_snapshot; no interactive zip generation in headless) | missing (out of MVP scope) |
 | Bug report display region selection | available | n/a — intrinsic (no GUI) | missing (out of MVP scope) |
-| Bug report trigger-time screenshot capture | available | n/a — intrinsic (no display) | missing (out of MVP scope) |
+| Bug report trigger-time screenshot capture | available | n/a — intrinsic (no continuously-painted display) | missing (out of MVP scope) |
 | Runtime metrics in bug reports (Linux `/proc`) | available | available (sampled in `metrics.rs`; used by pedantic observer) | missing (out of MVP scope) |
 | **Screenshot** | | | |
-| Screenshot (F8 / Menu → Screenshot) | available | n/a — intrinsic (no display to capture) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope "Recording / capture") |
-| Multi-surface screenshot (suffix `-1`, `-2`, …) | available | n/a — intrinsic (no display) | missing (out of MVP scope) |
+| Screenshot (F8 / Menu → Screenshot) | available | available (via the control socket `screenshot` verb — PNG or raw RGBA of any live surface; the backing `SurfaceMirror` is created on first use) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope "Recording / capture") |
+| Multi-surface screenshot (suffix `-1`, `-2`, …) | available | available (the `screenshot` verb takes a `surface_id` parameter; one call per surface) | missing (out of MVP scope) |
 | **Live Traffic Viewer** | | | |
 | Traffic viewer panel (F11 / Menu → Traffic) | available | n/a — intrinsic (no GUI) | missing (out of MVP scope) |
 | Traffic viewer channel filters | available | n/a — intrinsic (no GUI) | missing (out of MVP scope) |
@@ -132,7 +172,7 @@
 | File logging to `/tmp/ryll.log` (`-v`) | available | available | available |
 | Intimate logging (`--intimate`, keystrokes/mouse) | available | available | missing (no interactive input to log in web MVP that wouldn't also appear in the browser console) |
 | **Connection Source** | | | |
-| VDAgent connection status (agent_connected flag) | available | available (AgentConnected event handled and logged) | available (wired through same channel path) |
+| VDAgent connection status (agent_connected flag) | available | available (AgentConnected event handled and logged; also a control-socket event and `status` field) | available (wired through same channel path) |
 | TCP keepalive on all channel sockets | available | available | available (inherited from SpiceClient) |
 | **Authentication / Session Token** | | | |
 | Per-launch URL token (web mode only) | n/a — intrinsic (no HTTP server) | n/a — intrinsic (no HTTP server) | available (MVP; random 32-byte token printed to stdout, Phase 4) |
