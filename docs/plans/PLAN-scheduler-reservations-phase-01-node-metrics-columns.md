@@ -129,17 +129,26 @@ gate. Both consumers parse with `float()`. The scheduler test
 fixture moves to the correct key and gains a regression test
 that the filter actually rejects at `busy_time > 1200`; the
 `high_io` gate gets whatever unit coverage is practical for
-`daemon.py`. The commit says `Fixes #3567` / `Fixes #3568`.
+`daemon.py`.
 
-This is the one intentional behaviour change in the phase:
-two admission/gating checks that have never fired become live.
-The collection-module port taught us that activating dormant
-checks is where the risk hides, so step 1 measures the real
-`disk_busy_time_delta_per_second` distribution on sfcbr first
-to confirm the 1200 (scheduler) and 800 (high_io) thresholds
-will not reject or gate under normal load. If the measured
-distribution says the thresholds are wrong, fix the thresholds
-in the same commit and record the numbers in this plan.
+*Fully superseded (2026-07-31):* while this branch was in
+flight, the issue-fix workflow independently landed everything
+this step planned, on develop, in two commits: `ccf528164`
+(PR 3569, closing issue 3567) fixed both spellings and the
+`float()` parsing with regression tests, and `d24baa67a`
+(PR 3572, closing issue 3568) deduplicated the key behind
+`constants.DISK_BUSY_PER_SECOND_METRIC` — including a
+publisher-side `METRICS_DELTA_PER_SECOND_SUFFIX` constant used
+in the derivation itself, a stronger contract than the
+comment-based one planned here. This branch therefore carries
+no consumer changes at all; the extraction spec in
+`mariadb.py` simply imports develop's
+`DISK_BUSY_PER_SECOND_METRIC`.
+
+This phase consequently no longer changes any behaviour: the
+two gates went live via the workflow's commits. The step 1
+measurements below stand as the production validation of the
+1200/800 thresholds those commits activated.
 
 ### Explicitly out of scope
 
@@ -154,22 +163,48 @@ in the same commit and record the numbers in this plan.
 
 | Step | Description | Effort | Model | Isolation | Status |
 |------|-------------|--------|-------|-----------|--------|
-| 1 | Measure sfcbr `disk_busy_time_delta_per_second` distribution (Prometheus/Loki) to validate the 1200/800 thresholds; record numbers in the Measurements section | low | management session | none | Not started |
-| 2 | Schema: 15 typed columns, extraction table in `_direct_upsert_node_metrics()`, migration v3, unit tests (extraction coercions incl. float-string and garbage values; migration idempotency) | high | opus | worktree | Not started |
-| 3 | Fix issues 3567/3568: shared constant, `float()` parsing, corrected test fixture, regression tests; threshold adjustments if step 1 says so | medium | opus | worktree | Not started |
-| 4 | Docs: `docs/operator_guide/database.md` table description, CLAUDE.md MariaDB-storage list entry, AGENTS/ARCHITECTURE if touched surfaces warrant | low | sonnet | worktree | Not started |
-| 5 | Management-session code review of the branch against the review checklist; update master plan phase table row | medium | management session | none | Not started |
+| 1 | Measure sfcbr `disk_busy_time_delta_per_second` distribution to validate the 1200/800 thresholds; record numbers in the Measurements section | low | management session | none | Complete — see Measurements; thresholds kept |
+| 2 | Schema: 15 typed columns, extraction table in `_direct_upsert_node_metrics()`, migration v3, unit tests (extraction coercions incl. float-string and garbage values; migration idempotency) | high | sub-agent | worktree | Complete — 14 unit tests, pre-commit green |
+| 3 | Fix issues 3567/3568: shared constant, `float()` parsing, corrected test fixture, regression tests; threshold adjustments if step 1 says so | medium | sub-agent | worktree | Fully superseded — the issue-fix workflow landed the identical fixes and constant on develop (ccf528164 + d24baa67a) while this branch was in flight; this branch dropped its version and uses develop's DISK_BUSY_PER_SECOND_METRIC in the extraction spec. Step 1's measurements stand as the thresholds' production validation |
+| 4 | Docs: `docs/operator_guide/database.md` table description, CLAUDE.md MariaDB-storage list entry, AGENTS/ARCHITECTURE if touched surfaces warrant | low | sub-agent | worktree | Complete — database.md and CLAUDE.md updated; AGENTS/ARCHITECTURE confirmed still accurate |
+| 5 | Management-session code review of the branch against the review checklist; update master plan phase table row | medium | management session | none | Complete — checklist verified 2026-07-31 |
 | 6 | Operator review and PR | — | operator | — | Not started |
 
 ## Measurements
 
-### Step 1: sfcbr disk-busy distribution
+### Step 1: sfcbr disk-busy distribution (2026-07-31)
 
-To be recorded when step 1 runs: percentiles of
-`disk_busy_time_delta_per_second` per node class over a
-representative window with CI load present, and the resulting
-verdict on the 1200 (scheduler filter) and 800 (`high_io`
-gate) thresholds.
+Source: each node's `resources` events on sfcbr (the resources
+daemon logs its full metrics dict to the event log roughly
+every 5 minutes), fetched via the API — 995 samples per node
+spanning ~83.6 hours (≈3.5 days) with normal CI load present.
+Values are milliseconds of disk-busy time per second, summed
+across disks. Note the sampling caveat: these are 5-minute
+snapshots of a gauge the daemon refreshes every 60 s, so short
+spikes are under-represented; the conclusions below are about
+sustained saturation, which is what both gates target.
+
+| Node | p50 | p95 | p99 | max | >800 | >1200 |
+|---|---|---|---|---|---|---|
+| sf-1 | 10 | 340 | 904 | 2025 | 1.51% | 0.70% |
+| sf-2 | 12 | 366 | 888 | 3327 | 1.41% | 0.50% |
+| sf-3 | 19 | 378 | 790 | 6535 | 0.90% | 0.30% |
+| sf-4 | 12 | 382 | 898 | 1454 | 1.21% | 0.20% |
+| sf-5 | 31 | 323 | 768 | 831 | 0.90% | 0.00% |
+| sf-6 | 19 | 378 | 829 | 921 | 1.31% | 0.00% |
+
+Cross-node correlation of scheduler-threshold breaches
+(bucketed to 5 minutes): 98.71% of buckets had zero nodes over
+1200, 1.19% had exactly one, 0.10% had two, and **no bucket in
+3.5 days had more than two of six nodes over threshold** — the
+"every candidate excluded" scenario did not occur.
+
+Verdict: both thresholds are kept as-is. The scheduler filter
+(>1200) would have excluded one node for 0-0.7% of samples —
+rare, and precisely during the sustained-IO storms it exists
+for. The `high_io` gate (>800) engages for 0.9-1.5% of
+samples and only defers background high-IO work. Neither gate
+risks wedging scheduling when activated.
 
 ## Administration and logistics
 
