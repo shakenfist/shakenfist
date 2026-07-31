@@ -1,5 +1,6 @@
 import json
 import sys
+import traceback
 
 import flask
 import flask_restful
@@ -704,7 +705,19 @@ def suppress_exceptions_to_client(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            LOG.exception('Server error')
+            # Attach the exception class, traceback and request context as
+            # explicit structured fields. The .exception() call also carries
+            # exc_info for the formatter's exception_class / stack_trace
+            # enrichment, but 'Server error' records have reached centralised
+            # logging without that enrichment (issue 3433), leaving the events
+            # unattributable. Explicit fields ride in extra_fields and so
+            # survive independently of exc_info handling.
+            LOG.with_fields({
+                'exception_class': type(e).__name__,
+                'traceback': traceback.format_exc(),
+                'method': flask.request.method,
+                'path': flask.request.path,
+            }).exception('Server error')
             return sf_api.error(500, 'server error: %s' % repr(e),
                                 suppress_traceback=True)
 
