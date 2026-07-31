@@ -380,7 +380,7 @@ Recommendations are recorded inline.
 | 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Done |
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Done |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Done |
-| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Not started |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Done |
 
 ### Phase 0: Decisions and token format
 
@@ -555,7 +555,8 @@ sources for token verification and the maintenance loop reaps
 any console a live scrape did not yield — so a real SF (not a
 static or hand-seeded console) is required.
 
-- Deploy a single-node SF (getsf) in CI, provision `KERBSIDE_URL`
+- Deploy a single-node SF in CI (as realized: the
+  `build-smoke-cluster` action, not getsf), provision `KERBSIDE_URL`
   (deploy-time, since it is process-cached) and a signing key,
   point a kerbside at it, and drive the full flow: mint token via
   client, exchange for `.vv`, connect through the proxy, assert
