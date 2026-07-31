@@ -145,11 +145,23 @@
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/check/</loc>
+         <lastmod>2026-07-31</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/commit/</loc>
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/compare/</loc>
+         <lastmod>2026-07-31</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/configuration/</loc>
+         <lastmod>2026-07-31</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/convert/</loc>
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
@@ -161,11 +173,23 @@
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/development/</loc>
+         <lastmod>2026-07-31</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/format-coverage/</loc>
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/format-detection-safety/</loc>
+         <lastmod>2026-07-31</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/info/</loc>
+         <lastmod>2026-07-31</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/installation/</loc>
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
@@ -1362,10 +1386,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/</loc>
-         <lastmod>2026-07-31</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/TOKIO-WEDGING/</loc>
          <lastmod>2026-07-31</lastmod>
     </url>
     <url>
