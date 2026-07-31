@@ -34,15 +34,27 @@ Confused about how `instar` does these things? Perhaps read the
 
 # Main Implementation Documentation
 
-## Instar-Specific Features
+## Getting Started
 
-Features unique to instar that do not exist in qemu-img.
+| Document | Description |
+|----------|-------------|
+| [Installation](/components/instar/installation/) | Pre-built packages, system requirements, building from source |
+| [Development](/components/instar/development/) | Building, Makefile targets, tests, fuzzing, releases, GitHub automation |
+
+## Per-Command Guides and Instar-Specific Features
+
+The user guide for each subcommand, plus features unique to instar
+that do not exist in qemu-img.
 
 | Document | Description |
 |----------|-------------|
 | [Configuration Guide](/components/instar/configuration/) | Command-line flags, config files, quirk control |
 | [Chain Discovery](/components/instar/chain-discovery/) | `instar info --chain` - secure backing chain discovery |
 | [Chain Config Protocol](/components/instar/chain-config/) | Chain config structure layout and VMM-to-guest data flow |
+| [Info](/components/instar/info/) | `instar info` - image format information and version-profile output |
+| [Check](/components/instar/check/) | `instar check` - structural validation and qcow2 repair |
+| [Compare](/components/instar/compare/) | `instar compare` - content comparison across formats |
+| [Convert](/components/instar/convert/) | `instar convert` - format conversion, compression, encryption |
 | [Measure](/components/instar/measure/) | `instar measure` - predict file size for a target format |
 | [Create](/components/instar/create/) | `instar create` - create a new empty disk image |
 | [Resize](/components/instar/resize/) | `instar resize` - change a disk image's virtual size |

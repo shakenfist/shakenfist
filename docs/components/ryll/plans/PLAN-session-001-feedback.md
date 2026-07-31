@@ -52,7 +52,7 @@ description), `D#` (derived from the report data).
 
 | ID | Title | Sources | Severity | Disposition |
 |----|-------|---------|----------|-------------|
-| **K1** | Main channel rcc 30 s unresponsive timeout tears down session (perceived as inputs-channel disconnect) | N3, B3 (10:31:53Z), B5 (10:40:28Z), QEMU log | High — disrupts dogfooding workflow | **Resolved** in `370d8ce5` (root-cause fix) and `cf3d31f5` (regression test). Root cause was an abandoned-receiver deadlock in our own session orchestrator, not a tokio / rustls / kernel bug. See `docs/TOKIO-WEDGING.md` for the chronology. |
+| **K1** | Main channel rcc 30 s unresponsive timeout tears down session (perceived as inputs-channel disconnect) | N3, B3 (10:31:53Z), B5 (10:40:28Z), QEMU log | High — disrupts dogfooding workflow | **Resolved** in `370d8ce5` (root-cause fix) and `cf3d31f5` (regression test). Root cause was an abandoned-receiver deadlock in our own session orchestrator, not a tokio / rustls / kernel bug. The investigation chronology was recorded in `docs/TOKIO-WEDGING.md`, since removed — see git history for the full diagnosis record. |
 | **K2** | Ring-buffer frame builder drops SPICE messages > 64 KB (missing TCP segmentation in `bugreport.rs:317`; live writer already segments via `capture.rs:78`) | N4, B1 (10:12:15Z), B2 (10:15:01Z) | Medium — silently drops large display messages from bug-report pcaps | **Resolved** in Phase 08 — shared `capture::segment_payload` helper now drives both the live and ring paths; `TrafficEntry` gains `additional_segments: Vec<Arc<[u8]>>` for oversized messages. See `PLAN-session-001-feedback-phase-08-ring-segmentation.md`. |
 | **K3** | Reconnect resets client audio volume | B6 (10:40:51Z) | Low–Medium — surprises user after every reconnect | **Resolved** in Phase 03 — `RyllApp::reconnect()` now reuses `self.volume_control` instead of allocating a fresh `VolumeControl`. See `PLAN-session-001-feedback-phase-03-audio-volume.md`. |
 | **K4** | Region-select can produce a zero-width rectangle | D2 (B4, B6 metadata) | Low — bad-data path in bug reports | **Resolved** in Phase 04 — GUI-layer guard via new `validate_region` helper rejects zero-area inputs with a Warn notification, keeping the user in region-select for another attempt. See `PLAN-session-001-feedback-phase-04-region-select.md`. |
@@ -137,7 +137,9 @@ description), `D#` (derived from the report data).
    inside `event_tx.send().await`. With main's entire `select!`
    suspended, no pongs went out, and the server's rcc timer
    tore the connection down 30 s later. The "tokio waker bug"
-   appearance in `docs/TOKIO-WEDGING.md` was real but downstream
+   appearance documented during the investigation (in the
+   since-removed `docs/TOKIO-WEDGING.md`; see git history) was
+   real but downstream
    — the waker the runtime was waiting for was the mpsc
    permit-available waker, which would never fire because the
    receiver had been dropped while the buffer was full.

@@ -117,10 +117,16 @@ nav:
             - "Announcement": components/instar/openstack-announcement-email.md
             - "Backing Chain Discovery": components/instar/chain-discovery.md
             - "Chain Config Protocol": components/instar/chain-config.md
+            - "Check": components/instar/check.md
+            - "Compare": components/instar/compare.md
             - "Configuration Guide": components/instar/configuration.md
+            - "Convert": components/instar/convert.md
+            - "Development": components/instar/development.md
             - "Format Auto-Detection Safety in Instar": components/instar/format-detection-safety.md
             - "Format Detection and Safety Check Coverage": components/instar/format-coverage.md
             - "Image Handling and qemu-img Security Vulnerabilities": components/instar/security.md
+            - "Info": components/instar/info.md
+            - "Installation": components/instar/installation.md
             - "instar bench — benchmark the sandboxed I/O path": components/instar/bench.md
             - "Integration Test Suite": components/instar/testing.md
             - "qemu-img Output Formats": components/instar/output-formats.md
@@ -289,7 +295,6 @@ nav:
             - "Development": components/ryll/development.md
             - "Features": components/ryll/features.md
             - "Installation": components/ryll/installation.md
-            - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md
             - "macOS runtime-metrics verification runbook": components/ryll/macos-metrics-verification.md
             - "Multi-mode feature parity": components/ryll/multi-mode-parity.md

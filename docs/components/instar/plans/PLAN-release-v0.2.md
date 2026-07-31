@@ -75,7 +75,7 @@ should perform it, not a sub-agent.
 * `docs/plans/` is bootstrapped with `index.md`, `order.yml`,
   and `PLAN-distro-matrix-ci.md` (deferred follow-up).
 * `tools/audit/wave1.sh` and `tools/audit/wave2-mechanical.sh`
-  exist and are wired into `PUSH-TEMPLATE.md`.
+  exist and are wired into `PUSH-AUDIT.md`.
 * VMM boundary audit (`PLAN-audit.md` Phase 5) is complete: 8
   bugs fixed including sector bounds checking, BackingStore
   overflow / capacity, IO buffer cap, sandboxed info exit

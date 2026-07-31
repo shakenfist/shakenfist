@@ -237,11 +237,18 @@ freeze.
   detecting it
 - The SPICE server pings secondary channels only every 300 s; if
   the TCP path is already broken, the ping never arrives
+- Versions before 0.1.6 had a client-side deadlock: after
+  roughly 7m45s of idle the main channel task blocked forever on
+  an internal event queue whose receiver had been dropped, so
+  PONGs stopped and the server tore the session down about 45 s
+  later
 
 **Solutions:**
 1. Upgrade to 0.1.2+ which enables TCP keepalive (30 s idle,
    3 probes at 15 s) on all channel sockets
-2. If the problem persists, check whether a network appliance
+2. Upgrade to 0.1.6+ which fixes the idle deadlock (commit
+   `370d8ce5`; regression-guarded by `make test-k1-idle`)
+3. If the problem persists, check whether a network appliance
    between client and server has an unusually short idle timeout
 
 ## USB Issues
