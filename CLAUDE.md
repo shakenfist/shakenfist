@@ -476,7 +476,12 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **Node Metrics** (`node_metrics` table): Ephemeral per-node resource
   metrics (CPU, memory, disk, network, queue depths) updated every 60
   seconds by the resources daemon. Uses a JSON column (`metrics_json`)
-  for the schemaless metrics payload (~50+ fields). One row per node,
+  for the schemaless metrics payload (~50+ fields); `metrics_json`
+  remains authoritative for readers. Capacity-relevant fields (CPU,
+  memory, disk counts, disk-busy rate) are additionally projected into
+  15 typed nullable columns at upsert time (see
+  `NODE_METRICS_EXTRACTION_SPEC` in `shakenfist/mariadb.py`) so SQL-side
+  capacity arithmetic doesn't need to unpack JSON. One row per node,
   upserted each update cycle. Primary key is `node_uuid`.
 - **Per-daemon state** (`node_daemon_states` table): One row per
   `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`

@@ -487,7 +487,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
 | `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
-| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload |
+| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus 15 typed nullable columns projecting the capacity-relevant fields |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
 | `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
 
@@ -497,6 +497,20 @@ IPAM reservations are stored separately because:
 - **High churn**: Addresses are frequently reserved and released
 - **Cross-object queries**: Need to find all addresses for an IPAM, not just
   one object
+
+`node_metrics` additionally projects its capacity-relevant fields (CPU,
+memory, disk counts and the disk-busy bandwidth rate) from `metrics_json`
+into typed nullable columns at upsert time, so SQL-side capacity arithmetic
+(the scheduler-reservations work) can query them directly instead of
+unpacking JSON per row. `metrics_json` remains the full payload and stays
+authoritative for readers; the typed columns are only a projection of it,
+extracted server-side in `_direct_upsert_node_metrics()` so rows written by
+an older resources daemon during a rolling upgrade still get their columns
+populated once `sf-database` is upgraded. After running `sf-ctl
+ensure-mariadb-schema` to add the columns (run it before rolling the
+daemons, as always), existing rows keep NULL columns until the next 60
+second upsert cycle repopulates every live node — no backfill needed for a
+table whose rows are ephemeral by design.
 
 Cluster operation headers (`cluster_operations`) and work queue rows
 (`work_queue`) live in MariaDB so the create-and-enqueue step can run in a
