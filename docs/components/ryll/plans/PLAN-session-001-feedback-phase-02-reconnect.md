@@ -7,9 +7,10 @@ K1 itself is now **resolved at the root** in commits `370d8ce5`
 keepalive issue, a server rcc timeout, or any tokio / rustls /
 kernel bug — it was an abandoned-receiver deadlock in our own
 session orchestrator (`shakenfist-spice-renderer/src/
-session.rs`'s intermediate `mpsc::channel(64)`). See
-`docs/TOKIO-WEDGING.md` and the resolution note in
-`PLAN-session-001-feedback.md` for the full chronology.
+session.rs`'s intermediate `mpsc::channel(64)`). See the resolution note in
+`PLAN-session-001-feedback.md` for the full chronology (the
+standalone `docs/TOKIO-WEDGING.md` write-up has been removed
+and remains available in git history).
 
 This means the rest of this phase plan applies *as written* but
 with a different framing:

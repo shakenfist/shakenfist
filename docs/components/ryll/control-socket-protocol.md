@@ -2,13 +2,10 @@
 
 This document specifies the wire protocol spoken between Ryll's headless
 mode and any external driver that connects to its Unix-domain control
-socket. It is the load-bearing contract for all of phase 3 of the
-kerbside automated-SPICE-test-harness plan. Downstream work — the
-phase 4 latency loadtest port and the phase 7 Sextant scenario
-tempest test — implements against this document; the phase 6
-`digest_updated` event layer has landed and shipped as protocol
-v1.1. Read the whole document before writing a client
-or implementing a verb.
+socket. It is the load-bearing contract for the automated
+SPICE-test-harness work: external drivers such as latency loadtests
+and Sextant scenario tests implement against this document. Read the
+whole document before writing a client or implementing a verb.
 
 Protocol version: **1.1**
 
@@ -19,7 +16,7 @@ Version history:
   `agent_connected`, `paste_completed`, `paste_failed`,
   `dropped` events.
 - **1.1** — added the `surface_drawn` event (one wire event per
-  display draw command) so the phase 4 loadtest can compute
+  display draw command) so a loadtest can compute
   keypress-to-screen latency rather than PING/PONG round-trip.
   Added the `digest_updated` event behind the `digest-decode`
   Cargo feature.  Backwards-compatible at the major-version
@@ -59,22 +56,17 @@ Version history:
 - Capturing a screenshot of any live surface.
 - Subscribing to an asynchronous stream of events: SPICE latency
   samples, agent connect/disconnect transitions, paste completion
-  notifications, and queue-overflow notifications.
+  notifications, per-draw surface notifications, decoded
+  visual-digest updates (on `digest-decode` builds), and
+  queue-overflow notifications.
 - Negotiating the protocol version at connection time so clients and
   servers can evolve independently within a major version.
 
-### What this protocol does NOT cover (phase 3 non-goals)
+### What this protocol does NOT cover (v1 non-goals)
 
-- **Digest events.** The `digest_updated` event was reserved for
-  phase 6 and has since been added, exactly as planned, as a new
-  event name in the v1.1 minor version bump without changing any
-  existing envelope or verb (see the event reference). Clients that
-  ask to subscribe to `digest_updated` on a v1.0 server — or on a
-  v1.1 server built without the `digest-decode` feature — receive an
-  empty `subscribed` list for that name; this is intentional.
-- **Mouse and USB-redirection verbs.** The latency loadtest and first
-  Sextant scenarios do not need them. They will be added as new minor-
-  version verbs when a test that requires them arrives.
+- **Mouse and USB-redirection verbs.** No current test consumer needs
+  them. They will be added as new minor-version verbs when a test
+  that requires them arrives.
 - **Authentication or encryption on the socket.** Unix-socket file
   permissions are the security boundary for v1. Cross-host control is
   not a goal; if it ever becomes one, that is a separate design.
@@ -463,7 +455,7 @@ Params:
 | Field | Type | Description |
 |-------|------|-------------|
 | `text` | string | The text to type. Must be representable in US-QWERTY layout (ASCII printable characters). Characters that cannot be represented will cause a `paste_failed` event. |
-| `char_delay_ms` | u32 or null | Milliseconds to wait between each character. Defaults to Ryll's built-in paste delay (currently 10 ms) if omitted or null. Useful for guests with slow keystroke handling. |
+| `char_delay_ms` | u32 or null | Milliseconds to wait between each character. Defaults to 10 ms if omitted or null — a control-socket default, independent of the `--paste-char-delay-ms` CLI flag (whose default is 16 ms). Useful for guests with slow keystroke handling. |
 
 Result on success: `{}` (returned immediately on queue, not on completion)
 
@@ -658,8 +650,8 @@ flag was intended to write this metric to disk in headless mode, but
 is currently declared and unused — this event stream is the working
 way to collect latency samples.)
 
-High-frequency callers (the phase 4 loadtest) should subscribe to this
-event and accumulate samples client-side rather than polling with
+High-frequency callers (e.g. a latency loadtest) should subscribe to
+this event and accumulate samples client-side rather than polling with
 `status` calls.
 
 Data fields:
@@ -856,7 +848,8 @@ keys as forward-compatible additions and skip them.
 Future-work notes:
 
 - The polling task runs on a fixed 100 ms interval.  A rate-limit knob
-  (`--digest-min-interval-ms`) may be added if phase 7 needs it.
+  (`--digest-min-interval-ms`) may be added if a future consumer
+  needs it.
 - Because the wire `events` schema tracks
   `shakenfist-visual-digest::Event` directly, a schema-breaking v2 of
   the digest crate changes this event's payload and the protocol will
@@ -952,7 +945,7 @@ v1.0; v1.1 added no new codes):
 | `agent_not_connected` | A `paste` was requested but the SPICE vdagent is not currently connected. |
 | `no_such_surface` | A `screenshot` was requested for a `surface_id` that does not exist in the current session. |
 | `unsupported_format` | A `screenshot` was requested with a `format` value other than `"png"` or `"rgba"`. |
-| `not_implemented` | The method is recognised but not yet implemented. Used during incremental rollout (steps 3b–3g) before each verb is fully wired. Should not appear in a complete implementation; retained in the code so partial builds have a stable code to return. |
+| `not_implemented` | The method is recognised but not yet implemented. Should not appear in a complete implementation; retained in the code so partial builds have a stable code to return during incremental rollout of a new verb. |
 | `internal_error` | An unexpected condition occurred server-side. The `message` field will contain details. Report these as bugs. |
 
 Additional error codes may be added in future **minor** version bumps.

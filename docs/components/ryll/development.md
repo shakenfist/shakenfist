@@ -85,6 +85,51 @@ The slim test-harness binary is built with
 [control-socket-protocol.md](/components/ryll/control-socket-protocol/)
 for the `surface_drawn` and `digest_updated` event shapes.
 
+## Debugging async hangs
+
+A set of diagnostic hooks exists for debugging tokio task hangs
+and channel wedges. They were built during the K1 idle-wedge
+investigation (an abandoned-receiver deadlock in the session
+orchestrator, fixed in `370d8ce5`) and remain in tree:
+
+- **Per-channel run-loop exit logs** — every SPICE channel task
+  logs when its run loop exits, cleanly or with error. Always
+  on; a channel that never logs an exit is still running (or
+  wedged).
+- **`RYLL_WATCHDOG_GDB=1`** — an in-process gdb watchdog on the
+  main channel's run loop. If the loop goes silent for 5 s it
+  dumps `thread apply all bt` for the whole process to
+  `/tmp/ryll-watchdog-bt-<pid>-<ts>.txt`. Requires `gdb` on the
+  PATH.
+- **`RYLL_DISABLE_CLIPBOARD_POLL=1`** — disables the main
+  channel's clipboard-polling `select!` arm, for isolating
+  whether clipboard integration is implicated in a hang.
+- **`--debug-single-thread-runtime`** — CLI flag that forces a
+  single-threaded tokio runtime, for ruling scheduler
+  interactions in or out.
+- **`make build-tokio-console`** — builds ryll with the
+  `tokio-console` Cargo feature plus
+  `RUSTFLAGS="--cfg tokio_unstable"`. Run the resulting binary
+  with `RYLL_TOKIO_CONSOLE=1` and it serves the
+  console-subscriber endpoint on `127.0.0.1:6669` for the
+  `tokio-console` TUI viewer — per-task waker counts, poll
+  times, and last-woken ages. Do not apply
+  `--cfg tokio_unstable` to a release build; the regular
+  `make build` does not need it.
+
+### Idle-wedge regression test
+
+`make test-k1-idle` (driver: `tools/test-k1-idle.sh`) guards
+against the K1 deadlock regressing. It launches ryll headless
+against a SPICE server (start one with `make test-qemu` first),
+idles for 540 s — well past the historical ~T+466 s wedge point
+— and fails on early exit, `event_tx.send()` timeout warnings,
+channel errors, or a lower pong count than the idle window
+implies. The `IDLE_SECS`, `HOST_PORT`, and `RYLL` environment
+variables override the defaults, and the test sets
+`RYLL_K1_MAIN_ONLY=1` to run the main channel alone — cheaper,
+and the historical wedge fingerprint shows up there regardless.
+
 ## Pre-commit hooks
 
 The project uses pre-commit hooks to enforce code quality:

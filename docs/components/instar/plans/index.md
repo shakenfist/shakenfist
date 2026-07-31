@@ -6,7 +6,7 @@ file. Standalone plans track issues, follow-ups, or design decisions that
 do not require phased execution.
 
 New plans should follow the structure in `PLAN-TEMPLATE.md` at the repo
-root. For pre-push audits of our own work see `PUSH-TEMPLATE.md` (also
+root. For pre-push audits of our own work see `PUSH-AUDIT.md` (also
 at the repo root).
 
 ## Master plans
