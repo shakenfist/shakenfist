@@ -16,6 +16,11 @@ merged across four repos:
 Phase 9 is the **post-merge** phase: it runs the full flow against a **real
 Shaken Fist** and closes the one gap the earlier phases could not.
 
+**Status: Done.** The lane is green as of 2026-07-31 (dispatch
+`30608314535`): all steps pass, including the proxied SPICE session and the
+full adversarial matrix. See "First run" below for the one bug the first
+dispatch caught and the fix that cleared it.
+
 ## Situation (grounded)
 
 What is already proven, and where the hole is:
@@ -250,8 +255,13 @@ contract (distinct `uuid` vs `fqdn`) and fail without the fix. The lane's
 retain-on-dispatch step also gained `always()` so a *failed* run still lingers
 for debugging (it was skipped on this failure, tearing the env down early).
 
-Re-dispatch once the fix merges; downstream gates (the proxied SPICE session
-and on-screen digest assertion) are still unproven past this point.
+**Second run (dispatch `30608314535`, after the fix merged): green.** Every
+step passed — the console scraped, the happy path drove mint → offline-verify →
+exchange → proxied SPICE session → digest assertion → terminate, and all five
+adversarial cases were rejected as expected. The retain step (now `always()`)
+ran, and the downstream gates that had never executed before — the proxied
+SPICE session and the on-screen digest assertion — both passed. Phase 9 is
+complete.
 
 ## Residual open questions
 
