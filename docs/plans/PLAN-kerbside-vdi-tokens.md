@@ -380,7 +380,7 @@ Recommendations are recorded inline.
 | 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Done |
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Done |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Done |
-| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Not started |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Done |
 
 ### Phase 0: Decisions and token format
 
