@@ -205,3 +205,19 @@ class OrphanQueryTestCase(base.ShakenFistTestCase):
             ObjectType.UNKNOWN, updated_before=200.0))
         self.assertEqual([], mariadb._direct_get_stateless_object_uuids(
             ObjectType.UNKNOWN))
+
+    def test_namespace_keys_are_reconcilable(self):
+        # namespace_key was missing from _STATIC_TABLE_GETTERS from the
+        # day the object landed, so zombie keys (static row, no state
+        # row) were invisible to the reconciler while the expiry sweep
+        # re-evented every one of them every pass (issue 3588). Pin the
+        # membership so the reconciler keeps covering keys.
+        self.assertIn(ObjectType.NAMESPACE_KEY.value,
+                      mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES)
+
+        entry = mariadb._static_table_for_object_type(
+            ObjectType.NAMESPACE_KEY)
+        self.assertIsNotNone(entry)
+        table, pk = entry
+        self.assertEqual('namespace_keys', table.name)
+        self.assertEqual('uuid', pk)

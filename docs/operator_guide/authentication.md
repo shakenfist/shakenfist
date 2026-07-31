@@ -16,7 +16,11 @@ no window during which it still works because a cleanup task has not run yet.
 Tidying up expired keys is a separate, purely cosmetic concern. The cluster
 daemon sweeps every fifteen minutes and soft-deletes keys which expired more
 than `NAMESPACE_KEY_REAP_GRACE` seconds ago; the standard object reaper then
-hard-deletes them once they have been soft-deleted for `CLEANER_DELAY`.
+hard-deletes them once they have been soft-deleted for `CLEANER_DELAY`. A key
+whose static row has no state row at all (a "zombie", see the orphan
+reconciliation section of the [database guide](database.md)) is skipped by
+this sweep — the hourly orphan reconciliation repairs it, after which the
+normal reap path removes it.
 
 | Setting | Default | Effect |
 |---------|---------|--------|

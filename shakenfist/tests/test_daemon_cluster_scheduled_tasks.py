@@ -480,8 +480,28 @@ class ReapExpiredNamespaceKeysTestCase(base.ShakenFistTestCase):
         key = FakeNamespaceKey('racing')
         key.delete = mock.Mock(side_effect=InvalidStateException('raced'))
 
-        # Must not raise -- the key is going away either way.
+        # Must not raise -- the key is going away either way. And no
+        # audit event: the event records a delete that happened, and
+        # this one did not. Eventing before the attempt is how 4,151
+        # undeletable keys generated ~380k junk events/day (issue 3588).
         self._sweep([(key, _attrs(1000.0))])
+
+        self.assertEqual([], key.events)
+
+    def test_skips_a_zombie_key_with_no_state_row(self):
+        # A static row with no object_states row (a mixed-version deploy
+        # artifact) has no legal transition to deleted, so delete()
+        # raises on every sweep forever. The sweep must leave these to
+        # reconcile_orphaned_objects: no delete attempt, and above all
+        # no per-key audit event per pass (issue 3588).
+        key = FakeNamespaceKey('zombie', state=None)
+        key.delete = mock.Mock(
+            side_effect=AssertionError('zombie must not be deleted here'))
+
+        self._sweep([(key, _attrs(1000.0))])
+
+        self.assertEqual([], key.events)
+        key.delete.assert_not_called()
 
     def test_does_nothing_when_reaping_is_disabled(self):
         key = FakeNamespaceKey('stale')
