@@ -222,14 +222,46 @@ convention):
    stdout/stderr, the `.vv`, SF `sf-api`/`sf-console` logs, and the sources.yaml;
    upload on `always()`. The under-cloud reaper collects the SF instance.
 
+## First run (2026-07-31, dispatch 30582413364)
+
+The first dispatch (`retention=30`) **failed at the happy path's first gate**,
+but every heavy unknown upstream of it passed:
+
+* `build-smoke-cluster`, the co-located kerbside deploy (MariaDB, ryll from
+  source, proxy wheel, source key caching), and — notably — the **nested UEFI +
+  SPICE boot** of the Uncalibrated Sextant instance all went green. Open
+  question 1 is effectively answered: the guest reached `created` on the CI
+  hypervisor without a handshake-level fallback.
+* `drive-happy-path.py` then timed out after 180s waiting for the console to
+  appear in kerbside. The daemon log showed the source repeatedly *finding* the
+  instance (correct `vdi: spice`, state `created`) but discarding it:
+  `Ignoring instance whose node is not in the node map`.
+
+**Root cause — a real bug in `kerbside/sources/shakenfist.py`, not the lane.**
+The source keyed its node map by `node['name']` (the fqdn) but looked it up by
+`inst['node']`, which Shaken Fist reports as a node **UUID** (from the
+instance's placement). Name never equals UUID, so every SPICE console was
+dropped. It stayed latent because the unit-test fixture set `node='n1'` *and*
+`name='n1'`, making them accidentally equal. Fixed on branch
+`sf-source-node-uuid-fix`: key the map by `node['uuid']`, emit `hypervisor` as
+the node fqdn (a connectable host, as the direct-`.vv` `host=` needs), and
+synthesize `host_subject` from the fqdn. Test fixtures now model SF's real
+contract (distinct `uuid` vs `fqdn`) and fail without the fix. The lane's
+retain-on-dispatch step also gained `always()` so a *failed* run still lingers
+for debugging (it was skipped on this failure, tearing the env down early).
+
+Re-dispatch once the fix merges; downstream gates (the proxied SPICE session
+and on-screen digest assertion) are still unproven past this point.
+
 ## Residual open questions
 
-1. **Booting Uncalibrated Sextant inside nested SF.** The guest is UEFI and its
-   assertion oracle needs a working SPICE console on the SF instance. If nested
-   SPICE / UEFI boot proves flaky on the CI hypervisors, fall back to a
-   handshake-level assertion for that step (still proving mint → verify →
-   exchange → proxy) and track the on-screen assertion as follow-up. Decide by
-   observation once the lane first runs.
+1. **Booting Uncalibrated Sextant inside nested SF.** *(Largely resolved by the
+   first run — the guest booted UEFI + SPICE and reached `created`.)* The guest
+   is UEFI and its assertion oracle needs a working SPICE console on the SF
+   instance. If the on-screen digest step later proves flaky on the CI
+   hypervisors, fall back to a handshake-level assertion for that step (still
+   proving mint → verify → exchange → proxy) and track the on-screen assertion
+   as follow-up.
 2. **`kerbside_public_fqdn` / audience value.** With kerbside co-located and
    driven over localhost, confirm the exact string used for both SF's
    `KERBSIDE_URL` and kerbside's `SF_CONSOLE_TOKEN_AUDIENCE` (they must match
