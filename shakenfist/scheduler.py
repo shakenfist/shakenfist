@@ -12,6 +12,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist.config import config
+from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
 from shakenfist.node import Node
@@ -243,7 +244,7 @@ class Scheduler:
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
         busy_time = float(
-            self.metrics[node].get('disk_busy_time_delta_per_second', '0'))
+            self.metrics[node].get(DISK_BUSY_PER_SECOND_METRIC, 0))
         if busy_time > 1200:
             reason = {
                 'reason': 'disk bandwidth saturated',

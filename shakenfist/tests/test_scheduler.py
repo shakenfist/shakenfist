@@ -5,6 +5,7 @@ from unittest import mock
 from shakenfist import exceptions
 from shakenfist import scheduler
 from shakenfist.config import SFConfig
+from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import GiB
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tests import base
@@ -167,6 +168,8 @@ class LowResourceTestCase(SchedulerTestCase):
             str(exc))
 
     def test_not_enough_disk_bandwidth(self):
+        # The resources daemon serialises this metric as a float string, so
+        # the value here deliberately isn't int() parseable.
         self.mock_mariadb.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -175,7 +178,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free_instances': 200*GiB,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12,
-            'disk_busy_time_delta_per_second': 2000.5
+            DISK_BUSY_PER_SECOND_METRIC: '2000.5'
         })
 
         fake_inst = self.mock_mariadb.create_instance(
@@ -203,7 +206,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free_instances': 200*GiB,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12,
-            'disk_busy_time_delta_per_second': '16.6'
+            DISK_BUSY_PER_SECOND_METRIC: '16.6'
         })
 
         fake_inst = self.mock_mariadb.create_instance(

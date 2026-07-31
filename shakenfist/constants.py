@@ -21,6 +21,18 @@ ETCD_ATTEMPT_TIMEOUT = 60
 CLUSTER_LOCK_LEASE_SECONDS = 60
 
 
+# The resources daemon publishes a per-second rate for each raw psutil
+# counter by appending this suffix to the counter name. The full key for
+# the disk busy rate is spelled out here because both the scheduler and
+# the queue workers consume it, and each historically invented its own
+# subtly wrong spelling which silently read the default of zero. The
+# published value is a float (often serialised as a string) counting
+# milliseconds of disk busy time per wall clock second, so 1000.0 is one
+# fully busy disk; parse it with float(), not int().
+METRICS_DELTA_PER_SECOND_SUFFIX = '_delta_per_second'
+DISK_BUSY_PER_SECOND_METRIC = 'disk_busy_time' + METRICS_DELTA_PER_SECOND_SUFFIX
+
+
 # Disk caching mode. Refer to docs/development/io_performance_tuning.md for
 # more details than you really want.
 #
