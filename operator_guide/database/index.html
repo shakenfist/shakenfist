@@ -12212,7 +12212,7 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 </tr>
 <tr>
 <td><code>node_metrics</code></td>
-<td>Ephemeral per-node resource metrics with semi-schemaless JSON payload</td>
+<td>Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus 15 typed nullable columns projecting the capacity-relevant fields</td>
 </tr>
 <tr>
 <td><code>node_daemon_states</code></td>
@@ -12231,6 +12231,19 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <li><strong>Cross-object queries</strong>: Need to find all addresses for an IPAM, not just
   one object</li>
 </ul>
+<p><code>node_metrics</code> additionally projects its capacity-relevant fields (CPU,
+memory, disk counts and the disk-busy bandwidth rate) from <code>metrics_json</code>
+into typed nullable columns at upsert time, so SQL-side capacity arithmetic
+(the scheduler-reservations work) can query them directly instead of
+unpacking JSON per row. <code>metrics_json</code> remains the full payload and stays
+authoritative for readers; the typed columns are only a projection of it,
+extracted server-side in <code>_direct_upsert_node_metrics()</code> so rows written by
+an older resources daemon during a rolling upgrade still get their columns
+populated once <code>sf-database</code> is upgraded. After running <code>sf-ctl
+ensure-mariadb-schema</code> to add the columns (run it before rolling the
+daemons, as always), existing rows keep NULL columns until the next 60
+second upsert cycle repopulates every live node — no backfill needed for a
+table whose rows are ephemeral by design.</p>
 <p>Cluster operation headers (<code>cluster_operations</code>) and work queue rows
 (<code>work_queue</code>) live in MariaDB so the create-and-enqueue step can run in a
 single transaction (header row + state row + queue row). The <code>work_queue</code>
