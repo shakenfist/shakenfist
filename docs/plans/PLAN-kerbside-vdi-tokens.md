@@ -555,7 +555,8 @@ sources for token verification and the maintenance loop reaps
 any console a live scrape did not yield — so a real SF (not a
 static or hand-seeded console) is required.
 
-- Deploy a single-node SF (getsf) in CI, provision `KERBSIDE_URL`
+- Deploy a single-node SF in CI (as realized: the
+  `build-smoke-cluster` action, not getsf), provision `KERBSIDE_URL`
   (deploy-time, since it is process-cached) and a signing key,
   point a kerbside at it, and drive the full flow: mint token via
   client, exchange for `.vv`, connect through the proxy, assert
