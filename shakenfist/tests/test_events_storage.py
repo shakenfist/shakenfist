@@ -463,44 +463,49 @@ class RecordEventBatchRoutingTestCase(base.ShakenFistTestCase):
 class DirectGetEventsCountTestCase(base.ShakenFistTestCase):
     """Tests for _direct_get_events_count()."""
 
-    @mock.patch('shakenfist.mariadb._get_events_table')
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_returns_scalar_from_connection(
-            self, mock_get_engine, mock_get_events_table):
-        """The row count returned by the DB is forwarded unchanged."""
-        import sqlalchemy as sa
-        metadata = sa.MetaData()
-        events_table = sa.Table(
-            'events', metadata,
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-        )
-        mock_get_events_table.return_value = events_table
+    @mock.patch('shakenfist.mariadb._get_bounded_engine')
+    def test_returns_estimate_from_information_schema(
+            self, mock_get_bounded_engine):
+        """The information_schema TABLE_ROWS estimate is forwarded as an int.
 
+        The gauge refresh must not run an exact COUNT(*) -- the full scan
+        of a table larger than the buffer pool is what starved the systemd
+        watchdog in issue 3586 -- and must use the bounded engine so it
+        cannot stall the database daemon's main loop.
+        """
         conn = _MockConnection(result=_MockResult(scalar_val=42))
-        mock_get_engine.return_value = _MockEngine(conn)
+        mock_get_bounded_engine.return_value = _MockEngine(conn)
 
         count = mariadb._direct_get_events_count()
         self.assertEqual(count, 42)
 
-    @mock.patch('shakenfist.mariadb._get_events_table')
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_returns_zero_on_database_error(
-            self, mock_get_engine, mock_get_events_table):
-        """OperationalError during the count query returns 0 without raising."""
+        self.assertEqual(1, len(conn.executed))
+        self.assertIn('information_schema.tables', str(conn.executed[0]))
+        self.assertNotIn('count', str(conn.executed[0]).lower())
+
+    @mock.patch('shakenfist.mariadb._get_bounded_engine')
+    def test_returns_zero_when_table_absent(self, mock_get_bounded_engine):
+        """No information_schema row (scalar None) is reported as 0."""
+        conn = _MockConnection(result=_MockResult(scalar_val=None))
+        mock_get_bounded_engine.return_value = _MockEngine(conn)
+
+        count = mariadb._direct_get_events_count()
+        self.assertEqual(count, 0)
+
+    @mock.patch('shakenfist.mariadb._get_bounded_engine')
+    def test_returns_zero_on_database_error(self, mock_get_bounded_engine):
+        """OperationalError during the estimate query returns 0 without raising.
+
+        This includes the read/connect timeouts the bounded engine raises
+        as OperationalError when the server stalls.
+        """
         from sqlalchemy.exc import OperationalError
-        import sqlalchemy as sa
-        metadata = sa.MetaData()
-        events_table = sa.Table(
-            'events', metadata,
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-        )
-        mock_get_events_table.return_value = events_table
 
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception('db error'))
         )
-        mock_get_engine.return_value = _MockEngine(conn)
+        mock_get_bounded_engine.return_value = _MockEngine(conn)
 
         count = mariadb._direct_get_events_count()
         self.assertEqual(count, 0)

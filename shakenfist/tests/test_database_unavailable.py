@@ -330,8 +330,10 @@ class CheckDaemonStateTestCase(base.ShakenFistTestCase):
         with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
             self._daemon().check_daemon_state()
         mock_this_node.assert_not_called()
+        # bounded=True: the poll runs upstream of the systemd watchdog pet
+        # and must not block past WatchdogSec on a stalled database (3586).
         mock_get_state.assert_called_once_with(
-            uuid.UUID(self.NODE_UUID), 'queues')
+            uuid.UUID(self.NODE_UUID), 'queues', bounded=True)
 
     @mock.patch('shakenfist.daemons.daemon.set_abort_path')
     @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state')
