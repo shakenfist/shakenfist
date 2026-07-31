@@ -11217,7 +11217,7 @@ Recommendations are recorded inline.</p>
 <td>9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF)</td>
 <td>all</td>
 <td>PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside)</td>
-<td>Not started</td>
+<td>Done</td>
 </tr>
 </tbody>
 </table>
@@ -11388,7 +11388,8 @@ sources for token verification and the maintenance loop reaps
 any console a live scrape did not yield — so a real SF (not a
 static or hand-seeded console) is required.</p>
 <ul>
-<li>Deploy a single-node SF (getsf) in CI, provision <code>KERBSIDE_URL</code>
+<li>Deploy a single-node SF in CI (as realized: the
+  <code>build-smoke-cluster</code> action, not getsf), provision <code>KERBSIDE_URL</code>
   (deploy-time, since it is process-cached) and a signing key,
   point a kerbside at it, and drive the full flow: mint token via
   client, exchange for <code>.vv</code>, connect through the proxy, assert
