@@ -42,6 +42,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
+from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -328,7 +329,10 @@ OBJECT_METADATA_VERSION = 3
 # target ops. A non-unique idx_cot_operation index keeps lookups by
 # operation_uuid fast.
 CLUSTER_OPERATION_TARGETS_VERSION = 2
-NODE_METRICS_VERSION = 2
+# v1: schema creation. v2: etcd data-import marker (historical).
+# v3: adds 15 typed nullable capacity columns projected from
+# metrics_json at upsert time (scheduler-reservations phase 1).
+NODE_METRICS_VERSION = 3
 # v1: schema creation. v2: data migration from node_attributes.daemon_states
 # JSON column.
 NODE_DAEMON_STATES_VERSION = 2
@@ -1490,15 +1494,81 @@ def _ensure_cluster_operation_targets_schema(
     }
 
 
+def _node_metric_to_int(value: Any) -> int:
+    """Coerce a metrics value to an integer column value.
+
+    Metrics values arrive as numbers or as strings (some rendered from
+    floats, e.g. '16.6'), so parse via float() first and truncate.
+    """
+    return int(float(value))
+
+
+def _node_metric_to_float(value: Any) -> float:
+    """Coerce a metrics value to a float column value."""
+    return float(value)
+
+
+# Projection of capacity-relevant metrics_json fields to typed columns on
+# node_metrics (scheduler-reservations phase 1). Each entry is
+# (metrics_key, column_name, coercion). This single spec drives both the
+# column population in _direct_upsert_node_metrics() and the unit tests
+# that guard against drift between the spec and the table definition.
+NODE_METRICS_EXTRACTION_SPEC: tuple[tuple[str, str, Callable[[Any], Any]], ...] = (
+    ('cpu_max', 'cpu_max', _node_metric_to_int),
+    ('cpu_schedulable', 'cpu_schedulable', _node_metric_to_int),
+    ('cpu_max_per_instance', 'cpu_max_per_instance', _node_metric_to_int),
+    ('cpu_total_instance_vcpus', 'cpu_total_instance_vcpus', _node_metric_to_int),
+    ('cpu_load_1', 'cpu_load_1', _node_metric_to_float),
+    ('cpu_load_5', 'cpu_load_5', _node_metric_to_float),
+    ('cpu_load_15', 'cpu_load_15', _node_metric_to_float),
+    ('memory_max', 'memory_max', _node_metric_to_int),
+    ('memory_available', 'memory_available', _node_metric_to_int),
+    ('memory_reserved_mb', 'memory_reserved_mb', _node_metric_to_int),
+    ('memory_total_instance_actual', 'memory_total_instance_actual', _node_metric_to_int),
+    ('disk_free_instances', 'disk_free_instances', _node_metric_to_int),
+    ('disk_reservation_gb', 'disk_reservation_gb', _node_metric_to_int),
+    (DISK_BUSY_PER_SECOND_METRIC, 'disk_busy_time_delta_per_second', _node_metric_to_float),
+    ('node_queue_waiting', 'node_queue_waiting', _node_metric_to_int),
+)
+
+
+def _extract_node_metrics_columns(
+        node_uuid: UUID, metrics: dict[str, Any]) -> dict[str, Any]:
+    """Extract typed column values from a metrics dict.
+
+    A missing metrics key extracts as None; a value that fails coercion
+    also extracts as None, with a warning logged. Extraction can never
+    raise -- metrics upserts must not be blocked by one bad field.
+    """
+    extracted: dict[str, Any] = {}
+    for metrics_key, column_name, coercion in NODE_METRICS_EXTRACTION_SPEC:
+        value = metrics.get(metrics_key)
+        if value is None:
+            extracted[column_name] = None
+            continue
+        try:
+            extracted[column_name] = coercion(value)
+        except (TypeError, ValueError):
+            LOG.warning(
+                f'Failed to coerce node_metrics field {metrics_key} value {value!r} '
+                f'for node {node_uuid}; storing NULL')
+            extracted[column_name] = None
+    return extracted
+
+
 def _get_node_metrics_table() -> sa.Table:
     """Get or create the node_metrics table definition.
 
     This table stores ephemeral per-node resource metrics (CPU, memory, disk,
     network, queue depths, etc.) updated every 60 seconds by the resources
     daemon. The metrics payload is stored as a JSON column because it is
-    inherently schemaless (~50+ fields, new ones added as needed). Individual
-    metrics are already exposed as Prometheus gauges for monitoring, so SQL
-    queryability of individual fields is not needed.
+    inherently schemaless (~50+ fields, new ones added as needed).
+
+    Capacity-relevant fields are additionally projected to typed nullable
+    columns at upsert time (driven by NODE_METRICS_EXTRACTION_SPEC) so that
+    SQL-side capacity arithmetic is possible (scheduler-reservations
+    phase 1). metrics_json remains the full authoritative payload for
+    readers.
 
     One row per node, upserted each update cycle.
     """
@@ -1515,6 +1585,23 @@ def _get_node_metrics_table() -> sa.Table:
                 sa.Column('fqdn', sa.String(255), nullable=False),
                 sa.Column('timestamp', sa.Double(), nullable=False),
                 sa.Column('metrics_json', sa.JSON(), nullable=True),
+                sa.Column('cpu_max', sa.Integer(), nullable=True),
+                sa.Column('cpu_schedulable', sa.Integer(), nullable=True),
+                sa.Column('cpu_max_per_instance', sa.Integer(), nullable=True),
+                sa.Column('cpu_total_instance_vcpus', sa.Integer(), nullable=True),
+                sa.Column('cpu_load_1', sa.Double(), nullable=True),
+                sa.Column('cpu_load_5', sa.Double(), nullable=True),
+                sa.Column('cpu_load_15', sa.Double(), nullable=True),
+                sa.Column('memory_max', sa.Integer(), nullable=True),
+                sa.Column('memory_available', sa.Integer(), nullable=True),
+                sa.Column('memory_reserved_mb', sa.Integer(), nullable=True),
+                sa.Column('memory_total_instance_actual', sa.Integer(), nullable=True),
+                # disk_free_instances is in bytes (unit conversions happen at
+                # the read edge), so it needs a BIGINT.
+                sa.Column('disk_free_instances', sa.BigInteger(), nullable=True),
+                sa.Column('disk_reservation_gb', sa.Integer(), nullable=True),
+                sa.Column('disk_busy_time_delta_per_second', sa.Double(), nullable=True),
+                sa.Column('node_queue_waiting', sa.Integer(), nullable=True),
             )
     return _node_metrics_table
 
@@ -1534,6 +1621,29 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
         LOG.info(f'Creating {table_name} table (version {NODE_METRICS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = NODE_METRICS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # v3 adds typed nullable capacity columns projected from
+        # metrics_json at upsert time (scheduler-reservations phase 1).
+        # Existing rows keep NULL columns until the next 60 second upsert
+        # cycle repopulates every live node -- no backfill is needed for a
+        # table whose rows are ephemeral by design. The column types are
+        # taken from the table definition so the DDL cannot drift from it,
+        # and each ADD COLUMN is guarded by an existence check so re-runs
+        # are safe.
+        LOG.info(f'Adding typed capacity columns to {table_name} table (version 3)')
+        mysql_dialect = sa.dialects.mysql.dialect()
+        with engine.begin() as conn:
+            cols = get_table_columns(engine, table_name)
+            for _, column_name, _ in NODE_METRICS_EXTRACTION_SPEC:
+                if column_name in cols:
+                    continue
+                column_type = table.c[column_name].type.compile(dialect=mysql_dialect)
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} ADD COLUMN '
+                    f'{column_name} {column_type} NULL'))
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -17779,9 +17889,16 @@ def _direct_upsert_node_metrics(
 
     Uses INSERT ... ON DUPLICATE KEY UPDATE because metrics are
     updated every 60 seconds — there is no separate create path.
+
+    Capacity-relevant fields are projected from the metrics dict into
+    typed columns here (driven by NODE_METRICS_EXTRACTION_SPEC). Doing
+    the extraction server-side means the gRPC surface is unchanged and
+    rows written by old-version resources daemons during a rolling
+    upgrade still get their typed columns populated.
     """
     engine = _get_engine()
     table = _get_node_metrics_table()
+    extracted = _extract_node_metrics_columns(node_uuid, metrics)
 
     try:
         with engine.connect() as conn:
@@ -17789,12 +17906,14 @@ def _direct_upsert_node_metrics(
                 node_uuid=node_uuid,
                 fqdn=fqdn,
                 timestamp=timestamp,
-                metrics_json=metrics
+                metrics_json=metrics,
+                **extracted
             )
             stmt = stmt.on_duplicate_key_update(
                 fqdn=fqdn,
                 timestamp=timestamp,
-                metrics_json=metrics
+                metrics_json=metrics,
+                **extracted
             )
             conn.execute(stmt)
             conn.commit()
