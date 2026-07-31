@@ -3,7 +3,7 @@
     "allow_merge_commit": true,
     "allow_rebase_merge": true,
     "allow_squash_merge": false,
-    "delete_branch_on_merge": false,
+    "delete_branch_on_merge": true,
     "has_discussions": false,
     "has_issues": true,
     "has_projects": true,
