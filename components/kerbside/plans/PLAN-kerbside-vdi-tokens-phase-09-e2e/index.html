@@ -10788,6 +10788,10 @@ merged across four repos:</p>
 </table>
 <p>Phase 9 is the <strong>post-merge</strong> phase: it runs the full flow against a <strong>real
 Shaken Fist</strong> and closes the one gap the earlier phases could not.</p>
+<p><strong>Status: Done.</strong> The lane is green as of 2026-07-31 (dispatch
+<code>30608314535</code>): all steps pass, including the proxied SPICE session and the
+full adversarial matrix. See "First run" below for the one bug the first
+dispatch caught and the fix that cleared it.</p>
 <h2 id="situation-grounded">Situation (grounded)<a class="headerlink" href="#situation-grounded" title="Permanent link">&para;</a></h2>
 <p>What is already proven, and where the hole is:</p>
 <ul>
@@ -11009,8 +11013,13 @@ synthesize <code>host_subject</code> from the fqdn. Test fixtures now model SF's
 contract (distinct <code>uuid</code> vs <code>fqdn</code>) and fail without the fix. The lane's
 retain-on-dispatch step also gained <code>always()</code> so a <em>failed</em> run still lingers
 for debugging (it was skipped on this failure, tearing the env down early).</p>
-<p>Re-dispatch once the fix merges; downstream gates (the proxied SPICE session
-and on-screen digest assertion) are still unproven past this point.</p>
+<p><strong>Second run (dispatch <code>30608314535</code>, after the fix merged): green.</strong> Every
+step passed — the console scraped, the happy path drove mint → offline-verify →
+exchange → proxied SPICE session → digest assertion → terminate, and all five
+adversarial cases were rejected as expected. The retain step (now <code>always()</code>)
+ran, and the downstream gates that had never executed before — the proxied
+SPICE session and the on-screen digest assertion — both passed. Phase 9 is
+complete.</p>
 <h2 id="residual-open-questions">Residual open questions<a class="headerlink" href="#residual-open-questions" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Booting Uncalibrated Sextant inside nested SF.</strong> <em>(Largely resolved by the
