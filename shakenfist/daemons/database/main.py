@@ -5541,7 +5541,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # The database daemon doesn't have background work to do,
                 # it just serves gRPC requests. We check health periodically
                 # and refresh the events row-count gauge every ~60s (every
-                # 6 ticks of the 10s idle).
+                # 6 ticks of the 10s idle). Everything in this loop must be
+                # bounded well inside the unit's WatchdogSec: the watchdog is
+                # only petted from idle(), so an unbounded database call here
+                # gets the daemon SIGABRT-killed when MariaDB stalls -- on
+                # both gateways at once, since they run the same loop against
+                # the same server (issue 3586).
                 self._update_health()
 
                 refresh_tick += 1

@@ -117,6 +117,71 @@ class GetNodeDaemonStateTestCase(base.ShakenFistTestCase):
 
         self.assertIsNone(result)
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._get_bounded_engine')
+    def test_bounded_read_uses_bounded_engine(
+            self, mock_get_bounded_engine, mock_get_engine):
+        """bounded=True must route the read via the timeout-bearing engine.
+
+        The bounded path exists so Daemon.check_daemon_state()'s poll --
+        which runs upstream of the systemd watchdog pet -- cannot block
+        past WatchdogSec on a stalled server (issue 3586).
+        """
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_bounded_engine.return_value = mock_engine
+
+        result = mariadb._direct_get_node_daemon_state(
+            NODE_UUID, 'net', bounded=True)
+
+        self.assertIsNone(result)
+        mock_get_bounded_engine.assert_called_once()
+        mock_get_engine.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_daemon_state',
+                return_value=None)
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_public_accessor_plumbs_bounded_direct(
+            self, mock_use_service, mock_direct):
+        mariadb.get_node_daemon_state(NODE_UUID, 'net', bounded=True)
+        mock_direct.assert_called_once_with(NODE_UUID, 'net', bounded=True)
+
+    @mock.patch('shakenfist.mariadb._grpc_get_node_daemon_state',
+                return_value=None)
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_public_accessor_plumbs_bounded_grpc(
+            self, mock_use_service, mock_grpc):
+        mariadb.get_node_daemon_state(NODE_UUID, 'net', bounded=True)
+        mock_grpc.assert_called_once_with(NODE_UUID, 'net', bounded=True)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_grpc_bounded_read_uses_short_deadline_single_slow_attempt(
+            self, mock_get_stub, mock_grpc_call):
+        """The bounded gRPC read caps its worst-case wall time.
+
+        The default retry budget (GRPC_RETRIES full deadlines plus
+        sleeps) exceeds WatchdogSec, which is how a stalled database
+        tier SIGABRTed non-database daemons via their
+        check_daemon_state() poll (issue 3586).
+        """
+        mock_grpc_call.return_value = mock.Mock(found=False)
+
+        result = mariadb._grpc_get_node_daemon_state(
+            NODE_UUID, 'net', bounded=True)
+
+        self.assertIsNone(result)
+        _, kwargs = mock_grpc_call.call_args
+        self.assertEqual(kwargs['timeout'], mariadb.BOUNDED_QUERY_TIMEOUT)
+        self.assertEqual(kwargs['max_slow_failures'], 1)
+
 
 class GetAllNodeDaemonStatesTestCase(base.ShakenFistTestCase):
     """``_direct_get_all_node_daemon_states`` returns rows for one node."""

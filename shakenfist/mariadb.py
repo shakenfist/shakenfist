@@ -450,6 +450,16 @@ GRPC_RETRIES = 3
 GRPC_UNAVAILABLE_RETRIES = 6
 GRPC_RETRY_DELAY = 0.5
 
+# Ceiling for database work performed upstream of a daemon's systemd
+# watchdog pet (the check_daemon_state() poll inside Daemon.idle(), and
+# the database daemon's events-rows gauge refresh). Every such call must
+# complete or fail well inside WatchdogSec (60s in sf.service): issue
+# 3586 traced simultaneous SIGABRT coredumps of sf-database on both
+# gateways to an InnoDB stall holding these calls -- and with them the
+# watchdog pet -- hostage. Used as the connect/read/write timeout on the
+# bounded direct engine and as the gRPC deadline for bounded calls.
+BOUNDED_QUERY_TIMEOUT = 10
+
 
 def _get_database_stub() -> Any:
     """Get or create a gRPC stub for the database service.
@@ -477,8 +487,21 @@ def _reset_database_stub() -> None:
     _local.database_stub = None
 
 
-def _grpc_call(method: Any, request: Any) -> Any:
+def _grpc_call(
+    method: Any, request: Any,
+    timeout: Optional[int] = None,
+    max_slow_failures: Optional[int] = None,
+) -> Any:
     """Call a gRPC method with timeout and retry.
+
+    ``timeout`` and ``max_slow_failures`` default to GRPC_TIMEOUT and
+    GRPC_RETRIES. Callers running upstream of a systemd watchdog pet
+    pass BOUNDED_QUERY_TIMEOUT and 1 instead, capping the worst case
+    (one full deadline plus the fast-failing UNAVAILABLE attempts and
+    their sleeps) well inside WatchdogSec -- the default worst case of
+    GRPC_RETRIES * GRPC_TIMEOUT plus sleeps exceeds it, which is how a
+    stalled database tier SIGABRTed non-database daemons via their
+    check_daemon_state() poll (issue 3586).
 
     Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
     between attempts. On DEADLINE_EXCEEDED it rebuilds the channel
@@ -520,6 +543,11 @@ def _grpc_call(method: Any, request: Any) -> Any:
     so the retry path here -- which closes and rebuilds the channel
     -- never fires. Fail-fast plus retry recovers; fail-slow does not.
     """
+    if timeout is None:
+        timeout = GRPC_TIMEOUT
+    if max_slow_failures is None:
+        max_slow_failures = GRPC_RETRIES
+
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
@@ -550,7 +578,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
             if attempt > 0 and method_name:
                 stub = _get_database_stub()
                 method = getattr(stub, method_name)
-            return method(request, timeout=GRPC_TIMEOUT)
+            return method(request, timeout=timeout)
         except grpc.RpcError as e:
             last_error = e
             if e.code() not in retryable_codes:
@@ -560,7 +588,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
                 # cap them separately so the fast-failing UNAVAILABLE budget
                 # cannot stretch the caller's worst case to minutes.
                 slow_failures += 1
-                if slow_failures >= GRPC_RETRIES:
+                if slow_failures >= max_slow_failures:
                     break
             if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
                 # Whether to rebuild the channel depends on *why* we failed.
@@ -752,6 +780,48 @@ def _get_engine() -> sa.Engine:
             _log_slow_query)
         LOG.debug('Created new MariaDB engine for thread')
     engine: sa.Engine = _local.engine
+    return engine
+
+
+def _get_bounded_engine() -> sa.Engine:
+    """Get or create a thread-local engine whose calls cannot stall.
+
+    The pooled engine from _get_engine() carries no timeouts: a query
+    against a stalled server blocks indefinitely. That is tolerable for
+    gRPC worker threads, but fatal for code running upstream of a
+    daemon's systemd watchdog pet -- issue 3586 traced simultaneous
+    watchdog SIGABRTs of sf-database on both gateways to an InnoDB
+    buffer-pool stall wedging exactly such calls. This engine sets
+    connect, read and write timeouts of BOUNDED_QUERY_TIMEOUT seconds
+    so the worst case stays well inside WatchdogSec (60s); a timed-out
+    call surfaces as OperationalError, which the bounded callers
+    already treat as 'cannot check right now'.
+
+    Configuration otherwise mirrors _get_engine() (pool_recycle, JSON
+    serializer, slow-query listeners); see that docstring for the
+    reasoning behind those values.
+    """
+    if not hasattr(_local, 'bounded_engine') or _local.bounded_engine is None:
+        url = _get_connection_url()
+        _local.bounded_engine = sa.create_engine(
+            url,
+            pool_recycle=1800,
+            echo=False,
+            connect_args={
+                'connect_timeout': BOUNDED_QUERY_TIMEOUT,
+                'read_timeout': BOUNDED_QUERY_TIMEOUT,
+                'write_timeout': BOUNDED_QUERY_TIMEOUT,
+            },
+            json_serializer=_json_dumps,
+        )
+        sa_event.listen(
+            _local.bounded_engine, 'before_cursor_execute',
+            _record_query_start_time)
+        sa_event.listen(
+            _local.bounded_engine, 'after_cursor_execute',
+            _log_slow_query)
+        LOG.debug('Created new bounded MariaDB engine for thread')
+    engine: sa.Engine = _local.bounded_engine
     return engine
 
 
@@ -4746,19 +4816,33 @@ def _direct_record_event_batch(events: list[EventRecord]) -> bool:
 
 
 def _direct_get_events_count() -> int:
-    """Return the current row count of the events table.
+    """Return an estimate of the events table row count.
 
     Used by the database daemon to refresh the database_events_rows
-    Prometheus gauge. Returns 0 on database error so a transient
-    failure does not crash the gauge-refresh loop.
-    """
-    engine = _get_engine()
-    events_table = _get_events_table()
+    Prometheus gauge from its watchdog-petting main loop, so this must
+    be cheap and bounded. It reads the statistics-based
+    information_schema TABLE_ROWS estimate rather than an exact
+    COUNT(*): with millions of event rows the full scan takes unbounded
+    time under I/O pressure and cycles the entire table -- larger than
+    the InnoDB buffer pool on real deployments -- through it on every
+    refresh. Issue 3586 traced simultaneous watchdog SIGABRTs of
+    sf-database on both gateways to exactly that. The estimate can be
+    off by tens of percent between statistics refreshes, which is fine
+    for a growth-trend gauge (and matches what mysqld-exporter reports
+    for the same quantity).
 
+    Runs on the bounded engine so a stalled server cannot hold the
+    daemon's main loop -- and with it the systemd watchdog pet --
+    hostage. Returns 0 on database error so a transient failure does
+    not crash the gauge-refresh loop.
+    """
     try:
-        with engine.connect() as conn:
-            stmt = sa.select(sa.func.count()).select_from(events_table)
-            return conn.execute(stmt).scalar() or 0
+        with _get_bounded_engine().connect() as conn:
+            stmt = sa.text(
+                'SELECT table_rows FROM information_schema.tables '
+                'WHERE table_schema = DATABASE() AND table_name = :name')
+            return int(conn.execute(
+                stmt, {'name': 'events'}).scalar() or 0)
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for events count: {e}')
         return 0
@@ -10148,10 +10232,18 @@ def _direct_set_node_daemon_state(
 
 
 def _direct_get_node_daemon_state(
-    node_uuid: UUID, daemon: str,
+    node_uuid: UUID, daemon: str, bounded: bool = False,
 ) -> Optional[NodeDaemonStateData]:
-    """Read one (node, daemon) state row, or None if absent."""
-    engine = _get_engine()
+    """Read one (node, daemon) state row, or None if absent.
+
+    With bounded=True the read runs on the bounded engine: the caller
+    is upstream of a systemd watchdog pet (Daemon.check_daemon_state's
+    poll on the database daemon) and must not block on a stalled
+    server. A timeout surfaces as OperationalError and, as with any
+    database error here, returns None -- the poll just cannot check
+    right now and will again shortly.
+    """
+    engine = _get_bounded_engine() if bounded else _get_engine()
     table = _get_node_daemon_states_table()
 
     try:
@@ -10782,14 +10874,28 @@ def _grpc_set_node_daemon_state(
 
 
 def _grpc_get_node_daemon_state(
-    node_uuid: UUID, daemon: str,
+    node_uuid: UUID, daemon: str, bounded: bool = False,
 ) -> Optional[NodeDaemonStateData]:
-    """Read one (node, daemon) state row via the database service."""
+    """Read one (node, daemon) state row via the database service.
+
+    With bounded=True the call uses a short deadline and a single slow
+    attempt: the caller is upstream of a systemd watchdog pet
+    (Daemon.check_daemon_state's poll inside idle()) and the default
+    retry budget of GRPC_RETRIES * GRPC_TIMEOUT plus sleeps exceeds
+    WatchdogSec, so a stalled database tier would SIGABRT the polling
+    daemon (issue 3586). Exhausted retries still raise
+    DatabaseUnavailable, which the poll already catches.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetNodeDaemonStateRequest(
             node_uuid=str(node_uuid), daemon=daemon)
-        reply = _grpc_call(stub.GetNodeDaemonState, request)
+        if bounded:
+            reply = _grpc_call(
+                stub.GetNodeDaemonState, request,
+                timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
+        else:
+            reply = _grpc_call(stub.GetNodeDaemonState, request)
         if not reply.found:
             return None
         d = reply.data
@@ -10868,12 +10974,18 @@ def set_node_daemon_state(
 
 
 def get_node_daemon_state(
-    node_uuid: UUID, daemon: str,
+    node_uuid: UUID, daemon: str, bounded: bool = False,
 ) -> Optional[NodeDaemonStateData]:
-    """Read one (node, daemon) state row, or None if absent."""
+    """Read one (node, daemon) state row, or None if absent.
+
+    bounded=True promises the caller a bounded worst-case wall time
+    (well inside the systemd WatchdogSec) on both the direct and gRPC
+    paths, at the cost of giving up sooner when the database is slow.
+    Pass it from any code path that runs upstream of a watchdog pet.
+    """
     if _use_database_service():
-        return _grpc_get_node_daemon_state(node_uuid, daemon)
-    return _direct_get_node_daemon_state(node_uuid, daemon)
+        return _grpc_get_node_daemon_state(node_uuid, daemon, bounded=bounded)
+    return _direct_get_node_daemon_state(node_uuid, daemon, bounded=bounded)
 
 
 def get_all_node_daemon_states(

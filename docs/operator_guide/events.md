@@ -166,7 +166,7 @@ daemon's own metrics port.
 
 | Metric | Type | Source daemon | Description |
 |--------|------|---------------|-------------|
-| `database_events_rows` | Gauge | sf-database | Current row count in the `events` table, sampled roughly every 60 seconds. Use this to watch for unchecked growth if pruning stops. |
+| `database_events_rows` | Gauge | sf-database | Estimated row count of the `events` table (the statistics-based `information_schema` estimate, matching what mysqld-exporter reports), sampled roughly every 60 seconds. It can be off by tens of percent between statistics refreshes but tracks growth trends; use it to watch for unchecked growth if pruning stops. An exact `COUNT(*)` is deliberately not used: on a large events table the full scan churns the InnoDB buffer pool and can stall the daemon's watchdog loop (issue 3586). |
 | `database_events_inserted_total` | Counter | sf-database | Events inserted, labelled by `event_type`. Watch the per-label rate for unexpected spikes. |
 | `database_events_pruned_total` | Counter | sf-database | `event_objects` rows pruned per prune run, labelled by `event_type`. The synthetic label `event_type='api-request'` covers the object-type-override sweep. |
 | `database_orphan_events_pruned_total` | Counter | sf-database | `events` rows removed by the orphan sweep. A non-zero rate here is normal after each daily prune. |

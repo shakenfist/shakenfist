@@ -420,12 +420,18 @@ class Daemon:
         # avoid a get_node round trip just to reach a daemon-state accessor. An
         # unreachable database must not propagate from here -- we just can't
         # check right now, and will again shortly.
+        #
+        # bounded=True because this poll runs inside idle(), upstream of the
+        # systemd watchdog pet: a slow database must make the poll fail fast,
+        # not block past WatchdogSec and get the daemon SIGABRT-killed. That
+        # was the coredump mechanism in issue 3586, on both the database
+        # daemon's direct path and other daemons' gRPC path.
         node_uuid = config.NODE_UUID
         if not node_uuid:
             return
         try:
             row = mariadb.get_node_daemon_state(
-                uuid.UUID(node_uuid), self.daemon_name)
+                uuid.UUID(node_uuid), self.daemon_name, bounded=True)
         except DatabaseUnavailable:
             return
         daemon_state = row.value if row is not None else None
