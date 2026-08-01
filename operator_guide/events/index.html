@@ -10947,7 +10947,7 @@ daemon's own metrics port.</p>
 <td><code>database_events_rows</code></td>
 <td>Gauge</td>
 <td>sf-database</td>
-<td>Current row count in the <code>events</code> table, sampled roughly every 60 seconds. Use this to watch for unchecked growth if pruning stops.</td>
+<td>Estimated row count of the <code>events</code> table (the statistics-based <code>information_schema</code> estimate, matching what mysqld-exporter reports), sampled roughly every 60 seconds. It can be off by tens of percent between statistics refreshes but tracks growth trends; use it to watch for unchecked growth if pruning stops. An exact <code>COUNT(*)</code> is deliberately not used: on a large events table the full scan churns the InnoDB buffer pool and can stall the daemon's watchdog loop (issue 3586).</td>
 </tr>
 <tr>
 <td><code>database_events_inserted_total</code></td>
