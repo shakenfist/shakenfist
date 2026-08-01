@@ -145,16 +145,28 @@ class AuthEndpoint(api_base.Resource):
         # cost optimisation and a corruption check, not a security
         # boundary: a well formed but wrong secret still goes through
         # the full comparison below.
-        if credentials.has_prefix(key) and not credentials.looks_valid(key):
-            namespace_from_db.add_event(
-                EVENT_TYPE_AUDIT,
-                'malformed cluster generated key presented')
-            return sf_api.error(401, 'unauthorized')
+        #
+        # This deliberately writes no event of its own. /auth is public,
+        # so anyone who knows a namespace name can reach this line, and
+        # an event here would let them drive writes into that
+        # namespace's audit log at network speed for less work than the
+        # bcrypt path costs. The failure is still recorded, by the
+        # ordinary "incorrect namespace key" event at the bottom of this
+        # handler, so the event count per attempt is unchanged from
+        # before the checksum check existed. A checksum failure tells
+        # the namespace owner nothing they could act on that the
+        # ordinary event does not.
+        malformed = (credentials.has_prefix(key)
+                     and not credentials.looks_valid(key))
+        if malformed:
+            LOG.with_fields({'namespace': namespace}).info(
+                'Malformed cluster generated key presented')
 
         # The accessor is an indexed listing of the namespace's keys
         # with the expiry filter pushed into SQL, so expired keys are
         # never bcrypt compared here -- they simply are not returned.
-        keys = namespace_from_db.keys.get('nonced_keys', {})
+        keys = {} if malformed else namespace_from_db.keys.get(
+            'nonced_keys', {})
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
             try:

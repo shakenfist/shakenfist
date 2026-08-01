@@ -1289,3 +1289,32 @@ class ReservedKeyPrefixTestCase(base.ShakenFistTestCase):
                                  'key': 'sfk_bogus'}))
         self.assertEqual(401, resp.status_code)
         mock_checkpw.assert_not_called()
+
+    def test_early_rejection_does_not_amplify_event_writes(self):
+        # /auth is public, so anyone who knows a namespace name can
+        # reach the checksum check. If it wrote its own event, a caller
+        # could drive writes into that namespace's audit log for less
+        # work than the bcrypt path costs -- cheaper per event than the
+        # exposure that already exists.
+        events = []
+        patcher = mock.patch(
+            'shakenfist.eventlog.add_event',
+            side_effect=lambda event_type, object_type, object_uuid,
+            message, duration=None, extra=None, **kwargs: events.append(
+                message))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client.post('/auth', data=json.dumps(
+            {'namespace': 'banana', 'key': 'sfk_bogus'}))
+        malformed = list(events)
+
+        events.clear()
+        self.client.post('/auth', data=json.dumps(
+            {'namespace': 'banana', 'key': 'just-wrong'}))
+        ordinary = list(events)
+
+        self.assertEqual(
+            len(ordinary), len(malformed),
+            'a malformed cluster key wrote a different number of events '
+            f'({malformed}) than an ordinary wrong key ({ordinary})')
