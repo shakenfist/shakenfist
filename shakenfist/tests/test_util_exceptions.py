@@ -114,6 +114,36 @@ class RecordExceptionTestCase(base.ShakenFistTestCase):
         util_exceptions.record_exception(exc_type, exc_value, exc_tb)
         mock_close.assert_called_once_with(42)
 
+    @mock.patch('shakenfist.util.exceptions.os.close')
+    @mock.patch('shakenfist.util.exceptions.os.makedirs',
+                side_effect=PermissionError('denied'))
+    def test_record_exception_swallows_makedirs_failure(self, mock_makedirs,
+                                                        mock_close):
+        """An unwritable exceptions directory must not raise.
+
+        record_exception is called from exception handlers (the API server
+        error path, sys.excepthook). A failure escaping here replaces the
+        exception being recorded and misattributes the original failure
+        (issue 3433).
+        """
+        exc_type, exc_value, exc_tb = self._get_exception_info()
+        # Should not raise
+        util_exceptions.record_exception(exc_type, exc_value, exc_tb)
+        # No file descriptor was opened, so none should be closed
+        mock_close.assert_not_called()
+
+    @mock.patch('shakenfist.util.exceptions.os.close')
+    @mock.patch('shakenfist.util.exceptions.os.open',
+                side_effect=OSError('disk full'))
+    @mock.patch('shakenfist.util.exceptions.os.makedirs')
+    def test_record_exception_swallows_open_failure(self, mock_makedirs,
+                                                    mock_open, mock_close):
+        """A failing open must not raise or close an undefined fd."""
+        exc_type, exc_value, exc_tb = self._get_exception_info()
+        # Should not raise
+        util_exceptions.record_exception(exc_type, exc_value, exc_tb)
+        mock_close.assert_not_called()
+
     def test_hash_is_deterministic(self):
         """Test that the same traceback produces the same hash."""
         # We can't easily test this without running the full function,

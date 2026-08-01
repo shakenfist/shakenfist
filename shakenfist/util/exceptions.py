@@ -32,13 +32,20 @@ def record_exception(
     traceback_str = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
     h = hashlib.sha256(traceback_str.encode()).hexdigest()[-8:]
-    os.makedirs(os.path.join('/srv/shakenfist/exceptions'), exist_ok=True)
 
-    flags = os.O_RDWR | os.O_CREAT
-    fd = os.open(f'/srv/shakenfist/exceptions/{h}.json', flags, 0o644)
-
+    fd = None
     data = {}
     try:
+        # This function must never raise: it is called from exception
+        # handlers (the API server error path, sys.excepthook) where a
+        # failure here would replace the exception being recorded and
+        # misattribute the original failure (issue 3433). The directory
+        # creation and open therefore sit inside the try as well.
+        os.makedirs(os.path.join('/srv/shakenfist/exceptions'), exist_ok=True)
+
+        flags = os.O_RDWR | os.O_CREAT
+        fd = os.open(f'/srv/shakenfist/exceptions/{h}.json', flags, 0o644)
+
         # One writer at a time
         fcntl.flock(fd, fcntl.LOCK_EX)
 
@@ -83,7 +90,8 @@ def record_exception(
             'recording_exception': str(e)
         }).error('Failed to record exception')
     finally:
-        os.close(fd)
+        if fd is not None:
+            os.close(fd)
 
 
 _original_excepthook = sys.excepthook
