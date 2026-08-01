@@ -348,6 +348,13 @@ Tokens minted before the `scopes` claim existed carry no claim at all
 and are likewise treated as wildcard, so an upgrade does not
 invalidate tokens already in flight.
 
+A scope of the form `<family>.*` grants every verb in one family, so
+`blob.*` is `blob.read`, `blob.write` and `blob.delete` together.
+Granting a whole family is the common case when writing a mapping
+rule, and spelling out three verbs invites getting one wrong. The
+match is on the family, not on characters: `node.*` does not reach
+`nodegroup.read`.
+
 Scoped keys are produced by the federated exchange. A scoped token is
 refused with a 403 for anything outside its scopes, and is refused for
 any endpoint whose scope cannot be derived — a scope system which
@@ -356,12 +363,31 @@ allows what it cannot classify is not one.
 ### Administrative endpoints
 
 Endpoints guarded by `caller_is_admin` require **both** the `system`
-namespace and an explicit `admin` scope, in addition to the derived
+namespace and the `cluster-admin` scope, in addition to the derived
 scope for the operation itself. Being in the system namespace used to
 be sufficient, which meant a narrowly scoped key minted into `system`
 could reach every administrative endpoint. Unscoped keys carry the
 wildcard and satisfy all of this, so existing administrative
 automation is unaffected.
+
+`cluster-admin` is hyphenated rather than dotted because it is not a
+`<family>.<verb>` scope and does not name a family. Of the twenty
+methods `caller_is_admin` guards, only two derive an `admin.*` scope;
+the rest derive `node.*`, `issuer.*`, `auth.*` and `blob.read`. No
+family wildcard can produce it, which is why it carries no dot.
+
+Requiring both axes is deliberate. `cluster-admin` says the caller may
+act administratively at all; the derived scope says which operation.
+That is what makes a least-privilege administrative credential
+possible:
+
+```
+scopes: ["cluster-admin", "node.read"]
+```
+
+grants cluster-wide visibility to a monitoring workload that provably
+cannot delete a node. If administration were a single all-or-nothing
+flag, that credential could not be expressed.
 
 ## Secrets and the event log
 

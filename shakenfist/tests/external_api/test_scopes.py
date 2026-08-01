@@ -108,7 +108,7 @@ class DerivationTestCase(base.ShakenFistTestCase):
 class SatisfiesTestCase(base.ShakenFistTestCase):
     def test_wildcard_satisfies_everything(self):
         self.assertTrue(scopes.satisfies(['*'], 'blob.read'))
-        self.assertTrue(scopes.satisfies(['*'], 'admin'))
+        self.assertTrue(scopes.satisfies(['*'], scopes.ADMIN))
 
     def test_absent_claim_is_treated_as_wildcard(self):
         # Tokens minted before the scopes claim existed carry no
@@ -130,6 +130,43 @@ class SatisfiesTestCase(base.ShakenFistTestCase):
         # only ever bites deliberately scoped credentials.
         self.assertFalse(scopes.satisfies(['blob.read'], None))
         self.assertTrue(scopes.satisfies(['*'], None))
+
+
+class FamilyWildcardTestCase(base.ShakenFistTestCase):
+    """"<family>.*" grants every verb in one family and no more."""
+
+    def test_family_wildcard_grants_every_verb(self):
+        for verb in ('read', 'write', 'delete'):
+            self.assertTrue(
+                scopes.satisfies(['blob.*'], f'blob.{verb}'),
+                f'blob.* should grant blob.{verb}')
+
+    def test_family_wildcard_does_not_cross_families(self):
+        self.assertFalse(scopes.satisfies(['blob.*'], 'instance.read'))
+
+    def test_family_wildcard_is_not_a_string_prefix(self):
+        # The match is on the family, not on characters, so a family
+        # whose name merely starts with another's is unaffected. Get
+        # this wrong and node.* silently reaches nodegroup.delete.
+        self.assertFalse(scopes.satisfies(['node.*'], 'nodegroup.read'))
+        self.assertFalse(scopes.satisfies(['node.*'], 'nodegroup.delete'))
+
+    def test_family_wildcard_does_not_grant_administration(self):
+        # ADMIN is dotless so that no family wildcard can produce it.
+        # If it ever gains a dot this test fails, which is the point.
+        self.assertFalse(scopes.satisfies(['cluster-admin.*'], scopes.ADMIN))
+        self.assertFalse(scopes.satisfies(['admin.*'], scopes.ADMIN))
+        self.assertNotIn('.', scopes.ADMIN)
+
+    def test_family_wildcard_does_not_satisfy_an_underivable_scope(self):
+        # Default deny survives the new matcher.
+        self.assertFalse(scopes.satisfies(['blob.*'], None))
+
+    def test_admin_family_wildcard_still_needs_the_admin_scope(self):
+        # admin.* covers the derived scope for an admin endpoint but
+        # says nothing about whether the caller may administer at all.
+        self.assertTrue(scopes.satisfies(['admin.*'], 'admin.read'))
+        self.assertFalse(scopes.satisfies(['admin.*'], scopes.ADMIN))
 
 
 class RealEndpointDerivationTestCase(base.ShakenFistTestCase):
@@ -267,10 +304,11 @@ class EnforcementTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
 
     def test_admin_endpoints_need_both_admin_and_the_derived_scope(self):
-        # Decision 3 requires both: 'admin' says the token may act
-        # administratively at all, and the derived scope says which
+        # Decision 3 requires both: 'cluster-admin' says the token may
+        # act administratively at all, and the derived scope says which
         # operation. Holding one without the other is not enough.
-        admin_only = self._scoped_key('system', 'a', 'sekrit1', ['admin'])
+        admin_only = self._scoped_key(
+            'system', 'a', 'sekrit1', [scopes.ADMIN])
         self.assertEqual(403, self.client.get(
             '/admin/locks',
             headers={'Authorization': admin_only}).status_code)
@@ -282,7 +320,20 @@ class EnforcementTestCase(base.ShakenFistTestCase):
             headers={'Authorization': derived_only}).status_code)
 
         both = self._scoped_key(
-            'system', 'c', 'sekrit3', ['admin', 'admin.read'])
+            'system', 'c', 'sekrit3', [scopes.ADMIN, 'admin.read'])
         self.assertEqual(200, self.client.get(
             '/admin/locks',
             headers={'Authorization': both}).status_code)
+
+    def test_least_privilege_admin_token(self):
+        # The capability the two axis design exists to provide: a
+        # monitoring credential with cluster wide visibility that
+        # cannot destroy anything. Collapse administration into one
+        # flag and this becomes inexpressible.
+        readonly = self._scoped_key(
+            'system', 'd', 'sekrit4', [scopes.ADMIN, 'node.read'])
+        self.assertEqual(200, self.client.get(
+            '/nodes', headers={'Authorization': readonly}).status_code)
+        self.assertEqual(403, self.client.delete(
+            '/nodes/nosuchnode',
+            headers={'Authorization': readonly}).status_code)

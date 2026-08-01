@@ -75,7 +75,9 @@ class SomeOddEndpoint(api_base.Resource):
 
 The wildcard scope `*` means "everything", and is what legacy
 (unscoped) keys carry, so nothing an operator has today changes
-behaviour.
+behaviour. `<family>.*` means every verb in one family, matched on the
+family rather than on characters so that `node.*` cannot reach
+`nodegroup.read`.
 
 **Growing the vocabulary.** A new verb is added only when an operator
 genuinely needs to grant that action separately from `write`. The test
@@ -115,10 +117,25 @@ the guarantee true by construction rather than by review.
 pass every admin endpoint — a scoped credential escalating to full
 cluster administration.
 
-Admin endpoints will require **both** the `system` namespace and an
-`admin` scope on the token. Legacy unscoped keys carry the wildcard,
-so existing admin automation is unaffected; only a deliberately scoped
-system-namespace key is constrained, which is the entire point.
+Admin endpoints will require **both** the `system` namespace and a
+`cluster-admin` scope on the token. Legacy unscoped keys carry the
+wildcard, so existing admin automation is unaffected; only a
+deliberately scoped system-namespace key is constrained, which is the
+entire point.
+
+The scope is hyphenated rather than dotted because it is not a
+`<family>.<verb>` and names no family: of the twenty methods
+`caller_is_admin` guards, only two derive an `admin.*` scope and the
+rest derive `node.*`, `issuer.*`, `auth.*` and `blob.read`. Spelling
+it `admin` invited reading it as the admin family's wildcard, which
+was wrong in both directions — too narrow for what it gates, too
+broad for what it grants. Carrying no dot also means no family
+wildcard can synthesise it.
+
+Both axes are required, and that is the feature rather than the
+friction. `["cluster-admin", "node.read"]` is a monitoring credential
+with cluster-wide visibility that provably cannot delete a node, and
+that is not expressible if administration is one all-or-nothing flag.
 
 ### Object model (resolves open question 3's leftovers)
 
@@ -335,8 +352,12 @@ issuer-generic without shipping an Authentik dependency.
 2. **Authentication inverts to opt-out in this phase** (operator,
    2026-07-29). Measured as cheap: 120 of 124 methods already
    authenticate, and the four exceptions are the correct ones.
-3. **Admin endpoints require an `admin` scope** (operator,
-   2026-07-29). Closes scoped-key escalation inside `system`.
+3. **Admin endpoints require a `cluster-admin` scope** (operator,
+   2026-07-29). Closes scoped-key escalation inside `system`. Named
+   `admin` when first implemented; renamed 2026-08-01 (operator)
+   because it named no family and read as the admin family's
+   wildcard. The same review confirmed both axes stay required, so a
+   least-privilege administrative credential remains expressible.
 4. **Full abuse resistance in v1** (operator, 2026-07-29). The
    endpoint is unauthenticated by nature and is the most exposed
    surface in the API.
@@ -354,13 +375,18 @@ issuer-generic without shipping an Authentik dependency.
    that failing a bad checksum early at `/auth` is sound rather than a
    guess. Carries a documented upgrade caveat for the negligible but
    non-zero case of an existing secret already starting with `sfk_`.
+10. **Family wildcards `<family>.*`** (operator, 2026-08-01).
+    Granting a whole family is the common case in a mapping rule and
+    enumerating three verbs invites getting one wrong. Matched on the
+    family rather than on string prefixes, so `node.*` cannot reach
+    `nodegroup.delete`.
 
 ## Step plan
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 3a | high | opus | none | Enforcement inversion, no scopes yet. Move `verify_token` onto `api_base.Resource.method_decorators` — but **not** `log_token_use`: measurement showed 3 of the 120 authenticated methods deliberately omit it, and `AuthNamespacesEndpoint.post` writes its own richer namespace-creation events instead, so moving it universally would double-log there and would not be the pure refactor this step is supposed to be. Leave it per-method; remove the 120 per-method `@api_base.verify_token` decorators; add an `@api_base.public` marker and apply it to exactly `Root.get`, `Livez.get`, `Readyz.get`, `AuthEndpoint.post`. Class-level decorators run outermost so auth precedes ownership checks — verify that ordering with a test, it is the load-bearing assumption. Add the structural test: enumerate `app.url_map` and assert every rule's methods either authenticate or are `@public`. Add a pre-commit check modelled on `tools/check-from-db-by-ref-namespace.sh` that fails if a resource method is added without either. No behaviour change intended: the full existing suite must pass unmodified. Commit subject: "api: authenticate every endpoint by default." |
-| 3b | high | opus | none | Scope vocabulary and enforcement. Derivation (`<family>.<verb>` from resource class and method name, families defaulting from the class name with a `scope_family` class attribute override, verbs `read`/`write`/`delete`); the `@api_base.scope(verb=..., family=...)` annotation for overrides; enforcement on the same universal path added in 3a; wildcard `*` for tokens minted from unscoped keys; default-deny where derivation is impossible. Add the `admin` scope requirement to `caller_is_admin` per Decision 3. Publish the vocabulary and derivation rule in the developer guide. Tests: derivation for each verb, override honoured, wildcard passes everything, scoped token denied outside its scopes, and an admin endpoint refused to a scoped `system` key. Commit subject: "auth: derive and enforce token scopes." |
+| 3b | high | opus | none | Scope vocabulary and enforcement. Derivation (`<family>.<verb>` from resource class and method name, families defaulting from the class name with a `scope_family` class attribute override, verbs `read`/`write`/`delete`); the `@api_base.scope(verb=..., family=...)` annotation for overrides; enforcement on the same universal path added in 3a; wildcard `*` for tokens minted from unscoped keys; default-deny where derivation is impossible. Add the `cluster-admin` scope requirement to `caller_is_admin` per Decision 3 (delivered as `admin` and renamed on 2026-08-01; see that decision). Publish the vocabulary and derivation rule in the developer guide. Tests: derivation for each verb, override honoured, wildcard passes everything, scoped token denied outside its scopes, and an admin endpoint refused to a scoped `system` key. Commit subject: "auth: derive and enforce token scopes." |
 | 3c | medium | opus | none | Cluster-minted credential format, absorbed from the old phase 7. A `shakenfist/util/credentials.py` (or similar) with `generate()` producing `sfk_` + 32 base62 random + 6 base62 CRC32 checksum, and `looks_valid(secret)` verifying prefix and checksum. Reserve the prefix: key create and update reject an operator-supplied secret starting with `sfk_`, mirroring the existing `_service_key` name reservation in `external_api/auth.py`. Wire generation into `get_api_token()`'s `_service_key_*` secrets and add a "generate one for me" option to operator key creation (a request with no `key` returns a generated one — the response already returns the key name, so returning the secret is an additive change). Early rejection at `/auth`: a presented secret carrying the prefix but failing the checksum is refused before any bcrypt comparison. Tests: round trip, checksum catches single-character corruption, prefix reserved at create and update, early rejection fires, an operator secret without the prefix is unaffected. Document the upgrade caveat (an existing secret beginning with `sfk_` must be rotated) in the operator guide. Commit subject: "auth: give cluster-minted key secrets a recognisable format." |
 | 3d | medium | opus | none | `TrustedIssuer` object, following the `NamespaceKey` recipe exactly (`shakenfist/namespace_key.py`, `schema/namespace_key_data.py`, the `mariadb.py` three-layer accessors, `protos/database.proto`, `daemons/database/main.py` handlers, `OBJECT_NAMES_TO_CLASSES`). System-namespace-only CRUD endpoints under `/auth/issuers`. Unique on `name`. Run `tox -e genprotos`, never `grpc_tools` directly. Commit subject: "objects: add the TrustedIssuer object." |
 | 3e | medium | opus | none | `MappingRule` object, same recipe, owned by its namespace, unique on `(namespace, name)`. CRUD under `/auth/namespaces/{namespace}/rules`, gated by `requires_namespace_ownership` (already defined in `external_api/auth.py` and used by key creation). Claim matcher validation at creation: exact strings or lists of strings only, at least one bound claim, referenced issuer must exist. Rules are deleted with their namespace. Commit subject: "objects: add the MappingRule object." |
@@ -429,7 +455,8 @@ the security boundary of this whole plan. After 3i:
       explicit, greppable and documented; legacy unscoped keys carry
       the wildcard and behave exactly as before.
 - [ ] Admin endpoints require both the `system` namespace and the
-      `admin` scope.
+      `cluster-admin` scope, and a `["cluster-admin", "node.read"]`
+      credential can read a node but not delete one.
 - [ ] `TrustedIssuer` and `MappingRule` are database-backed objects
       with events, CRUD APIs, and the correct ownership gates; rules
       die with their namespace.

@@ -30,7 +30,21 @@ WILDCARD = '*'
 
 # Granted separately from everything else, because holding it means
 # administering the cluster rather than using it.
-ADMIN = 'admin'
+#
+# Deliberately hyphenated rather than dotted. This is not a
+# "<family>.<verb>" scope and does not name a family: of the twenty
+# methods guarded by caller_is_admin, only two derive an admin.* scope
+# and the rest derive node.*, issuer.*, auth.* and blob.read. Calling
+# it "admin" invited reading it as the admin family's wildcard, which
+# would be wrong in both directions -- too narrow for what it gates,
+# and too broad for what it grants, since a caller still needs the
+# derived scope for the operation as well.
+#
+# Requiring both axes is the point. A rule granting cluster-admin plus
+# node.read mints a token with cluster wide visibility that provably
+# cannot delete a node, which is not expressible if administration is
+# a single all-or-nothing flag.
+ADMIN = 'cluster-admin'
 
 _LEADING_WORD = re.compile(r'[A-Z][a-z0-9]*')
 
@@ -101,6 +115,11 @@ def required_scope(resource_class, http_method, override=None):
     return f'{family}.{verb}'
 
 
+def family_wildcard(family):
+    """The scope granting every verb in ``family``."""
+    return f'{family}.{WILDCARD}'
+
+
 def satisfies(held, required):
     """Does a token holding ``held`` satisfy ``required``?
 
@@ -108,6 +127,12 @@ def satisfies(held, required):
     everything, which is what keeps every pre-existing key working
     unchanged. A required scope of None -- derivation failed -- is
     satisfied only by the wildcard.
+
+    A held "<family>.*" satisfies any verb in that family. Granting a
+    whole family is the common case when writing a mapping rule, and
+    spelling out three verbs invites getting one wrong. The match is
+    on the family portion rather than on string prefixes, so
+    "node.*" does not reach a hypothetical "nodegroup.read".
     """
     if held is None:
         # No scopes claim at all. Tokens minted before this feature
@@ -122,4 +147,14 @@ def satisfies(held, required):
     if required is None:
         return False
 
-    return required in held
+    if required in held:
+        return True
+
+    # Family wildcards only apply to dotted scopes. ADMIN carries no
+    # dot precisely so that nothing can wildcard its way into
+    # administrative privilege.
+    family, dot, verb = required.partition('.')
+    if dot and verb:
+        return family_wildcard(family) in held
+
+    return False
