@@ -10543,7 +10543,11 @@ no window during which it still works because a cleanup task has not run yet.</p
 <p>Tidying up expired keys is a separate, purely cosmetic concern. The cluster
 daemon sweeps every fifteen minutes and soft-deletes keys which expired more
 than <code>NAMESPACE_KEY_REAP_GRACE</code> seconds ago; the standard object reaper then
-hard-deletes them once they have been soft-deleted for <code>CLEANER_DELAY</code>.</p>
+hard-deletes them once they have been soft-deleted for <code>CLEANER_DELAY</code>. A key
+whose static row has no state row at all (a "zombie", see the orphan
+reconciliation section of the <a href="../database/">database guide</a>) is skipped by
+this sweep — the hourly orphan reconciliation repairs it, after which the
+normal reap path removes it.</p>
 <table>
 <thead>
 <tr>
