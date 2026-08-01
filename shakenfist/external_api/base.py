@@ -76,6 +76,20 @@ def caller_is_admin(func):
     return wrapper
 
 
+def caller_scopes():
+    """The scopes the requesting token holds, or None for wildcard.
+
+    None means "unrestricted" here, covering both a legacy token with
+    no scopes claim and one explicitly carrying the wildcard. Callers
+    deriving a new credential's scopes from the caller's should treat
+    None as "no restriction to inherit".
+    """
+    held = get_jwt().get('scopes')
+    if held is None or api_scopes.WILDCARD in held:
+        return None
+    return list(held)
+
+
 def resolve_lookup_namespace(body_namespace, kind):
     # Decide which namespace a `*_ref` lookup should be scoped to.
     #

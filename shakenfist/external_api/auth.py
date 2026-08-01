@@ -369,11 +369,18 @@ def _validate_key_secret(key):
     return key, None
 
 
-def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None):
+def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None,
+                            allow_generation=False):
     """Create or rotate a namespace key. ``ns`` is a Namespace object.
 
     Returns the key name, or a dict carrying the generated secret when
     the caller asked the cluster to pick one.
+
+    ``allow_generation`` is set only by the create path. Rotation must
+    not treat a missing secret as "pick one for me": a PUT which
+    forgot its body would silently replace a live credential with one
+    the caller then has to notice in the response, which is a
+    destructive outcome for a typo.
     """
     if not key_name:
         return sf_api.error(400, 'no key name specified')
@@ -387,6 +394,8 @@ def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None):
     # bcrypt hash is stored, so it cannot be recovered afterwards.
     generated = False
     if not key:
+        if not allow_generation:
+            return sf_api.error(400, 'no key specified')
         key = credentials.generate()
         generated = True
     else:
@@ -398,7 +407,21 @@ def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None):
     if err:
         return err
 
-    ns.add_key(key_name, key, expiry=expiry)
+    # A key may not be created with more privilege than the caller
+    # creating it. Key creation is gated by namespace ownership rather
+    # than by caller_is_admin, and a namespace always owns itself, so
+    # without this a token scoped auth.write (or auth.*, which the
+    # family wildcard actively encourages) could mint an unscoped key
+    # in its own namespace and re-authenticate carrying the wildcard.
+    # In the system namespace that reaches cluster-admin, which would
+    # route straight around Decision 3.
+    #
+    # None from caller_scopes() means the caller is unrestricted, which
+    # is every operator holding a legacy key, so their keys keep being
+    # created unscoped exactly as before.
+    inherited = api_base.caller_scopes()
+
+    ns.add_key(key_name, key, expiry=expiry, scopes=inherited)
     if generated:
         return {'key_name': key_name, 'key': key}
     return key_name
@@ -427,13 +450,18 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
             ('key_name', 'body', 'string', 'The name of the key.', True),
-            ('key', 'body', 'string', 'The authentication key.', True),
+            ('key', 'body', 'string',
+             'Optional. The authentication key. If omitted the cluster '
+             'generates one and returns it in the response, which is the '
+             'only time it can be read.', False),
             ('expiry', 'body', 'number',
              'Optional. The time, in seconds since the unix epoch, at which '
              'this key stops working. Must be in the future. If omitted the '
              'key never expires.', False)
         ],
-        [(200, 'The name of the created key.', 'newkey'),
+        [(200, 'The name of the created key, or an object carrying the '
+               'generated secret when no key was supplied.',
+          '{"key_name": "newkey", "key": "sfk_..."}'),
          (400, 'Expiry is not a number, or is not in the future.', None),
          (403, 'Illegal key name.', None),
          (404, 'Namespace not found.', None),
@@ -448,7 +476,8 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'create auth key request from REST API',
             extra={'key': key_name})
         return _namespace_keys_putpost(
-            namespace_from_db, key_name, key, expiry=expiry)
+            namespace_from_db, key_name, key, expiry=expiry,
+            allow_generation=True)
 
 
 class AuthNamespaceKeyEndpoint(api_base.Resource):

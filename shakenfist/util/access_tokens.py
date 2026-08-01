@@ -32,10 +32,18 @@ def create_token(
     # 'scopes' at all. api_scopes.satisfies() treats a missing claim as
     # wildcard for exactly that reason: refusing them would invalidate
     # every token in flight across an upgrade.
+    #
+    # None and an empty list mean different things here and must not be
+    # conflated. None is "no scopes recorded", which is every legacy
+    # key, and mints a wildcard. [] is "recorded as granting nothing",
+    # and must mint a token which satisfies nothing. Testing scopes for
+    # truthiness makes an empty grant mean total access, which is the
+    # worst direction for an authorisation bug to fail in.
     claims = {
         'iss': config.ZONE,
         'nonce': nonce,
-        'scopes': list(scopes) if scopes else [api_scopes.WILDCARD]
+        'scopes': (list(scopes) if scopes is not None
+                   else [api_scopes.WILDCARD])
     }
     token = create_access_token(
         identity=f'{ns.uuid}:{keyname}',

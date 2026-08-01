@@ -15,8 +15,8 @@ from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
-from shakenfist.util import credentials
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.util import credentials
 
 
 def _clean_traceback(resp):
@@ -619,6 +619,27 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(404, resp.status_code)
         self.assertEqual('key does not exist', resp.get_json()['error'])
+
+    def test_update_key_without_a_secret_is_refused(self):
+        # Secret generation belongs to the create path only. A rotation
+        # which forgot its body must not silently replace a live
+        # credential with a generated one -- the caller's existing
+        # secret would stop working on a typo.
+        self._add_key('rotate-me', 'original')
+        original = Namespace.from_db('system').lookup_key('rotate-me')
+
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/rotate-me',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({}))
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('no key specified', resp.get_json()['error'])
+
+        unchanged = Namespace.from_db('system').lookup_key('rotate-me')
+        self.assertEqual(original.nonce, unchanged.nonce)
+        self.assertTrue(bcrypt.checkpw(
+            'original'.encode('utf-8'), base64.b64decode(unchanged.key)))
 
 
 class ExternalApiTestCase(base.ShakenFistTestCase):

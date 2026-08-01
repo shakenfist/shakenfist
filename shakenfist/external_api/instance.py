@@ -1424,6 +1424,11 @@ ca=-----BEGIN CERTIFICATE-----\nMIIEF...16br/Fw==\n-----END CERTIFICATE-----\n""
 
 
 class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
+    # A .vv file carries the SPICE connection credentials for the
+    # guest, so this hands out interactive keyboard and mouse control
+    # rather than an observation. Deriving instance.read would let a
+    # credential granted only to watch instances take one over.
+    @api_base.scope(verb='console')
     @swag_from(api_base.swagger_helper(
         'instances',
         ('Fetch a virt-viewer .vv file describing how to connect to the VDI console '
@@ -1476,6 +1481,10 @@ instance_vdiconsoleproxy_get_example = """{
 
 
 class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
+    # Mints an Ed25519 console token, which is a credential for full
+    # interactive control of the guest. Same reasoning as the .vv file
+    # helper above: this is not a read.
+    @api_base.scope(verb='console')
     @swag_from(api_base.swagger_helper(
         'instances',
         ('Mint a short lived Kerbside VDI console token and return a '
@@ -1650,6 +1659,11 @@ class InstanceAgentGetEndpoint(api_base.Resource):
 
 
 class InstanceAgentExecuteEndpoint(api_base.Resource):
+    # Arbitrary command execution inside the guest is a different kind
+    # of privilege from creating an instance, and an operator writing a
+    # mapping rule would sensibly grant one without the other, so it
+    # gets its own verb rather than riding on instance.write.
+    @api_base.scope(verb='execute')
     @swag_from(api_base.swagger_helper(
         'instances', 'Execute a command within an instance via the Shaken Fist agent.',
         [

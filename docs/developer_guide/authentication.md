@@ -339,6 +339,18 @@ deliberate and greppable; `tools/check-endpoint-authentication.sh`
 requires the decorator form to be outermost so it cannot be swallowed
 by another decorator.
 
+Two verbs exist only as overrides, because the HTTP method describes
+the mechanism rather than the privilege:
+
+| Verb | Endpoints | Why not the derived verb |
+|------|-----------|--------------------------|
+| `console` | `/instances/{ref}/vdiconsolehelper`, `/instances/{ref}/vdiconsoleproxy` | Both are `GET`, but both return credentials for interactive keyboard and mouse control of the guest. `instance.read` must mean observation, or a monitoring credential can take a machine over. |
+| `execute` | `/instances/{ref}/agent/execute` | Arbitrary command execution inside a guest is a different privilege from creating an instance, and an operator would sensibly grant one without the other. |
+
+Adding a verb is a vocabulary decision, not a convenience: the test is
+whether anyone would sensibly write a mapping rule granting it alone.
+The full set is pinned by a test over the real routing table.
+
 ### Wildcards and compatibility
 
 A key with no scopes recorded mints a token carrying the wildcard `*`,

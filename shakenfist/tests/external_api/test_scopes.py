@@ -13,6 +13,7 @@ import logging
 import sys
 
 import flask_restful
+from flask_jwt_extended import decode_token
 
 from shakenfist import mariadb
 from shakenfist.external_api import app as external_api
@@ -207,6 +208,36 @@ class RealEndpointDerivationTestCase(base.ShakenFistTestCase):
             'vocabulary decision and a renamed one silently changes '
             'what existing rules grant.')
 
+    # The three derived verbs, plus the ones only reachable through an
+    # @api_base.scope override. Adding a verb is a vocabulary decision:
+    # the test is whether an operator would sensibly grant it alone.
+    EXPECTED_VERBS = {'read', 'write', 'delete', 'console', 'execute'}
+
+    def test_derived_verbs_are_as_expected(self):
+        found = set()
+        for rule in external_api.app.url_map.iter_rules():
+            view = external_api.app.view_functions.get(rule.endpoint)
+            resource = getattr(view, 'view_class', None)
+            if resource is None or not issubclass(
+                    resource, flask_restful.Resource):
+                continue
+            for method in rule.methods:
+                if method in ('OPTIONS', 'HEAD'):
+                    continue
+                handler = getattr(resource, method.lower(), None)
+                if handler is None:
+                    continue
+                required = scopes.required_scope(
+                    resource, method, getattr(handler, '_sf_scope', None))
+                if required:
+                    found.add(required.split('.', 1)[1])
+
+        self.assertEqual(
+            self.EXPECTED_VERBS, found,
+            'The set of scope verbs changed. A new verb is only worth '
+            'having if an operator would sensibly grant it on its own, '
+            'so this is a deliberate decision rather than a detail.')
+
 
 class EnforcementTestCase(base.ShakenFistTestCase):
     """End to end: a scoped token may do only what it was granted."""
@@ -261,12 +292,115 @@ class EnforcementTestCase(base.ShakenFistTestCase):
                                headers={'Authorization': token})
         self.assertEqual(200, resp.status_code)
 
+    def test_a_key_granted_nothing_can_do_nothing(self):
+        # An empty scope list is "granted nothing", which is a
+        # different thing from the None of a legacy key. Testing the
+        # list for truthiness conflates them and turns a grant of
+        # nothing into a grant of everything.
+        token = self._scoped_key('banana', 'empty', 'sekrit0', [])
+        self.assertEqual(403, self.client.get(
+            '/instances', headers={'Authorization': token}).status_code)
+
+        # Assert on the claim too, so this fails for the right reason
+        # rather than for any incidental 403.
+        with external_api.app.app_context():
+            claims = decode_token(token.split(' ', 1)[1])
+        self.assertEqual([], claims['scopes'])
+
     def test_scoped_token_allowed_within_its_scope(self):
         token = self._scoped_key('banana', 'scoped', 'sekrit',
                                  ['instance.read'])
         resp = self.client.get('/instances',
                                headers={'Authorization': token})
         self.assertEqual(200, resp.status_code)
+
+    def test_a_scoped_token_cannot_mint_a_broader_key(self):
+        # Key creation is gated by namespace ownership, and a namespace
+        # always owns itself, so without scope inheritance a token
+        # holding auth.write could create an unscoped key beside itself
+        # and re-authenticate carrying the wildcard. That is a complete
+        # bypass of scoping, reachable by any scoped credential.
+        token = self._scoped_key('banana', 'writer', 'sekrit1',
+                                 ['auth.write', 'auth.read'])
+
+        resp = self.client.post(
+            '/auth/namespaces/banana/keys',
+            headers={'Authorization': token},
+            data=json.dumps({'key_name': 'escalated'}))
+        self.assertEqual(200, resp.status_code)
+        minted = resp.get_json()['key']
+
+        resp = self.client.post(
+            '/auth',
+            data=json.dumps({'namespace': 'banana', 'key': minted}))
+        self.assertEqual(200, resp.status_code)
+        escalated = 'Bearer %s' % resp.get_json()['access_token']
+
+        # The derived key inherited its creator's scopes rather than
+        # becoming a wildcard.
+        with external_api.app.app_context():
+            claims = decode_token(escalated.split(' ', 1)[1])
+        self.assertEqual(['auth.write', 'auth.read'], claims['scopes'])
+
+        self.assertEqual(403, self.client.get(
+            '/instances', headers={'Authorization': escalated}).status_code)
+
+    def test_an_unscoped_caller_still_creates_unscoped_keys(self):
+        # The compatibility half: an operator holding a legacy key must
+        # keep creating ordinary unrestricted keys.
+        token = self._unscoped_token('banana', 'bacon')
+
+        resp = self.client.post(
+            '/auth/namespaces/banana/keys',
+            headers={'Authorization': token},
+            data=json.dumps({'key_name': 'ordinary'}))
+        self.assertEqual(200, resp.status_code)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({
+                'namespace': 'banana', 'key': resp.get_json()['key']}))
+        self.assertEqual(200, resp.status_code)
+        derived = 'Bearer %s' % resp.get_json()['access_token']
+
+        self.assertEqual(200, self.client.get(
+            '/instances', headers={'Authorization': derived}).status_code)
+
+    def test_instance_read_does_not_grant_console_control(self):
+        # A console helper hands out SPICE credentials, which is
+        # interactive keyboard and mouse control of the guest. The
+        # design's worked example is a credential that can watch but
+        # not destroy; a "read" scope that can drive the machine makes
+        # that promise meaningless.
+        token = self._scoped_key('banana', 'watcher', 'sekrit',
+                                 ['instance.read'])
+
+        for path in ('/instances/whatever/vdiconsolehelper',
+                     '/instances/whatever/vdiconsoleproxy'):
+            resp = self.client.get(path, headers={'Authorization': token})
+            self.assertEqual(403, resp.status_code, path)
+            self.assertIn('not scoped', resp.get_json()['error'])
+
+    def test_instance_write_does_not_grant_in_guest_execution(self):
+        token = self._scoped_key('banana', 'builder', 'sekrit',
+                                 ['instance.write'])
+        resp = self.client.post(
+            '/instances/whatever/agent/execute',
+            headers={'Authorization': token},
+            data=json.dumps({'command_line': 'id'}))
+        self.assertEqual(403, resp.status_code)
+
+    def test_the_scope_override_reaches_enforcement(self):
+        # The @api_base.scope override is only useful if the attribute
+        # survives the decorator stack and is read off the bound method
+        # at dispatch. Granting exactly the overridden scope proves the
+        # whole path, not just the derivation helper.
+        token = self._scoped_key('banana', 'operator', 'sekrit',
+                                 ['instance.console'])
+        resp = self.client.get('/instances/whatever/vdiconsolehelper',
+                               headers={'Authorization': token})
+        # 404 because the instance does not exist -- but the scope
+        # check passed, which is what this is pinning.
+        self.assertEqual(404, resp.status_code)
 
     def test_scoped_token_refused_outside_its_scope(self):
         token = self._scoped_key('banana', 'scoped', 'sekrit',
