@@ -136,7 +136,15 @@ class Monitor(daemon.Daemon):
         self.last_logged_resources = 0
 
     def _get_stats(self):
-        n = Node.from_db(config.NODE_NAME)
+        # This periodic sweep can race deletion of this node from the cluster
+        # (issue 3591). That is expected, not an error, so suppress the
+        # "non-existent object" audit event and skip the sweep entirely --
+        # publishing metrics or events for a deleted node would recreate rows
+        # for it.
+        n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+        if not n:
+            LOG.info('Skipping stats collection, node absent from database')
+            return None
 
         old_metrics = mariadb.get_node_metrics(config.NODE_UUID) or {}
         timestamp = time.time()
@@ -555,7 +563,10 @@ class Monitor(daemon.Daemon):
             try:
                 result = node_health.evaluate(checks, types_by_identity)
                 health_gauge.set(1.0 if result.healthy else 0.0)
-                n = Node.from_db(config.NODE_NAME)
+                # Like _get_stats, this lookup can race deletion of this node
+                # from the cluster (issue 3591) -- that's expected, not an
+                # audit-worthy error.
+                n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
                 if n:
                     node_health.apply_result(n, result)
             except Exception as e:
@@ -606,6 +617,9 @@ class Monitor(daemon.Daemon):
 
         def update_metrics():
             stats = self._get_stats()
+            if stats is None:
+                # The sweep raced deletion of this node; nothing to publish.
+                return
             for metric in stats:
                 if metric not in gauges:
                     gauges[metric] = Gauge(metric, '')
