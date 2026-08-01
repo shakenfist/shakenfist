@@ -11055,7 +11055,7 @@ management session, not delegated.</p>
 <td>Land this plan: <code>docs/plans/PLAN-release-v0.3.md</code> + <code>index.md</code> row + <code>order.yml</code> entry, PR into <code>develop</code></td>
 <td>low</td>
 <td>(management)</td>
-<td>In progress (this PR)</td>
+<td>Complete (PR #465, merged 2026-07-30)</td>
 </tr>
 <tr>
 <td>2</td>
@@ -11111,21 +11111,21 @@ management session, not delegated.</p>
 <td>Confirm the <code>release</code> environment (required reviewer) and the <code>release.yml</code> runner labels are live</td>
 <td>low</td>
 <td>(operator)</td>
-<td>Not started</td>
+<td>Complete: <code>release</code> environment exists (API-confirmed 2026-07-30); runners confirmed online by the operator (2026-08-02)</td>
 </tr>
 <tr>
 <td>10</td>
 <td>Merge the prep PR(s) from steps 1-4 into <code>develop</code></td>
 <td>low</td>
 <td>(operator)</td>
-<td>Not started</td>
+<td>Complete (PR #465 merged; all 12 CI checks green, including the extended package-smoke)</td>
 </tr>
 <tr>
 <td>11</td>
 <td>Retitle <code>CHANGELOG.md</code> <code>## [Unreleased]</code> to <code>## [0.3.0] - YYYY-MM-DD</code> (tag day) and add a fresh empty <code>[Unreleased]</code> heading; land on <code>develop</code> immediately before the bump</td>
 <td>low</td>
 <td>sonnet</td>
-<td>Not started</td>
+<td>Complete (2026-08-02, committed on <code>develop</code> beneath the bump; the duplicate <code>### Fixed</code> headings merged into one)</td>
 </tr>
 <tr>
 <td>12</td>
