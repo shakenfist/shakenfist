@@ -9,7 +9,9 @@ tests here care as much about who is refused as about what works.
 import json
 import logging
 import sys
+from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -133,6 +135,71 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
     def test_delete_of_an_unknown_issuer_is_404(self):
         resp = self.client.delete(
             '/auth/issuers/nope', headers={'Authorization': self.admin})
+        self.assertEqual(404, resp.status_code)
+
+    def test_a_deleted_issuer_is_gone_immediately(self):
+        # Not "gone once the reaper runs". Until the row is collected
+        # the object still exists, so every read path has to agree that
+        # this cluster no longer trusts it.
+        self._create()
+        self.assertEqual(200, self.client.delete(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin}).status_code)
+
+        self.assertEqual(404, self.client.get(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin}).status_code)
+
+        resp = self.client.get(
+            '/auth/issuers', headers={'Authorization': self.admin})
+        self.assertEqual([], resp.get_json())
+
+    def test_a_deleted_issuers_name_can_be_reused(self):
+        self._create()
+        self.client.delete(
+            '/auth/issuers/github', headers={'Authorization': self.admin})
+
+        resp = self._create(audience='https://sf2.example.com')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('https://sf2.example.com',
+                         resp.get_json()['audience'])
+
+    def test_database_outage_is_503_not_404(self):
+        # A read failure must not be reported as "no such issuer". The
+        # exchange resolves issuers by name and treats a miss as an
+        # authoritative refusal, so an outage answering "not found"
+        # would look like a deliberate configuration change.
+        self._create()
+        with mock.patch(
+                'shakenfist.mariadb.get_trusted_issuer_by_name',
+                side_effect=exceptions.DatabaseUnavailable('unreadable')):
+            resp = self.client.get(
+                '/auth/issuers/github',
+                headers={'Authorization': self.admin})
+        self.assertEqual(503, resp.status_code)
+
+    def test_database_outage_does_not_report_an_empty_issuer_list(self):
+        # "This cluster trusts nobody" is a valid-looking answer, which
+        # is exactly why it must not be what an outage produces.
+        self._create()
+        with mock.patch(
+                'shakenfist.mariadb.get_all_trusted_issuers',
+                side_effect=exceptions.DatabaseUnavailable('unreadable')):
+            resp = self.client.get(
+                '/auth/issuers', headers={'Authorization': self.admin})
+        self.assertEqual(503, resp.status_code)
+
+    def test_update_of_a_deleted_issuer_is_404(self):
+        self._create()
+        self.client.delete(
+            '/auth/issuers/github', headers={'Authorization': self.admin})
+
+        resp = self.client.put(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin},
+            data=json.dumps({
+                'issuer_url': GITHUB, 'jwks_uri': GITHUB_JWKS,
+                'audience': 'x'}))
         self.assertEqual(404, resp.status_code)
 
     def test_listing(self):

@@ -62,12 +62,12 @@ from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
-from shakenfist.schema.trusted_issuer_attributes import (
-    TrustedIssuerAttributesData)
-from shakenfist.schema.trusted_issuer_data import TrustedIssuerData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.schema.node_data import NodeData
+from shakenfist.schema.trusted_issuer_attributes import (
+    TrustedIssuerAttributesData)
+from shakenfist.schema.trusted_issuer_data import TrustedIssuerData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -13094,8 +13094,16 @@ def _grpc_get_trusted_issuer(
             return None
         return _trusted_issuer_from_proto(reply.data)
     except grpc.RpcError as e:
+        # None from these reads means "no such issuer", and both the
+        # CRUD API and the exchange treat that as authoritative -- a
+        # 404, or a refusal to believe an identity token. A transport
+        # or server failure must therefore raise rather than
+        # masquerade as a deliberate absence. Issue 3522 established
+        # this for the analogous namespace key read, which sits on the
+        # same authentication path.
         LOG.error(f'gRPC GetTrustedIssuer failed for {issuer_uuid}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuer {issuer_uuid} could not be read: {e}') from e
 
 
 def _grpc_get_trusted_issuer_by_name(
@@ -13109,7 +13117,8 @@ def _grpc_get_trusted_issuer_by_name(
         return _trusted_issuer_from_proto(reply.data)
     except grpc.RpcError as e:
         LOG.error(f'gRPC GetTrustedIssuerByName failed for {name}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuer {name} could not be read: {e}') from e
 
 
 def _grpc_get_all_trusted_issuers() -> list[TrustedIssuerData]:
@@ -13119,8 +13128,11 @@ def _grpc_get_all_trusted_issuers() -> list[TrustedIssuerData]:
         reply = _grpc_call(stub.GetAllTrustedIssuers, request)
         return [_trusted_issuer_from_proto(i) for i in reply.issuers]
     except grpc.RpcError as e:
+        # An empty list here would read as "this cluster trusts nobody",
+        # which is indistinguishable from a correct answer.
         LOG.error(f'gRPC GetAllTrustedIssuers failed: {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuers could not be listed: {e}') from e
 
 
 def _grpc_delete_trusted_issuer(issuer_uuid: UUID) -> bool:
@@ -13160,9 +13172,15 @@ def _grpc_get_trusted_issuer_attributes(
             return None
         return _trusted_issuer_attrs_from_proto(reply.data)
     except grpc.RpcError as e:
+        # The attributes are the trust configuration itself, so None
+        # here would present an issuer whose issuer_url, jwks_uri and
+        # audience all read as null -- a confidently wrong answer
+        # rather than an admission that the database is unreachable.
         LOG.error(
             f'gRPC GetTrustedIssuerAttributes failed for {issuer_uuid}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuer {issuer_uuid} attributes could not be read: '
+            f'{e}') from e
 
 
 def _grpc_update_trusted_issuer_attributes(

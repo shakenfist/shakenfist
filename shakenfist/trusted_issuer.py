@@ -101,17 +101,30 @@ class TrustedIssuer(dbo):
         return cls(cls._static_values_to_dict(data))
 
     @classmethod
-    def from_db_by_name(cls, name: str) -> Optional['TrustedIssuer']:
-        """Look up an issuer by its unique name.
+    def from_db_by_name(cls, name: str,
+                        include_deleted: bool = False
+                        ) -> Optional['TrustedIssuer']:
+        """Look up an active issuer by its unique name.
 
         A miss is an ordinary outcome when an operator names an issuer
         that does not exist, so unlike from_db() this does not write a
         "non-existent object" audit event.
+
+        Soft-deleted issuers are invisible by default. Deleting an
+        issuer must revoke trust in it immediately rather than when
+        the reaper eventually collects the row, because the exchange
+        resolves issuers by name and would otherwise keep believing
+        one an operator had explicitly stopped believing. The same
+        filter is what lets the name be reused straight away.
         """
         data = mariadb.get_trusted_issuer_by_name(name)
         if not data:
             return None
-        return cls.from_static_data(data)
+
+        issuer = cls.from_static_data(data)
+        if not include_deleted and issuer.state.value == cls.STATE_DELETED:
+            return None
+        return issuer
 
     @classmethod
     def new(cls, name: str, issuer_url: str, jwks_uri: str,
@@ -122,9 +135,20 @@ class TrustedIssuer(dbo):
         is the arbiter, so two administrators racing to create the same
         issuer name produce one issuer and one clean failure rather
         than a duplicate.
+
+        A name held only by a soft-deleted issuer is reclaimed. The
+        operator has already said they no longer trust that issuer, and
+        making them wait for the reaper before they can reuse the name
+        would be a surprising thing for a delete to do. The unique
+        index means the old row has to actually go, so this is a hard
+        delete rather than a second soft one.
         """
         if cls.from_db_by_name(name):
             return None
+
+        superseded = cls.from_db_by_name(name, include_deleted=True)
+        if superseded:
+            superseded.hard_delete()
 
         issuer_uuid = str(uuid4())
         cls._db_create(issuer_uuid, {

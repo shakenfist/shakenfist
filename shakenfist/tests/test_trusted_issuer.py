@@ -6,6 +6,9 @@ ambiguous or silently mutable: names are unique, configuration moves as
 a set, and deletion follows the standard object lifecycle.
 """
 
+from functools import partial
+
+from shakenfist.baseobject import state_filter
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
@@ -76,17 +79,45 @@ class TrustedIssuerTestCase(base.ShakenFistTestCase):
         self.assertEqual(GITHUB_JWKS, view['jwks_uri'])
         self.assertEqual('https://sf.example.com', view['audience'])
 
-    def test_soft_delete_then_hard_delete(self):
+    def test_soft_delete_stops_the_issuer_resolving(self):
         issuer = self._new()
         issuer.delete()
         self.assertEqual('deleted', issuer.state.value)
 
-        # The row survives a soft delete, so an operator can still see
-        # what was removed until the reaper collects it.
-        self.assertIsNotNone(TrustedIssuer.from_db_by_name('github'))
+        # Deleting an issuer has to revoke trust in it now, not when
+        # the reaper eventually collects the row. The exchange resolves
+        # issuers by name, so a soft-deleted one that still resolves is
+        # one this cluster still believes.
+        self.assertIsNone(TrustedIssuer.from_db_by_name('github'))
+
+        # The row itself survives until the reaper runs, and an
+        # operator inspecting history can still reach it.
+        self.assertIsNotNone(
+            TrustedIssuer.from_db_by_name('github', include_deleted=True))
 
         issuer.hard_delete()
-        self.assertIsNone(TrustedIssuer.from_db_by_name('github'))
+        self.assertIsNone(
+            TrustedIssuer.from_db_by_name('github', include_deleted=True))
+
+    def test_soft_deleted_issuers_are_not_listed(self):
+        self._new(name='github')
+        self._new(name='authentik').delete()
+
+        listed = {i.name for i in TrustedIssuers(
+            [partial(state_filter, TrustedIssuer.ACTIVE_STATES)])}
+        self.assertEqual({'github'}, listed)
+
+    def test_name_is_reusable_after_a_soft_delete(self):
+        first = self._new()
+        first.delete()
+
+        # The unique index still holds the old row, so reclaiming the
+        # name means the superseded issuer has to actually go.
+        second = self._new(audience='https://sf2.example.com')
+        self.assertIsNotNone(second)
+        self.assertNotEqual(first.uuid, second.uuid)
+        self.assertEqual('https://sf2.example.com',
+                         TrustedIssuer.from_db_by_name('github').audience)
 
     def test_hard_delete_removes_the_attributes_too(self):
         issuer = self._new()

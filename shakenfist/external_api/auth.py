@@ -8,6 +8,7 @@
 #   - Has complete CI coverage: yes
 import base64
 import time
+from functools import partial
 
 import bcrypt
 import flask
@@ -16,6 +17,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
+from shakenfist import baseobject
 from shakenfist import instance
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -23,10 +25,10 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.namespace import Namespace
-from shakenfist.trusted_issuer import TrustedIssuer
-from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
+from shakenfist.trusted_issuer import TrustedIssuer
+from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
 from shakenfist.util import credentials
 from shakenfist.util.access_tokens import parse_jwt_identity
@@ -738,7 +740,12 @@ class AuthIssuersEndpoint(api_base.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
-        return [i.external_view() for i in TrustedIssuers([])]
+        # Soft-deleted issuers are gone as far as an operator is
+        # concerned: they no longer resolve by name and no longer vouch
+        # for anyone, so listing them would misrepresent who this
+        # cluster trusts.
+        return [i.external_view() for i in TrustedIssuers(
+            [partial(baseobject.state_filter, TrustedIssuer.ACTIVE_STATES)])]
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Configure a trusted identity issuer.',
