@@ -173,6 +173,27 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
             resources_main._compute_reservations(16, 24, 8, 9.0, 65536))
 
 
+class GetStatsRacesNodeDeletionTestCase(base.ShakenFistTestCase):
+    """The periodic stats sweep can race deletion of this node from the
+    cluster (issue 3591). That is expected: the lookup must not emit the
+    "non-existent object" audit event, and the sweep must be skipped rather
+    than recreating rows for the deleted node."""
+
+    def test_sweep_skipped_and_audit_suppressed(self):
+        m = resources_main.Monitor.__new__(resources_main.Monitor)
+        m.last_logged_resources = 0
+        with mock.patch.object(
+                resources_main.Node, 'from_db',
+                return_value=None) as mock_from_db, \
+                mock.patch.object(
+                    resources_main.mariadb,
+                    'get_node_metrics') as mock_get_metrics:
+            self.assertIsNone(m._get_stats())
+        mock_from_db.assert_called_once_with(
+            resources_main.config.NODE_NAME, suppress_failure_audit=True)
+        mock_get_metrics.assert_not_called()
+
+
 class HealthGaugeTestCase(base.ShakenFistTestCase):
     """The node-health thread exposes node_resource_health, tracking the
     evaluate() result each cycle."""
@@ -228,6 +249,26 @@ class HealthGaugeTestCase(base.ShakenFistTestCase):
                                   side_effect=[True, False, False]):
             m._run_health_checks(checks=[], types_by_identity={})
         mock_apply.assert_called_once_with(fake_node, result)
+
+    def test_node_lookup_suppresses_failure_audit(self):
+        # The health thread's node lookup races node deletion just like
+        # _get_stats does (issue 3591), so it must not emit the
+        # "non-existent object" audit event either.
+        m = resources_main.Monitor.__new__(resources_main.Monitor)
+        m.abort_path = '/nonexistent-abort-path'
+        result = NodeHealthResult(
+            healthy=True, failed=[], affected_types=set(),
+            reason='all resource health checks passed')
+        with mock.patch.object(resources_main, 'Gauge'), \
+                mock.patch.object(resources_main.node_health, 'evaluate',
+                                  return_value=result), \
+                mock.patch.object(resources_main.Node, 'from_db',
+                                  return_value=None) as mock_from_db, \
+                mock.patch.object(resources_main.daemon, 'check_abort_path',
+                                  side_effect=[True, False, False]):
+            m._run_health_checks(checks=[], types_by_identity={})
+        mock_from_db.assert_called_once_with(
+            resources_main.config.NODE_NAME, suppress_failure_audit=True)
 
     def test_evaluate_exception_is_swallowed(self):
         # A raise inside the cycle (for example a probe failure) must be
