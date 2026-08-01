@@ -361,6 +361,7 @@ def reap_expired_namespace_keys() -> None:
 
     cutoff = time.time() - grace
     reaped = 0
+    zombies = 0
 
     for ns in Namespaces(filters=[], prefilter='active'):
         # include_expired is the whole point of the sweep, and the
@@ -370,19 +371,26 @@ def reap_expired_namespace_keys() -> None:
             if attrs.expiry is None or attrs.expiry >= cutoff:
                 continue
 
+            state_value = key.state.value
+
             # Already soft deleted by an earlier sweep, and now waiting
             # on the hard delete reaper.
-            if key.state.value in FINAL_OBJECT_STATES:
+            if state_value in FINAL_OBJECT_STATES:
+                continue
+
+            # A static row with no state row at all cannot be soft
+            # deleted: the state machine has no transition from None to
+            # deleted, so delete() would raise on every sweep forever.
+            # These zombies are reconcile_orphaned_objects' problem --
+            # it writes them a deleted state row and the hard delete
+            # reaper takes it from there. Count them for one aggregate
+            # log line rather than logging (or worse, eventing) each.
+            if state_value is None:
+                zombies += 1
                 continue
 
             try:
-                key.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'the cluster wide cleanup daemon is deleting this '
-                    'namespace key because it expired',
-                    extra={'expiry': attrs.expiry})
                 key.delete()
-                reaped += 1
             except InvalidStateException as e:
                 # Raced with something else deleting the key. Not an
                 # error, the key is going away either way.
@@ -390,9 +398,26 @@ def reap_expired_namespace_keys() -> None:
                     'namespace': key.namespace,
                     'key': key.name
                 }).info(f'Expired namespace key already transitioning: {e}')
+                continue
+
+            # The audit event records only a successful delete. Eventing
+            # before the attempt meant a key whose delete always failed
+            # was re-evented every fifteen minutes forever -- 4,151
+            # zombie keys generated ~380k junk audit events/day, two
+            # thirds of the cluster's entire event volume (issue 3588).
+            key.add_event(
+                EVENT_TYPE_AUDIT,
+                'the cluster wide cleanup daemon is deleting this '
+                'namespace key because it expired',
+                extra={'expiry': attrs.expiry})
+            reaped += 1
 
     if reaped:
         LOG.info(f'Soft deleted {reaped} expired namespace keys')
+    if zombies:
+        LOG.with_fields({'zombies': zombies}).warning(
+            'Expired namespace keys with no state row skipped; '
+            'reconcile_orphaned_objects repairs these')
 
 
 def prune_events() -> None:

@@ -20800,6 +20800,12 @@ _STATIC_TABLE_GETTERS: dict[str, tuple[Callable[[], sa.Table], str]] = {
     ObjectType.INTERFACE.value: (_get_network_interfaces_table, 'uuid'),
     ObjectType.IPAM.value: (_get_ipams_table, 'uuid'),
     ObjectType.NAMESPACE.value: (_get_namespaces_table, 'name'),
+    # namespace_key was missing from this map from the day the object
+    # landed, so the reconciler never repaired zombie keys: 4,151
+    # stateless keys from the cutover deploy's mixed-version window sat
+    # unrepairable while the expiry sweep re-evented every one of them
+    # every pass, ~380k junk audit events/day (issue 3588).
+    ObjectType.NAMESPACE_KEY.value: (_get_namespace_keys_table, 'uuid'),
     ObjectType.NETWORK.value: (_get_networks_table, 'uuid'),
     ObjectType.NODE.value: (_get_nodes_table, 'uuid'),
     ObjectType.UPLOAD.value: (_get_uploads_table, 'uuid'),
