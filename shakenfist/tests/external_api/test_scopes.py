@@ -8,8 +8,11 @@ particular that everything which existed before scopes did keeps
 working, which is the property that makes this safe to ship.
 """
 
+import ast
+import inspect
 import json
 import logging
+import os
 import sys
 
 import flask_restful
@@ -237,6 +240,48 @@ class RealEndpointDerivationTestCase(base.ShakenFistTestCase):
             'The set of scope verbs changed. A new verb is only worth '
             'having if an operator would sensibly grant it on its own, '
             'so this is a deliberate decision rather than a detail.')
+
+
+class ClassBodyStringLiteralTestCase(base.ShakenFistTestCase):
+    """No class may have a string literal below its first statement.
+
+    Adding scope_family above a class docstring silently destroys it:
+    a string that is not the first statement in the body is a no-op
+    expression, so __doc__ becomes None and the prose stops describing
+    anything. This happened to two endpoints while scope families were
+    being added, and nothing failed.
+    """
+
+    def test_no_orphaned_docstrings_in_external_api(self):
+        api_dir = os.path.dirname(
+            inspect.getfile(external_api)).replace('/tests', '')
+        offenders = []
+
+        for name in sorted(os.listdir(api_dir)):
+            if not name.endswith('.py'):
+                continue
+            path = os.path.join(api_dir, name)
+            with open(path) as f:
+                tree = ast.parse(f.read(), filename=path)
+
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                for statement in node.body[1:]:
+                    if (isinstance(statement, ast.Expr)
+                            and isinstance(statement.value, ast.Constant)
+                            and isinstance(statement.value.value, str)):
+                        offenders.append(
+                            f'{name}:{statement.lineno} '
+                            f'{node.name} has a string literal below its '
+                            'first statement')
+
+        self.assertEqual(
+            [], offenders,
+            'A class body string literal that is not the first statement '
+            'is dead code, and is almost always a docstring that an '
+            'inserted attribute pushed out of place:\n  '
+            + '\n  '.join(offenders))
 
 
 class EnforcementTestCase(base.ShakenFistTestCase):

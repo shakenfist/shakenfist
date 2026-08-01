@@ -132,9 +132,12 @@ with Linux network namespaces, which the networking documentation uses heavily
 
 **namespace key**{#namespace-key} -- The stored credential from which
 [access tokens](#access-token) are minted: a bcrypt hash, a [nonce](#nonce),
-and an optional expiry. [Scopes](#scope) and provenance are reserved on the
-object but are not yet populated or enforced -- they arrive with the federation
-exchange. `/auth` bcrypt-compares a presented secret against the namespace's
+and an optional expiry. [Scopes](#scope) are recorded on the object and
+enforced on every request made with a token minted from it; a key with no
+scopes recorded mints wildcard tokens, which is every key predating the
+federation work. Provenance is reserved but not yet populated -- it arrives
+with the federation exchange. `/auth` bcrypt-compares a presented secret
+against the namespace's
 unexpired keys and mints a token bound to the matching key's nonce. A key is a
 first-class object owned by its namespace, with its own lifecycle, events and
 soft delete. Defined in `shakenfist/namespace_key.py` (the object) and
@@ -186,12 +189,18 @@ This vocabulary -- "trusted publisher", "OIDC token", "keyless signing", release
 [identity tokens](#identity-token)). Defined in
 `docs/developer_guide/release_process.md`.
 
-**scope**{#scope}
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
--- A `resource-family.verb` string naming a class of operation that a
-[namespace key](#namespace-key) (and the tokens derived from it) may perform.
-Scope is the authorization noun in Shaken Fist. Defined in
-`docs/plans/PLAN-auth-federation.md` ("Authentication terms to pin"). Not to be
+**scope**{#scope} -- A `resource-family.verb` string naming a class of
+operation that a [namespace key](#namespace-key) (and the tokens derived from
+it) may perform, for example `blob.read` or `instance.delete`. Scope is the
+authorization noun in Shaken Fist. Families and verbs are derived mechanically
+from the resource class and the HTTP method, so an endpoint is governed the
+moment it exists. Three forms are special: `*` grants everything and is what a
+key with no scopes recorded carries; `<family>.*` grants every verb in one
+family; and `cluster-admin` is required, alongside the `system` namespace, for
+administrative endpoints. `cluster-admin` is hyphenated rather than dotted
+because it names no family, and so no family wildcard can synthesise it.
+Defined in `shakenfist/external_api/scopes.py` and
+`docs/developer_guide/authentication.md`. Not to be
 confused with (a) [capability](#capability), which already names the client's
 server-feature-probe mechanism -- scope is not "capability"; or (b) the Linux
 `ip` scope attribute (`scope global`, `scope link`, `scope host`) that appears
@@ -234,17 +243,18 @@ authentication and is closest in nature to the planned
 namespace A trusts namespace B, then callers in B can see A's objects by
 reference. Defined in `shakenfist/namespace.py` (the `trust` member and
 `add_trust`/`remove_trust`) and `docs/operator_guide/authentication.md`. Not to
-be confused with: the planned [trusted issuer](#trusted-issuer), which is about
+be confused with: a [trusted issuer](#trusted-issuer), which is about
 accepting external token issuers rather than sharing objects between namespaces;
 the release pipeline's Sigstore / PyPI "Trusted Publisher" vocabulary (see
 [Release pipeline vocabulary](#release-pipeline)); or generic network-trust prose
 elsewhere in the documentation.
 
-**trusted issuer**{#trusted-issuer}
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
--- An external token issuer the cluster is configured to accept, recorded with
-its JWKS location and expected audience. Defined in
-`docs/plans/PLAN-auth-federation.md` ("Authentication terms to pin"). Not to be
+**trusted issuer**{#trusted-issuer} -- An external token issuer the cluster is
+configured to accept, recorded with its JWKS location and expected audience.
+Cluster level rather than namespaced, because deciding who may vouch for
+identities is an administrative decision, and managed through `/auth/issuers`
+by administrators only. Defined in `shakenfist/trusted_issuer.py` and
+`docs/operator_guide/authentication.md`. Not to be
 confused with namespace [trust](#trust), nor with the release pipeline's "Trusted
 Publisher" (see [Release pipeline vocabulary](#release-pipeline)).
 

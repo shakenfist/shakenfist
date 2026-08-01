@@ -154,8 +154,6 @@ class ClusterOperationEndpoint(api_base.Resource):
 
 
 class ClusterOperationChainEndpoint(api_base.Resource):
-    scope_family = 'clusteroperation'
-
     """Return the transitive ``depends_on`` closure for a cluster operation.
 
     Starts from ``op_uuid`` and walks every ``depends_on`` ancestor via
@@ -165,6 +163,8 @@ class ClusterOperationChainEndpoint(api_base.Resource):
     touches a foreign namespace (i.e. a namespace other than the
     caller's, and not the cluster ``system`` namespace).
     """
+
+    scope_family = 'clusteroperation'
 
     @swag_from(api_base.swagger_helper(
         'clusteroperations',
@@ -279,8 +279,6 @@ class ClusterOperationChainEndpoint(api_base.Resource):
 
 
 class ClusterOperationsEndpoint(api_base.Resource):
-    scope_family = 'clusteroperation'
-
     """List cluster operations targeting a specific object.
 
     Query parameters:
@@ -294,6 +292,8 @@ class ClusterOperationsEndpoint(api_base.Resource):
     on this specific target, the ops list follows without additional
     namespace filtering at the SQL layer.
     """
+
+    scope_family = 'clusteroperation'
 
     @swag_from(api_base.swagger_helper(
         'clusteroperations',

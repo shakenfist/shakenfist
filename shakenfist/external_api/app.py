@@ -235,6 +235,11 @@ class Root(api_base.Resource):
              'instance-agentoperations-all, agentoperations-put-with-mode</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types, '
              'artifact-clusteroperations</li>'
+             # scope-enforcement lets a client tell whether a 403 means
+             # "your token is not scoped for this" on this cluster, or
+             # something else entirely.
+             '<li>auth: trusted-issuers, generated-key-secrets, '
+             'scope-enforcement</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
