@@ -20,14 +20,15 @@ def ignore_exception(processname: str, e: BaseException) -> None:
     if exc_tb:
         msg += '\n'
         msg += '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        record_exception(exc_type, exc_value, exc_tb)
+        record_exception(exc_type, exc_value, exc_tb, already_logged=True)
     LOG.error(msg)
 
 
 def record_exception(
     exc_type: type[BaseException] | None,
     exc_value: BaseException | None,
-    exc_tb: TracebackType | None
+    exc_tb: TracebackType | None,
+    already_logged: bool = False
 ) -> None:
     traceback_str = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
@@ -70,17 +71,23 @@ def record_exception(
         # An exception noteworthy enough to record is noteworthy enough
         # to reach centralised logging, which generally ships INFO and
         # above. Log the first occurrence of a given traceback hash at
-        # WARNING with the full detail; repeats log a compact line at
-        # DEBUG so a hot loop does not flood the aggregator (the
-        # on-disk file keeps the authoritative count and event times).
+        # WARNING with the full traceback in the message body; repeats
+        # log a compact line at DEBUG so a hot loop does not flood the
+        # aggregator (the on-disk file keeps the authoritative count and
+        # event times). Callers which have already emitted a full-detail
+        # log line for this exception (ignore_exception's ERROR) pass
+        # already_logged=True so we don't emit a second, content-free
+        # entry for the same event and double the signature count in
+        # downstream log mining (issue 3590).
         log_ctx = LOG.with_fields({
             'exception_hash': h,
             'exception_class': exc_type.__name__ if exc_type else None,
             'count': data['count'],
         })
-        if data['count'] == 1:
-            log_ctx.with_fields({'traceback': traceback_str}).warning(
-                'Recorded new exception')
+        if already_logged:
+            log_ctx.debug('Recorded exception')
+        elif data['count'] == 1:
+            log_ctx.warning(f'Recorded new exception: {exc_value}\n{traceback_str}')
         else:
             log_ctx.debug('Recorded repeat exception')
 

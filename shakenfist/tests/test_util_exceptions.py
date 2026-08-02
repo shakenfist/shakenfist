@@ -185,12 +185,13 @@ class RecordExceptionLoggingTestCase(base.ShakenFistTestCase):
                                     exceptions_path)
             return real_os_open(new_path, flags, mode)
 
-        def raise_and_record():
+        def raise_and_record(already_logged=False):
             try:
                 raise TypeError('type mismatch')
             except TypeError:
                 exc_type, exc_value, exc_tb = sys.exc_info()
-                util_exceptions.record_exception(exc_type, exc_value, exc_tb)
+                util_exceptions.record_exception(
+                    exc_type, exc_value, exc_tb, already_logged=already_logged)
 
         with mock.patch('shakenfist.util.exceptions.os.makedirs'):
             with mock.patch('shakenfist.util.exceptions.os.open',
@@ -200,19 +201,21 @@ class RecordExceptionLoggingTestCase(base.ShakenFistTestCase):
                     raise_and_record()
 
                     log_ctx = mock_log.with_fields.return_value
-                    log_ctx.with_fields.return_value.warning\
-                        .assert_called_once_with('Recorded new exception')
+                    log_ctx.warning.assert_called_once()
                     log_ctx.debug.assert_not_called()
 
                     # The WARNING context must carry the correlation
-                    # fields and the full traceback.
+                    # fields, and the message body must carry the same
+                    # detail as an ERROR line: the exception message and
+                    # the full traceback (issue 3590).
                     fields = mock_log.with_fields.call_args[0][0]
                     self.assertEqual('TypeError',
                                      fields['exception_class'])
                     self.assertEqual(1, fields['count'])
                     self.assertIn('exception_hash', fields)
-                    detail = log_ctx.with_fields.call_args[0][0]
-                    self.assertIn('type mismatch', detail['traceback'])
+                    warn_msg = log_ctx.warning.call_args[0][0]
+                    self.assertIn('type mismatch', warn_msg)
+                    self.assertIn('Traceback', warn_msg)
 
                     mock_log.reset_mock()
                     raise_and_record()
@@ -220,10 +223,50 @@ class RecordExceptionLoggingTestCase(base.ShakenFistTestCase):
                     log_ctx = mock_log.with_fields.return_value
                     log_ctx.debug.assert_called_once_with(
                         'Recorded repeat exception')
-                    log_ctx.with_fields.return_value.warning\
-                        .assert_not_called()
+                    log_ctx.warning.assert_not_called()
                     fields = mock_log.with_fields.call_args[0][0]
                     self.assertEqual(2, fields['count'])
+
+    def test_already_logged_suppresses_warning(self):
+        """A caller that has already emitted a full-detail log line for
+        the exception (ignore_exception's ERROR) must not get a second
+        WARNING for the same event, even on first occurrence -- the pair
+        doubled the signature count for every task-exception type in
+        downstream log mining (issue 3590). The on-disk record is still
+        written.
+        """
+        real_os_open = os.open
+        exceptions_path = self.exceptions_path
+
+        def redirect_open(path, flags, mode):
+            new_path = path.replace('/srv/shakenfist/exceptions',
+                                    exceptions_path)
+            return real_os_open(new_path, flags, mode)
+
+        with mock.patch('shakenfist.util.exceptions.os.makedirs'):
+            with mock.patch('shakenfist.util.exceptions.os.open',
+                            side_effect=redirect_open):
+                with mock.patch(
+                        'shakenfist.util.exceptions.LOG') as mock_log:
+                    try:
+                        raise TypeError('type mismatch')
+                    except TypeError:
+                        exc_type, exc_value, exc_tb = sys.exc_info()
+                        util_exceptions.record_exception(
+                            exc_type, exc_value, exc_tb, already_logged=True)
+
+                    log_ctx = mock_log.with_fields.return_value
+                    log_ctx.warning.assert_not_called()
+                    log_ctx.debug.assert_called_once_with(
+                        'Recorded exception')
+
+        # The on-disk record must still have been written
+        files = os.listdir(self.exceptions_path)
+        self.assertEqual(1, len(files))
+        with open(os.path.join(self.exceptions_path, files[0])) as f:
+            data = json.load(f)
+        self.assertEqual(1, data['count'])
+        self.assertIn('type mismatch', data['traceback'])
 
 
 class IgnoreExceptionTestCase(base.ShakenFistTestCase):
@@ -243,7 +286,10 @@ class IgnoreExceptionTestCase(base.ShakenFistTestCase):
         self.assertIn('something went wrong', log_msg)
         self.assertIn('RuntimeError', log_msg)
 
+        # The ERROR above carries the full detail, so record_exception
+        # must be told not to log a duplicate entry (issue 3590).
         mock_record.assert_called_once()
+        self.assertTrue(mock_record.call_args.kwargs['already_logged'])
 
     @mock.patch('shakenfist.util.exceptions.record_exception')
     @mock.patch('shakenfist.util.exceptions.LOG')
