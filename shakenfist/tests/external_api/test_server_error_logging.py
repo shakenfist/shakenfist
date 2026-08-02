@@ -36,6 +36,13 @@ class ServerErrorLoggingTestCase(base.ShakenFistTestCase):
         api = flask_restful.Api(app)
 
         class _Boom(api_base.Resource):
+            # Marked public because this app is a bare Flask app with no
+            # JWT configuration -- authentication would raise KeyError
+            # ('JWT_HEADER_NAME') before get() ever runs, and the
+            # exception under test would never be reached. What is being
+            # tested is attribution on the server error path, which is
+            # the same whether or not the caller was authenticated.
+            @api_base.public
             def get(self):
                 raise ValueError('boom')
 
