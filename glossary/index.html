@@ -10565,9 +10565,12 @@ with Linux network namespaces, which the networking documentation uses heavily
 (<code>docs/operator_guide/networking/overview.md</code>).</p>
 <p><strong id="namespace-key">namespace key</strong> -- The stored credential from which
 <a href="#access-token">access tokens</a> are minted: a bcrypt hash, a <a href="#nonce">nonce</a>,
-and an optional expiry. <a href="#scope">Scopes</a> and provenance are reserved on the
-object but are not yet populated or enforced -- they arrive with the federation
-exchange. <code>/auth</code> bcrypt-compares a presented secret against the namespace's
+and an optional expiry. <a href="#scope">Scopes</a> are recorded on the object and
+enforced on every request made with a token minted from it; a key with no
+scopes recorded mints wildcard tokens, which is every key predating the
+federation work. Provenance is reserved but not yet populated -- it arrives
+with the federation exchange. <code>/auth</code> bcrypt-compares a presented secret
+against the namespace's
 unexpired keys and mints a token bound to the matching key's nonce. A key is a
 first-class object owned by its namespace, with its own lifecycle, events and
 soft delete. Defined in <code>shakenfist/namespace_key.py</code> (the object) and
@@ -10614,12 +10617,18 @@ This vocabulary -- "trusted publisher", "OIDC token", "keyless signing", release
 (namespace <a href="#trust">trust</a>, <a href="#trusted-issuer">trusted issuers</a>,
 <a href="#identity-token">identity tokens</a>). Defined in
 <code>docs/developer_guide/release_process.md</code>.</p>
-<p><strong id="scope">scope</strong>
-<em>(planned -- see <a href="../plans/PLAN-auth-federation/">PLAN-auth-federation</a>)</em>
--- A <code>resource-family.verb</code> string naming a class of operation that a
-<a href="#namespace-key">namespace key</a> (and the tokens derived from it) may perform.
-Scope is the authorization noun in Shaken Fist. Defined in
-<code>docs/plans/PLAN-auth-federation.md</code> ("Authentication terms to pin"). Not to be
+<p><strong id="scope">scope</strong> -- A <code>resource-family.verb</code> string naming a class of
+operation that a <a href="#namespace-key">namespace key</a> (and the tokens derived from
+it) may perform, for example <code>blob.read</code> or <code>instance.delete</code>. Scope is the
+authorization noun in Shaken Fist. Families and verbs are derived mechanically
+from the resource class and the HTTP method, so an endpoint is governed the
+moment it exists. Three forms are special: <code>*</code> grants everything and is what a
+key with no scopes recorded carries; <code>&lt;family&gt;.*</code> grants every verb in one
+family; and <code>cluster-admin</code> is required, alongside the <code>system</code> namespace, for
+administrative endpoints. <code>cluster-admin</code> is hyphenated rather than dotted
+because it names no family, and so no family wildcard can synthesise it.
+Defined in <code>shakenfist/external_api/scopes.py</code> and
+<code>docs/developer_guide/authentication.md</code>. Not to be
 confused with (a) <a href="#capability">capability</a>, which already names the client's
 server-feature-probe mechanism -- scope is not "capability"; or (b) the Linux
 <code>ip</code> scope attribute (<code>scope global</code>, <code>scope link</code>, <code>scope host</code>) that appears
@@ -10656,16 +10665,17 @@ authentication and is closest in nature to the planned
 namespace A trusts namespace B, then callers in B can see A's objects by
 reference. Defined in <code>shakenfist/namespace.py</code> (the <code>trust</code> member and
 <code>add_trust</code>/<code>remove_trust</code>) and <code>docs/operator_guide/authentication.md</code>. Not to
-be confused with: the planned <a href="#trusted-issuer">trusted issuer</a>, which is about
+be confused with: a <a href="#trusted-issuer">trusted issuer</a>, which is about
 accepting external token issuers rather than sharing objects between namespaces;
 the release pipeline's Sigstore / PyPI "Trusted Publisher" vocabulary (see
 <a href="#release-pipeline">Release pipeline vocabulary</a>); or generic network-trust prose
 elsewhere in the documentation.</p>
-<p><strong id="trusted-issuer">trusted issuer</strong>
-<em>(planned -- see <a href="../plans/PLAN-auth-federation/">PLAN-auth-federation</a>)</em>
--- An external token issuer the cluster is configured to accept, recorded with
-its JWKS location and expected audience. Defined in
-<code>docs/plans/PLAN-auth-federation.md</code> ("Authentication terms to pin"). Not to be
+<p><strong id="trusted-issuer">trusted issuer</strong> -- An external token issuer the cluster is
+configured to accept, recorded with its JWKS location and expected audience.
+Cluster level rather than namespaced, because deciding who may vouch for
+identities is an administrative decision, and managed through <code>/auth/issuers</code>
+by administrators only. Defined in <code>shakenfist/trusted_issuer.py</code> and
+<code>docs/operator_guide/authentication.md</code>. Not to be
 confused with namespace <a href="#trust">trust</a>, nor with the release pipeline's "Trusted
 Publisher" (see <a href="#release-pipeline">Release pipeline vocabulary</a>).</p>
 <p><strong id="upload">upload</strong> -- The short-lived staging object used to stream bytes to a

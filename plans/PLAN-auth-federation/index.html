@@ -10574,10 +10574,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-7-recognisable-secrets-and-leak-detection" class="md-nav__link">
+  <a href="#phase-7-leak-detection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 7: Recognisable secrets and leak detection
+        Phase 7: Leak detection
       
     </span>
   </a>
@@ -11157,8 +11157,8 @@ groundwork exists, and lives mostly outside this repository.</p>
 </tr>
 <tr>
 <td>3. Federated exchange and scope enforcement</td>
-<td>PLAN-auth-federation-phase-03-exchange.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
+<td>Planning</td>
 </tr>
 <tr>
 <td>4. Authentication documentation</td>
@@ -11176,13 +11176,13 @@ groundwork exists, and lives mostly outside this repository.</p>
 <td>Not started</td>
 </tr>
 <tr>
-<td>7. Recognisable secrets and leak detection</td>
-<td>PLAN-auth-federation-phase-07-secret-format.md</td>
+<td>7. Leak detection</td>
+<td>PLAN-auth-federation-phase-07-leak-detection.md</td>
 <td>Not started</td>
 </tr>
 </tbody>
 </table>
-<p>Phase plans for phases 3–7 have not been drafted yet; the
+<p>Phase plans for phases 4–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
 carried into the relevant phase plan) before each phase is
 cut.</p>
@@ -11195,11 +11195,13 @@ named field was gone. Two rounds of the same bug in one
 phase is the argument for both: phase 6 makes the mistake
 hard to make, phase 7 makes it detectable when it is made
 anyway.</p>
-<p>Neither blocks phases 3–5, with one ordering preference:
-<strong>phase 7's secret format should be settled before phase 3
-mints its first exchange key</strong>, or keys minted in between
-will not match the scanners. If phase 3 runs first it should
-adopt the format itself rather than defer it.</p>
+<p>Neither blocks phases 3–5. There was an ordering hazard here
+— phase 7's secret format needed to be settled before phase
+3 minted its first exchange key, or keys minted in between
+would not match the scanners — and it is resolved by moving
+the format into phase 3, which is where the first
+cluster-generated secrets appear. Phase 7 keeps the
+detection half, which has no such constraint.</p>
 <h3 id="phase-1-terminology-and-glossary">Phase 1: Terminology and glossary<a class="headerlink" href="#phase-1-terminology-and-glossary" title="Permanent link">&para;</a></h3>
 <p>Nail down the vocabulary this plan (and the sibling OIDC
 plan) needs, and fold in other overloaded terms the codebase
@@ -11422,44 +11424,28 @@ redaction are complementary, not alternatives.</p>
 <p>This phase is deliberately independent of the federation
 work and could be done at any time, including by someone
 who is not otherwise following this plan.</p>
-<h3 id="phase-7-recognisable-secrets-and-leak-detection">Phase 7: Recognisable secrets and leak detection<a class="headerlink" href="#phase-7-recognisable-secrets-and-leak-detection" title="Permanent link">&para;</a></h3>
+<h3 id="phase-7-leak-detection">Phase 7: Leak detection<a class="headerlink" href="#phase-7-leak-detection" title="Permanent link">&para;</a></h3>
 <p>Phase 6 stops secrets reaching a sink. This phase assumes
 one got out anyway and shortens the time to notice.</p>
-<p>The industry pattern is a structured secret: GitHub's
-<code>ghp_</code>-style prefix plus a CRC32 checksum in the trailing
-characters, mirrored by GitLab's <code>glpat-</code>, Stripe's
-<code>sk_live_</code> and Slack's <code>xoxb-</code>. The prefix makes the secret
-greppable; the checksum lets a scanner reject lookalikes
-without calling an API, which is what makes large-scale
-scanning tolerable. Note that this costs nothing
-cryptographically — a prefix is a label beside a random
-value, not a revealed piece of one, and the entropy of the
-random part is unchanged.</p>
+<p>The credential <em>format</em> this phase was originally going to
+define now lands in phase 3 instead, because phase 3 mints
+the first cluster-generated key secrets and anything minted
+before the format existed would need reissuing. Phase 3
+therefore delivers the <code>sfk_</code> prefix, the CRC32 checksum,
+the reservation of the prefix against operator-supplied
+secrets, and early rejection on a bad checksum. What remains
+here is detecting the format once it escapes.</p>
 <ul>
-<li><strong>A format for cluster-minted key secrets</strong>: a short
-  prefix, a high-entropy random body, and a trailing
-  checksum over the two. The exact alphabet and lengths are
-  a phase-plan decision; matching GitHub's shape closely
-  enough that off-the-shelf scanner tooling is easy to
-  configure is worth more than novelty.</li>
-<li><strong>Only for secrets Shaken Fist generates.</strong> Namespace key
-  secrets are operator-supplied today and must stay
-  supported — an operator's chosen string cannot carry our
-  prefix. The format applies to phase 3's exchange-minted
-  keys, and to a new "let the cluster generate one for you"
-  path for operator keys. Access tokens are JWTs and are
-  already recognisable by their <code>eyJ</code> prefix and <code>iss</code>
-  claim, so they need nothing.</li>
-<li><strong>Cheap early rejection</strong>: <code>/auth</code> and <code>sf-client</code> can
-  fail a malformed cluster-minted key on its checksum before
-  spending a bcrypt comparison on it.</li>
 <li><strong>A gitleaks rule</strong> for the format. Shaken Fist has no
   gitleaks job yet — ryll's <code>supply-chain.yml</code> has the
   working pattern, including that <code>gitleaks-action@v2</code>
   refuses to run on org repos without a paid licence so the
   upstream binary is invoked directly, and that gitleaks is
   only packaged from Debian 13 onward. Adding the job is
-  part of this phase.</li>
+  part of this phase. Note the <code>secret-handling</code> consistency
+  audit in <code>shakenfist/development</code> already requires a
+  scanner in CI, so this phase is also how Shaken Fist
+  becomes compliant with an audit it currently fails.</li>
 <li><strong>Log-sink detection, which is the valuable half.</strong> Events
   go to syslog <em>and</em> to Loki, so a credential written into
   an event leaves the cluster and lands in log aggregation.
@@ -11470,6 +11456,10 @@ random part is unchanged.</p>
   someone committed to the repository, which is the less
   likely accident for a runtime-minted credential. Both are
   worth having; if only one gets built, build this one.</li>
+<li><strong>A verification pass</strong> that the format phase 3 shipped is
+  actually what the scanners match — one regression test
+  asserting a freshly minted key is matched by the committed
+  gitleaks rule, so the two cannot drift apart silently.</li>
 </ul>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
@@ -11592,6 +11582,23 @@ implemented because the following statements will be true:</p>
   (fewer long-lived credentials), which makes eventual
   publication easier; revisit once the conductor has grown
   a deployment story.</li>
+<li><strong>Restoring prune-on-write for expired keys</strong>, if the
+  cluster daemon's sweep proves too weak a guarantee. While
+  phase 2 was in flight, develop independently fixed issue
+  #3521: <code>get_api_token()</code> mints a short-lived
+  <code>_service_key_*</code> every few minutes per daemon, and
+  filtering those only on read let the <code>keys</code> JSON blob grow
+  until it crossed gRPC's maximum message size, failing
+  namespace reads cluster-wide. The fix purged expired
+  entries on every write. Phase 2's cutover removes that
+  code path. The original failure mode cannot recur — keys
+  are rows now, so no single value grows, and the expiry
+  filter is applied in SQL — but the guarantee is weaker in
+  one respect: removal now depends on the cluster daemon
+  running, where purging on write did not. The consequence
+  if it never runs is bounded table growth rather than a
+  cluster-wide read failure. <code>delete_expired_namespace_keys()</code>
+  already exists if we decide the write path should sweep too.</li>
 <li><strong><code>sf-client namespace add-key --expiry</code></strong>: phase 2 added
   the <code>expiry</code> body parameter to the key create and update
   endpoints, but the command line has no flag for it yet,

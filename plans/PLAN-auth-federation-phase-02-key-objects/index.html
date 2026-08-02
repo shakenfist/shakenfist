@@ -10897,10 +10897,11 @@ no caching crept in and the <code>_service_key</code> bypass survived. After
       it should not be published either.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> clean; <code>tox -e genprotos</code>
       no-op (verified by md5sum over the generated stubs before
-      and after); unit tests green at 1438.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Functional CI green on the branch. <strong>Not yet run</strong> — the
-      branch has not been pushed, so no CI has ever executed
-      against it. This is the one outstanding item at phase end.</li>
+      and after); unit tests green at 1753 after the rebase onto
+      develop (1438 before it).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Functional CI green on the branch. Functional tests, CodeQL
+      and documentation tests all passed on the rebased branch, and
+      PR #3544 merged on 2026-07-28.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Master plan open question 7 marked resolved; phase status
       updated in the Execution table and <code>docs/plans/index.md</code>;
       glossary and guides updated.</li>
