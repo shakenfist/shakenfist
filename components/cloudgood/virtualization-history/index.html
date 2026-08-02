@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/cloudgood/virtualization-history/">
       
       
-        <link rel="prev" href="../fundamentals/">
+        <link rel="prev" href="../accounting/">
       
       
         <link rel="next" href="../memory-mapped-devices/">
@@ -527,6 +527,34 @@
     
   
     Fundamentals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../accounting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU and resource accounting
   
 
     
@@ -1335,6 +1363,34 @@
     
   
     Neutron legacy routers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../galera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Galera and WSREP replication
   
 
     
@@ -11859,8 +11915,7 @@
 <h2 id="hardware-assisted-virtualization">Hardware-assisted virtualization<a class="headerlink" href="#hardware-assisted-virtualization" title="Permanent link">&para;</a></h2>
 <p>As we discussed above, pure software emulation is slow -- typically running at 1-10% of native speed. This is fine for debugging or running legacy software, but completely impractical for production workloads. The solution came from the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> vendors themselves.</p>
 <h3 id="the-x86-virtualization-problem">The x86 virtualization problem<a class="headerlink" href="#the-x86-virtualization-problem" title="Permanent link">&para;</a></h3>
-<p>Before hardware support, virtualizing x86 was particularly tricky. The x86 architecture has certain "sensitive" instructions that behave differently depending on the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>'s privilege level, but don't trap when executed in user mode. In a properly virtualizable architecture, any instruction that could reveal or affect the machine's true state would cause a trap, allowing the hypervisor to intercept and emulate it. x86 didn't work this way.</p>
-<p>Early x86 hypervisors like VMware used clever techniques to work around this. They would scan the guest's code before execution and rewrite problematic instructions to trap into the hypervisor -- a technique called "binary translation". This worked, but added complexity and overhead.</p>
+<p>As we discussed in <a href="#the-x86-problem">the x86 problem</a> above, x86 has sensitive instructions that don't trap in user mode, making it non-virtualizable in the classical sense. VMware's binary translation worked around this, but added complexity and overhead.</p>
 <h3 id="intel-vt-x-and-amd-v">Intel <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> and <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr><a class="headerlink" href="#intel-vt-x-and-amd-v" title="Permanent link">&para;</a></h3>
 <p>In 2005-2006, both Intel and AMD released <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> extensions specifically designed for virtualization:</p>
 <ul>
@@ -11873,13 +11928,9 @@
 <p><strong><abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> entry and <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> exit</strong>: When the hypervisor wants to run guest code, it performs a "<abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> entry" which loads the guest state and switches to non-root mode. When something happens that the hypervisor needs to handle, a "<abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> exit" occurs, saving the guest state and returning control to the hypervisor.</p>
 <p>This means the guest's code runs directly on the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> at near-native speed for most operations. The hypervisor only gets involved when something interesting happens -- an I/O operation, a page fault, a timer interrupt, etc.</p>
 <h3 id="extended-page-tables-eptnpt">Extended Page Tables (<abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>/<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr>)<a class="headerlink" href="#extended-page-tables-eptnpt" title="Permanent link">&para;</a></h3>
-<p>The original <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> and <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr> implementations still had a significant overhead for memory operations. Every memory access in a virtual machine involves two levels of address translation:</p>
-<ol>
-<li>Guest virtual address → Guest physical address (using the guest's page tables)</li>
-<li>Guest physical address → Host physical address (using the hypervisor's shadow page tables)</li>
-</ol>
-<p>Originally, the hypervisor had to maintain "shadow page tables" that combined both translations, and trap on every guest page table modification to keep them synchronized. This was expensive.</p>
-<p>Intel's Extended Page Tables (<abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>, introduced with Nehalem in 2008) and AMD's Nested Page Tables (<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr>, introduced with Barcelona in 2007) solve this by doing both translations in hardware. The <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> walks both sets of page tables automatically, eliminating most of the hypervisor's involvement in memory management.</p>
+<p>The original <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> and <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr> implementations still had a significant overhead for memory operations. Every memory access in a virtual machine involves two levels of address translation -- guest virtual to guest physical, then guest physical to host physical -- and the hypervisor had to maintain costly "shadow page tables" to handle this.</p>
+<p>Intel's Extended Page Tables (<abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>, introduced with Nehalem in 2008) and AMD's Nested Page Tables (<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr>, introduced with Barcelona in 2007) solve this by doing both translations in hardware. The <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> walks both sets of page tables automatically, eliminating most of the hypervisor's involvement in memory management. <abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>/<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr> also provides the memory isolation boundary between VMs -- a guest can only access host-physical memory that the hypervisor has mapped into its <abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr> tables.</p>
+<p>For a deeper treatment of how <abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>/<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr> works, including the page walk mechanics, <abbr title="Translation Lookaside Buffer -- a cache of recent virtual-to-physical address translations.">TLB</abbr> implications, and the relationship with <abbr title="I/O Memory Management Unit -- hardware that provides address translation for device DMA.">IOMMU</abbr> for device isolation, see the <a href="/components/cloudgood/technology-primer/#extended-page-tables-eptnpt">Technology primer</a>.</p>
 <h3 id="kvm-the-linux-approach"><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>: The Linux approach<a class="headerlink" href="#kvm-the-linux-approach" title="Permanent link">&para;</a></h3>
 <p>With hardware virtualization support widely available, Linux gained its own hypervisor: <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> (Kernel-based Virtual Machine), first merged in 2007. <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> takes an elegant approach -- instead of being a separate hypervisor, it turns the Linux kernel itself into a hypervisor.</p>
 <p><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> is implemented as a kernel module that exposes the hardware virtualization features through a simple interface. User-space programs (typically <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>) use this interface to create and run virtual machines. The division of labor is:</p>
@@ -11920,6 +11971,7 @@
 </dl>
 <p>The virtio interface uses shared memory queues ("virtqueues") for communication. The guest places requests in a queue, notifies the hypervisor with a single write, and the hypervisor processes them and places responses in a return queue. This is far more efficient than emulating hundreds of register accesses for a single I/O operation.</p>
 <p>The trade-off is that the guest must have virtio drivers. Linux has had virtio support since 2008, and Windows virtio drivers are available (though not included by default). When you provision a cloud <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>, you're almost certainly using virtio devices even if you don't realize it.</p>
+<p>For a detailed look at how virtio devices use memory-mapped I/O, the virtqueue protocol, and advanced backends like vhost-user and DPDK, see <a href="/components/cloudgood/memory-mapped-devices/">Memory mapped devices</a>.</p>
 <h3 id="paravirtualization-today">Paravirtualization today<a class="headerlink" href="#paravirtualization-today" title="Permanent link">&para;</a></h3>
 <p>You'll still see the term "paravirtualization" in older documentation, particularly around AWS EC2's older instance types and Xen-based platforms. However, the term has fallen somewhat out of fashion -- we now just talk about "virtio drivers" without necessarily invoking the paravirtualization concept.</p>
 <p>The pattern remains important though: rather than perfectly emulating legacy hardware, design an interface optimized for the virtual environment. This principle extends beyond virtualization to containers (where the "hardware" is the kernel's syscall interface) and even to some modern hardware designs.</p>

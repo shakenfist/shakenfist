@@ -557,6 +557,34 @@
   
   
     <li class="md-nav__item">
+      <a href="accounting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU and resource accounting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="virtualization-history/" class="md-nav__link">
         
   
@@ -733,6 +761,34 @@
     
   
     Neutron legacy routers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="galera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Galera and WSREP replication
   
 
     
@@ -10441,6 +10497,13 @@ introduction, while not repeating too much of the content of the technology
 primer.</p>
 <p><a href="/components/cloudgood/fundamentals/">Fundamentals</a> discusses some of the fundamentals of
 computing that we're going to keep coming upon.</p>
+<p><a href="/components/cloudgood/accounting/"><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> and resource accounting</a> explores how the Linux
+kernel measures <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> time for both regular processes and virtual
+machines. It turns out the mechanism is fundamentally the same in
+both cases -- timer interrupts give the kernel regular opportunities
+to note what was running and charge the time. This chapter also covers
+steal time (how guests detect lost <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>) and cgroups (how the kernel
+enforces resource limits).</p>
 <p><a href="/components/cloudgood/virtualization-history/">Virtualization history</a> takes a slower journey
 through the history of virtualization and how we got to where we are now.
 Virtualization has been around in various forms for a lot longer than many
@@ -10464,6 +10527,16 @@ obsolete <a href="/components/cloudgood/neutron-linuxbridge/">OpenStack Neutron 
 then <a href="/components/cloudgood/neutron-legacy/">OpenStack Neutron's Legacy non-high availability routing</a>,
 with a solid intention to one day cover OpenStack Neutron's HA and DVR
 options at a future date.</p>
+<p>We then turn to the control plane's own state.
+<a href="/components/cloudgood/galera/">Galera and WSREP replication</a> explains how the database
+underneath almost every OpenStack deployment actually works: how a
+transaction is turned into a write set, broadcast in a global total order,
+and certified independently on every node without any of them talking to
+each other. That mechanism explains most of the things operators find
+surprising -- deadlock errors at commit time, one slow node pausing the
+whole cluster, and why a backup taken carelessly on a "spare" node can hurt
+the busy one. It closes with what all of this puts on the network, and why
+the replication network is the cluster's real security boundary.</p>
 <!-- Shared abbreviations for cloudgood documentation pages -->
 <!-- Include at the bottom of cloudgood files with: --8<-- "docs-include/abbreviations.md" -->
 <!-- These definitions are invisible - they enable hover tooltips for the defined terms -->
