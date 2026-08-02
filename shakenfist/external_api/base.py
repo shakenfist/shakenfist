@@ -760,7 +760,19 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     endpoints: each handler does authn / authz / object lookup, then
     delegates the read-and-shape step here so the wire-format change
     only happens in one place.
+
+    ``limit`` is coerced to int here because log_request merges JSON
+    body values into handler kwargs verbatim, so a caller sending
+    ``{'limit': '5'}`` delivers a str. Left uncoerced, the range check
+    in mariadb.get_object_events raised TypeError, which
+    handle_authorization_exceptions turned into a 400 leaking the
+    interpreter message to the client (issue 3609).
     """
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return sf_api.error(400, 'limit must be an integer')
+
     return [
         row.model_dump(mode='json')
         for row in mariadb.get_object_events(

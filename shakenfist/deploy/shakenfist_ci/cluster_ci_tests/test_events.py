@@ -1,6 +1,7 @@
 import json
 import time
 
+from shakenfist_client import apiclient
 from testtools import content
 
 from shakenfist_ci import base
@@ -42,6 +43,34 @@ class TestEvents(base.BaseNamespacedTestCase):
         self.addDetail('events', content.text_content(json.dumps(
             events, indent=4, sort_keys=True)))
         self.assertNotEqual(0, len(events))
+
+    def test_node_events_limit_coercion(self):
+        # Issue 3609: the API layer merges JSON body values into handler
+        # kwargs verbatim, so a caller sending {'limit': '5'} delivers a
+        # str. That used to surface as a 400 leaking an interpreter
+        # TypeError ("'<=' not supported between instances of 'str' and
+        # 'int'"); the API must instead coerce numeric strings and reject
+        # non-numeric ones cleanly. The client helpers always send an
+        # int, so drive the body parameter via _request_url directly.
+        nodes = self.system_client.get_nodes()
+        self.assertNotEqual(0, len(nodes))
+        node_name = nodes[0]['name']
+
+        events = self.system_client._request_url(
+            'GET', '/nodes/' + node_name + '/events',
+            data={'limit': '5'}).json()
+        self.addDetail('events', content.text_content(json.dumps(
+            events, indent=4, sort_keys=True)))
+        self.assertLessEqual(len(events), 5)
+
+        # A non-numeric limit must be a clean 400, with no Python type
+        # names leaking into the error message.
+        exc = self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.system_client._request_url,
+            'GET', '/nodes/' + node_name + '/events',
+            data={'limit': 'banana'})
+        self.assertNotIn('not supported between instances', str(exc))
 
     def test_instance_events(self):
         inst1 = self.test_client.create_instance(
