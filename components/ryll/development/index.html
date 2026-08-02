@@ -10789,10 +10789,15 @@ and the historical wedge fingerprint shows up there regardless.</p>
 is maintained with <code>tools/review-tracking.sh</code>, a wrapper around the
 shared helper in the
 <a href="https://github.com/shakenfist/development/blob/main/docs/code-review-tracking.md">shakenfist/development</a>
-repository. It is run by hand, not from git hooks: <code>prune</code> after a
-pull to discard reviews of files that have since changed, <code>stamp</code>
-before committing new review marks, <code>regen</code> to rebuild <code>REVIEWS.md</code>,
-and <code>next</code> to pick an unreviewed file.</p>
+repository. In a clone it is run by hand, not from git hooks:
+<code>prune</code> after a pull to discard reviews of files that have since
+changed, <code>stamp</code> before committing new review marks, <code>regen</code> to
+rebuild <code>REVIEWS.md</code>, <code>next</code> to pick an unreviewed file, and
+<code>status</code> to report effective coverage at HEAD. On develop itself
+the <code>prune-reviews</code> workflow runs <code>prune</code> automatically after every
+push, committing the result back as shakenfist-bot, and the daily
+consistency audit in shakenfist/development files an issue when
+five or more in-scope files need review.</p>
 <h2 id="ci-and-automation">CI and automation<a class="headerlink" href="#ci-and-automation" title="Permanent link">&para;</a></h2>
 <p>GitHub Actions CI builds and tests ryll on Linux (x86_64 + aarch64),
 macOS (Apple Silicon), and Windows (x86_64 + aarch64) on every push to
@@ -10852,6 +10857,10 @@ entirely; the supply-chain content scanners still run on them.</p>
 <tr>
 <td><code>pr-retest.yml</code></td>
 <td>Bot-triggered CI re-run (<code>@shakenfist-bot please retest</code>)</td>
+</tr>
+<tr>
+<td><code>prune-reviews.yml</code></td>
+<td>Prune stale review marks after each push to develop</td>
 </tr>
 </tbody>
 </table>

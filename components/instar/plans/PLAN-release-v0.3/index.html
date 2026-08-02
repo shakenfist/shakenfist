@@ -2916,10 +2916,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-drafted-not-started" class="md-nav__link">
+  <a href="#status-complete-v030-published-2026-08-02-install-validation-carried-to-474" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Drafted, not started
+        Status: Complete (v0.3.0 published 2026-08-02; install validation carried to #474)
       
     </span>
   </a>
@@ -3116,21 +3116,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
+  <a href="#follow-up-issues-filed-at-close-out" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Follow-up issues filed at close-out
       
     </span>
   </a>
@@ -10652,10 +10641,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-drafted-not-started" class="md-nav__link">
+  <a href="#status-complete-v030-published-2026-08-02-install-validation-carried-to-474" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Drafted, not started
+        Status: Complete (v0.3.0 published 2026-08-02; install validation carried to #474)
       
     </span>
   </a>
@@ -10852,21 +10841,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
+  <a href="#follow-up-issues-filed-at-close-out" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Follow-up issues filed at close-out
       
     </span>
   </a>
@@ -10900,7 +10878,7 @@
 
 
 <h1 id="release-v030">Release v0.3.0<a class="headerlink" href="#release-v030" title="Permanent link">&para;</a></h1>
-<h2 id="status-drafted-not-started">Status: Drafted, not started<a class="headerlink" href="#status-drafted-not-started" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete-v030-published-2026-08-02-install-validation-carried-to-474">Status: Complete (v0.3.0 published 2026-08-02; install validation carried to #474)<a class="headerlink" href="#status-complete-v030-published-2026-08-02-install-validation-carried-to-474" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -11132,49 +11110,49 @@ management session, not delegated.</p>
 <td><code>make release VERSION=0.3.0</code> on <code>develop</code>; review the bump commit and tag</td>
 <td>medium</td>
 <td>(operator)</td>
-<td>Not started</td>
+<td>Complete (2026-08-02; bump commit <code>d6bd755</code> atop the retitle commit)</td>
 </tr>
 <tr>
 <td>13</td>
 <td><code>git push origin HEAD &amp;&amp; git push origin v0.3.0</code>; watch <code>release.yml</code> to completion; approve the <code>release</code> environment when prompted</td>
 <td>medium</td>
 <td>(operator)</td>
-<td>Not started</td>
+<td>Complete (run 30719418010: check-version, build/package, sign-tag after environment approval, release — all green on the workflow's second-ever run)</td>
 </tr>
 <tr>
 <td>14</td>
 <td>Verify the Release page: <code>gh release view v0.3.0 --json assets,tagName,isDraft</code> shows the tarball, <code>instar_0.3.0-1_amd64.deb</code>, <code>instar-0.3.0-1.x86_64.rpm</code>; not draft</td>
 <td>low</td>
 <td>sonnet</td>
-<td>Not started</td>
+<td>Complete (all three assets present with 0.3.0 names; not draft, not prerelease)</td>
 </tr>
 <tr>
 <td>15</td>
 <td>Verify the Sigstore tag signature (<code>git verify-tag v0.3.0</code> via gitsign, or Rekor lookup); record the verifying identity</td>
 <td>medium</td>
 <td>sonnet</td>
-<td>Not started</td>
+<td>Complete: good signature, identity <code>https://github.com/shakenfist/instar/.github/workflows/release.yml@refs/tags/v0.3.0</code>, Rekor entry validated (tlog 2318166334). Note: the sign-tag job replaces the pushed tag with the signed object, so local clones need <code>git fetch --tags --force</code> afterwards.</td>
 </tr>
 <tr>
 <td>16</td>
 <td>Real-world <code>.deb</code> validation: clean Debian/Ubuntu VM with <code>/dev/kvm</code>, install the <em>published</em> artifact, run <code>instar info</code> <strong>and</strong> one post-v0.2 subcommand against a sample qcow2</td>
 <td>medium</td>
 <td>(operator)</td>
-<td>Not started</td>
+<td>Carried forward to issue #474 (v0.2 precedent; CI package-smoke covers the same flow in a container)</td>
 </tr>
 <tr>
 <td>17</td>
 <td>Real-world <code>.rpm</code> validation per open question 3, or record the caveat in the release notes</td>
 <td>medium</td>
 <td>(operator)</td>
-<td>Not started</td>
+<td>Carried forward to issue #474, per open question 3's fallback</td>
 </tr>
 <tr>
 <td>18</td>
 <td>Mark this plan Complete in <code>docs/plans/index.md</code></td>
 <td>low</td>
 <td>sonnet</td>
-<td>Not started</td>
+<td>Complete (this PR)</td>
 </tr>
 </tbody>
 </table>
@@ -11246,6 +11224,23 @@ where noted:</p>
 <li>Stale <code>.deb</code> / <code>.rpm</code> asset manifests (found at drafting;
   fixed by step 2) and the package-smoke blind spot that hid
   them (step 3).</li>
+<li><code>functional-tests.yml</code> did not trigger on <code>tools/</code> changes,
+  leaving the (now load-bearing) package smoke script outside
+  CI's paths filter (fixed in PR #465).</li>
+</ul>
+<h3 id="follow-up-issues-filed-at-close-out">Follow-up issues filed at close-out<a class="headerlink" href="#follow-up-issues-filed-at-close-out" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<h1 id="471-clippy-warnings-in-generated-guest-protocol-code">471 — clippy warnings in generated guest-protocol code<a class="headerlink" href="#471-clippy-warnings-in-generated-guest-protocol-code" title="Permanent link">&para;</a></h1>
+  (from the step-7 lint gate).</li>
+<li>
+<h1 id="472-473-tracking-issues-for-the-two-upstream-qemu">472 / #473 — tracking issues for the two upstream qemu<a class="headerlink" href="#472-473-tracking-issues-for-the-two-upstream-qemu" title="Permanent link">&para;</a></h1>
+  crash reports recorded in PLAN-format-coverage's future
+  work (DMG zero-chunk NULL-deref; parallels_check_duplicate
+  assertion).</li>
+<li>
+<h1 id="474-post-release-install-validation-of-the-published">474 — post-release install validation of the published<a class="headerlink" href="#474-post-release-install-validation-of-the-published" title="Permanent link">&para;</a></h1>
+  .deb / .rpm artifacts (steps 16-17 carried forward).</li>
 </ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this plan is committed:</p>
