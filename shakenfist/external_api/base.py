@@ -718,12 +718,45 @@ def handle_database_unavailable(func):
     return wrapper
 
 
+# The flask.g key carrying the correlation fields for a recorded
+# exception from the record_exception decorator out to
+# suppress_exceptions_to_client, which sits immediately outside it in
+# Resource.method_decorators and emits the single log line for the
+# event. flask.g is request scoped, so there is no cross-request leak.
+_RECORDED_EXCEPTION_FIELDS = 'sf_recorded_exception_fields'
+
+
 def record_exception(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            util_exceptions.record_exception(*sys.exc_info())
+            # suppress_exceptions_to_client wraps this decorator -- it
+            # is last in Resource.method_decorators and therefore
+            # outermost -- and is guaranteed to log the full detail of
+            # anything we re-raise. Recording must therefore not log a
+            # second entry for the same event: that pair is exactly the
+            # duplicate signature issue 3590 describes, and fixing only
+            # ignore_exception would have left the API tier emitting it.
+            #
+            # Stash the correlation fields so that single 'Server error'
+            # line can carry them. Without this the only link from a log
+            # line to /srv/shakenfist/exceptions/<hash>.json would be on
+            # a DEBUG record, which centralised logging does not ship.
+            fields = util_exceptions.record_exception(
+                *sys.exc_info(), already_logged=True)
+            if fields:
+                try:
+                    setattr(flask.g, _RECORDED_EXCEPTION_FIELDS, fields)
+                except RuntimeError:
+                    # No application context. This decorator is only
+                    # reached through flask_restful dispatch, so it
+                    # should not happen -- but losing the correlation
+                    # fields is survivable and replacing the exception
+                    # we are about to re-raise is not. That is the
+                    # misattribution issue 3433 was about, and it is
+                    # why record_exception itself never raises either.
+                    pass
             raise e
 
     return wrapper
@@ -741,12 +774,20 @@ def suppress_exceptions_to_client(func):
             # logging without that enrichment (issue 3433), leaving the events
             # unattributable. Explicit fields ride in extra_fields and so
             # survive independently of exc_info handling.
-            LOG.with_fields({
+            fields = {
                 'exception_class': type(e).__name__,
                 'traceback': traceback.format_exc(),
                 'method': flask.request.method,
                 'path': flask.request.path,
-            }).exception('Server error')
+            }
+
+            # Correlation fields for the on-disk record, stashed by the
+            # record_exception decorator immediately inside this one.
+            # This is the only line shipped for the event, so it is the
+            # only place they can ride out (issue 3590).
+            fields.update(getattr(flask.g, _RECORDED_EXCEPTION_FIELDS, {}))
+
+            LOG.with_fields(fields).exception('Server error')
             return sf_api.error(500, 'server error: %s' % repr(e),
                                 suppress_traceback=True)
 
