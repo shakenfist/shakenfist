@@ -32,6 +32,48 @@ want a longer forensic window; set it to `0` if you would rather expired keys
 were never removed. Neither choice affects security, because enforcement does
 not depend on the sweep having run.
 
+## Cluster generated key secrets
+
+Secrets Shaken Fist generates itself — the short-lived service keys
+used between nodes, keys minted by the federated exchange, and any key
+you ask the cluster to generate for you — carry a recognisable format:
+
+```
+sfk_<32 random characters><6 character checksum>
+```
+
+The prefix makes a leaked credential greppable in logs and
+repositories; the checksum lets a secret scanner reject lookalikes
+without calling the API. It costs nothing cryptographically, because a
+bearer credential is a random identifier rather than ciphertext, so the
+prefix is a label beside the random part rather than a revealed piece
+of it.
+
+To have the cluster generate a key for you, create the key without
+supplying a secret. The generated secret is returned exactly once —
+only its bcrypt hash is stored, so it cannot be recovered afterwards.
+
+### The prefix is reserved
+
+`sfk_` may not be used at the start of an operator-supplied key secret;
+attempting it is refused with a 400. This is not cosmetic. `/auth`
+rejects a presented secret which carries the prefix but fails its
+checksum *before* bcrypt comparing it against anything, and that
+shortcut is only sound if no legitimate operator secret can be shaped
+that way.
+
+!!! warning "Upgrade note"
+
+    If you have an existing key whose **secret** happens to begin with
+    `sfk_`, it will stop authenticating after this upgrade, and it will
+    fail as an ordinary 401 rather than with a distinctive error. A
+    four-character prefix on a secret somebody chose makes this very
+    unlikely, but it is not impossible. If an automation begins failing
+    to authenticate immediately after upgrading and you cannot explain
+    it, check whether its key starts with `sfk_` and rotate it.
+
+    Key *names* are unaffected — only secrets.
+
 ## Keys and the event log
 
 Credentials are deliberately absent from Shaken Fist's events. This is worth

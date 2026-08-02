@@ -8,6 +8,7 @@
 #   - Has complete CI coverage: yes
 import base64
 import time
+from functools import partial
 
 import bcrypt
 import flask
@@ -16,6 +17,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
+from shakenfist import baseobject
 from shakenfist import instance
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -25,7 +27,10 @@ from shakenfist.external_api import base as api_base
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
+from shakenfist.trusted_issuer import TrustedIssuer
+from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
+from shakenfist.util import credentials
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util.access_tokens import request_namespace
 
@@ -111,6 +116,9 @@ def _validate_key_expiry(expiry):
 
 
 class AuthEndpoint(api_base.Resource):
+    # Unauthenticated by definition: this is where a caller trades a
+    # namespace key for a token, so it cannot require a token.
+    @api_base.public
     @swag_from(api_base.swagger_helper(
         'auth', 'Authenticate and create access token.',
         [
@@ -130,16 +138,48 @@ class AuthEndpoint(api_base.Resource):
             # Must be a string to encode()
             return sf_api.error(400, 'key is not a string')
 
+        # A secret carrying the reserved prefix but failing its
+        # checksum cannot match any stored key, because operator
+        # supplied secrets may not carry that prefix. Reject it before
+        # spending a bcrypt comparison per key on it. Note this is a
+        # cost optimisation and a corruption check, not a security
+        # boundary: a well formed but wrong secret still goes through
+        # the full comparison below.
+        #
+        # This deliberately writes no event of its own. /auth is public,
+        # so anyone who knows a namespace name can reach this line, and
+        # an event here would let them drive writes into that
+        # namespace's audit log at network speed for less work than the
+        # bcrypt path costs. The failure is still recorded, by the
+        # ordinary "incorrect namespace key" event at the bottom of this
+        # handler, so the event count per attempt is unchanged from
+        # before the checksum check existed. A checksum failure tells
+        # the namespace owner nothing they could act on that the
+        # ordinary event does not.
+        malformed = (credentials.has_prefix(key)
+                     and not credentials.looks_valid(key))
+        if malformed:
+            LOG.with_fields({'namespace': namespace}).info(
+                'Malformed cluster generated key presented')
+
         # The accessor is an indexed listing of the namespace's keys
         # with the expiry filter pushed into SQL, so expired keys are
         # never bcrypt compared here -- they simply are not returned.
-        keys = namespace_from_db.keys.get('nonced_keys', {})
+        keys = {} if malformed else namespace_from_db.keys.get(
+            'nonced_keys', {})
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
             try:
                 if bcrypt.checkpw(key.encode('utf-8'), possible_key):
+                    # One extra point read, and only on the successful
+                    # match rather than per candidate key. The legacy
+                    # accessor shape above is pinned by the phase 2
+                    # behaviour preservation tests, so scopes are
+                    # fetched here rather than widening it.
+                    matched = namespace_from_db.lookup_key(keyname)
                     return access_tokens.create_token(
-                        namespace_from_db, keyname, keys[keyname]['nonce'])
+                        namespace_from_db, keyname, keys[keyname]['nonce'],
+                        scopes=matched.scopes if matched else None)
             except ValueError as e:
                 # The key body held the stored hash and the nonce, so it
                 # cannot go in the event. The error and the key name are
@@ -192,7 +232,6 @@ class AuthNamespacesEndpoint(api_base.Resource):
          (400, 'No namespace specified, no key specified, or key is not a string.', None),
          (403, 'Illegal key name.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
@@ -204,14 +243,12 @@ class AuthNamespacesEndpoint(api_base.Resource):
         if key_name:
             if not key:
                 return sf_api.error(400, 'no key specified')
-            if not isinstance(key, str):
-                # Must be a string to encode()
-                return sf_api.error(400, 'key is not a string')
             err = _validate_key_name(key_name)
             if err:
                 return err
-            if len(key) > 72:
-                return sf_api.error(422, 'keys cannot be longer than 72 characters')
+            key, err = _validate_key_secret(key)
+            if err:
+                return err
 
         ns = Namespace.new(namespace)
         ns.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
@@ -250,7 +287,6 @@ class AuthNamespacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'List all namespaces visible to this namespace.', [],
         [(200, 'The namespace as created.', namespace_list_example)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self):
         retval = []
@@ -271,7 +307,6 @@ class AuthNamespaceEndpoint(api_base.Resource):
          (403, 'You cannot delete the system namespace.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @arg_is_namespace
     @api_base.log_token_use
@@ -316,7 +351,6 @@ class AuthNamespaceEndpoint(api_base.Resource):
         ],
         [(200, 'Information about a single namespace.', namespace_get_example),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -324,23 +358,86 @@ class AuthNamespaceEndpoint(api_base.Resource):
         return namespace_from_db.external_view()
 
 
-def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None):
-    """Create or rotate a namespace key. ``ns`` is a Namespace object."""
+def _validate_key_secret(key):
+    """Check an operator-supplied key secret.
+
+    Returns (key, error_response), exactly one of which is None.
+
+    The sfk_ prefix is reserved for secrets the cluster generates. That
+    reservation is load bearing rather than cosmetic: /auth rejects a
+    presented secret which carries the prefix but fails its checksum,
+    without bcrypt comparing it against anything, and that is only
+    sound if no legitimate operator secret can be shaped that way.
+    """
+    if not isinstance(key, str):
+        # Must be a string to encode()
+        return None, sf_api.error(400, 'key is not a string')
+    if len(key) > 72:
+        return None, sf_api.error(
+            422, 'keys cannot be longer than 72 characters')
+    if credentials.has_prefix(key):
+        return None, sf_api.error(
+            400, 'the %s prefix is reserved for cluster generated keys; '
+                 'omit the key entirely to have one generated for you'
+                 % credentials.PREFIX)
+    return key, None
+
+
+def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None,
+                            allow_generation=False):
+    """Create or rotate a namespace key. ``ns`` is a Namespace object.
+
+    Returns the key name, or a dict carrying the generated secret when
+    the caller asked the cluster to pick one.
+
+    ``allow_generation`` is set only by the create path. Rotation must
+    not treat a missing secret as "pick one for me": a PUT which
+    forgot its body would silently replace a live credential with one
+    the caller then has to notice in the response, which is a
+    destructive outcome for a typo.
+    """
     if not key_name:
         return sf_api.error(400, 'no key name specified')
-    if not key:
-        return sf_api.error(400, 'no key specified')
     err = _validate_key_name(key_name)
     if err:
         return err
-    if len(key) > 72:
-        return sf_api.error(422, 'keys cannot be longer than 72 characters')
+
+    # A caller who supplies no secret is asking the cluster to generate
+    # one. The generated form is the only way to get a secret carrying
+    # the sfk_ prefix, and it is returned exactly once -- only the
+    # bcrypt hash is stored, so it cannot be recovered afterwards.
+    generated = False
+    if not key:
+        if not allow_generation:
+            return sf_api.error(400, 'no key specified')
+        key = credentials.generate()
+        generated = True
+    else:
+        key, err = _validate_key_secret(key)
+        if err:
+            return err
 
     expiry, err = _validate_key_expiry(expiry)
     if err:
         return err
 
-    ns.add_key(key_name, key, expiry=expiry)
+    # A key may not be created with more privilege than the caller
+    # creating it. Key creation is gated by namespace ownership rather
+    # than by caller_is_admin, and a namespace always owns itself, so
+    # without this a token scoped auth.write (or auth.*, which the
+    # family wildcard actively encourages) could mint an unscoped key
+    # in its own namespace and re-authenticate carrying the wildcard.
+    # In the system namespace that reaches cluster-admin, which would
+    # route straight around Decision 3.
+    #
+    # None from caller_scopes() means the caller is unrestricted, which
+    # is every operator holding a legacy key, so their keys keep being
+    # created unscoped exactly as before.
+    inherited = api_base.caller_scopes()
+
+    ns.add_key(key_name, key, expiry=expiry, scopes=inherited)
+    if generated:
+        return {'key_name': key_name, 'key': key}
     return key_name
 
 
@@ -353,7 +450,6 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         ],
         [(200, 'A list of keynames for the namespace.', '["deploy", ...]'),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -368,18 +464,22 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
             ('key_name', 'body', 'string', 'The name of the key.', True),
-            ('key', 'body', 'string', 'The authentication key.', True),
+            ('key', 'body', 'string',
+             'Optional. The authentication key. If omitted the cluster '
+             'generates one and returns it in the response, which is the '
+             'only time it can be read.', False),
             ('expiry', 'body', 'number',
              'Optional. The time, in seconds since the unix epoch, at which '
              'this key stops working. Must be in the future. If omitted the '
              'key never expires.', False)
         ],
-        [(200, 'The name of the created key.', 'newkey'),
+        [(200, 'The name of the created key, or an object carrying the '
+               'generated secret when no key was supplied.',
+          '{"key_name": "newkey", "key": "sfk_..."}'),
          (400, 'Expiry is not a number, or is not in the future.', None),
          (403, 'Illegal key name.', None),
          (404, 'Namespace not found.', None),
          (422, 'Keys cannot be longer than 72 characters.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.requires_namespace_exist_if_specified
@@ -390,7 +490,8 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'create auth key request from REST API',
             extra={'key': key_name})
         return _namespace_keys_putpost(
-            namespace_from_db, key_name, key, expiry=expiry)
+            namespace_from_db, key_name, key, expiry=expiry,
+            allow_generation=True)
 
 
 class AuthNamespaceKeyEndpoint(api_base.Resource):
@@ -412,7 +513,6 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
          (404, 'Namespace or key not found.', None),
          (422, 'Keys cannot be longer than 72 characters.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @requires_namespace_ownership
     @arg_is_namespace
@@ -444,7 +544,6 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'No key name specified.', None),
          (404, 'Namespace or key not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -469,7 +568,6 @@ class AuthMetadatasEndpoint(api_base.Resource):
         ],
         [(200, 'Namespace metadata, if any.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -486,7 +584,6 @@ class AuthMetadatasEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
     @arg_is_namespace
@@ -513,7 +610,6 @@ class AuthMetadataEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
     @arg_is_namespace
@@ -537,7 +633,6 @@ class AuthMetadataEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -560,7 +655,6 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
          (400, 'No external namespace specified.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
     def post(self, namespace=None, external_namespace=None, namespace_from_db=None):
@@ -591,7 +685,6 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
          (400, 'No external namespace specified.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
     def delete(self, namespace=None, external_namespace=None, namespace_from_db=None):
@@ -607,3 +700,160 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'remove trust request from REST API')
         namespace_from_db.remove_trust(external_namespace)
         return namespace_from_db.external_view()
+
+
+trusted_issuer_example = """{
+    "audience": "https://shakenfist.example.com",
+    "issuer_url": "https://token.actions.githubusercontent.com",
+    "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+    "name": "github",
+    "state": "created",
+    "uuid": "b2b3a04e-8f22-4a1e-8f8e-2f3b1f7a41ab",
+    "version": 1
+}"""
+
+
+def _validate_issuer_arguments(issuer_url, jwks_uri, audience):
+    """Check the configuration of a trusted issuer.
+
+    Returns an error response, or None. Every field is required: an
+    issuer missing its audience would accept tokens minted for someone
+    else, and one missing its JWKS URI cannot verify a signature at
+    all. There is no sensible default for any of them.
+    """
+    for name, value in (('issuer_url', issuer_url),
+                        ('jwks_uri', jwks_uri),
+                        ('audience', audience)):
+        if not value:
+            return sf_api.error(400, f'no {name} specified')
+        if not isinstance(value, str):
+            return sf_api.error(400, f'{name} is not a string')
+        if len(value) > 1024:
+            return sf_api.error(
+                422, f'{name} cannot be longer than 1024 characters')
+
+    # Signing keys must come from somewhere we control the choice of.
+    # Refusing plaintext here is not paranoia: a JWKS fetched over HTTP
+    # can be substituted by anyone on the path, which turns signature
+    # verification into theatre.
+    if not jwks_uri.startswith('https://'):
+        return sf_api.error(400, 'jwks_uri must be https')
+    return None
+
+
+class AuthIssuersEndpoint(api_base.Resource):
+    scope_family = 'issuer'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List the trusted identity issuers.',
+        [],
+        [(200, 'The configured trusted issuers.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @api_base.log_token_use
+    def get(self):
+        # Soft-deleted issuers are gone as far as an operator is
+        # concerned: they no longer resolve by name and no longer vouch
+        # for anyone, so listing them would misrepresent who this
+        # cluster trusts.
+        return [i.external_view() for i in TrustedIssuers(
+            [partial(baseobject.state_filter, TrustedIssuer.ACTIVE_STATES)])]
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Configure a trusted identity issuer.',
+        [
+            ('name', 'body', 'string',
+             'A unique name for this issuer.', True),
+            ('issuer_url', 'body', 'string',
+             'The exact value expected in a token\'s iss claim.', True),
+            ('jwks_uri', 'body', 'url',
+             'Where the issuer publishes its signing keys.', True),
+            ('audience', 'body', 'string',
+             'The value expected in a token\'s aud claim.', True)
+        ],
+        [(200, 'The issuer as created.', trusted_issuer_example),
+         (400, 'A required field is missing or malformed.', None),
+         (409, 'An issuer of that name already exists.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @api_base.log_token_use
+    def post(self, name=None, issuer_url=None, jwks_uri=None, audience=None):
+        if not name:
+            return sf_api.error(400, 'no name specified')
+        if not isinstance(name, str) or len(name) > 255:
+            return sf_api.error(400, 'name is not a valid string')
+
+        err = _validate_issuer_arguments(issuer_url, jwks_uri, audience)
+        if err:
+            return err
+
+        issuer = TrustedIssuer.new(name, issuer_url, jwks_uri, audience)
+        if not issuer:
+            return sf_api.error(409, 'issuer already exists')
+        return issuer.external_view()
+
+
+class AuthIssuerEndpoint(api_base.Resource):
+    scope_family = 'issuer'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Fetch a trusted identity issuer.',
+        [('issuer_name', 'path', 'string', 'The issuer name.', True)],
+        [(200, 'The issuer.', trusted_issuer_example),
+         (404, 'Issuer not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @api_base.log_token_use
+    def get(self, issuer_name=None):
+        issuer = TrustedIssuer.from_db_by_name(issuer_name)
+        if not issuer:
+            return sf_api.error(404, 'issuer not found')
+        return issuer.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Update a trusted identity issuer.',
+        [
+            ('issuer_name', 'path', 'string', 'The issuer name.', True),
+            ('issuer_url', 'body', 'string',
+             'The exact value expected in a token\'s iss claim.', True),
+            ('jwks_uri', 'body', 'url',
+             'Where the issuer publishes its signing keys.', True),
+            ('audience', 'body', 'string',
+             'The value expected in a token\'s aud claim.', True)
+        ],
+        [(200, 'The updated issuer.', trusted_issuer_example),
+         (400, 'A required field is missing or malformed.', None),
+         (404, 'Issuer not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @api_base.log_token_use
+    def put(self, issuer_name=None, issuer_url=None, jwks_uri=None,
+            audience=None):
+        issuer = TrustedIssuer.from_db_by_name(issuer_name)
+        if not issuer:
+            return sf_api.error(404, 'issuer not found')
+
+        err = _validate_issuer_arguments(issuer_url, jwks_uri, audience)
+        if err:
+            return err
+
+        issuer.update(issuer_url, jwks_uri, audience)
+        return issuer.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Delete a trusted identity issuer.',
+        [('issuer_name', 'path', 'string', 'The issuer name.', True)],
+        [(200, 'The issuer was deleted.', None),
+         (404, 'Issuer not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @api_base.log_token_use
+    def delete(self, issuer_name=None):
+        issuer = TrustedIssuer.from_db_by_name(issuer_name)
+        if not issuer:
+            return sf_api.error(404, 'issuer not found')
+
+        issuer.add_event(
+            EVENT_TYPE_AUDIT, 'delete issuer request from REST API')
+        issuer.delete()
+        return issuer.external_view()

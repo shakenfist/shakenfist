@@ -273,10 +273,11 @@ no caching crept in and the `_service_key` bypass survived. After
       it should not be published either.
 - [x] `pre-commit run --all-files` clean; `tox -e genprotos`
       no-op (verified by md5sum over the generated stubs before
-      and after); unit tests green at 1438.
-- [ ] Functional CI green on the branch. **Not yet run** — the
-      branch has not been pushed, so no CI has ever executed
-      against it. This is the one outstanding item at phase end.
+      and after); unit tests green at 1753 after the rebase onto
+      develop (1438 before it).
+- [x] Functional CI green on the branch. Functional tests, CodeQL
+      and documentation tests all passed on the rebased branch, and
+      PR #3544 merged on 2026-07-28.
 - [x] Master plan open question 7 marked resolved; phase status
       updated in the Execution table and `docs/plans/index.md`;
       glossary and guides updated.

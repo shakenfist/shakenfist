@@ -799,6 +799,51 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.DeleteNamespaceKeyAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateTrustedIssuer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateTrustedIssuer',
+                request_serializer=database__pb2.CreateTrustedIssuerRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetTrustedIssuer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetTrustedIssuer',
+                request_serializer=database__pb2.GetTrustedIssuerRequest.SerializeToString,
+                response_deserializer=database__pb2.GetTrustedIssuerReply.FromString,
+                _registered_method=True)
+        self.GetTrustedIssuerByName = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetTrustedIssuerByName',
+                request_serializer=database__pb2.GetTrustedIssuerByNameRequest.SerializeToString,
+                response_deserializer=database__pb2.GetTrustedIssuerReply.FromString,
+                _registered_method=True)
+        self.GetAllTrustedIssuers = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllTrustedIssuers',
+                request_serializer=database__pb2.GetAllTrustedIssuersRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllTrustedIssuersReply.FromString,
+                _registered_method=True)
+        self.DeleteTrustedIssuer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteTrustedIssuer',
+                request_serializer=database__pb2.DeleteTrustedIssuerRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateTrustedIssuerAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateTrustedIssuerAttributes',
+                request_serializer=database__pb2.CreateTrustedIssuerAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetTrustedIssuerAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetTrustedIssuerAttributes',
+                request_serializer=database__pb2.GetTrustedIssuerAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetTrustedIssuerAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateTrustedIssuerAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateTrustedIssuerAttributes',
+                request_serializer=database__pb2.UpdateTrustedIssuerAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteTrustedIssuerAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteTrustedIssuerAttributes',
+                request_serializer=database__pb2.DeleteTrustedIssuerAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.CreateAgentOperation = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/CreateAgentOperation',
                 request_serializer=database__pb2.CreateAgentOperationRequest.SerializeToString,
@@ -2001,6 +2046,65 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateTrustedIssuer(self, request, context):
+        """TrustedIssuer Operations (MariaDB)
+        A TrustedIssuer is an external identity provider this cluster will
+        believe. Cluster level and system owned: who may vouch for
+        identities here is an administrative decision.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTrustedIssuer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTrustedIssuerByName(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllTrustedIssuers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteTrustedIssuer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateTrustedIssuerAttributes(self, request, context):
+        """TrustedIssuer Attributes Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTrustedIssuerAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateTrustedIssuerAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteTrustedIssuerAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateAgentOperation(self, request, context):
         """AgentOperation Operations (MariaDB)
         These manage AgentOperation static values in MariaDB. AgentOperations
@@ -3062,6 +3166,51 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteNamespaceKeyAttributes': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNamespaceKeyAttributes,
                     request_deserializer=database__pb2.DeleteNamespaceKeyAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateTrustedIssuer': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateTrustedIssuer,
+                    request_deserializer=database__pb2.CreateTrustedIssuerRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetTrustedIssuer': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTrustedIssuer,
+                    request_deserializer=database__pb2.GetTrustedIssuerRequest.FromString,
+                    response_serializer=database__pb2.GetTrustedIssuerReply.SerializeToString,
+            ),
+            'GetTrustedIssuerByName': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTrustedIssuerByName,
+                    request_deserializer=database__pb2.GetTrustedIssuerByNameRequest.FromString,
+                    response_serializer=database__pb2.GetTrustedIssuerReply.SerializeToString,
+            ),
+            'GetAllTrustedIssuers': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllTrustedIssuers,
+                    request_deserializer=database__pb2.GetAllTrustedIssuersRequest.FromString,
+                    response_serializer=database__pb2.GetAllTrustedIssuersReply.SerializeToString,
+            ),
+            'DeleteTrustedIssuer': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteTrustedIssuer,
+                    request_deserializer=database__pb2.DeleteTrustedIssuerRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateTrustedIssuerAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateTrustedIssuerAttributes,
+                    request_deserializer=database__pb2.CreateTrustedIssuerAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetTrustedIssuerAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTrustedIssuerAttributes,
+                    request_deserializer=database__pb2.GetTrustedIssuerAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetTrustedIssuerAttributesReply.SerializeToString,
+            ),
+            'UpdateTrustedIssuerAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateTrustedIssuerAttributes,
+                    request_deserializer=database__pb2.UpdateTrustedIssuerAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteTrustedIssuerAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteTrustedIssuerAttributes,
+                    request_deserializer=database__pb2.DeleteTrustedIssuerAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'CreateAgentOperation': grpc.unary_unary_rpc_method_handler(
@@ -7415,6 +7564,249 @@ class DatabaseService:
             target,
             '/shakenfist.protos.DatabaseService/DeleteNamespaceKeyAttributes',
             database__pb2.DeleteNamespaceKeyAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateTrustedIssuer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateTrustedIssuer',
+            database__pb2.CreateTrustedIssuerRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTrustedIssuer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetTrustedIssuer',
+            database__pb2.GetTrustedIssuerRequest.SerializeToString,
+            database__pb2.GetTrustedIssuerReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTrustedIssuerByName(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetTrustedIssuerByName',
+            database__pb2.GetTrustedIssuerByNameRequest.SerializeToString,
+            database__pb2.GetTrustedIssuerReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllTrustedIssuers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllTrustedIssuers',
+            database__pb2.GetAllTrustedIssuersRequest.SerializeToString,
+            database__pb2.GetAllTrustedIssuersReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteTrustedIssuer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteTrustedIssuer',
+            database__pb2.DeleteTrustedIssuerRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateTrustedIssuerAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateTrustedIssuerAttributes',
+            database__pb2.CreateTrustedIssuerAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTrustedIssuerAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetTrustedIssuerAttributes',
+            database__pb2.GetTrustedIssuerAttributesRequest.SerializeToString,
+            database__pb2.GetTrustedIssuerAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateTrustedIssuerAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateTrustedIssuerAttributes',
+            database__pb2.UpdateTrustedIssuerAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteTrustedIssuerAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteTrustedIssuerAttributes',
+            database__pb2.DeleteTrustedIssuerAttributesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

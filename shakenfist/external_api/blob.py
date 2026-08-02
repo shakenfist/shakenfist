@@ -155,7 +155,6 @@ class BlobEndpoint(api_base.Resource):
         [('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True)],
         [(200, 'Information about a single blob.', blob_get_example),
          (404, 'Blob not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     @arg_is_blob_uuid
     def get(self, blob_uuid=None, blob_from_db=None):
@@ -185,7 +184,6 @@ class BlobDataEndpoint(api_base.Resource):
         ],
         [(200, 'Content of a blob as a streaming binary HTTP result.', 'n/a'),
          (404, 'Blob not found.', None)]))
-    @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @api_base.log_token_use
     @arg_is_blob_uuid
@@ -236,7 +234,6 @@ class BlobsEndpoint(api_base.Resource):
                 'output as a GET for a blob artifact would show.'),
           blobs_get_example)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
@@ -277,7 +274,6 @@ class BlobEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single blob.', blob_events_example),
          (404, 'Blob not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, blob_uuid=None, event_type=None, limit=100):
         return api_base.object_events_response(
@@ -296,7 +292,6 @@ class BlobChecksumEndpoint(api_base.Resource):
             (200, 'The hash of this blob, if known.', None),
             (404, 'Blob not found.', None)
         ]))
-    @api_base.verify_token
     @api_base.log_token_use
     @arg_is_blob_uuid
     def get(self, blob_uuid=None, algorithm=None, blob_from_db=None):
@@ -335,7 +330,6 @@ class BlobChecksumsEndpoint(api_base.Resource):
             (400, 'Invalid hash algorithm or hash.', None),
             (404, 'Blob not found.', None)
         ]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, algorithm=None, hash=None):
         if algorithm not in BLOB_HASH_ALGORITHMS:
@@ -368,7 +362,6 @@ class BlobMetadatasEndpoint(api_base.Resource):
         [(200, 'Blob metadata, if any.', None),
          (404, 'Blob not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_blob_uuid
     @api_base.log_token_use
     def get(self, blob_uuid=None, blob_from_db=None):
@@ -385,7 +378,6 @@ class BlobMetadatasEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Blob not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_blob_uuid
     @api_base.log_token_use
     def post(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
@@ -411,7 +403,6 @@ class BlobMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Blob not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_blob_uuid
     @api_base.log_token_use
     def put(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
@@ -434,7 +425,6 @@ class BlobMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Blob not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_blob_uuid
     @api_base.log_token_use
     def delete(self, blob_uuid=None, key=None, value=None, blob_from_db=None):

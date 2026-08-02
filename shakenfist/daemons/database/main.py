@@ -3403,6 +3403,172 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
     # AgentOperation Operations (MariaDB)
 
+    # ------------------------------------------------------------------
+    # TrustedIssuer operations
+    # ------------------------------------------------------------------
+
+    def CreateTrustedIssuer(
+        self,
+        request: database_pb2.CreateTrustedIssuerRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['create_trusted_issuer'].inc()
+            ok = mariadb._direct_create_trusted_issuer(
+                mariadb._trusted_issuer_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateTrustedIssuer failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def GetTrustedIssuer(
+        self,
+        request: database_pb2.GetTrustedIssuerRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetTrustedIssuerReply:
+        try:
+            self.monitor.counters['get_trusted_issuer'].inc()
+            data = mariadb._direct_get_trusted_issuer(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetTrustedIssuerReply(found=False)
+            return database_pb2.GetTrustedIssuerReply(
+                found=True, data=mariadb._trusted_issuer_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetTrustedIssuer failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetTrustedIssuerReply(found=False)
+
+    def GetTrustedIssuerByName(
+        self,
+        request: database_pb2.GetTrustedIssuerByNameRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetTrustedIssuerReply:
+        try:
+            self.monitor.counters['get_trusted_issuer_by_name'].inc()
+            data = mariadb._direct_get_trusted_issuer_by_name(request.name)
+            if data is None:
+                return database_pb2.GetTrustedIssuerReply(found=False)
+            return database_pb2.GetTrustedIssuerReply(
+                found=True, data=mariadb._trusted_issuer_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetTrustedIssuerByName failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetTrustedIssuerReply(found=False)
+
+    def GetAllTrustedIssuers(
+        self,
+        request: database_pb2.GetAllTrustedIssuersRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllTrustedIssuersReply:
+        try:
+            self.monitor.counters['get_all_trusted_issuers'].inc()
+            issuers = mariadb._direct_get_all_trusted_issuers()
+            return database_pb2.GetAllTrustedIssuersReply(
+                issuers=[mariadb._trusted_issuer_to_proto(i)
+                         for i in issuers])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllTrustedIssuers failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllTrustedIssuersReply(issuers=[])
+
+    def DeleteTrustedIssuer(
+        self,
+        request: database_pb2.DeleteTrustedIssuerRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['delete_trusted_issuer'].inc()
+            ok = mariadb._direct_delete_trusted_issuer(UUID(request.uuid))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteTrustedIssuer failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def CreateTrustedIssuerAttributes(
+        self,
+        request: database_pb2.CreateTrustedIssuerAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['create_trusted_issuer_attributes'].inc()
+            ok = mariadb._direct_create_trusted_issuer_attributes(
+                mariadb._trusted_issuer_attrs_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateTrustedIssuerAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def GetTrustedIssuerAttributes(
+        self,
+        request: database_pb2.GetTrustedIssuerAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetTrustedIssuerAttributesReply:
+        try:
+            self.monitor.counters['get_trusted_issuer_attributes'].inc()
+            data = mariadb._direct_get_trusted_issuer_attributes(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetTrustedIssuerAttributesReply(
+                    found=False)
+            return database_pb2.GetTrustedIssuerAttributesReply(
+                found=True,
+                data=mariadb._trusted_issuer_attrs_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetTrustedIssuerAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetTrustedIssuerAttributesReply(found=False)
+
+    def UpdateTrustedIssuerAttributes(
+        self,
+        request: database_pb2.UpdateTrustedIssuerAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['update_trusted_issuer_attributes'].inc()
+            ok = mariadb._direct_update_trusted_issuer_attributes(
+                mariadb._trusted_issuer_attrs_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateTrustedIssuerAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def DeleteTrustedIssuerAttributes(
+        self,
+        request: database_pb2.DeleteTrustedIssuerAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['delete_trusted_issuer_attributes'].inc()
+            ok = mariadb._direct_delete_trusted_issuer_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteTrustedIssuerAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
     def CreateAgentOperation(
         self,
         request: database_pb2.CreateAgentOperationRequest,
@@ -5365,6 +5531,14 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB namespace key operations
             'create_namespace_key', 'get_namespace_key',
             'get_namespace_key_by_name',
+            # MariaDB trusted issuer operations
+            'create_trusted_issuer', 'get_trusted_issuer',
+            'get_trusted_issuer_by_name', 'get_all_trusted_issuers',
+            'delete_trusted_issuer',
+            'create_trusted_issuer_attributes',
+            'get_trusted_issuer_attributes',
+            'update_trusted_issuer_attributes',
+            'delete_trusted_issuer_attributes',
             'find_namespace_keys', 'delete_namespace_key',
             'delete_expired_namespace_keys',
             # MariaDB namespace key attributes operations

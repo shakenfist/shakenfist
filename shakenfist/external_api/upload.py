@@ -35,7 +35,6 @@ class UploadCreateEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Create a new upload.', [],
         [(200, 'Information about the upload.', upload_create_example)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def post(self):
         u = Upload.new(str(uuid.uuid4()), config.NODE_NAME)
@@ -49,7 +48,6 @@ class UploadDataEndpoint(api_base.Resource):
         [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
          ('binary data', 'body', 'binary', 'Binary data to append to the upload.', True)],
         [(200, 'The new size of the uploaded object.', '1500')]))
-    @api_base.verify_token
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
     @api_base.log_token_use
@@ -74,7 +72,6 @@ class UploadTruncateEndpoint(api_base.Resource):
         [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
          ('offset', 'query', 'integer', 'The new length of the object.', True)],
         [(200, 'No return value', '')]))
-    @api_base.verify_token
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
     @api_base.log_token_use

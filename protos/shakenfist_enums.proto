@@ -47,6 +47,8 @@ enum ObjectType {
   OBJECT_TYPE_UNKNOWN = 27;  // "unknown"
   OBJECT_TYPE_UNKNOWN_MANAGED_EXECUTABLE = 28;  // "unknown_managed_executable"
   OBJECT_TYPE_NAMESPACE_KEY = 29;  // "namespace_key"
+  OBJECT_TYPE_TRUSTED_ISSUER = 30;  // "trusted_issuer"
+  OBJECT_TYPE_MAPPING_RULE = 31;  // "mapping_rule"
 }
 
 // ReservationType enum - IPAM reservation types

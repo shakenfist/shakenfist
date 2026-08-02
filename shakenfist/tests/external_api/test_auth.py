@@ -16,6 +16,7 @@ from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.util import credentials
 
 
 def _clean_traceback(resp):
@@ -619,6 +620,27 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         self.assertEqual(404, resp.status_code)
         self.assertEqual('key does not exist', resp.get_json()['error'])
 
+    def test_update_key_without_a_secret_is_refused(self):
+        # Secret generation belongs to the create path only. A rotation
+        # which forgot its body must not silently replace a live
+        # credential with a generated one -- the caller's existing
+        # secret would stop working on a typo.
+        self._add_key('rotate-me', 'original')
+        original = Namespace.from_db('system').lookup_key('rotate-me')
+
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/rotate-me',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({}))
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('no key specified', resp.get_json()['error'])
+
+        unchanged = Namespace.from_db('system').lookup_key('rotate-me')
+        self.assertEqual(original.nonce, unchanged.nonce)
+        self.assertTrue(bcrypt.checkpw(
+            'original'.encode('utf-8'), base64.b64decode(unchanged.key)))
+
 
 class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
@@ -1167,3 +1189,132 @@ class EventSecretsTestCase(base.ShakenFistTestCase):
                   for extra in self._extras_for('api response sent')]
         for body in bodies:
             self.assertNotIn('credentials', str(body))
+
+
+class ReservedKeyPrefixTestCase(base.ShakenFistTestCase):
+    """The sfk_ prefix belongs to the cluster, not to operators.
+
+    Reserving it is what makes rejecting a bad checksum at /auth sound:
+    /auth cannot tell which stored key a presented secret is meant to
+    match until it bcrypt compares against each one, so early rejection
+    is only safe if no legitimate operator secret can carry the prefix
+    and fail the checksum.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+
+        self.client = external_api.app.test_client()
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _add_key(self, name, key=None, expiry=None):
+        body = {'key_name': name}
+        if key is not None:
+            body['key'] = key
+        if expiry is not None:
+            body['expiry'] = expiry
+        return self.client.post(
+            '/auth/namespaces/banana/keys',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps(body))
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_operator_cannot_supply_a_reserved_prefix(self, mock_lock):
+        resp = self._add_key('mine', credentials.generate())
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('reserved', resp.get_json()['error'])
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_reservation_covers_malformed_lookalikes_too(self, mock_lock):
+        # Not just valid cluster secrets: anything wearing the prefix,
+        # or the reservation would have a hole in exactly the shape
+        # early rejection cares about.
+        resp = self._add_key('mine', 'sfk_i-made-this-up')
+        self.assertEqual(400, resp.status_code)
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_ordinary_operator_secrets_are_unaffected(self, mock_lock):
+        resp = self._add_key('mine', 'a perfectly ordinary secret')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('mine', resp.get_json())
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_omitting_the_key_generates_one(self, mock_lock):
+        resp = self._add_key('generated')
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+        self.assertEqual('generated', body['key_name'])
+        self.assertTrue(credentials.looks_valid(body['key']))
+
+        # And it actually authenticates, which is the only proof that
+        # what was returned is what was stored.
+        resp = self.client.post(
+            '/auth',
+            data=json.dumps({'namespace': 'banana', 'key': body['key']}))
+        self.assertEqual(200, resp.status_code)
+
+    def test_malformed_cluster_key_is_refused_at_auth(self):
+        resp = self.client.post(
+            '/auth',
+            data=json.dumps({'namespace': 'banana',
+                             'key': 'sfk_not_a_real_key_at_all'}))
+        self.assertEqual(401, resp.status_code)
+
+    @mock.patch('shakenfist.util.credentials.looks_valid')
+    def test_early_rejection_skips_the_bcrypt_comparisons(self, mock_valid):
+        # The point of checking the checksum first is to avoid the
+        # per-key bcrypt work, so assert the comparison never happens
+        # rather than only that the response is a 401.
+        mock_valid.return_value = False
+        with mock.patch('bcrypt.checkpw') as mock_checkpw:
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana',
+                                 'key': 'sfk_bogus'}))
+        self.assertEqual(401, resp.status_code)
+        mock_checkpw.assert_not_called()
+
+    def test_early_rejection_does_not_amplify_event_writes(self):
+        # /auth is public, so anyone who knows a namespace name can
+        # reach the checksum check. If it wrote its own event, a caller
+        # could drive writes into that namespace's audit log for less
+        # work than the bcrypt path costs -- cheaper per event than the
+        # exposure that already exists.
+        events = []
+        patcher = mock.patch(
+            'shakenfist.eventlog.add_event',
+            side_effect=lambda event_type, object_type, object_uuid,
+            message, duration=None, extra=None, **kwargs: events.append(
+                message))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client.post('/auth', data=json.dumps(
+            {'namespace': 'banana', 'key': 'sfk_bogus'}))
+        malformed = list(events)
+
+        events.clear()
+        self.client.post('/auth', data=json.dumps(
+            {'namespace': 'banana', 'key': 'just-wrong'}))
+        ordinary = list(events)
+
+        self.assertEqual(
+            len(ordinary), len(malformed),
+            'a malformed cluster key wrote a different number of events '
+            f'({malformed}) than an ordinary wrong key ({ordinary})')

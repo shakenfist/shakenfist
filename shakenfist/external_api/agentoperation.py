@@ -92,12 +92,15 @@ agentoperation_get_example = """{
 
 
 class AgentOperationEndpoint(api_base.Resource):
+    # Derivation would give 'agent' from the leading word, which
+    # reads as though it were about the in-guest agent itself.
+    scope_family = 'agentoperation'
+
     @swag_from(api_base.swagger_helper(
         'agentoperations', 'Get information for an agent operation.',
         [('operation_uuid', 'query', 'uuid', 'The UUID of an agent operation.', True)],
         [(200, 'Information about a single agent operation.', agentoperation_get_example),
          (404, 'Agent operation not found.', None)]))
-    @api_base.verify_token
     @arg_is_operation_uuid
     @requires_operation_ownership
     @api_base.log_token_use
@@ -109,7 +112,6 @@ class AgentOperationEndpoint(api_base.Resource):
         [('operation_uuid', 'query', 'uuid', 'The UUID of an agent operation.', True)],
         [(200, 'Information about a single agentoperation.', None),
          (404, 'Agent operation not found.', None)]))
-    @api_base.verify_token
     @arg_is_operation_uuid
     @requires_operation_ownership
     @api_base.log_token_use
@@ -184,7 +186,6 @@ class InstanceAgentOperationsEndpoint(api_base.Resource):
         [(200, 'Information about a agentoperations for an instance.',
           agentoperation_instance_example),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use

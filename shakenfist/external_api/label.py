@@ -76,7 +76,6 @@ class LabelEndpoint(api_base.Resource):
         ],
         [(200, 'The updated artifact.', label_example)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         namespace, label_url = _label_url(label_name)
@@ -99,7 +98,6 @@ class LabelEndpoint(api_base.Resource):
         [(200, 'The label artifact, if found.', label_example),
          (404, 'Label not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, label_name=None):
         artifacts = list(Artifacts(filters=[
@@ -118,7 +116,6 @@ class LabelEndpoint(api_base.Resource):
         [(200, 'The label artifact, if found.', label_example),
          (404, 'Label not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def delete(self, label_name=None):
         artifacts = list(Artifacts(filters=[

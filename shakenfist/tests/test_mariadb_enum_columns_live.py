@@ -87,26 +87,37 @@ class NativeEnumWideningLiveTestCase(base.ShakenFistTestCase):
         self.assertIsNotNone(values)
         return values
 
-    def _shrink_enum_columns(self):
-        """Rewrite every native ENUM column without its newest member.
+    def _shrink_enum_columns(self, omit=None):
+        """Rewrite every native ENUM column without one of its members.
 
         This is exactly what a database created from an older release
         looks like after a code upgrade: the Python enum has a member
         the column definition has never heard of.
+
+        The member dropped defaults to the last one declared, which
+        approximates "the newest" and is all a test needs when it does
+        not care which member is missing. A test that does care must
+        pass omit={(table, column): member_name} rather than relying on
+        its member being last, because "last" moves whenever someone
+        appends to the Python enum.
         """
+        omit = omit or {}
         shrunk = []
         with self.engine.connect() as conn:
             for table_name, column in mariadb._native_enum_columns():
                 values = list(column.type.enums)
                 if len(values) < 2:
                     continue
+                dropped = omit.get((table_name, column.name), values[-1])
+                self.assertIn(dropped, values)
+                remaining = [v for v in values if v != dropped]
                 nullability = 'NULL' if column.nullable else 'NOT NULL'
                 conn.execute(sa.text(
                     f'ALTER TABLE {table_name} '
                     f'MODIFY COLUMN {column.name} '
-                    f'{mariadb._render_enum_ddl(values[:-1])} '
+                    f'{mariadb._render_enum_ddl(remaining)} '
                     f'{nullability}'))
-                shrunk.append((table_name, column.name, values[-1]))
+                shrunk.append((table_name, column.name, dropped))
             conn.commit()
         return shrunk
 
@@ -138,7 +149,14 @@ class NativeEnumWideningLiveTestCase(base.ShakenFistTestCase):
         that failure against the shrunken schema, then prove the
         reconciliation fixes it.
         """
-        self._shrink_enum_columns()
+        # Name the member to drop rather than taking the default of
+        # "whichever is last": this test inserts a NAMESPACE_KEY row and
+        # needs that specific member missing. It used to be last, so the
+        # default happened to work, until trusted_issuer and mapping_rule
+        # were appended after it and the INSERT stopped failing.
+        self._shrink_enum_columns(
+            omit={('object_states', 'object_type'):
+                  ObjectType.NAMESPACE_KEY.name})
 
         table = mariadb._get_object_states_table()
         key_uuid = str(uuid4())

@@ -5,6 +5,7 @@ import traceback
 import flask
 import flask_restful
 from flask_jwt_extended import decode_token
+from flask_jwt_extended import get_jwt
 from flask_jwt_extended import unset_jwt_cookies
 from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended.exceptions import CSRFError
@@ -28,6 +29,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist.external_api import scopes as api_scopes
 from shakenfist.instance import Instance
 from shakenfist.namespace import get_api_token
 from shakenfist.node import Node
@@ -57,8 +59,35 @@ def caller_is_admin(func):
         if request_namespace() != 'system':
             return sf_api.error(401, 'unauthorized')
 
+        # Being in the system namespace is necessary but no longer
+        # sufficient. Without this a key scoped to, say, blob.read but
+        # minted into system would reach every administrative endpoint
+        # -- a scoped credential escalating to cluster administration.
+        # Legacy unscoped keys carry the wildcard and are unaffected,
+        # so existing admin automation keeps working.
+        held = get_jwt().get('scopes')
+        if not api_scopes.satisfies(held, api_scopes.ADMIN):
+            LOG.with_fields({'held': held}).info(
+                'Administrative request denied: token lacks the admin scope')
+            return sf_api.error(
+                403, 'token is not scoped for administrative operations')
+
         return func(*args, **kwargs)
     return wrapper
+
+
+def caller_scopes():
+    """The scopes the requesting token holds, or None for wildcard.
+
+    None means "unrestricted" here, covering both a legacy token with
+    no scopes claim and one explicitly carrying the wildcard. Callers
+    deriving a new credential's scopes from the caller's should treat
+    None as "no restriction to inherit".
+    """
+    held = get_jwt().get('scopes')
+    if held is None or api_scopes.WILDCARD in held:
+        return None
+    return list(held)
 
 
 def resolve_lookup_namespace(body_namespace, kind):
@@ -740,11 +769,106 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     ]
 
 
+def public(func):
+    """Mark an endpoint method as deliberately unauthenticated.
+
+    Authentication is applied to every resource method by
+    Resource.method_decorators below, so this marker is the only way
+    out of it, and every use of it needs justifying in review. There
+    should only ever be a handful.
+
+    Apply it as the outermost (topmost) decorator on the method. The
+    marker is an attribute read off the bound method at dispatch time,
+    and several decorators in this file predate functools.wraps and so
+    do not propagate attributes -- being outermost means the marker
+    cannot be swallowed by whatever is applied beneath it. The
+    structural test in shakenfist/tests/external_api/test_auth_universal.py
+    enumerates the routes and will fail if this is ever not true.
+    """
+    func._sf_public = True
+    return func
+
+
+def scope(family=None, verb=None, name=None):
+    """Override the scope derived for an endpoint method.
+
+    Scopes are normally derived from the resource class and the HTTP
+    method, so most endpoints need nothing. This annotates the cases
+    where that derivation misleads -- a POSTed power action is not
+    really a write of the instance -- and it exists so those cases are
+    visible at the decoration site and greppable in review.
+
+    Apply it as the outermost decorator, for the same reason
+    @public must be: the marker is read off the bound method at
+    dispatch and several decorators in this file predate
+    functools.wraps. tools/check-endpoint-authentication.sh enforces
+    that placement.
+    """
+    def decorator(func):
+        func._sf_scope = {'family': family, 'verb': verb, 'scope': name}
+        return func
+    return decorator
+
+
+def _enforce_scope(func, resource_class, override):
+    def wrapper(*args, **kwargs):
+        required = api_scopes.required_scope(
+            resource_class, flask.request.method, override)
+        held = get_jwt().get('scopes')
+
+        if not api_scopes.satisfies(held, required):
+            resource_name = (resource_class.__name__
+                             if resource_class else None)
+            LOG.with_fields({
+                'required': required,
+                'held': held,
+                'resource': resource_name
+            }).info('Request denied by scope')
+            return sf_api.error(
+                403, 'token is not scoped for this operation')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def _authenticate_unless_public(func):
+    # The method_decorators entry which makes authentication the
+    # default. flask_restful applies these to the bound method at
+    # dispatch, so this wraps outside every per-method decorator --
+    # which is what lets authentication precede the ownership checks
+    # that assume an authenticated caller.
+    if getattr(func, '_sf_public', False):
+        return func
+
+    # The resource instance is available because func is bound. The
+    # HTTP method is read from the request rather than from
+    # func.__name__, which is unreliable: the per-method decorators in
+    # this file predate functools.wraps, so by the time we see it the
+    # name is often 'wrapper'.
+    instance = getattr(func, '__self__', None)
+    resource_class = type(instance) if instance is not None else None
+    override = getattr(func, '_sf_scope', None)
+
+    # verify_token wraps the scope check, so the token is proven valid
+    # before its claims are trusted to say what it may do.
+    return verify_token(_enforce_scope(func, resource_class, override))
+
+
 class Resource(flask_restful.Resource):
     # Remember that order here matters, the record_exception
     # wrapper deliberately reraises the exception so that
     # generic_wrapper can handle the response after logging.
+    #
+    # flask_restful applies these in list order with each wrapping the
+    # previous, so the LAST entry ends up outermost and therefore runs
+    # FIRST. Reading bottom to top gives execution order: exceptions
+    # are suppressed and recorded, authorization errors are turned into
+    # responses, the request is logged, and only then is the caller
+    # authenticated. Authentication is last in that sequence but still
+    # ahead of every per-method decorator, so an unauthenticated
+    # request never reaches an ownership check.
     method_decorators = [
+        _authenticate_unless_public,
         log_request,
         handle_authorization_exceptions,
         handle_database_unavailable,

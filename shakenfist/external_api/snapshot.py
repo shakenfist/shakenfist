@@ -25,7 +25,6 @@ daemon.set_log_level(LOG, 'api')
 
 
 class InstanceSnapshotEndpoint(api_base.Resource):
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -41,7 +40,6 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         return instance_from_db.snapshot(
             all=all, device=device, max_versions=max_versions, thin=thin)
 
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use

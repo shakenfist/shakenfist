@@ -11,7 +11,10 @@
 # - All threads receive the same Table object (identity, not equality)
 # - No exception escapes from any concurrent call
 
+import ast
 import concurrent.futures
+import inspect
+import textwrap
 from unittest import mock
 
 import sqlalchemy as sa
@@ -163,6 +166,8 @@ EXPECTED_TABLE_NAMES = sorted([
     'namespaces',
     'namespace_attributes',
     'namespace_keys',
+    'trusted_issuer_attributes',
+    'trusted_issuers',
     'namespace_key_attributes',
     'artifacts',
     'artifact_attributes',
@@ -288,3 +293,63 @@ class RegisterAllTablesTestCase(base.ShakenFistTestCase):
             f'register_all_tables() failed to register: {sorted(missing)}. '
             'Add the missing _get_*_table() calls to register_all_tables() '
             'in shakenfist/mariadb.py.')
+
+
+# The keys every _ensure_*_schema() function must put in its result dict.
+# ensure_schema() collects those dicts and summarises them, so a function
+# which spells a key differently does not fail until sf-ctl
+# ensure-mariadb-schema runs against a real cluster -- long after the unit
+# tests have passed.
+ENSURE_RESULT_KEYS = {
+    'table', 'start_version', 'end_version', 'target_version', 'migrated'}
+
+
+class EnsureSchemaResultContractTestCase(base.ShakenFistTestCase):
+    """Every _ensure_*_schema() must return the same shape of dict.
+
+    ensure_schema() reads r['migrated'] from each result, and
+    verify_schema_versions() reads the version keys, so a typo here is a
+    KeyError at deployment time rather than a test failure. The check is
+    static because the real functions need a live engine to run.
+    """
+
+    def test_every_ensure_function_returns_the_contract_keys(self):
+        source = textwrap.dedent(inspect.getsource(mariadb))
+        tree = ast.parse(source)
+
+        checked = 0
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if not (node.name.startswith('_ensure_')
+                    and node.name.endswith('_schema')):
+                continue
+
+            returned = [
+                sub for sub in ast.walk(node)
+                if isinstance(sub, ast.Return)
+                and isinstance(sub.value, ast.Dict)]
+            self.assertTrue(
+                returned,
+                f'{node.name}() does not return a dict literal, so its '
+                'result shape cannot be checked. Return one, or exclude it '
+                'from the _ensure_*_schema naming convention.')
+
+            for result in returned:
+                keys = {k.value for k in result.value.keys
+                        if isinstance(k, ast.Constant)}
+                self.assertEqual(
+                    ENSURE_RESULT_KEYS, keys,
+                    f'{node.name}() returns {sorted(keys)}, but every '
+                    '_ensure_*_schema() must return exactly '
+                    f'{sorted(ENSURE_RESULT_KEYS)}. ensure_schema() and '
+                    'verify_schema_versions() index these keys directly.')
+            checked += 1
+
+        # Guard the guard: if the naming convention changes this test
+        # would silently check nothing at all.
+        self.assertGreater(
+            checked, 30,
+            'Found only %d _ensure_*_schema() functions, which suggests the '
+            'naming convention changed and this test is no longer checking '
+            'anything.' % checked)

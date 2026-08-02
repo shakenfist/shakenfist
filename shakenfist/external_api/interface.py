@@ -58,7 +58,6 @@ class InterfaceEndpoint(api_base.Resource):
         [(200, 'Interface details.', interface_get_example),
          (404, 'Interface not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, interface_uuid=None):
         ni, _, err = api_util.safe_get_network_interface(interface_uuid)
@@ -75,7 +74,6 @@ class InterfaceFloatEndpoint(api_base.Resource):
          (404, 'Interface not found.', None),
          (507, 'Network congested and unable to allocate address.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -103,7 +101,6 @@ class InterfaceDefloatEndpoint(api_base.Resource):
         [(200, 'Interface defloat requested.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -141,7 +138,6 @@ class InterfaceMetadatasEndpoint(api_base.Resource):
         [(200, 'Interface metadata, if any.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -160,7 +156,6 @@ class InterfaceMetadatasEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None, key=None, value=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -188,7 +183,6 @@ class InterfaceMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def put(self, interface_uuid=None, key=None, value=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -213,7 +207,6 @@ class InterfaceMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.log_token_use
     def delete(self, interface_uuid=None, key=None, value=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)

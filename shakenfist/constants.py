@@ -118,6 +118,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'ipam': 'ipam.IPAM',
     'namespace': 'namespace.Namespace',
     'namespace_key': 'namespace_key.NamespaceKey',
+    'trusted_issuer': 'trusted_issuer.TrustedIssuer',
     'net_iface_ip_op': 'operations.net_iface_ip_op.NetIfaceIPOp',
     'net_iface_op': 'operations.net_iface_op.NetIfaceOp',
     'net_ip_op': 'operations.net_ip_op.NetIPOp',

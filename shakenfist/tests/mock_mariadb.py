@@ -96,6 +96,8 @@ class MockMariaDB():
         self.namespace_attributes = _NamespaceAttributesStore(self)
         self.namespace_key_objects = {}  # Mock MariaDB namespace key storage
         self.namespace_key_attributes = {}  # Mock MariaDB namespace key attrs
+        self.trusted_issuers = {}  # Mock MariaDB trusted issuer storage
+        self.trusted_issuer_attributes = {}  # ... and their attributes
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
         self.object_references = {}  # Mock MariaDB object references
@@ -403,6 +405,19 @@ class MockMariaDB():
             side_effect=self._mariadb_create_namespace_key)
         self.mariadb_create_namespace_key.start()
         self.test_obj.addCleanup(self.mariadb_create_namespace_key.stop)
+
+        for name in ('create_trusted_issuer', 'get_trusted_issuer',
+                     'get_trusted_issuer_by_name',
+                     'get_all_trusted_issuers', 'delete_trusted_issuer',
+                     'create_trusted_issuer_attributes',
+                     'get_trusted_issuer_attributes',
+                     'update_trusted_issuer_attributes',
+                     'delete_trusted_issuer_attributes'):
+            patcher = mock.patch(
+                f'shakenfist.mariadb.{name}',
+                side_effect=getattr(self, f'_mariadb_{name}'))
+            patcher.start()
+            self.test_obj.addCleanup(patcher.stop)
 
         self.mariadb_get_namespace_key = mock.patch(
             'shakenfist.mariadb.get_namespace_key',
@@ -3384,3 +3399,47 @@ class MockMariaDB():
         net_iface._state_update(set_state, skip_transition_validation=True)
 
         return net_iface
+
+    # ------------------------------------------------------------------
+    # TrustedIssuer storage
+    # ------------------------------------------------------------------
+
+    def _mariadb_create_trusted_issuer(self, data):
+        if any(d.name == data.name
+               for d in self.trusted_issuers.values()):
+            # The unique index on name.
+            return False
+        self.trusted_issuers[str(data.uuid)] = data
+        return True
+
+    def _mariadb_get_trusted_issuer(self, issuer_uuid):
+        return self.trusted_issuers.get(str(issuer_uuid))
+
+    def _mariadb_get_trusted_issuer_by_name(self, name):
+        for data in self.trusted_issuers.values():
+            if data.name == name:
+                return data
+        return None
+
+    def _mariadb_get_all_trusted_issuers(self):
+        return list(self.trusted_issuers.values())
+
+    def _mariadb_delete_trusted_issuer(self, issuer_uuid):
+        return self.trusted_issuers.pop(str(issuer_uuid), None) is not None
+
+    def _mariadb_create_trusted_issuer_attributes(self, data):
+        self.trusted_issuer_attributes[str(data.uuid)] = data
+        return True
+
+    def _mariadb_get_trusted_issuer_attributes(self, issuer_uuid):
+        return self.trusted_issuer_attributes.get(str(issuer_uuid))
+
+    def _mariadb_update_trusted_issuer_attributes(self, data):
+        if str(data.uuid) not in self.trusted_issuer_attributes:
+            return False
+        self.trusted_issuer_attributes[str(data.uuid)] = data
+        return True
+
+    def _mariadb_delete_trusted_issuer_attributes(self, issuer_uuid):
+        return self.trusted_issuer_attributes.pop(
+            str(issuer_uuid), None) is not None

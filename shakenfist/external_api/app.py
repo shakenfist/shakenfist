@@ -221,6 +221,7 @@ def log_response_info(response):
 
 
 class Root(api_base.Resource):
+    @api_base.public
     def get(self):
         resp = flask.Response(
             ('<html><head><title>Shaken Fist REST API service</title></head>'
@@ -234,6 +235,11 @@ class Root(api_base.Resource):
              'instance-agentoperations-all, agentoperations-put-with-mode</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types, '
              'artifact-clusteroperations</li>'
+             # scope-enforcement lets a client tell whether a 403 means
+             # "your token is not scoped for this" on this cluster, or
+             # something else entirely.
+             '<li>auth: trusted-issuers, generated-key-secrets, '
+             'scope-enforcement</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
@@ -260,6 +266,7 @@ class Livez(api_base.Resource):
     # Unauthenticated: liveness means "this worker process is serving HTTP".
     # It deliberately does not check any downstream dependency, so a healthy
     # but not-yet-ready worker is not killed by an orchestrator liveness probe.
+    @api_base.public
     def get(self):
         resp = flask.Response('ok', mimetype='text/plain')
         resp.status_code = 200
@@ -270,6 +277,7 @@ class Readyz(api_base.Resource):
     # Unauthenticated: readiness reflects whether this worker should receive
     # traffic. health.is_ready() already returns False when the worker is
     # draining or its cached readiness state is stale.
+    @api_base.public
     def get(self):
         if health.is_ready():
             return flask.Response('ready', mimetype='text/plain', status=200)
@@ -320,6 +328,9 @@ api.add_resource(api_auth.AuthEndpoint, '/auth')
 api.add_resource(api_auth.AuthNamespacesEndpoint, '/auth/namespaces')
 api.add_resource(api_auth.AuthNamespaceEndpoint,
                  '/auth/namespaces/<namespace>')
+api.add_resource(api_auth.AuthIssuersEndpoint, '/auth/issuers')
+api.add_resource(api_auth.AuthIssuerEndpoint,
+                 '/auth/issuers/<issuer_name>')
 api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,

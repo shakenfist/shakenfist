@@ -227,7 +227,6 @@ class InstanceEndpoint(api_base.Resource):
           'The namespace to contain the network.', False)],
         [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -243,7 +242,6 @@ class InstanceEndpoint(api_base.Resource):
         [(200, 'Information about the instance post delete.',
           instance_get_example_deleted),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_namespace_exist_if_specified
@@ -428,7 +426,6 @@ class InstancesEndpoint(api_base.Resource):
           'If unset or False, only active instances are shown.', False)],
         [(200, 'Information about a single instance.', instances_get_example),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
         prefilter = None
@@ -510,7 +507,6 @@ class InstancesEndpoint(api_base.Resource):
             (409, 'Network address in use.', None),
             (507, 'Unable to allocate resources for the instance.', None)
          ]))
-    @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
@@ -876,7 +872,6 @@ class InstancesEndpoint(api_base.Resource):
         [(200, 'A list of the UUIDs of instances awaiting deletion.', None),
          (400, 'The confirm parameter is not True or a administrative user has '
                'not specified a namespace.', None)]))
-    @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None):
@@ -947,7 +942,6 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         [(200, 'A list of network interfaces for an instance.',
           instance_interfaces_example),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -971,7 +965,6 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             (406, 'Instance or network not ready.', None),
             (409, 'Address in use.', None)
         ]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1096,7 +1089,6 @@ class InstanceEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single instance.', instance_events_example),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1112,7 +1104,6 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be rebooted.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1136,7 +1127,6 @@ class InstanceRebootHardEndpoint(api_base.Resource):
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be rebooted.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1160,7 +1150,6 @@ class InstancePowerOffEndpoint(api_base.Resource):
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be powered off.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1184,7 +1173,6 @@ class InstancePowerOnEndpoint(api_base.Resource):
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be powered on.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1208,7 +1196,6 @@ class InstancePauseEndpoint(api_base.Resource):
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be paused.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1232,7 +1219,6 @@ class InstanceUnpauseEndpoint(api_base.Resource):
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be unpaused.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1257,7 +1243,6 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         [(200, 'Instance metadata, if any.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1275,7 +1260,6 @@ class InstanceMetadatasEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1326,7 +1310,6 @@ class InstanceMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1349,7 +1332,6 @@ class InstanceMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1374,7 +1356,6 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         [(200, 'The console data as an application/octet-stream.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1412,7 +1393,6 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1444,6 +1424,11 @@ ca=-----BEGIN CERTIFICATE-----\nMIIEF...16br/Fw==\n-----END CERTIFICATE-----\n""
 
 
 class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
+    # A .vv file carries the SPICE connection credentials for the
+    # guest, so this hands out interactive keyboard and mouse control
+    # rather than an observation. Deriving instance.read would let a
+    # credential granted only to watch instances take one over.
+    @api_base.scope(verb='console')
     @swag_from(api_base.swagger_helper(
         'instances',
         ('Fetch a virt-viewer .vv file describing how to connect to the VDI console '
@@ -1456,7 +1441,6 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
           instance_vv_file_example),
          (404, 'Instance not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1497,6 +1481,10 @@ instance_vdiconsoleproxy_get_example = """{
 
 
 class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
+    # Mints an Ed25519 console token, which is a credential for full
+    # interactive control of the guest. Same reasoning as the .vv file
+    # helper above: this is not a read.
+    @api_base.scope(verb='console')
     @swag_from(api_base.swagger_helper(
         'instances',
         ('Mint a short lived Kerbside VDI console token and return a '
@@ -1512,7 +1500,6 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
          (406, 'Instance is not ready.', None),
          (409, 'Instance does not have a SPICE console.', None),
          (500, 'Kerbside signing key is not configured.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1581,7 +1568,6 @@ class InstanceAgentPutEndpoint(api_base.Resource):
          (400, 'No agent connection to instance.', None),
          (404, 'Instance or blob not found.', None),
          (406, 'Invalid mode specified', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
@@ -1645,7 +1631,6 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance.', None),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
@@ -1674,6 +1659,11 @@ class InstanceAgentGetEndpoint(api_base.Resource):
 
 
 class InstanceAgentExecuteEndpoint(api_base.Resource):
+    # Arbitrary command execution inside the guest is a different kind
+    # of privilege from creating an instance, and an operator writing a
+    # mapping rule would sensibly grant one without the other, so it
+    # gets its own verb rather than riding on instance.write.
+    @api_base.scope(verb='execute')
     @swag_from(api_base.swagger_helper(
         'instances', 'Execute a command within an instance via the Shaken Fist agent.',
         [
@@ -1684,7 +1674,6 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance.', None),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
@@ -1722,7 +1711,6 @@ class InstanceScreenshotEndpoint(api_base.Resource):
         ],
         [(200, 'The UUID of a blob containing the screenshot.', None),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1789,7 +1777,6 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
             'A list of the cluster operations not yet executed for this instance.',
             instance_outstanding_operations_example),
          (404, 'Instance not found.', None)]))
-    @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

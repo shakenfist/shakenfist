@@ -261,6 +261,21 @@ class DatabaseServiceStub:
     GetNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyAttributesRequest, _database_pb2.GetNamespaceKeyAttributesReply]
     UpdateNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceKeyAttributesRequest, _database_pb2.StatusReply]
     DeleteNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyAttributesRequest, _database_pb2.StatusReply]
+    CreateTrustedIssuer: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateTrustedIssuerRequest, _database_pb2.StatusReply]
+    """TrustedIssuer Operations (MariaDB)
+    A TrustedIssuer is an external identity provider this cluster will
+    believe. Cluster level and system owned: who may vouch for
+    identities here is an administrative decision.
+    """
+    GetTrustedIssuer: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerRequest, _database_pb2.GetTrustedIssuerReply]
+    GetTrustedIssuerByName: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerByNameRequest, _database_pb2.GetTrustedIssuerReply]
+    GetAllTrustedIssuers: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllTrustedIssuersRequest, _database_pb2.GetAllTrustedIssuersReply]
+    DeleteTrustedIssuer: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteTrustedIssuerRequest, _database_pb2.StatusReply]
+    CreateTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateTrustedIssuerAttributesRequest, _database_pb2.StatusReply]
+    """TrustedIssuer Attributes Operations (MariaDB)"""
+    GetTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerAttributesRequest, _database_pb2.GetTrustedIssuerAttributesReply]
+    UpdateTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateTrustedIssuerAttributesRequest, _database_pb2.StatusReply]
+    DeleteTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteTrustedIssuerAttributesRequest, _database_pb2.StatusReply]
     CreateAgentOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
@@ -580,6 +595,21 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyAttributesRequest, _database_pb2.GetNamespaceKeyAttributesReply]  # type: ignore[assignment]
     UpdateNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceKeyAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateTrustedIssuer: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateTrustedIssuerRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    """TrustedIssuer Operations (MariaDB)
+    A TrustedIssuer is an external identity provider this cluster will
+    believe. Cluster level and system owned: who may vouch for
+    identities here is an administrative decision.
+    """
+    GetTrustedIssuer: _aio.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerRequest, _database_pb2.GetTrustedIssuerReply]  # type: ignore[assignment]
+    GetTrustedIssuerByName: _aio.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerByNameRequest, _database_pb2.GetTrustedIssuerReply]  # type: ignore[assignment]
+    GetAllTrustedIssuers: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllTrustedIssuersRequest, _database_pb2.GetAllTrustedIssuersReply]  # type: ignore[assignment]
+    DeleteTrustedIssuer: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteTrustedIssuerRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateTrustedIssuerAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    """TrustedIssuer Attributes Operations (MariaDB)"""
+    GetTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerAttributesRequest, _database_pb2.GetTrustedIssuerAttributesReply]  # type: ignore[assignment]
+    UpdateTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateTrustedIssuerAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteTrustedIssuerAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     CreateAgentOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
@@ -1812,6 +1842,75 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     def DeleteNamespaceKeyAttributes(
         self,
         request: _database_pb2.DeleteNamespaceKeyAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def CreateTrustedIssuer(
+        self,
+        request: _database_pb2.CreateTrustedIssuerRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
+        """TrustedIssuer Operations (MariaDB)
+        A TrustedIssuer is an external identity provider this cluster will
+        believe. Cluster level and system owned: who may vouch for
+        identities here is an administrative decision.
+        """
+
+    @_abc_1.abstractmethod
+    def GetTrustedIssuer(
+        self,
+        request: _database_pb2.GetTrustedIssuerRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetTrustedIssuerReply, _abc.Awaitable[_database_pb2.GetTrustedIssuerReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetTrustedIssuerByName(
+        self,
+        request: _database_pb2.GetTrustedIssuerByNameRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetTrustedIssuerReply, _abc.Awaitable[_database_pb2.GetTrustedIssuerReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetAllTrustedIssuers(
+        self,
+        request: _database_pb2.GetAllTrustedIssuersRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetAllTrustedIssuersReply, _abc.Awaitable[_database_pb2.GetAllTrustedIssuersReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteTrustedIssuer(
+        self,
+        request: _database_pb2.DeleteTrustedIssuerRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def CreateTrustedIssuerAttributes(
+        self,
+        request: _database_pb2.CreateTrustedIssuerAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
+        """TrustedIssuer Attributes Operations (MariaDB)"""
+
+    @_abc_1.abstractmethod
+    def GetTrustedIssuerAttributes(
+        self,
+        request: _database_pb2.GetTrustedIssuerAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetTrustedIssuerAttributesReply, _abc.Awaitable[_database_pb2.GetTrustedIssuerAttributesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def UpdateTrustedIssuerAttributes(
+        self,
+        request: _database_pb2.UpdateTrustedIssuerAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteTrustedIssuerAttributes(
+        self,
+        request: _database_pb2.DeleteTrustedIssuerAttributesRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 

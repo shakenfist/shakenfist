@@ -18,6 +18,7 @@ from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import access_tokens
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import credentials
 
 
 LOG, _ = logs.setup(__name__)
@@ -230,7 +231,7 @@ class Namespace(dbo):
             return None
         return attrs
 
-    def add_key(self, name, value, expiry=None):
+    def add_key(self, name, value, expiry=None, scopes=None):
         """Create one of this namespace's keys, or rotate it if it exists.
 
         Adding a key whose name is already in use has always silently
@@ -245,10 +246,17 @@ class Namespace(dbo):
         loser of the race falling back to the rotation it would have
         performed anyway.
 
+        ``scopes`` of None records no scopes, which mints wildcard
+        tokens. That is the right default for an operator creating a
+        key by hand, and the wrong one when the caller is itself
+        scoped -- see the REST layer, which passes its own scopes down
+        so a key cannot be minted with more privilege than the caller
+        creating it.
+
         Returns the new nonce, as it always has.
         """
         key = namespace_key.NamespaceKey.new(
-            self.uuid, name, value, expiry=expiry)
+            self.uuid, name, value, expiry=expiry, scopes=scopes)
         return key.nonce
 
     def remove_key(self, name):
@@ -377,7 +385,9 @@ def get_api_token(base_url, namespace='system'):
 
     ns = Namespace.from_db(namespace)
 
-    key = ''.join(secrets.choice(string.ascii_letters) for i in range(50))
+    # Service keys are cluster generated, so they carry the recognisable
+    # sfk_ format like any other secret we mint ourselves.
+    key = credentials.generate()
     unique = ''.join(secrets.choice(string.ascii_letters) for i in range(5))
     keyname = '_service_key_%s' % unique
     expiry = time.time() + 300

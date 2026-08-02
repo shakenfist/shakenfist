@@ -309,6 +309,98 @@ validate. The old column is left in place but is no longer read or written.
 Note that this means downgrading after the migration loses any key created
 afterwards; keys that predate the upgrade are unaffected.
 
+## Scopes
+
+A token carries a set of **scopes** naming the classes of operation it
+may perform. A scope is a `<family>.<verb>` string, and there are three
+verbs:
+
+| Verb | Meaning | HTTP methods |
+|------|---------|--------------|
+| `read` | Observe without changing | `GET`, `HEAD` |
+| `write` | Create or modify | `POST`, `PUT`, `PATCH` |
+| `delete` | Destroy | `DELETE` |
+
+Scopes are not hand-assigned per endpoint. The verb comes from the HTTP
+method and the family from the resource class, so coverage is
+automatic and a newly added endpoint is governed the moment it exists.
+The families in use are:
+
+`admin`, `agentoperation`, `artifact`, `auth`, `blob`,
+`clusteroperation`, `instance`, `interface`, `label`, `network`,
+`node`, `upload`
+
+So `GET /blobs` needs `blob.read`, and `DELETE /instances/{ref}` needs
+`instance.delete`.
+
+Where the derivation would mislead, a resource sets `scope_family`, or
+a method carries `@api_base.scope(...)` to override the verb. Both are
+deliberate and greppable; `tools/check-endpoint-authentication.sh`
+requires the decorator form to be outermost so it cannot be swallowed
+by another decorator.
+
+Two verbs exist only as overrides, because the HTTP method describes
+the mechanism rather than the privilege:
+
+| Verb | Endpoints | Why not the derived verb |
+|------|-----------|--------------------------|
+| `console` | `/instances/{ref}/vdiconsolehelper`, `/instances/{ref}/vdiconsoleproxy` | Both are `GET`, but both return credentials for interactive keyboard and mouse control of the guest. `instance.read` must mean observation, or a monitoring credential can take a machine over. |
+| `execute` | `/instances/{ref}/agent/execute` | Arbitrary command execution inside a guest is a different privilege from creating an instance, and an operator would sensibly grant one without the other. |
+
+Adding a verb is a vocabulary decision, not a convenience: the test is
+whether anyone would sensibly write a mapping rule granting it alone.
+The full set is pinned by a test over the real routing table.
+
+### Wildcards and compatibility
+
+A key with no scopes recorded mints a token carrying the wildcard `*`,
+which satisfies everything. Every key created before scopes existed is
+in that state, so nothing an operator already has behaves differently.
+Tokens minted before the `scopes` claim existed carry no claim at all
+and are likewise treated as wildcard, so an upgrade does not
+invalidate tokens already in flight.
+
+A scope of the form `<family>.*` grants every verb in one family, so
+`blob.*` is `blob.read`, `blob.write` and `blob.delete` together.
+Granting a whole family is the common case when writing a mapping
+rule, and spelling out three verbs invites getting one wrong. The
+match is on the family, not on characters: `node.*` does not reach
+`nodegroup.read`.
+
+Scoped keys are produced by the federated exchange. A scoped token is
+refused with a 403 for anything outside its scopes, and is refused for
+any endpoint whose scope cannot be derived — a scope system which
+allows what it cannot classify is not one.
+
+### Administrative endpoints
+
+Endpoints guarded by `caller_is_admin` require **both** the `system`
+namespace and the `cluster-admin` scope, in addition to the derived
+scope for the operation itself. Being in the system namespace used to
+be sufficient, which meant a narrowly scoped key minted into `system`
+could reach every administrative endpoint. Unscoped keys carry the
+wildcard and satisfy all of this, so existing administrative
+automation is unaffected.
+
+`cluster-admin` is hyphenated rather than dotted because it is not a
+`<family>.<verb>` scope and does not name a family. Of the twenty
+methods `caller_is_admin` guards, only two derive an `admin.*` scope;
+the rest derive `node.*`, `issuer.*`, `auth.*` and `blob.read`. No
+family wildcard can produce it, which is why it carries no dot.
+
+Requiring both axes is deliberate. `cluster-admin` says the caller may
+act administratively at all; the derived scope says which operation.
+That is what makes a least-privilege administrative credential
+possible:
+
+```
+scopes: ["cluster-admin", "node.read"]
+```
+
+grants cluster-wide visibility to a monitoring workload that provably
+cannot delete a node. If administration were a single all-or-nothing
+flag, that credential could not be expressed.
+
 ## Secrets and the event log
 
 Credentials never appear in events. This matters more than it might sound,

@@ -6066,6 +6066,313 @@ class DeleteNamespaceKeyAttributesRequest(_message.Message):
 Global___DeleteNamespaceKeyAttributesRequest: _TypeAlias = DeleteNamespaceKeyAttributesRequest  # noqa: Y015
 
 @_typing.final
+class TrustedIssuerStaticData(_message.Message):
+    """TrustedIssuer Operations (MariaDB)
+    An external identity provider this cluster is willing to believe.
+    The name is unique cluster wide, because mapping rules reference an
+    issuer by name.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    VERSION_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """TrustedIssuer UUID"""
+    name: _builtins.str
+    """Unique cluster wide"""
+    version: _builtins.int
+    """Schema version"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        name: _builtins.str = ...,
+        version: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___TrustedIssuerStaticData: _TypeAlias = TrustedIssuerStaticData  # noqa: Y015
+
+@_typing.final
+class TrustedIssuerAttributesProto(_message.Message):
+    """The mutable configuration. Kept separate from the static values so
+    an operator can correct where signing keys are fetched from without
+    the issuer's identity changing underneath the rules referencing it.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    ISSUER_URL_FIELD_NUMBER: _builtins.int
+    JWKS_URI_FIELD_NUMBER: _builtins.int
+    AUDIENCE_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """References trusted_issuers.uuid"""
+    issuer_url: _builtins.str
+    """Exact expected value of the token iss claim"""
+    jwks_uri: _builtins.str
+    """Where signing keys are fetched"""
+    audience: _builtins.str
+    """Expected aud claim"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        issuer_url: _builtins.str = ...,
+        jwks_uri: _builtins.str = ...,
+        audience: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["audience", b"audience", "issuer_url", b"issuer_url", "jwks_uri", b"jwks_uri", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___TrustedIssuerAttributesProto: _TypeAlias = TrustedIssuerAttributesProto  # noqa: Y015
+
+@_typing.final
+class CreateTrustedIssuerRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___TrustedIssuerStaticData: ...
+    def __init__(
+        self,
+        *,
+        data: Global___TrustedIssuerStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateTrustedIssuerRequest: _TypeAlias = CreateTrustedIssuerRequest  # noqa: Y015
+
+@_typing.final
+class GetTrustedIssuerRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetTrustedIssuerRequest: _TypeAlias = GetTrustedIssuerRequest  # noqa: Y015
+
+@_typing.final
+class GetTrustedIssuerByNameRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: _builtins.int
+    name: _builtins.str
+    def __init__(
+        self,
+        *,
+        name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetTrustedIssuerByNameRequest: _TypeAlias = GetTrustedIssuerByNameRequest  # noqa: Y015
+
+@_typing.final
+class GetTrustedIssuerReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___TrustedIssuerStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___TrustedIssuerStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetTrustedIssuerReply: _TypeAlias = GetTrustedIssuerReply  # noqa: Y015
+
+@_typing.final
+class GetAllTrustedIssuersRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetAllTrustedIssuersRequest: _TypeAlias = GetAllTrustedIssuersRequest  # noqa: Y015
+
+@_typing.final
+class GetAllTrustedIssuersReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ISSUERS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def issuers(self) -> _containers.RepeatedCompositeFieldContainer[Global___TrustedIssuerStaticData]: ...
+    def __init__(
+        self,
+        *,
+        issuers: _abc.Iterable[Global___TrustedIssuerStaticData] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["issuers", b"issuers"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetAllTrustedIssuersReply: _TypeAlias = GetAllTrustedIssuersReply  # noqa: Y015
+
+@_typing.final
+class DeleteTrustedIssuerRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteTrustedIssuerRequest: _TypeAlias = DeleteTrustedIssuerRequest  # noqa: Y015
+
+@_typing.final
+class CreateTrustedIssuerAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___TrustedIssuerAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___TrustedIssuerAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateTrustedIssuerAttributesRequest: _TypeAlias = CreateTrustedIssuerAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetTrustedIssuerAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetTrustedIssuerAttributesRequest: _TypeAlias = GetTrustedIssuerAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetTrustedIssuerAttributesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___TrustedIssuerAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___TrustedIssuerAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetTrustedIssuerAttributesReply: _TypeAlias = GetTrustedIssuerAttributesReply  # noqa: Y015
+
+@_typing.final
+class UpdateTrustedIssuerAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___TrustedIssuerAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___TrustedIssuerAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___UpdateTrustedIssuerAttributesRequest: _TypeAlias = UpdateTrustedIssuerAttributesRequest  # noqa: Y015
+
+@_typing.final
+class DeleteTrustedIssuerAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteTrustedIssuerAttributesRequest: _TypeAlias = DeleteTrustedIssuerAttributesRequest  # noqa: Y015
+
+@_typing.final
 class AgentOperationStaticData(_message.Message):
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values. AgentOperations represent
