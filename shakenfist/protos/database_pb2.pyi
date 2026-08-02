@@ -6373,6 +6373,350 @@ class DeleteTrustedIssuerAttributesRequest(_message.Message):
 Global___DeleteTrustedIssuerAttributesRequest: _TypeAlias = DeleteTrustedIssuerAttributesRequest  # noqa: Y015
 
 @_typing.final
+class MappingRuleStaticData(_message.Message):
+    """MappingRule Operations (MariaDB)
+    A MappingRule says which external identities a namespace will mint
+    keys for, and what those keys may do. Owned by the namespace it
+    targets; the (namespace, name) pair is unique.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    VERSION_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """MappingRule UUID"""
+    namespace: _builtins.str
+    """Owning namespace"""
+    name: _builtins.str
+    """Unique within the owning namespace"""
+    version: _builtins.int
+    """Schema version"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+        version: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___MappingRuleStaticData: _TypeAlias = MappingRuleStaticData  # noqa: Y015
+
+@_typing.final
+class MappingRuleAttributesProto(_message.Message):
+    """The policy the rule expresses. bound_claims and scopes travel as JSON
+    strings rather than as proto maps or repeated fields: a claim matcher
+    is "an exact string or a list of acceptable strings", which a
+    map<string, string> cannot carry without inventing an encoding, and
+    an invented encoding is how the two sides of a wire drift apart. The
+    same reasoning is why AgentOperationStaticData carries commands_json.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    ISSUER_FIELD_NUMBER: _builtins.int
+    BOUND_CLAIMS_FIELD_NUMBER: _builtins.int
+    SCOPES_FIELD_NUMBER: _builtins.int
+    KEY_TTL_FIELD_NUMBER: _builtins.int
+    KEY_NAME_PREFIX_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """References mapping_rules.uuid"""
+    issuer: _builtins.str
+    """Name of the TrustedIssuer accepted"""
+    bound_claims: _builtins.str
+    """JSON object: claim name -> matcher"""
+    scopes: _builtins.str
+    """JSON array of scope strings"""
+    key_ttl: _builtins.int
+    """Seconds of life for minted keys"""
+    key_name_prefix: _builtins.str
+    """Prefix for minted key names"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        issuer: _builtins.str = ...,
+        bound_claims: _builtins.str = ...,
+        scopes: _builtins.str = ...,
+        key_ttl: _builtins.int = ...,
+        key_name_prefix: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["bound_claims", b"bound_claims", "issuer", b"issuer", "key_name_prefix", b"key_name_prefix", "key_ttl", b"key_ttl", "scopes", b"scopes", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___MappingRuleAttributesProto: _TypeAlias = MappingRuleAttributesProto  # noqa: Y015
+
+@_typing.final
+class CreateMappingRuleRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___MappingRuleStaticData: ...
+    def __init__(
+        self,
+        *,
+        data: Global___MappingRuleStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateMappingRuleRequest: _TypeAlias = CreateMappingRuleRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleRequest: _TypeAlias = GetMappingRuleRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleByNameRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    name: _builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleByNameRequest: _TypeAlias = GetMappingRuleByNameRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___MappingRuleStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___MappingRuleStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleReply: _TypeAlias = GetMappingRuleReply  # noqa: Y015
+
+@_typing.final
+class GetMappingRulesInNamespaceRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRulesInNamespaceRequest: _TypeAlias = GetMappingRulesInNamespaceRequest  # noqa: Y015
+
+@_typing.final
+class GetAllMappingRulesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetAllMappingRulesRequest: _TypeAlias = GetAllMappingRulesRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRulesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    RULES_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def rules(self) -> _containers.RepeatedCompositeFieldContainer[Global___MappingRuleStaticData]: ...
+    def __init__(
+        self,
+        *,
+        rules: _abc.Iterable[Global___MappingRuleStaticData] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["rules", b"rules"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRulesReply: _TypeAlias = GetMappingRulesReply  # noqa: Y015
+
+@_typing.final
+class DeleteMappingRuleRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteMappingRuleRequest: _TypeAlias = DeleteMappingRuleRequest  # noqa: Y015
+
+@_typing.final
+class CreateMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___MappingRuleAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___MappingRuleAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateMappingRuleAttributesRequest: _TypeAlias = CreateMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleAttributesRequest: _TypeAlias = GetMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleAttributesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___MappingRuleAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___MappingRuleAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleAttributesReply: _TypeAlias = GetMappingRuleAttributesReply  # noqa: Y015
+
+@_typing.final
+class UpdateMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___MappingRuleAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___MappingRuleAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___UpdateMappingRuleAttributesRequest: _TypeAlias = UpdateMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
+class DeleteMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteMappingRuleAttributesRequest: _TypeAlias = DeleteMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
 class AgentOperationStaticData(_message.Message):
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values. AgentOperations represent

@@ -116,12 +116,19 @@ Prometheus/Loki metric and log labels (`docs/operator_guide/events.md`,
 `docs/operator_guide/logging.md`) or GitHub issue labels such as `ci-failure`
 (`docs/developer_guide/workflow.md`).
 
-**mapping rule**{#mapping-rule}
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
--- A first-class object, owned by the namespace it targets, that is a standing
-claim-gated authorization to mint keys there: a [trusted issuer](#trusted-issuer)
-reference, bound claims, [scopes](#scope), and an expiry. Defined in
-`docs/plans/PLAN-auth-federation.md` ("Authentication terms to pin").
+**mapping rule**{#mapping-rule} -- A first-class object, owned by the namespace
+it targets, that is a standing claim-gated authorization to mint keys there: a
+[trusted issuer](#trusted-issuer) reference, bound claims, the [scopes](#scope)
+minted keys receive, a TTL for those keys, and a prefix for their names.
+Managed under `/auth/namespaces/{namespace}/rules` by the namespace owner,
+unique on (namespace, name), and deleted with the namespace. Bound claims match
+exactly -- an exact string, or a list of acceptable strings -- with no globbing,
+regular expressions or prefix matching, and a rule must bind at least one claim
+and grant at least one scope, so it can neither accept every identity an issuer
+vouches for nor inherit the wildcard an unscoped [namespace key](#namespace-key)
+would. Defined in `shakenfist/mapping_rule.py`. The exchange that consumes rules
+is still to come (see
+[PLAN-auth-federation](plans/PLAN-auth-federation.md)).
 
 **namespace**{#namespace} -- The tenancy and authorization unit: objects belong
 to a namespace, and a caller acts within one. Visibility extends to a caller's

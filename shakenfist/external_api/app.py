@@ -344,6 +344,10 @@ api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,
                  '/auth/namespaces/<namespace>/keys/<key_name>')
+api.add_resource(api_auth.AuthNamespaceRulesEndpoint,
+                 '/auth/namespaces/<namespace>/rules')
+api.add_resource(api_auth.AuthNamespaceRuleEndpoint,
+                 '/auth/namespaces/<namespace>/rules/<rule_name>')
 api.add_resource(api_auth.AuthMetadatasEndpoint,
                  '/auth/namespaces/<namespace>/metadata')
 api.add_resource(api_auth.AuthMetadataEndpoint,

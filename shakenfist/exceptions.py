@@ -133,6 +133,17 @@ class BadObjectVersion(DatabaseException):
     ...
 
 
+class CorruptMappingRule(DatabaseException):
+    """A mapping rule's policy columns could not be decoded.
+
+    Raised rather than defaulted because the columns are NOT NULL and
+    are written only by us, so an absent value means the row is
+    damaged. An empty bound_claims dict would be a matcher set that
+    matches every token, which is the one thing a rule must never
+    silently become.
+    """
+
+
 class PreExistingReadOnlyCache(DatabaseException):
     ...
 

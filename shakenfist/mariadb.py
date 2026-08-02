@@ -58,6 +58,9 @@ from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.mapping_rule_attributes import (
+    MappingRuleAttributesData)
+from shakenfist.schema.mapping_rule_data import MappingRuleData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
@@ -271,6 +274,8 @@ _namespace_keys_table: Optional[sa.Table] = None
 _namespace_key_attributes_table: Optional[sa.Table] = None
 _trusted_issuers_table: Optional[sa.Table] = None
 _trusted_issuer_attributes_table: Optional[sa.Table] = None
+_mapping_rules_table: Optional[sa.Table] = None
+_mapping_rule_attributes_table: Optional[sa.Table] = None
 _agent_operations_table: Optional[sa.Table] = None
 _agent_operation_attributes_table: Optional[sa.Table] = None
 _instances_table: Optional[sa.Table] = None
@@ -312,6 +317,8 @@ NAMESPACE_KEYS_VERSION = 2
 NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
 TRUSTED_ISSUERS_VERSION = 1
 TRUSTED_ISSUER_ATTRIBUTES_VERSION = 1
+MAPPING_RULES_VERSION = 1
+MAPPING_RULE_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
@@ -394,6 +401,8 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'namespace_key_attributes': NAMESPACE_KEY_ATTRIBUTES_VERSION,
     'trusted_issuers': TRUSTED_ISSUERS_VERSION,
     'trusted_issuer_attributes': TRUSTED_ISSUER_ATTRIBUTES_VERSION,
+    'mapping_rules': MAPPING_RULES_VERSION,
+    'mapping_rule_attributes': MAPPING_RULE_ATTRIBUTES_VERSION,
     'artifacts': ARTIFACTS_VERSION,
     'artifact_attributes': ARTIFACT_ATTRIBUTES_VERSION,
     'artifact_indexes': ARTIFACT_INDEXES_VERSION,
@@ -3129,6 +3138,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_namespace_keys_schema(engine))
     results.append(_ensure_trusted_issuer_attributes_schema(engine))
     results.append(_ensure_trusted_issuers_schema(engine))
+    results.append(_ensure_mapping_rule_attributes_schema(engine))
+    results.append(_ensure_mapping_rules_schema(engine))
     results.append(_ensure_artifacts_schema(engine))
     results.append(_ensure_artifact_attributes_schema(engine))
     results.append(_ensure_artifact_indexes_schema(engine))
@@ -3204,6 +3215,8 @@ def register_all_tables() -> None:
     _get_namespace_keys_table()
     _get_trusted_issuers_table()
     _get_trusted_issuer_attributes_table()
+    _get_mapping_rules_table()
+    _get_mapping_rule_attributes_table()
     _get_namespace_key_attributes_table()
     _get_artifacts_table()
     _get_artifact_attributes_table()
@@ -13278,6 +13291,655 @@ def delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_trusted_issuer_attributes(issuer_uuid)
     return _direct_delete_trusted_issuer_attributes(issuer_uuid)
+
+
+# =============================================================================
+# MappingRule Table Definitions
+# =============================================================================
+
+# The (namespace, name) UNIQUE index the Pydantic model cannot express:
+# the SQLUniqueIndex marker is single-column, and the compound-index
+# configuration path is multi-column but non-unique. Created by hand
+# here for the same reason namespace_keys does it.
+MAPPING_RULES_UNIQUE_INDEX_SQL = (
+    'CREATE UNIQUE INDEX IF NOT EXISTS uidx_mapping_rules_namespace_name '
+    'ON mapping_rules (namespace, name)')
+
+
+def _get_mapping_rules_table() -> sa.Table:
+    """Get or create the mapping_rules table definition.
+
+    A MappingRule says which external identities a namespace will mint
+    keys for. The table is generated from the MappingRuleData Pydantic
+    model, with uuid as the primary key and a hand-built UNIQUE index
+    on (namespace, name).
+    """
+    global _mapping_rules_table
+    if _mapping_rules_table is None:
+        with TABLE_CREATION_LOCK:
+            if _mapping_rules_table is not None:
+                return _mapping_rules_table
+            metadata = _get_metadata()
+            _mapping_rules_table = pydantic_to_sqlalchemy_table(
+                MappingRuleData,
+                'mapping_rules',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _mapping_rules_table
+
+
+def _get_mapping_rule_attributes_table() -> sa.Table:
+    """Get or create the mapping_rule_attributes table definition."""
+    global _mapping_rule_attributes_table
+    if _mapping_rule_attributes_table is None:
+        with TABLE_CREATION_LOCK:
+            if _mapping_rule_attributes_table is not None:
+                return _mapping_rule_attributes_table
+            metadata = _get_metadata()
+            _mapping_rule_attributes_table = pydantic_to_sqlalchemy_table(
+                MappingRuleAttributesData,
+                'mapping_rule_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _mapping_rule_attributes_table
+
+
+def _ensure_mapping_rules_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the mapping_rules table schema is up to date."""
+    table_name = 'mapping_rules'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_mapping_rules_table()
+
+    # This table has no pre-object history to import, so version 1 is
+    # simply "the table exists".
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+            # The composite UNIQUE index the model cannot express. See
+            # the comment on MAPPING_RULES_UNIQUE_INDEX_SQL above.
+            conn.execute(sa.text(MAPPING_RULES_UNIQUE_INDEX_SQL))
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': MAPPING_RULES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_mapping_rule_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the mapping_rule_attributes table schema is up to date."""
+    table_name = 'mapping_rule_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_mapping_rule_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': MAPPING_RULE_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# MappingRule Direct Access Functions
+# =============================================================================
+
+def _mapping_rule_row_to_data(row: Any) -> MappingRuleData:
+    return MappingRuleData(
+        uuid=row.uuid, namespace=row.namespace, name=row.name,
+        version=row.version)
+
+
+def _require_bound_claims(value: Any, rule_uuid: Any) -> dict[str, Any]:
+    """Decode a rule's bound_claims, refusing to invent a default.
+
+    The column is NOT NULL and is written only by us, so None here is
+    a damaged row rather than an absent policy. Defaulting to {} would
+    turn it into a matcher set that matches every token.
+    """
+    decoded = _decode_optional_json_dict(value)
+    if decoded is None:
+        raise exceptions.CorruptMappingRule(
+            f'mapping rule {rule_uuid} has undecodable bound_claims')
+    return decoded
+
+
+def _require_scopes(value: Any, rule_uuid: Any) -> list[str]:
+    """Decode a rule's scopes, refusing to invent a default."""
+    decoded = _decode_optional_json_list(value)
+    if decoded is None:
+        raise exceptions.CorruptMappingRule(
+            f'mapping rule {rule_uuid} has undecodable scopes')
+    return decoded
+
+
+def _direct_create_mapping_rule(data: MappingRuleData) -> bool:
+    """Create a mapping_rules record in MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid, namespace=data.namespace, name=data.name,
+                version=data.version)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # The (namespace, name) unique index rejected this. A duplicate
+        # rule name within a namespace is a caller error, not a failure.
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for mapping_rule '
+            f'{data.namespace}/{data.name}: {e}')
+        return False
+
+
+def _direct_get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
+    """Get a mapping_rules record from MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == rule_uuid)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return _mapping_rule_row_to_data(row)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for mapping_rule {rule_uuid}: {e}')
+        return None
+
+
+def _direct_get_mapping_rule_by_name(
+        namespace: str, name: str) -> Optional[MappingRuleData]:
+    """Look a rule up by its (namespace, name) pair.
+
+    This is the exchange's path: a federated request names a namespace
+    and a rule, and this resolves the pair. Served by the composite
+    unique index.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(table.c.namespace == namespace,
+                        table.c.name == name))
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return _mapping_rule_row_to_data(row)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for mapping_rule {namespace}/{name}: {e}')
+        return None
+
+
+def _direct_get_mapping_rules_in_namespace(
+        namespace: str) -> list[MappingRuleData]:
+    """Every rule owned by one namespace.
+
+    Served by the leading column of the (namespace, name) unique index.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.namespace == namespace)
+            rows = conn.execute(stmt).fetchall()
+            return [_mapping_rule_row_to_data(row) for row in rows]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB list failed for mapping_rules in {namespace}: {e}')
+        return []
+
+
+def _direct_get_all_mapping_rules() -> list[MappingRuleData]:
+    """Every rule on the cluster, for cluster-wide iteration."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(sa.select(table)).fetchall()
+            return [_mapping_rule_row_to_data(row) for row in rows]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB list failed for mapping_rules: {e}')
+        return []
+
+
+def _direct_delete_mapping_rule(rule_uuid: UUID) -> bool:
+    """Delete a mapping_rules record from MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == rule_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for mapping_rule {rule_uuid}: {e}')
+        return False
+
+
+def _direct_create_mapping_rule_attributes(
+        data: MappingRuleAttributesData) -> bool:
+    """Create a mapping_rule_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                issuer=data.issuer,
+                bound_claims=_json_dumps(data.bound_claims),
+                scopes=_json_dumps(data.scopes),
+                key_ttl=data.key_ttl,
+                key_name_prefix=data.key_name_prefix)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for mapping_rule_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_get_mapping_rule_attributes(
+        rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
+    """Get MappingRule attributes from MariaDB.
+
+    Both JSON columns are NOT NULL, so a None decode means the row is
+    corrupt rather than absent. That is deliberately left to raise
+    through Pydantic: an empty bound_claims dict would be a matcher set
+    that matches every token, so failing loudly beats defaulting.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == rule_uuid)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return MappingRuleAttributesData(
+                uuid=row.uuid,
+                issuer=row.issuer,
+                bound_claims=_require_bound_claims(
+                    row.bound_claims, rule_uuid),
+                scopes=_require_scopes(row.scopes, rule_uuid),
+                key_ttl=row.key_ttl,
+                key_name_prefix=row.key_name_prefix)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for mapping_rule_attributes {rule_uuid}: {e}')
+        return None
+
+
+def _direct_update_mapping_rule_attributes(
+        data: MappingRuleAttributesData) -> bool:
+    """Replace a MappingRule's mutable attributes.
+
+    The whole attribute set moves together: a rule's issuer, claims and
+    the scopes it grants are one policy, and applying half of an edit
+    would leave a grant nobody wrote.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                issuer=data.issuer,
+                bound_claims=_json_dumps(data.bound_claims),
+                scopes=_json_dumps(data.scopes),
+                key_ttl=data.key_ttl,
+                key_name_prefix=data.key_name_prefix)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB update failed for mapping_rule_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:
+    """Delete MappingRule attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == rule_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for mapping_rule_attributes '
+            f'{rule_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# MappingRule Proto Conversion and gRPC Access Functions
+# =============================================================================
+
+def _mapping_rule_to_proto(
+        data: MappingRuleData) -> 'database_pb2.MappingRuleStaticData':
+    return database_pb2.MappingRuleStaticData(
+        uuid=str(data.uuid), namespace=data.namespace, name=data.name,
+        version=data.version)
+
+
+def _mapping_rule_from_proto(
+        proto: 'database_pb2.MappingRuleStaticData') -> MappingRuleData:
+    return MappingRuleData(
+        uuid=UUID(proto.uuid), namespace=proto.namespace, name=proto.name,
+        version=proto.version)
+
+
+def _mapping_rule_attrs_to_proto(
+        data: MappingRuleAttributesData
+) -> 'database_pb2.MappingRuleAttributesProto':
+    # bound_claims and scopes cross the wire as JSON strings rather than
+    # as proto maps: a matcher is "string or list of strings", which a
+    # protobuf map<string, string> cannot express without inventing an
+    # encoding, and inventing one here is how the two sides drift.
+    return database_pb2.MappingRuleAttributesProto(
+        uuid=str(data.uuid),
+        issuer=data.issuer,
+        bound_claims=_json_dumps(data.bound_claims),
+        scopes=_json_dumps(data.scopes),
+        key_ttl=data.key_ttl,
+        key_name_prefix=data.key_name_prefix)
+
+
+def _mapping_rule_attrs_from_proto(
+        proto: 'database_pb2.MappingRuleAttributesProto'
+) -> MappingRuleAttributesData:
+    return MappingRuleAttributesData(
+        uuid=UUID(proto.uuid),
+        issuer=proto.issuer,
+        bound_claims=_require_bound_claims(proto.bound_claims, proto.uuid),
+        scopes=_require_scopes(proto.scopes, proto.uuid),
+        key_ttl=proto.key_ttl,
+        key_name_prefix=proto.key_name_prefix)
+
+
+def _grpc_create_mapping_rule(data: MappingRuleData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateMappingRuleRequest(
+            data=_mapping_rule_to_proto(data))
+        reply = _grpc_call(stub.CreateMappingRule, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC CreateMappingRule failed for '
+            f'{data.namespace}/{data.name}: {e}')
+        return False
+
+
+def _grpc_get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRuleRequest(uuid=str(rule_uuid))
+        reply = _grpc_call(stub.GetMappingRule, request)
+        if not reply.found:
+            return None
+        return _mapping_rule_from_proto(reply.data)
+    except grpc.RpcError as e:
+        # None from these reads means "no such rule", and the exchange
+        # treats that as authoritative -- a refusal to mint. A transport
+        # or server failure must therefore raise rather than masquerade
+        # as a deliberate absence. Issue 3522 established this for the
+        # analogous namespace key read on the same authentication path.
+        LOG.error(f'gRPC GetMappingRule failed for {rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {rule_uuid} could not be read: {e}') from e
+
+
+def _grpc_get_mapping_rule_by_name(
+        namespace: str, name: str) -> Optional[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRuleByNameRequest(
+            namespace=namespace, name=name)
+        reply = _grpc_call(stub.GetMappingRuleByName, request)
+        if not reply.found:
+            return None
+        return _mapping_rule_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetMappingRuleByName failed for {namespace}/{name}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {namespace}/{name} could not be read: {e}') from e
+
+
+def _grpc_get_mapping_rules_in_namespace(
+        namespace: str) -> list[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRulesInNamespaceRequest(
+            namespace=namespace)
+        reply = _grpc_call(stub.GetMappingRulesInNamespace, request)
+        return [_mapping_rule_from_proto(r) for r in reply.rules]
+    except grpc.RpcError as e:
+        # An empty list would read as "this namespace federates with
+        # nobody", which is a valid looking answer and therefore the
+        # worst possible thing to invent during an outage.
+        LOG.error(f'gRPC GetMappingRulesInNamespace failed for '
+                  f'{namespace}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules in {namespace} could not be listed: {e}') from e
+
+
+def _grpc_get_all_mapping_rules() -> list[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllMappingRulesRequest()
+        reply = _grpc_call(stub.GetAllMappingRules, request)
+        return [_mapping_rule_from_proto(r) for r in reply.rules]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetAllMappingRules failed: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules could not be listed: {e}') from e
+
+
+def _grpc_delete_mapping_rule(rule_uuid: UUID) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteMappingRuleRequest(uuid=str(rule_uuid))
+        reply = _grpc_call(stub.DeleteMappingRule, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC DeleteMappingRule failed for {rule_uuid}: {e}')
+        return False
+
+
+def _grpc_create_mapping_rule_attributes(
+        data: MappingRuleAttributesData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateMappingRuleAttributesRequest(
+            data=_mapping_rule_attrs_to_proto(data))
+        reply = _grpc_call(stub.CreateMappingRuleAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC CreateMappingRuleAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_mapping_rule_attributes(
+        rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRuleAttributesRequest(
+            uuid=str(rule_uuid))
+        reply = _grpc_call(stub.GetMappingRuleAttributes, request)
+        if not reply.found:
+            return None
+        return _mapping_rule_attrs_from_proto(reply.data)
+    except grpc.RpcError as e:
+        # The attributes are the policy itself. Returning None here
+        # would present a rule whose issuer, claims and scopes all read
+        # as absent, which is the same confidently wrong answer as a
+        # missing rule.
+        LOG.error(
+            f'gRPC GetMappingRuleAttributes failed for {rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {rule_uuid} attributes could not be read: '
+            f'{e}') from e
+
+
+def _grpc_update_mapping_rule_attributes(
+        data: MappingRuleAttributesData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateMappingRuleAttributesRequest(
+            data=_mapping_rule_attrs_to_proto(data))
+        reply = _grpc_call(stub.UpdateMappingRuleAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC UpdateMappingRuleAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteMappingRuleAttributesRequest(
+            uuid=str(rule_uuid))
+        reply = _grpc_call(stub.DeleteMappingRuleAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteMappingRuleAttributes failed for {rule_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# MappingRule Public Access Functions
+# =============================================================================
+
+def create_mapping_rule(data: MappingRuleData) -> bool:
+    """Create a MappingRule's static values."""
+    if _use_database_service():
+        return _grpc_create_mapping_rule(data)
+    return _direct_create_mapping_rule(data)
+
+
+def get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
+    """Get a MappingRule's static values."""
+    if _use_database_service():
+        return _grpc_get_mapping_rule(rule_uuid)
+    return _direct_get_mapping_rule(rule_uuid)
+
+
+def get_mapping_rule_by_name(
+        namespace: str, name: str) -> Optional[MappingRuleData]:
+    """Look a MappingRule up by its (namespace, name) pair."""
+    if _use_database_service():
+        return _grpc_get_mapping_rule_by_name(namespace, name)
+    return _direct_get_mapping_rule_by_name(namespace, name)
+
+
+def get_mapping_rules_in_namespace(namespace: str) -> list[MappingRuleData]:
+    """Every MappingRule owned by one namespace."""
+    if _use_database_service():
+        return _grpc_get_mapping_rules_in_namespace(namespace)
+    return _direct_get_mapping_rules_in_namespace(namespace)
+
+
+def get_all_mapping_rules() -> list[MappingRuleData]:
+    """Every MappingRule on the cluster."""
+    if _use_database_service():
+        return _grpc_get_all_mapping_rules()
+    return _direct_get_all_mapping_rules()
+
+
+def delete_mapping_rule(rule_uuid: UUID) -> bool:
+    """Delete a MappingRule's static values."""
+    if _use_database_service():
+        return _grpc_delete_mapping_rule(rule_uuid)
+    return _direct_delete_mapping_rule(rule_uuid)
+
+
+def create_mapping_rule_attributes(data: MappingRuleAttributesData) -> bool:
+    """Create a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_create_mapping_rule_attributes(data)
+    return _direct_create_mapping_rule_attributes(data)
+
+
+def get_mapping_rule_attributes(
+        rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
+    """Get a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_get_mapping_rule_attributes(rule_uuid)
+    return _direct_get_mapping_rule_attributes(rule_uuid)
+
+
+def update_mapping_rule_attributes(data: MappingRuleAttributesData) -> bool:
+    """Replace a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_update_mapping_rule_attributes(data)
+    return _direct_update_mapping_rule_attributes(data)
+
+
+def delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:
+    """Delete a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_delete_mapping_rule_attributes(rule_uuid)
+    return _direct_delete_mapping_rule_attributes(rule_uuid)
 
 
 # =============================================================================

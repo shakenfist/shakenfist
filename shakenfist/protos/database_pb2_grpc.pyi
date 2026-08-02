@@ -276,6 +276,21 @@ class DatabaseServiceStub:
     GetTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerAttributesRequest, _database_pb2.GetTrustedIssuerAttributesReply]
     UpdateTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateTrustedIssuerAttributesRequest, _database_pb2.StatusReply]
     DeleteTrustedIssuerAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteTrustedIssuerAttributesRequest, _database_pb2.StatusReply]
+    CreateMappingRule: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateMappingRuleRequest, _database_pb2.StatusReply]
+    """MappingRule Operations (MariaDB)
+    A MappingRule says which external identities a namespace will mint
+    keys for. Owned by that namespace; unique on (namespace, name).
+    """
+    GetMappingRule: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleRequest, _database_pb2.GetMappingRuleReply]
+    GetMappingRuleByName: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleByNameRequest, _database_pb2.GetMappingRuleReply]
+    GetMappingRulesInNamespace: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetMappingRulesInNamespaceRequest, _database_pb2.GetMappingRulesReply]
+    GetAllMappingRules: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllMappingRulesRequest, _database_pb2.GetMappingRulesReply]
+    DeleteMappingRule: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteMappingRuleRequest, _database_pb2.StatusReply]
+    CreateMappingRuleAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateMappingRuleAttributesRequest, _database_pb2.StatusReply]
+    """MappingRule Attributes Operations (MariaDB)"""
+    GetMappingRuleAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleAttributesRequest, _database_pb2.GetMappingRuleAttributesReply]
+    UpdateMappingRuleAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateMappingRuleAttributesRequest, _database_pb2.StatusReply]
+    DeleteMappingRuleAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteMappingRuleAttributesRequest, _database_pb2.StatusReply]
     CreateAgentOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
@@ -610,6 +625,21 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetTrustedIssuerAttributesRequest, _database_pb2.GetTrustedIssuerAttributesReply]  # type: ignore[assignment]
     UpdateTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateTrustedIssuerAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteTrustedIssuerAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteTrustedIssuerAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateMappingRule: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateMappingRuleRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    """MappingRule Operations (MariaDB)
+    A MappingRule says which external identities a namespace will mint
+    keys for. Owned by that namespace; unique on (namespace, name).
+    """
+    GetMappingRule: _aio.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleRequest, _database_pb2.GetMappingRuleReply]  # type: ignore[assignment]
+    GetMappingRuleByName: _aio.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleByNameRequest, _database_pb2.GetMappingRuleReply]  # type: ignore[assignment]
+    GetMappingRulesInNamespace: _aio.UnaryUnaryMultiCallable[_database_pb2.GetMappingRulesInNamespaceRequest, _database_pb2.GetMappingRulesReply]  # type: ignore[assignment]
+    GetAllMappingRules: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllMappingRulesRequest, _database_pb2.GetMappingRulesReply]  # type: ignore[assignment]
+    DeleteMappingRule: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteMappingRuleRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateMappingRuleAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateMappingRuleAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    """MappingRule Attributes Operations (MariaDB)"""
+    GetMappingRuleAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleAttributesRequest, _database_pb2.GetMappingRuleAttributesReply]  # type: ignore[assignment]
+    UpdateMappingRuleAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateMappingRuleAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteMappingRuleAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteMappingRuleAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     CreateAgentOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
@@ -1911,6 +1941,81 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     def DeleteTrustedIssuerAttributes(
         self,
         request: _database_pb2.DeleteTrustedIssuerAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def CreateMappingRule(
+        self,
+        request: _database_pb2.CreateMappingRuleRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
+        """MappingRule Operations (MariaDB)
+        A MappingRule says which external identities a namespace will mint
+        keys for. Owned by that namespace; unique on (namespace, name).
+        """
+
+    @_abc_1.abstractmethod
+    def GetMappingRule(
+        self,
+        request: _database_pb2.GetMappingRuleRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetMappingRuleReply, _abc.Awaitable[_database_pb2.GetMappingRuleReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetMappingRuleByName(
+        self,
+        request: _database_pb2.GetMappingRuleByNameRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetMappingRuleReply, _abc.Awaitable[_database_pb2.GetMappingRuleReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetMappingRulesInNamespace(
+        self,
+        request: _database_pb2.GetMappingRulesInNamespaceRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetMappingRulesReply, _abc.Awaitable[_database_pb2.GetMappingRulesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetAllMappingRules(
+        self,
+        request: _database_pb2.GetAllMappingRulesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetMappingRulesReply, _abc.Awaitable[_database_pb2.GetMappingRulesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteMappingRule(
+        self,
+        request: _database_pb2.DeleteMappingRuleRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def CreateMappingRuleAttributes(
+        self,
+        request: _database_pb2.CreateMappingRuleAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
+        """MappingRule Attributes Operations (MariaDB)"""
+
+    @_abc_1.abstractmethod
+    def GetMappingRuleAttributes(
+        self,
+        request: _database_pb2.GetMappingRuleAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetMappingRuleAttributesReply, _abc.Awaitable[_database_pb2.GetMappingRuleAttributesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def UpdateMappingRuleAttributes(
+        self,
+        request: _database_pb2.UpdateMappingRuleAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteMappingRuleAttributes(
+        self,
+        request: _database_pb2.DeleteMappingRuleAttributesRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 

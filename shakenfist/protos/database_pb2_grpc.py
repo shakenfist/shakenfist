@@ -844,6 +844,56 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.DeleteTrustedIssuerAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateMappingRule = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateMappingRule',
+                request_serializer=database__pb2.CreateMappingRuleRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetMappingRule = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetMappingRule',
+                request_serializer=database__pb2.GetMappingRuleRequest.SerializeToString,
+                response_deserializer=database__pb2.GetMappingRuleReply.FromString,
+                _registered_method=True)
+        self.GetMappingRuleByName = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetMappingRuleByName',
+                request_serializer=database__pb2.GetMappingRuleByNameRequest.SerializeToString,
+                response_deserializer=database__pb2.GetMappingRuleReply.FromString,
+                _registered_method=True)
+        self.GetMappingRulesInNamespace = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetMappingRulesInNamespace',
+                request_serializer=database__pb2.GetMappingRulesInNamespaceRequest.SerializeToString,
+                response_deserializer=database__pb2.GetMappingRulesReply.FromString,
+                _registered_method=True)
+        self.GetAllMappingRules = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllMappingRules',
+                request_serializer=database__pb2.GetAllMappingRulesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetMappingRulesReply.FromString,
+                _registered_method=True)
+        self.DeleteMappingRule = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteMappingRule',
+                request_serializer=database__pb2.DeleteMappingRuleRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateMappingRuleAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateMappingRuleAttributes',
+                request_serializer=database__pb2.CreateMappingRuleAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetMappingRuleAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetMappingRuleAttributes',
+                request_serializer=database__pb2.GetMappingRuleAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetMappingRuleAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateMappingRuleAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateMappingRuleAttributes',
+                request_serializer=database__pb2.UpdateMappingRuleAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteMappingRuleAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteMappingRuleAttributes',
+                request_serializer=database__pb2.DeleteMappingRuleAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.CreateAgentOperation = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/CreateAgentOperation',
                 request_serializer=database__pb2.CreateAgentOperationRequest.SerializeToString,
@@ -2105,6 +2155,70 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateMappingRule(self, request, context):
+        """MappingRule Operations (MariaDB)
+        A MappingRule says which external identities a namespace will mint
+        keys for. Owned by that namespace; unique on (namespace, name).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMappingRule(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMappingRuleByName(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMappingRulesInNamespace(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllMappingRules(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteMappingRule(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateMappingRuleAttributes(self, request, context):
+        """MappingRule Attributes Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMappingRuleAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateMappingRuleAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteMappingRuleAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateAgentOperation(self, request, context):
         """AgentOperation Operations (MariaDB)
         These manage AgentOperation static values in MariaDB. AgentOperations
@@ -3211,6 +3325,56 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteTrustedIssuerAttributes': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteTrustedIssuerAttributes,
                     request_deserializer=database__pb2.DeleteTrustedIssuerAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateMappingRule': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateMappingRule,
+                    request_deserializer=database__pb2.CreateMappingRuleRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetMappingRule': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMappingRule,
+                    request_deserializer=database__pb2.GetMappingRuleRequest.FromString,
+                    response_serializer=database__pb2.GetMappingRuleReply.SerializeToString,
+            ),
+            'GetMappingRuleByName': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMappingRuleByName,
+                    request_deserializer=database__pb2.GetMappingRuleByNameRequest.FromString,
+                    response_serializer=database__pb2.GetMappingRuleReply.SerializeToString,
+            ),
+            'GetMappingRulesInNamespace': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMappingRulesInNamespace,
+                    request_deserializer=database__pb2.GetMappingRulesInNamespaceRequest.FromString,
+                    response_serializer=database__pb2.GetMappingRulesReply.SerializeToString,
+            ),
+            'GetAllMappingRules': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllMappingRules,
+                    request_deserializer=database__pb2.GetAllMappingRulesRequest.FromString,
+                    response_serializer=database__pb2.GetMappingRulesReply.SerializeToString,
+            ),
+            'DeleteMappingRule': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteMappingRule,
+                    request_deserializer=database__pb2.DeleteMappingRuleRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateMappingRuleAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateMappingRuleAttributes,
+                    request_deserializer=database__pb2.CreateMappingRuleAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetMappingRuleAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMappingRuleAttributes,
+                    request_deserializer=database__pb2.GetMappingRuleAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetMappingRuleAttributesReply.SerializeToString,
+            ),
+            'UpdateMappingRuleAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateMappingRuleAttributes,
+                    request_deserializer=database__pb2.UpdateMappingRuleAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteMappingRuleAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteMappingRuleAttributes,
+                    request_deserializer=database__pb2.DeleteMappingRuleAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'CreateAgentOperation': grpc.unary_unary_rpc_method_handler(
@@ -7807,6 +7971,276 @@ class DatabaseService:
             target,
             '/shakenfist.protos.DatabaseService/DeleteTrustedIssuerAttributes',
             database__pb2.DeleteTrustedIssuerAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateMappingRule(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateMappingRule',
+            database__pb2.CreateMappingRuleRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMappingRule(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetMappingRule',
+            database__pb2.GetMappingRuleRequest.SerializeToString,
+            database__pb2.GetMappingRuleReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMappingRuleByName(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetMappingRuleByName',
+            database__pb2.GetMappingRuleByNameRequest.SerializeToString,
+            database__pb2.GetMappingRuleReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMappingRulesInNamespace(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetMappingRulesInNamespace',
+            database__pb2.GetMappingRulesInNamespaceRequest.SerializeToString,
+            database__pb2.GetMappingRulesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllMappingRules(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllMappingRules',
+            database__pb2.GetAllMappingRulesRequest.SerializeToString,
+            database__pb2.GetMappingRulesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteMappingRule(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteMappingRule',
+            database__pb2.DeleteMappingRuleRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateMappingRuleAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateMappingRuleAttributes',
+            database__pb2.CreateMappingRuleAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMappingRuleAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetMappingRuleAttributes',
+            database__pb2.GetMappingRuleAttributesRequest.SerializeToString,
+            database__pb2.GetMappingRuleAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateMappingRuleAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateMappingRuleAttributes',
+            database__pb2.UpdateMappingRuleAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteMappingRuleAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteMappingRuleAttributes',
+            database__pb2.DeleteMappingRuleAttributesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

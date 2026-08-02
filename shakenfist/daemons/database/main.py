@@ -3569,6 +3569,188 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.StatusReply(success=False)
 
+    # ------------------------------------------------------------------
+    # MappingRule operations
+    # ------------------------------------------------------------------
+
+    def CreateMappingRule(
+        self,
+        request: database_pb2.CreateMappingRuleRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['create_mapping_rule'].inc()
+            ok = mariadb._direct_create_mapping_rule(
+                mariadb._mapping_rule_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateMappingRule failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def GetMappingRule(
+        self,
+        request: database_pb2.GetMappingRuleRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRuleReply:
+        try:
+            self.monitor.counters['get_mapping_rule'].inc()
+            data = mariadb._direct_get_mapping_rule(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetMappingRuleReply(found=False)
+            return database_pb2.GetMappingRuleReply(
+                found=True, data=mariadb._mapping_rule_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRule failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRuleReply(found=False)
+
+    def GetMappingRuleByName(
+        self,
+        request: database_pb2.GetMappingRuleByNameRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRuleReply:
+        try:
+            self.monitor.counters['get_mapping_rule_by_name'].inc()
+            data = mariadb._direct_get_mapping_rule_by_name(
+                request.namespace, request.name)
+            if data is None:
+                return database_pb2.GetMappingRuleReply(found=False)
+            return database_pb2.GetMappingRuleReply(
+                found=True, data=mariadb._mapping_rule_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRuleByName failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRuleReply(found=False)
+
+    def GetMappingRulesInNamespace(
+        self,
+        request: database_pb2.GetMappingRulesInNamespaceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRulesReply:
+        try:
+            self.monitor.counters['get_mapping_rules_in_namespace'].inc()
+            rules = mariadb._direct_get_mapping_rules_in_namespace(
+                request.namespace)
+            return database_pb2.GetMappingRulesReply(
+                rules=[mariadb._mapping_rule_to_proto(r) for r in rules])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRulesInNamespace failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRulesReply(rules=[])
+
+    def GetAllMappingRules(
+        self,
+        request: database_pb2.GetAllMappingRulesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRulesReply:
+        try:
+            self.monitor.counters['get_all_mapping_rules'].inc()
+            rules = mariadb._direct_get_all_mapping_rules()
+            return database_pb2.GetMappingRulesReply(
+                rules=[mariadb._mapping_rule_to_proto(r) for r in rules])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllMappingRules failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRulesReply(rules=[])
+
+    def DeleteMappingRule(
+        self,
+        request: database_pb2.DeleteMappingRuleRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['delete_mapping_rule'].inc()
+            ok = mariadb._direct_delete_mapping_rule(UUID(request.uuid))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteMappingRule failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def CreateMappingRuleAttributes(
+        self,
+        request: database_pb2.CreateMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['create_mapping_rule_attributes'].inc()
+            ok = mariadb._direct_create_mapping_rule_attributes(
+                mariadb._mapping_rule_attrs_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def GetMappingRuleAttributes(
+        self,
+        request: database_pb2.GetMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRuleAttributesReply:
+        try:
+            self.monitor.counters['get_mapping_rule_attributes'].inc()
+            data = mariadb._direct_get_mapping_rule_attributes(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetMappingRuleAttributesReply(found=False)
+            return database_pb2.GetMappingRuleAttributesReply(
+                found=True, data=mariadb._mapping_rule_attrs_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRuleAttributesReply(found=False)
+
+    def UpdateMappingRuleAttributes(
+        self,
+        request: database_pb2.UpdateMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['update_mapping_rule_attributes'].inc()
+            ok = mariadb._direct_update_mapping_rule_attributes(
+                mariadb._mapping_rule_attrs_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def DeleteMappingRuleAttributes(
+        self,
+        request: database_pb2.DeleteMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['delete_mapping_rule_attributes'].inc()
+            ok = mariadb._direct_delete_mapping_rule_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
     def CreateAgentOperation(
         self,
         request: database_pb2.CreateAgentOperationRequest,
@@ -5539,6 +5721,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_trusted_issuer_attributes',
             'update_trusted_issuer_attributes',
             'delete_trusted_issuer_attributes',
+            'create_mapping_rule', 'get_mapping_rule',
+            'get_mapping_rule_by_name', 'get_mapping_rules_in_namespace',
+            'get_all_mapping_rules', 'delete_mapping_rule',
+            'create_mapping_rule_attributes',
+            'get_mapping_rule_attributes',
+            'update_mapping_rule_attributes',
+            'delete_mapping_rule_attributes',
             'find_namespace_keys', 'delete_namespace_key',
             'delete_expired_namespace_keys',
             # MariaDB namespace key attributes operations

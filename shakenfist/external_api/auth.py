@@ -24,6 +24,9 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.mapping_rule import MappingRule
+from shakenfist.mapping_rule import MappingRules
+from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
@@ -857,3 +860,210 @@ class AuthIssuerEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'delete issuer request from REST API')
         issuer.delete()
         return issuer.external_view()
+
+
+mapping_rule_example = """{
+    "namespace": "ci",
+    "name": "ryll-develop",
+    "issuer": "github",
+    "bound_claims": {
+        "repository": "shakenfist/ryll",
+        "ref": ["refs/heads/develop", "refs/heads/main"]
+    },
+    "scopes": ["blob.read", "artifact.*"],
+    "key_ttl": 3600,
+    "key_name_prefix": "ryll-ci"
+}
+"""
+
+
+def _rule_arguments(issuer, bound_claims, scopes, key_ttl, key_name_prefix):
+    """Normalise the rule body, or return an error response.
+
+    Returns (kwargs, error_response), exactly one of which is None.
+    Only presence is checked here; the meaning of each value is the
+    MappingRule's business, so that a rule created through the API and
+    a rule created any other way cannot diverge on what is safe.
+    """
+    missing = [
+        field for field, value in [
+            ('issuer', issuer), ('bound_claims', bound_claims),
+            ('scopes', scopes), ('key_ttl', key_ttl),
+            ('key_name_prefix', key_name_prefix)]
+        if value is None
+    ]
+    if missing:
+        return None, sf_api.error(
+            400, 'missing required field(s): %s' % ', '.join(missing))
+
+    return {
+        'issuer': issuer,
+        'bound_claims': bound_claims,
+        'scopes': scopes,
+        'key_ttl': key_ttl,
+        'key_name_prefix': key_name_prefix
+    }, None
+
+
+class AuthNamespaceRulesEndpoint(api_base.Resource):
+    scope_family = 'rule'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List the identity mapping rules for a namespace.',
+        [('namespace', 'path', 'string', 'The namespace.', True)],
+        [(200, 'The namespace\'s mapping rules.', None),
+         (404, 'Namespace not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, namespace_from_db=None):
+        # Soft-deleted rules are gone as far as an operator is
+        # concerned: they no longer resolve by name and no longer mint
+        # anything, so listing them would misrepresent who this
+        # namespace federates with.
+        return [
+            r.external_view() for r in MappingRules(
+                [partial(baseobject.state_filter, MappingRule.ACTIVE_STATES)],
+                namespace=namespace)
+        ]
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Create an identity mapping rule for a namespace.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('name', 'body', 'string',
+             'A name for this rule, unique within the namespace.', True),
+            ('issuer', 'body', 'string',
+             'The name of the trusted issuer whose tokens this rule '
+             'accepts.', True),
+            ('bound_claims', 'body', 'dict',
+             'Claim name to matcher. A matcher is an exact string, or a '
+             'list of acceptable strings. Matching is exact: no globbing, '
+             'no regular expressions, no prefix matching. At least one '
+             'claim must be bound.', True),
+            ('scopes', 'body', 'arrayofstring',
+             'The scopes granted to keys minted through this rule. Must be '
+             'non-empty.', True),
+            ('key_ttl', 'body', 'integer',
+             'Seconds of life for keys minted through this rule.', True),
+            ('key_name_prefix', 'body', 'string',
+             'Prefix for minted key names. The cluster appends a random '
+             'discriminator, so minted names never collide.', True)
+        ],
+        [(200, 'The rule as created.', mapping_rule_example),
+         (400, 'A required field is missing or malformed.', None),
+         (404, 'Namespace not found.', None),
+         (409, 'A rule of that name already exists in this namespace.',
+          None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def post(self, namespace=None, name=None, issuer=None, bound_claims=None,
+             scopes=None, key_ttl=None, key_name_prefix=None,
+             namespace_from_db=None):
+        if not name:
+            return sf_api.error(400, 'no name specified')
+        if not isinstance(name, str) or len(name) > 255:
+            return sf_api.error(400, 'name is not a valid string')
+
+        kwargs, err = _rule_arguments(
+            issuer, bound_claims, scopes, key_ttl, key_name_prefix)
+        if err:
+            return err
+
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'create mapping rule request from REST API',
+            extra={'rule': name})
+
+        try:
+            rule = MappingRule.new(namespace, name, **kwargs)
+        except RuleValidationError as e:
+            return sf_api.error(400, str(e))
+
+        if not rule:
+            return sf_api.error(409, 'rule already exists')
+        return rule.external_view()
+
+
+class AuthNamespaceRuleEndpoint(api_base.Resource):
+    scope_family = 'rule'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Fetch an identity mapping rule.',
+        [('namespace', 'path', 'string', 'The namespace.', True),
+         ('rule_name', 'path', 'string', 'The rule name.', True)],
+        [(200, 'The rule.', mapping_rule_example),
+         (404, 'Namespace or rule not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, rule_name=None, namespace_from_db=None):
+        rule = MappingRule.from_db_by_name(namespace, rule_name)
+        if not rule:
+            return sf_api.error(404, 'rule not found')
+        return rule.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Update an identity mapping rule.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('rule_name', 'path', 'string', 'The rule name.', True),
+            ('issuer', 'body', 'string',
+             'The name of the trusted issuer whose tokens this rule '
+             'accepts.', True),
+            ('bound_claims', 'body', 'dict',
+             'Claim name to matcher, as for creation.', True),
+            ('scopes', 'body', 'arrayofstring',
+             'The scopes granted to keys minted through this rule.', True),
+            ('key_ttl', 'body', 'integer',
+             'Seconds of life for keys minted through this rule.', True),
+            ('key_name_prefix', 'body', 'string',
+             'Prefix for minted key names.', True)
+        ],
+        [(200, 'The updated rule.', mapping_rule_example),
+         (400, 'A required field is missing or malformed.', None),
+         (404, 'Namespace or rule not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def put(self, namespace=None, rule_name=None, issuer=None,
+            bound_claims=None, scopes=None, key_ttl=None,
+            key_name_prefix=None, namespace_from_db=None):
+        rule = MappingRule.from_db_by_name(namespace, rule_name)
+        if not rule:
+            return sf_api.error(404, 'rule not found')
+
+        kwargs, err = _rule_arguments(
+            issuer, bound_claims, scopes, key_ttl, key_name_prefix)
+        if err:
+            return err
+
+        # Updating a rule does not touch keys already minted from it.
+        # A minted key stands alone and its provenance records the
+        # claims it actually satisfied, so narrowing a rule does not
+        # retroactively narrow a live key -- delete the key for that.
+        try:
+            rule.update(**kwargs)
+        except RuleValidationError as e:
+            return sf_api.error(400, str(e))
+
+        return rule.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Delete an identity mapping rule.',
+        [('namespace', 'path', 'string', 'The namespace.', True),
+         ('rule_name', 'path', 'string', 'The rule name.', True)],
+        [(200, 'The rule was deleted.', None),
+         (404, 'Namespace or rule not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def delete(self, namespace=None, rule_name=None, namespace_from_db=None):
+        rule = MappingRule.from_db_by_name(namespace, rule_name)
+        if not rule:
+            return sf_api.error(404, 'rule not found')
+
+        rule.add_event(
+            EVENT_TYPE_AUDIT, 'delete mapping rule request from REST API')
+        rule.delete()
+        return rule.external_view()

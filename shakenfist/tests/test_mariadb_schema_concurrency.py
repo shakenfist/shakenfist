@@ -168,6 +168,8 @@ EXPECTED_TABLE_NAMES = sorted([
     'namespace_keys',
     'trusted_issuer_attributes',
     'trusted_issuers',
+    'mapping_rule_attributes',
+    'mapping_rules',
     'namespace_key_attributes',
     'artifacts',
     'artifact_attributes',

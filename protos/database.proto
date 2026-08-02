@@ -261,6 +261,22 @@ service DatabaseService {
   rpc UpdateTrustedIssuerAttributes (UpdateTrustedIssuerAttributesRequest) returns (StatusReply) {}
   rpc DeleteTrustedIssuerAttributes (DeleteTrustedIssuerAttributesRequest) returns (StatusReply) {}
 
+  // MappingRule Operations (MariaDB)
+  // A MappingRule says which external identities a namespace will mint
+  // keys for. Owned by that namespace; unique on (namespace, name).
+  rpc CreateMappingRule (CreateMappingRuleRequest) returns (StatusReply) {}
+  rpc GetMappingRule (GetMappingRuleRequest) returns (GetMappingRuleReply) {}
+  rpc GetMappingRuleByName (GetMappingRuleByNameRequest) returns (GetMappingRuleReply) {}
+  rpc GetMappingRulesInNamespace (GetMappingRulesInNamespaceRequest) returns (GetMappingRulesReply) {}
+  rpc GetAllMappingRules (GetAllMappingRulesRequest) returns (GetMappingRulesReply) {}
+  rpc DeleteMappingRule (DeleteMappingRuleRequest) returns (StatusReply) {}
+
+  // MappingRule Attributes Operations (MariaDB)
+  rpc CreateMappingRuleAttributes (CreateMappingRuleAttributesRequest) returns (StatusReply) {}
+  rpc GetMappingRuleAttributes (GetMappingRuleAttributesRequest) returns (GetMappingRuleAttributesReply) {}
+  rpc UpdateMappingRuleAttributes (UpdateMappingRuleAttributesRequest) returns (StatusReply) {}
+  rpc DeleteMappingRuleAttributes (DeleteMappingRuleAttributesRequest) returns (StatusReply) {}
+
   // AgentOperation Operations (MariaDB)
   // These manage AgentOperation static values in MariaDB. AgentOperations
   // represent in-guest agent tasks (execute, get-file, put-blob, chmod).
@@ -1871,6 +1887,87 @@ message UpdateTrustedIssuerAttributesRequest {
 }
 
 message DeleteTrustedIssuerAttributesRequest {
+  string uuid = 1;
+}
+
+// MappingRule Operations (MariaDB)
+// A MappingRule says which external identities a namespace will mint
+// keys for, and what those keys may do. Owned by the namespace it
+// targets; the (namespace, name) pair is unique.
+
+message MappingRuleStaticData {
+  string uuid = 1;            // MappingRule UUID
+  string namespace = 2;       // Owning namespace
+  string name = 3;            // Unique within the owning namespace
+  int32 version = 4;          // Schema version
+}
+
+// The policy the rule expresses. bound_claims and scopes travel as JSON
+// strings rather than as proto maps or repeated fields: a claim matcher
+// is "an exact string or a list of acceptable strings", which a
+// map<string, string> cannot carry without inventing an encoding, and
+// an invented encoding is how the two sides of a wire drift apart. The
+// same reasoning is why AgentOperationStaticData carries commands_json.
+message MappingRuleAttributesProto {
+  string uuid = 1;             // References mapping_rules.uuid
+  string issuer = 2;           // Name of the TrustedIssuer accepted
+  string bound_claims = 3;     // JSON object: claim name -> matcher
+  string scopes = 4;           // JSON array of scope strings
+  int64 key_ttl = 5;           // Seconds of life for minted keys
+  string key_name_prefix = 6;  // Prefix for minted key names
+}
+
+message CreateMappingRuleRequest {
+  MappingRuleStaticData data = 1;
+}
+
+message GetMappingRuleRequest {
+  string uuid = 1;
+}
+
+message GetMappingRuleByNameRequest {
+  string namespace = 1;
+  string name = 2;
+}
+
+message GetMappingRuleReply {
+  bool found = 1;
+  MappingRuleStaticData data = 2;
+}
+
+message GetMappingRulesInNamespaceRequest {
+  string namespace = 1;
+}
+
+message GetAllMappingRulesRequest {
+}
+
+message GetMappingRulesReply {
+  repeated MappingRuleStaticData rules = 1;
+}
+
+message DeleteMappingRuleRequest {
+  string uuid = 1;
+}
+
+message CreateMappingRuleAttributesRequest {
+  MappingRuleAttributesProto data = 1;
+}
+
+message GetMappingRuleAttributesRequest {
+  string uuid = 1;
+}
+
+message GetMappingRuleAttributesReply {
+  bool found = 1;
+  MappingRuleAttributesProto data = 2;
+}
+
+message UpdateMappingRuleAttributesRequest {
+  MappingRuleAttributesProto data = 1;
+}
+
+message DeleteMappingRuleAttributesRequest {
   string uuid = 1;
 }
 

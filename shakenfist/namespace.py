@@ -6,6 +6,7 @@ from typing import Optional
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mapping_rule
 from shakenfist import mariadb
 from shakenfist import namespace_key
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -316,6 +317,14 @@ class Namespace(dbo):
         for key, _ in namespace_key.keys_with_attributes(
                 self.uuid, include_expired=True):
             key.hard_delete()
+
+        # Mapping rules are owned the same way and go for the same
+        # reason. Leaving one behind would be worse than leaving a key
+        # behind: a rule names its namespace by name, so if the name
+        # were ever recreated the new owner would inherit a federation
+        # trust they never asked for.
+        for rule in mapping_rule.rules_in_namespace(self.uuid):
+            rule.hard_delete()
 
         mariadb.delete_namespace_attributes(self.uuid)
         mariadb.delete_namespace(self.uuid)
