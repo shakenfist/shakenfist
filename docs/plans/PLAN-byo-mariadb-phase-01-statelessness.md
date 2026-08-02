@@ -121,6 +121,17 @@ land in phase 1.
      unit-tests is the cheapest insurance and is
      filed as future work below.
 
+   *Addendum (2026-08-02): superseded -- the floor is
+   now `10.11.0`. The `ipam_reservations.address`
+   INET4 column (which post-dates this decision)
+   requires MariaDB 10.10+, so the 10.6 floor had
+   silently stopped being achievable:
+   `verify_mariadb_compat` passed servers on which
+   `ensure-mariadb-schema` could not actually run.
+   Found by scheduler-reservations phase 2 validation;
+   10.11 chosen as the oldest in-support LTS above
+   10.10, and the version CI actually exercises.*
+
 2. **Compatibility check is a hard refuse, not a
    warning.** Per master plan decision 13. Implication:
    the check raises a typed exception

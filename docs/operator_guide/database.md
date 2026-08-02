@@ -15,7 +15,7 @@ database server before deploying the cluster.
 1. **Provision a MariaDB server.** Any host reachable from every SF node
    works — it need not be an SF node itself. The server must meet the
    [compatibility requirements](#mariadb-compatibility-requirements) below
-   (MariaDB 10.6.0+, InnoDB, utf8mb4).
+   (MariaDB 10.11.0+, InnoDB, utf8mb4).
 
 2. **Apply the bootstrap snippet.** The repository ships
    `tools/bootstrap-mariadb.sql`, which creates the `shakenfist` database,
@@ -77,8 +77,11 @@ any schema work, the server is checked against these requirements:
 - **MariaDB, not MySQL.** The `VERSION()` string must contain `MariaDB`.
   Shaken Fist uses MariaDB-specific column types (such as `INET4`) that are
   not available in MySQL.
-- **Version 10.6.0 or later.** This matches the version shipped with
-  Ubuntu 22.04 LTS and is well above the 10.2 JSON-features floor.
+- **Version 10.11.0 or later.** The `ipam_reservations` table uses the
+  `INET4` column type, which only exists from MariaDB 10.10, and 10.11
+  is the oldest in-support LTS above that. It is also the version the
+  functional CI suite exercises, and ships with Debian 12/13 and
+  Ubuntu 24.04.
 - **Default storage engine: InnoDB.** Shaken Fist relies on row-level
   locking and transactional semantics provided by InnoDB.
 - **Default character set: utf8mb4.** Required for full Unicode support,

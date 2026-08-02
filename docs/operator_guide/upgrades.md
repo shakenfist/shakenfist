@@ -59,7 +59,7 @@ When the cluster is deployed or upgraded, the `sf-ctl ensure-mariadb-schema`
 command must be run on a node with direct database access to:
 
 1. Perform a compatibility check against the server requirements (MariaDB
-   not MySQL, version >= 10.6.0, InnoDB engine, utf8mb4 charset and
+   not MySQL, version >= 10.11.0, InnoDB engine, utf8mb4 charset and
    collation) — the command refuses to proceed if any check fails
 2. Create any missing tables
 3. Apply any pending schema migrations to bring tables up to the current

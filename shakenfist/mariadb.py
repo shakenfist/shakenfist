@@ -376,12 +376,16 @@ NAMESPACE_CLAIMS_VERSION = 1
 CLUSTER_CAPACITY_VERSION = 1
 
 
-# Minimum supported MariaDB version. See docs/plans/PLAN-byo-mariadb-phase-01-
-# statelessness.md decision 1 for the rationale; in short: comfortably above
-# the 10.2 JSON-features floor SF uses today, matches Ubuntu 22.04 LTS so the
-# floor lines up with a vendor-supported LTS distro, and well below what
-# cluster_ci's debian-12 functional tests (MariaDB 10.11) exercise.
-MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 6, 0)
+# Minimum supported MariaDB version. Originally 10.6.0 (see
+# docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md decision 1: alignment
+# with Ubuntu 22.04's MariaDB), but the ipam_reservations.address column uses
+# the native INET4 type, which only exists from MariaDB 10.10 -- so schema
+# creation on 10.6 fails and that floor had silently stopped being real
+# (found by scheduler-reservations phase 2 validation). 10.11 is the oldest
+# in-support LTS above 10.10 (itself a short-term release, EOL 2023), is the
+# version the debian-12 cluster CI functional tests actually exercise, and
+# ships with Debian 12/13 and Ubuntu 24.04.
+MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 11, 0)
 
 
 # Consolidated mapping of every MariaDB table managed by ensure_schema() to
@@ -23316,9 +23320,10 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # join compares directly.
 #
 # Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
-# (available from the MIN_MARIADB_VERSION floor of 10.6). The derived
-# table aggregates per instance first so the lateral JSON_TABLE only
-# ever sees one document at a time; the JSON_TYPE guard skips a
+# (available since MariaDB 10.6, below the MIN_MARIADB_VERSION floor).
+# The derived table aggregates per instance first so the lateral
+# JSON_TABLE only ever sees one document at a time; the JSON_TYPE
+# guard skips a
 # disk_spec that is somehow not an array, and the DEFAULT ... ON
 # EMPTY / ON ERROR clauses make elements without a numeric size
 # contribute 0 -- one malformed disk_spec can not abort the pass (see

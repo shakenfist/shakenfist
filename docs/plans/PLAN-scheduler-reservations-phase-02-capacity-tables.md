@@ -282,7 +282,11 @@ Two incidental findings worth recording:
    unsatisfiable for fresh installs — not a phase 2 issue,
    but the constant is stale. JSON_TABLE itself was
    separately validated on a real 10.6 during step 2 with the
-   exact reconcile query text.
+   exact reconcile query text. *Fixed on this branch: the
+   floor is now `(10, 11, 0)` — the oldest in-support LTS
+   above INET4's 10.10 requirement, and the version cluster
+   CI actually exercises. sfcbr runs `mariadb:11.8` and is
+   unaffected.*
 2. **Claim expiry must be written server-relative.** The
    first validation run seeded `expires_at` from the client's
    local clock and the expiry sweep correctly did nothing —
