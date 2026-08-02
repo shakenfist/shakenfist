@@ -57,6 +57,7 @@ def _patch_maintain_module(network_node=True, queue_depth_per_queue=0,
             'shakenfist.daemons.network.maintain.net_ip_create_and_enqueue'),
         'instance': mock.patch(
             'shakenfist.daemons.network.maintain.instance'),
+        'log': mock.patch('shakenfist.daemons.network.maintain.LOG'),
     }
     return patches
 
@@ -66,10 +67,17 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
     shakenfist.daemons.network.maintain.Job.execute().
     """
 
+    def setUp(self):
+        super().setUp()
+        from shakenfist.daemons.network import maintain
+        maintain.EXTRA_VLANS_HISTORY.clear()
+        maintain.EXTRA_VLANS_WARNED.clear()
+
     def _run_one_iteration(self, *, network_node=True,
                            queue_depth_per_queue=0,
                            pending_op=False, recent_history=None,
-                           networks=None, floating_network=None):
+                           networks=None, floating_network=None,
+                           vxid_to_mac=None, db_network_vxids=None):
         """Drive Job.execute() through exactly one pass of the outer loop
         and return a dict of the mocks that callers will most likely
         want to assert on.
@@ -78,6 +86,10 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             networks = []
         if recent_history is None:
             recent_history = []
+        if vxid_to_mac is None:
+            vxid_to_mac = {}
+        if db_network_vxids is None:
+            db_network_vxids = []
 
         patches = _patch_maintain_module()
         active = {name: p.start() for name, p in patches.items()}
@@ -99,7 +111,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             mt.sleep.return_value = None
 
             active['util_network'].discover_interfaces.return_value = (
-                None, None, {})
+                None, None, vxid_to_mac)
 
             active['network'].Networks.return_value = networks
             # Network.from_db should return the matching mock by uuid
@@ -134,6 +146,8 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             mar.has_pending_cluster_operation_target.return_value = pending_op
             mar.get_recent_terminal_op_states_for_target.return_value = (
                 recent_history)
+            mar.get_all_networks.return_value = [
+                mock.MagicMock(vxid=v) for v in db_network_vxids]
 
             active['node'].from_db.return_value = mock.MagicMock()
 
@@ -519,3 +533,87 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         rc = routed_calls[0]
         self.assertEqual(fake_addr, rc.kwargs.get('ip'))
         self.assertEqual(PRIORITY.background, rc.kwargs.get('priority'))
+
+    def test_stray_vxlan_within_grace_period_not_touched(self):
+        """A stray vxlan seen for less than five minutes is only tracked,
+        never deleted or warned about."""
+        from shakenfist.daemons.network import maintain
+
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+        )
+
+        # First sighting is recorded at the (mocked) current time.
+        self.assertEqual(10_000.0, maintain.EXTRA_VLANS_HISTORY[0x123])
+        # No devices deleted, and the database was not consulted.
+        active['util_concurrency'].execute.assert_not_called()
+        active['mariadb'].get_all_networks.assert_not_called()
+        active['log'].with_fields.return_value.warning.assert_not_called()
+
+    def test_stray_vxlan_reaped_after_grace_period(self):
+        """A vxlan stray for more than five minutes whose vxid no network
+        in the database claims is reaped, with an audit event on the
+        node."""
+        from shakenfist.daemons.network import maintain
+
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[],
+        )
+
+        active['util_concurrency'].execute.assert_any_call(
+            'ip link delete br-vxlan-000123')
+        active['util_concurrency'].execute.assert_any_call(
+            'ip link delete vxlan-000123')
+        node = active['node'].from_db.return_value
+        node.add_event.assert_called_once()
+        self.assertIn(
+            'reaped stray vxlan', node.add_event.call_args.args[1])
+        # The stray is forgotten so a reappearance gets a fresh grace
+        # period.
+        self.assertNotIn(0x123, maintain.EXTRA_VLANS_HISTORY)
+
+    def test_stray_vxlan_claimed_by_network_warned_once_not_reaped(self):
+        """A stray vxlan whose vxid is still claimed by a network row in
+        the database must not be deleted, and is warned about once per
+        stray episode rather than on every pass."""
+        from shakenfist.daemons.network import maintain
+
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[0x123],
+        )
+
+        active['util_concurrency'].execute.assert_not_called()
+        active['log'].with_fields.return_value.warning.\
+            assert_called_once_with('Extra vxlan present!')
+        self.assertIn(0x123, maintain.EXTRA_VLANS_WARNED)
+
+        # A second pass over the same stray must not warn again.
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[0x123],
+        )
+        active['util_concurrency'].execute.assert_not_called()
+        active['log'].with_fields.return_value.warning.assert_not_called()
+
+    def test_stray_vxlan_disappearance_resets_tracking(self):
+        """When a stray vxlan disappears from the host its history and
+        warned state are dropped, so a reappearance is a new episode."""
+        from shakenfist.daemons.network import maintain
+
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        maintain.EXTRA_VLANS_WARNED.add(0x123)
+        self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={},
+        )
+
+        self.assertNotIn(0x123, maintain.EXTRA_VLANS_HISTORY)
+        self.assertNotIn(0x123, maintain.EXTRA_VLANS_WARNED)

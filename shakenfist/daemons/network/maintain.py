@@ -38,6 +38,7 @@ LOG, _ = logs.setup(__name__)
 
 
 EXTRA_VLANS_HISTORY = {}
+EXTRA_VLANS_WARNED = set()
 
 
 # Terminal cluster-operation states. Mirrors the set used by the
@@ -310,16 +311,47 @@ class Job(util_concurrency.Job):
             extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
             # We keep a global cache of extra vxlans we've seen before, so that
-            # we only warn about them when they've been stray for five minutes.
+            # we only act on them when they've been stray for five minutes.
             for vxid in EXTRA_VLANS_HISTORY.copy():
                 if vxid not in extra_vxids:
                     del EXTRA_VLANS_HISTORY[vxid]
+                    EXTRA_VLANS_WARNED.discard(vxid)
             for vxid in extra_vxids:
                 if vxid not in EXTRA_VLANS_HISTORY:
                     EXTRA_VLANS_HISTORY[vxid] = time.time()
 
-            # Warn of extra vxlans which have been present for more than five minutes
-            for vxid in EXTRA_VLANS_HISTORY:
-                if time.time() - EXTRA_VLANS_HISTORY[vxid] > 5 * 60:
-                    LOG.with_fields({'vxid': vxid}).warning(
-                        'Extra vxlan present!')
+            # Handle extra vxlans which have been present for more than five
+            # minutes. If no network in the database claims the vxid then the
+            # device is orphaned and we reap it. If a network still claims the
+            # vxid we must not delete the device -- removing a vxlan that is
+            # in use would take the network down -- so we instead warn once
+            # per stray episode rather than on every pass.
+            overdue = [vxid for vxid in EXTRA_VLANS_HISTORY
+                       if time.time() - EXTRA_VLANS_HISTORY[vxid] > 5 * 60]
+            if overdue:
+                # Re-verify against the database immediately before deletion,
+                # regardless of network state.
+                known_vxids = {net.vxid for net in mariadb.get_all_networks()}
+                for vxid in overdue:
+                    if vxid in known_vxids:
+                        if vxid not in EXTRA_VLANS_WARNED:
+                            EXTRA_VLANS_WARNED.add(vxid)
+                            LOG.with_fields({'vxid': vxid}).warning(
+                                'Extra vxlan present!')
+                        continue
+
+                    for device in ['br-vxlan-%06x' % vxid,
+                                   'vxlan-%06x' % vxid]:
+                        if util_network.check_for_interface(device):
+                            util_concurrency.execute(
+                                'ip link delete %s' % device)
+
+                    this_node = Node.from_db(config.NODE_NAME)
+                    if this_node:
+                        this_node.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'reaped stray vxlan with no matching network',
+                            extra={'vxid': vxid})
+                    LOG.with_fields({'vxid': vxid}).info(
+                        'Reaped stray vxlan with no matching network')
+                    del EXTRA_VLANS_HISTORY[vxid]
