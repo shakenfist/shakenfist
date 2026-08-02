@@ -1,0 +1,456 @@
+"""Identity token validation.
+
+This is the module that decides whether to believe a token, so the
+tests are mostly about refusals. Everything runs against locally
+generated RSA keys and a mocked JWKS fetch -- no network, and no
+dependency on a real identity provider being reachable or unchanged.
+"""
+
+import base64
+import hashlib
+import hmac
+import io
+import json
+import threading
+import time
+from unittest import mock
+
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from shakenfist import exceptions
+from shakenfist import federation
+from shakenfist.mapping_rule import MappingRule
+from shakenfist.tests import base
+from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.trusted_issuer import TrustedIssuer
+
+
+GITHUB = 'https://token.actions.githubusercontent.com'
+GITHUB_JWKS = GITHUB + '/.well-known/jwks'
+AUDIENCE = 'https://sf.example.com'
+
+
+def _keypair():
+    return rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+def _jwks_for(keys):
+    """A JWKS document for {kid: private_key}."""
+    return {
+        'keys': [
+            json.loads(
+                jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())
+            ) | {'kid': kid, 'use': 'sig', 'alg': 'RS256'}
+            for kid, key in keys.items()
+        ]
+    }
+
+
+class FederationTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+        self.key = _keypair()
+        self.keys = {'key-1': self.key}
+        self.fetches = []
+        self.fetch_delay = 0
+
+        # Every test starts with an empty client cache, or a client
+        # built by an earlier test would answer with its stale keys.
+        federation.JWKS_CACHE = federation.JWKSCache()
+
+        self.issuer = TrustedIssuer.new(
+            'github', GITHUB, GITHUB_JWKS, AUDIENCE)
+
+        # Patched at the socket rather than at fetch_data, because
+        # fetch_data is what populates PyJWKClient's key set cache.
+        # Mocking it out would silently disable the caching these tests
+        # exist to check, and they would pass for the wrong reason.
+        patcher = mock.patch(
+            'jwt.jwks_client.urllib.request.urlopen',
+            side_effect=self._urlopen)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _urlopen(self, request, **kwargs):
+        self.fetches.append(request.full_url)
+        # A real JWKS fetch is a network round trip. Without some
+        # duration here the threads in the stampede test finish one at
+        # a time before the next is scheduled, and the test passes
+        # whether or not the single-flight lock exists -- which makes
+        # it worse than no test.
+        time.sleep(self.fetch_delay)
+        body = json.dumps(_jwks_for(self.keys)).encode('utf-8')
+        response = mock.MagicMock()
+        response.read.return_value = body
+        response.__enter__.return_value = io.BytesIO(body)
+        response.__exit__.return_value = False
+        return response
+
+    def _token(self, kid='key-1', key=None, claims=None, audience=AUDIENCE,
+               issuer=GITHUB, exp_delta=300, nbf_delta=None, iat_delta=0):
+        now = int(time.time())
+        body = {
+            'iss': issuer,
+            'aud': audience,
+            # iat_delta models an identity provider whose clock is
+            # ahead of ours, which is the common direction for skew.
+            'iat': now + iat_delta,
+            'exp': now + exp_delta,
+            'sub': 'repo:shakenfist/ryll:ref:refs/heads/develop',
+            'repository': 'shakenfist/ryll',
+            'ref': 'refs/heads/develop'
+        }
+        if nbf_delta is not None:
+            body['nbf'] = now + nbf_delta
+        if claims:
+            body.update(claims)
+        return jwt.encode(
+            body, key or self.key, algorithm='RS256',
+            headers={'kid': kid})
+
+
+class IssuerResolutionTestCase(FederationTestCase):
+    def test_the_issuer_is_read_from_an_unverified_token(self):
+        self.assertEqual(GITHUB, federation.unverified_issuer(self._token()))
+
+    def test_garbage_has_no_readable_issuer(self):
+        self.assertIsNone(federation.unverified_issuer('not-a-token'))
+        self.assertIsNone(federation.unverified_issuer(''))
+
+    def test_resolution_finds_the_configured_issuer(self):
+        found = federation.issuer_for_token(self._token())
+        self.assertEqual(self.issuer.uuid, found.uuid)
+
+    def test_an_unknown_issuer_is_refused_without_a_fetch(self):
+        # The cheap rejection. If this ever reaches the network, an
+        # unauthenticated caller with a made-up iss can tie up a worker
+        # on an outbound request.
+        self.assertRaises(
+            exceptions.UntrustedIssuer, federation.issuer_for_token,
+            self._token(issuer='https://evil.example.com'))
+        self.assertEqual([], self.fetches)
+
+    def test_issuer_matching_is_exact(self):
+        # No trailing slash tolerance: a loose comparison here is a way
+        # to accept tokens from somewhere else entirely.
+        self.assertRaises(
+            exceptions.UntrustedIssuer, federation.issuer_for_token,
+            self._token(issuer=GITHUB + '/'))
+
+    def test_a_deleted_issuer_is_no_longer_trusted(self):
+        self.issuer.delete()
+        self.assertRaises(
+            exceptions.UntrustedIssuer, federation.issuer_for_token,
+            self._token())
+
+
+class TokenValidationTestCase(FederationTestCase):
+    def test_a_good_token_validates(self):
+        claims = federation.validate_token(self._token(), self.issuer)
+
+        self.assertEqual(GITHUB, claims['iss'])
+        self.assertEqual('shakenfist/ryll', claims['repository'])
+
+    def test_a_token_signed_by_the_wrong_key_is_refused(self):
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(key=_keypair()), self.issuer)
+
+    def test_a_token_for_another_audience_is_refused(self):
+        # Otherwise a token minted for some other relying party can be
+        # replayed at us.
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(audience='https://someone-else.example.com'),
+            self.issuer)
+
+    def test_an_expired_token_is_refused(self):
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(exp_delta=-1), self.issuer)
+
+    def test_a_token_not_yet_valid_is_refused(self):
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(nbf_delta=300), self.issuer)
+
+    def test_an_issuer_whose_clock_runs_fast_still_works(self):
+        # The skew that matters is between the identity provider, which
+        # stamps iat, and the API node checking it. PyJWT treats iat as
+        # "not valid before", so with zero leeway a provider running a
+        # few seconds fast would have every token it issues refused the
+        # moment it is issued -- which is why iat is not verified.
+        claims = federation.validate_token(
+            self._token(iat_delta=30), self.issuer)
+        self.assertEqual(GITHUB, claims['iss'])
+
+    def test_expiry_is_still_strict_for_a_fast_issuer(self):
+        # Not verifying iat must not soften exp, which is the claim
+        # that actually bounds the token.
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(iat_delta=30, exp_delta=-1), self.issuer)
+
+    def test_a_deliberately_postdated_token_is_still_refused(self):
+        # nbf is how an issuer says "not before", and it stays enforced
+        # even though iat no longer is.
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(iat_delta=30, nbf_delta=300), self.issuer)
+
+    def test_a_token_with_no_expiry_is_refused(self):
+        # A token that never expires is a permanent grant wearing a
+        # credential's clothes.
+        now = int(time.time())
+        token = jwt.encode(
+            {'iss': GITHUB, 'aud': AUDIENCE, 'iat': now,
+             'repository': 'shakenfist/ryll'},
+            self.key, algorithm='RS256', headers={'kid': 'key-1'})
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            token, self.issuer)
+
+    def test_an_unsigned_token_is_refused(self):
+        now = int(time.time())
+        token = jwt.encode(
+            {'iss': GITHUB, 'aud': AUDIENCE, 'exp': now + 300},
+            key='', algorithm='none')
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            token, self.issuer)
+
+    def test_an_hmac_token_signed_with_the_public_key_is_refused(self):
+        # The classic JWT attack. The issuer's public key is, by
+        # definition, public; if HS256 were accepted then anybody could
+        # take that key, use it as an HMAC secret, and mint a token we
+        # would verify happily. ALLOWED_ALGORITHMS being asymmetric only
+        # is what stops it.
+        #
+        # Hand-rolled because PyJWT refuses to *encode* this -- which is
+        # a good protection, but it protects the signer, and the signer
+        # here is the attacker. Only the verify side matters.
+        pub_pem = self.key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo)
+
+        def _segment(obj):
+            return base64.urlsafe_b64encode(
+                json.dumps(obj).encode('utf-8')).rstrip(b'=')
+
+        now = int(time.time())
+        signing_input = b'.'.join([
+            _segment({'alg': 'HS256', 'typ': 'JWT', 'kid': 'key-1'}),
+            _segment({'iss': GITHUB, 'aud': AUDIENCE, 'exp': now + 300,
+                      'repository': 'shakenfist/evil'})
+        ])
+        signature = base64.urlsafe_b64encode(
+            hmac.new(pub_pem, signing_input, hashlib.sha256).digest()
+        ).rstrip(b'=')
+        token = (signing_input + b'.' + signature).decode('utf-8')
+
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            token, self.issuer)
+
+    def test_hmac_is_not_an_allowed_algorithm(self):
+        for algorithm in federation.ALLOWED_ALGORITHMS:
+            self.assertFalse(
+                algorithm.startswith('HS'),
+                'a symmetric algorithm would let the public key sign')
+        self.assertNotIn('none', federation.ALLOWED_ALGORITHMS)
+
+
+class JWKSCachingTestCase(FederationTestCase):
+    def test_the_key_set_is_fetched_once_and_then_cached(self):
+        for _ in range(5):
+            federation.validate_token(self._token(), self.issuer)
+        self.assertEqual(1, len(self.fetches))
+
+    def test_an_unknown_kid_triggers_exactly_one_refetch(self):
+        federation.validate_token(self._token(), self.issuer)
+        self.assertEqual(1, len(self.fetches))
+
+        # The issuer rotates: a new key, and a token signed with it.
+        rotated = _keypair()
+        self.keys['key-2'] = rotated
+
+        claims = federation.validate_token(
+            self._token(kid='key-2', key=rotated), self.issuer)
+        self.assertEqual(GITHUB, claims['iss'])
+        self.assertEqual(2, len(self.fetches))
+
+    def test_a_kid_that_never_appears_does_not_fetch_forever(self):
+        federation.validate_token(self._token(), self.issuer)
+        before = len(self.fetches)
+
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(kid='nope', key=_keypair()), self.issuer)
+
+        # One refetch to check whether the key is newly published, and
+        # then it gives up rather than retrying per request.
+        self.assertEqual(before + 1, len(self.fetches))
+
+    def test_concurrent_unknown_kids_collapse_into_one_fetch(self):
+        # The stampede this cache exists to prevent: fifty CI jobs
+        # presenting tokens signed with a freshly rotated key must not
+        # become fifty requests to the identity provider.
+        federation.validate_token(self._token(), self.issuer)
+        self.fetches.clear()
+
+        rotated = _keypair()
+        self.keys['key-2'] = rotated
+        tokens = [self._token(kid='key-2', key=rotated) for _ in range(20)]
+        # Wide enough that every thread is inside the refetch window at
+        # once, so an unlocked implementation genuinely stampedes.
+        self.fetch_delay = 0.1
+
+        barrier = threading.Barrier(len(tokens))
+        errors = []
+
+        def _validate(token):
+            try:
+                barrier.wait(timeout=10)
+                federation.validate_token(token, self.issuer)
+            except Exception as e:      # noqa: BLE001 - reported below
+                errors.append(e)
+
+        threads = [threading.Thread(target=_validate, args=(t,))
+                   for t in tokens]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+
+        self.assertEqual([], errors)
+        self.assertEqual(
+            1, len(self.fetches),
+            'concurrent unknown-kid lookups stampeded the issuer')
+
+    def test_repointing_an_issuers_jwks_uri_replaces_the_client(self):
+        federation.validate_token(self._token(), self.issuer)
+        self.assertEqual(1, len(self.fetches))
+
+        # The operator repoints the issuer. The old client's cached
+        # keys are no longer the right answer.
+        self.issuer.update(GITHUB, GITHUB_JWKS + '2', AUDIENCE)
+        federation.validate_token(self._token(), self.issuer)
+        self.assertEqual(2, len(self.fetches))
+
+
+class ClaimMatchingTestCase(base.ShakenFistTestCase):
+    def test_an_exact_matcher_compares_exactly(self):
+        self.assertTrue(federation.claim_matches('a', 'a'))
+        self.assertFalse(federation.claim_matches('a', 'b'))
+        self.assertFalse(federation.claim_matches('ab', 'a'))
+        self.assertFalse(federation.claim_matches('a', 'ab'))
+
+    def test_an_enumerated_matcher_accepts_any_alternative(self):
+        self.assertTrue(federation.claim_matches('b', ['a', 'b']))
+        self.assertFalse(federation.claim_matches('c', ['a', 'b']))
+
+    def test_there_is_no_globbing(self):
+        # The property the whole design rests on. shakenfist/* must not
+        # match, or registering shakenfist-evil becomes an attack.
+        self.assertFalse(
+            federation.claim_matches('shakenfist/evil', 'shakenfist/*'))
+        self.assertFalse(
+            federation.claim_matches('shakenfist/ryll', 'shakenfist/'))
+
+    def test_non_string_claim_values_never_match(self):
+        # A claim of 1 must not satisfy a matcher of "1": a federation
+        # that coerces is one that eventually accepts the wrong thing.
+        self.assertFalse(federation.claim_matches(1, '1'))
+        self.assertFalse(federation.claim_matches(True, 'true'))
+        self.assertFalse(federation.claim_matches(None, 'None'))
+        self.assertFalse(federation.claim_matches(['a'], 'a'))
+
+    def test_every_bound_claim_must_be_present(self):
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.match_claims,
+            {'repository': 'shakenfist/ryll'},
+            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop'})
+
+    def test_matching_returns_the_satisfied_claims(self):
+        satisfied = federation.match_claims(
+            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop',
+             'sub': 'ignored'},
+            {'repository': 'shakenfist/ryll',
+             'ref': ['refs/heads/develop', 'refs/heads/main']})
+
+        self.assertEqual(
+            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop'},
+            satisfied)
+
+    def test_an_empty_matcher_set_refuses_rather_than_matching(self):
+        # Rule creation refuses to write one, so reaching here means a
+        # damaged row -- and the safe reading of a damaged rule is that
+        # it grants nothing.
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.match_claims,
+            {'repository': 'shakenfist/ryll'}, {})
+
+
+class ValidateForRuleTestCase(FederationTestCase):
+    def setUp(self):
+        super().setUp()
+        self.rule = MappingRule.new(
+            'ci', 'ryll', 'github',
+            {'repository': 'shakenfist/ryll',
+             'ref': ['refs/heads/develop', 'refs/heads/main']},
+            ['blob.read'], 3600, 'ryll-ci')
+
+    def test_a_good_token_satisfies_its_rule(self):
+        claims, satisfied = federation.validate_for_rule(
+            self._token(), self.rule)
+
+        self.assertEqual(GITHUB, claims['iss'])
+        self.assertEqual(
+            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop'},
+            satisfied)
+
+    def test_a_token_from_the_wrong_branch_is_refused(self):
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.validate_for_rule,
+            self._token(claims={'ref': 'refs/heads/wip'}), self.rule)
+
+    def test_a_token_from_the_wrong_repository_is_refused(self):
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.validate_for_rule,
+            self._token(claims={'repository': 'shakenfist/evil'}), self.rule)
+
+    def test_a_rule_bound_to_another_issuer_refuses_the_token(self):
+        # A token from issuer A must not be exchangeable through a rule
+        # that trusts issuer B, even though both are trusted here.
+        TrustedIssuer.new(
+            'authentik', 'https://auth.example.com',
+            'https://auth.example.com/jwks', AUDIENCE)
+        other = MappingRule.new(
+            'ci', 'via-authentik', 'authentik',
+            {'repository': 'shakenfist/ryll'}, ['blob.read'], 3600, 'x')
+
+        self.assertRaises(
+            exceptions.UntrustedIssuer, federation.validate_for_rule,
+            self._token(), other)
+
+    def test_an_authentik_style_token_needs_no_different_code(self):
+        # The phase plan's proof obligation: a second issuer with
+        # entirely different claims works through the same machinery.
+        TrustedIssuer.new(
+            'authentik', 'https://auth.example.com',
+            'https://auth.example.com/jwks', AUDIENCE)
+        rule = MappingRule.new(
+            'ci', 'via-groups', 'authentik', {'groups': ['sf-ci']},
+            ['blob.read'], 3600, 'ci')
+
+        token = self._token(
+            issuer='https://auth.example.com',
+            claims={'groups': 'sf-ci', 'sub': 'service-account'})
+
+        _, satisfied = federation.validate_for_rule(token, rule)
+        self.assertEqual({'groups': 'sf-ci'}, satisfied)

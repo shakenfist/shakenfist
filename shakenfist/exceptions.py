@@ -133,6 +133,28 @@ class BadObjectVersion(DatabaseException):
     ...
 
 
+class FederationException(Exception):
+    """An identity token could not be turned into a grant.
+
+    Subclassed rather than flattened so the exchange endpoint can
+    decide what to tell an unauthenticated caller and what to keep to
+    the audit log: which claim failed is useful to a namespace owner
+    reading their events, and an oracle to somebody probing.
+    """
+
+
+class UntrustedIssuer(FederationException):
+    """No configured trusted issuer matches the token's iss claim."""
+
+
+class TokenValidationFailed(FederationException):
+    """Signature, audience, issuer, or lifetime verification failed."""
+
+
+class ClaimMismatch(FederationException):
+    """The token is genuine, but does not satisfy the rule's claims."""
+
+
 class CorruptMappingRule(DatabaseException):
     """A mapping rule's policy columns could not be decoded.
 

@@ -153,6 +153,17 @@ class SFConfig(BaseSettings):
         15,
         description='How long in minutes an API token is valid for.'
     )
+    FEDERATION_JWKS_CACHE_SECONDS: int = Field(
+        300,
+        description=(
+            'How long in seconds a trusted issuer\'s JWKS is cached before '
+            'being refetched. Lower values shorten the window in which a '
+            'key the issuer has revoked is still accepted; higher values '
+            'reduce load on the issuer. An unknown key id always triggers '
+            'an immediate refetch regardless of this setting, so raising '
+            'it does not delay recognising a newly rotated key.'
+        )
+    )
     API_ADVERTISED_HOST: str = Field(
         'localhost',
         description='The DNS name of the REST API host as advertised to users.'
