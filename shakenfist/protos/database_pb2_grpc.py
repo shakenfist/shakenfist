@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from shakenfist.protos import database_pb2 as database__pb2
+from shakenfist.protos from shakenfist.protos import database_pb2 as database__pb2
 
 GRPC_GENERATED_VERSION = '1.83.0'
 GRPC_VERSION = grpc.__version__
@@ -1119,6 +1119,7 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.DeleteClusterOperationErrorRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+<<<<<<< HEAD
         self.RecordFederatedExchange = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/RecordFederatedExchange',
                 request_serializer=database__pb2.RecordFederatedExchangeRequest.SerializeToString,
@@ -1138,6 +1139,12 @@ class DatabaseServiceStub:
                 '/shakenfist.protos.DatabaseService/ReapFederationRateLimits',
                 request_serializer=database__pb2.ReapFederationRateLimitsRequest.SerializeToString,
                 response_deserializer=database__pb2.ReapFederationReply.FromString,
+=======
+        self.ReconcileSchedulerCapacity = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReconcileSchedulerCapacity',
+                request_serializer=database__pb2.ReconcileSchedulerCapacityRequest.SerializeToString,
+                response_deserializer=database__pb2.ReconcileSchedulerCapacityReply.FromString,
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
                 _registered_method=True)
 
 
@@ -2545,17 +2552,30 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+<<<<<<< HEAD
     def RecordFederatedExchange(self, request, context):
         """Federation Abuse Resistance (MariaDB)
         Replay refusal and rate limiting for /auth/federated. Both counters
         live in the database rather than in the API worker so the
         protection is cluster wide -- a per process counter would let a
         caller multiply their allowance by the number of workers.
+=======
+    def ReconcileSchedulerCapacity(self, request, context):
+        """Scheduler Capacity Operations (MariaDB)
+        Scheduler-reservations phase 2: the reconciler's single RPC. One
+        call expires stale namespace claims, refreshes per-node limits from
+        node_metrics, recomputes usage and expected demand from placement
+        ground truth, and rebuilds the cluster_capacity singleton. The
+        demand parameters ride in the request so the database daemon needs
+        no copy of the caller's scheduler configuration. See
+        docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+<<<<<<< HEAD
     def CountFederatedAttempt(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -2574,6 +2594,8 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+=======
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -3662,6 +3684,7 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.DeleteClusterOperationErrorRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
+<<<<<<< HEAD
             'RecordFederatedExchange': grpc.unary_unary_rpc_method_handler(
                     servicer.RecordFederatedExchange,
                     request_deserializer=database__pb2.RecordFederatedExchangeRequest.FromString,
@@ -3681,6 +3704,12 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.ReapFederationRateLimits,
                     request_deserializer=database__pb2.ReapFederationRateLimitsRequest.FromString,
                     response_serializer=database__pb2.ReapFederationReply.SerializeToString,
+=======
+            'ReconcileSchedulerCapacity': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReconcileSchedulerCapacity,
+                    request_deserializer=database__pb2.ReconcileSchedulerCapacityRequest.FromString,
+                    response_serializer=database__pb2.ReconcileSchedulerCapacityReply.SerializeToString,
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -9553,7 +9582,11 @@ class DatabaseService:
             _registered_method=True)
 
     @staticmethod
+<<<<<<< HEAD
     def RecordFederatedExchange(request,
+=======
+    def ReconcileSchedulerCapacity(request,
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
             target,
             options=(),
             channel_credentials=None,
@@ -9566,6 +9599,7 @@ class DatabaseService:
         return grpc.experimental.unary_unary(
             request,
             target,
+<<<<<<< HEAD
             '/shakenfist.protos.DatabaseService/RecordFederatedExchange',
             database__pb2.RecordFederatedExchangeRequest.SerializeToString,
             database__pb2.RecordFederatedExchangeReply.FromString,
@@ -9650,6 +9684,11 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/ReapFederationRateLimits',
             database__pb2.ReapFederationRateLimitsRequest.SerializeToString,
             database__pb2.ReapFederationReply.FromString,
+=======
+            '/shakenfist.protos.DatabaseService/ReconcileSchedulerCapacity',
+            database__pb2.ReconcileSchedulerCapacityRequest.SerializeToString,
+            database__pb2.ReconcileSchedulerCapacityReply.FromString,
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
             options,
             channel_credentials,
             insecure,

@@ -2,6 +2,8 @@
 import time
 from unittest import mock
 
+from prometheus_client import REGISTRY
+
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -842,3 +844,176 @@ class ReapFederationRecordsTestCase(base.ShakenFistTestCase):
             st.reap_federation_records()
 
         self.assertEqual([], log_info.call_args_list)
+
+
+def _capacity_node(node_uuid, limit_cpus=16, limit_memory_mb=32768,
+                   limit_disk_gb=500, used_cpus=4, used_memory_mb=8192,
+                   used_disk_gb=100, expected_demand=2.5):
+    return {
+        'node_uuid': node_uuid,
+        'limit_cpus': limit_cpus,
+        'limit_memory_mb': limit_memory_mb,
+        'limit_disk_gb': limit_disk_gb,
+        'used_cpus': used_cpus,
+        'used_memory_mb': used_memory_mb,
+        'used_disk_gb': used_disk_gb,
+        'expected_demand': expected_demand,
+        'delta_used_cpus': 0,
+        'delta_used_memory_mb': 0,
+        'delta_used_disk_gb': 0
+    }
+
+
+def _capacity_reply(nodes, nodes_added=0, nodes_removed=0, claims_expired=0):
+    return {
+        'success': True,
+        'nodes_added': nodes_added,
+        'nodes_removed': nodes_removed,
+        'claims_expired': claims_expired,
+        'nodes': nodes,
+        'cluster': {
+            'total_cpus': sum(n['limit_cpus'] for n in nodes),
+            'total_memory_mb': sum(n['limit_memory_mb'] for n in nodes),
+            'total_disk_gb': sum(n['limit_disk_gb'] for n in nodes),
+            'claimed_cpus': 0,
+            'claimed_memory_mb': 0,
+            'claimed_disk_gb': 0,
+            'unclaimed_used_cpus': sum(n['used_cpus'] for n in nodes),
+            'unclaimed_used_memory_mb': sum(
+                n['used_memory_mb'] for n in nodes),
+            'unclaimed_used_disk_gb': sum(n['used_disk_gb'] for n in nodes)
+        }
+    }
+
+
+def _sample(name, labels=None):
+    return REGISTRY.get_sample_value(name, labels)
+
+
+class ReconcileSchedulerCapacityTaskTestCase(base.ShakenFistTestCase):
+    """The scheduled_tasks.reconcile_scheduler_capacity() wrapper: one
+    mariadb RPC per pass, gauges updated from the reply, stale node
+    label sets removed, and failures counted without raising."""
+
+    def setUp(self):
+        super().setUp()
+        # Metrics and the exported-nodes record are module level; reset
+        # them so tests do not observe each other's label sets.
+        st._CAPACITY_EXPORTED_NODES.clear()
+        st.SCHEDULER_CAPACITY_NODE_LIMIT.clear()
+        st.SCHEDULER_CAPACITY_NODE_USED.clear()
+        st.SCHEDULER_CAPACITY_NODE_EXPECTED_DEMAND.clear()
+        st.SCHEDULER_CAPACITY_CLUSTER_TOTAL.clear()
+        st.SCHEDULER_CAPACITY_CLUSTER_CLAIMED.clear()
+        st.SCHEDULER_CAPACITY_CLUSTER_UNCLAIMED_USED.clear()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_success_sets_gauges_from_reply(self, mock_reconcile):
+        mock_reconcile.return_value = _capacity_reply(
+            [_capacity_node(NODE_UUID_1),
+             _capacity_node(NODE_UUID_2, limit_cpus=32, used_cpus=10,
+                            expected_demand=7.5)])
+
+        st.reconcile_scheduler_capacity()
+
+        mock_reconcile.assert_called_once_with()
+        self.assertEqual(
+            16.0, _sample('scheduler_capacity_node_limit',
+                          {'node': NODE_UUID_1, 'resource': 'cpus'}))
+        self.assertEqual(
+            8192.0, _sample('scheduler_capacity_node_used',
+                            {'node': NODE_UUID_1, 'resource': 'memory_mb'}))
+        self.assertEqual(
+            7.5, _sample('scheduler_capacity_node_expected_demand',
+                         {'node': NODE_UUID_2}))
+        self.assertEqual(
+            48.0, _sample('scheduler_capacity_cluster_total',
+                          {'resource': 'cpus'}))
+        self.assertEqual(
+            0.0, _sample('scheduler_capacity_cluster_claimed',
+                         {'resource': 'memory_mb'}))
+        self.assertEqual(
+            200.0, _sample('scheduler_capacity_cluster_unclaimed_used',
+                           {'resource': 'disk_gb'}))
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_reconcile_last_success_timestamp'))
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_reconcile_last_duration_seconds'))
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_departed_node_label_sets_are_removed(self, mock_reconcile):
+        mock_reconcile.side_effect = [
+            _capacity_reply(
+                [_capacity_node(NODE_UUID_1), _capacity_node(NODE_UUID_2)]),
+            _capacity_reply([_capacity_node(NODE_UUID_1)], nodes_removed=1)
+        ]
+
+        st.reconcile_scheduler_capacity()
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_node_limit',
+                    {'node': NODE_UUID_2, 'resource': 'cpus'}))
+
+        st.reconcile_scheduler_capacity()
+        for resource in st.CAPACITY_RESOURCES:
+            self.assertIsNone(
+                _sample('scheduler_capacity_node_limit',
+                        {'node': NODE_UUID_2, 'resource': resource}))
+            self.assertIsNone(
+                _sample('scheduler_capacity_node_used',
+                        {'node': NODE_UUID_2, 'resource': resource}))
+        self.assertIsNone(
+            _sample('scheduler_capacity_node_expected_demand',
+                    {'node': NODE_UUID_2}))
+
+        # The surviving node's label sets are untouched.
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_node_limit',
+                    {'node': NODE_UUID_1, 'resource': 'cpus'}))
+        self.assertEqual({NODE_UUID_1}, st._CAPACITY_EXPORTED_NODES)
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity', return_value=None)
+    def test_failed_pass_increments_counter_without_raising(
+            self, mock_reconcile):
+        passes_before = _sample(
+            'scheduler_capacity_reconcile_passes_total') or 0.0
+        failures_before = _sample(
+            'scheduler_capacity_reconcile_failures_total') or 0.0
+
+        with mock.patch.object(st.LOG, 'with_fields') as mock_with_fields:
+            # Must not raise.
+            st.reconcile_scheduler_capacity()
+
+        self.assertEqual(
+            passes_before + 1,
+            _sample('scheduler_capacity_reconcile_passes_total'))
+        self.assertEqual(
+            failures_before + 1,
+            _sample('scheduler_capacity_reconcile_failures_total'))
+        mock_with_fields.return_value.warning.assert_called_once()
+        mock_with_fields.return_value.info.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_success_logs_exactly_one_info_summary(self, mock_reconcile):
+        mock_reconcile.return_value = _capacity_reply(
+            [_capacity_node(NODE_UUID_1)], nodes_added=1, claims_expired=2)
+
+        with mock.patch.object(st.LOG, 'with_fields') as mock_with_fields:
+            st.reconcile_scheduler_capacity()
+
+        mock_with_fields.assert_called_once()
+        fields = mock_with_fields.call_args[0][0]
+        self.assertEqual(1, fields['nodes'])
+        self.assertEqual(1, fields['nodes_added'])
+        self.assertEqual(0, fields['nodes_removed'])
+        self.assertEqual(2, fields['claims_expired'])
+        self.assertIn('duration', fields)
+        mock_with_fields.return_value.info.assert_called_once()
+        mock_with_fields.return_value.warning.assert_not_called()

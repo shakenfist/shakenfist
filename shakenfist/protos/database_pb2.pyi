@@ -8,7 +8,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf.internal import containers as _containers
 import builtins as _builtins
-from shakenfist.protos import shakenfist_enums_pb2 as _shakenfist_enums_pb2
+from shakenfist.protos from shakenfist.protos import shakenfist_enums_pb2 as _shakenfist_enums_pb2
 import sys
 import typing as _typing
 
@@ -8598,6 +8598,7 @@ class DeleteClusterOperationErrorRequest(_message.Message):
 Global___DeleteClusterOperationErrorRequest: _TypeAlias = DeleteClusterOperationErrorRequest  # noqa: Y015
 
 @_typing.final
+<<<<<<< HEAD
 class RecordFederatedExchangeRequest(_message.Message):
     """Federation Abuse Resistance (MariaDB)"""
 
@@ -8788,3 +8789,173 @@ class ReapFederationReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ReapFederationReply: _TypeAlias = ReapFederationReply  # noqa: Y015
+=======
+class ReconcileSchedulerCapacityRequest(_message.Message):
+    """Scheduler Capacity Operations (MariaDB)
+    Scheduler-reservations phase 2 (see docs/plans/
+    PLAN-scheduler-reservations-phase-02-capacity-tables.md). The demand
+    parameters come from the caller's configuration (D13): placement adds
+    vcpus x demand_per_vcpu of expected load, and the reconciler decays
+    each placement's contribution linearly to zero over
+    demand_decay_seconds of instance age.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DEMAND_PER_VCPU_FIELD_NUMBER: _builtins.int
+    DEMAND_DECAY_SECONDS_FIELD_NUMBER: _builtins.int
+    demand_per_vcpu: _builtins.float
+    """Expected load per placed vCPU"""
+    demand_decay_seconds: _builtins.int
+    """Linear decay window for placements"""
+    def __init__(
+        self,
+        *,
+        demand_per_vcpu: _builtins.float = ...,
+        demand_decay_seconds: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["demand_decay_seconds", b"demand_decay_seconds", "demand_per_vcpu", b"demand_per_vcpu"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReconcileSchedulerCapacityRequest: _TypeAlias = ReconcileSchedulerCapacityRequest  # noqa: Y015
+
+@_typing.final
+class NodeCapacity(_message.Message):
+    """One scheduler_node_capacity row after the pass. The delta_used_*
+    fields are the change relative to the row's previous values; until
+    phase 3 adds guarded-UPDATE drawdown they are ordinary between-pass
+    churn, after which they become the drift-detection signal (D5).
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    LIMIT_CPUS_FIELD_NUMBER: _builtins.int
+    LIMIT_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    LIMIT_DISK_GB_FIELD_NUMBER: _builtins.int
+    USED_CPUS_FIELD_NUMBER: _builtins.int
+    USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    DELTA_USED_CPUS_FIELD_NUMBER: _builtins.int
+    DELTA_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    DELTA_USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    node_uuid: _builtins.str
+    """Dashed uuid form"""
+    limit_cpus: _builtins.int
+    limit_memory_mb: _builtins.int
+    limit_disk_gb: _builtins.int
+    used_cpus: _builtins.int
+    used_memory_mb: _builtins.int
+    used_disk_gb: _builtins.int
+    expected_demand: _builtins.float
+    delta_used_cpus: _builtins.int
+    delta_used_memory_mb: _builtins.int
+    delta_used_disk_gb: _builtins.int
+    def __init__(
+        self,
+        *,
+        node_uuid: _builtins.str = ...,
+        limit_cpus: _builtins.int = ...,
+        limit_memory_mb: _builtins.int = ...,
+        limit_disk_gb: _builtins.int = ...,
+        used_cpus: _builtins.int = ...,
+        used_memory_mb: _builtins.int = ...,
+        used_disk_gb: _builtins.int = ...,
+        expected_demand: _builtins.float = ...,
+        delta_used_cpus: _builtins.int = ...,
+        delta_used_memory_mb: _builtins.int = ...,
+        delta_used_disk_gb: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["delta_used_cpus", b"delta_used_cpus", "delta_used_disk_gb", b"delta_used_disk_gb", "delta_used_memory_mb", b"delta_used_memory_mb", "expected_demand", b"expected_demand", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "node_uuid", b"node_uuid", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NodeCapacity: _TypeAlias = NodeCapacity  # noqa: Y015
+
+@_typing.final
+class ClusterCapacity(_message.Message):
+    """The cluster_capacity singleton after the pass."""
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    TOTAL_CPUS_FIELD_NUMBER: _builtins.int
+    TOTAL_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    TOTAL_DISK_GB_FIELD_NUMBER: _builtins.int
+    CLAIMED_CPUS_FIELD_NUMBER: _builtins.int
+    CLAIMED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    CLAIMED_DISK_GB_FIELD_NUMBER: _builtins.int
+    UNCLAIMED_USED_CPUS_FIELD_NUMBER: _builtins.int
+    UNCLAIMED_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    UNCLAIMED_USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    total_cpus: _builtins.int
+    total_memory_mb: _builtins.int
+    total_disk_gb: _builtins.int
+    claimed_cpus: _builtins.int
+    claimed_memory_mb: _builtins.int
+    claimed_disk_gb: _builtins.int
+    unclaimed_used_cpus: _builtins.int
+    unclaimed_used_memory_mb: _builtins.int
+    unclaimed_used_disk_gb: _builtins.int
+    def __init__(
+        self,
+        *,
+        total_cpus: _builtins.int = ...,
+        total_memory_mb: _builtins.int = ...,
+        total_disk_gb: _builtins.int = ...,
+        claimed_cpus: _builtins.int = ...,
+        claimed_memory_mb: _builtins.int = ...,
+        claimed_disk_gb: _builtins.int = ...,
+        unclaimed_used_cpus: _builtins.int = ...,
+        unclaimed_used_memory_mb: _builtins.int = ...,
+        unclaimed_used_disk_gb: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claimed_cpus", b"claimed_cpus", "claimed_disk_gb", b"claimed_disk_gb", "claimed_memory_mb", b"claimed_memory_mb", "total_cpus", b"total_cpus", "total_disk_gb", b"total_disk_gb", "total_memory_mb", b"total_memory_mb", "unclaimed_used_cpus", b"unclaimed_used_cpus", "unclaimed_used_disk_gb", b"unclaimed_used_disk_gb", "unclaimed_used_memory_mb", b"unclaimed_used_memory_mb"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ClusterCapacity: _TypeAlias = ClusterCapacity  # noqa: Y015
+
+@_typing.final
+class ReconcileSchedulerCapacityReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    NODES_ADDED_FIELD_NUMBER: _builtins.int
+    NODES_REMOVED_FIELD_NUMBER: _builtins.int
+    CLAIMS_EXPIRED_FIELD_NUMBER: _builtins.int
+    NODES_FIELD_NUMBER: _builtins.int
+    CLUSTER_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    nodes_added: _builtins.int
+    nodes_removed: _builtins.int
+    claims_expired: _builtins.int
+    @_builtins.property
+    def nodes(self) -> _containers.RepeatedCompositeFieldContainer[Global___NodeCapacity]: ...
+    @_builtins.property
+    def cluster(self) -> Global___ClusterCapacity: ...
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        nodes_added: _builtins.int = ...,
+        nodes_removed: _builtins.int = ...,
+        claims_expired: _builtins.int = ...,
+        nodes: _abc.Iterable[Global___NodeCapacity] | None = ...,
+        cluster: Global___ClusterCapacity | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["cluster", b"cluster"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claims_expired", b"claims_expired", "cluster", b"cluster", "nodes", b"nodes", "nodes_added", b"nodes_added", "nodes_removed", b"nodes_removed", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReconcileSchedulerCapacityReply: _TypeAlias = ReconcileSchedulerCapacityReply  # noqa: Y015
+>>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)

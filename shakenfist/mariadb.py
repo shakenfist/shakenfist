@@ -24,6 +24,7 @@
 
 from ipaddress import IPv4Address
 import json
+import math
 import random
 import time
 import threading
@@ -43,6 +44,7 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
+from shakenfist.constants import GiB
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -366,6 +368,12 @@ CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENTS_VERSION = 1
 EVENT_OBJECTS_VERSION = 1
+# Scheduler-reservations capacity tables (see docs/plans/
+# PLAN-scheduler-reservations-phase-02-capacity-tables.md). v1: schema
+# creation.
+SCHEDULER_NODE_CAPACITY_VERSION = 1
+NAMESPACE_CLAIMS_VERSION = 1
+CLUSTER_CAPACITY_VERSION = 1
 
 
 # Minimum supported MariaDB version. See docs/plans/PLAN-byo-mariadb-phase-01-
@@ -432,6 +440,9 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'cluster_config': CLUSTER_CONFIG_VERSION,
     'events': EVENTS_VERSION,
     'event_objects': EVENT_OBJECTS_VERSION,
+    'scheduler_node_capacity': SCHEDULER_NODE_CAPACITY_VERSION,
+    'namespace_claims': NAMESPACE_CLAIMS_VERSION,
+    'cluster_capacity': CLUSTER_CAPACITY_VERSION,
 }
 
 
@@ -3259,6 +3270,239 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+# =============================================================================
+# Scheduler Capacity Table Definitions (scheduler-reservations phase 2)
+# =============================================================================
+
+_scheduler_node_capacity_table: Optional[sa.Table] = None
+_namespace_claims_table: Optional[sa.Table] = None
+_cluster_capacity_table: Optional[sa.Table] = None
+
+
+def _get_scheduler_node_capacity_table() -> sa.Table:
+    """Get or create the scheduler_node_capacity table definition.
+
+    One of the three scheduler-reservations capacity tables (see
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
+    One row per hypervisor: the schedulable limits derived from the typed
+    node_metrics columns, the materialised usage counters recomputed from
+    placed instances, and the decaying expected-demand signal. In this
+    phase the tables are maintained solely by the reconciler; the
+    guarded-UPDATE admission path arrives in phase 3.
+
+    ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
+    server-side timestamp so comparisons happen against the database's
+    NOW(), never a per-node clock.
+    """
+    global _scheduler_node_capacity_table
+    if _scheduler_node_capacity_table is None:
+        with TABLE_CREATION_LOCK:
+            if _scheduler_node_capacity_table is not None:
+                return _scheduler_node_capacity_table
+            metadata = _get_metadata()
+            if 'scheduler_node_capacity' in metadata.tables:
+                _scheduler_node_capacity_table = \
+                    metadata.tables['scheduler_node_capacity']
+                return _scheduler_node_capacity_table
+            _scheduler_node_capacity_table = sa.Table(
+                'scheduler_node_capacity',
+                metadata,
+                sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('limit_cpus', sa.Integer(), nullable=False),
+                sa.Column('limit_memory_mb', sa.Integer(), nullable=False),
+                sa.Column('limit_disk_gb', sa.Integer(), nullable=False),
+                sa.Column('used_cpus', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_memory_mb', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_disk_gb', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('expected_demand', sa.Double(), nullable=False,
+                          server_default='0'),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+            )
+    return _scheduler_node_capacity_table
+
+
+def _get_namespace_claims_table() -> sa.Table:
+    """Get or create the namespace_claims table definition.
+
+    One of the three scheduler-reservations capacity tables (see
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
+    One row per capacity claim: the claiming namespace (indexed, because
+    phase 3 admission looks claims up by namespace; the column matches
+    the namespaces table's name primary key), the claimed limits, the
+    materialised usage counters, the claim state, and its expiry. The
+    table is created empty in this phase -- the claims API is phase 4 --
+    and is maintained solely by the reconciler; the guarded-UPDATE
+    admission path arrives in phase 3.
+
+    ``expires_at`` and ``updated_at`` follow the cluster_locks TIMESTAMP
+    idiom: server-side timestamps so the expiry sweep compares against
+    the database's NOW(), never a per-node clock.
+    """
+    global _namespace_claims_table
+    if _namespace_claims_table is None:
+        with TABLE_CREATION_LOCK:
+            if _namespace_claims_table is not None:
+                return _namespace_claims_table
+            metadata = _get_metadata()
+            if 'namespace_claims' in metadata.tables:
+                _namespace_claims_table = metadata.tables['namespace_claims']
+                return _namespace_claims_table
+            _namespace_claims_table = sa.Table(
+                'namespace_claims',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('namespace', sa.String(255), nullable=False),
+                sa.Column('limit_cpus', sa.Integer(), nullable=False),
+                sa.Column('limit_memory_mb', sa.Integer(), nullable=False),
+                sa.Column('limit_disk_gb', sa.Integer(), nullable=False),
+                sa.Column('used_cpus', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_memory_mb', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_disk_gb', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('state', sa.String(32), nullable=False),
+                sa.Column('expires_at', sa.DateTime(), nullable=False),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+                sa.Index('idx_namespace_claims_namespace', 'namespace'),
+            )
+    return _namespace_claims_table
+
+
+def _get_cluster_capacity_table() -> sa.Table:
+    """Get or create the cluster_capacity table definition.
+
+    One of the three scheduler-reservations capacity tables (see
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
+    A singleton row (id always 1): cluster-wide totals summed from node
+    limits, capacity claimed by active namespace claims, and usage by
+    instances in namespaces without an active claim. The D14 admission
+    guards run against this row in phases 3/4; in this phase it is
+    maintained solely by the reconciler.
+
+    ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
+    server-side timestamp so comparisons happen against the database's
+    NOW(), never a per-node clock.
+    """
+    global _cluster_capacity_table
+    if _cluster_capacity_table is None:
+        with TABLE_CREATION_LOCK:
+            if _cluster_capacity_table is not None:
+                return _cluster_capacity_table
+            metadata = _get_metadata()
+            if 'cluster_capacity' in metadata.tables:
+                _cluster_capacity_table = metadata.tables['cluster_capacity']
+                return _cluster_capacity_table
+            _cluster_capacity_table = sa.Table(
+                'cluster_capacity',
+                metadata,
+                sa.Column('id', sa.Integer(), primary_key=True,
+                          autoincrement=False),
+                sa.Column('total_cpus', sa.Integer(), nullable=False),
+                sa.Column('total_memory_mb', sa.Integer(), nullable=False),
+                sa.Column('total_disk_gb', sa.Integer(), nullable=False),
+                sa.Column('claimed_cpus', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('claimed_memory_mb', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('claimed_disk_gb', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('unclaimed_used_cpus', sa.Integer(), nullable=False,
+                          server_default='0'),
+                sa.Column('unclaimed_used_memory_mb', sa.Integer(),
+                          nullable=False, server_default='0'),
+                sa.Column('unclaimed_used_disk_gb', sa.Integer(),
+                          nullable=False, server_default='0'),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+            )
+    return _cluster_capacity_table
+
+
+def _ensure_scheduler_node_capacity_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the scheduler_node_capacity table schema is up to date."""
+    table_name = 'scheduler_node_capacity'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_scheduler_node_capacity_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. This table is new in scheduler-
+    # reservations phase 2, so there is no prior shape to migrate.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {SCHEDULER_NODE_CAPACITY_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = SCHEDULER_NODE_CAPACITY_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': SCHEDULER_NODE_CAPACITY_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_namespace_claims_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the namespace_claims table schema is up to date."""
+    table_name = 'namespace_claims'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespace_claims_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. This table is new in scheduler-
+    # reservations phase 2, so there is no prior shape to migrate. The
+    # namespace index is part of the table definition and is created by
+    # create_all alongside the table.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {NAMESPACE_CLAIMS_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = NAMESPACE_CLAIMS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACE_CLAIMS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_cluster_capacity_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_capacity table schema is up to date."""
+    table_name = 'cluster_capacity'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_capacity_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. This table is new in scheduler-
+    # reservations phase 2, so there is no prior shape to migrate. The
+    # singleton row (id=1) is written by the reconciler, not here.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {CLUSTER_CAPACITY_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = CLUSTER_CAPACITY_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_CAPACITY_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -3332,6 +3576,9 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_cluster_config_schema(engine))
     results.append(_ensure_events_schema(engine))
     results.append(_ensure_event_objects_schema(engine))
+    results.append(_ensure_scheduler_node_capacity_schema(engine))
+    results.append(_ensure_namespace_claims_schema(engine))
+    results.append(_ensure_cluster_capacity_schema(engine))
 
     # Widen any native ENUM column whose Python enum has grown since the
     # table was created. This runs after the per-table ensures so every
@@ -3412,6 +3659,9 @@ def register_all_tables() -> None:
     _get_cluster_config_table()
     _get_events_table()
     _get_event_objects_table()
+    _get_scheduler_node_capacity_table()
+    _get_namespace_claims_table()
+    _get_cluster_capacity_table()
     LOG.info('Registered %d MariaDB Table objects in metadata',
              len(_get_metadata().tables))
 
@@ -22922,3 +23172,608 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
     if _use_database_service():
         return _grpc_delete_orphaned_artifact_attributes()
     return _direct_delete_orphaned_artifact_attributes()
+
+
+# =============================================================================
+# Scheduler capacity reconcile (scheduler-reservations phase 2)
+#
+# The reconciler (D5) recomputes every counter in the three capacity
+# tables from ground truth in a single RPC: it expires stale namespace
+# claims, refreshes per-node limits from the typed node_metrics columns,
+# recomputes usage from placed instances (instance_location rows in
+# object_references), recomputes the D13 expected-demand decay, and
+# rebuilds the cluster_capacity singleton. In this phase the reconciler
+# is the only writer of these tables; phase 3's guarded-UPDATE admission
+# path turns the recompute into a drift correction.
+#
+# The limit formulas below deliberately mirror scheduler.py
+# (_has_sufficient_cpu/_ram/_disk) so that the phase 3 guard
+# ``used + x <= limit`` admits exactly what today's Python filter admits.
+# See docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+# =============================================================================
+
+
+def _derive_cpu_memory_limits(
+        cpu_schedulable: Optional[int],
+        memory_max: Optional[int],
+        memory_reserved_mb: Optional[int],
+        cpu_overcommit_ratio: float,
+        ram_overcommit_ratio: float) -> tuple[Optional[int], Optional[int]]:
+    """Derive (limit_cpus, limit_memory_mb) from typed node_metrics values.
+
+    Mirrors the scheduler's arithmetic: ``limit_cpus`` is the
+    _has_sufficient_cpu bound ``floor(cpu_schedulable ×
+    CPU_OVERCOMMIT_RATIO)``; ``limit_memory_mb`` is the
+    _has_sufficient_ram overcommit bound ``floor(memory_max ×
+    RAM_OVERCOMMIT_RATIO) - memory_reserved_mb`` (an allocation ledger,
+    not the KSM-aware actual-usage check, which remains a phase 3
+    candidate filter).
+
+    A dimension whose inputs are NULL (a metrics row written by an old
+    resources daemon mid-upgrade) derives as None so the caller keeps
+    the previous limit rather than zeroing it.
+    """
+    limit_cpus = None
+    if cpu_schedulable is not None:
+        limit_cpus = math.floor(cpu_schedulable * cpu_overcommit_ratio)
+
+    limit_memory_mb = None
+    if memory_max is not None and memory_reserved_mb is not None:
+        limit_memory_mb = (
+            math.floor(memory_max * ram_overcommit_ratio) - memory_reserved_mb)
+
+    return limit_cpus, limit_memory_mb
+
+
+def _derive_disk_limit_gb(
+        used_disk_gb: int,
+        disk_free_instances: Optional[int],
+        disk_reservation_gb: Optional[int]) -> Optional[int]:
+    """Derive limit_disk_gb from recomputed usage and node_metrics values.
+
+    ``disk_free_instances`` is in bytes (as published by the resources
+    daemon); the conversion to GiB matches scheduler.py's
+    _has_sufficient_disk. There is no total-disk metric and free space
+    is the only ground truth that survives qcow2 growth, so the limit is
+    "current virtual drawdown plus what the filesystem says still fits":
+    ``used_disk_gb + max(0, floor(disk_free_instances/GiB) -
+    disk_reservation_gb)``. The phase 3 guard ``used + x <= limit`` is
+    then exactly today's free-space check, while accounting virtual size.
+
+    Returns None when the metrics inputs are NULL, so the caller keeps
+    the previous limit rather than zeroing it.
+    """
+    if disk_free_instances is None or disk_reservation_gb is None:
+        return None
+    return used_disk_gb + max(
+        0, math.floor(disk_free_instances / GiB) - disk_reservation_gb)
+
+
+def _decayed_demand_contribution(
+        cpus: int,
+        age_seconds: float,
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> float:
+    """One placement's contribution to a node's expected_demand (D13).
+
+    A placement starts at ``cpus × demand_per_vcpu`` of anticipated load
+    and decays linearly to zero over ``demand_decay_seconds`` of
+    instance age. Ages outside the window (including negative ages from
+    clock skew between the placement writer and the database) clamp to
+    the window edges; a non-positive decay window disables the term
+    entirely rather than dividing by zero.
+    """
+    if demand_decay_seconds <= 0:
+        return 0.0
+    age = max(0.0, age_seconds)
+    if age >= demand_decay_seconds:
+        return 0.0
+    return cpus * demand_per_vcpu * (1.0 - age / demand_decay_seconds)
+
+
+def _disk_spec_virtual_gb(disk_spec: Any) -> int:
+    """Sum the virtual sizes (in GB) of a disk_spec JSON list.
+
+    This is the Python reference implementation of the JSON_TABLE
+    aggregation in _RECONCILE_USAGE_SQL, kept for unit tests of the
+    intended semantics and as the fallback if step 4 validation finds
+    JSON_TABLE unworkable against real payloads: elements without a
+    numeric ``size`` (missing, null, or garbage) contribute 0, and a
+    disk_spec that is not a list contributes 0 with a warning.
+    """
+    if not isinstance(disk_spec, list):
+        LOG.warning(f'Malformed disk_spec (not a list): {disk_spec!r}')
+        return 0
+    total = 0
+    for disk in disk_spec:
+        if not isinstance(disk, dict):
+            LOG.warning(f'Malformed disk_spec element: {disk!r}')
+            continue
+        size = disk.get('size')
+        try:
+            if size is not None:
+                total += int(size)
+        except (TypeError, ValueError):
+            LOG.warning(f'Malformed disk_spec size: {size!r}')
+    return total
+
+
+# Usage recompute, grouped by (node, namespace) so one query feeds the
+# per-node counters, the per-claim counters and the cluster singleton's
+# unclaimed sums. Ground truth is the instance_location rows in
+# object_references (source: node uuid, target: instance uuid), joined
+# to instances for the allocated resources and to object_states for the
+# instance state. Only state 'deleted' is excluded: errored instances
+# keep their placement and their resources until hard-delete, so they
+# count; a stateless (zombie) instance also counts until the orphan
+# reconciler removes it.
+#
+# Format note (pitfall 6): object_references uuid columns store the
+# dashed 36-character form while instances.uuid is sa.Uuid (undashed
+# CHAR(32) on MariaDB), so the join transforms the reference-side value
+# with REPLACE so the lookup lands on the instances primary key.
+# object_states.object_uuid is dashed like object_references, so that
+# join compares directly.
+#
+# Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
+# (available from the MIN_MARIADB_VERSION floor of 10.6). The derived
+# table aggregates per instance first so the lateral JSON_TABLE only
+# ever sees one document at a time; the JSON_TYPE guard skips a
+# disk_spec that is somehow not an array, and the DEFAULT ... ON
+# EMPTY / ON ERROR clauses make elements without a numeric size
+# contribute 0 -- one malformed disk_spec can not abort the pass (see
+# _disk_spec_virtual_gb for the reference semantics). The enum-valued
+# columns (object_type, relationship) are bound as parameters because
+# SQLAlchemy persists enum member names, not values.
+_RECONCILE_USAGE_SQL = sa.text('''
+    SELECT r.source_uuid AS node_uuid,
+           i.namespace AS namespace,
+           COALESCE(SUM(i.cpus), 0) AS used_cpus,
+           COALESCE(SUM(i.memory), 0) AS used_memory_mb,
+           COALESCE(SUM(d.disk_gb), 0) AS used_disk_gb
+      FROM object_references r
+      JOIN instances i
+        ON i.uuid = REPLACE(r.target_uuid, '-', '')
+      LEFT JOIN (
+               SELECT i2.uuid AS instance_uuid,
+                      COALESCE(SUM(jt.size_gb), 0) AS disk_gb
+                 FROM instances i2,
+                      JSON_TABLE(i2.disk_spec, '$[*]'
+                          COLUMNS (size_gb BIGINT PATH '$.size'
+                                   DEFAULT '0' ON EMPTY
+                                   DEFAULT '0' ON ERROR)) jt
+                WHERE JSON_TYPE(i2.disk_spec) = 'ARRAY'
+                GROUP BY i2.uuid) d
+        ON d.instance_uuid = i.uuid
+      LEFT JOIN object_states s
+        ON s.object_uuid = r.target_uuid
+       AND s.object_type = :instance_object_type
+     WHERE r.relationship = :instance_location
+       AND (s.state_value IS NULL OR s.state_value != 'deleted')
+     GROUP BY r.source_uuid, i.namespace
+''')
+
+
+def _reconcile_fetch_usage(
+        conn: sa.Connection) -> dict[tuple[UUID, str], tuple[int, int, int]]:
+    """Recompute usage from ground truth, grouped by (node, namespace).
+
+    Returns {(node_uuid, namespace): (cpus, memory_mb, disk_gb)}. Rows
+    whose node uuid does not parse are skipped with a warning (they can
+    not be attributed to a capacity row anyway).
+    """
+    usage: dict[tuple[UUID, str], tuple[int, int, int]] = {}
+    rows = conn.execute(_RECONCILE_USAGE_SQL, {
+        'instance_object_type': ObjectType.INSTANCE.name,
+        'instance_location': RelationshipType.INSTANCE_LOCATION.name,
+    }).fetchall()
+    for row in rows:
+        try:
+            node_uuid = UUID(str(row.node_uuid))
+        except ValueError:
+            LOG.warning(
+                f'Skipping usage row with malformed node uuid '
+                f'{row.node_uuid!r}')
+            continue
+        usage[(node_uuid, str(row.namespace))] = (
+            int(row.used_cpus), int(row.used_memory_mb),
+            int(row.used_disk_gb))
+    return usage
+
+
+def _reconcile_fetch_demand(
+        conn: sa.Connection,
+        now: float,
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> dict[UUID, float]:
+    """Recompute expected_demand per node (D13).
+
+    Fetches the placements younger than the decay window (the
+    instance_location reference row's ``created`` timestamp is the
+    placement time) and folds each one's decayed contribution via
+    _decayed_demand_contribution. The set-based query bounds the fetch
+    to the recent window, so the Python fold is over a handful of rows
+    and the arithmetic is exactly the unit-tested helper.
+    """
+    demand: dict[UUID, float] = {}
+    if demand_decay_seconds <= 0:
+        return demand
+
+    refs = _get_object_references_table()
+    instances = _get_instances_table()
+    states = _get_object_states_table()
+
+    joined = refs.join(
+        instances,
+        instances.c.uuid == sa.func.replace(refs.c.target_uuid, '-', '')
+    ).outerjoin(
+        states,
+        sa.and_(
+            states.c.object_uuid == refs.c.target_uuid,
+            states.c.object_type == ObjectType.INSTANCE))
+    stmt = sa.select(
+        refs.c.source_uuid, refs.c.created, instances.c.cpus
+    ).select_from(joined).where(sa.and_(
+        refs.c.relationship == RelationshipType.INSTANCE_LOCATION,
+        sa.or_(
+            states.c.state_value.is_(None),
+            states.c.state_value != 'deleted'),
+        refs.c.created > now - demand_decay_seconds))
+
+    for row in conn.execute(stmt).fetchall():
+        try:
+            node_uuid = UUID(str(row.source_uuid))
+        except ValueError:
+            LOG.warning(
+                f'Skipping demand row with malformed node uuid '
+                f'{row.source_uuid!r}')
+            continue
+        contribution = _decayed_demand_contribution(
+            int(row.cpus), now - float(row.created), demand_per_vcpu,
+            demand_decay_seconds)
+        demand[node_uuid] = demand.get(node_uuid, 0.0) + contribution
+    return demand
+
+
+def _direct_reconcile_scheduler_capacity(
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> Optional[dict[str, Any]]:
+    """Run one full capacity reconcile pass directly against MariaDB.
+
+    One pass, in order (D5): expire stale namespace claims; refresh node
+    limit rows from node_metrics; recompute usage from placement ground
+    truth; recompute expected_demand; rebuild the cluster_capacity
+    singleton. Usage is computed before limits are written because
+    limit_disk_gb depends on the recomputed used_disk_gb.
+
+    CPU_OVERCOMMIT_RATIO and RAM_OVERCOMMIT_RATIO come from this
+    process's config: they are cluster-wide settings the database daemon
+    shares, unlike the demand parameters which ride in from the caller.
+
+    Nothing else writes these tables until phase 3, so the
+    per-statement writes need no enclosing transaction; the single
+    commit at the end simply keeps a failed pass from leaving a partial
+    write behind.
+
+    Returns the summary dict the reply is built from (counts, per-node
+    rows with previous-vs-new used deltas, the cluster row), or None on
+    error.
+    """
+    engine = _get_engine()
+    capacity = _get_scheduler_node_capacity_table()
+    claims = _get_namespace_claims_table()
+    cluster = _get_cluster_capacity_table()
+    metrics = _get_node_metrics_table()
+    states = _get_object_states_table()
+    nodes = _get_nodes_table()
+
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            # (1) Expire claims: the D4 crash backstop. Server-side
+            # NOW() comparison, matching the cluster_locks idiom.
+            claims_expired = int(conn.execute(
+                sa.update(claims).where(sa.and_(
+                    claims.c.state == 'active',
+                    claims.c.expires_at < sa.func.now()
+                )).values(state='expired', updated_at=sa.func.now())
+            ).rowcount)
+
+            # Snapshot the previous capacity rows for delta reporting,
+            # NULL-metrics limit retention and node add/remove counting.
+            previous = {}
+            for row in conn.execute(sa.select(capacity)).fetchall():
+                previous[row.node_uuid] = row
+
+            # The typed capacity columns from node_metrics (phase 1).
+            metrics_rows = {}
+            for row in conn.execute(sa.select(
+                    metrics.c.node_uuid,
+                    metrics.c.cpu_schedulable,
+                    metrics.c.memory_max,
+                    metrics.c.memory_reserved_mb,
+                    metrics.c.disk_free_instances,
+                    metrics.c.disk_reservation_gb)).fetchall():
+                metrics_rows[row.node_uuid] = row
+
+            # Node existence and deletion ground truth.
+            known_nodes = {
+                row.uuid for row in
+                conn.execute(sa.select(nodes.c.uuid)).fetchall()}
+            deleted_nodes = set()
+            for row in conn.execute(sa.select(states.c.object_uuid).where(
+                    sa.and_(
+                        states.c.object_type == ObjectType.NODE,
+                        states.c.state_value == 'deleted'))).fetchall():
+                try:
+                    deleted_nodes.add(UUID(str(row.object_uuid)))
+                except ValueError:
+                    pass
+
+            # (3) Recompute usage from ground truth, and (4) expected
+            # demand. Usage comes before the limit writes because
+            # limit_disk_gb depends on used_disk_gb.
+            usage = _reconcile_fetch_usage(conn)
+            demand = _reconcile_fetch_demand(
+                conn, now, demand_per_vcpu, demand_decay_seconds)
+
+            usage_by_node: dict[UUID, list[int]] = {}
+            usage_by_namespace: dict[str, list[int]] = {}
+            for (node_uuid, namespace), used_row in usage.items():
+                for totals in (usage_by_node.setdefault(
+                                   node_uuid, [0, 0, 0]),
+                               usage_by_namespace.setdefault(
+                                   namespace, [0, 0, 0])):
+                    totals[0] += used_row[0]
+                    totals[1] += used_row[1]
+                    totals[2] += used_row[2]
+
+            # (2) Refresh node rows. A node has a capacity row while it
+            # has a node_metrics row (and is not deleted); an existing
+            # row also survives a missing metrics row while the node
+            # itself still exists, and NULL metrics columns keep the
+            # previous limits rather than zeroing them.
+            removals = [
+                node_uuid for node_uuid in previous
+                if node_uuid in deleted_nodes or (
+                    node_uuid not in metrics_rows and
+                    node_uuid not in known_nodes)]
+            candidates = (
+                set(previous) | set(metrics_rows)
+            ) - deleted_nodes - set(removals)
+
+            nodes_added = 0
+            reply_nodes = []
+            total_limits = [0, 0, 0]
+            for node_uuid in sorted(candidates, key=lambda u: u.hex):
+                prev_row = previous.get(node_uuid)
+                metrics_row = metrics_rows.get(node_uuid)
+                used = usage_by_node.get(node_uuid, [0, 0, 0])
+
+                limit_cpus: Optional[int] = None
+                limit_memory_mb: Optional[int] = None
+                limit_disk_gb: Optional[int] = None
+                if metrics_row is not None:
+                    limit_cpus, limit_memory_mb = _derive_cpu_memory_limits(
+                        metrics_row.cpu_schedulable,
+                        metrics_row.memory_max,
+                        metrics_row.memory_reserved_mb,
+                        config.CPU_OVERCOMMIT_RATIO,
+                        config.RAM_OVERCOMMIT_RATIO)
+                    limit_disk_gb = _derive_disk_limit_gb(
+                        used[2],
+                        metrics_row.disk_free_instances,
+                        metrics_row.disk_reservation_gb)
+                if prev_row is not None:
+                    if limit_cpus is None:
+                        limit_cpus = prev_row.limit_cpus
+                    if limit_memory_mb is None:
+                        limit_memory_mb = prev_row.limit_memory_mb
+                    if limit_disk_gb is None:
+                        limit_disk_gb = prev_row.limit_disk_gb
+                if (limit_cpus is None or limit_memory_mb is None or
+                        limit_disk_gb is None):
+                    # A new node whose metrics row lacks the needed
+                    # columns: there is nothing defensible to write yet,
+                    # so wait for the next resources-daemon upsert.
+                    LOG.info(
+                        f'Skipping capacity row for node {node_uuid}: '
+                        f'metrics row lacks capacity columns')
+                    continue
+
+                expected_demand = demand.get(node_uuid, 0.0)
+                values = {
+                    'limit_cpus': limit_cpus,
+                    'limit_memory_mb': limit_memory_mb,
+                    'limit_disk_gb': limit_disk_gb,
+                    'used_cpus': used[0],
+                    'used_memory_mb': used[1],
+                    'used_disk_gb': used[2],
+                    'expected_demand': expected_demand,
+                    'updated_at': sa.func.now(),
+                }
+                stmt = sa.dialects.mysql.insert(capacity).values(
+                    node_uuid=node_uuid, **values)
+                conn.execute(stmt.on_duplicate_key_update(**values))
+                if prev_row is None:
+                    nodes_added += 1
+
+                total_limits[0] += limit_cpus
+                total_limits[1] += limit_memory_mb
+                total_limits[2] += limit_disk_gb
+                reply_nodes.append({
+                    'node_uuid': str(node_uuid),
+                    'limit_cpus': limit_cpus,
+                    'limit_memory_mb': limit_memory_mb,
+                    'limit_disk_gb': limit_disk_gb,
+                    'used_cpus': used[0],
+                    'used_memory_mb': used[1],
+                    'used_disk_gb': used[2],
+                    'expected_demand': expected_demand,
+                    'delta_used_cpus': used[0] - (
+                        prev_row.used_cpus if prev_row is not None else 0),
+                    'delta_used_memory_mb': used[1] - (
+                        prev_row.used_memory_mb
+                        if prev_row is not None else 0),
+                    'delta_used_disk_gb': used[2] - (
+                        prev_row.used_disk_gb
+                        if prev_row is not None else 0),
+                })
+
+            nodes_removed = 0
+            if removals:
+                nodes_removed = int(conn.execute(
+                    sa.delete(capacity).where(
+                        capacity.c.node_uuid.in_(removals))).rowcount)
+
+            # Per-claim usage recompute over the same instance set,
+            # grouped by namespace. Empty in production this phase (the
+            # claims API is phase 4), but the machinery must be proven.
+            claimed_limits = [0, 0, 0]
+            claimed_namespaces = set()
+            active_claims = conn.execute(sa.select(claims).where(
+                claims.c.state == 'active')).fetchall()
+            for claim_row in active_claims:
+                ns_used = usage_by_namespace.get(
+                    claim_row.namespace, [0, 0, 0])
+                conn.execute(sa.update(claims).where(
+                    claims.c.uuid == claim_row.uuid
+                ).values(
+                    used_cpus=ns_used[0],
+                    used_memory_mb=ns_used[1],
+                    used_disk_gb=ns_used[2],
+                    updated_at=sa.func.now()))
+                claimed_limits[0] += claim_row.limit_cpus
+                claimed_limits[1] += claim_row.limit_memory_mb
+                claimed_limits[2] += claim_row.limit_disk_gb
+                claimed_namespaces.add(claim_row.namespace)
+
+            # (5) Rebuild the cluster_capacity singleton: node limit
+            # sums, active claim limit sums, and usage by instances in
+            # namespaces without an active claim.
+            unclaimed_used = [0, 0, 0]
+            for namespace, ns_used in usage_by_namespace.items():
+                if namespace in claimed_namespaces:
+                    continue
+                unclaimed_used[0] += ns_used[0]
+                unclaimed_used[1] += ns_used[1]
+                unclaimed_used[2] += ns_used[2]
+
+            cluster_values = {
+                'total_cpus': total_limits[0],
+                'total_memory_mb': total_limits[1],
+                'total_disk_gb': total_limits[2],
+                'claimed_cpus': claimed_limits[0],
+                'claimed_memory_mb': claimed_limits[1],
+                'claimed_disk_gb': claimed_limits[2],
+                'unclaimed_used_cpus': unclaimed_used[0],
+                'unclaimed_used_memory_mb': unclaimed_used[1],
+                'unclaimed_used_disk_gb': unclaimed_used[2],
+                'updated_at': sa.func.now(),
+            }
+            cluster_stmt = sa.dialects.mysql.insert(cluster).values(
+                id=1, **cluster_values)
+            conn.execute(
+                cluster_stmt.on_duplicate_key_update(**cluster_values))
+
+            conn.commit()
+
+            del cluster_values['updated_at']
+            return {
+                'success': True,
+                'nodes_added': nodes_added,
+                'nodes_removed': nodes_removed,
+                'claims_expired': claims_expired,
+                'nodes': reply_nodes,
+                'cluster': cluster_values,
+            }
+    except (OperationalError, IntegrityError) as e:
+        LOG.warning(f'MariaDB reconcile_scheduler_capacity failed: {e}')
+        return None
+
+
+def _grpc_reconcile_scheduler_capacity(
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> Optional[dict[str, Any]]:
+    """Run a capacity reconcile pass via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReconcileSchedulerCapacityRequest(
+            demand_per_vcpu=demand_per_vcpu,
+            demand_decay_seconds=demand_decay_seconds)
+        reply = _grpc_call(stub.ReconcileSchedulerCapacity, request)
+        if not reply.success:
+            return None
+        return {
+            'success': True,
+            'nodes_added': int(reply.nodes_added),
+            'nodes_removed': int(reply.nodes_removed),
+            'claims_expired': int(reply.claims_expired),
+            'nodes': [
+                {
+                    'node_uuid': n.node_uuid,
+                    'limit_cpus': int(n.limit_cpus),
+                    'limit_memory_mb': int(n.limit_memory_mb),
+                    'limit_disk_gb': int(n.limit_disk_gb),
+                    'used_cpus': int(n.used_cpus),
+                    'used_memory_mb': int(n.used_memory_mb),
+                    'used_disk_gb': int(n.used_disk_gb),
+                    'expected_demand': float(n.expected_demand),
+                    'delta_used_cpus': int(n.delta_used_cpus),
+                    'delta_used_memory_mb': int(n.delta_used_memory_mb),
+                    'delta_used_disk_gb': int(n.delta_used_disk_gb),
+                } for n in reply.nodes],
+            'cluster': {
+                'total_cpus': int(reply.cluster.total_cpus),
+                'total_memory_mb': int(reply.cluster.total_memory_mb),
+                'total_disk_gb': int(reply.cluster.total_disk_gb),
+                'claimed_cpus': int(reply.cluster.claimed_cpus),
+                'claimed_memory_mb': int(reply.cluster.claimed_memory_mb),
+                'claimed_disk_gb': int(reply.cluster.claimed_disk_gb),
+                'unclaimed_used_cpus': int(
+                    reply.cluster.unclaimed_used_cpus),
+                'unclaimed_used_memory_mb': int(
+                    reply.cluster.unclaimed_used_memory_mb),
+                'unclaimed_used_disk_gb': int(
+                    reply.cluster.unclaimed_used_disk_gb),
+            },
+        }
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC ReconcileSchedulerCapacity failed: {e}')
+        return None
+
+
+def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
+    """Run one scheduler capacity reconcile pass.
+
+    Called from the cluster daemon's elected-leader loop. The demand
+    parameters come from this process's config so the database daemon
+    needs no copy of the scheduler configuration.
+
+    Returns a summary dict:
+
+        {'success': True,
+         'nodes_added': int, 'nodes_removed': int, 'claims_expired': int,
+         'nodes': [{'node_uuid': str, 'limit_cpus': int,
+                    'limit_memory_mb': int, 'limit_disk_gb': int,
+                    'used_cpus': int, 'used_memory_mb': int,
+                    'used_disk_gb': int, 'expected_demand': float,
+                    'delta_used_cpus': int, 'delta_used_memory_mb': int,
+                    'delta_used_disk_gb': int}, ...],
+         'cluster': {'total_cpus': int, 'total_memory_mb': int,
+                     'total_disk_gb': int, 'claimed_cpus': int,
+                     'claimed_memory_mb': int, 'claimed_disk_gb': int,
+                     'unclaimed_used_cpus': int,
+                     'unclaimed_used_memory_mb': int,
+                     'unclaimed_used_disk_gb': int}}
+
+    or None on error.
+    """
+    if _use_database_service():
+        return _grpc_reconcile_scheduler_capacity(
+            config.SCHEDULER_DEMAND_PER_VCPU,
+            config.SCHEDULER_DEMAND_DECAY_SECONDS)
+    return _direct_reconcile_scheduler_capacity(
+        config.SCHEDULER_DEMAND_PER_VCPU,
+        config.SCHEDULER_DEMAND_DECAY_SECONDS)

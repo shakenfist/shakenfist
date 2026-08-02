@@ -1,0 +1,566 @@
+# Copyright 2026 Michael Still and contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+
+"""Tests for the scheduler capacity reconciler (phase 2, D5).
+
+Covers the pure limit-derivation and demand-decay helpers (including
+scheduler-parity cases mirroring the arithmetic in scheduler.py's
+_has_sufficient_cpu/_ram/_disk), the disk_spec reference aggregation,
+and the SQL layer of _direct_reconcile_scheduler_capacity() against
+mocked engines in the style of test_mariadb_node_metrics_schema.py:
+statement shapes are verified by compiling what was executed, not by
+running it (step 4 of the plan validates execution against a real
+MariaDB).
+"""
+
+import math
+from types import SimpleNamespace
+from unittest import mock
+from uuid import UUID
+
+import sqlalchemy as sa
+from sqlalchemy.exc import OperationalError
+
+from shakenfist.constants import GiB
+from shakenfist import mariadb
+from shakenfist.tests import base
+
+
+MYSQL_DIALECT = sa.dialects.mysql.dialect()
+
+
+def _compiled(stmt):
+    """Compile an executed statement for shape assertions."""
+    compiled = stmt.compile(dialect=MYSQL_DIALECT)
+    return str(compiled), compiled.params
+
+
+class LimitDerivationTestCase(base.ShakenFistTestCase):
+    """_derive_cpu_memory_limits() mirrors scheduler.py arithmetic."""
+
+    def test_cpu_limit_matches_scheduler_bound(self):
+        # scheduler.py _has_sufficient_cpu admits while
+        # current_cpu + cpus <= cpu_schedulable * CPU_OVERCOMMIT_RATIO.
+        cpu_schedulable = 14
+        ratio = 3.0
+        limit_cpus, _ = mariadb._derive_cpu_memory_limits(
+            cpu_schedulable, None, None, ratio, 3.0)
+        self.assertEqual(42, limit_cpus)
+
+        # Guard parity at the boundary: the phase 3 guard
+        # used + requested <= limit admits exactly what the scheduler's
+        # current + requested > hard_max rejects.
+        hard_max = cpu_schedulable * ratio
+        for current, requested in ((40, 2), (40, 3), (0, 42), (0, 43)):
+            scheduler_admits = not (current + requested > hard_max)
+            guard_admits = current + requested <= limit_cpus
+            self.assertEqual(scheduler_admits, guard_admits,
+                             f'divergence at {current}+{requested}')
+
+    def test_cpu_limit_floors_fractional_ratio(self):
+        limit_cpus, _ = mariadb._derive_cpu_memory_limits(
+            5, None, None, 2.5, 3.0)
+        self.assertEqual(12, limit_cpus)
+
+    def test_memory_limit_matches_scheduler_overcommit_bound(self):
+        # scheduler.py _has_sufficient_ram rejects when
+        # instance_memory / memory_max > RAM_OVERCOMMIT_RATIO. The
+        # ledger form floors the product and subtracts the node's
+        # published reservation (the documented deviation: allocated
+        # MB, not KSM-aware actuals).
+        _, limit_memory_mb = mariadb._derive_cpu_memory_limits(
+            None, 64243, 4096, 3.0, 3.0)
+        self.assertEqual(math.floor(64243 * 3.0) - 4096, limit_memory_mb)
+        self.assertEqual(188633, limit_memory_mb)
+
+    def test_memory_limit_floors_fractional_ratio(self):
+        _, limit_memory_mb = mariadb._derive_cpu_memory_limits(
+            None, 3, 1, 3.0, 1.5)
+        self.assertEqual(3, limit_memory_mb)
+
+    def test_null_cpu_input_derives_none(self):
+        limit_cpus, limit_memory_mb = mariadb._derive_cpu_memory_limits(
+            None, 64243, 4096, 3.0, 3.0)
+        self.assertIsNone(limit_cpus)
+        self.assertIsNotNone(limit_memory_mb)
+
+    def test_null_memory_inputs_derive_none(self):
+        for memory_max, reserved in ((None, 4096), (64243, None),
+                                     (None, None)):
+            limit_cpus, limit_memory_mb = mariadb._derive_cpu_memory_limits(
+                14, memory_max, reserved, 3.0, 3.0)
+            self.assertEqual(42, limit_cpus)
+            self.assertIsNone(limit_memory_mb)
+
+
+class DiskLimitTestCase(base.ShakenFistTestCase):
+    """_derive_disk_limit_gb() mirrors _has_sufficient_disk."""
+
+    def test_matches_scheduler_free_space_check(self):
+        # scheduler.py _has_sufficient_disk admits while
+        # requested <= disk_free_instances/GiB - disk_reservation_gb.
+        # The guard form used + requested <= limit reduces to
+        # requested <= floor(free/GiB) - reservation: identical for
+        # whole-GB requests, up to a sub-GB conservative rounding.
+        disk_free = 803469852672  # bytes; 748.28... GiB
+        reservation = 20
+        used = 100
+        limit = mariadb._derive_disk_limit_gb(used, disk_free, reservation)
+        self.assertEqual(used + 728, limit)
+
+        scheduler_headroom = disk_free / GiB - reservation
+        for requested in (727, 728, 729):
+            scheduler_admits = not (requested > scheduler_headroom)
+            guard_admits = used + requested <= limit
+            self.assertEqual(scheduler_admits, guard_admits,
+                             f'divergence at {requested}')
+
+    def test_exact_gib_conversion(self):
+        self.assertEqual(
+            1, mariadb._derive_disk_limit_gb(0, GiB, 0))
+
+    def test_clamps_negative_headroom(self):
+        # Free space below the reservation must clamp to zero headroom,
+        # not shrink the limit below current drawdown.
+        self.assertEqual(
+            100, mariadb._derive_disk_limit_gb(100, 10 * GiB, 20))
+
+    def test_null_inputs_derive_none(self):
+        self.assertIsNone(mariadb._derive_disk_limit_gb(100, None, 20))
+        self.assertIsNone(mariadb._derive_disk_limit_gb(100, GiB, None))
+
+
+class DemandDecayTestCase(base.ShakenFistTestCase):
+    """_decayed_demand_contribution() implements the D13 linear decay."""
+
+    def test_age_zero_is_full_contribution(self):
+        self.assertEqual(
+            10.0, mariadb._decayed_demand_contribution(4, 0.0, 2.5, 600))
+
+    def test_half_window_is_half_contribution(self):
+        self.assertEqual(
+            5.0, mariadb._decayed_demand_contribution(4, 300.0, 2.5, 600))
+
+    def test_full_window_is_zero(self):
+        self.assertEqual(
+            0.0, mariadb._decayed_demand_contribution(4, 600.0, 2.5, 600))
+
+    def test_beyond_window_is_zero(self):
+        self.assertEqual(
+            0.0, mariadb._decayed_demand_contribution(4, 601.0, 2.5, 600))
+
+    def test_negative_age_clamps_to_full_contribution(self):
+        # Clock skew between the placement writer and the database can
+        # make a placement look like it is from the future.
+        self.assertEqual(
+            10.0, mariadb._decayed_demand_contribution(4, -5.0, 2.5, 600))
+
+    def test_zero_window_is_zero_not_division_error(self):
+        self.assertEqual(
+            0.0, mariadb._decayed_demand_contribution(4, 0.0, 2.5, 0))
+
+    def test_negative_window_is_zero(self):
+        self.assertEqual(
+            0.0, mariadb._decayed_demand_contribution(4, 0.0, 2.5, -600))
+
+
+class DiskSpecReferenceTestCase(base.ShakenFistTestCase):
+    """_disk_spec_virtual_gb() is the JSON_TABLE reference semantics."""
+
+    def test_sums_sizes(self):
+        self.assertEqual(
+            30, mariadb._disk_spec_virtual_gb(
+                [{'size': 10}, {'size': 20}]))
+
+    def test_sizeless_and_null_elements_contribute_zero(self):
+        # CD ROM style disks have no size; explicit nulls also occur.
+        self.assertEqual(
+            10, mariadb._disk_spec_virtual_gb(
+                [{'size': 10}, {'base': 'cd'}, {'size': None}]))
+
+    def test_string_size_coerces(self):
+        self.assertEqual(
+            8, mariadb._disk_spec_virtual_gb([{'size': '8'}]))
+
+    def test_garbage_size_contributes_zero(self):
+        self.assertEqual(
+            10, mariadb._disk_spec_virtual_gb(
+                [{'size': 10}, {'size': 'banana'}]))
+
+    def test_non_dict_element_contributes_zero(self):
+        self.assertEqual(
+            10, mariadb._disk_spec_virtual_gb([{'size': 10}, 'garbage']))
+
+    def test_non_list_spec_is_zero(self):
+        self.assertEqual(0, mariadb._disk_spec_virtual_gb({'size': 10}))
+        self.assertEqual(0, mariadb._disk_spec_virtual_gb(None))
+
+
+class FetchUsageTestCase(base.ShakenFistTestCase):
+    """_reconcile_fetch_usage() statement shape and row folding."""
+
+    def test_query_uses_dashed_undashed_transform_and_json_table(self):
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchall.return_value = []
+        mariadb._reconcile_fetch_usage(conn)
+
+        stmt, params = conn.execute.call_args.args
+        text = str(stmt)
+        # Pitfall 6: the reference-side dashed uuid is transformed so
+        # the join lands on the instances primary key.
+        self.assertIn("REPLACE(r.target_uuid, '-', '')", text)
+        self.assertIn('JSON_TABLE', text)
+        self.assertIn("JSON_TYPE(i2.disk_spec) = 'ARRAY'", text)
+        # Only 'deleted' is excluded; stateless rows count.
+        self.assertIn('s.state_value IS NULL', text)
+        self.assertIn("s.state_value != 'deleted'", text)
+        # SQLAlchemy persists enum member names.
+        self.assertEqual('INSTANCE', params['instance_object_type'])
+        self.assertEqual('INSTANCE_LOCATION', params['instance_location'])
+
+    def test_folds_rows_and_skips_malformed_node_uuid(self):
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchall.return_value = [
+            SimpleNamespace(
+                node_uuid='11111111-1111-1111-1111-111111111111',
+                namespace='ns1', used_cpus=3, used_memory_mb=2560,
+                used_disk_gb=30),
+            SimpleNamespace(
+                node_uuid='not-a-uuid', namespace='ns1', used_cpus=1,
+                used_memory_mb=1, used_disk_gb=1),
+        ]
+        usage = mariadb._reconcile_fetch_usage(conn)
+        self.assertEqual(
+            {(UUID('11111111-1111-1111-1111-111111111111'), 'ns1'):
+             (3, 2560, 30)}, usage)
+
+
+class FetchDemandTestCase(base.ShakenFistTestCase):
+    """_reconcile_fetch_demand() statement shape and decay folding."""
+
+    def test_zero_window_skips_query(self):
+        conn = mock.MagicMock()
+        self.assertEqual({}, mariadb._reconcile_fetch_demand(
+            conn, 1000.0, 2.5, 0))
+        conn.execute.assert_not_called()
+
+    def test_query_uses_dashed_undashed_transform_and_window(self):
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchall.return_value = []
+        mariadb._reconcile_fetch_demand(conn, 1000.0, 2.5, 600)
+
+        text, params = _compiled(conn.execute.call_args.args[0])
+        self.assertIn(
+            'replace(object_references.target_uuid', text.lower())
+        self.assertIn('object_references.created >', text)
+        # The window cutoff is now - decay = 1000 - 600.
+        self.assertIn(400.0, params.values())
+
+    def test_folds_decayed_contributions(self):
+        node = '11111111-1111-1111-1111-111111111111'
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchall.return_value = [
+            SimpleNamespace(source_uuid=node, created=1000.0, cpus=4),
+            SimpleNamespace(source_uuid=node, created=700.0, cpus=4),
+            SimpleNamespace(source_uuid='not-a-uuid', created=1000.0,
+                            cpus=4),
+        ]
+        demand = mariadb._reconcile_fetch_demand(conn, 1000.0, 2.5, 600)
+        # age 0 contributes 4 x 2.5 = 10; age 300 contributes 5.
+        self.assertEqual({UUID(node): 15.0}, demand)
+
+
+class ReconcileEmptyClusterTestCase(base.ShakenFistTestCase):
+    """An empty cluster completes and returns zero counts."""
+
+    ZERO_CLUSTER = {
+        'total_cpus': 0, 'total_memory_mb': 0, 'total_disk_gb': 0,
+        'claimed_cpus': 0, 'claimed_memory_mb': 0, 'claimed_disk_gb': 0,
+        'unclaimed_used_cpus': 0, 'unclaimed_used_memory_mb': 0,
+        'unclaimed_used_disk_gb': 0,
+    }
+
+    def _run_empty(self):
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.connect.return_value.__enter__.return_value
+        conn.execute.return_value.fetchall.return_value = []
+        conn.execute.return_value.rowcount = 0
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=mock_engine):
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+        return result, conn
+
+    def test_empty_cluster_returns_zero_counts(self):
+        result, conn = self._run_empty()
+        self.assertEqual({
+            'success': True,
+            'nodes_added': 0,
+            'nodes_removed': 0,
+            'claims_expired': 0,
+            'nodes': [],
+            'cluster': self.ZERO_CLUSTER,
+        }, result)
+        conn.commit.assert_called_once()
+
+    def test_claim_expiry_update_shape(self):
+        _, conn = self._run_empty()
+        # The expiry sweep is the first statement of the pass.
+        text, params = _compiled(conn.execute.call_args_list[0].args[0])
+        self.assertIn('UPDATE namespace_claims', text)
+        self.assertIn('expires_at < now()', text)
+        self.assertEqual('active', params['state_1'])
+        self.assertEqual('expired', params['state'])
+
+    def test_cluster_singleton_upsert_shape(self):
+        _, conn = self._run_empty()
+        upserts = []
+        for call in conn.execute.call_args_list:
+            stmt = call.args[0]
+            if isinstance(stmt, sa.sql.expression.Insert):
+                upserts.append(_compiled(stmt))
+        self.assertEqual(1, len(upserts))
+        text, params = upserts[0]
+        self.assertIn('INSERT INTO cluster_capacity', text)
+        self.assertIn('ON DUPLICATE KEY UPDATE', text)
+        self.assertEqual(1, params['id'])
+        self.assertEqual(0, params['total_cpus'])
+        self.assertEqual(0, params['unclaimed_used_disk_gb'])
+
+    def test_operational_error_returns_none(self):
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = OperationalError(
+            'stmt', {}, Exception('boom'))
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=mock_engine):
+            self.assertIsNone(
+                mariadb._direct_reconcile_scheduler_capacity(2.5, 600))
+
+
+NODE1 = UUID('11111111-1111-1111-1111-111111111111')
+NODE2 = UUID('22222222-2222-2222-2222-222222222222')
+NODE3 = UUID('33333333-3333-3333-3333-333333333333')
+NODE4 = UUID('44444444-4444-4444-4444-444444444444')
+NODE5 = UUID('55555555-5555-5555-5555-555555555555')
+CLAIM1 = UUID('cccccccc-cccc-cccc-cccc-cccccccccccc')
+
+
+def _metrics_row(node_uuid, cpu_schedulable=None, memory_max=None,
+                 memory_reserved_mb=None, disk_free_instances=None,
+                 disk_reservation_gb=None):
+    return SimpleNamespace(
+        node_uuid=node_uuid, cpu_schedulable=cpu_schedulable,
+        memory_max=memory_max, memory_reserved_mb=memory_reserved_mb,
+        disk_free_instances=disk_free_instances,
+        disk_reservation_gb=disk_reservation_gb)
+
+
+def _capacity_row(node_uuid, limit_cpus, limit_memory_mb, limit_disk_gb,
+                  used_cpus=0, used_memory_mb=0, used_disk_gb=0):
+    return SimpleNamespace(
+        node_uuid=node_uuid, limit_cpus=limit_cpus,
+        limit_memory_mb=limit_memory_mb, limit_disk_gb=limit_disk_gb,
+        used_cpus=used_cpus, used_memory_mb=used_memory_mb,
+        used_disk_gb=used_disk_gb, expected_demand=0.0, updated_at=None)
+
+
+class ReconcileScenarioTestCase(base.ShakenFistTestCase):
+    """A populated pass: add, keep-on-NULL-metrics, remove, claims."""
+
+    def _fake_result(self, rows=None, rowcount=0):
+        result = mock.MagicMock()
+        result.fetchall.return_value = rows or []
+        result.rowcount = rowcount
+        return result
+
+    def _route(self, stmt, *args, **kwargs):
+        try:
+            text = str(stmt.compile(dialect=MYSQL_DIALECT))
+        except AttributeError:
+            text = str(stmt)
+
+        if 'UPDATE namespace_claims' in text and 'expires_at' in text:
+            return self._fake_result(rowcount=3)
+        if 'DELETE FROM scheduler_node_capacity' in text:
+            return self._fake_result(rowcount=2)
+        if 'FROM scheduler_node_capacity' in text:
+            return self._fake_result(rows=self.previous_rows)
+        if 'FROM node_metrics' in text:
+            return self._fake_result(rows=self.metrics_rows)
+        if 'FROM nodes' in text:
+            return self._fake_result(rows=self.node_rows)
+        if 'FROM object_states' in text:
+            return self._fake_result(rows=self.deleted_rows)
+        if 'FROM namespace_claims' in text:
+            return self._fake_result(rows=self.claim_rows)
+        self.executed.append((text, stmt))
+        return self._fake_result()
+
+    def _run_scenario(self):
+        # node1: fresh metrics, no previous row -> added.
+        # node2: previous row, metrics row with NULL capacity columns
+        #        -> limits kept, usage refreshed.
+        # node3: previous row, no metrics row, not in nodes -> removed.
+        # node4: previous row, has metrics, but node deleted -> removed.
+        # node5: metrics row but node deleted -> never inserted.
+        self.previous_rows = [
+            _capacity_row(NODE2, 10, 1000, 50, used_cpus=5,
+                          used_memory_mb=500, used_disk_gb=10),
+            _capacity_row(NODE3, 1, 1, 1),
+            _capacity_row(NODE4, 1, 1, 1),
+        ]
+        self.metrics_rows = [
+            _metrics_row(NODE1, cpu_schedulable=14, memory_max=64243,
+                         memory_reserved_mb=4096,
+                         disk_free_instances=803469852672,
+                         disk_reservation_gb=20),
+            _metrics_row(NODE2),
+            _metrics_row(NODE4, cpu_schedulable=1, memory_max=1,
+                         memory_reserved_mb=0, disk_free_instances=GiB,
+                         disk_reservation_gb=0),
+            _metrics_row(NODE5, cpu_schedulable=1, memory_max=1,
+                         memory_reserved_mb=0, disk_free_instances=GiB,
+                         disk_reservation_gb=0),
+        ]
+        self.node_rows = [
+            SimpleNamespace(uuid=NODE1), SimpleNamespace(uuid=NODE2),
+            SimpleNamespace(uuid=NODE4), SimpleNamespace(uuid=NODE5)]
+        self.deleted_rows = [
+            SimpleNamespace(object_uuid=str(NODE4)),
+            SimpleNamespace(object_uuid=str(NODE5))]
+        self.claim_rows = [
+            SimpleNamespace(uuid=CLAIM1, namespace='ns1', limit_cpus=8,
+                            limit_memory_mb=8192, limit_disk_gb=100,
+                            state='active')]
+        self.executed = []
+
+        usage = {
+            (NODE1, 'ns1'): (2, 2048, 30),
+            (NODE1, 'ns2'): (4, 4096, 8),
+            (NODE2, 'ns2'): (1, 1024, 5),
+        }
+        demand = {NODE1: 10.0}
+
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = self._route
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=mock_engine), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_usage',
+                           return_value=usage), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_demand',
+                           return_value=demand), \
+                mock.patch.object(mariadb.config,
+                                  'CPU_OVERCOMMIT_RATIO', 3.0), \
+                mock.patch.object(mariadb.config,
+                                  'RAM_OVERCOMMIT_RATIO', 3.0):
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+        return result, conn
+
+    def test_counts_and_reply_rows(self):
+        result, _ = self._run_scenario()
+        self.assertEqual(1, result['nodes_added'])
+        self.assertEqual(2, result['nodes_removed'])
+        self.assertEqual(3, result['claims_expired'])
+
+        self.assertEqual(2, len(result['nodes']))
+        node1, node2 = result['nodes']
+
+        # node1: fresh limits from metrics. used_disk 38 (30 + 8), so
+        # limit_disk = 38 + (floor(748.28) - 20) = 766.
+        self.assertEqual({
+            'node_uuid': str(NODE1), 'limit_cpus': 42,
+            'limit_memory_mb': 188633, 'limit_disk_gb': 766,
+            'used_cpus': 6, 'used_memory_mb': 6144, 'used_disk_gb': 38,
+            'expected_demand': 10.0, 'delta_used_cpus': 6,
+            'delta_used_memory_mb': 6144, 'delta_used_disk_gb': 38,
+        }, node1)
+
+        # node2: NULL metrics columns keep the previous limits; usage
+        # is refreshed from ground truth and deltas reflect it.
+        self.assertEqual({
+            'node_uuid': str(NODE2), 'limit_cpus': 10,
+            'limit_memory_mb': 1000, 'limit_disk_gb': 50,
+            'used_cpus': 1, 'used_memory_mb': 1024, 'used_disk_gb': 5,
+            'expected_demand': 0.0, 'delta_used_cpus': -4,
+            'delta_used_memory_mb': 524, 'delta_used_disk_gb': -5,
+        }, node2)
+
+    def test_cluster_row_sums(self):
+        result, _ = self._run_scenario()
+        self.assertEqual({
+            'total_cpus': 52, 'total_memory_mb': 189633,
+            'total_disk_gb': 816,
+            # The active ns1 claim's limits.
+            'claimed_cpus': 8, 'claimed_memory_mb': 8192,
+            'claimed_disk_gb': 100,
+            # ns2 has no active claim: (4 + 1, 4096 + 1024, 8 + 5).
+            'unclaimed_used_cpus': 5, 'unclaimed_used_memory_mb': 5120,
+            'unclaimed_used_disk_gb': 13,
+        }, result['cluster'])
+
+    def test_removals_and_claim_update_statements(self):
+        _, conn = self._run_scenario()
+
+        deletes = [str(call.args[0].compile(dialect=MYSQL_DIALECT))
+                   for call in conn.execute.call_args_list
+                   if isinstance(call.args[0], sa.sql.expression.Delete)]
+        self.assertEqual(1, len(deletes))
+        self.assertIn('DELETE FROM scheduler_node_capacity', deletes[0])
+
+        # The active claim's usage was recomputed from the ns1 sums.
+        claim_updates = []
+        for call in conn.execute.call_args_list:
+            stmt = call.args[0]
+            if not isinstance(stmt, sa.sql.expression.Update):
+                continue
+            compiled = stmt.compile(dialect=MYSQL_DIALECT)
+            if ('namespace_claims' in str(compiled) and
+                    'used_cpus' in compiled.params):
+                claim_updates.append(compiled.params)
+        self.assertEqual(1, len(claim_updates))
+        self.assertEqual(2, claim_updates[0]['used_cpus'])
+        self.assertEqual(2048, claim_updates[0]['used_memory_mb'])
+        self.assertEqual(30, claim_updates[0]['used_disk_gb'])
+
+    def test_node_upserts_have_on_duplicate_key_update(self):
+        _, conn = self._run_scenario()
+        upserts = []
+        for call in conn.execute.call_args_list:
+            stmt = call.args[0]
+            if not isinstance(stmt, sa.sql.expression.Insert):
+                continue
+            text = str(stmt.compile(dialect=MYSQL_DIALECT))
+            if 'scheduler_node_capacity' in text:
+                upserts.append(text)
+        self.assertEqual(2, len(upserts))
+        for text in upserts:
+            self.assertIn('ON DUPLICATE KEY UPDATE', text)
+
+
+class ReconcilePublicRoutingTestCase(base.ShakenFistTestCase):
+    """reconcile_scheduler_capacity() routes and passes config values."""
+
+    @mock.patch('shakenfist.mariadb._grpc_reconcile_scheduler_capacity')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_routes_to_grpc(self, mock_use, mock_grpc):
+        with mock.patch.object(mariadb.config,
+                               'SCHEDULER_DEMAND_PER_VCPU', 2.5), \
+                mock.patch.object(mariadb.config,
+                                  'SCHEDULER_DEMAND_DECAY_SECONDS', 600):
+            mariadb.reconcile_scheduler_capacity()
+        mock_grpc.assert_called_once_with(2.5, 600)
+
+    @mock.patch('shakenfist.mariadb._direct_reconcile_scheduler_capacity')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_routes_to_direct(self, mock_use, mock_direct):
+        with mock.patch.object(mariadb.config,
+                               'SCHEDULER_DEMAND_PER_VCPU', 2.5), \
+                mock.patch.object(mariadb.config,
+                                  'SCHEDULER_DEMAND_DECAY_SECONDS', 600):
+            mariadb.reconcile_scheduler_capacity()
+        mock_direct.assert_called_once_with(2.5, 600)

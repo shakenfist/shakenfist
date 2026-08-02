@@ -530,6 +530,8 @@ class Monitor(daemon.Daemon):
                 scheduled_tasks.per_blob_checks)
             schedule.every(5).minutes.do(
                 scheduled_tasks.per_instance_checks_and_usage)
+            schedule.every(5).minutes.do(
+                scheduled_tasks.reconcile_scheduler_capacity)
             schedule.every(15).minutes.do(
                 scheduled_tasks.per_deleted_object_checks)
             schedule.every(15).minutes.do(
