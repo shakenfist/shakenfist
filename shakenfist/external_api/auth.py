@@ -15,12 +15,16 @@ import flask
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import artifact
 from shakenfist import baseobject
+from shakenfist import exceptions
+from shakenfist import federation
 from shakenfist import instance
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
@@ -30,6 +34,7 @@ from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
+from shakenfist.namespace_key import NamespaceKey
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
@@ -1067,3 +1072,188 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'delete mapping rule request from REST API')
         rule.delete()
         return rule.external_view()
+
+
+federated_example = """{
+    "namespace": "ci",
+    "key_name": "ryll-ci-8fJ2mQ",
+    "key": "sfk_..."
+}
+"""
+
+
+def _federated_refusal(rule, reason, detail, namespace=None):
+    """Refuse an exchange, auditing it to the rule's owner if we can.
+
+    A stream of near-miss claim failures is what probing looks like,
+    and the namespace owner is the person who needs to see it. So a
+    failure against a rule we resolved is evented against that rule.
+
+    A failure where no owner can be identified -- an unknown namespace,
+    an unknown rule, a token from nobody we trust -- is logged and not
+    evented. /auth/federated is unauthenticated, so eventing those
+    would hand an anonymous caller a way to write unbounded rows into
+    a namespace's audit log, or into no namespace at all.
+
+    The caller is told less than the log records. "federated exchange
+    refused" plus a category is enough for an operator debugging their
+    own workflow, and withholding which claim missed avoids turning
+    the endpoint into an oracle for guessing a rule's contents.
+    """
+    if rule:
+        rule.add_event(
+            EVENT_TYPE_AUDIT, 'federated exchange refused',
+            extra={'reason': reason, 'detail': detail})
+    else:
+        LOG.with_fields({
+            'namespace': namespace, 'reason': reason
+        }).info(f'Federated exchange refused: {detail}')
+
+    return sf_api.error(401, f'federated exchange refused: {reason}')
+
+
+class AuthFederatedEndpoint(api_base.Resource):
+    # Unauthenticated by nature: the whole point is that the caller has
+    # no Shaken Fist credential yet, only an identity from somewhere we
+    # have been told to believe.
+    @api_base.public
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Exchange an identity token for a namespace key.',
+        [
+            ('token', 'body', 'string',
+             'A signed identity token from a trusted issuer.', True),
+            ('namespace', 'body', 'string',
+             'The namespace to mint a key in.', True),
+            ('rule', 'body', 'string',
+             'The name of the mapping rule to exchange through.', True)
+        ],
+        [(200, 'The minted key. The secret is returned once and never '
+               'again.', federated_example),
+         (400, 'A required field is missing.', None),
+         (401, 'The exchange was refused.', None),
+         (413, 'The request body is too large.', None)],
+        requires_auth=False))
+    def post(self, token=None, namespace=None, rule=None):
+        # The order below is the one in the phase 3 design section, and
+        # it is a security property rather than a style. Each step is
+        # cheaper than the one after it, and the expensive ones -- a
+        # JWKS fetch, a bcrypt hash -- sit behind checks that an
+        # anonymous caller cannot pass by guessing.
+
+        # 1. Size, before any parsing. Nothing else rejects on size --
+        #    app.py's 1kb threshold only decides whether to log a body,
+        #    not whether to accept it -- so this is the only thing
+        #    standing between an anonymous caller and us parsing a JWT
+        #    as large as they care to send.
+        if (flask.request.content_length or 0) > \
+                config.FEDERATION_MAX_TOKEN_BYTES:
+            return sf_api.error(413, 'request body too large')
+
+        if not token or not isinstance(token, str):
+            return sf_api.error(400, 'no token specified')
+        if not namespace or not isinstance(namespace, str):
+            return sf_api.error(400, 'no namespace specified')
+        if not rule or not isinstance(rule, str):
+            return sf_api.error(400, 'no rule specified')
+
+        # 2. Resolve the issuer from the unverified iss. No network yet:
+        #    a made-up issuer must not be able to make us dial out.
+        try:
+            issuer = federation.issuer_for_token(token)
+        except exceptions.UntrustedIssuer as e:
+            return _federated_refusal(
+                None, 'untrusted issuer', str(e), namespace=namespace)
+
+        # 3. Rate limiting per source address arrives in step 3h. The
+        #    ordering slot is deliberate: it belongs after the free
+        #    local rejections and before the first outbound request.
+
+        # 4 and 5. Signature, then audience, issuer and lifetime.
+        try:
+            claims = federation.validate_token(token, issuer)
+        except exceptions.TokenValidationFailed as e:
+            return _federated_refusal(
+                None, 'token rejected', str(e), namespace=namespace)
+
+        # 6. Replay refusal on (jti, rule) arrives in step 3h.
+
+        # 7. Only now look up the rule. Doing it after verification
+        #    means an anonymous caller holding no valid token cannot
+        #    use this endpoint to discover which rules exist.
+        rule_from_db = MappingRule.from_db_by_name(namespace, rule)
+        if not rule_from_db:
+            return _federated_refusal(
+                None, 'no such rule', f'no rule {namespace}/{rule}',
+                namespace=namespace)
+
+        if rule_from_db.issuer != issuer.name:
+            return _federated_refusal(
+                rule_from_db, 'wrong issuer',
+                f'rule accepts {rule_from_db.issuer}, token is from '
+                f'{issuer.name}')
+
+        try:
+            satisfied = federation.match_claims(
+                claims, rule_from_db.bound_claims or {})
+        except exceptions.ClaimMismatch as e:
+            return _federated_refusal(
+                rule_from_db, 'claims do not match', str(e))
+
+        namespace_from_db = Namespace.from_db(
+            namespace, suppress_failure_audit=True)
+        if not namespace_from_db or \
+                namespace_from_db.state.value == dbo.STATE_DELETED:
+            # The rule outlived its namespace, which Namespace
+            # hard delete is supposed to prevent. Refuse rather than
+            # mint into a namespace that is on its way out.
+            return _federated_refusal(
+                rule_from_db, 'no such namespace',
+                f'rule {namespace}/{rule} names a namespace which is gone')
+
+        # 8. Mint. The name carries a random discriminator so a
+        #    workflow re-run gets its own key rather than silently
+        #    rotating the secret out from under a still-running job.
+        scopes = rule_from_db.scopes
+        key_ttl = rule_from_db.key_ttl
+        if not scopes or not key_ttl:
+            return _federated_refusal(
+                rule_from_db, 'rule is unusable',
+                'rule has no scopes or no key_ttl')
+
+        key_name = '%s-%s' % (
+            rule_from_db.key_name_prefix, sf_random.random_id()[:8])
+        secret = credentials.generate()
+
+        minted = NamespaceKey.new(
+            namespace, key_name, secret,
+            expiry=time.time() + key_ttl,
+            scopes=list(scopes),
+            provenance={
+                'source': 'federated',
+                'rule': str(rule_from_db.uuid),
+                'rule_name': rule_from_db.name,
+                'issuer': issuer.name,
+                # The claims that were actually satisfied, not the
+                # rule's matchers. An audit should describe the grant
+                # as it was made, not as the rule reads today.
+                'claims': satisfied,
+                'jti': claims.get('jti'),
+                'sub': claims.get('sub')
+            })
+
+        minted.add_event(
+            EVENT_TYPE_AUDIT, 'key minted by federated exchange',
+            extra={'rule': str(rule_from_db.uuid), 'issuer': issuer.name,
+                   'claims': satisfied, 'scopes': list(scopes)})
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'federated exchange minted a key',
+            extra={'key_name': key_name, 'rule': rule_from_db.name,
+                   'issuer': issuer.name, 'claims': satisfied})
+
+        # The secret is returned here and never again: nothing stores
+        # it, only its bcrypt hash.
+        return {
+            'namespace': namespace,
+            'key_name': key_name,
+            'key': secret
+        }

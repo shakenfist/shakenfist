@@ -153,6 +153,16 @@ class SFConfig(BaseSettings):
         15,
         description='How long in minutes an API token is valid for.'
     )
+    FEDERATION_MAX_TOKEN_BYTES: int = Field(
+        16384,
+        description=(
+            'The largest federated exchange request body accepted, in '
+            'bytes. Refused before any parsing, because /auth/federated is '
+            'unauthenticated and parsing an attacker-sized JWT is work '
+            'done on their behalf. Comfortably above a real identity '
+            'token, which is typically one to two kilobytes.'
+        )
+    )
     FEDERATION_JWKS_CACHE_SECONDS: int = Field(
         300,
         description=(

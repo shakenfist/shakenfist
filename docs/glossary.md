@@ -84,12 +84,16 @@ event" strictly means an event of type `audit`; documentation sometimes uses the
 phrase loosely to mean "the event that serves as the audit record", which may be
 of another type.
 
-**identity token**{#identity-token}
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
--- An externally-issued JWT proving workload or user identity, for example a
-GitHub Actions OIDC token or an Authentik-issued token. It is presented to
-Shaken Fist to be exchanged for a scoped [namespace key](#namespace-key).
-Defined in `docs/plans/PLAN-auth-federation.md` ("Authentication terms to pin").
+**identity token**{#identity-token} -- An externally-issued JWT proving
+workload or user identity, for example a GitHub Actions OIDC token or an
+Authentik-issued token. It is presented to `POST /auth/federated`, along with a
+namespace and a [mapping rule](#mapping-rule) name, and exchanged for a scoped
+[namespace key](#namespace-key). The token is verified against the
+[trusted issuer](#trusted-issuer) named by its `iss` claim: signature against
+that issuer's published keys, using asymmetric algorithms only, then audience,
+issuer and lifetime, then the rule's bound claims. Validation is defined in
+`shakenfist/federation.py` and the exchange in
+`shakenfist/external_api/auth.py`.
 
 **instance**{#instance} -- The virtual machine object: a running (or startable)
 VM with disks, network interfaces, and a lifecycle. Defined in

@@ -247,8 +247,11 @@ class Root(api_base.Resource):
              # scope-enforcement lets a client tell whether a 403 means
              # "your token is not scoped for this" on this cluster, or
              # something else entirely.
+             # mapping-rules and federated-exchange are advertised
+             # separately: a client can be told which rules exist
+             # without the cluster necessarily accepting exchanges yet.
              '<li>auth: trusted-issuers, generated-key-secrets, '
-             'scope-enforcement</li>'
+             'scope-enforcement, mapping-rules, federated-exchange</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
@@ -344,6 +347,7 @@ api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,
                  '/auth/namespaces/<namespace>/keys/<key_name>')
+api.add_resource(api_auth.AuthFederatedEndpoint, '/auth/federated')
 api.add_resource(api_auth.AuthNamespaceRulesEndpoint,
                  '/auth/namespaces/<namespace>/rules')
 api.add_resource(api_auth.AuthNamespaceRuleEndpoint,

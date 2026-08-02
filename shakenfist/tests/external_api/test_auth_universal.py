@@ -29,6 +29,14 @@ EXPECTED_PUBLIC = {
     ('Readyz', 'get'),      # readiness probe, ditto; also serves
                             # /healthz on a second path
     ('AuthEndpoint', 'post'),  # trades a key for a token; cannot need one
+    # Trades an identity token from a trusted issuer for a namespace
+    # key. Unauthenticated by nature -- the caller has no Shaken Fist
+    # credential yet, which is the entire point of federating. What
+    # stands in place of authentication is a signature check against a
+    # configured issuer's published keys plus a mapping rule the
+    # namespace owner wrote; see
+    # docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+    ('AuthFederatedEndpoint', 'post'),
 }
 
 HTTP_METHODS = ('get', 'post', 'put', 'delete', 'patch')
