@@ -3037,7 +3037,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.FindNetworkVxidsRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.FindNetworkVxidsReply:
-        """Return the subset of the requested vxids a network claims.
+        """Return the requested vxids a network claims, and its uuid.
 
         The reply is empty both when nothing claims the vxids and, were
         we to swallow the error, when the query failed -- and the caller
@@ -3047,14 +3047,18 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """
         try:
             self.monitor.counters['find_network_vxids'].inc()
-            vxids = mariadb._direct_find_network_vxids(list(request.vxids))
-            return database_pb2.FindNetworkVxidsReply(vxids=sorted(vxids))
+            claims = mariadb._direct_find_network_vxids(list(request.vxids))
+            return database_pb2.FindNetworkVxidsReply(
+                claims=[
+                    database_pb2.NetworkVxidClaim(vxid=vxid, uuid=uuid)
+                    for vxid, uuid in sorted(claims.items())
+                ])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindNetworkVxids failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return database_pb2.FindNetworkVxidsReply(vxids=[])
+            return database_pb2.FindNetworkVxidsReply(claims=[])
 
     def DeleteNetwork(
         self,

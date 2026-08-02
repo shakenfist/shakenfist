@@ -2259,12 +2259,12 @@ class MockMariaDB():
         self._trace('MockMariaDB.get_all_networks()')
         return list(self.network_objects.values())
 
-    def _mariadb_find_network_vxids(self, vxids: list[int]) -> set[int]:
+    def _mariadb_find_network_vxids(self, vxids: list[int]) -> dict[int, str]:
         """Mock implementation of mariadb.find_network_vxids()"""
         self._trace(f'MockMariaDB.find_network_vxids({vxids})')
         wanted = set(vxids)
         return {
-            d.vxid for d in self.network_objects.values()
+            d.vxid: str(d.uuid) for d in self.network_objects.values()
             if d.vxid in wanted
         }
 

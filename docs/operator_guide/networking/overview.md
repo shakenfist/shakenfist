@@ -424,6 +424,58 @@ end by `TestFloatingIPLifecycle` in the cluster CI suite. If you change
 a name, change it in the add path, the remove path, the tests, this
 page and `docs/components/cloudgood/networking-shakenfist.md` together.
 
+## Stray vxlan reaping
+
+Every node's network maintainer compares the vxlan devices actually
+present on the host against the networks that node should be carrying.
+A device which matches nothing is a *stray* -- residue from a network
+teardown which did not finish, or from a network which has since been
+hard deleted entirely.
+
+Once a stray has been present for `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`
+(default 300) the maintainer acts on it:
+
+* If no `networks` row claims the vxid at all, the maintainer deletes
+  `br-vxlan-<vxid>`, `veth-<vxid>-o`, `egr-<vxid>-o` and
+  `vxlan-<vxid>` itself, and records a **`reaped stray vxlan`** audit
+  event on the node. The `extra` field of that event names the devices
+  which were actually removed, and the message says why the vxid was
+  considered reapable.
+* If the network still exists but no instance on this hypervisor uses
+  it, the maintainer enqueues an ordinary network teardown operation
+  for that network on that node instead of touching the devices
+  itself, and records an **`enqueued teardown of stray vxlan`** audit
+  event.
+* Otherwise the stray is left alone and logged once per episode. It is
+  *not* re-logged on every pass -- it used to be, which on a busy
+  cluster produced thousands of identical `Extra vxlan present!` lines
+  per day (github issue #3597).
+
+Both audit events are worth watching for. Neither is an error on its
+own -- the maintainer is doing the job it exists to do -- but a node
+producing them repeatedly is a node where network teardown is failing
+somewhere upstream, and that is worth investigating.
+
+**A reap on the network node implies manual cleanup.** The devices
+listed above are all named from the VXLAN id, so the maintainer can
+find them without the network object. The network namespace, and the
+NAT and DNAT rules inside it, are named from the network *uuid* --
+which is exactly what has been lost by the time a reap happens. They
+are therefore not cleaned up, and once the vxlan devices are gone
+nothing in Shaken Fist will report them again. Previously the
+never-ending `Extra vxlan present!` warning was, in effect, the
+standing notification that this residue existed; now the single audit
+event is the only record, so if you see a `reaped stray vxlan` event on
+your network node, check for a leftover namespace:
+
+```bash
+sudo ip netns list
+```
+
+Namespaces are named with the virtual network's UUID, so any name which
+does not correspond to a network in `sf-client network list` is residue
+and can be removed with `sudo ip netns delete <uuid>`.
+
 ## Dispatcher diagnostic events
 
 Operators reading the event log for a cluster operation will see two

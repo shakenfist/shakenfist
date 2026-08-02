@@ -17043,13 +17043,16 @@ def _direct_get_all_networks() -> list[NetworkData]:
         return []
 
 
-def _direct_find_network_vxids(vxids: list[int]) -> set[int]:
-    """Return the subset of vxids which a network row claims.
+def _direct_find_network_vxids(vxids: list[int]) -> dict[int, str]:
+    """Return the vxids which a network row claims, mapped to that network.
 
     An exact-match lookup against the UNIQUE index on networks.vxid,
-    returning ints rather than hydrating NetworkData objects. Callers
-    which only need to know whether a vxid is claimed should use this
-    rather than scanning every network.
+    returning the vxid and uuid columns rather than hydrating
+    NetworkData objects. Callers which only need to know whether a
+    vxid is claimed should use this rather than scanning every
+    network. The uuid is returned as well because the caller routes
+    cleanup of a still-existing network through a cluster operation
+    targeting it, and can only do so if it knows which network it is.
 
     Note that unlike most getters here this deliberately does not
     swallow OperationalError. The only caller (the stray vxlan reaper
@@ -17060,14 +17063,18 @@ def _direct_find_network_vxids(vxids: list[int]) -> set[int]:
     outcome.
     """
     if not vxids:
-        return set()
+        return {}
 
     engine = _get_engine()
     table = _get_networks_table()
 
     with engine.connect() as conn:
-        stmt = sa.select(table.c.vxid).where(table.c.vxid.in_(vxids))
-        return {row.vxid for row in conn.execute(stmt).fetchall()}
+        stmt = sa.select(table.c.vxid, table.c.uuid).where(
+            table.c.vxid.in_(vxids))
+        return {
+            row.vxid: str(row.uuid)
+            for row in conn.execute(stmt).fetchall()
+        }
 
 
 def _direct_find_networks(
@@ -17352,8 +17359,8 @@ def _grpc_get_all_networks() -> list[NetworkData]:
         return []
 
 
-def _grpc_find_network_vxids(vxids: list[int]) -> set[int]:
-    """Return the subset of vxids a network claims, via the database
+def _grpc_find_network_vxids(vxids: list[int]) -> dict[int, str]:
+    """Return the claimed vxids and their networks, via the database
     microservice.
 
     As with ``_direct_find_network_vxids``, errors are deliberately not
@@ -17361,12 +17368,12 @@ def _grpc_find_network_vxids(vxids: list[int]) -> set[int]:
     and the caller deletes host network devices on the strength of it.
     """
     if not vxids:
-        return set()
+        return {}
 
     stub = _get_database_stub()
     request = database_pb2.FindNetworkVxidsRequest(vxids=vxids)
     reply = _grpc_call(stub.FindNetworkVxids, request)
-    return set(reply.vxids)
+    return {claim.vxid: claim.uuid for claim in reply.claims}
 
 
 def _grpc_find_networks(
@@ -17557,19 +17564,20 @@ def get_all_networks() -> list[NetworkData]:
     return _direct_get_all_networks()
 
 
-def find_network_vxids(vxids: list[int]) -> set[int]:
-    """Return the subset of the supplied vxids which a network claims.
+def find_network_vxids(vxids: list[int]) -> dict[int, str]:
+    """Return the supplied vxids which a network claims, and its uuid.
 
     Args:
         vxids: Candidate VXLAN ids.
 
     Returns:
-        The set of vxids for which a networks row exists, regardless of
-        the network's state. Errors propagate rather than presenting as
-        an empty set -- see ``_direct_find_network_vxids``.
+        A mapping of vxid to network uuid for every supplied vxid which
+        has a networks row, regardless of the network's state. Errors
+        propagate rather than presenting as an empty result -- see
+        ``_direct_find_network_vxids``.
     """
     if not vxids:
-        return set()
+        return {}
     if _use_database_service():
         return _grpc_find_network_vxids(vxids)
     return _direct_find_network_vxids(vxids)

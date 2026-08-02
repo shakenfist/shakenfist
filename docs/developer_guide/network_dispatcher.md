@@ -412,43 +412,70 @@ drift uses `net_create_and_enqueue` plus per-floating-IP and per-route ops.
 Discovery-only has exactly one exception. At the end of each pass maintain
 compares the vxlan devices present on the host against the networks it should
 be carrying. A device which matches nothing, and has done so for
-`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`, is deleted directly by
-`Job._handle_stray_vxlans()` on the maintain thread — not enqueued.
+`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`, is handled by
+`Job._handle_stray_vxlans()`, which sorts it into one of three outcomes.
 
-This does not go through the queue because it cannot: a cluster operation has
-to target an object, and these devices are exactly the ones whose object is
-gone, or which this node has nothing on. The safety argument is:
+**Reaped directly, on the maintain thread.** A device whose vxid no `networks`
+row claims. This is the exception to worker-only mutation, and it exists
+because the queue path is genuinely unavailable: a cluster operation has to
+target an object, and this is precisely the device whose object is gone. The
+row is inserted before the device is ever created, so an on-host device whose
+vxid has no row can never be a network under construction — it can only be
+residue. Note the test is for the *static row*, not the object state: a
+soft-deleted network still protects its device, only a hard-deleted one is
+reapable.
 
-- **A device with no networks row is residue.** The row is inserted before the
-  device is ever created, so an on-host device whose vxid has no row can never
-  be a network under construction. Note the test is for the *static row*, not
-  the object state: a soft-deleted network still protects its device, only a
-  hard-deleted one is reapable.
-- **On a hypervisor, a device for a network with no local instance is also
-  residue.** Per-instance teardown deletes the device when the last instance on
-  a host leaves a network, so one still present means that cleanup was missed.
-  Before reaping on this test maintain checks every instance on the node in an
-  `ACTIVE_STATE` — not just the healthy ones the maintain loop reconciles — so
-  an instance which is still building, or which errored with a domain that may
-  still be running, keeps its device. The network node is excluded from this
-  test entirely, since it carries a device for every active network whether or
-  not it hosts instances.
-- **Racing the net-worker is harmless.** Deletion is guarded by
-  `check_for_interface()` and wrapped in a `try`/`except` which logs and leaves
-  the vxid in the history for the next pass, so a `network_destroy` running
-  concurrently on the same node cannot take the maintain thread down with it.
+**Enqueued as a `node_net_op`.** On a hypervisor, a device whose network *does*
+still exist but which no instance on this node is attached to. Per-instance
+teardown deletes the device when the last instance on a host leaves a network,
+so one still present means that cleanup was missed. The object exists here, so
+there is no reason to step outside the dispatcher:
+`nn_create_and_enqueue(node_uuid, network_uuid, [network_destroy],
+PRIORITY.background)` targets exactly this (node, network) pair, and running
+inside the worker serialises the teardown against any concurrent create for
+the same network. `find_network_vxids()` returns the claiming network's uuid
+alongside the vxid so this is possible. The enqueue is skipped when a cluster
+operation already targets that network, and the vxid's grace period is re-armed
+afterwards so the operation has time to run before the vxid is reconsidered.
+The network node is excluded from this branch entirely, since it carries a
+device for every active network whether or not it hosts instances.
 
-A stray which fails both tests is left alone and warned about once per stray
-episode. Before this existed the warning fired on every pass forever, which on
-one production cluster was ~5,700 identical log lines per day per stray
-(issue #3597).
+**Left alone, warned about once.** Anything else. Before this existed the
+warning fired on every pass forever, which on one production cluster was
+~5,700 identical log lines per day per stray (issue #3597). Every non-actioned
+outcome — a failed delete, a vxid which maps to no Shaken Fist-named device —
+also re-arms the grace period rather than retrying every thirty seconds, so no
+path here can reintroduce that log storm.
+
+Deciding whether an instance protects its network reads this node's
+`INSTANCE_LOCATION` references (`Node.instances`) rather than filtering
+`instance.Instances` by placement, which is a Python-side predicate and would
+hydrate every active instance in the cluster on every pass — a protected stray
+is deliberately never reaped, so that cost would be permanent. The states which
+protect are `Instance.ACTIVE_STATES` plus `delete-wait-error`: the latter is
+not in `ACTIVE_STATES` but by definition means teardown did not complete, so a
+domain may well still be attached to the bridge. If this node's row cannot be
+read at all, every claimed stray is protected.
+
+Racing the net-worker is harmless. Deletion is guarded by
+`check_for_interface()` and each device is deleted inside its own
+`try`/`except`, so a `network_destroy` running concurrently on the same node
+cannot take the maintain thread down with it, and one failing device does not
+abandon the others. `vxlan-%06x` is deleted last and only if every sibling
+succeeded: `discover_interfaces()` only reports a vxid when an interface named
+`vxlan-` exists, so removing it while a leftover survives would hide that
+leftover from every future pass — no rediscovery, therefore no retry and no
+event.
 
 Reaping removes every device Shaken Fist names from the vxid — `br-vxlan-`,
-`vxlan-`, `veth-...-o` and `egr-...-o`. The network namespace and NAT rules a
-network node also owns are keyed by network uuid rather than vxid, so they are
-unreachable once the row is gone; that residue is a known limitation. Each
-reap records an audit event on the node, which is the operator-visible record
-of what was removed and why.
+`veth-...-o`, `egr-...-o` and then `vxlan-`. The network namespace and NAT
+rules a network node also owns are keyed by network uuid rather than vxid, so
+they are unreachable once the row is gone; that residue is a known limitation,
+and is called out for operators in
+[the networking overview](../operator_guide/networking/overview.md#stray-vxlan-reaping).
+Each reap records an audit event on the node naming the devices actually
+removed, which is the operator-visible record of what happened and why. An
+audit event is *not* recorded when nothing was removed.
 
 The database check uses `mariadb.find_network_vxids()`, an indexed
 `WHERE vxid IN (...)` against the UNIQUE index on `networks.vxid`. Unlike most

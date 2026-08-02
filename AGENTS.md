@@ -268,21 +268,27 @@ control the guards: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50),
 **The one exception: reaping stray vxlans.** Maintain deletes orphaned
 vxlan devices (`_handle_stray_vxlans()`) directly, on the maintain thread,
 rather than through the queue. This is deliberate and is the only
-host-mutating code outside the net-worker. The queue path is unavailable
-by construction: an operation has to target an object, and these devices
-are precisely the ones whose network object no longer exists, or which
-this node has no instance on. Two properties make it safe. First, the
-networks row is written before any device is created, so a device whose
-vxid has no row can never be a network under construction — it can only
-be residue. Second, deletion is idempotent and guarded by
-`check_for_interface()`, so racing the net-worker's own
-`network_destroy` teardown of the same device is harmless; the delete is
-wrapped in a `try`/`except` which logs and retries on the next pass
-rather than killing the maintain thread. Devices are only touched after
-they have been stray for `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`
-(default 300). A stray which is *not* reapable is warned about once per
-episode rather than on every pass — see issue #3597 for the log storm
-that motivated this.
+host-mutating code outside the net-worker. The exception is kept exactly
+as wide as the argument for it: it covers *only* devices whose network
+object no longer exists, because for those the queue path is unavailable
+by construction — an operation has to target an object, and there is no
+object left to target. The neighbouring case, where the network still
+exists but no instance on this node uses it, *is* enqueued: it becomes a
+`node_net_op` `network_destroy` targeting (this node, that network), so
+it stays inside the dispatcher and serialises against any concurrent
+create for the same network.
+
+Two properties make the direct case safe. First, the networks row is
+written before any device is created, so a device whose vxid has no row
+can never be a network under construction — it can only be residue.
+Second, deletion is idempotent and guarded by `check_for_interface()`, so
+racing the net-worker's own `network_destroy` teardown of the same device
+is harmless; each device is deleted inside its own `try`/`except` which
+logs and re-arms the grace period rather than killing the maintain
+thread. Devices are only touched after they have been stray for
+`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS` (default 300). A stray which is
+*not* actionable is warned about once per episode rather than on every
+pass — see issue #3597 for the log storm that motivated this.
 
 **REST API surface.** The two network delete endpoints
 (`DELETE /networks/<uuid>` and `DELETE /networks`) return HTTP 202

@@ -137,10 +137,20 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
         self.addDetail('links_at_end', content.text_content(
             json.dumps(sorted(links), indent=4)))
 
-        events = self.system_client.get_node_events(
-            self.node['name'], limit=100)
-        self.addDetail('node_events', content.text_content(
-            json.dumps(events, indent=4, sort_keys=True, default=str)))
+        # Diagnostics only. get_node_events() is not used by any other
+        # test in this suite, and the client is a separately versioned
+        # package -- a missing method or a changed signature here must
+        # read as a harness problem, not as a stray vxlan regression, so
+        # it must not be able to fail the test before the assertions
+        # below run.
+        try:
+            events = self.system_client.get_node_events(
+                self.node['name'], limit=100)
+            self.addDetail('node_events', content.text_content(
+                json.dumps(events, indent=4, sort_keys=True, default=str)))
+        except Exception as e:
+            self.addDetail('node_events_error', content.text_content(
+                '%s: %s' % (type(e).__name__, e)))
 
         self.assertNotIn(
             'vxlan-%06x' % vxid, links,
