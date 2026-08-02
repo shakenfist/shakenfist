@@ -3032,6 +3032,30 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.FindNetworksReply(networks=[])
 
+    def FindNetworkVxids(
+        self,
+        request: database_pb2.FindNetworkVxidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindNetworkVxidsReply:
+        """Return the subset of the requested vxids a network claims.
+
+        The reply is empty both when nothing claims the vxids and, were
+        we to swallow the error, when the query failed -- and the caller
+        deletes host network devices when a vxid is unclaimed. The error
+        path therefore sets an INTERNAL status so the client raises
+        rather than reading the empty reply as an answer.
+        """
+        try:
+            self.monitor.counters['find_network_vxids'].inc()
+            vxids = mariadb._direct_find_network_vxids(list(request.vxids))
+            return database_pb2.FindNetworkVxidsReply(vxids=sorted(vxids))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindNetworkVxids failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindNetworkVxidsReply(vxids=[])
+
     def DeleteNetwork(
         self,
         request: database_pb2.DeleteNetworkRequest,
@@ -5916,7 +5940,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'reap_federation_rate_limits',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
-            'find_network_interfaces',
+            'find_network_interfaces', 'find_network_vxids',
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',

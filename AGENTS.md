@@ -234,7 +234,10 @@ remain serialised.
 
 **Worker-only mutation surface.** `BridgedVXLanNetwork`
 (`shakenfist/network/bridged_vxlan_network.py`) is the only place that
-mutates host network state. Its constructor is called exclusively from the
+mutates host network state for a network which exists (the one exception,
+reaping devices belonging to networks which no longer exist, is described
+under "maintain is discovery-only" below). Its constructor is called
+exclusively from the
 single-threaded net-worker dispatcher
 (`shakenfist/daemons/network/workitem.py`) — making re-entrancy through
 the queue structurally impossible. External callers always hold `Network`;
@@ -261,6 +264,25 @@ via `has_pending_cluster_operation`, (3) cooldown on recent errors,
 control the guards: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50),
 `MAINTAIN_RECONCILE_COOLDOWN_SECONDS` (default 60),
 `MAINTAIN_RECONCILE_CIRCUIT_K` (default 5).
+
+**The one exception: reaping stray vxlans.** Maintain deletes orphaned
+vxlan devices (`_handle_stray_vxlans()`) directly, on the maintain thread,
+rather than through the queue. This is deliberate and is the only
+host-mutating code outside the net-worker. The queue path is unavailable
+by construction: an operation has to target an object, and these devices
+are precisely the ones whose network object no longer exists, or which
+this node has no instance on. Two properties make it safe. First, the
+networks row is written before any device is created, so a device whose
+vxid has no row can never be a network under construction — it can only
+be residue. Second, deletion is idempotent and guarded by
+`check_for_interface()`, so racing the net-worker's own
+`network_destroy` teardown of the same device is harmless; the delete is
+wrapped in a `try`/`except` which logs and retries on the next pass
+rather than killing the maintain thread. Devices are only touched after
+they have been stray for `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`
+(default 300). A stray which is *not* reapable is warned about once per
+episode rather than on every pass — see issue #3597 for the log storm
+that motivated this.
 
 **REST API surface.** The two network delete endpoints
 (`DELETE /networks/<uuid>` and `DELETE /networks`) return HTTP 202

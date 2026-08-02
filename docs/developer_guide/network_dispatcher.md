@@ -407,6 +407,55 @@ helpers using `PRIORITY.background` (not `user_facing`). The maintain thread
 does not wait. Per-hypervisor drift uses `nn_create_and_enqueue`; network-node
 drift uses `net_create_and_enqueue` plus per-floating-IP and per-route ops.
 
+### Stray vxlan reaping — the one host mutation maintain performs
+
+Discovery-only has exactly one exception. At the end of each pass maintain
+compares the vxlan devices present on the host against the networks it should
+be carrying. A device which matches nothing, and has done so for
+`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`, is deleted directly by
+`Job._handle_stray_vxlans()` on the maintain thread — not enqueued.
+
+This does not go through the queue because it cannot: a cluster operation has
+to target an object, and these devices are exactly the ones whose object is
+gone, or which this node has nothing on. The safety argument is:
+
+- **A device with no networks row is residue.** The row is inserted before the
+  device is ever created, so an on-host device whose vxid has no row can never
+  be a network under construction. Note the test is for the *static row*, not
+  the object state: a soft-deleted network still protects its device, only a
+  hard-deleted one is reapable.
+- **On a hypervisor, a device for a network with no local instance is also
+  residue.** Per-instance teardown deletes the device when the last instance on
+  a host leaves a network, so one still present means that cleanup was missed.
+  Before reaping on this test maintain checks every instance on the node in an
+  `ACTIVE_STATE` — not just the healthy ones the maintain loop reconciles — so
+  an instance which is still building, or which errored with a domain that may
+  still be running, keeps its device. The network node is excluded from this
+  test entirely, since it carries a device for every active network whether or
+  not it hosts instances.
+- **Racing the net-worker is harmless.** Deletion is guarded by
+  `check_for_interface()` and wrapped in a `try`/`except` which logs and leaves
+  the vxid in the history for the next pass, so a `network_destroy` running
+  concurrently on the same node cannot take the maintain thread down with it.
+
+A stray which fails both tests is left alone and warned about once per stray
+episode. Before this existed the warning fired on every pass forever, which on
+one production cluster was ~5,700 identical log lines per day per stray
+(issue #3597).
+
+Reaping removes every device Shaken Fist names from the vxid — `br-vxlan-`,
+`vxlan-`, `veth-...-o` and `egr-...-o`. The network namespace and NAT rules a
+network node also owns are keyed by network uuid rather than vxid, so they are
+unreachable once the row is gone; that residue is a known limitation. Each
+reap records an audit event on the node, which is the operator-visible record
+of what was removed and why.
+
+The database check uses `mariadb.find_network_vxids()`, an indexed
+`WHERE vxid IN (...)` against the UNIQUE index on `networks.vxid`. Unlike most
+getters it deliberately does not swallow database errors: an empty result means
+"nothing claims these vxids" and the caller deletes host devices on the
+strength of it, so a failed query must raise rather than present as an answer.
+
 ### New config knobs
 
 | Knob | Default | Description |
@@ -414,6 +463,7 @@ drift uses `net_create_and_enqueue` plus per-floating-IP and per-route ops.
 | `MAINTAIN_QUEUE_DEPTH_THRESHOLD` | `50` | Skip the entire pass if the combined network-queue depth exceeds this value |
 | `MAINTAIN_RECONCILE_COOLDOWN_SECONDS` | `60` | Skip a network if its most recent terminal op was `STATE_ERROR` within this window |
 | `MAINTAIN_RECONCILE_CIRCUIT_K` | `5` | Quiesce a network if the last K terminal ops are all `STATE_ERROR` |
+| `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS` | `300` | How long a vxlan device must be stray before maintain reaps or warns about it |
 
 ### The `get_recent_terminal_op_states_for_target` MariaDB helper
 

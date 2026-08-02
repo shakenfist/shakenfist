@@ -43,6 +43,12 @@ mariadb_user: "shakenfist"
 mariadb_password: "unknown"
 mariadb_database: "sf"
 
+# How long a vxlan device matching no network this node should be on must
+# persist before the network maintainer reaps it. Matches the server default.
+# The functional test for stray reaping waits this out, so a CI deploy may
+# reasonably lower it; production has no reason to.
+maintain_stray_vxlan_grace_seconds: 300
+
 # Loki log shipping. Empty leaves the shipper dormant.
 loki_base_url: ""
 loki_tenant: ""

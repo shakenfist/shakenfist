@@ -76,6 +76,132 @@ class Job(util_concurrency.Job):
             total += processing + queued + deferred
         return total
 
+    def _local_instance_vxids(self):
+        """The vxids of every network an instance on this node is attached to.
+
+        ``host_networks`` in the main pass deliberately covers only
+        instances which are built and healthy, because those are the
+        ones whose networks we are obliged to maintain. Deciding whether
+        a device may be *deleted* needs the wider set: an instance which
+        is still building, or which has errored but whose domain may
+        still be running, is entitled to its vxlan even though maintain
+        does not reconcile its network.
+        """
+        network_uuids = set()
+        for inst in instance.Instances([instance.this_node_filter],
+                                       prefilter='active'):
+            for ni in inst.interfaces:
+                network_uuids.add(ni.network_uuid)
+
+        vxids = set()
+        for network_uuid in network_uuids:
+            n = network.Network.from_db(
+                network_uuid, suppress_failure_audit=True)
+            if n:
+                vxids.add(n.vxid)
+        return vxids
+
+    def _handle_stray_vxlans(self, overdue):
+        """Reap or warn about vxlan devices which have been stray for
+        longer than the grace period.
+
+        A device is reapable when nothing on this node can legitimately
+        be using it:
+
+        * No networks row claims the vxid. The row is written before the
+          device is ever created, so a device whose vxid has no row can
+          never be a network under construction -- it is the residue of
+          a network which has since been hard deleted. This holds on
+          every node role.
+        * Or, on a hypervisor only, a row exists but no instance on this
+          node is attached to that network. Per-instance teardown
+          deletes the device when the last instance on a host leaves a
+          network (see node_inst_op), so a leftover device here means
+          that cleanup was missed or failed. The network node is
+          excluded because it carries a device for every active network
+          whether or not it hosts instances.
+
+        Anything else is left alone and warned about once per stray
+        episode rather than on every pass.
+        """
+        # Re-check the networks table immediately before deleting
+        # anything. We deliberately test for the presence of the static
+        # row rather than the object state, so a network which is merely
+        # soft deleted still protects its device; only a hard deleted
+        # (row gone) network is reapable on this test.
+        claimed_vxids = mariadb.find_network_vxids(overdue)
+
+        # Only pay for the instance lookup if a claimed stray might be
+        # reapable on this node.
+        protected_vxids = set()
+        if (not config.NODE_IS_NETWORK_NODE
+                and claimed_vxids.intersection(overdue)):
+            protected_vxids = self._local_instance_vxids()
+
+        reapable = []
+        for vxid in overdue:
+            if vxid in claimed_vxids:
+                if config.NODE_IS_NETWORK_NODE:
+                    reason = 'network node hosts every active network'
+                elif vxid in protected_vxids:
+                    reason = 'an instance on this node is attached to it'
+                else:
+                    reapable.append(
+                        (vxid, 'no instance on this node uses this network'))
+                    continue
+
+                if vxid not in EXTRA_VLANS_WARNED:
+                    EXTRA_VLANS_WARNED.add(vxid)
+                    LOG.with_fields({'vxid': vxid, 'reason': reason}).warning(
+                        'Extra vxlan present!')
+                continue
+
+            reapable.append((vxid, 'no network claims this vxid'))
+
+        if not reapable:
+            return
+
+        this_node = Node.from_db(config.NODE_NAME)
+        for vxid, reason in reapable:
+            # Every device Shaken Fist names from a vxid. The netns and
+            # the NAT rules a network node also owns are keyed by network
+            # uuid, not vxid, and are therefore unreachable once the row
+            # is gone -- they are a known limitation of this reap.
+            devices = ['br-vxlan-%06x' % vxid, 'vxlan-%06x' % vxid,
+                       'veth-%06x-o' % vxid, 'egr-%06x-o' % vxid]
+
+            try:
+                for device in devices:
+                    if util_network.check_for_interface(device):
+                        util_concurrency.execute('ip link delete %s' % device)
+            except Exception as e:
+                # The net-worker on this node can be tearing down the
+                # same devices, so a delete racing to "no such device"
+                # is expected. Leave the vxid in the history so the next
+                # pass retries, and do not let one bad device abort the
+                # maintenance pass -- this code runs outside the
+                # dispatcher, so nothing else would catch it.
+                LOG.with_fields({'vxid': vxid}).warning(
+                    'Failed to reap stray vxlan: %s' % e)
+                continue
+
+            if this_node:
+                this_node.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'reaped stray vxlan: %s' % reason,
+                    extra={'vxid': vxid})
+            else:
+                # add_event() echoes into the log stream, so this only
+                # fires when the event could not be recorded at all.
+                LOG.with_fields({'vxid': vxid}).info(
+                    'Reaped stray vxlan: %s' % reason)
+
+            # Forget the stray so a reappearance gets a fresh grace
+            # period, and a later network which is randomly allocated
+            # this vxid can be warned about on its own merits.
+            del EXTRA_VLANS_HISTORY[vxid]
+            EXTRA_VLANS_WARNED.discard(vxid)
+
     def execute(self):
         LOG.info('Starting network maintenance')
         last_loop = 0
@@ -311,7 +437,8 @@ class Job(util_concurrency.Job):
             extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
             # We keep a global cache of extra vxlans we've seen before, so that
-            # we only act on them when they've been stray for five minutes.
+            # we only act on them once they've been stray for the whole grace
+            # period.
             for vxid in EXTRA_VLANS_HISTORY.copy():
                 if vxid not in extra_vxids:
                     del EXTRA_VLANS_HISTORY[vxid]
@@ -320,38 +447,11 @@ class Job(util_concurrency.Job):
                 if vxid not in EXTRA_VLANS_HISTORY:
                     EXTRA_VLANS_HISTORY[vxid] = time.time()
 
-            # Handle extra vxlans which have been present for more than five
-            # minutes. If no network in the database claims the vxid then the
-            # device is orphaned and we reap it. If a network still claims the
-            # vxid we must not delete the device -- removing a vxlan that is
-            # in use would take the network down -- so we instead warn once
-            # per stray episode rather than on every pass.
-            overdue = [vxid for vxid in EXTRA_VLANS_HISTORY
-                       if time.time() - EXTRA_VLANS_HISTORY[vxid] > 5 * 60]
+            # Act on extra vxlans which have been stray for longer than the
+            # grace period.
+            overdue = [
+                vxid for vxid in EXTRA_VLANS_HISTORY
+                if (time.time() - EXTRA_VLANS_HISTORY[vxid]
+                    > config.MAINTAIN_STRAY_VXLAN_GRACE_SECONDS)]
             if overdue:
-                # Re-verify against the database immediately before deletion,
-                # regardless of network state.
-                known_vxids = {net.vxid for net in mariadb.get_all_networks()}
-                for vxid in overdue:
-                    if vxid in known_vxids:
-                        if vxid not in EXTRA_VLANS_WARNED:
-                            EXTRA_VLANS_WARNED.add(vxid)
-                            LOG.with_fields({'vxid': vxid}).warning(
-                                'Extra vxlan present!')
-                        continue
-
-                    for device in ['br-vxlan-%06x' % vxid,
-                                   'vxlan-%06x' % vxid]:
-                        if util_network.check_for_interface(device):
-                            util_concurrency.execute(
-                                'ip link delete %s' % device)
-
-                    this_node = Node.from_db(config.NODE_NAME)
-                    if this_node:
-                        this_node.add_event(
-                            EVENT_TYPE_AUDIT,
-                            'reaped stray vxlan with no matching network',
-                            extra={'vxid': vxid})
-                    LOG.with_fields({'vxid': vxid}).info(
-                        'Reaped stray vxlan with no matching network')
-                    del EXTRA_VLANS_HISTORY[vxid]
+                self._handle_stray_vxlans(overdue)

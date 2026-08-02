@@ -5477,6 +5477,50 @@ class FindNetworksReply(_message.Message):
 Global___FindNetworksReply: _TypeAlias = FindNetworksReply  # noqa: Y015
 
 @_typing.final
+class FindNetworkVxidsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    VXIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def vxids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """Candidate VXLAN IDs to test"""
+
+    def __init__(
+        self,
+        *,
+        vxids: _abc.Iterable[_builtins.int] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["vxids", b"vxids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindNetworkVxidsRequest: _TypeAlias = FindNetworkVxidsRequest  # noqa: Y015
+
+@_typing.final
+class FindNetworkVxidsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    VXIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def vxids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """The subset which a networks row claims"""
+
+    def __init__(
+        self,
+        *,
+        vxids: _abc.Iterable[_builtins.int] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["vxids", b"vxids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindNetworkVxidsReply: _TypeAlias = FindNetworkVxidsReply  # noqa: Y015
+
+@_typing.final
 class DeleteNetworkRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

@@ -30,6 +30,10 @@ SHAKENFIST_NODE_RAM_RESERVATION_GB={{ node_ram_reservation_gb }}
 SHAKENFIST_NODE_CPU_RESERVATION_THREADS={{ node_cpu_reservation_threads }}
 SHAKENFIST_NODE_DISK_RESERVATION_GB={{ node_disk_reservation_gb }}
 
+# How long a vxlan device which matches no network this node should be on must
+# persist before the network maintainer deletes it.
+SHAKENFIST_MAINTAIN_STRAY_VXLAN_GRACE_SECONDS={{ maintain_stray_vxlan_grace_seconds }}
+
 # Database service configuration
 {% if node_is_database_node %}
 SHAKENFIST_NODE_IS_DATABASE_NODE=True

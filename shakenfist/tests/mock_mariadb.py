@@ -672,6 +672,12 @@ class MockMariaDB():
         self.mariadb_find_networks.start()
         self.test_obj.addCleanup(self.mariadb_find_networks.stop)
 
+        self.mariadb_find_network_vxids = mock.patch(
+            'shakenfist.mariadb.find_network_vxids',
+            side_effect=self._mariadb_find_network_vxids)
+        self.mariadb_find_network_vxids.start()
+        self.test_obj.addCleanup(self.mariadb_find_network_vxids.stop)
+
         self.mariadb_delete_network = mock.patch(
             'shakenfist.mariadb.delete_network',
             side_effect=self._mariadb_delete_network)
@@ -2252,6 +2258,15 @@ class MockMariaDB():
         """Mock implementation of mariadb.get_all_networks()"""
         self._trace('MockMariaDB.get_all_networks()')
         return list(self.network_objects.values())
+
+    def _mariadb_find_network_vxids(self, vxids: list[int]) -> set[int]:
+        """Mock implementation of mariadb.find_network_vxids()"""
+        self._trace(f'MockMariaDB.find_network_vxids({vxids})')
+        wanted = set(vxids)
+        return {
+            d.vxid for d in self.network_objects.values()
+            if d.vxid in wanted
+        }
 
     def _mariadb_find_networks(
             self, criteria: ObjectFilterCriteria) -> list[NetworkData]:

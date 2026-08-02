@@ -234,6 +234,7 @@ class DatabaseServiceStub:
     GetNetwork: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkRequest, _database_pb2.GetNetworkReply]
     GetAllNetworks: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNetworksRequest, _database_pb2.GetAllNetworksReply]
     FindNetworks: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindNetworksRequest, _database_pb2.FindNetworksReply]
+    FindNetworkVxids: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindNetworkVxidsRequest, _database_pb2.FindNetworkVxidsReply]
     DeleteNetwork: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkRequest, _database_pb2.StatusReply]
     CreateNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkAttributesRequest, _database_pb2.StatusReply]
     """Network Attributes Operations (MariaDB)
@@ -593,6 +594,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetNetwork: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkRequest, _database_pb2.GetNetworkReply]  # type: ignore[assignment]
     GetAllNetworks: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNetworksRequest, _database_pb2.GetAllNetworksReply]  # type: ignore[assignment]
     FindNetworks: _aio.UnaryUnaryMultiCallable[_database_pb2.FindNetworksRequest, _database_pb2.FindNetworksReply]  # type: ignore[assignment]
+    FindNetworkVxids: _aio.UnaryUnaryMultiCallable[_database_pb2.FindNetworkVxidsRequest, _database_pb2.FindNetworkVxidsReply]  # type: ignore[assignment]
     DeleteNetwork: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     CreateNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Network Attributes Operations (MariaDB)
@@ -1777,6 +1779,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.FindNetworksRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.FindNetworksReply, _abc.Awaitable[_database_pb2.FindNetworksReply]]: ...
+
+    @_abc_1.abstractmethod
+    def FindNetworkVxids(
+        self,
+        request: _database_pb2.FindNetworkVxidsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.FindNetworkVxidsReply, _abc.Awaitable[_database_pb2.FindNetworkVxidsReply]]: ...
 
     @_abc_1.abstractmethod
     def DeleteNetwork(

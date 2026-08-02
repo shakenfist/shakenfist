@@ -17043,6 +17043,33 @@ def _direct_get_all_networks() -> list[NetworkData]:
         return []
 
 
+def _direct_find_network_vxids(vxids: list[int]) -> set[int]:
+    """Return the subset of vxids which a network row claims.
+
+    An exact-match lookup against the UNIQUE index on networks.vxid,
+    returning ints rather than hydrating NetworkData objects. Callers
+    which only need to know whether a vxid is claimed should use this
+    rather than scanning every network.
+
+    Note that unlike most getters here this deliberately does not
+    swallow OperationalError. The only caller (the stray vxlan reaper
+    in the network maintainer) treats "no network claims this vxid" as
+    permission to delete a host network device, so a database failure
+    must not be reported as an empty result. Letting the error
+    propagate aborts the maintain pass instead, which is the safe
+    outcome.
+    """
+    if not vxids:
+        return set()
+
+    engine = _get_engine()
+    table = _get_networks_table()
+
+    with engine.connect() as conn:
+        stmt = sa.select(table.c.vxid).where(table.c.vxid.in_(vxids))
+        return {row.vxid for row in conn.execute(stmt).fetchall()}
+
+
 def _direct_find_networks(
         criteria: ObjectFilterCriteria) -> list[NetworkData]:
     """Find networks matching the given filter criteria.
@@ -17325,6 +17352,23 @@ def _grpc_get_all_networks() -> list[NetworkData]:
         return []
 
 
+def _grpc_find_network_vxids(vxids: list[int]) -> set[int]:
+    """Return the subset of vxids a network claims, via the database
+    microservice.
+
+    As with ``_direct_find_network_vxids``, errors are deliberately not
+    swallowed: an empty result here means "these vxids are unclaimed"
+    and the caller deletes host network devices on the strength of it.
+    """
+    if not vxids:
+        return set()
+
+    stub = _get_database_stub()
+    request = database_pb2.FindNetworkVxidsRequest(vxids=vxids)
+    reply = _grpc_call(stub.FindNetworkVxids, request)
+    return set(reply.vxids)
+
+
 def _grpc_find_networks(
         criteria: ObjectFilterCriteria) -> list[NetworkData]:
     """Find networks matching criteria via the database microservice."""
@@ -17511,6 +17555,24 @@ def get_all_networks() -> list[NetworkData]:
     if _use_database_service():
         return _grpc_get_all_networks()
     return _direct_get_all_networks()
+
+
+def find_network_vxids(vxids: list[int]) -> set[int]:
+    """Return the subset of the supplied vxids which a network claims.
+
+    Args:
+        vxids: Candidate VXLAN ids.
+
+    Returns:
+        The set of vxids for which a networks row exists, regardless of
+        the network's state. Errors propagate rather than presenting as
+        an empty set -- see ``_direct_find_network_vxids``.
+    """
+    if not vxids:
+        return set()
+    if _use_database_service():
+        return _grpc_find_network_vxids(vxids)
+    return _direct_find_network_vxids(vxids)
 
 
 def find_networks(

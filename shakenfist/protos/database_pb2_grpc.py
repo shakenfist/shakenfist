@@ -724,6 +724,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.FindNetworksRequest.SerializeToString,
                 response_deserializer=database__pb2.FindNetworksReply.FromString,
                 _registered_method=True)
+        self.FindNetworkVxids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindNetworkVxids',
+                request_serializer=database__pb2.FindNetworkVxidsRequest.SerializeToString,
+                response_deserializer=database__pb2.FindNetworkVxidsReply.FromString,
+                _registered_method=True)
         self.DeleteNetwork = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteNetwork',
                 request_serializer=database__pb2.DeleteNetworkRequest.SerializeToString,
@@ -2017,6 +2022,12 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FindNetworkVxids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteNetwork(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -3255,6 +3266,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.FindNetworks,
                     request_deserializer=database__pb2.FindNetworksRequest.FromString,
                     response_serializer=database__pb2.FindNetworksReply.SerializeToString,
+            ),
+            'FindNetworkVxids': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindNetworkVxids,
+                    request_deserializer=database__pb2.FindNetworkVxidsRequest.FromString,
+                    response_serializer=database__pb2.FindNetworkVxidsReply.SerializeToString,
             ),
             'DeleteNetwork': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetwork,
@@ -7393,6 +7409,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/FindNetworks',
             database__pb2.FindNetworksRequest.SerializeToString,
             database__pb2.FindNetworksReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindNetworkVxids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindNetworkVxids',
+            database__pb2.FindNetworkVxidsRequest.SerializeToString,
+            database__pb2.FindNetworkVxidsReply.FromString,
             options,
             channel_credentials,
             insecure,
