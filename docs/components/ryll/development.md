@@ -158,10 +158,15 @@ Whole-file human review state (`REVIEWS.md`, `.vscode/*.weaudit*`)
 is maintained with `tools/review-tracking.sh`, a wrapper around the
 shared helper in the
 [shakenfist/development](https://github.com/shakenfist/development/blob/main/docs/code-review-tracking.md)
-repository. It is run by hand, not from git hooks: `prune` after a
-pull to discard reviews of files that have since changed, `stamp`
-before committing new review marks, `regen` to rebuild `REVIEWS.md`,
-and `next` to pick an unreviewed file.
+repository. In a clone it is run by hand, not from git hooks:
+`prune` after a pull to discard reviews of files that have since
+changed, `stamp` before committing new review marks, `regen` to
+rebuild `REVIEWS.md`, `next` to pick an unreviewed file, and
+`status` to report effective coverage at HEAD. On develop itself
+the `prune-reviews` workflow runs `prune` automatically after every
+push, committing the result back as shakenfist-bot, and the daily
+consistency audit in shakenfist/development files an issue when
+five or more in-scope files need review.
 
 ## CI and automation
 
@@ -190,6 +195,7 @@ Workflows in `.github/workflows/`:
 | `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
 | `pr-address-comments.yml` | Bot-triggered comment addressing (`@shakenfist-bot please address comments`) |
 | `pr-retest.yml` | Bot-triggered CI re-run (`@shakenfist-bot please retest`) |
+| `prune-reviews.yml` | Prune stale review marks after each push to develop |
 
 ## Key dependencies
 

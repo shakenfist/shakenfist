@@ -1,6 +1,6 @@
 # Release v0.3.0
 
-## Status: Drafted, not started
+## Status: Complete (v0.3.0 published 2026-08-02; install validation carried to #474)
 
 ## Prompt
 
@@ -167,13 +167,13 @@ management session, not delegated.
 | 9  | Confirm the `release` environment (required reviewer) and the `release.yml` runner labels are live | low | (operator) | Complete: `release` environment exists (API-confirmed 2026-07-30); runners confirmed online by the operator (2026-08-02) |
 | 10 | Merge the prep PR(s) from steps 1-4 into `develop` | low | (operator) | Complete (PR #465 merged; all 12 CI checks green, including the extended package-smoke) |
 | 11 | Retitle `CHANGELOG.md` `## [Unreleased]` to `## [0.3.0] - YYYY-MM-DD` (tag day) and add a fresh empty `[Unreleased]` heading; land on `develop` immediately before the bump | low | sonnet | Complete (2026-08-02, committed on `develop` beneath the bump; the duplicate `### Fixed` headings merged into one) |
-| 12 | `make release VERSION=0.3.0` on `develop`; review the bump commit and tag | medium | (operator) | Not started |
-| 13 | `git push origin HEAD && git push origin v0.3.0`; watch `release.yml` to completion; approve the `release` environment when prompted | medium | (operator) | Not started |
-| 14 | Verify the Release page: `gh release view v0.3.0 --json assets,tagName,isDraft` shows the tarball, `instar_0.3.0-1_amd64.deb`, `instar-0.3.0-1.x86_64.rpm`; not draft | low | sonnet | Not started |
-| 15 | Verify the Sigstore tag signature (`git verify-tag v0.3.0` via gitsign, or Rekor lookup); record the verifying identity | medium | sonnet | Not started |
-| 16 | Real-world `.deb` validation: clean Debian/Ubuntu VM with `/dev/kvm`, install the *published* artifact, run `instar info` **and** one post-v0.2 subcommand against a sample qcow2 | medium | (operator) | Not started |
-| 17 | Real-world `.rpm` validation per open question 3, or record the caveat in the release notes | medium | (operator) | Not started |
-| 18 | Mark this plan Complete in `docs/plans/index.md` | low | sonnet | Not started |
+| 12 | `make release VERSION=0.3.0` on `develop`; review the bump commit and tag | medium | (operator) | Complete (2026-08-02; bump commit `d6bd755` atop the retitle commit) |
+| 13 | `git push origin HEAD && git push origin v0.3.0`; watch `release.yml` to completion; approve the `release` environment when prompted | medium | (operator) | Complete (run 30719418010: check-version, build/package, sign-tag after environment approval, release — all green on the workflow's second-ever run) |
+| 14 | Verify the Release page: `gh release view v0.3.0 --json assets,tagName,isDraft` shows the tarball, `instar_0.3.0-1_amd64.deb`, `instar-0.3.0-1.x86_64.rpm`; not draft | low | sonnet | Complete (all three assets present with 0.3.0 names; not draft, not prerelease) |
+| 15 | Verify the Sigstore tag signature (`git verify-tag v0.3.0` via gitsign, or Rekor lookup); record the verifying identity | medium | sonnet | Complete: good signature, identity `https://github.com/shakenfist/instar/.github/workflows/release.yml@refs/tags/v0.3.0`, Rekor entry validated (tlog 2318166334). Note: the sign-tag job replaces the pushed tag with the signed object, so local clones need `git fetch --tags --force` afterwards. |
+| 16 | Real-world `.deb` validation: clean Debian/Ubuntu VM with `/dev/kvm`, install the *published* artifact, run `instar info` **and** one post-v0.2 subcommand against a sample qcow2 | medium | (operator) | Carried forward to issue #474 (v0.2 precedent; CI package-smoke covers the same flow in a container) |
+| 17 | Real-world `.rpm` validation per open question 3, or record the caveat in the release notes | medium | (operator) | Carried forward to issue #474, per open question 3's fallback |
+| 18 | Mark this plan Complete in `docs/plans/index.md` | low | sonnet | Complete (this PR) |
 
 ## Agent guidance
 
@@ -250,6 +250,20 @@ where noted:
 * Stale `.deb` / `.rpm` asset manifests (found at drafting;
   fixed by step 2) and the package-smoke blind spot that hid
   them (step 3).
+* `functional-tests.yml` did not trigger on `tools/` changes,
+  leaving the (now load-bearing) package smoke script outside
+  CI's paths filter (fixed in PR #465).
+
+### Follow-up issues filed at close-out
+
+* #471 — clippy warnings in generated guest-protocol code
+  (from the step-7 lint gate).
+* #472 / #473 — tracking issues for the two upstream qemu
+  crash reports recorded in PLAN-format-coverage's future
+  work (DMG zero-chunk NULL-deref; parallels_check_duplicate
+  assertion).
+* #474 — post-release install validation of the published
+  .deb / .rpm artifacts (steps 16-17 carried forward).
 
 ### Documentation index maintenance
 
