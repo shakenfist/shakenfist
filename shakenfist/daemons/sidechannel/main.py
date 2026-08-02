@@ -1052,11 +1052,14 @@ class Monitor(daemon.Daemon):
                     if instance_uuid in self.executors:
                         continue
 
-                    # Rate limit executor starts per instance. A failed
+                    # Rate limit dispatch checks per instance. A failed
                     # dispatch (the executor couldn't connect, or the
                     # agent never welcomed us) leaves the operation at
                     # the head of the queue, so we would otherwise retry
-                    # every loop iteration.
+                    # every loop iteration. The idle case matters just as
+                    # much: agent_operation_next() costs an uncached
+                    # instance attributes read per call, so an unthrottled
+                    # check polls the database at 1Hz per ready instance.
                     last_attempt = self.executor_attempts.get(
                         instance_uuid, 0)
                     if time.time() - last_attempt < 5:
@@ -1072,6 +1075,7 @@ class Monitor(daemon.Daemon):
                                      constants.AGENT_READY_DEGRADED]:
                         continue
 
+                    self.executor_attempts[instance_uuid] = time.time()
                     inst = instance.Instance.from_db(instance_uuid)
                     if not inst:
                         continue
