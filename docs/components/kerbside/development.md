@@ -49,6 +49,28 @@ alembic downgrade -1
 kerbside configuration, so ensure your kerbside config is properly set
 up before running migrations.
 
+## Review tracking
+
+Kerbside receives periodic whole-file human review in addition to the
+usual review of changes at pull request time; the current state is in
+[REVIEWS.md](https://github.com/shakenfist/kerbside/blob/develop/REVIEWS.md).
+Which files count is set by `.vscode/review-scope.toml`: Python, Rust,
+shell, and Markdown, less the plan archive in `docs/plans/` and the
+generated protobuf stubs.
+
+The state (`REVIEWS.md`, `.vscode/*.weaudit*`) is maintained with
+`tools/review-tracking.sh`, a wrapper around the shared helper in the
+[shakenfist/development](https://github.com/shakenfist/development/blob/main/docs/code-review-tracking.md)
+repository. In a clone it is run by hand, not from git hooks: `prune`
+after a pull to discard reviews of files that have since changed,
+`stamp` before committing new review marks, `regen` to rebuild
+`REVIEWS.md`, `next` to pick an unreviewed file, and `status` to
+report effective coverage at HEAD. On develop itself the
+`prune-reviews` workflow runs `prune` automatically after every push,
+committing the result back as shakenfist-bot, and the daily
+consistency audit in shakenfist/development files an issue when five
+or more in-scope files need review.
+
 ## Vendored web assets
 
 ### Bootstrap CSS
