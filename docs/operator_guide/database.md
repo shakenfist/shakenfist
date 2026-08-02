@@ -490,6 +490,9 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus 15 typed nullable columns projecting the capacity-relevant fields |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
 | `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
+| `scheduler_node_capacity` | One row per hypervisor: schedulable limits derived from the typed `node_metrics` columns, materialised usage counters, and a decaying expected-demand signal |
+| `namespace_claims` | One row per namespace capacity claim: limits, usage counters, state and server-side expiry. Created empty in this release — the claims API arrives later |
+| `cluster_capacity` | A singleton row (id always 1): cluster-wide totals, capacity claimed by active claims, and usage by namespaces without a claim |
 
 IPAM reservations are stored separately because:
 
@@ -511,6 +514,26 @@ ensure-mariadb-schema` to add the columns (run it before rolling the
 daemons, as always), existing rows keep NULL columns until the next 60
 second upsert cycle repopulates every live node — no backfill needed for a
 table whose rows are ephemeral by design.
+
+The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and
+`cluster_capacity`) belong to scheduler-reservations phase 2 and are
+maintained solely by a reconciler that runs every five minutes on the
+elected cluster node. Each pass is a single `ReconcileSchedulerCapacity`
+RPC which expires stale claims, re-derives each hypervisor's limits from
+the typed `node_metrics` columns (deliberately mirroring the scheduler's
+admission arithmetic), recomputes usage counters from placed instances,
+recomputes the decaying expected-demand signal, and rebuilds the
+`cluster_capacity` singleton. The tables are created by `sf-ctl
+ensure-mariadb-schema` (run it before rolling the daemons after an
+upgrade, as always). In this release nothing consumes them for admission —
+the scheduler still admits directly from `node_metrics`; guarded-UPDATE
+admission against these counters arrives in a later release (phase 3 of
+`docs/plans/PLAN-scheduler-reservations.md`). Operator-facing
+observability is the `scheduler_capacity_*` family of prometheus metrics
+(per-node limit/used/expected-demand gauges, cluster-row gauges, and
+reconcile pass/failure counters, last-success timestamp and duration)
+exported from the cluster daemon's metrics port (`CLUSTER_METRICS_PORT`,
+default `13007`), plus one structured log line per reconcile pass.
 
 Cluster operation headers (`cluster_operations`) and work queue rows
 (`work_queue`) live in MariaDB so the create-and-enqueue step can run in a

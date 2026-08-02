@@ -382,6 +382,21 @@ once the zombie has been seen on two consecutive sweeps; node and
 namespace objects are excluded from zombie repair. Both kinds of
 orphan are otherwise invisible to every state-driven iterator.
 
+The elected cluster node also runs
+`reconcile_scheduler_capacity()` every five minutes
+(scheduler-reservations phase 2). One pass is a single
+`ReconcileSchedulerCapacity` RPC which expires stale namespace
+claims, re-derives per-hypervisor limits from the typed
+`node_metrics` columns, recomputes usage counters from placed
+instances and the decaying expected-demand signal, and rebuilds
+the `cluster_capacity` singleton. In this release the reconciler
+is the only writer of the three capacity tables
+(`scheduler_node_capacity`, `namespace_claims`,
+`cluster_capacity`) and nothing consumes them for admission (that
+arrives with phase 3's guarded-UPDATE path). Observability is the
+`scheduler_capacity_*` gauges and counters exported on
+`CLUSTER_METRICS_PORT`, plus one structured log line per pass.
+
 #### Batched, Priority-Aware Dequeue
 
 `sf-net` and the `sf-queues` worker pool both call a single
@@ -871,7 +886,10 @@ publishes the schedulable remainder (`cpu_schedulable`,
 See [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md)
 for the full pipeline, the configuration knobs, and how to diagnose a
 placement decision from audit events. Atomic reservation-table scheduling
-is planned in `docs/plans/PLAN-scheduler-reservations.md`.
+is being built in phases per `docs/plans/PLAN-scheduler-reservations.md`:
+the capacity tables and their reconciler exist (observable-but-inert; see
+the cluster daemon material above) but the scheduler does not yet consult
+them.
 
 ## State Machines
 

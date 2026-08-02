@@ -380,6 +380,17 @@ resources daemons (the CPU fallback subtracts this node's own
 un-upgraded nodes don't look artificially large) — admission,
 ordering and `summarize_resources()` all go through these helpers,
 so keep them in sync if you touch capacity arithmetic.
+A third participant mirrors the same arithmetic: the scheduler
+capacity reconciler's limit-derivation helpers in
+`shakenfist/mariadb.py` (`_derive_cpu_memory_limits()`,
+`_derive_disk_limit_gb()`) deliberately reproduce `scheduler.py`'s
+admission bounds so the phase 3 counter guard will admit exactly
+what today's Python filter admits — a change to one must change
+both. The reconciler maintains the `scheduler_node_capacity`,
+`namespace_claims` and `cluster_capacity` tables from the elected
+cluster node every five minutes; in this release nothing consumes
+them for admission
+(`docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md`).
 Operator-facing documentation is
 [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).
 

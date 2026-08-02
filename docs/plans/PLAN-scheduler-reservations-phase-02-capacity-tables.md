@@ -235,20 +235,61 @@ surface yet: the admin capacity view migrates in phase 5.
 
 | Step | Description | Effort | Model | Isolation | Status |
 |------|-------------|--------|-------|-----------|--------|
-| 1 | Schema: three tables, version constants, `ensure_schema()` and `EXPECTED_SCHEMA_VERSIONS` wiring, `EXPECTED_TABLE_NAMES` drift-guard update, unit tests (creation, versions, idempotent re-run) | medium | sub-agent | worktree | Not started |
-| 2 | Reconcile RPC: proto + genprotos, servicer, tri-layer functions, the five-part recompute (limit formulas and demand decay as pure, unit-testable helpers), summary reply; unit tests incl. scheduler-parity cases for the limit formulas, decay arithmetic, dashed/undashed join shapes, empty-cluster and empty-claims passes | high | sub-agent | worktree | Not started |
-| 3 | Cluster daemon integration: scheduled task, prometheus metrics, structured pass logging; unit tests where practical | medium | sub-agent | worktree | Not started |
-| 4 | Local validation: run the reconciler against a docker MariaDB seeded with realistic rows (incl. a multi-disk `disk_spec` and both uuid forms); record results in the Validation section | medium | management session | none | Not started |
-| 5 | Docs: `docs/operator_guide/database.md` (three tables), CLAUDE.md MariaDB-storage list, correct CLAUDE.md's stale `shakenfist/deploy/` collection paths, ARCHITECTURE/AGENTS if warranted, master plan phase row | low | sub-agent | worktree | Not started |
-| 6 | Management-session code review against the checklist | medium | management session | none | Not started |
+| 1 | Schema: three tables, version constants, `ensure_schema()` and `EXPECTED_SCHEMA_VERSIONS` wiring, `EXPECTED_TABLE_NAMES` drift-guard update, unit tests (creation, versions, idempotent re-run) | medium | sub-agent | worktree | Complete — 10 unit tests, pre-commit green |
+| 2 | Reconcile RPC: proto + genprotos, servicer, tri-layer functions, the five-part recompute (limit formulas and demand decay as pure, unit-testable helpers), summary reply; unit tests incl. scheduler-parity cases for the limit formulas, decay arithmetic, dashed/undashed join shapes, empty-cluster and empty-claims passes | high | sub-agent | worktree | Complete — JSON_TABLE used for the disk sum (validated against real MariaDB 10.6 with the exact query; Python reference kept as `_disk_spec_virtual_gb`), 38 unit tests |
+| 3 | Cluster daemon integration: scheduled task, prometheus metrics, structured pass logging; unit tests where practical | medium | sub-agent | worktree | Complete — `scheduler_capacity_*` metrics, stale node label sets removed, failure path cannot raise; 4 unit tests |
+| 4 | Local validation: run the reconciler against a docker MariaDB seeded with realistic rows (incl. a multi-disk `disk_spec` and both uuid forms); record results in the Validation section | medium | management session | none | Complete — 36/36 checks, 42 ms at 32 nodes / 1,205 instances; see Validation |
+| 5 | Docs: `docs/operator_guide/database.md` (three tables), CLAUDE.md MariaDB-storage list, correct CLAUDE.md's stale `shakenfist/deploy/` collection paths, ARCHITECTURE/AGENTS if warranted, master plan phase row | low | sub-agent | worktree | Complete — all four docs updated; verification showed the collection and `shakenfist_ci` still live in-repo at `shakenfist/deploy/`, so only CLAUDE.md's directory tree (which drew `deploy/` at the repo root) needed correcting |
+| 6 | Management-session code review against the checklist | medium | management session | none | Complete — checklist verified 2026-08-02 |
 | 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | Not started |
 
 ## Validation
 
-To be recorded by step 4: docker-MariaDB reconcile results
-(row contents vs hand-computed expectations, JSON_TABLE
-viability against real `disk_spec` payloads, pass duration at
-sfcbr-like scale).
+### Step 4: docker-MariaDB reconcile validation (2026-08-02)
+
+Run against MariaDB 11.8 with the schema created by
+`ensure_schema()`, seeded with four nodes (live, live,
+new-with-partial-metrics, deleted), five instances with
+deliberately messy `disk_spec` payloads (string sizes, null
+sizes, a non-list document), dashed-uuid placement references
+and states, and two claims (one live, one past expiry). All
+36 checks passed:
+
+* Limits match the hand-computed scheduler-parity values for
+  both overcommit ratios; the partial-metrics node is skipped
+  without a row and the deleted node gets none.
+* Usage counts the errored instance, excludes the deleted
+  one, and counts a stateless (zombie) instance; the
+  malformed `disk_spec` contributes 0 without aborting the
+  pass; `20 + '8'` sums to 28 GB.
+* Expected demand matches the decay formula (4 vCPUs placed
+  100 s ago at defaults → 8.333).
+* The stale claim flips to `expired` and stops counting
+  toward `claimed_*`; the live claim's `used_*` recomputes to
+  the namespace's actual footprint.
+* The cluster singleton sums node limits, active claim limits
+  and unclaimed usage correctly; a second pass is idempotent
+  (zero added/expired, zero deltas).
+* Duration: 14 ms for the small case, 42 ms at 32 nodes /
+  1,205 placed instances — far inside the watchdog budget.
+
+Two incidental findings worth recording:
+
+1. **`ensure_schema()` cannot run on MariaDB 10.6**: the
+   pre-existing `ipam_reservations.address INET4` column
+   requires 10.10+, so the documented
+   `MIN_MARIADB_VERSION = (10, 6, 0)` floor is already
+   unsatisfiable for fresh installs — not a phase 2 issue,
+   but the constant is stale. JSON_TABLE itself was
+   separately validated on a real 10.6 during step 2 with the
+   exact reconcile query text.
+2. **Claim expiry must be written server-relative.** The
+   first validation run seeded `expires_at` from the client's
+   local clock and the expiry sweep correctly did nothing —
+   the timestamp was hours in the future in the server's
+   timezone. Phase 4's claim create/update must always write
+   expiry as `NOW() + INTERVAL`, the `cluster_locks` idiom,
+   never a client-computed datetime.
 
 ## Administration and logistics
 
@@ -275,28 +316,28 @@ sfcbr-like scale).
 
 ### Review checklist (management session, step 6)
 
-- [ ] Every dashed/undashed uuid join uses the index-friendly
+- [x] Every dashed/undashed uuid join uses the index-friendly
       transform (pitfall 6); no join compares the two forms
       directly.
-- [ ] Limit formulas match `scheduler.py` arithmetic;
+- [x] Limit formulas match `scheduler.py` arithmetic;
       deviations (allocation-ledger memory, virtual-size
       disk) are exactly the documented ones.
-- [ ] The reconciler cannot raise out of the scheduled task,
+- [x] The reconciler cannot raise out of the scheduled task,
       and one malformed row (bad `disk_spec`, NULL metrics)
       cannot abort the whole pass.
-- [ ] Reconcile is a single RPC; its duration and reply size
+- [x] Reconcile is a single RPC; its duration and reply size
       are bounded and sane at sfcbr scale (watchdog budget,
       gRPC message limits).
-- [ ] NULL-columned `node_metrics` rows (old resources
+- [x] NULL-columned `node_metrics` rows (old resources
       daemon) do not zero existing limits.
-- [ ] Nothing outside the reconciler and its tests reads or
+- [x] Nothing outside the reconciler and its tests reads or
       writes the new tables.
-- [ ] `in_memory_only` objects cannot reach the new tables
+- [x] `in_memory_only` objects cannot reach the new tables
       (the reconciler only reads static tables and writes its
       own).
-- [ ] New config options registered with descriptions and
+- [x] New config options registered with descriptions and
       flagged provisional pending step 3 data.
-- [ ] The plan file rides in the PR branch; master plan row
+- [x] The plan file rides in the PR branch; master plan row
       updated.
 
 ### Back brief
