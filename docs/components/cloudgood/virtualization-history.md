@@ -299,9 +299,7 @@ As we discussed above, pure software emulation is slow -- typically running at 1
 
 ### The x86 virtualization problem
 
-Before hardware support, virtualizing x86 was particularly tricky. The x86 architecture has certain "sensitive" instructions that behave differently depending on the CPU's privilege level, but don't trap when executed in user mode. In a properly virtualizable architecture, any instruction that could reveal or affect the machine's true state would cause a trap, allowing the hypervisor to intercept and emulate it. x86 didn't work this way.
-
-Early x86 hypervisors like VMware used clever techniques to work around this. They would scan the guest's code before execution and rewrite problematic instructions to trap into the hypervisor -- a technique called "binary translation". This worked, but added complexity and overhead.
+As we discussed in [the x86 problem](#the-x86-problem) above, x86 has sensitive instructions that don't trap in user mode, making it non-virtualizable in the classical sense. VMware's binary translation worked around this, but added complexity and overhead.
 
 ### Intel VT-x and AMD-V
 
@@ -322,14 +320,11 @@ This means the guest's code runs directly on the CPU at near-native speed for mo
 
 ### Extended Page Tables (EPT/NPT)
 
-The original VT-x and AMD-V implementations still had a significant overhead for memory operations. Every memory access in a virtual machine involves two levels of address translation:
+The original VT-x and AMD-V implementations still had a significant overhead for memory operations. Every memory access in a virtual machine involves two levels of address translation -- guest virtual to guest physical, then guest physical to host physical -- and the hypervisor had to maintain costly "shadow page tables" to handle this.
 
-1. Guest virtual address → Guest physical address (using the guest's page tables)
-2. Guest physical address → Host physical address (using the hypervisor's shadow page tables)
+Intel's Extended Page Tables (EPT, introduced with Nehalem in 2008) and AMD's Nested Page Tables (NPT, introduced with Barcelona in 2007) solve this by doing both translations in hardware. The CPU walks both sets of page tables automatically, eliminating most of the hypervisor's involvement in memory management. EPT/NPT also provides the memory isolation boundary between VMs -- a guest can only access host-physical memory that the hypervisor has mapped into its EPT tables.
 
-Originally, the hypervisor had to maintain "shadow page tables" that combined both translations, and trap on every guest page table modification to keep them synchronized. This was expensive.
-
-Intel's Extended Page Tables (EPT, introduced with Nehalem in 2008) and AMD's Nested Page Tables (NPT, introduced with Barcelona in 2007) solve this by doing both translations in hardware. The CPU walks both sets of page tables automatically, eliminating most of the hypervisor's involvement in memory management.
+For a deeper treatment of how EPT/NPT works, including the page walk mechanics, TLB implications, and the relationship with IOMMU for device isolation, see the [Technology primer](/components/cloudgood/technology-primer/#extended-page-tables-eptnpt).
 
 ### KVM: The Linux approach
 
@@ -390,6 +385,8 @@ Virtio, developed for use with KVM (but now used by other hypervisors too), take
 The virtio interface uses shared memory queues ("virtqueues") for communication. The guest places requests in a queue, notifies the hypervisor with a single write, and the hypervisor processes them and places responses in a return queue. This is far more efficient than emulating hundreds of register accesses for a single I/O operation.
 
 The trade-off is that the guest must have virtio drivers. Linux has had virtio support since 2008, and Windows virtio drivers are available (though not included by default). When you provision a cloud VM, you're almost certainly using virtio devices even if you don't realize it.
+
+For a detailed look at how virtio devices use memory-mapped I/O, the virtqueue protocol, and advanced backends like vhost-user and DPDK, see [Memory mapped devices](/components/cloudgood/memory-mapped-devices/).
 
 ### Paravirtualization today
 
