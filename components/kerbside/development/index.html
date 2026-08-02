@@ -4804,6 +4804,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#review-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review tracking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#vendored-web-assets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10652,6 +10663,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#review-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review tracking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#vendored-web-assets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10743,6 +10765,25 @@ generated file to add your schema changes in the <code>upgrade()</code> and
 <p><strong>Note:</strong> Alembic automatically uses the database URL from the
 kerbside configuration, so ensure your kerbside config is properly set
 up before running migrations.</p>
+<h2 id="review-tracking">Review tracking<a class="headerlink" href="#review-tracking" title="Permanent link">&para;</a></h2>
+<p>Kerbside receives periodic whole-file human review in addition to the
+usual review of changes at pull request time; the current state is in
+<a href="https://github.com/shakenfist/kerbside/blob/develop/REVIEWS.md">REVIEWS.md</a>.
+Which files count is set by <code>.vscode/review-scope.toml</code>: Python, Rust,
+shell, and Markdown, less the plan archive in <code>docs/plans/</code> and the
+generated protobuf stubs.</p>
+<p>The state (<code>REVIEWS.md</code>, <code>.vscode/*.weaudit*</code>) is maintained with
+<code>tools/review-tracking.sh</code>, a wrapper around the shared helper in the
+<a href="https://github.com/shakenfist/development/blob/main/docs/code-review-tracking.md">shakenfist/development</a>
+repository. In a clone it is run by hand, not from git hooks: <code>prune</code>
+after a pull to discard reviews of files that have since changed,
+<code>stamp</code> before committing new review marks, <code>regen</code> to rebuild
+<code>REVIEWS.md</code>, <code>next</code> to pick an unreviewed file, and <code>status</code> to
+report effective coverage at HEAD. On develop itself the
+<code>prune-reviews</code> workflow runs <code>prune</code> automatically after every push,
+committing the result back as shakenfist-bot, and the daily
+consistency audit in shakenfist/development files an issue when five
+or more in-scope files need review.</p>
 <h2 id="vendored-web-assets">Vendored web assets<a class="headerlink" href="#vendored-web-assets" title="Permanent link">&para;</a></h2>
 <h3 id="bootstrap-css">Bootstrap CSS<a class="headerlink" href="#bootstrap-css" title="Permanent link">&para;</a></h3>
 <p>Kerbside uses bootstrap CSS for styling. This was constructed by
