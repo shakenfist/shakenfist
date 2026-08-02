@@ -13,7 +13,7 @@ lowers its glibc baseline.
 ## Debian / Ubuntu (.deb)
 
 ```bash
-VERSION=0.2.0
+VERSION=0.3.0
 curl -sLO "https://github.com/shakenfist/instar/releases/download/v${VERSION}/instar_${VERSION}-1_amd64.deb"
 sudo apt install "./instar_${VERSION}-1_amd64.deb"
 instar --help
@@ -22,7 +22,7 @@ instar --help
 ## Fedora / RHEL / SUSE (.rpm)
 
 ```bash
-VERSION=0.2.0
+VERSION=0.3.0
 curl -sLO "https://github.com/shakenfist/instar/releases/download/v${VERSION}/instar-${VERSION}-1.x86_64.rpm"
 sudo dnf install "./instar-${VERSION}-1.x86_64.rpm"
 instar --help
@@ -35,7 +35,7 @@ binaries (loaded into the KVM sandbox at runtime) at
 ## Tarball (any Linux)
 
 ```bash
-VERSION=0.2.0
+VERSION=0.3.0
 curl -sL "https://github.com/shakenfist/instar/releases/download/v${VERSION}/instar-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
   | sudo tar xz -C /usr/local/bin/
 instar --help
