@@ -54,6 +54,14 @@ primer.
 [Fundamentals](/components/cloudgood/fundamentals/) discusses some of the fundamentals of
 computing that we're going to keep coming upon.
 
+[CPU and resource accounting](/components/cloudgood/accounting/) explores how the Linux
+kernel measures CPU time for both regular processes and virtual
+machines. It turns out the mechanism is fundamentally the same in
+both cases -- timer interrupts give the kernel regular opportunities
+to note what was running and charge the time. This chapter also covers
+steal time (how guests detect lost CPU) and cgroups (how the kernel
+enforces resource limits).
+
 [Virtualization history](/components/cloudgood/virtualization-history/) takes a slower journey
 through the history of virtualization and how we got to where we are now.
 Virtualization has been around in various forms for a lot longer than many
@@ -80,5 +88,16 @@ obsolete [OpenStack Neutron Linux Bridge networking](/components/cloudgood/neutr
 then [OpenStack Neutron's Legacy non-high availability routing](/components/cloudgood/neutron-legacy/),
 with a solid intention to one day cover OpenStack Neutron's HA and DVR
 options at a future date.
+
+We then turn to the control plane's own state.
+[Galera and WSREP replication](/components/cloudgood/galera/) explains how the database
+underneath almost every OpenStack deployment actually works: how a
+transaction is turned into a write set, broadcast in a global total order,
+and certified independently on every node without any of them talking to
+each other. That mechanism explains most of the things operators find
+surprising -- deadlock errors at commit time, one slow node pausing the
+whole cluster, and why a backup taken carelessly on a "spare" node can hurt
+the busy one. It closes with what all of this puts on the network, and why
+the replication network is the cluster's real security boundary.
 
 --8<-- "docs-include/abbreviations.md"
