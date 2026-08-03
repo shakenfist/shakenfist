@@ -552,3 +552,100 @@ class RateLimitTestCase(FederatedExchangeTestCase):
         self.assertEqual(429, self._exchange(
             token=self._token(kid='key-2')).status_code)
         self.assertEqual(before, len(self.fetches))
+
+
+class SecondIssuerTestCase(FederatedExchangeTestCase):
+    """The same machinery, a completely different identity provider.
+
+    The plan's proof obligation: an Authentik-style token, whose claims
+    look nothing like GitHub's, must be exchangeable with configuration
+    alone. If any of this needed a code path of its own then the
+    design is not federation, it is a GitHub integration with extra
+    steps.
+    """
+
+    AUTHENTIK = 'https://auth.example.com'
+
+    def setUp(self):
+        super().setUp()
+        self.authentik = TrustedIssuer.new(
+            'authentik', self.AUTHENTIK, self.AUTHENTIK + '/jwks', AUDIENCE)
+        self.authentik_rule = MappingRule.new(
+            'ci', 'via-groups', 'authentik', {'groups': ['sf-ci', 'sf-ops']},
+            ['blob.read'], 900, 'ak')
+
+    def _authentik_token(self, claims=None):
+        # No repository, no ref, a different subject shape, and a
+        # group membership instead -- nothing GitHub about it.
+        return self._token(
+            issuer=self.AUTHENTIK,
+            claims={'groups': 'sf-ci', 'sub': 'service-account-ci',
+                    'preferred_username': 'ci',
+                    **(claims or {})})
+
+    def test_an_authentik_token_mints_a_key(self):
+        resp = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(), 'namespace': 'ci',
+            'rule': 'via-groups'}))
+
+        self.assertEqual(200, resp.status_code)
+        self.assertTrue(resp.get_json()['key_name'].startswith('ak-'))
+
+    def test_it_carries_the_rules_scopes_and_ttl(self):
+        minted = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(), 'namespace': 'ci',
+            'rule': 'via-groups'})).get_json()
+
+        key = NamespaceKey.from_db_by_name('ci', minted['key_name'])
+        self.assertEqual(['blob.read'], key.scopes)
+        self.assertGreater(key.expiry, time.time() + 800)
+        self.assertLess(key.expiry, time.time() + 1000)
+
+    def test_the_provenance_names_the_second_issuer(self):
+        minted = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(), 'namespace': 'ci',
+            'rule': 'via-groups'})).get_json()
+
+        key = NamespaceKey.from_db_by_name('ci', minted['key_name'])
+        self.assertEqual('authentik', key.provenance['issuer'])
+        self.assertEqual({'groups': 'sf-ci'}, key.provenance['claims'])
+
+    def test_the_other_enumerated_group_also_matches(self):
+        resp = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(claims={'groups': 'sf-ops'}),
+            'namespace': 'ci', 'rule': 'via-groups'}))
+        self.assertEqual(200, resp.status_code)
+
+    def test_a_group_the_rule_does_not_bind_is_refused(self):
+        resp = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(claims={'groups': 'everyone'}),
+            'namespace': 'ci', 'rule': 'via-groups'}))
+        self.assertEqual(401, resp.status_code)
+
+    def test_the_two_issuers_do_not_bleed_into_each_other(self):
+        # A GitHub token must not pass through the Authentik rule even
+        # though its claims would satisfy nothing there, and an
+        # Authentik token must not pass through the GitHub rule. The
+        # issuer is checked against the rule's, not just against the
+        # configured set.
+        resp = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._token(), 'namespace': 'ci',
+            'rule': 'via-groups'}))
+        self.assertEqual(401, resp.status_code)
+
+        resp = self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(), 'namespace': 'ci',
+            'rule': 'ryll'}))
+        self.assertEqual(401, resp.status_code)
+
+    def test_each_issuer_is_fetched_from_its_own_jwks_uri(self):
+        # Both issuers are served by the same mock here, so what this
+        # pins is that the uri came from the TrustedIssuer rather than
+        # from the token -- a token naming its own key source would be
+        # a token vouching for itself.
+        self.client.post('/auth/federated', data=json.dumps({
+            'token': self._authentik_token(), 'namespace': 'ci',
+            'rule': 'via-groups'}))
+
+        self.assertIn(self.AUTHENTIK + '/jwks', self.fetches)
+        self.assertNotIn(GITHUB_JWKS, self.fetches)

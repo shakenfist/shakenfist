@@ -877,7 +877,47 @@ There is no error state, because key operations are atomic. Expiry is not a
 state: it is enforced when the key is used, and the cluster daemon separately
 soft-deletes long-expired keys so that the standard reaper hard-deletes them.
 
+### Trusted Issuer and Mapping Rule States
+- `initial` -> `created`
+- `created` -> `deleted` (soft delete)
+
+Both follow the `NamespaceKey` recipe. A `TrustedIssuer`
+(`shakenfist/trusted_issuer.py`) is a cluster-level record of an external
+identity provider whose tokens this cluster will accept, managed through
+`/auth/issuers` by the `system` namespace only. A `MappingRule`
+(`shakenfist/mapping_rule.py`) is owned by the namespace it targets, managed
+under `/auth/namespaces/{namespace}/rules` by that namespace's owner, and hard
+deleted with its namespace.
+
 See `docs/developer_guide/state_machine.md` for complete documentation.
+
+## Federated Identity Exchange
+
+`POST /auth/federated` (`shakenfist/external_api/auth.py`) trades an
+externally issued identity token for a scoped, expiring `NamespaceKey`. It is
+one of the handful of `@api_base.public` routes, because the caller by
+definition has no Shaken Fist credential yet.
+
+Token validation lives in `shakenfist/federation.py`, which is deliberately
+Flask-free: issuer resolution from an unverified `iss`, signature checking
+against a `PyJWKClient` cache (one client and one lock per issuer, so a key
+rotation does not stampede the provider), audience and lifetime checks, and
+claim matching against a rule. The endpoint composes these in a fixed order —
+cheap local rejections before anything that costs a network round trip — and
+that order is a security property rather than a style, asserted by tests.
+
+Two plain (non-DBO) tables back the abuse resistance, both reaped by the
+cluster daemon's `reap_federation_records`:
+
+- `federation_replay`, keyed `(token_id, rule_uuid)`, makes an identity token
+  single-use per rule. The composite primary key does the arbitration, so a
+  failing insert *is* the replay detection.
+- `federation_rate_limits`, keyed `(source, window_start)`, counts exchange
+  attempts per source per minute in the database rather than in the worker, so
+  the limit is cluster-wide.
+
+Both fail closed: a database error refuses the exchange rather than being read
+as "not seen before" or "under the limit".
 
 ## Configuration
 

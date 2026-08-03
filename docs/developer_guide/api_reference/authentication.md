@@ -298,6 +298,176 @@ the keys used to authenticate to a namespace.
     sf_client.update_namespace_key('ci', 'newkey', 'newsecret')
     ```
 
+## Trusted issuers
+
+A **trusted issuer** is an external identity provider this cluster will
+believe: GitHub Actions, an Authentik instance, or anything else that
+signs OIDC-style JWTs. Issuers are cluster-wide and administrative --
+deciding who may vouch for identities here is not a per-namespace
+decision -- so every call below requires the `system` namespace.
+
+An issuer records four things: a `name` used to refer to it, the
+`issuer_url` that must match a token's `iss` claim exactly, the
+`jwks_uri` its signing keys are published at, and the `audience` its
+tokens must be minted for. The `jwks_uri` always comes from this
+record and never from the token, because a token naming its own key
+source is a token vouching for itself.
+
+???+ tip "REST API calls"
+
+    * [GET /auth/issuers](https://openapi.shakenfist.com/#/auth/get_auth_issuers): List all trusted issuers.
+    * [POST /auth/issuers](https://openapi.shakenfist.com/#/auth/post_auth_issuers): Configure a new trusted issuer.
+    * [GET /auth/issuers/{issuer_name}](https://openapi.shakenfist.com/#/auth/get_auth_issuers__issuer_name_): Fetch one trusted issuer.
+    * [PUT /auth/issuers/{issuer_name}](https://openapi.shakenfist.com/#/auth/put_auth_issuers__issuer_name_): Update a trusted issuer.
+    * [DELETE /auth/issuers/{issuer_name}](https://openapi.shakenfist.com/#/auth/delete_auth_issuers__issuer_name_): Remove a trusted issuer.
+
+??? example "Configuring GitHub Actions as a trusted issuer"
+
+    ```bash
+    curl -X POST https://sf.example.com/auth/issuers \
+      -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{
+            "name": "github",
+            "issuer_url": "https://token.actions.githubusercontent.com",
+            "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+            "audience": "https://sf.example.com"
+          }'
+    ```
+
+???+ warning "Deleting an issuer"
+
+    Mapping rules reference their issuer by name. Deleting an issuer
+    does not delete the rules that name it -- those rules simply stop
+    working, because the exchange can no longer resolve the issuer.
+    Recreating an issuer under the same name rebinds every rule that
+    named it, so treat the name as the durable identifier it is.
+
+## Mapping rules
+
+A **mapping rule** is a namespace's standing offer: "an identity from
+this issuer, carrying these claims, may mint a key here with these
+scopes". Rules are owned by the namespace they mint into and are gated
+by namespace ownership, exactly as key creation is -- a rule is the
+same class of privilege as `add-key`, granted in advance and gated on
+claims.
+
+Rules are deleted with their namespace, so "who can get into this
+namespace" is answered by listing its rules. That listing is the
+inbound sibling of the trust list.
+
+A rule carries:
+
+| Field | Meaning |
+|-------|---------|
+| `name` | Unique within the namespace, and named by the exchange request |
+| `issuer` | The trusted issuer whose tokens this rule accepts |
+| `bound_claims` | Claims a token must carry, and the values they must have |
+| `scopes` | The scopes minted keys receive |
+| `key_ttl` | How long a minted key lives, in seconds |
+| `key_name_prefix` | Prefix for minted key names; the cluster appends a random discriminator |
+
+`bound_claims` values are exact strings, or lists of exact strings
+meaning "any of these". There is no globbing and no pattern matching:
+`shakenfist/*` looks reasonable until somebody registers
+`shakenfist-evil`, and the anchored patterns needed to make that safe
+are exactly what reviewers get wrong. A rule must bind at least one
+claim and grant at least one scope, both enforced at creation, because
+a rule that binds nothing matches every identity the issuer will ever
+sign.
+
+???+ tip "REST API calls"
+
+    * [GET /auth/namespaces/{namespace}/rules](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__rules): List the mapping rules for a namespace.
+    * [POST /auth/namespaces/{namespace}/rules](https://openapi.shakenfist.com/#/auth/post_auth_namespaces__namespace__rules): Create a mapping rule.
+    * [GET /auth/namespaces/{namespace}/rules/{rule_name}](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__rules__rule_name_): Fetch one mapping rule.
+    * [PUT /auth/namespaces/{namespace}/rules/{rule_name}](https://openapi.shakenfist.com/#/auth/put_auth_namespaces__namespace__rules__rule_name_): Replace a mapping rule's policy.
+    * [DELETE /auth/namespaces/{namespace}/rules/{rule_name}](https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace__rules__rule_name_): Delete a mapping rule.
+
+??? example "A rule for one repository and two branches"
+
+    ```bash
+    curl -X POST https://sf.example.com/auth/namespaces/ci/rules \
+      -H "Authorization: Bearer ${SF_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{
+            "name": "ryll",
+            "issuer": "github",
+            "bound_claims": {
+              "repository": "shakenfist/ryll",
+              "ref": ["refs/heads/develop", "refs/heads/main"]
+            },
+            "scopes": ["blob.read", "artifact.*"],
+            "key_ttl": 3600,
+            "key_name_prefix": "ryll-ci"
+          }'
+    ```
+
+???+ info "Updating a rule does not touch keys already minted"
+
+    A minted key stands alone. Its provenance records the claims that
+    were actually satisfied, so the audit trail describes the grant as
+    it was made rather than as the rule reads today. Narrowing a
+    rule's scopes therefore does not retroactively narrow keys it
+    minted earlier -- delete those keys if that is what you need.
+
+## Federated exchange
+
+`POST /auth/federated` trades an [identity token](/glossary/#identity-token)
+from a trusted issuer for a namespace key. It is unauthenticated by
+nature: the caller has no Shaken Fist credential yet, which is the
+entire point. What stands in place of authentication is the token's
+signature, checked against the issuer's published keys, plus a
+mapping rule the namespace owner wrote in advance.
+
+The request names three things, and the response returns the minted
+secret exactly once:
+
+```json
+{"token": "eyJ...", "namespace": "ci", "rule": "ryll"}
+```
+
+```json
+{"namespace": "ci", "key_name": "ryll-ci-8fJ2mQ", "key": "sfk_..."}
+```
+
+The secret is never returned again and is never written to an event or
+a log -- only its bcrypt hash is stored. Use it immediately to call
+`POST /auth` for an access token, exactly as you would any other
+namespace key.
+
+???+ tip "REST API calls"
+
+    * [POST /auth/federated](https://openapi.shakenfist.com/#/auth/post_auth_federated): Exchange an identity token for a namespace key.
+
+???+ info "What a refusal tells you"
+
+    | Status | Meaning |
+    |--------|---------|
+    | 400 | A required field is missing |
+    | 401 | The exchange was refused, with a category but no detail |
+    | 413 | The request body exceeds `FEDERATION_MAX_TOKEN_BYTES` |
+    | 429 | Too many attempts from this source address |
+    | 503 | The database was unavailable, so the exchange could not be checked |
+
+    A 401 deliberately says less than the audit log records. Telling
+    an anonymous caller *which* claim missed would turn the endpoint
+    into an oracle for guessing a rule's contents, one request at a
+    time. The namespace that owns the rule sees the detail in its
+    events, which is where a stream of near-miss claim failures --
+    what probing looks like -- belongs.
+
+???+ warning "An identity token is single-use per rule"
+
+    Once a token has been exchanged through a given rule it cannot be
+    exchanged through that rule again. The same token *can* still be
+    exchanged through a different rule to reach a second namespace,
+    which is a legitimate pattern: a workflow needing two namespaces
+    exchanges its token twice against two rules.
+
+    A refusal for any other reason does not consume the token, so
+    fixing a rule and retrying with a still-valid token works.
+
 ## Metadata
 
 All objects exposed by the REST API may have metadata associated with them. This

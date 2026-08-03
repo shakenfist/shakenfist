@@ -6,12 +6,12 @@ inside Shaken Fist, or against the vocabulary of an external tool -- the entry
 names the sibling meaning so that a reader who arrived by search is not misled.
 Other documents should link here rather than redefining these terms.
 
-Definitions describe what the code does *today*. A few entries describe concepts
-that are planned but not yet implemented (the workload identity federation
-work): these carry a
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
-marker, and will lose it as the features land. An entry without the marker
-describes something that exists in the current release.
+Definitions describe what the code does *today*. Entries which once carried a
+*(planned)* marker for the workload identity federation work have lost it: as
+of phase 3 of [PLAN-auth-federation](plans/PLAN-auth-federation.md), trusted
+issuers, mapping rules, identity tokens and scopes all exist and are described
+here as they behave. Should a future entry describe something not yet built, it
+will say so explicitly.
 
 Entries are alphabetical. Each carries a short definition, a "Defined in"
 pointer to the authoritative code or documentation, and, where the term is
@@ -133,9 +133,10 @@ exactly -- an exact string, or a list of acceptable strings -- with no globbing,
 regular expressions or prefix matching, and a rule must bind at least one claim
 and grant at least one scope, so it can neither accept every identity an issuer
 vouches for nor inherit the wildcard an unscoped [namespace key](#namespace-key)
-would. Defined in `shakenfist/mapping_rule.py`. The exchange that consumes rules
-is still to come (see
-[PLAN-auth-federation](plans/PLAN-auth-federation.md)).
+would. Rules are consumed by `POST /auth/federated`, which is where an
+[identity token](#identity-token) becomes a key. Defined in
+`shakenfist/mapping_rule.py` and
+`docs/developer_guide/api_reference/authentication.md`.
 
 **namespace**{#namespace} -- The tenancy and authorization unit: objects belong
 to a namespace, and a caller acts within one. Visibility extends to a caller's
@@ -149,8 +150,9 @@ with Linux network namespaces, which the networking documentation uses heavily
 and an optional expiry. [Scopes](#scope) are recorded on the object and
 enforced on every request made with a token minted from it; a key with no
 scopes recorded mints wildcard tokens, which is every key predating the
-federation work. Provenance is reserved but not yet populated -- it arrives
-with the federation exchange. `/auth` bcrypt-compares a presented secret
+federation work. Provenance records where a key came from: keys minted by the
+[federated exchange](#identity-token) carry the rule, the issuer and the
+claims that were satisfied. `/auth` bcrypt-compares a presented secret
 against the namespace's
 unexpired keys and mints a token bound to the matching key's nonce. A key is a
 first-class object owned by its namespace, with its own lifecycle, events and

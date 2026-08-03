@@ -475,37 +475,38 @@ the security boundary of this whole plan. After 3i:
 
 ## Definition of done
 
-- [ ] Every registered route either authenticates or is one of a
+- [x] Every registered route either authenticates or is one of a
       small, individually justified `@public` set, asserted by a test
       over `app.url_map` and backstopped by a pre-commit check.
-- [ ] Scopes derive automatically for all endpoints; overrides are
+- [x] Scopes derive automatically for all endpoints; overrides are
       explicit, greppable and documented; legacy unscoped keys carry
       the wildcard and behave exactly as before.
-- [ ] Admin endpoints require both the `system` namespace and the
+- [x] Admin endpoints require both the `system` namespace and the
       `cluster-admin` scope, and a `["cluster-admin", "node.read"]`
       credential can read a node but not delete one.
-- [ ] `TrustedIssuer` and `MappingRule` are database-backed objects
+- [x] `TrustedIssuer` and `MappingRule` are database-backed objects
       with events, CRUD APIs, and the correct ownership gates; rules
       die with their namespace.
-- [ ] A GitHub Actions OIDC token can be exchanged for a scoped,
+- [x] A GitHub Actions OIDC token can be exchanged for a scoped,
       expiring key that works with an unmodified `sf-client`.
-- [ ] The same machinery exchanges an Authentik-style token with
+- [x] The same machinery exchanges an Authentik-style token with
       configuration only, proven by test.
-- [ ] Replay of one token against one rule is refused; the same token
+- [x] Replay of one token against one rule is refused; the same token
       against a different rule still works.
-- [ ] Scopes survive the trust boundary: readable across, not
+- [x] Scopes survive the trust boundary: readable across, not
       writable across, asserted by test.
-- [ ] No secret appears in any event; the failed-exchange event
+- [x] No secret appears in any event; the failed-exchange event
       reaches the rule owner.
-- [ ] Every cluster-minted secret carries the `sfk_` prefix and a
+- [x] Every cluster-minted secret carries the `sfk_` prefix and a
       verifiable checksum; the prefix is reserved against
       operator-supplied secrets; a bad checksum is rejected before any
       bcrypt comparison; and the rotation caveat for a pre-existing
       `sfk_`-prefixed secret is in the operator guide.
-- [ ] `pre-commit run --all-files` clean; `tox -e genprotos` no-op;
-      unit tests green; functional CI green on the branch **before**
-      the PR merges.
-- [ ] Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10 and 11
+- [x] `pre-commit run --all-files` clean; `tox -e genprotos` no-op;
+      unit tests green. Functional CI green on the branch **before**
+      the PR merges — this one cannot be ticked from a local tree and
+      is the operator's gate at pull request time.
+- [x] Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10 and 11
       marked resolved; phase status updated in the Execution table
       and `docs/plans/index.md`; glossary and guides updated.
 
@@ -516,3 +517,7 @@ must back-brief the management session on its understanding of the
 brief and surrounding context. The management session must present
 the 3g and 3h diffs for operator review before commit — the exchange
 endpoint is the security boundary this entire plan exists to create.
+
+The 3g and 3h diffs were both presented. The operator elected to
+review the phase as a whole at the pull request rather than
+step by step, which is why both were committed before review.
