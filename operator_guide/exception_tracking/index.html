@@ -10233,6 +10233,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exceptions-in-the-log-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exceptions in the log stream
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#viewing-exceptions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10599,6 +10610,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exceptions-in-the-log-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exceptions in the log stream
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#viewing-exceptions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10670,26 +10692,83 @@ identical exceptions are deduplicated automatically.</p>
 <li>Unhandled exceptions in worker threads via <code>threading.excepthook</code></li>
 <li>Exceptions passed to <code>ignore_exception()</code>, which are caught but logged</li>
 </ul>
+<h2 id="exceptions-in-the-log-stream">Exceptions in the log stream<a class="headerlink" href="#exceptions-in-the-log-stream" title="Permanent link">&para;</a></h2>
+<p>Every recorded exception also produces exactly one log line above DEBUG,
+and that line carries the fields needed to find the on-disk record:</p>
+<ul>
+<li><code>exception_hash</code> -- the same 8 characters used in the filename, so the
+  record is at <code>/srv/shakenfist/exceptions/&lt;exception_hash&gt;.json</code></li>
+<li><code>exception_class</code> -- the exception type, for example <code>ValueError</code></li>
+<li><code>count</code> -- how many times this signature has been seen, which is the
+  value from the JSON file at the moment the line was emitted</li>
+</ul>
+<p>Which line carries them depends on how the exception was caught:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Shipped line</th>
+<th>Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ignore_exception()</code> (daemons and workers)</td>
+<td><code>[Exception] Ignored error in &lt;process&gt;: ...</code></td>
+<td>ERROR</td>
+</tr>
+<tr>
+<td>An unhandled exception in a REST API handler</td>
+<td><code>Server error</code></td>
+<td>ERROR</td>
+</tr>
+<tr>
+<td><code>sys.excepthook</code> / <code>threading.excepthook</code>, first occurrence of a signature</td>
+<td><code>Recorded new exception: ...</code></td>
+<td>WARNING</td>
+</tr>
+<tr>
+<td><code>sys.excepthook</code> / <code>threading.excepthook</code>, repeat occurrence</td>
+<td><code>Recorded repeat exception</code></td>
+<td>DEBUG</td>
+</tr>
+</tbody>
+</table>
+<p>Only one line per event is emitted above DEBUG. The recorder's own
+book-keeping line (<code>Recorded exception (already logged by caller)</code>) stays
+at DEBUG whenever the caller has already logged the full detail, so a
+single failure does not appear twice in centralised logging under two
+different message signatures -- which used to double the apparent rate of
+every task exception type in log mining (github issue #3590).</p>
+<p>Note that repeat occurrences from the excepthooks drop to DEBUG on
+purpose, so a hot loop cannot flood the aggregator. The JSON file remains
+the authoritative record of how many times a signature has occurred and
+when, so a signature which appears once in your logs may still have a
+<code>count</code> in the thousands.</p>
+<p>To go from a log line to the record, take <code>exception_hash</code> from the log
+event and read the matching file on the node which emitted it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cat<span class="w"> </span>/srv/shakenfist/exceptions/1a2b3c4d.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
+</code></pre></div>
 <h2 id="viewing-exceptions">Viewing Exceptions<a class="headerlink" href="#viewing-exceptions" title="Permanent link">&para;</a></h2>
 <p>To list all recorded exceptions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ls<span class="w"> </span>-la<span class="w"> </span>/srv/shakenfist/exceptions/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ls<span class="w"> </span>-la<span class="w"> </span>/srv/shakenfist/exceptions/
 </code></pre></div>
 <p>To view the details of a specific exception:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cat<span class="w"> </span>/srv/shakenfist/exceptions/&lt;hash&gt;.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cat<span class="w"> </span>/srv/shakenfist/exceptions/&lt;hash&gt;.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
 </code></pre></div>
 <p>To find the most frequently occurring exceptions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>/srv/shakenfist/exceptions/*.json<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>jq<span class="w"> </span>-r<span class="w"> </span>.count<span class="w"> </span><span class="nv">$f</span><span class="k">)</span><span class="s2"> </span><span class="nv">$f</span><span class="s2">&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-10
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>/srv/shakenfist/exceptions/*.json<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>jq<span class="w"> </span>-r<span class="w"> </span>.count<span class="w"> </span><span class="nv">$f</span><span class="k">)</span><span class="s2"> </span><span class="nv">$f</span><span class="s2">&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-10
 </code></pre></div>
 <h2 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h2>
 <p>Exception files accumulate over time. You may wish to periodically clean up
 old exception files, particularly after addressing the underlying issues:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Remove all exception files</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>rm<span class="w"> </span>/srv/shakenfist/exceptions/*.json
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Or remove files older than 7 days</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>find<span class="w"> </span>/srv/shakenfist/exceptions/<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.json&quot;</span><span class="w"> </span>-mtime<span class="w"> </span>+7<span class="w"> </span>-delete
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Remove all exception files</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>rm<span class="w"> </span>/srv/shakenfist/exceptions/*.json
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Or remove files older than 7 days</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>find<span class="w"> </span>/srv/shakenfist/exceptions/<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.json&quot;</span><span class="w"> </span>-mtime<span class="w"> </span>+7<span class="w"> </span>-delete
 </code></pre></div>
 
 
