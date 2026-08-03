@@ -23,6 +23,8 @@ The remaining incomplete plans — [Embrace TLS](PLAN-embrace-tls.md), [Sticky b
 
 The **generic-allocator / network-service-ports / network-carrier-model triple** is internally ordered. Generic-allocator is the foundational refactor (replaces five ad-hoc allocators with one primitive and is independently shippable). Network-service-ports builds on the allocator to expose per-network DNAT'd ports for managed services (web consoles, transfer agents, managed VPN endpoints). Network-carrier-model layers a smeared lease-based per-network carrier role with VIP advertisement on top, removing the network-node singleton; it depends on both prior plans and is the largest of the three. The triple supersedes the "network node failover" thread that was previously a not-yet-drafted line item.
 
+[Declarative API input validation](PLAN-api-input-validation.md) is independent of all of the above and gated on nothing, so it can start whenever there is appetite. It closes a cluster of reported issues going back to 2020 (#528 and #936 are the parent issues) whose common cause is that request body values reach handlers untyped. It is drafted now because a per-endpoint fix for one instance of it (#3609) was attempted and abandoned: seven hand-rolled guards, two of them wrong on the first attempt, and the defect class still not covered. Its one coordination point is with the [API query batching roadmap](api-query-batching-roadmap.md), which needs the same bounded `limit`/`offset` parameter types for #1974.
+
 The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing.
 
 ## Plan Status
@@ -167,6 +169,8 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 2: Disk reservation model](PLAN-per-host-resource-reservations-phase-02-disk-metric.md) | Complete | Per-node disk floor at the instances/blobs allocation points; publish `disk_reservation_gb` and convert `MINIMUM_FREE_DISK` consumers |
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 3: Ansible templating](PLAN-per-host-resource-reservations-phase-03-ansible-templating.md) | Complete | Per-host defaults templated into `/etc/sf/config`; stop `set-config`'ing reservations; inventory override |
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 4: Docs and cleanup](PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md) | Complete | Operator docs, plan index, `sf-ctl unset-config` + inert-row retirement |
+| [API input validation](PLAN-api-input-validation.md) | Phase 0: Research and decisions | Stub | Choose the validation library, decide whether to compile the existing `swagger_helper` declarations or author schemas, settle the malformed-input response shape and the warn-only exit criterion |
+| [API input validation](PLAN-api-input-validation.md) | Later phases | Stub | Declaration audit, type vocabulary, warn-only rollout, enforcement, exception-handler narrowing, semantic validators |
 
 ### Status Definitions
 
