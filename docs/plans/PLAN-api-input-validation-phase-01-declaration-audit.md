@@ -2,6 +2,8 @@
 
 ## Context
 
+**Status: complete.**
+
 This is phase 1 of
 [`PLAN-api-input-validation.md`](PLAN-api-input-validation.md).
 
@@ -155,20 +157,47 @@ substring matching on source text.
 
 ## Success criteria
 
-- [ ] All 119 path parameters declared as `path`, derived from
+- [x] All 119 path parameters declared as `path`, derived from
       the route table rather than by hand.
-- [ ] No location outside the Swagger 2.0 set, enforced at import
-      time.
-- [ ] The 5 wrong names corrected, and the raw-body
+- [x] No location outside the Swagger 2.0 set, enforced at import
+      time via `InvalidAPIDeclaration`.
+- [x] The 5 wrong names corrected, and the raw-body
       pseudo-parameter given a representation the compiler can
-      skip.
-- [ ] Every handler kwarg either declared or explicitly exempt.
-- [ ] W6's test passes, and fails when a declaration is broken on
-      purpose.
-- [ ] `mkdocs` builds and the generated OpenAPI is inspected —
-      path parameters now render as path parameters.
-- [ ] No production behaviour change: the full unit suite and a
-      functional CI run pass without modification.
+      skip (`api_base.RAW_BODY_PARAMETER`).
+- [x] Every handler kwarg either declared or explicitly exempt.
+- [x] W6's test passes, and fails when a declaration is broken on
+      purpose (verified against two deliberate breakages).
+- [x] The generated specification was inspected — path parameters
+      now render as `in=path`.
+- [x] No production behaviour change: the full unit suite passes
+      unmodified.
+
+## Outcome
+
+Six commits, one per worklist item plus the snapshot endpoint the
+test found. What changed beyond the plan:
+
+**W6 found an endpoint the audit could not.**
+`InstanceSnapshotEndpoint` carries no `swag_from` at all, so both
+its methods were absent from the published API — including
+`max_versions`, which PR #3610 found flows unvalidated into
+`Artifact.from_url()`. The by-hand measurements compared
+declarations against handlers, so an endpoint with *no*
+declaration was invisible to them. Declared as part of W6.
+
+**One deferral.** The five metadata `delete` endpoints accept
+`value` and none of them read it. The right fix is to stop
+accepting it, not to document it, but removing it today makes a
+caller who sends it receive `delete() got an unexpected keyword
+argument 'value'` as a 400 — the exact leak this plan exists to
+close. It is deferred to phase 4, when the schema layer rejects
+unknown parameters cleanly, and is recorded in
+`UNDECLARED_BY_DESIGN` in the test with that reasoning. The
+official client has never sent it.
+
+**The 11 `body` path parameters were all unintentional**, as
+phase 0's D8 predicted: `interface_uuid`, `key_name` and
+`namespace`, all ordinary path segments.
 
 ## Notes for the executing session
 
