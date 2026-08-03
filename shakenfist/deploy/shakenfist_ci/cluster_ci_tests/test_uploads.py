@@ -1,6 +1,7 @@
 import json
 import string
 
+from shakenfist_client import apiclient
 from testtools import content
 
 from shakenfist_ci import base
@@ -31,3 +32,27 @@ class TestUploads(base.BaseNamespacedTestCase):
 
         self.assertEqual(
             len(string.ascii_letters) * 50 + 100, a['blobs']['1']['size'])
+
+    def test_truncate_rejects_a_bad_offset(self):
+        # The truncate offset used to reach os.truncate through an
+        # unguarded int(): a non-numeric offset raised ValueError and
+        # became a 500 with a ValueError repr in the body, and a
+        # negative one raised OSError and did the same. Both are client
+        # input, so both must be a 400. This is the same defect class
+        # as issue 3609.
+        upl = self.test_client.create_upload()
+        self.test_client.send_upload(upl['uuid'], string.ascii_letters)
+
+        for offset in ('banana', '-1'):
+            exc = self.assertRaises(
+                apiclient.RequestMalformedException,
+                self.test_client._request_url,
+                'POST', '/upload/' + upl['uuid'] + '/truncate/' + offset)
+            self.assertEqual(400, exc.status_code, 'offset %s' % offset)
+            self.assertIn('offset', exc.text)
+
+        # A valid truncate still works after the rejections, so the
+        # upload was not damaged by them.
+        self.test_client.truncate_upload(upl['uuid'], 10)
+        a = self.test_client.upload_artifact('test-bad-offset', upl['uuid'])
+        self.assertEqual(10, a['blobs']['1']['size'])

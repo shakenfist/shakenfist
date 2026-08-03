@@ -64,7 +64,13 @@ class TestEventsQueryParameters(base.BaseTestCase):
         if len(control) > 5:
             self.assertEqual(5, len(events))
         else:
-            self.assertEqual(len(control), len(events))
+            # A node with fewer than five events is not a case this can
+            # assert equality on: events are appended continuously, so
+            # one landing between the two fetches would make the second
+            # response longer than the control. Any real node has well
+            # over five events, so this branch should be unreachable,
+            # but it must not be racy if it is reached.
+            self.assertLessEqual(len(events), 5)
 
     def test_oversized_limit_is_capped(self):
         # A limit beyond int32 was coerced successfully and then
@@ -75,6 +81,11 @@ class TestEventsQueryParameters(base.BaseTestCase):
         node_name = self._node_name()
         events = self._events(node_name, limit=2 ** 40)
         self.assertNotEqual(0, len(events))
+
+        # The documented ceiling, which is what makes the value
+        # serialisable. Only non-vacuous on a node with more than 1000
+        # events, but free to assert.
+        self.assertLessEqual(len(events), 1000)
 
     def test_non_numeric_limit_is_a_clean_400(self):
         node_name = self._node_name()

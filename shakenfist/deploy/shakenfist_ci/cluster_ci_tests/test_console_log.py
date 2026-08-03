@@ -75,3 +75,16 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.RequestMalformedException,
             self.test_client.get_console_data, inst['uuid'], 'banana')
+
+        # A non-scalar length raises TypeError rather than ValueError
+        # from int(), which used to escape the endpoint's guard and be
+        # returned to the client as a 400 carrying the interpreter's
+        # own message -- the same defect as issue 3609. The client
+        # helper always sends an int, so drive the body directly.
+        exc = self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.test_client._request_url,
+            'GET', '/instances/' + inst['uuid'] + '/consoledata',
+            data={'length': [5]})
+        self.assertEqual(400, exc.status_code)
+        self.assertIn('length is not an integer', exc.text)

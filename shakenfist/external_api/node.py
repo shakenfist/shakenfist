@@ -162,11 +162,11 @@ class NodeEventsEndpoint(api_base.Resource):
         [
             ('node', 'query', 'node', 'The name of a node.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
-            ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+            ('limit', 'body', 'integer', api_base.EVENTS_LIMIT_DESCRIPTION,
+             False)
         ],
         [(200, 'Event information about a single node.', node_events_example),
-         (400, 'The limit must be an integer.', None),
+         (400, 'The limit or event_type parameter was malformed.', None),
          (404, 'Node not found.', None)]))
     @api_base.caller_is_admin
     @api_base.log_token_use

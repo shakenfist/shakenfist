@@ -563,11 +563,11 @@ class ArtifactEventsEndpoint(api_base.Resource):
             ('artifact_ref', 'query', 'uuidorname',
              'The UUID or name of the artifact.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
-            ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+            ('limit', 'body', 'integer', api_base.EVENTS_LIMIT_DESCRIPTION,
+             False)
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
-         (400, 'The limit must be an integer.', None),
+         (400, 'The limit or event_type parameter was malformed.', None),
          (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_access
@@ -679,6 +679,7 @@ class ArtifactVersionEndpoint(api_base.Resource):
             ('version_id', 'query', 'integer', 'The version number to remove.', False)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
+         (400, 'The version index must be an integer.', None),
          (404, 'Artifact index not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_ownership
@@ -687,7 +688,7 @@ class ArtifactVersionEndpoint(api_base.Resource):
         try:
             ver_index = int(version_id)
         except (TypeError, ValueError):
-            # See the note on ArtifactMaxVersionsEndpoint.post: a JSON
+            # See the note on ArtifactVersionsEndpoint.post: a JSON
             # null reaches int() as None, which is a TypeError.
             return sf_api.error(400, 'version index is not an integer',
                                 suppress_traceback=True)

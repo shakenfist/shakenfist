@@ -671,7 +671,7 @@ def handle_authorization_exceptions(func):
             # used for query args, and then narrow this handler to the
             # JWT-related TypeErrors it was written for. That is a
             # larger change than any single endpoint fix, so it is
-            # recorded here rather than done in passing.
+            # tracked as issue 3612 rather than done in passing.
             return sf_api.error(400, str(e), suppress_traceback=False)
 
         except DecodeError:
@@ -769,6 +769,18 @@ def suppress_exceptions_to_client(func):
     return wrapper
 
 
+# The bounds object_events_response enforces on limit. The endpoints
+# state them in their swagger parameter description via
+# EVENTS_LIMIT_DESCRIPTION, so the published API contract and the code
+# cannot drift apart.
+EVENTS_LIMIT_DEFAULT = 100
+EVENTS_LIMIT_MAX = 1000
+EVENTS_LIMIT_DESCRIPTION = (
+    'The number of events to return, defaults to %d, maximum %d. Values of '
+    'zero or less are treated as the default.'
+    % (EVENTS_LIMIT_DEFAULT, EVENTS_LIMIT_MAX))
+
+
 def object_events_response(object_type, object_uuid, limit, event_type):
     """Build the per-object events REST response.
 
@@ -798,6 +810,15 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     API's guarantee about ``limit`` complete rather than partial, and
     keeps the two layers agreeing on the ceiling.
     """
+    # bool is a subclass of int, so int(True) is 1 and int(False) is 0.
+    # Coercing those silently would answer obviously malformed input
+    # with exactly one event, or with the default, which is more
+    # surprising than a rejection -- and the event_type check below
+    # already rejects a wrong-typed value outright.
+    if isinstance(limit, bool):
+        return sf_api.error(400, 'limit must be an integer',
+                            suppress_traceback=True)
+
     try:
         limit = int(limit)
     except (TypeError, ValueError):
@@ -811,8 +832,8 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     # Mirrors the hardening documented on
     # mariadb._direct_get_object_events.
     if limit <= 0:
-        limit = 100
-    limit = min(limit, 1000)
+        limit = EVENTS_LIMIT_DEFAULT
+    limit = min(limit, EVENTS_LIMIT_MAX)
 
     if event_type is not None and not isinstance(event_type, str):
         return sf_api.error(400, 'event_type must be a string',

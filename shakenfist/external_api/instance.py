@@ -1084,11 +1084,11 @@ class InstanceEventsEndpoint(api_base.Resource):
             ('instance_ref', 'query', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
-            ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+            ('limit', 'body', 'integer', api_base.EVENTS_LIMIT_DESCRIPTION,
+             False)
         ],
         [(200, 'Event information about a single instance.', instance_events_example),
-         (400, 'The limit must be an integer.', None),
+         (400, 'The limit or event_type parameter was malformed.', None),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1355,6 +1355,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
              'The amount of data to fetch, defaults to 10240 bytes.', False)
         ],
         [(200, 'The console data as an application/octet-stream.', None),
+         (400, 'The length must be an integer.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
     @api_base.arg_is_instance_ref
@@ -1369,7 +1370,14 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         else:
             try:
                 parsed_length = int(length)
-            except ValueError:
+            except (TypeError, ValueError):
+                # TypeError as well as ValueError: log_request merges
+                # JSON body values into kwargs verbatim, so a
+                # {'length': [5]} body reaches int() as a list. Catching
+                # only ValueError let that escape to
+                # handle_authorization_exceptions, which turns any
+                # TypeError into a 400 carrying the interpreter's own
+                # message -- the same defect as issue 3609.
                 pass
 
             # This is done this way so that there is no active traceback for

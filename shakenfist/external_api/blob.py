@@ -269,11 +269,11 @@ class BlobEventsEndpoint(api_base.Resource):
         [
             ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
-            ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+            ('limit', 'body', 'integer', api_base.EVENTS_LIMIT_DESCRIPTION,
+             False)
         ],
         [(200, 'Event information about a single blob.', blob_events_example),
-         (400, 'The limit must be an integer.', None),
+         (400, 'The limit or event_type parameter was malformed.', None),
          (404, 'Blob not found.', None)]))
     @api_base.log_token_use
     def get(self, blob_uuid=None, event_type=None, limit=100):
