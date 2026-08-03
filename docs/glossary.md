@@ -193,7 +193,11 @@ object, usually referred to by a version-4 UUID string; the exceptions named by
 name are nodes, namespaces, and keys. Referring to an object *by reference* means
 passing either its name or its UUID, and a by-name lookup searches every object
 visible to the caller -- those in the caller's own namespace, and those in
-namespaces that trust it (plus shared artifacts for artifact commands). Defined
+namespaces that trust it (plus shared artifacts for artifact commands). The
+caller's own namespace always wins, so nothing another namespace does can
+change what a name already means to you. Operations which *modify* an object
+resolve a name in the caller's own namespace only, so that a name can never
+resolve into another namespace and then destroy what it found there. Defined
 authoritatively in `docs/user_guide/objects.md`.
 
 **Release pipeline vocabulary**{#release-pipeline} -- The release process signs

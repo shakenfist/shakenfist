@@ -249,6 +249,67 @@ class Artifact(dbowo):
         return cls(matches[0])
 
     @classmethod
+    def from_db_by_ref_visible_to(
+            cls, object_ref: Union[str, uuid_mod.UUID],
+            requestor: Optional[str] = None) -> 'Artifact | None':
+        """Resolve a ref across everything ``requestor`` may see.
+
+        ``from_db_by_ref`` scopes a name lookup to exactly one
+        namespace, which is right when the caller named one and wrong
+        when they did not. A tenant can see a shared image in
+        ``GET /artifacts`` and then fail to look up the very name the
+        listing just showed them, because the name search never leaves
+        their own namespace. Use this when the caller did *not* name a
+        namespace and the answer should match what they can see.
+
+        Resolution is two phase, and the first phase is exactly
+        ``from_db_by_ref``. Whatever the caller's own namespace
+        resolves to wins unchanged, including raising
+        ``MultipleObjects`` when the name is ambiguous within it: an
+        artifact you own must never start resolving to somebody else's
+        just because they happen to have picked the same name. Only
+        when your own namespace has no answer at all do we widen, and
+        then only to artifacts ``namespace_or_shared_filter`` would
+        have put in your listing.
+
+        Phase one is also the fast path, and stays free of the
+        per-candidate trust lookups phase two needs.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        own = cls.from_db_by_ref(object_ref, requestor)
+        if own:
+            return own
+
+        # from_db_by_ref reads 'system' and None as "every namespace",
+        # so for those callers phase one has already searched the whole
+        # cluster and phase two would just run the query again.
+        if not requestor or requestor == 'system':
+            return None
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            name=object_ref,
+        )
+        visible = [
+            a for a in map(cls, mariadb.find_artifacts(criteria))
+            if namespace_or_shared_filter(requestor, a)
+        ]
+
+        if not visible:
+            return None
+        if len(visible) > 1:
+            # A tenant cannot disambiguate this with the `namespace`
+            # body field, because resolve_lookup_namespace only lets
+            # them name their own, so point them at the ref which is
+            # never ambiguous.
+            raise exceptions.MultipleObjects(
+                f'multiple artifacts visible to "{requestor}" have the '
+                f'name "{object_ref}", use a UUID to choose one')
+        return visible[0]
+
+    @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,
             namespace=None):
         if namespace is None:

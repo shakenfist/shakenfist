@@ -38,6 +38,31 @@ artifacts in a namespace, or a specific artifact for more detailed information.
 Artifacts also track "events" (see the [user guide](/user_guide/events/) for
 a general introduction to the Shaken Fist event system).
 
+`{artifact_ref}` is either a UUID or a name. A UUID identifies exactly one
+artifact. A name does not, because names are only unique within a namespace,
+so on the read-only routes a name is resolved against every artifact you can
+see — your own namespace first, and then the artifacts of namespaces which
+trust you and any artifact marked shared. Your own namespace always wins: if
+you have an artifact called `debian-11` and somebody shares a different one by
+that name, yours is still the one you get.
+
+If a name matches more than one artifact you can see and none of them is
+yours, the request fails with `400` rather than picking one, and you should
+use the UUID instead. Supplying a `namespace` in the request body turns the
+widening off and resolves the name in that namespace alone; a `400` in your
+own namespace means you have two artifacts of that name, which the `namespace`
+field cannot disambiguate either.
+
+Routes which **change** an artifact — delete, share, unshare, set max
+versions, delete a version, and all of the metadata routes — resolve a name in
+your own namespace and nowhere else, and answer `404` for a name you do not
+own. Trust still permits those operations against a namespace which trusts
+you, but you have to name the artifact by UUID to reach it. A name that
+resolves somewhere unexpected is a nuisance on a read and a disaster on a
+delete. Note that this follows the route's authorization, not its HTTP verb:
+`GET /artifacts/{artifact_ref}/metadata` is ownership-guarded and therefore
+resolves narrowly.
+
 ???+ tip "REST API calls"
 
     * [GET /artifacts](https://openapi.shakenfist.com/#/artifacts/get_artifacts): List artifacts for a namespace.

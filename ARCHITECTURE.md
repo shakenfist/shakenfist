@@ -1082,6 +1082,61 @@ Both refuse with `404` rather than `403`, so a refusal does not confirm that
 the object exists. Scope enforcement is a separate and earlier gate — a caller
 who fails the scope check gets `403` without either decorator running.
 
+#### Resolving a name
+
+Guarding a lookup is a separate problem from performing one, and for a name
+the two have to agree. `{artifact_ref}` accepts a UUID or a name; a UUID
+identifies one artifact, but names are unique only within a namespace, so
+resolution needs a scope and the obvious scope — the caller's own namespace —
+is narrower than what the caller can see. That gap is visible from outside: a
+tenant reads a shared image's name out of `GET /artifacts` and then gets a
+`404` asking for it by that name.
+
+`Artifact.from_db_by_ref_visible_to(ref, requestor)` closes it in two phases,
+and the ordering carries more weight than the widening:
+
+1. `from_db_by_ref(ref, requestor)`, unchanged, including raising
+   `MultipleObjects` when the name is ambiguous inside the caller's own
+   namespace. Whatever your own namespace resolves to wins. Without this,
+   sharing an artifact called `debian-11` would silently retarget every
+   tenant who already had one of their own by that name.
+2. Only on a miss, an unscoped query by name filtered through
+   `namespace_or_shared_filter` — the same predicate the listing and the read
+   guard use. More than one survivor raises `MultipleObjects`, because a
+   tenant cannot disambiguate with the `namespace` body field (they may only
+   name their own) and picking one would be a guess. The error points at the
+   UUID, which is never ambiguous.
+
+Phase one is the fast path and stays free of phase two's per-candidate trust
+lookups.
+
+Widening applies to reading only, and the split is expressed as two decorators
+over one shared body (`_resolve_artifact_ref`) so the pairing is visible at
+each route:
+
+| Decorator | Pairs with | A name resolves to |
+|-----------|------------|--------------------|
+| `arg_is_visible_artifact_ref` | `requires_artifact_access` | anything you can see, own namespace first |
+| `arg_is_artifact_ref` | `requires_artifact_ownership` | your own namespace only |
+
+Trust permits a trusted namespace to delete another's artifact, and it still
+does *by UUID*. What the narrow rule prevents is a name resolving into another
+namespace on a route that then destroys what it found:
+`sf-client artifact delete build-cache`, run somewhere with no `build-cache`
+of its own, must fail rather than delete the one belonging to a namespace that
+happens to trust it. A misresolved name is a nuisance on a read and a disaster
+on a delete, so the two routes get different answers.
+
+The split follows the authorization guard, not the HTTP verb — `GET
+/artifacts/{ref}/metadata` is ownership-guarded and therefore resolves
+narrowly. Either decorator also drops back to the narrow behaviour when the
+caller named a namespace in the request body, since that caller asked about
+one namespace specifically.
+
+Instances and networks have the same shape in `arg_is_instance_ref` and
+`arg_is_network_ref` and have not been widened. Sharing is an artifact-only
+concept by design, so only the trust half would apply to them.
+
 ### VDI console token trust model
 
 The Kerbside VDI console proxy integration uses **offline signature

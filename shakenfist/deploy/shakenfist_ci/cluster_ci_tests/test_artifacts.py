@@ -333,6 +333,12 @@ class TestSharedImages(base.BaseNamespacedTestCase):
             fetched, indent=4, sort_keys=True)))
         self.assertEqual(url, fetched['source_url'])
 
+        # And by name, which is what a caller who has just read the
+        # listing actually has to hand. An artifact cached from a URL
+        # takes its name from the last path element.
+        by_name = self.test_client.get_artifact(url.split('/')[-1])
+        self.assertEqual(shared['uuid'], by_name['uuid'])
+
         # Sharing publishes an artifact for reading. It is not a
         # transfer of ownership, so the write paths stay closed.
         self.assertRaises(
@@ -389,6 +395,9 @@ class TestTrusts(base.BaseNamespacedTestCase):
         fetched = self.test_client_two.get_artifact(art['uuid'])
         self.assertEqual(url, fetched['source_url'])
 
+        by_name = self.test_client_two.get_artifact(url.split('/')[-1])
+        self.assertEqual(art['uuid'], by_name['uuid'])
+
         # Remove trust
         self.test_client_one.remove_namespace_trust(
             self.namespace + '-1', self.namespace + '-2')
@@ -406,6 +415,9 @@ class TestTrusts(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.ResourceNotFoundException,
             self.test_client_two.get_artifact, art['uuid'])
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client_two.get_artifact, url.split('/')[-1])
 
         self.system_client.delete_namespace(self.namespace + '-1')
         self.system_client.delete_namespace(self.namespace + '-2')

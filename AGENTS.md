@@ -380,6 +380,21 @@ unshared artifacts. Refuse with `404` rather than `403` so the refusal does not
 confirm the object exists, and pair every new refusal test with a control that
 shows the same request succeeding when the one thing under test changes.
 
+The same predicate governs how a *name* resolves on the read routes, not just
+whether a resolved object is allowed through. `arg_is_visible_artifact_ref`
+(paired with `requires_artifact_access`) resolves through
+`Artifact.from_db_by_ref_visible_to`, which searches the caller's own
+namespace first and only then widens to what `namespace_or_shared_filter`
+admits. Two rules to preserve if you touch this:
+
+- The caller's own namespace must win, or sharing an object silently
+  retargets every tenant who already used that name.
+- Routes which change an object use plain `arg_is_artifact_ref` and resolve
+  names narrowly. Trust still permits the write by UUID; what must not happen
+  is a name resolving into someone else's namespace on a route that then
+  deletes what it found. New route, ownership guard, narrow ref decorator —
+  the pairing goes together.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

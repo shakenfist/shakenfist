@@ -48,7 +48,10 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-def arg_is_artifact_ref(func):
+def _resolve_artifact_ref(func, widen):
+    # Shared body of the two ref decorators below. `widen` says
+    # whether a *name* may resolve outside the caller's own namespace;
+    # see those two for which routes get which, and why.
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.pop('namespace', None)
 
@@ -72,8 +75,16 @@ def arg_is_artifact_ref(func):
                 kwargs['artifact_uuid'])
         else:
             try:
-                kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
-                    kwargs.get('artifact_ref'), lookup_namespace)
+                # Naming a namespace turns the widening off whatever
+                # the route asked for: that caller asked about one
+                # namespace and must be answered from it or not at all.
+                if widen and not body_namespace:
+                    kwargs['artifact_from_db'] = \
+                        Artifact.from_db_by_ref_visible_to(
+                            kwargs.get('artifact_ref'), lookup_namespace)
+                else:
+                    kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
+                        kwargs.get('artifact_ref'), lookup_namespace)
             except exceptions.MultipleObjects as e:
                 return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -97,8 +108,46 @@ def arg_is_artifact_ref(func):
     return wrapper
 
 
+def arg_is_artifact_ref(func):
+    """Resolve a ref, with names scoped to the caller's namespace.
+
+    Pair this with `requires_artifact_ownership`, which is to say use
+    it on everything that changes an artifact.
+
+    A name here means "mine". Trust does permit a trusted namespace to
+    delete somebody else's artifact, and `requires_artifact_ownership`
+    still allows that by UUID -- but *resolving* a name into another
+    namespace and then destroying what it landed on is a different
+    proposition. `sf-client artifact delete build-cache` run in a
+    namespace that has no `build-cache` of its own should say so, not
+    quietly find and delete the one belonging to a namespace which
+    happens to trust it. Destructive actions get the narrow, boring
+    reading of an ambiguous name.
+    """
+    return _resolve_artifact_ref(func, widen=False)
+
+
+def arg_is_visible_artifact_ref(func):
+    """Resolve a ref, with names spanning everything the caller sees.
+
+    Pair this with `requires_artifact_access`, which is to say use it
+    on read only routes.
+
+    Reading is where the narrow reading is the surprising one: a
+    tenant sees a shared image in `GET /artifacts`, asks for it by the
+    name the listing just showed them, and gets a 404. Widening costs
+    nothing here because the worst case is that the caller reads
+    something they were already entitled to read, and
+    `requires_artifact_access` still has to agree.
+    """
+    return _resolve_artifact_ref(func, widen=True)
+
+
 def requires_artifact_ownership(func):
-    # Requires that @arg_is_artifact_ref has already run.
+    # Requires that @arg_is_artifact_ref has already run -- that one
+    # specifically, not the widening variant, so that a name never
+    # resolves into another namespace on a route which then changes
+    # what it found.
     #
     # The stricter of the two tests, for anything which changes the
     # artifact: the caller's own namespace, a namespace which trusts
@@ -121,7 +170,7 @@ def requires_artifact_ownership(func):
 
 
 def requires_artifact_access(func):
-    # Requires that @arg_is_artifact_ref has already run.
+    # Requires that @arg_is_visible_artifact_ref has already run.
     #
     # The wider test, for read only routes: ownership as above, plus
     # any artifact explicitly marked shared. This is exactly the
@@ -260,7 +309,7 @@ class ArtifactEndpoint(api_base.Resource):
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact not found.', None)]))
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
     def get(self, artifact_ref=None, artifact_from_db=None):
@@ -599,7 +648,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
          (404, 'Artifact not found.', None)]))
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
     def get(self, artifact_ref=None, event_type=None, limit=100, artifact_from_db=None):
@@ -651,7 +700,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [(200, 'A list of the blobs which form the artifact versions.',
           artifact_versions_example),
          (404, 'Artifact not found.', None)]))
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, artifact_from_db=None):
         retval = []
@@ -888,7 +937,7 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
             artifact_outstanding_operations_example),
          (404, 'Artifact not found.', None)]))
     @use_kwargs(get_args, location='query')
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, all=False, artifact_from_db=None):
         retval = []

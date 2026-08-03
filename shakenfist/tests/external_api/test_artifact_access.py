@@ -111,10 +111,16 @@ class ArtifactAccessFixture(base.ShakenFistTestCase):
             '/artifacts/%s%s' % (self.artifact.uuid, path),
             headers={'Authorization': self._token(namespace, scopes_granted)})
 
-    def _delete(self, namespace):
+    def _delete(self, namespace, ref=None):
         return self.client.delete(
-            '/artifacts/%s' % self.artifact.uuid,
+            '/artifacts/%s' % (ref or self.artifact.uuid),
             headers={'Authorization': self._token(namespace)})
+
+    def _by_name(self, namespace, name='thing', body=None):
+        kwargs = {'headers': {'Authorization': self._token(namespace)}}
+        if body is not None:
+            kwargs['data'] = json.dumps(body)
+        return self.client.get('/artifacts/%s' % name, **kwargs)
 
 
 class UnsharedArtifactAccessTestCase(ArtifactAccessFixture):
@@ -268,3 +274,217 @@ class ArtifactAccessComposesWithScopesTestCase(ArtifactAccessFixture):
         # this caller see that object".
         resp = self._get('stranger', scopes_granted=['artifact.read'])
         self.assertEqual(404, resp.status_code)
+
+
+class ArtifactNameResolutionTestCase(ArtifactAccessFixture):
+    """Looking an artifact up by the name the listing showed you.
+
+    Visibility and resolution are different steps, and they used to
+    disagree in a way that had no explanation from outside: a tenant
+    could see a shared image in `GET /artifacts`, read its name, and
+    then get a 404 asking for it by that name, because the name search
+    never left their own namespace. Only a UUID worked.
+
+    Widening name resolution is not free, though. Names are unique per
+    namespace and nothing stops two namespaces choosing the same one,
+    so the ordering matters more than the widening does: your own
+    namespace must always win, or sharing an artifact called `debian`
+    would silently redirect every tenant who already had one.
+
+    And it only applies to reading. On a route that changes an
+    artifact, a name means one of yours -- see the write path tests at
+    the bottom of this class.
+    """
+
+    def _other(self, namespace, name='thing', shared=False):
+        """Another artifact of the same name, somewhere else."""
+        a = Artifact.new(
+            Artifact.TYPE_OTHER, 'http://example.com/%s-%s.tgz' % (
+                namespace, name),
+            name=name, namespace=namespace)
+        a.state = Artifact.STATE_CREATED
+        if shared:
+            a.shared = True
+        return a
+
+    # -- The gap being closed ------------------------------------------
+
+    def test_a_stranger_resolves_a_shared_artifact_by_name(self):
+        # The fix. Before this the listing would show `thing` and this
+        # request would 404.
+        self._share()
+        resp = self._by_name('stranger')
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(str(self.artifact.uuid), resp.get_json()['uuid'])
+
+    def test_a_trusted_namespace_resolves_by_name(self):
+        resp = self._by_name('trusted')
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(str(self.artifact.uuid), resp.get_json()['uuid'])
+
+    def test_the_owner_resolves_their_own_by_name(self):
+        # The control. Unchanged behaviour, and if it breaks none of
+        # the rest of this class means anything.
+        resp = self._by_name('owner')
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(str(self.artifact.uuid), resp.get_json()['uuid'])
+
+    def test_a_stranger_cannot_resolve_an_unshared_name(self):
+        # Widening resolution to what you can see must not widen what
+        # you can see.
+        self.assertEqual(404, self._by_name('stranger').status_code)
+
+    def test_an_unknown_name_is_still_not_found(self):
+        self.assertEqual(404, self._by_name('owner', 'nosuchthing').status_code)
+
+    # -- Ordering, which is the risky part -----------------------------
+
+    def test_your_own_artifact_wins_over_a_shared_one(self):
+        # The property that makes the widening safe to ship. A tenant
+        # with their own `thing` keeps resolving to their own `thing`
+        # after somebody else shares one by that name -- otherwise
+        # sharing an image would silently retarget every tenant who
+        # had already picked the same name for their own.
+        self._share()
+        mine = self._other('stranger')
+
+        resp = self._by_name('stranger')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(str(mine.uuid), resp.get_json()['uuid'])
+
+    def test_your_own_artifact_wins_over_a_trusted_one(self):
+        # The same property on the trust path. 'trusted' can see
+        # owner's `thing`, but has one of its own.
+        mine = self._other('trusted')
+
+        resp = self._by_name('trusted')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(str(mine.uuid), resp.get_json()['uuid'])
+
+    def test_an_ambiguous_name_in_your_own_namespace_still_refuses(self):
+        # Pre-existing behaviour, pinned because the new code path runs
+        # underneath it: two of your own by one name is a 400, and the
+        # widening must not "resolve" it by picking one.
+        self._other('owner')
+
+        self.assertEqual(400, self._by_name('owner').status_code)
+
+    def test_two_visible_foreign_artifacts_are_ambiguous(self):
+        # 'trusted' can see owner's `thing` through trust and
+        # stranger's `thing` through sharing, and owns neither, so
+        # there is no answer to give. A 400 naming the problem beats
+        # picking one at random.
+        self._share()
+        self._other('stranger', shared=True)
+
+        resp = self._by_name('trusted')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('UUID', resp.get_data(as_text=True))
+
+    def test_the_ambiguity_resolves_by_uuid(self):
+        # The control for the test above, and the escape hatch its
+        # error message points at. A tenant cannot disambiguate with
+        # the namespace field, because they may only name their own.
+        self._share()
+        self._other('stranger', shared=True)
+
+        resp = self.client.get(
+            '/artifacts/%s' % self.artifact.uuid,
+            headers={'Authorization': self._token('trusted')})
+        self.assertEqual(200, resp.status_code)
+
+    # -- Naming a namespace explicitly ---------------------------------
+
+    def test_naming_a_namespace_scopes_the_lookup(self):
+        # Widening only applies when the caller left the question open.
+        # A system caller who names a namespace is asking about that
+        # namespace, and must not be answered from another one.
+        self._share()
+
+        self.assertEqual(
+            200, self._by_name('system', body={'namespace': 'owner'}
+                               ).status_code)
+        self.assertEqual(
+            404, self._by_name('system', body={'namespace': 'stranger'}
+                               ).status_code)
+
+    def test_a_tenant_may_not_name_a_namespace_they_do_not_own(self):
+        # Pinned because this branch is the one the change reorganised.
+        self._share()
+
+        self.assertEqual(
+            404, self._by_name('stranger', body={'namespace': 'owner'}
+                               ).status_code)
+
+    def test_system_resolves_by_name_unchanged(self):
+        resp = self._by_name('system')
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(str(self.artifact.uuid), resp.get_json()['uuid'])
+
+    # -- The write paths -----------------------------------------------
+
+    def test_a_shared_artifact_cannot_be_deleted_by_name(self):
+        # Resolution getting wider must not make authorisation wider.
+        self._share()
+
+        self.assertEqual(404, self._delete('stranger', 'thing').status_code)
+        self.assertNotEqual(
+            Artifact.STATE_DELETED,
+            Artifact.from_db(self.artifact.uuid).state.value)
+
+    def test_a_trusted_namespace_cannot_delete_by_name(self):
+        # The widening stops at the read routes. Trust does permit
+        # this delete, and the test below shows it going through by
+        # UUID -- but a name that resolves into somebody else's
+        # namespace and then destroys what it lands on is a surprise
+        # nobody asked for. `artifact delete build-cache` in a
+        # namespace with no `build-cache` of its own must say so.
+        self.assertEqual(404, self._delete('trusted', 'thing').status_code)
+        self.assertNotEqual(
+            Artifact.STATE_DELETED,
+            Artifact.from_db(self.artifact.uuid).state.value)
+
+    def test_a_trusted_namespace_can_still_delete_by_uuid(self):
+        # The control for the test above. Trust is unchanged; only the
+        # way a name resolves on this route is.
+        self.assertEqual(200, self._delete('trusted').status_code)
+
+    def test_the_owner_can_still_delete_by_name(self):
+        # And the control for that control: narrowing name resolution
+        # on the write routes did not narrow it to nothing.
+        self.assertEqual(200, self._delete('owner', 'thing').status_code)
+
+    def test_the_narrow_rule_follows_the_guard_and_not_the_verb(self):
+        # Artifact metadata is a GET, but it is ownership guarded
+        # rather than access guarded, so it resolves names narrowly
+        # along with the write routes. The pairing is decorator to
+        # decorator and the HTTP verb has nothing to do with it --
+        # asserted on a second route so that the split is not resting
+        # on the delete test alone.
+        self.assertEqual(404, self.client.get(
+            '/artifacts/thing/metadata',
+            headers={'Authorization': self._token('trusted')}).status_code)
+
+        self.assertEqual(200, self.client.get(
+            '/artifacts/%s/metadata' % self.artifact.uuid,
+            headers={'Authorization': self._token('trusted')}).status_code)
+
+    def test_a_write_route_ignores_a_shared_artifact_of_the_same_name(self):
+        # `stranger` owns `thing` and can also see owner's shared
+        # `thing`. On a read route that ambiguity never arises, because
+        # your own namespace wins. On a write route the foreign one is
+        # not a candidate at all, so this deletes stranger's and leaves
+        # owner's alone.
+        self._share()
+        mine = self._other('stranger')
+
+        self.assertEqual(200, self._delete('stranger', 'thing').status_code)
+        self.assertEqual(
+            Artifact.STATE_DELETED, Artifact.from_db(mine.uuid).state.value)
+        self.assertNotEqual(
+            Artifact.STATE_DELETED,
+            Artifact.from_db(self.artifact.uuid).state.value)
