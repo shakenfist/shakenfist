@@ -315,7 +315,7 @@ class AuthNamespaceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to delete.', True)
+            ('namespace', 'path', 'string', 'The namespace to delete.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'You cannot delete a namespace with instances or networks.', None),
@@ -362,7 +362,7 @@ class AuthNamespaceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Get namespace information.',
         [
-            ('namespace', 'body', 'string', 'The namespace to get.', True)
+            ('namespace', 'path', 'string', 'The namespace to get.', True)
         ],
         [(200, 'Information about a single namespace.', namespace_get_example),
          (404, 'Namespace not found.', None)]))
@@ -460,7 +460,7 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Get the authentication keys for a namespace.',
         [
-            ('namespace', 'body', 'string',
+            ('namespace', 'path', 'string',
              'The namespace to fetch authentication keys for.', True)
         ],
         [(200, 'A list of keynames for the namespace.', '["deploy", ...]'),
@@ -477,7 +477,7 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Add an authentication key for the namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
+            ('namespace', 'path', 'string', 'The namespace to add a key to.', True),
             ('key_name', 'body', 'string', 'The name of the key.', True),
             ('key', 'body', 'string',
              'Optional. The authentication key. If omitted the cluster '
@@ -513,8 +513,8 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Update an authentication key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
-            ('key_name', 'body', 'string', 'The name of the key.', True),
+            ('namespace', 'path', 'string', 'The namespace to add a key to.', True),
+            ('key_name', 'path', 'string', 'The name of the key.', True),
             ('key', 'body', 'string', 'The authentication key.', True),
             ('expiry', 'body', 'number',
              'Optional. The time, in seconds since the unix epoch, at which '
@@ -553,8 +553,8 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete an authentication key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to remove a key from.', True),
-            ('key_name', 'body', 'string', 'The name of the key.', True)
+            ('namespace', 'path', 'string', 'The namespace to remove a key from.', True),
+            ('key_name', 'path', 'string', 'The name of the key.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'No key name specified.', None),
@@ -579,7 +579,7 @@ class AuthMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Fetch metadata for a namespace.',
         [
-            ('namespace', 'query', 'string', 'The namespace to fetch metadata for.', True)
+            ('namespace', 'path', 'string', 'The namespace to fetch metadata for.', True)
         ],
         [(200, 'Namespace metadata, if any.', None),
          (404, 'Namespace not found.', None)]))
@@ -592,7 +592,7 @@ class AuthMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Add metadata for a namespace.',
         [
-            ('namespace', 'query', 'string', 'The namespace to add a key to.', True),
+            ('namespace', 'path', 'string', 'The namespace to add a key to.', True),
             ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
@@ -618,8 +618,8 @@ class AuthMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Update a metadata key for a namespace.',
         [
-            ('namespace', 'query', 'string', 'The namespace to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('namespace', 'path', 'string', 'The namespace to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -642,8 +642,8 @@ class AuthMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a metadata key for a namespace.',
         [
-            ('namespace', 'query', 'string', 'The namespace to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('namespace', 'path', 'string', 'The namespace to remove a key from.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -664,7 +664,7 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Trust an external namespace.',
         [
-            ('namespace', 'query', 'string', 'The namespace to trust.', True)
+            ('namespace', 'path', 'string', 'The namespace to trust.', True)
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
          (400, 'No external namespace specified.', None),
@@ -691,9 +691,9 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Remove trust from an external namespace.',
         [
-            ('namespace', 'query', 'string',
+            ('namespace', 'path', 'string',
              'The namespace to alter.', True),
-            ('external_namespace', 'query', 'string',
+            ('external_namespace', 'path', 'string',
              'The namespace to no longer trust.', True)
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),

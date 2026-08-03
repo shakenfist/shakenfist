@@ -111,8 +111,8 @@ class ClusterOperationEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'clusteroperations', 'Get information for a cluster operation.',
         [
-            ('operation_type', 'query', 'uuid', 'The UUID of the operation.', True),
-            ('operation_uuid', 'query', 'uuid', 'The UUID of the operation.', True)
+            ('operation_type', 'path', 'uuid', 'The UUID of the operation.', True),
+            ('operation_uuid', 'path', 'uuid', 'The UUID of the operation.', True)
         ],
         [(200, 'Information about a single cluster operation.', clusteroperation_get_example),
          (403, 'Operation belongs to a namespace the caller cannot see.', None),
@@ -169,7 +169,7 @@ class ClusterOperationChainEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'clusteroperations',
         'Get the transitive depends_on closure for a cluster operation.',
-        [('op_uuid', 'query', 'uuid', 'The UUID of the operation.', True)],
+        [('op_uuid', 'path', 'uuid', 'The UUID of the operation.', True)],
         [(200, 'A list of cluster operation summary dicts, newest-first.',
           clusteroperation_chain_example),
          (400, 'Malformed depends_on entry, or chain exceeds the '
