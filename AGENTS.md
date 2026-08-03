@@ -357,6 +357,29 @@ row, `KERBSIDE_JWT_SIGNING_KEY` (two-key rotation window). The `sf-ctl`
 bootstrap and rotate it. Operator runbook:
 `docs/operator_guide/vdi_console_tokens.md`.
 
+### Never restate a visibility predicate
+
+A listing endpoint filters; a single-object endpoint cannot, because it has
+already resolved the object by the time it knows who is asking. The two must
+still agree, so the single-object guard calls *the same function* the listing
+filters with rather than open-coding the equivalent test.
+
+For artifacts that function is `namespace_or_shared_filter(namespace, obj)`:
+own namespace, a namespace whose trust list names the caller, `system`, or
+`shared`. `requires_artifact_access` calls it. `requires_artifact_ownership`
+is the deliberately stricter mutation guard and tests `namespace_is_trusted`
+alone — sharing publishes an artifact for reading, so the write paths must
+not consult the `shared` flag.
+
+This is not a style preference. `requires_artifact_access` used to restate the
+rule as `if a.shared and requestor not in [a.namespace, 'system']`, which is
+inverted in both directions, and because `arg_is_artifact_ref` resolves a UUID
+straight to `Artifact.from_db` with no namespace filter, that decorator was the
+only guard on the path. Any caller who knew a UUID could read any namespace's
+unshared artifacts. Refuse with `404` rather than `403` so the refusal does not
+confirm the object exists, and pair every new refusal test with a control that
+shows the same request succeeding when the one thing under test changes.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

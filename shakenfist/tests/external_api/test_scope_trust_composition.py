@@ -14,12 +14,18 @@ object it is reaching for lives in a namespace that trusts it. If it
 did, trust would be a scope-escape hatch: mint a narrowly scoped key,
 point it at a trusting namespace, and get the wildcard back.
 
-The tests run against the two artifact paths where trust is the gate:
-listing, which filters through namespace_or_shared_filter, and delete,
-which is guarded by requires_artifact_ownership. Each refusal is
-paired with a control showing the same request succeeding when the one
-thing under test is changed -- otherwise a 403 for some unrelated
-reason would read as the property holding.
+The tests run against the three artifact paths where trust is the
+gate: listing and reading by uuid, which both filter through
+namespace_or_shared_filter, and delete, which is guarded by
+requires_artifact_ownership. Each refusal is paired with a control
+showing the same request succeeding when the one thing under test is
+changed -- otherwise a 403 for some unrelated reason would read as the
+property holding.
+
+Whether a caller may see an artifact at all is a separate question,
+tested separately in test_artifact_access.py. Here it is only the
+backdrop: trust is the thing that opens the door, and the point is
+that a scoped key walking through it stays scoped.
 """
 
 import io
@@ -120,6 +126,11 @@ class TrustCompositionFixture(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         return [a['uuid'] for a in resp.get_json()]
 
+    def _read(self, token):
+        return self.client.get(
+            '/artifacts/%s' % self.artifact.uuid,
+            headers={'Authorization': token})
+
     def _delete(self, token):
         return self.client.delete(
             '/artifacts/%s' % self.artifact.uuid,
@@ -162,6 +173,27 @@ class ScopeTrustCompositionTestCase(TrustCompositionFixture):
 
         self.assertEqual(403, self._list(token).status_code)
         self.assertEqual(403, self._delete(token).status_code)
+
+    def test_a_scoped_key_reads_by_uuid_across_the_trust_boundary(self):
+        # The listing is the discovery path; this is the fetch path,
+        # and it has its own guard (requires_artifact_access) rather
+        # than sharing the filter the listing applies. Composition has
+        # to hold on both or the second is a way around the first.
+        self._trust()
+        token = self._token('scratch', 'sekritc', ['artifact.read'])
+
+        self.assertEqual(200, self._read(token).status_code)
+
+    def test_reading_by_uuid_still_needs_the_trust(self):
+        token = self._token('scratch', 'sekritd', ['artifact.read'])
+
+        self.assertEqual(404, self._read(token).status_code)
+
+    def test_reading_by_uuid_still_needs_the_scope(self):
+        self._trust()
+        token = self._token('scratch', 'sekrite', ['instance.read'])
+
+        self.assertEqual(403, self._read(token).status_code)
 
     def test_the_scopes_claim_survives_the_boundary_unchanged(self):
         # Asserted on the claim as well as the behaviour, so a failure
@@ -299,6 +331,12 @@ class FederatedKeyTrustCompositionTestCase(TrustCompositionFixture):
         token = self._federated_token()
 
         self.assertIn(str(self.artifact.uuid), self._visible(token))
+
+    def test_a_federated_key_reads_by_uuid_across_the_boundary(self):
+        self._trust()
+        token = self._federated_token()
+
+        self.assertEqual(200, self._read(token).status_code)
 
     def test_a_federated_key_cannot_delete_across_it(self):
         self._trust()

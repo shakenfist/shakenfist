@@ -1050,6 +1050,38 @@ The develop branch uses:
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 
+### Object visibility and the two artifact guards
+
+Namespace isolation is enforced at two different granularities, and the
+artifact endpoints are where both are visible.
+
+Listing endpoints filter in the query or in a filter callable —
+`namespace_or_shared_filter(namespace, obj)` for artifacts, which admits the
+caller's own namespace, any namespace whose trust list names the caller,
+`system`, and anything flagged `shared`.
+
+Single-object endpoints cannot filter, because they resolve the object before
+they know who is asking. `arg_is_artifact_ref` short-circuits a UUID straight
+to `Artifact.from_db` with no namespace filter at all — deliberately, since
+system callers legitimately reach across namespaces — so the whole of the
+authorization decision rests on the decorator that runs next. There are two:
+
+- `requires_artifact_access` guards the read-only routes (the artifact, its
+  events, versions and cluster operations) and calls
+  `namespace_or_shared_filter`, the same predicate the listing uses. That
+  reuse is deliberate: "appears in the list" and "is readable by UUID" have to
+  be one rule, and for as long as they were two copies of a rule they
+  disagreed.
+- `requires_artifact_ownership` guards everything that mutates, and tests
+  `namespace_is_trusted` only. It never consults the `shared` flag, because
+  sharing publishes an artifact for reading rather than transferring it.
+  `system` passes because `Namespace.remove_trust` refuses to remove `system`
+  from any trust list.
+
+Both refuse with `404` rather than `403`, so a refusal does not confirm that
+the object exists. Scope enforcement is a separate and earlier gate — a caller
+who fails the scope check gets `403` without either decorator running.
+
 ### VDI console token trust model
 
 The Kerbside VDI console proxy integration uses **offline signature

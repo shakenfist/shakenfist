@@ -297,7 +297,7 @@ class TestSharedImages(base.BaseNamespacedTestCase):
         url = ('https://sfcbr.shakenfist.com/gw-basic-shared.qcow2')
 
         # Cache a non-shared version of the image
-        self.system_client.cache_artifact(url)
+        art = self.system_client.cache_artifact(url)
 
         image_urls = []
         for image in self.test_client.get_artifacts():
@@ -306,8 +306,17 @@ class TestSharedImages(base.BaseNamespacedTestCase):
             image_urls, indent=4, sort_keys=True)))
         self.assertNotIn(url, image_urls)
 
+        # The listing filter and the by-uuid fetch are separate guards,
+        # so the second is checked as well as the first. A uuid is not
+        # a secret -- it turns up in logs, in error messages, and in
+        # any API response that mentions the object -- and knowing one
+        # must not be a way around the listing.
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client.get_artifact, art['uuid'])
+
         # Cache a shared version of the image
-        self.system_client.cache_artifact(url, shared=True)
+        shared = self.system_client.cache_artifact(url, shared=True)
 
         image_urls = []
         for image in self.test_client.get_artifacts():
@@ -315,6 +324,20 @@ class TestSharedImages(base.BaseNamespacedTestCase):
         self.addDetail('image_urls_shared', content.text_content(json.dumps(
             image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
+
+        # ... and now the fetch works, which is the point of sharing:
+        # a tenant that can see an image in the list has to be able to
+        # go and read it.
+        fetched = self.test_client.get_artifact(shared['uuid'])
+        self.addDetail('shared_fetch', content.text_content(json.dumps(
+            fetched, indent=4, sort_keys=True)))
+        self.assertEqual(url, fetched['source_url'])
+
+        # Sharing publishes an artifact for reading. It is not a
+        # transfer of ownership, so the write paths stay closed.
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client.delete_artifact, shared['uuid'])
 
         # Try to cache a shared version when not admin
         self.assertRaises(
@@ -336,7 +359,7 @@ class TestTrusts(base.BaseNamespacedTestCase):
             self.namespace + '-2', self.namespace_key)
 
         # Cache a non-shared version of the image in the first namespace
-        self.test_client_one.cache_artifact(url)
+        art = self.test_client_one.cache_artifact(url)
 
         image_urls = []
         for image in self.test_client_two.get_artifacts():
@@ -344,6 +367,13 @@ class TestTrusts(base.BaseNamespacedTestCase):
         self.addDetail('image_urls_before_trust', content.text_content(
             json.dumps(image_urls, indent=4, sort_keys=True)))
         self.assertNotIn(url, image_urls)
+
+        # The by-uuid fetch is checked alongside the listing at every
+        # step, because it is guarded separately and the two have
+        # disagreed before.
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client_two.get_artifact, art['uuid'])
 
         # Add a trust
         self.test_client_one.add_namespace_trust(
@@ -356,6 +386,9 @@ class TestTrusts(base.BaseNamespacedTestCase):
             json.dumps(image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
 
+        fetched = self.test_client_two.get_artifact(art['uuid'])
+        self.assertEqual(url, fetched['source_url'])
+
         # Remove trust
         self.test_client_one.remove_namespace_trust(
             self.namespace + '-1', self.namespace + '-2')
@@ -366,6 +399,13 @@ class TestTrusts(base.BaseNamespacedTestCase):
         self.addDetail('image_urls_after_remove', content.text_content(
             json.dumps(image_urls, indent=4, sort_keys=True)))
         self.assertNotIn(url, image_urls)
+
+        # Revoking a trust closes the fetch path too, and not just the
+        # listing. This is the assertion that a cached authorisation
+        # decision, or a guard reading a stale trust list, would fail.
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client_two.get_artifact, art['uuid'])
 
         self.system_client.delete_namespace(self.namespace + '-1')
         self.system_client.delete_namespace(self.namespace + '-2')

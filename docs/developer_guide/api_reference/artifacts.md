@@ -369,6 +369,20 @@ As described in the [operator guide](/operator_guide/artifacts/), artifacts in
 the system namespace can be shared with all other namespaces. This is desirable
 for commonly used "official" images which many users will want to use.
 
+Sharing grants reading, and only reading. A shared artifact appears in every
+namespace's `GET /artifacts` listing and can be fetched by UUID, along with its
+events, versions and cluster operations. It cannot be deleted, unshared,
+retagged or otherwise modified by anyone but its owning namespace, a namespace
+that owner trusts, or `system` — the write paths do not consult the shared flag
+at all.
+
+Read access is otherwise exactly the set the artifact listing shows you: your
+own namespace's artifacts, those of any namespace which
+[trusts](/operator_guide/authentication/) yours, and everything if you are
+`system`. A UUID is not a capability, so requesting an artifact you may not see
+returns `404` rather than `403` — the refusal does not confirm that the
+artifact exists.
+
 ???+ tip "REST API calls"
 
     * [POST /artifacts/{artifact_ref}/share](https://openapi.shakenfist.com/#/artifacts/post_artifacts__artifact_ref__share): Share an artifact.

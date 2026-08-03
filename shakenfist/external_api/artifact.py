@@ -98,7 +98,14 @@ def arg_is_artifact_ref(func):
 
 
 def requires_artifact_ownership(func):
-    # Requires that @arg_is_artifact_ref has already run
+    # Requires that @arg_is_artifact_ref has already run.
+    #
+    # The stricter of the two tests, for anything which changes the
+    # artifact: the caller's own namespace, a namespace which trusts
+    # them, or system (which every namespace trusts, because
+    # Namespace.remove_trust refuses to drop it). Deliberately does
+    # *not* consult the shared flag -- sharing an artifact publishes it
+    # for reading, it does not hand the world a delete button.
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
@@ -114,15 +121,39 @@ def requires_artifact_ownership(func):
 
 
 def requires_artifact_access(func):
-    # Requires that @arg_is_artifact_ref has already run
+    # Requires that @arg_is_artifact_ref has already run.
+    #
+    # The wider test, for read only routes: ownership as above, plus
+    # any artifact explicitly marked shared. This is exactly the
+    # predicate the artifact listing filters on, and it reuses that
+    # function rather than restating it -- "appears in the list" and
+    # "is readable by uuid" have to be one rule, because two copies of
+    # a visibility rule is two chances to get it wrong.
+    #
+    # It was previously two copies, and they did disagree. The test
+    # here read `if a.shared and requestor not in [a.namespace,
+    # 'system']`, which is inverted in both directions: it hid shared
+    # artifacts from the namespaces they were shared with, and, far
+    # worse, let any caller who knew a uuid read an *unshared*
+    # artifact belonging to any namespace. `arg_is_artifact_ref`
+    # short-circuits a uuid straight to `Artifact.from_db`, applying no
+    # namespace filter of its own, so this decorator was the only thing
+    # standing between a guessed or leaked uuid and another tenant's
+    # artifact metadata.
+    #
+    # The refusal also logged through LOG.with_object, which
+    # shakenfist_utilities no longer provides, so the one case the old
+    # test did refuse raised AttributeError and answered 500 rather
+    # than 404. That nobody noticed is itself the evidence for how
+    # rarely the branch ran.
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if (a.shared and request_namespace() not in [a.namespace, 'system']):
-            LOG.with_object(a).info(
-                'Artifact not found, ownership test in decorator')
+        if not namespace_or_shared_filter(request_namespace(), a):
+            LOG.with_fields({'artifact': a}).info(
+                'Artifact not found, access test in decorator')
             return sf_api.error(404, 'artifact not found')
 
         return func(*args, **kwargs)

@@ -581,10 +581,14 @@ groundwork exists, and lives mostly outside this repository.
     `shakenfist/tests/external_api/test_scope_trust_composition.py`.
 
     A key scoped `artifact.read` in a namespace that a cache
-    namespace trusts can list the cache's artifacts and
-    cannot delete them; a key scoped `instance.read` is
-    refused outright rather than being handed an empty list;
-    and a key granted nothing gains nothing from trust. Each
+    namespace trusts can list the cache's artifacts and read
+    them by UUID, and cannot delete them; a key scoped
+    `instance.read` is refused outright rather than being
+    handed an empty list; and a key granted nothing gains
+    nothing from trust. Reading by UUID is asserted
+    separately from listing because the two are separately
+    guarded — and were separately wrong, see the artifact
+    read bug below. Each
     refusal is paired with a control — a wildcard key
     reaching the same object across the same trust succeeds
     — so a 403 arriving for some unrelated reason cannot
@@ -1068,20 +1072,6 @@ implemented because the following statements will be true:
   anything, which is what it already has. Issuer and rule
   management is where a command line would actually earn
   its keep.
-* **Cross-namespace artifact reads by UUID**: found while
-  writing phase 3's trust composition test and *not* fixed
-  there, being unrelated to federation.
-  `GET /artifacts/{uuid}` resolves through
-  `Artifact.from_db_by_ref`, which short-circuits to
-  `from_db()` for a UUID and applies no namespace filter,
-  and `ArtifactEndpoint.get` is guarded by
-  `requires_artifact_access` (which only inspects the
-  `shared` flag) rather than `requires_artifact_ownership`
-  (which checks trust). A caller who knows an artifact uuid
-  can therefore read that artifact from any namespace. The
-  delete path and the listings are correctly gated, which
-  is why the phase 3 test exercises those. Needs its own
-  issue and its own fix.
 * **Token introspection / jti denylist** if bounded-delay
   revocation of *scoped keys themselves* (as opposed to
   their derived tokens) ever proves insufficient.
@@ -1090,6 +1080,42 @@ implemented because the following statements will be true:
   real.
 
 ### Bugs fixed during this work
+
+Phase 3:
+
+* **Cross-namespace artifact reads by UUID**, found while
+  writing phase 3's trust composition test. Unrelated to
+  federation and older than this plan, but fixed on this
+  branch rather than filed, because an issue would have
+  advertised the hole before a fix existed.
+
+  `arg_is_artifact_ref` short-circuits a UUID straight to
+  `Artifact.from_db`, applying no namespace filter — that is
+  deliberate, because the same decorator serves system
+  callers who legitimately reach across namespaces. It makes
+  `requires_artifact_access` the only guard on the path, and
+  that guard read `if a.shared and requestor not in
+  [a.namespace, 'system']: 404`, which is inverted in both
+  directions. Unshared artifacts belonging to any namespace
+  were readable by anyone who knew the UUID, and shared
+  artifacts were refused to precisely the namespaces they
+  had been shared with. The refusal branch then called
+  `LOG.with_object`, which `shakenfist_utilities` no longer
+  provides, so the one case it did refuse got a 500 rather
+  than a 404 — evidence that the branch had not executed in
+  a long time.
+
+  The fix replaces the restated predicate with the one the
+  artifact listing already filters on,
+  `namespace_or_shared_filter`: owner, a namespace which
+  trusts the caller, system, or shared. "Appears in the
+  list" and "is readable by UUID" are now one rule rather
+  than two copies of a rule. `requires_artifact_ownership`
+  is unchanged and still ignores the shared flag, so
+  publishing an artifact for reading does not hand out a
+  delete button. Four routes were affected: the artifact
+  itself, its events, its versions and its cluster
+  operations.
 
 Phase 2:
 
