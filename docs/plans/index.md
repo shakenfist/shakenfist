@@ -169,8 +169,13 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 2: Disk reservation model](PLAN-per-host-resource-reservations-phase-02-disk-metric.md) | Complete | Per-node disk floor at the instances/blobs allocation points; publish `disk_reservation_gb` and convert `MINIMUM_FREE_DISK` consumers |
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 3: Ansible templating](PLAN-per-host-resource-reservations-phase-03-ansible-templating.md) | Complete | Per-host defaults templated into `/etc/sf/config`; stop `set-config`'ing reservations; inventory override |
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 4: Docs and cleanup](PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md) | Complete | Operator docs, plan index, `sf-ctl unset-config` + inert-row retirement |
-| [API input validation](PLAN-api-input-validation.md) | Phase 0: Research and decisions | Stub | Choose the validation library, decide whether to compile the existing `swagger_helper` declarations or author schemas, settle the malformed-input response shape and the warn-only exit criterion |
-| [API input validation](PLAN-api-input-validation.md) | Later phases | Stub | Declaration audit, type vocabulary, warn-only rollout, enforcement, exception-handler narrowing, semantic validators |
+| [API input validation](PLAN-api-input-validation.md) | Phase 0: Research and decisions | Complete | Measured declaration accuracy (97% of declared names match a real kwarg); chose webargs + marshmallow, compiling the existing declarations, chain placement, error shape and the warn-only exit criterion |
+| [API input validation](PLAN-api-input-validation.md) | Phase 1: Declaration audit | Not started | Fix 2 invalid locations, 5 wrong parameter names, 20 undeclared parameters; reject unknown locations |
+| [API input validation](PLAN-api-input-validation.md) | Phase 2: Type vocabulary | Not started | Unsigned/bounded integers, format tokens, constraints rendered into the OpenAPI |
+| [API input validation](PLAN-api-input-validation.md) | Phase 3: Compile and warn | Not started | Declarations to schemas, warn-only rollout on sfcbr |
+| [API input validation](PLAN-api-input-validation.md) | Phase 4: Enforce | Not started | Turn on rejection; fold the four hand-authored schemas into the compiled path |
+| [API input validation](PLAN-api-input-validation.md) | Phase 5: Narrow the handlers | Not started | Narrow `except TypeError`; fix attribution issues #3523, #3371, #3606, #3615 |
+| [API input validation](PLAN-api-input-validation.md) | Phase 6: Required and semantics | Not started | Enforce `required`; semantic validators for #534, #3269, #323, #936 |
 
 ### Status Definitions
 

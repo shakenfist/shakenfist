@@ -32,8 +32,11 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: draft.** Phase 0 (research and decisions) has not run.
-The open questions at the bottom are the input to it.
+**Status: phase 0 complete.** The open questions at the bottom
+are answered in the Decisions section; see
+[`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
+for the measurements behind them. Phases 1 onward are not yet
+cut into per-phase files.
 
 ## Situation
 
@@ -235,7 +238,75 @@ the open questions have something to argue about.
 7. **Structured and semantic validators** for the specs in #936,
    and the semantic checks in #323, #534 and #3269.
 
+## Decisions
+
+Resolved by phase 0. The measurements behind each are in
+[`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md).
+
+**The central hypothesis held.** 229 of 236 declared parameter
+names (97%) match a kwarg their handler actually accepts, and no
+declared type contradicts its signature default. The
+declarations are good enough to compile.
+
+1. **Library — webargs + marshmallow.** All three candidates
+   (webargs, marshmallow, pydantic) are already pinned direct
+   dependencies, so this is a fit decision, not a dependency
+   one. webargs exists to parse Flask request arguments, is
+   already used at four sites, and does per-location parsing.
+   Pydantic models persisted state here; keep that boundary.
+2. **Compile the existing declarations,** with a per-endpoint
+   override for cases a declaration cannot express. Authoring
+   254 schemas to replace declarations that are already correct
+   is make-work, and the four endpoints that hand-author schemas
+   today are exactly the ones whose documentation has drifted.
+3. **Validation runs at index 0 of `method_decorators`** —
+   verified empirically as the innermost position, so after
+   authentication and before every per-method decorator. webargs'
+   default 422 handling must be replaced so failures come out
+   through `sf_api.error`.
+4. **The error shape does not change:**
+   `{"error": "<parameter>: <reason>", "status": 400}`. The
+   official client never parses the message, and only 11 test
+   assertions touch error text.
+5. **Warn-only ends when every remaining rejection is
+   intended** — not after a fixed duration. The window must
+   cover a full functional CI run plus seven days of sfcbr.
+   Warn records carry the offending value's *type*, never its
+   value.
+6. **Query strings become an accepted fallback** for parameters
+   declared `query`, with the JSON body still authoritative.
+   Additive and unbreakable: the client sends everything in the
+   body regardless of method.
+7. **Response validation is out of scope,** not deferred. It
+   breaks working clients when wrong, and no issue asks for it.
+8. **A body key colliding with a path parameter is rejected.**
+   `log_request` already dodges one instance of this by mapping
+   body `uuid` to `passed_uuid`, which shows it is a known
+   hazard rather than a feature.
+9. **The type vocabulary gains tokens and an optional
+   constraints element** (`unsignedinteger`, `macaddr`,
+   `base64`, `netblock`; `minimum` / `maximum` / `pattern`).
+   These are valid Swagger 2.0 keywords, so constraints render
+   into the published OpenAPI instead of being invisible to
+   callers the way the events `limit` cap was.
+
+### Phases
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion |
+| 1: Declaration audit | Not started | Fix 2 invalid locations, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI), 20 undeclared parameters; make `swagger_helper()` reject unknown locations |
+| 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI |
+| 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs |
+| 4: Enforce | Not started | Turn on rejection; fold the four hand-authored `get_args` schemas into the compiled path |
+| 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors; fix the attribution issues (#3523, #3371, #3606, #3615) |
+| 6: Required and semantics | Not started | Enforce `required`; semantic validators for #534, #3269, #323, #936 |
+
+
 ## Open questions for phase 0
+
+All answered above; retained as the record of what phase 0
+was asked to decide.
 
 1. **webargs/marshmallow, pydantic, or hand-rolled?** Pydantic is
    already a core dependency (config and `schema/`), but webargs
