@@ -110,8 +110,18 @@ today's Python filter admits:
 
 * `limit_cpus = floor(cpu_schedulable ×
   CPU_OVERCOMMIT_RATIO)` — the `_has_sufficient_cpu` bound.
-  `used_cpus` counts allocated vCPUs, as
-  `cpu_total_instance_vcpus` does today.
+  `used_cpus` sums the allocated vCPUs of every placed,
+  non-deleted instance. **This is not parity with
+  `cpu_total_instance_vcpus`**, which an earlier draft of this
+  plan claimed: the resources daemon counts only *active*
+  libvirt domains, so a powered-off instance (or one placed
+  but not yet defined in libvirt) is in the ledger and not in
+  the measurement, and `used_cpus` reads higher than today's
+  filter sees on a node with powered-off instances. The ledger
+  is the right semantics for a reservation — a stopped
+  instance still owns its resources — but it means phase 3
+  must decide explicitly which number its guard reads, and a
+  unit test asserting the two agree would be false comfort.
 * `limit_memory_mb = floor(memory_max ×
   RAM_OVERCOMMIT_RATIO) - memory_reserved_mb` — the
   `_has_sufficient_ram` overcommit bound. `used_memory_mb`
@@ -136,6 +146,23 @@ with non-NULL capacity columns; rows are deleted when the
 node is deleted. NULL-columned metrics rows (written by an
 old resources daemon mid-upgrade) leave the previous limits
 in place rather than zeroing them.
+
+Capacity rows exist per **hypervisor**, not per node. The
+resources daemon runs on every cluster node and upserts
+`node_metrics` unconditionally, so a network-only or
+database-only node has a metrics row with perfectly good
+capacity columns describing capacity no instance can ever be
+placed on. `scheduler.py` drops non-hypervisor candidates
+before any capacity arithmetic and the reconciler must do the
+same, so phase 2 adds `is_hypervisor` to
+`NODE_METRICS_EXTRACTION_SPEC` (`node_metrics` v3 → v4) and
+filters on the typed column in SQL. A node that stops being a
+hypervisor loses its capacity row, which is also how rows
+written by a pre-filter release get cleaned up on upgrade. A
+NULL `is_hypervisor` — a metrics row not yet rewritten after
+the upgrade — is treated as no evidence either way: it neither
+creates nor destroys a row, and an existing row keeps its
+limits until the next 60-second upsert settles the question.
 
 ### The reconciler (D5)
 
@@ -183,6 +210,27 @@ One pass, in order:
    limits, `claimed_*` as sums of active claim limits (zero
    for now), `unclaimed_used_*` as usage by instances in
    namespaces without an active claim (all usage, for now).
+
+Two claim-accounting decisions this leaves for phase 4, both
+inert while `namespace_claims` is empty but both fixed by the
+semantics being built now:
+
+* **Overage is currently invisible.** `unclaimed_used_*`
+  skips any namespace with an active claim, and `claimed_*`
+  sums those claims' *limits*. A namespace using more than it
+  claimed contributes its overage to neither figure, so a
+  D14 guard shaped `claimed + unclaimed_used + request <=
+  total` would over-admit by exactly that overage. Phase 4
+  must either prevent overage at admission, or have the
+  reconciler attribute usage above a claim's limit into
+  `unclaimed_used_*` so the cluster row stays a complete
+  accounting of the cluster.
+* **Two active claims for one namespace would double-count.**
+  Each active claim row is written the same full namespace
+  usage, and both limits sum into `claimed_*`. The claims API
+  should enforce one active claim per namespace; a unique
+  partial index would make that structural rather than
+  procedural.
 
 The reply carries a summary (per-node limits/used/demand, the
 cluster row, expired-claim and added/removed node counts, and
@@ -241,7 +289,8 @@ surface yet: the admin capacity view migrates in phase 5.
 | 4 | Local validation: run the reconciler against a docker MariaDB seeded with realistic rows (incl. a multi-disk `disk_spec` and both uuid forms); record results in the Validation section | medium | management session | none | Complete — 36/36 checks, 42 ms at 32 nodes / 1,205 instances; see Validation |
 | 5 | Docs: `docs/operator_guide/database.md` (three tables), CLAUDE.md MariaDB-storage list, correct CLAUDE.md's stale `shakenfist/deploy/` collection paths, ARCHITECTURE/AGENTS if warranted, master plan phase row | low | sub-agent | worktree | Complete — all four docs updated; verification showed the collection and `shakenfist_ci` still live in-repo at `shakenfist/deploy/`, so only CLAUDE.md's directory tree (which drew `deploy/` at the repo root) needed correcting |
 | 6 | Management-session code review against the checklist | medium | management session | none | Complete — checklist verified 2026-08-02 |
-| 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | Not started |
+| 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | In progress — PR #3614 open |
+| 8 | Address automated review of PR #3614 | medium | management session | none | Complete — see Review response |
 
 ## Validation
 
@@ -294,6 +343,85 @@ Two incidental findings worth recording:
    timezone. Phase 4's claim create/update must always write
    expiry as `NOW() + INTERVAL`, the `cluster_locks` idiom,
    never a client-computed datetime.
+
+### Step 8: response to the automated review of PR #3614 (2026-08-03)
+
+Ten items were raised. One was a real bug, two were
+documentation corrections, five were adopted improvements, one
+was investigated and rejected on measurement, and one was
+informational.
+
+**Fixed — capacity rows were being created per node, not per
+hypervisor.** The reconciler keyed candidate rows off the
+presence of a `node_metrics` row, but sf-resources runs on
+every node and upserts unconditionally, so network-only and
+database-only nodes were getting capacity rows and their
+unschedulable capacity was being summed into
+`cluster_capacity.total_*`. Inert this release, but it would
+have made the soak dashboards — the entire point of the phase
+— report wrong totals, and become an admission bug in phase 3.
+Fixed by projecting `is_hypervisor` into `node_metrics`
+(v3 → v4) and filtering in SQL; see the limit-derivation
+section above for the NULL-during-upgrade handling. Four unit
+tests plus a re-run of the step 4 validation with a
+non-hypervisor node carrying good capacity columns and a
+pre-existing capacity row (it is deleted, which is the upgrade
+path).
+
+**Rejected on measurement — restricting the disk `JSON_TABLE`
+derived table to the placement set.** The review's premise was
+that the derived table expands every instance row, including
+the deleted-but-not-hard-deleted backlog, before the outer
+join discards them. MariaDB does not do that: `EXPLAIN` shows
+it already resolves the derived table as `LATERAL DERIVED`
+correlated on `i.uuid`, so it only expands the instances the
+outer query joins to. Measured with 73,640 instance rows of
+which 1,205 were placed, adding the suggested
+`i2.uuid IN (SELECT ... FROM object_references)` restriction
+turned the plan into a materialised `DERIVED` with a semi-join
+and made the query *slower* (10 ms → 13 ms) for identical
+results. A reconcile pass over that database took 44 ms, the
+same as with no backlog at all. The comment above the query now
+records the measurement so the change is not re-proposed.
+
+**Adopted:**
+
+* The reconcile RPC now uses `BOUNDED_QUERY_TIMEOUT` with one
+  retry rather than the default 3 × 30 s budget. Its caller is
+  the elected loop that pets the systemd watchdog itself, and
+  its server side is one analytical query — the exact shape
+  that SIGABRTed non-database daemons in issue 3586. A skipped
+  pass is harmless because the next one recomputes everything.
+* `SCHEDULER_CAPACITY_LAST_DURATION` is now set before the
+  failure return, so a slow-then-failing pass reports its own
+  duration instead of the last successful one.
+* The task is decorated with `@util_general.recorded_method`
+  like its five-minute siblings.
+* The capacity gauges are cleared when the cluster daemon
+  leaves the elected loop. They describe singleton cluster
+  state, so a demoted node that kept publishing would
+  contradict its successor. `docs/operator_guide/database.md`
+  now tells operators to alert on the last-success timestamp
+  going stale rather than on a gauge disappearing.
+* Round-trip test coverage of the servicer's reply
+  construction and the client's field-by-field unpacking, so a
+  proto/dict key rename fails in CI rather than on a live
+  cluster, plus the `result is None` and unexpected-exception
+  branches.
+
+**Documentation corrections:** the `used_cpus` parity claim
+(above) and the missing `SCHEDULER_DEMAND_*` entries in
+`docs/operator_guide/scheduler.md`.
+
+**Found while fixing the gauge staleness, outside the review's
+scope:** the elected loop registered its `schedule.every()`
+jobs on every election without clearing them first, and
+`schedule` keeps a module-global job list — so a node elected
+twice ran every maintenance task twice per cadence, three
+times after a third election, and so on. Fixed with a
+`schedule.clear()` before registration. Pre-existing, not
+introduced by this phase, but it would have doubled up the
+reconcile pass this phase adds.
 
 ## Administration and logistics
 

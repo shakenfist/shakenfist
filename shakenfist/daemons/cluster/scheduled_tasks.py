@@ -681,6 +681,42 @@ def reconcile_orphaned_objects():
                     f'zombie repair of {objtype} {obj_uuid}', e)
 
 
+def clear_scheduler_capacity_metrics() -> None:
+    """Drop the capacity gauges when this node stops being the leader.
+
+    The cluster-wide gauges describe singleton cluster state rather than
+    this node's own work, so a demoted node that keeps exporting its
+    final values leaves two nodes publishing contradictory cluster
+    numbers until the demoted one restarts. Counters do not have this
+    problem -- they are monotonic and aggregate correctly across nodes --
+    but these are gauges, so the demoted node has to stop answering. The
+    newly elected node repopulates all of them on its first pass.
+    """
+    for node_uuid in _CAPACITY_EXPORTED_NODES:
+        for gauge in (SCHEDULER_CAPACITY_NODE_LIMIT,
+                      SCHEDULER_CAPACITY_NODE_USED):
+            for resource in CAPACITY_RESOURCES:
+                try:
+                    gauge.remove(node_uuid, resource)
+                except KeyError:
+                    pass
+        try:
+            SCHEDULER_CAPACITY_NODE_EXPECTED_DEMAND.remove(node_uuid)
+        except KeyError:
+            pass
+    _CAPACITY_EXPORTED_NODES.clear()
+
+    for gauge in (SCHEDULER_CAPACITY_CLUSTER_TOTAL,
+                  SCHEDULER_CAPACITY_CLUSTER_CLAIMED,
+                  SCHEDULER_CAPACITY_CLUSTER_UNCLAIMED_USED):
+        for resource in CAPACITY_RESOURCES:
+            try:
+                gauge.remove(resource)
+            except KeyError:
+                pass
+
+
+@util_general.recorded_method
 def reconcile_scheduler_capacity() -> None:
     """Run the scheduler capacity reconciler (phase 2, D5) cadence.
 
@@ -703,6 +739,10 @@ def reconcile_scheduler_capacity() -> None:
         util_exceptions.ignore_exception('scheduler capacity reconcile', e)
         reply = None
     duration = time.time() - start_time
+    # Set before the failure return: a slow-then-failing pass is exactly
+    # when an operator wants to know how long it ran, and leaving the
+    # gauge at the last successful pass's duration hides that.
+    SCHEDULER_CAPACITY_LAST_DURATION.set(duration)
 
     if not reply:
         SCHEDULER_CAPACITY_FAILURES.inc()
@@ -750,7 +790,6 @@ def reconcile_scheduler_capacity() -> None:
             resource=resource).set(cluster[f'unclaimed_used_{resource}'])
 
     SCHEDULER_CAPACITY_LAST_SUCCESS.set(time.time())
-    SCHEDULER_CAPACITY_LAST_DURATION.set(duration)
 
     LOG.with_fields({
         'nodes': len(reply['nodes']),

@@ -490,7 +490,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
 | `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
-| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus 15 typed nullable columns projecting the capacity-relevant fields |
+| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus typed nullable columns projecting the capacity-relevant fields and the node's hypervisor role |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
 | `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
 | `scheduler_node_capacity` | One row per hypervisor: schedulable limits derived from the typed `node_metrics` columns, materialised usage counters, and a decaying expected-demand signal |
@@ -505,10 +505,15 @@ IPAM reservations are stored separately because:
   one object
 
 `node_metrics` additionally projects its capacity-relevant fields (CPU,
-memory, disk counts and the disk-busy bandwidth rate) from `metrics_json`
-into typed nullable columns at upsert time, so SQL-side capacity arithmetic
-(the scheduler-reservations work) can query them directly instead of
-unpacking JSON per row. `metrics_json` remains the full payload and stays
+memory, disk counts and the disk-busy bandwidth rate), plus the node's
+`is_hypervisor` role flag, from `metrics_json` into typed nullable columns
+at upsert time, so SQL-side capacity arithmetic (the
+scheduler-reservations work) can query them directly instead of
+unpacking JSON per row. The role flag is projected because the resources
+daemon runs on every node and publishes metrics whatever that node's
+roles are, so a query that sums schedulable capacity has to exclude
+network-only and database-only nodes the same way the scheduler does.
+`metrics_json` remains the full payload and stays
 authoritative for readers; the typed columns are only a projection of it,
 extracted server-side in `_direct_upsert_node_metrics()` so rows written by
 an older resources daemon during a rolling upgrade still get their columns
@@ -537,6 +542,19 @@ observability is the `scheduler_capacity_*` family of prometheus metrics
 reconcile pass/failure counters, last-success timestamp and duration)
 exported from the cluster daemon's metrics port (`CLUSTER_METRICS_PORT`,
 default `13007`), plus one structured log line per reconcile pass.
+
+Two things to know when reading those numbers. The `used_*` counters are
+allocation ledgers: they sum what every placed, non-deleted instance was
+allocated, so an instance that is powered off but not deleted still
+counts, and the numbers will not match the resources daemon's
+`cpu_total_instance_vcpus` and `memory_total_instance_actual` (which
+count only running libvirt domains) on a cluster with powered-off
+instances. And the gauges are published only by the elected cluster node,
+which drops them when it loses the lock, so during a leadership handoff
+there is a window with no capacity gauges at all until the new leader's
+first pass — alert on
+`scheduler_capacity_reconcile_last_success_timestamp` going stale rather
+than on a gauge disappearing.
 
 Cluster operation headers (`cluster_operations`) and work queue rows
 (`work_queue`) live in MariaDB so the create-and-enqueue step can run in a

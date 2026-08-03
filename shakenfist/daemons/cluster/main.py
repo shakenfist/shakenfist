@@ -521,7 +521,12 @@ class Monitor(daemon.Daemon):
                 self.idle(60)
                 continue
 
-            # Setup a schedule of things to do
+            # Setup a schedule of things to do. Clear first: this block
+            # runs on every election and schedule.every() appends to a
+            # module-global job list, so without this a node elected a
+            # second time would run every maintenance task twice per
+            # cadence, three times after a third election, and so on.
+            schedule.clear()
             schedule.every(1).minutes.do(
                 scheduled_tasks.log_cluster_queue_lengths)
             schedule.every(1).minutes.do(
@@ -587,6 +592,12 @@ class Monitor(daemon.Daemon):
                     LOG.warning(
                         'Cluster maintenance lock lost; re-entering election')
                     self.is_elected = False
+
+            # No longer the leader (lock lost, or shutting down). The
+            # capacity gauges describe cluster-wide singleton state, so
+            # stop publishing them rather than leaving this node
+            # contradicting whichever node takes over.
+            scheduled_tasks.clear_scheduler_capacity_metrics()
 
         # Stop being the cluster maintenance node if we were. Release
         # may raise LockNotHeld if our lease has lapsed -- swallow it,

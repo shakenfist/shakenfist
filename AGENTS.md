@@ -384,12 +384,23 @@ A third participant mirrors the same arithmetic: the scheduler
 capacity reconciler's limit-derivation helpers in
 `shakenfist/mariadb.py` (`_derive_cpu_memory_limits()`,
 `_derive_disk_limit_gb()`) deliberately reproduce `scheduler.py`'s
-admission bounds so the phase 3 counter guard will admit exactly
-what today's Python filter admits — a change to one must change
-both. The reconciler maintains the `scheduler_node_capacity`,
-`namespace_claims` and `cluster_capacity` tables from the elected
-cluster node every five minutes; in this release nothing consumes
-them for admission
+admission *limits*, so the phase 3 counter guard bounds capacity the
+same way today's Python filter does — a change to one must change
+both. The *usage* side is deliberately not a mirror: the reconciler's
+`used_cpus` and `used_memory_mb` are allocation ledgers over every
+placed, non-deleted instance, whereas the resources daemon's
+`cpu_total_instance_vcpus` and `memory_total_instance_actual` count
+only active libvirt domains. A powered-off instance holds its
+reservation in the ledger and is absent from the measurement, so the
+two legitimately disagree and phase 3 has to choose between them
+explicitly rather than assume parity. The reconciler maintains the
+`scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
+tables from the elected cluster node every five minutes. Rows exist
+per *hypervisor*, not per node: sf-resources publishes metrics from
+every node whatever its roles, so the reconciler filters on the
+`is_hypervisor` column projected into `node_metrics`, the same way
+`scheduler.py` drops non-hypervisor candidates before any capacity
+arithmetic. In this release nothing consumes the tables for admission
 (`docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md`).
 Operator-facing documentation is
 [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).

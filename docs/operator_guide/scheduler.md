@@ -142,9 +142,10 @@ refused until they drain.
 ## Configuration reference
 
 Except for `CPU_OVERCOMMIT_RATIO`, `RAM_OVERCOMMIT_RATIO`,
-`SCHEDULER_TARGET_LOAD` and `SCHEDULER_CACHE_TIMEOUT` (cluster-wide,
-set with `sf-ctl set-config`), the reservation variables below are
-**per-node** and set through each node's `/etc/sf/config`:
+`SCHEDULER_TARGET_LOAD`, `SCHEDULER_CACHE_TIMEOUT` and the two
+`SCHEDULER_DEMAND_*` settings (cluster-wide, set with
+`sf-ctl set-config`), the reservation variables below are **per-node**
+and set through each node's `/etc/sf/config`:
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -154,6 +155,25 @@ set with `sf-ctl set-config`), the reservation variables below are
 | `CPU_OVERCOMMIT_RATIO` | 3.0 | vCPUs admitted per schedulable thread |
 | `SCHEDULER_TARGET_LOAD` | 0.75 | Target sustained load per schedulable thread, used for selection weighting |
 | `SCHEDULER_CACHE_TIMEOUT` | 5 | Seconds an sf-api worker caches its metrics view |
+| `SCHEDULER_DEMAND_PER_VCPU` | 2.5 | Anticipated load per vCPU of a freshly placed instance (provisional) |
+| `SCHEDULER_DEMAND_DECAY_SECONDS` | 600 | Seconds over which that anticipated load decays to zero (provisional) |
+
+### Expected demand
+
+The two `SCHEDULER_DEMAND_*` settings describe how much load a
+*just-placed* instance is assumed to be about to generate, before that
+load shows up in the node's measured `cpu_load_*` metrics. A placement
+starts at `vcpus × SCHEDULER_DEMAND_PER_VCPU` of anticipated load and
+decays linearly to zero over `SCHEDULER_DEMAND_DECAY_SECONDS` of
+instance age. The purpose is to stop a burst of placements all choosing
+the same node because none of them have started doing any work yet.
+
+In this release they only shape the `expected_demand` column the
+capacity reconciler writes to `scheduler_node_capacity`, and the
+matching `scheduler_capacity_node_expected_demand` metric — **they do
+not affect placement**. The defaults are also provisional, pending an
+analysis of accumulated cluster data, so expect them to change. There is
+no reason to tune them yet.
 
 ## Diagnosing a placement decision
 

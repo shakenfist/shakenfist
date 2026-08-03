@@ -1017,3 +1017,72 @@ class ReconcileSchedulerCapacityTaskTestCase(base.ShakenFistTestCase):
         self.assertIn('duration', fields)
         mock_with_fields.return_value.info.assert_called_once()
         mock_with_fields.return_value.warning.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_failed_pass_still_records_its_duration(self, mock_reconcile):
+        # A slow-then-failing pass is exactly when an operator wants the
+        # duration, so it must not be left reporting the last successful
+        # pass's timing.
+        mock_reconcile.return_value = _capacity_reply(
+            [_capacity_node(NODE_UUID_1)])
+        st.reconcile_scheduler_capacity()
+        success_timestamp = _sample(
+            'scheduler_capacity_reconcile_last_success_timestamp')
+
+        mock_reconcile.return_value = None
+        st.reconcile_scheduler_capacity()
+
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_reconcile_last_duration_seconds'))
+        # The success timestamp does not move on a failed pass, so
+        # freshness alerting still fires.
+        self.assertEqual(
+            success_timestamp,
+            _sample('scheduler_capacity_reconcile_last_success_timestamp'))
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_demotion_clears_the_capacity_gauges(self, mock_reconcile):
+        # The cluster gauges describe singleton cluster state, so a
+        # demoted node must stop publishing rather than contradict
+        # whichever node takes the lock next.
+        mock_reconcile.return_value = _capacity_reply(
+            [_capacity_node(NODE_UUID_1), _capacity_node(NODE_UUID_2)])
+        st.reconcile_scheduler_capacity()
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_cluster_total', {'resource': 'cpus'}))
+
+        st.clear_scheduler_capacity_metrics()
+
+        for resource in st.CAPACITY_RESOURCES:
+            self.assertIsNone(
+                _sample('scheduler_capacity_cluster_total',
+                        {'resource': resource}))
+            self.assertIsNone(
+                _sample('scheduler_capacity_cluster_claimed',
+                        {'resource': resource}))
+            self.assertIsNone(
+                _sample('scheduler_capacity_cluster_unclaimed_used',
+                        {'resource': resource}))
+            for node_uuid in (NODE_UUID_1, NODE_UUID_2):
+                self.assertIsNone(
+                    _sample('scheduler_capacity_node_limit',
+                            {'node': node_uuid, 'resource': resource}))
+                self.assertIsNone(
+                    _sample('scheduler_capacity_node_used',
+                            {'node': node_uuid, 'resource': resource}))
+        self.assertEqual(set(), st._CAPACITY_EXPORTED_NODES)
+
+        # The counters are monotonic and aggregate correctly across
+        # nodes, so they are deliberately left alone.
+        self.assertIsNotNone(
+            _sample('scheduler_capacity_reconcile_passes_total'))
+
+    def test_clearing_when_nothing_was_exported_is_safe(self):
+        # Called on every loop exit, including from a node which was
+        # never elected or has just restarted.
+        st.clear_scheduler_capacity_metrics()
+        st.clear_scheduler_capacity_metrics()

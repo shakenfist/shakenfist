@@ -350,7 +350,9 @@ CLUSTER_OPERATION_TARGETS_VERSION = 2
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
 # metrics_json at upsert time (scheduler-reservations phase 1).
-NODE_METRICS_VERSION = 3
+# v4: adds is_hypervisor, projected the same way, so the capacity
+# reconciler can filter to hypervisors in SQL (phase 2).
+NODE_METRICS_VERSION = 4
 # v1: schema creation. v2: data migration from node_attributes.daemon_states
 # JSON column.
 NODE_DAEMON_STATES_VERSION = 2
@@ -1617,6 +1619,27 @@ def _node_metric_to_float(value: Any) -> float:
     return float(value)
 
 
+def _node_metric_to_bool(value: Any) -> bool:
+    """Coerce a metrics value to a boolean column value.
+
+    The published value is a real JSON boolean, but be defensive about
+    the string and integer forms so a publisher change cannot silently
+    turn every node into a hypervisor -- bool('false') is True, which is
+    exactly the trap this avoids.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ('true', 't', 'yes', 'y', '1'):
+            return True
+        if lowered in ('false', 'f', 'no', 'n', '0', ''):
+            return False
+    raise ValueError(f'Cannot coerce {value!r} to a boolean')
+
+
 # Projection of capacity-relevant metrics_json fields to typed columns on
 # node_metrics (scheduler-reservations phase 1). Each entry is
 # (metrics_key, column_name, coercion). This single spec drives both the
@@ -1638,6 +1661,13 @@ NODE_METRICS_EXTRACTION_SPEC: tuple[tuple[str, str, Callable[[Any], Any]], ...] 
     ('disk_reservation_gb', 'disk_reservation_gb', _node_metric_to_int),
     (DISK_BUSY_PER_SECOND_METRIC, 'disk_busy_time_delta_per_second', _node_metric_to_float),
     ('node_queue_waiting', 'node_queue_waiting', _node_metric_to_int),
+    # Not a capacity number, but the reconciler must filter capacity rows
+    # to hypervisors the way the scheduler does (scheduler.py drops
+    # non-hypervisor candidates before any capacity arithmetic), and
+    # sf-resources publishes metrics from every node regardless of role.
+    # A typed column keeps that filter in SQL rather than unpacking
+    # metrics_json per row (scheduler-reservations phase 2).
+    ('is_hypervisor', 'is_hypervisor', _node_metric_to_bool),
 )
 
 
@@ -1711,8 +1741,29 @@ def _get_node_metrics_table() -> sa.Table:
                 sa.Column('disk_reservation_gb', sa.Integer(), nullable=True),
                 sa.Column('disk_busy_time_delta_per_second', sa.Double(), nullable=True),
                 sa.Column('node_queue_waiting', sa.Integer(), nullable=True),
+                sa.Column('is_hypervisor', sa.Boolean(), nullable=True),
             )
     return _node_metrics_table
+
+
+def _add_missing_node_metrics_columns(
+        engine: sa.Engine, table: sa.Table, table_name: str) -> None:
+    """Add any NODE_METRICS_EXTRACTION_SPEC column the table is missing.
+
+    The column types are taken from the table definition so the DDL can
+    not drift from it, and each ADD COLUMN is guarded by an existence
+    check so re-runs (and re-runs from an older schema version) are safe.
+    """
+    mysql_dialect = sa.dialects.mysql.dialect()
+    with engine.begin() as conn:
+        cols = get_table_columns(engine, table_name)
+        for _, column_name, _ in NODE_METRICS_EXTRACTION_SPEC:
+            if column_name in cols:
+                continue
+            column_type = table.c[column_name].type.compile(dialect=mysql_dialect)
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} ADD COLUMN '
+                f'{column_name} {column_type} NULL'))
 
 
 def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
@@ -1742,17 +1793,21 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
         # and each ADD COLUMN is guarded by an existence check so re-runs
         # are safe.
         LOG.info(f'Adding typed capacity columns to {table_name} table (version 3)')
-        mysql_dialect = sa.dialects.mysql.dialect()
-        with engine.begin() as conn:
-            cols = get_table_columns(engine, table_name)
-            for _, column_name, _ in NODE_METRICS_EXTRACTION_SPEC:
-                if column_name in cols:
-                    continue
-                column_type = table.c[column_name].type.compile(dialect=mysql_dialect)
-                conn.execute(sa.text(
-                    f'ALTER TABLE {table_name} ADD COLUMN '
-                    f'{column_name} {column_type} NULL'))
+        _add_missing_node_metrics_columns(engine, table, table_name)
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v4 adds is_hypervisor, projected from metrics_json alongside the
+        # v3 capacity columns so the capacity reconciler can filter to
+        # hypervisors in SQL (scheduler-reservations phase 2). Same
+        # spec-driven, existence-guarded ADD COLUMN pass as v3: both steps
+        # simply converge the table onto NODE_METRICS_EXTRACTION_SPEC, so
+        # running them in sequence on an old database is safe and the end
+        # state does not depend on which step introduced a column.
+        LOG.info(f'Adding is_hypervisor column to {table_name} table (version 4)')
+        _add_missing_node_metrics_columns(engine, table, table_name)
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -23319,17 +23374,40 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # object_states.object_uuid is dashed like object_references, so that
 # join compares directly.
 #
+# These are allocation ledgers, not measurements. used_cpus and
+# used_memory_mb sum what every placed, non-deleted instance was
+# allocated, which is deliberately not what the resources daemon
+# publishes as cpu_total_instance_vcpus and memory_total_instance_actual
+# -- those count only *active* libvirt domains. A powered-off instance,
+# or one placed but not yet defined in libvirt, still holds its
+# reservation here and does not appear there, so used_cpus reads higher
+# than today's scheduler filter sees whenever a node has powered-off
+# instances. That is the right semantics for a reservation ledger, but
+# it means phase 3 must decide explicitly which number its guard uses
+# rather than assuming the two agree.
+#
 # Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
 # (available since MariaDB 10.6, below the MIN_MARIADB_VERSION floor).
-# The derived table aggregates per instance first so the lateral
-# JSON_TABLE only ever sees one document at a time; the JSON_TYPE
-# guard skips a
-# disk_spec that is somehow not an array, and the DEFAULT ... ON
-# EMPTY / ON ERROR clauses make elements without a numeric size
-# contribute 0 -- one malformed disk_spec can not abort the pass (see
-# _disk_spec_virtual_gb for the reference semantics). The enum-valued
-# columns (object_type, relationship) are bound as parameters because
-# SQLAlchemy persists enum member names, not values.
+# The derived table aggregates per instance first so the JSON_TABLE only
+# ever sees one document at a time. It reads as though it expands every
+# instance row -- including the deleted-but-not-hard-deleted backlog,
+# which on a long-lived cluster dwarfs the live set -- and then throws
+# most of them away in the outer join, so do not "fix" that by
+# restricting it to the placement set: MariaDB already resolves it as a
+# LATERAL DERIVED correlated on i.uuid, and only expands the instances
+# the outer query joins to. Measured at 73,640 instance rows of which
+# 1,205 were placed, adding an
+# ``i2.uuid IN (SELECT ... FROM object_references)`` restriction turned
+# the plan from LATERAL DERIVED into a materialised DERIVED with a
+# semi-join and made the query slower (10ms to 13ms), for identical
+# results.
+#
+# The JSON_TYPE guard skips a disk_spec that is somehow not an array, and
+# the DEFAULT ... ON EMPTY / ON ERROR clauses make elements without a
+# numeric size contribute 0 -- one malformed disk_spec can not abort the
+# pass (see _disk_spec_virtual_gb for the reference semantics). The
+# enum-valued columns (object_type, relationship) are bound as parameters
+# because SQLAlchemy persists enum member names, not values.
 _RECONCILE_USAGE_SQL = sa.text('''
     SELECT r.source_uuid AS node_uuid,
            i.namespace AS namespace,
@@ -23491,7 +23569,21 @@ def _direct_reconcile_scheduler_capacity(
             for row in conn.execute(sa.select(capacity)).fetchall():
                 previous[row.node_uuid] = row
 
-            # The typed capacity columns from node_metrics (phase 1).
+            # The typed capacity columns from node_metrics (phase 1),
+            # restricted to hypervisors. sf-resources publishes metrics
+            # from every node whatever its roles, but only a hypervisor
+            # can host an instance -- the scheduler drops non-hypervisor
+            # candidates before any capacity arithmetic, so capacity rows
+            # exist per hypervisor, not per node, and the cluster totals
+            # only sum capacity that can actually be scheduled onto.
+            #
+            # A NULL is_hypervisor (a metrics row written by a
+            # pre-upgrade resources daemon, before the first upsert
+            # repopulates the column) is neither a hypervisor nor a
+            # confirmed non-hypervisor: it is left out of the refresh
+            # below and out of non_hypervisors, so an existing row keeps
+            # its limits and no row is created or destroyed on the
+            # strength of a missing value.
             metrics_rows = {}
             for row in conn.execute(sa.select(
                     metrics.c.node_uuid,
@@ -23499,8 +23591,14 @@ def _direct_reconcile_scheduler_capacity(
                     metrics.c.memory_max,
                     metrics.c.memory_reserved_mb,
                     metrics.c.disk_free_instances,
-                    metrics.c.disk_reservation_gb)).fetchall():
+                    metrics.c.disk_reservation_gb).where(
+                        metrics.c.is_hypervisor.is_(True))).fetchall():
                 metrics_rows[row.node_uuid] = row
+
+            non_hypervisors = {
+                row.node_uuid for row in conn.execute(
+                    sa.select(metrics.c.node_uuid).where(
+                        metrics.c.is_hypervisor.is_(False))).fetchall()}
 
             # Node existence and deletion ground truth.
             known_nodes = {
@@ -23535,14 +23633,18 @@ def _direct_reconcile_scheduler_capacity(
                     totals[2] += used_row[2]
 
             # (2) Refresh node rows. A node has a capacity row while it
-            # has a node_metrics row (and is not deleted); an existing
-            # row also survives a missing metrics row while the node
-            # itself still exists, and NULL metrics columns keep the
-            # previous limits rather than zeroing them.
+            # has a hypervisor node_metrics row (and is not deleted); an
+            # existing row also survives a missing metrics row while the
+            # node itself still exists, and NULL metrics columns keep the
+            # previous limits rather than zeroing them. A node that has
+            # stopped being a hypervisor loses its row, which is also how
+            # rows written before the hypervisor filter existed get
+            # cleaned up on upgrade.
             removals = [
                 node_uuid for node_uuid in previous
-                if node_uuid in deleted_nodes or (
-                    node_uuid not in metrics_rows and
+                if node_uuid in deleted_nodes
+                or node_uuid in non_hypervisors
+                or (node_uuid not in metrics_rows and
                     node_uuid not in known_nodes)]
             candidates = (
                 set(previous) | set(metrics_rows)
@@ -23701,13 +23803,26 @@ def _direct_reconcile_scheduler_capacity(
 def _grpc_reconcile_scheduler_capacity(
         demand_per_vcpu: float,
         demand_decay_seconds: int) -> Optional[dict[str, Any]]:
-    """Run a capacity reconcile pass via the database microservice."""
+    """Run a capacity reconcile pass via the database microservice.
+
+    The only caller is the cluster daemon's elected loop, which pets the
+    systemd watchdog itself between maintenance passes, so this uses the
+    bounded budget rather than the default GRPC_RETRIES * GRPC_TIMEOUT
+    worst case that exceeds WatchdogSec (issue 3586). The server side is
+    deliberately one analytical query rather than a point lookup, which
+    makes DEADLINE_EXCEEDED on a loaded database realistic rather than
+    pathological -- and harmless, because the next pass recomputes every
+    counter from ground truth. A skipped pass costs five minutes of gauge
+    freshness, not correctness.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.ReconcileSchedulerCapacityRequest(
             demand_per_vcpu=demand_per_vcpu,
             demand_decay_seconds=demand_decay_seconds)
-        reply = _grpc_call(stub.ReconcileSchedulerCapacity, request)
+        reply = _grpc_call(
+            stub.ReconcileSchedulerCapacity, request,
+            timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
         if not reply.success:
             return None
         return {

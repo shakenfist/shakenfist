@@ -24,7 +24,9 @@ import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError
 
 from shakenfist.constants import GiB
+from shakenfist.daemons.database import main as database_main
 from shakenfist import mariadb
+from shakenfist.protos import database_pb2
 from shakenfist.tests import base
 
 
@@ -357,6 +359,16 @@ def _metrics_row(node_uuid, cpu_schedulable=None, memory_max=None,
         disk_reservation_gb=disk_reservation_gb)
 
 
+def _is_non_hypervisor_query(text):
+    """Is this the node_metrics query for confirmed non-hypervisors?
+
+    The reconciler issues two node_metrics selects: the capacity columns
+    for hypervisors, and the uuids of nodes known not to be hypervisors.
+    They are told apart by the polarity of the is_hypervisor predicate.
+    """
+    return 'is_hypervisor IS false' in text
+
+
 def _capacity_row(node_uuid, limit_cpus, limit_memory_mb, limit_disk_gb,
                   used_cpus=0, used_memory_mb=0, used_disk_gb=0):
     return SimpleNamespace(
@@ -366,8 +378,13 @@ def _capacity_row(node_uuid, limit_cpus, limit_memory_mb, limit_disk_gb,
         used_disk_gb=used_disk_gb, expected_demand=0.0, updated_at=None)
 
 
-class ReconcileScenarioTestCase(base.ShakenFistTestCase):
-    """A populated pass: add, keep-on-NULL-metrics, remove, claims."""
+class _ReconcileRouterMixin:
+    """Routes a mocked connection's execute() calls to canned rows.
+
+    A reconcile pass issues a fixed sequence of reads; each test sets the
+    rows it wants each of them to return and this dispatches on the
+    compiled statement text.
+    """
 
     def _fake_result(self, rows=None, rowcount=0):
         result = mock.MagicMock()
@@ -388,6 +405,8 @@ class ReconcileScenarioTestCase(base.ShakenFistTestCase):
         if 'FROM scheduler_node_capacity' in text:
             return self._fake_result(rows=self.previous_rows)
         if 'FROM node_metrics' in text:
+            if _is_non_hypervisor_query(text):
+                return self._fake_result(rows=self.non_hypervisor_rows)
             return self._fake_result(rows=self.metrics_rows)
         if 'FROM nodes' in text:
             return self._fake_result(rows=self.node_rows)
@@ -397,6 +416,10 @@ class ReconcileScenarioTestCase(base.ShakenFistTestCase):
             return self._fake_result(rows=self.claim_rows)
         self.executed.append((text, stmt))
         return self._fake_result()
+
+
+class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
+    """A populated pass: add, keep-on-NULL-metrics, remove, claims."""
 
     def _run_scenario(self):
         # node1: fresh metrics, no previous row -> added.
@@ -434,6 +457,7 @@ class ReconcileScenarioTestCase(base.ShakenFistTestCase):
             SimpleNamespace(uuid=CLAIM1, namespace='ns1', limit_cpus=8,
                             limit_memory_mb=8192, limit_disk_gb=100,
                             state='active')]
+        self.non_hypervisor_rows = []
         self.executed = []
 
         usage = {
@@ -538,6 +562,227 @@ class ReconcileScenarioTestCase(base.ShakenFistTestCase):
         self.assertEqual(2, len(upserts))
         for text in upserts:
             self.assertIn('ON DUPLICATE KEY UPDATE', text)
+
+
+class ReconcileHypervisorFilterTestCase(
+        _ReconcileRouterMixin, base.ShakenFistTestCase):
+    """Only hypervisors get capacity rows (the scheduler's own rule).
+
+    sf-resources publishes metrics from every node whatever its roles, so
+    without an is_hypervisor filter a network-only or database-only node
+    would get a capacity row and its unschedulable capacity would be
+    summed into the cluster totals.
+    """
+
+    def _run_roles(self, previous_rows, metrics_rows, non_hypervisor_rows,
+                   node_rows):
+        self.previous_rows = previous_rows
+        self.metrics_rows = metrics_rows
+        self.non_hypervisor_rows = non_hypervisor_rows
+        self.node_rows = node_rows
+        self.deleted_rows = []
+        self.claim_rows = []
+        self.executed = []
+
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = self._route
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=mock_engine), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_usage',
+                           return_value={}), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_demand',
+                           return_value={}), \
+                mock.patch.object(mariadb.config,
+                                  'CPU_OVERCOMMIT_RATIO', 3.0), \
+                mock.patch.object(mariadb.config,
+                                  'RAM_OVERCOMMIT_RATIO', 3.0):
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+        return result, conn
+
+    def test_metrics_select_filters_on_is_hypervisor(self):
+        # Both polarities are queried, and the capacity columns only ever
+        # come from the hypervisor side.
+        _, conn = self._run_roles(
+            previous_rows=[], metrics_rows=[], non_hypervisor_rows=[],
+            node_rows=[])
+        metrics_queries = []
+        for call in conn.execute.call_args_list:
+            try:
+                text = str(call.args[0].compile(dialect=MYSQL_DIALECT))
+            except AttributeError:
+                continue
+            if 'FROM node_metrics' in text:
+                metrics_queries.append(text)
+        self.assertEqual(2, len(metrics_queries))
+        hypervisor = [t for t in metrics_queries
+                      if not _is_non_hypervisor_query(t)]
+        self.assertEqual(1, len(hypervisor))
+        self.assertIn('is_hypervisor IS true', hypervisor[0])
+        self.assertIn('cpu_schedulable', hypervisor[0])
+
+    def test_non_hypervisor_gets_no_capacity_row(self):
+        # NODE1 is a hypervisor, NODE2 is a network-only node: it has a
+        # metrics row with perfectly good capacity columns, but the
+        # hypervisor query never returns it.
+        result, _ = self._run_roles(
+            previous_rows=[],
+            metrics_rows=[
+                _metrics_row(NODE1, cpu_schedulable=10, memory_max=1024,
+                             memory_reserved_mb=0,
+                             disk_free_instances=100 * GiB,
+                             disk_reservation_gb=0)],
+            non_hypervisor_rows=[SimpleNamespace(node_uuid=NODE2)],
+            node_rows=[SimpleNamespace(uuid=NODE1),
+                       SimpleNamespace(uuid=NODE2)])
+
+        self.assertEqual([str(NODE1)],
+                         [n['node_uuid'] for n in result['nodes']])
+        self.assertEqual(1, result['nodes_added'])
+        # The cluster totals see only the hypervisor's capacity.
+        self.assertEqual(30, result['cluster']['total_cpus'])
+        self.assertEqual(3072, result['cluster']['total_memory_mb'])
+        self.assertEqual(100, result['cluster']['total_disk_gb'])
+
+    def test_demoted_hypervisor_loses_its_row(self):
+        # NODE2 has a capacity row from when it was a hypervisor. It is
+        # still a live node, so the not-in-nodes removal rule does not
+        # catch it -- the is_hypervisor=False rule must. This is also how
+        # rows written before the filter existed are cleaned up.
+        result, conn = self._run_roles(
+            previous_rows=[_capacity_row(NODE2, 10, 1000, 50)],
+            metrics_rows=[],
+            non_hypervisor_rows=[SimpleNamespace(node_uuid=NODE2)],
+            node_rows=[SimpleNamespace(uuid=NODE2)])
+
+        self.assertEqual([], result['nodes'])
+        self.assertEqual(2, result['nodes_removed'])
+        deletes = [str(call.args[0].compile(dialect=MYSQL_DIALECT))
+                   for call in conn.execute.call_args_list
+                   if isinstance(call.args[0], sa.sql.expression.Delete)]
+        self.assertEqual(1, len(deletes))
+        self.assertIn('DELETE FROM scheduler_node_capacity', deletes[0])
+        self.assertEqual(0, result['cluster']['total_cpus'])
+
+    def test_null_is_hypervisor_keeps_an_existing_row(self):
+        # A metrics row written by a pre-upgrade resources daemon has
+        # is_hypervisor NULL, so the node appears in neither query. That
+        # is not evidence of anything, so an existing row keeps its
+        # limits rather than being deleted on the strength of a value
+        # that has simply not been written yet.
+        result, _ = self._run_roles(
+            previous_rows=[_capacity_row(NODE2, 10, 1000, 50)],
+            metrics_rows=[],
+            non_hypervisor_rows=[],
+            node_rows=[SimpleNamespace(uuid=NODE2)])
+
+        self.assertEqual(1, len(result['nodes']))
+        self.assertEqual(str(NODE2), result['nodes'][0]['node_uuid'])
+        self.assertEqual(10, result['nodes'][0]['limit_cpus'])
+        self.assertEqual(0, result['nodes_removed'])
+
+
+class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
+    """The summary dict survives the trip through the proto and back.
+
+    The keys _direct_ produces, the proto field names, and the keys the
+    cluster daemon reads are kept in sync by nothing but care: the
+    servicer splats the dict into the message (raising on an unknown
+    field name) and the client hand-copies all twenty fields back out. A
+    rename on either side would pass every other test and fail only on a
+    live cluster, so exercise both layers against each other.
+    """
+
+    SUMMARY = {
+        'success': True,
+        'nodes_added': 2,
+        'nodes_removed': 1,
+        'claims_expired': 3,
+        'nodes': [{
+            'node_uuid': str(NODE1),
+            'limit_cpus': 42, 'limit_memory_mb': 188633,
+            'limit_disk_gb': 766,
+            'used_cpus': 6, 'used_memory_mb': 6144, 'used_disk_gb': 38,
+            'expected_demand': 10.0,
+            'delta_used_cpus': 6, 'delta_used_memory_mb': 6144,
+            'delta_used_disk_gb': 38,
+        }],
+        'cluster': {
+            'total_cpus': 52, 'total_memory_mb': 189633,
+            'total_disk_gb': 816,
+            'claimed_cpus': 8, 'claimed_memory_mb': 8192,
+            'claimed_disk_gb': 100,
+            'unclaimed_used_cpus': 5, 'unclaimed_used_memory_mb': 5120,
+            'unclaimed_used_disk_gb': 13,
+        },
+    }
+
+    def _servicer_reply(self, direct_result):
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        request = database_pb2.ReconcileSchedulerCapacityRequest(
+            demand_per_vcpu=2.5, demand_decay_seconds=600)
+        with mock.patch(
+                'shakenfist.mariadb._direct_reconcile_scheduler_capacity',
+                return_value=direct_result):
+            return servicer.ReconcileSchedulerCapacity(
+                request, mock.MagicMock())
+
+    def test_round_trip_preserves_every_field(self):
+        reply = self._servicer_reply(self.SUMMARY)
+        self.assertTrue(reply.success)
+
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            unpacked = mariadb._grpc_reconcile_scheduler_capacity(2.5, 600)
+
+        self.assertEqual(self.SUMMARY, unpacked)
+
+    def test_grpc_call_uses_the_bounded_budget(self):
+        # This runs inside the cluster daemon's watchdog-petting elected
+        # loop, so it must not be able to block for the default
+        # GRPC_RETRIES * GRPC_TIMEOUT worst case (issue 3586).
+        reply = self._servicer_reply(self.SUMMARY)
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply) as mock_call:
+            mariadb._grpc_reconcile_scheduler_capacity(2.5, 600)
+        self.assertEqual(mariadb.BOUNDED_QUERY_TIMEOUT,
+                         mock_call.call_args.kwargs['timeout'])
+        self.assertEqual(1, mock_call.call_args.kwargs['max_slow_failures'])
+
+    def test_direct_failure_becomes_an_unsuccessful_reply(self):
+        reply = self._servicer_reply(None)
+        self.assertFalse(reply.success)
+
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            self.assertIsNone(
+                mariadb._grpc_reconcile_scheduler_capacity(2.5, 600))
+
+    def test_servicer_swallows_an_unexpected_exception(self):
+        # _direct_ only converts OperationalError and IntegrityError to
+        # None; anything else propagates and is caught here.
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        request = database_pb2.ReconcileSchedulerCapacityRequest(
+            demand_per_vcpu=2.5, demand_decay_seconds=600)
+        with mock.patch(
+                'shakenfist.mariadb._direct_reconcile_scheduler_capacity',
+                side_effect=ValueError('boom')):
+            reply = servicer.ReconcileSchedulerCapacity(
+                request, mock.MagicMock())
+        self.assertFalse(reply.success)
 
 
 class ReconcilePublicRoutingTestCase(base.ShakenFistTestCase):

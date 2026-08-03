@@ -42,6 +42,7 @@ REALISTIC_METRICS = {
     'disk_reservation_gb': 20,
     'disk_busy_time_delta_per_second': '16.6',
     'node_queue_waiting': 3,
+    'is_hypervisor': True,
 
     # Fields which are not projected to typed columns.
     'instances_total': 7,
@@ -75,6 +76,7 @@ class NodeMetricsExtractionTestCase(base.ShakenFistTestCase):
                 'disk_reservation_gb': 20,
                 'disk_busy_time_delta_per_second': 16.6,
                 'node_queue_waiting': 3,
+                'is_hypervisor': True,
             }, extracted)
 
         # Integral columns really are ints (parsed via float() first, so a
@@ -141,7 +143,7 @@ class NodeMetricsExtractionTestCase(base.ShakenFistTestCase):
 
         spec_columns = [column_name for _, column_name, _
                         in mariadb.NODE_METRICS_EXTRACTION_SPEC]
-        self.assertEqual(15, len(spec_columns))
+        self.assertEqual(16, len(spec_columns))
         self.assertEqual(len(spec_columns), len(set(spec_columns)))
 
         for column_name in spec_columns:
@@ -166,6 +168,10 @@ class NodeMetricsExtractionTestCase(base.ShakenFistTestCase):
                 self.assertEqual(
                     mariadb._node_metric_to_float, coercion,
                     f'{column_name} is DOUBLE but does not coerce to float')
+            elif isinstance(column_type, sa.Boolean):
+                self.assertEqual(
+                    mariadb._node_metric_to_bool, coercion,
+                    f'{column_name} is BOOLEAN but does not coerce to bool')
             else:
                 self.assertIsInstance(column_type, sa.Integer)
                 self.assertEqual(
@@ -221,16 +227,21 @@ class EnsureNodeMetricsSchemaTestCase(base.ShakenFistTestCase):
     """Tests for _ensure_node_metrics_schema() version gating."""
 
     def test_target_version_is_wired_into_expected_versions(self):
-        self.assertEqual(3, mariadb.NODE_METRICS_VERSION)
+        self.assertEqual(4, mariadb.NODE_METRICS_VERSION)
         self.assertEqual(mariadb.NODE_METRICS_VERSION,
                          mariadb.EXPECTED_SCHEMA_VERSIONS['node_metrics'])
 
     @mock.patch('shakenfist.mariadb.get_table_columns')
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
-    def test_v2_to_v3_adds_columns(
+    def test_v2_to_current_adds_columns(
             self, mock_get_version, mock_set_version, mock_get_columns):
-        """From v2: every typed column is added and the version advances."""
+        """From v2: every typed column is added and the version advances.
+
+        Both the v3 and v4 steps run, and both just converge the table
+        onto the spec, so an old database ends up with exactly the same
+        columns as a fresh one regardless of which step introduced them.
+        """
         mock_get_columns.return_value = {name: {} for name in BASE_COLUMNS}
         mock_engine = mock.MagicMock()
 
@@ -238,15 +249,14 @@ class EnsureNodeMetricsSchemaTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result['table'], 'node_metrics')
         self.assertEqual(result['start_version'], 2)
-        self.assertEqual(result['end_version'], 3)
+        self.assertEqual(result['end_version'], 4)
         self.assertTrue(result['migrated'])
-        mock_set_version.assert_called_once_with(
-            mock_engine, 'node_metrics', 3)
+        mock_set_version.assert_has_calls([
+            mock.call(mock_engine, 'node_metrics', 3),
+            mock.call(mock_engine, 'node_metrics', 4)])
 
         conn = mock_engine.begin.return_value.__enter__.return_value
         executed = [str(call.args[0]) for call in conn.execute.call_args_list]
-        self.assertEqual(
-            len(mariadb.NODE_METRICS_EXTRACTION_SPEC), len(executed))
         joined = ' '.join(executed)
         for _, column_name, _ in mariadb.NODE_METRICS_EXTRACTION_SPEC:
             self.assertIn(
@@ -255,11 +265,12 @@ class EnsureNodeMetricsSchemaTestCase(base.ShakenFistTestCase):
         self.assertIn('disk_free_instances BIGINT NULL', joined)
         self.assertIn('cpu_load_1 DOUBLE NULL', joined)
         self.assertIn('cpu_max INTEGER NULL', joined)
+        self.assertIn('is_hypervisor BOOL NULL', joined)
 
     @mock.patch('shakenfist.mariadb.get_table_columns')
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
-    def test_v2_to_v3_is_idempotent(
+    def test_v2_to_current_is_idempotent(
             self, mock_get_version, mock_set_version, mock_get_columns):
         """A re-run against a table that already has the columns adds
         nothing but still advances the version."""
@@ -269,23 +280,51 @@ class EnsureNodeMetricsSchemaTestCase(base.ShakenFistTestCase):
 
         result = mariadb._ensure_node_metrics_schema(mock_engine)
 
-        self.assertEqual(result['end_version'], 3)
+        self.assertEqual(result['end_version'], 4)
         self.assertTrue(result['migrated'])
         conn = mock_engine.begin.return_value.__enter__.return_value
         conn.execute.assert_not_called()
-        mock_set_version.assert_called_once_with(
-            mock_engine, 'node_metrics', 3)
+        mock_set_version.assert_has_calls([
+            mock.call(mock_engine, 'node_metrics', 3),
+            mock.call(mock_engine, 'node_metrics', 4)])
 
+    @mock.patch('shakenfist.mariadb.get_table_columns')
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
-    def test_already_at_v3_is_noop(
-            self, mock_get_version, mock_set_version):
-        """Already at v3: no DDL, no version write, migrated=False."""
+    def test_v3_to_v4_adds_only_is_hypervisor(
+            self, mock_get_version, mock_set_version, mock_get_columns):
+        """From v3: the capacity columns are already there, so only the
+        new is_hypervisor column is added."""
+        table = mariadb._get_node_metrics_table()
+        mock_get_columns.return_value = {
+            c.name: {} for c in table.c if c.name != 'is_hypervisor'}
         mock_engine = mock.MagicMock()
 
         result = mariadb._ensure_node_metrics_schema(mock_engine)
 
-        self.assertEqual(result['end_version'], 3)
+        self.assertEqual(result['start_version'], 3)
+        self.assertEqual(result['end_version'], 4)
+        self.assertTrue(result['migrated'])
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'node_metrics', 4)
+
+        conn = mock_engine.begin.return_value.__enter__.return_value
+        executed = [str(call.args[0]) for call in conn.execute.call_args_list]
+        self.assertEqual(1, len(executed))
+        self.assertIn(
+            'ALTER TABLE node_metrics ADD COLUMN is_hypervisor BOOL NULL',
+            executed[0])
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=4)
+    def test_already_at_v4_is_noop(
+            self, mock_get_version, mock_set_version):
+        """Already at v4: no DDL, no version write, migrated=False."""
+        mock_engine = mock.MagicMock()
+
+        result = mariadb._ensure_node_metrics_schema(mock_engine)
+
+        self.assertEqual(result['end_version'], 4)
         self.assertFalse(result['migrated'])
         mock_set_version.assert_not_called()
         mock_engine.begin.assert_not_called()
