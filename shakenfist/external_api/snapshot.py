@@ -8,6 +8,7 @@
 #   - Has complete CI coverage:
 from functools import partial
 
+from flasgger import swag_from
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
@@ -25,6 +26,27 @@ daemon.set_log_level(LOG, 'api')
 
 
 class InstanceSnapshotEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Snapshot an instance.',
+        [
+            ('instance_ref', 'path', 'uuidorname',
+             'The UUID or name of the instance.', True),
+            ('all', 'body', 'boolean',
+             'Snapshot every disk, rather than only the first.', False),
+            ('device', 'body', 'string',
+             'Snapshot only this device, for example "vdb".', False),
+            ('max_versions', 'body', 'integer',
+             'The maximum number of versions to retain for the resulting '
+             'snapshot artifacts, or zero for the configured default.', False),
+            ('thin', 'body', 'boolean',
+             'Take a thin snapshot, which records only the differences from '
+             'the backing image. Defaults to SNAPSHOTS_DEFAULT_TO_THIN.',
+             False)
+        ],
+        [(200, 'Information about the snapshots taken.', None),
+         (404, 'Instance not found.', None),
+         (406, 'Instance is not in a state where it can be snapshotted.',
+          None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -40,6 +62,12 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         return instance_from_db.snapshot(
             all=all, device=device, max_versions=max_versions, thin=thin)
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'List the snapshots of an instance.',
+        [('instance_ref', 'path', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(200, 'Information about the snapshots of an instance.', None),
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
