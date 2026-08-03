@@ -38,14 +38,10 @@ because you may only name your own, so use the UUID.
 !!! warning "Commands which change something are narrower"
 
     The wider search applies when you are *reading*. Anything which changes an
-    object — deleting it, sharing it, setting metadata — resolves a name in
-    your own namespace and nowhere else.
-
-    This is deliberate. Trust does allow you to delete an artifact belonging
-    to a namespace which trusts you, but `sf-client artifact delete
-    build-cache` run somewhere with no `build-cache` of its own should tell
-    you that, rather than quietly finding and deleting somebody else's. If you
-    really do mean theirs, refer to it by UUID and it will work.
+    object — deleting it, sharing it, setting metadata — works only on objects
+    in your own namespace, and resolves a name there and nowhere else. Being
+    able to see somebody's object does not mean being able to change it, and
+    that is true whether you use a name or a UUID.
 
 !!! note
 

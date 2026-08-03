@@ -366,10 +366,15 @@ filters with rather than open-coding the equivalent test.
 
 For artifacts that function is `namespace_or_shared_filter(namespace, obj)`:
 own namespace, a namespace whose trust list names the caller, `system`, or
-`shared`. `requires_artifact_access` calls it. `requires_artifact_ownership`
-is the deliberately stricter mutation guard and tests `namespace_is_trusted`
-alone — sharing publishes an artifact for reading, so the write paths must
-not consult the `shared` flag.
+`shared`. `requires_artifact_access` calls it.
+
+`requires_artifact_ownership` is the deliberately stricter mutation guard and
+tests `request_namespace() not in [obj.namespace, 'system']` — the same test
+`requires_instance_ownership` and `requires_network_ownership` use. It
+consults neither the `shared` flag nor the trust list: sharing publishes an
+object for reading, and a trust is a visibility grant, so neither one hands
+out a delete button. Creating an object *in* a namespace that trusts you is a
+separate question and is still allowed.
 
 This is not a style preference. `requires_artifact_access` used to restate the
 rule as `if a.shared and requestor not in [a.namespace, 'system']`, which is

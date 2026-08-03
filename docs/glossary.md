@@ -261,7 +261,9 @@ authentication and is closest in nature to an
 
 **trust**{#trust} -- The existing namespace-to-namespace visibility grant: if
 namespace A trusts namespace B, then callers in B can see A's objects by
-reference. Defined in `shakenfist/namespace.py` (the `trust` member and
+reference. Visibility only -- B may read A's objects and may create new ones
+in A (the "gifting" pattern), but may not delete or modify what A already has.
+Defined in `shakenfist/namespace.py` (the `trust` member and
 `add_trust`/`remove_trust`) and `docs/operator_guide/authentication.md`. Not to
 be confused with: a [trusted issuer](#trusted-issuer), which is about
 accepting external token issuers rather than sharing objects between namespaces;

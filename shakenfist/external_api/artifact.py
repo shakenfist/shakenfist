@@ -150,17 +150,33 @@ def requires_artifact_ownership(func):
     # what it found.
     #
     # The stricter of the two tests, for anything which changes the
-    # artifact: the caller's own namespace, a namespace which trusts
-    # them, or system (which every namespace trusts, because
-    # Namespace.remove_trust refuses to drop it). Deliberately does
-    # *not* consult the shared flag -- sharing an artifact publishes it
-    # for reading, it does not hand the world a delete button.
+    # artifact: the caller's own namespace, or system.
+    #
+    # Deliberately does *not* consult the shared flag -- sharing an
+    # artifact publishes it for reading, it does not hand the world a
+    # delete button -- and deliberately does not consult trust either.
+    # Trust is a visibility mechanism. The operator guide introduces it
+    # as a way to get the system namespace's cross-namespace *sight* on
+    # a smaller scale, and letting somebody delete your artifacts is
+    # not a smaller scale version of being able to see them. It is also
+    # what the rest of the codebase already does:
+    # requires_instance_ownership and requires_network_ownership both
+    # test `request_namespace() not in [obj.namespace, 'system']`, and
+    # artifacts were the only object type where trust reached past
+    # reading. Now they match.
+    #
+    # Creating an artifact *in* a namespace which trusts you is a
+    # different question and still allowed -- see the namespace checks
+    # on the cache and upload routes. That is the "gifting" pattern the
+    # operator guide's ci-images example is built on, and it is
+    # additive: the receiving namespace opted in by trusting you, and
+    # nothing it already had is lost.
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if not namespace_is_trusted(a.namespace, request_namespace()):
+        if request_namespace() not in [a.namespace, 'system']:
             LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
             return sf_api.error(404, 'artifact not found')

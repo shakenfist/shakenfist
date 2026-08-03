@@ -54,14 +54,14 @@ own namespace means you have two artifacts of that name, which the `namespace`
 field cannot disambiguate either.
 
 Routes which **change** an artifact — delete, share, unshare, set max
-versions, delete a version, and all of the metadata routes — resolve a name in
-your own namespace and nowhere else, and answer `404` for a name you do not
-own. Trust still permits those operations against a namespace which trusts
-you, but you have to name the artifact by UUID to reach it. A name that
-resolves somewhere unexpected is a nuisance on a read and a disaster on a
-delete. Note that this follows the route's authorization, not its HTTP verb:
+versions, delete a version, and all of the metadata routes — require the
+artifact to be in your own namespace, or you to be `system`. A trust does not
+grant them, whether you use a name or a UUID; see
+[trusts](/operator_guide/authentication/) for why. Those routes also resolve
+names in your own namespace and nowhere else, so a name you do not own is a
+`404`. Note that this follows the route's authorization, not its HTTP verb:
 `GET /artifacts/{artifact_ref}/metadata` is ownership-guarded and therefore
-resolves narrowly.
+both narrow and owner-only.
 
 ???+ tip "REST API calls"
 

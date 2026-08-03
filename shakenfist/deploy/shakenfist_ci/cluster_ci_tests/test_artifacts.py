@@ -398,6 +398,17 @@ class TestTrusts(base.BaseNamespacedTestCase):
         by_name = self.test_client_two.get_artifact(url.split('/')[-1])
         self.assertEqual(art['uuid'], by_name['uuid'])
 
+        # A trust grants visibility and nothing else. Namespace two can
+        # see the artifact and cannot destroy it, by uuid or by name.
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client_two.delete_artifact, art['uuid'])
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client_two.delete_artifact, url.split('/')[-1])
+        self.assertEqual(
+            url, self.test_client_two.get_artifact(art['uuid'])['source_url'])
+
         # Remove trust
         self.test_client_one.remove_namespace_trust(
             self.namespace + '-1', self.namespace + '-2')

@@ -200,9 +200,11 @@ class SharedArtifactAccessTestCase(ArtifactAccessFixture):
             Artifact.from_db(self.artifact.uuid).state.value)
 
     def test_the_delete_refusal_is_the_sharing_and_not_the_uuid(self):
-        # The control for the test above: the same request, from a
-        # namespace that is trusted, succeeds.
-        self.assertEqual(200, self._delete('trusted').status_code)
+        # The control for the test above: the same request, from the
+        # owning namespace, succeeds. Not from `trusted` -- trust
+        # grants visibility and does not authorise writes, which is
+        # asserted in ArtifactMutationTestCase below.
+        self.assertEqual(200, self._delete('owner').status_code)
 
 
 class ArtifactSubresourceAccessTestCase(ArtifactAccessFixture):
@@ -436,42 +438,23 @@ class ArtifactNameResolutionTestCase(ArtifactAccessFixture):
             Artifact.STATE_DELETED,
             Artifact.from_db(self.artifact.uuid).state.value)
 
-    def test_a_trusted_namespace_cannot_delete_by_name(self):
-        # The widening stops at the read routes. Trust does permit
-        # this delete, and the test below shows it going through by
-        # UUID -- but a name that resolves into somebody else's
-        # namespace and then destroys what it lands on is a surprise
-        # nobody asked for. `artifact delete build-cache` in a
-        # namespace with no `build-cache` of its own must say so.
-        self.assertEqual(404, self._delete('trusted', 'thing').status_code)
-        self.assertNotEqual(
-            Artifact.STATE_DELETED,
-            Artifact.from_db(self.artifact.uuid).state.value)
-
-    def test_a_trusted_namespace_can_still_delete_by_uuid(self):
-        # The control for the test above. Trust is unchanged; only the
-        # way a name resolves on this route is.
-        self.assertEqual(200, self._delete('trusted').status_code)
-
     def test_the_owner_can_still_delete_by_name(self):
-        # And the control for that control: narrowing name resolution
-        # on the write routes did not narrow it to nothing.
+        # Narrowing name resolution on the write routes did not narrow
+        # it to nothing.
         self.assertEqual(200, self._delete('owner', 'thing').status_code)
 
-    def test_the_narrow_rule_follows_the_guard_and_not_the_verb(self):
-        # Artifact metadata is a GET, but it is ownership guarded
-        # rather than access guarded, so it resolves names narrowly
-        # along with the write routes. The pairing is decorator to
-        # decorator and the HTTP verb has nothing to do with it --
-        # asserted on a second route so that the split is not resting
-        # on the delete test alone.
-        self.assertEqual(404, self.client.get(
-            '/artifacts/thing/metadata',
-            headers={'Authorization': self._token('trusted')}).status_code)
+    def test_a_write_route_does_not_leak_a_foreign_ambiguity(self):
+        # The observable difference between the two ref decorators
+        # once ownership stops honouring trust. `stranger` owns no
+        # `thing` and can see two: the read route has to say "which
+        # one" and answers 400, but the write route was never going to
+        # accept any of them, so it answers a flat 404 rather than
+        # confirming that two exist.
+        self._share()
+        self._other('trusted', shared=True)
 
-        self.assertEqual(200, self.client.get(
-            '/artifacts/%s/metadata' % self.artifact.uuid,
-            headers={'Authorization': self._token('trusted')}).status_code)
+        self.assertEqual(400, self._by_name('stranger').status_code)
+        self.assertEqual(404, self._delete('stranger', 'thing').status_code)
 
     def test_a_write_route_ignores_a_shared_artifact_of_the_same_name(self):
         # `stranger` owns `thing` and can also see owner's shared
@@ -485,6 +468,106 @@ class ArtifactNameResolutionTestCase(ArtifactAccessFixture):
         self.assertEqual(200, self._delete('stranger', 'thing').status_code)
         self.assertEqual(
             Artifact.STATE_DELETED, Artifact.from_db(mine.uuid).state.value)
+        self.assertNotEqual(
+            Artifact.STATE_DELETED,
+            Artifact.from_db(self.artifact.uuid).state.value)
+
+
+class ArtifactMutationTestCase(ArtifactAccessFixture):
+    """Trust lets you look. It does not let you touch.
+
+    The operator guide introduces a trust as a way to get the system
+    namespace's cross-namespace *sight* on a smaller scale, and being
+    able to delete somebody's artifacts is not a smaller scale version
+    of being able to see them. Instances and networks have always read
+    this way -- `requires_instance_ownership` and
+    `requires_network_ownership` both test `request_namespace() not in
+    [obj.namespace, 'system']` -- and artifacts were the one object
+    type where trust reached past reading.
+
+    Every refusal below is a UUID, because a name would also have been
+    refused by resolution and a refusal with two causes demonstrates
+    neither.
+    """
+
+    def _mutations(self, namespace):
+        """Every ownership guarded route, and what an owner should get.
+
+        Ordered so that delete runs last, since the routes after it
+        would otherwise be acting on a deleted artifact.
+
+        `share` and `unshare` carry preconditions of their own -- only
+        an artifact in the system namespace can be shared, and only a
+        shared one can be unshared -- so an authorised caller reaches
+        those and is refused with 403. That asymmetry is useful rather
+        than awkward: 403 means the request got past the ownership
+        guard, 404 means it did not, so these two routes distinguish
+        the two refusals more sharply than the rest.
+        """
+        auth = {'Authorization': self._token(namespace)}
+        u = self.artifact.uuid
+        return [
+            ('metadata_read', 200, lambda: self.client.get(
+                '/artifacts/%s/metadata' % u, headers=auth)),
+            ('metadata_write', 200, lambda: self.client.post(
+                '/artifacts/%s/metadata' % u, headers=auth,
+                data=json.dumps({'key': 'k', 'value': 'v'}))),
+            ('max_versions', 200, lambda: self.client.post(
+                '/artifacts/%s/versions' % u, headers=auth,
+                data=json.dumps({'max_versions': 2}))),
+            ('share', 403, lambda: self.client.post(
+                '/artifacts/%s/share' % u, headers=auth)),
+            ('unshare', 403, lambda: self.client.post(
+                '/artifacts/%s/unshare' % u, headers=auth)),
+            ('delete', 200, lambda: self.client.delete(
+                '/artifacts/%s' % u, headers=auth)),
+        ]
+
+    def test_a_trusted_namespace_cannot_mutate(self):
+        for name, _, call in self._mutations('trusted'):
+            with self.subTest(route=name):
+                self.assertEqual(404, call().status_code)
+
+    def test_a_stranger_cannot_mutate(self):
+        for name, _, call in self._mutations('stranger'):
+            with self.subTest(route=name):
+                self.assertEqual(404, call().status_code)
+
+    def test_the_owner_can_mutate(self):
+        # The control. Without it every 404 above could be a broken
+        # route rather than a working guard.
+        for name, expected, call in self._mutations('owner'):
+            with self.subTest(route=name):
+                self.assertEqual(expected, call().status_code)
+
+    def test_system_can_mutate(self):
+        # System has to keep working; a cluster admin who cannot clean
+        # up a tenant's artifacts is not a cluster admin. This is why
+        # the test is `not in [namespace, 'system']` rather than a
+        # plain equality.
+        for name, expected, call in self._mutations('system'):
+            with self.subTest(route=name):
+                self.assertEqual(expected, call().status_code)
+
+    def test_a_trusted_namespace_can_still_read(self):
+        # The whole point: nothing about visibility changed. Trust
+        # still opens the read paths it always did.
+        self.assertEqual(200, self._get('trusted').status_code)
+        self.assertIn(
+            str(self.artifact.uuid),
+            [a['uuid'] for a in self.client.get(
+                '/artifacts',
+                headers={'Authorization': self._token('trusted')}
+            ).get_json()])
+
+    def test_the_artifact_survives_a_refused_delete(self):
+        # Asserted on the object rather than the status code, because
+        # a guard that returns 404 after doing the work would pass
+        # every other test in this class.
+        self.client.delete(
+            '/artifacts/%s' % self.artifact.uuid,
+            headers={'Authorization': self._token('trusted')})
+
         self.assertNotEqual(
             Artifact.STATE_DELETED,
             Artifact.from_db(self.artifact.uuid).state.value)

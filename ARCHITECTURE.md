@@ -1073,10 +1073,23 @@ authorization decision rests on the decorator that runs next. There are two:
   be one rule, and for as long as they were two copies of a rule they
   disagreed.
 - `requires_artifact_ownership` guards everything that mutates, and tests
-  `namespace_is_trusted` only. It never consults the `shared` flag, because
-  sharing publishes an artifact for reading rather than transferring it.
-  `system` passes because `Namespace.remove_trust` refuses to remove `system`
-  from any trust list.
+  `request_namespace() not in [a.namespace, 'system']` — the caller's own
+  namespace, or the cluster admin. It consults neither the `shared` flag nor
+  the trust list. Sharing publishes an artifact for reading rather than
+  transferring it, and a trust is a visibility grant: the operator guide
+  introduces it as the system namespace's cross-namespace *sight* on a
+  smaller scale, and being able to delete somebody's artifacts is not a
+  smaller-scale version of being able to see them. This matches
+  `requires_instance_ownership` and `requires_network_ownership`, which have
+  always read exactly this way; artifacts were the one object type where
+  trust reached past reading.
+
+Creating an object *in* a namespace which trusts you is a different question
+and remains allowed — see the `namespace_is_trusted` checks on the artifact
+cache and upload routes, and on instance creation. That is the "gifting"
+pattern the operator guide's `ci-images` example is built on. It is additive,
+the receiving namespace opted in by extending the trust, and nothing it
+already had is lost.
 
 Both refuse with `404` rather than `403`, so a refusal does not confirm that
 the object exists. Scope enforcement is a separate and earlier gate — a caller
@@ -1119,19 +1132,20 @@ each route:
 | `arg_is_visible_artifact_ref` | `requires_artifact_access` | anything you can see, own namespace first |
 | `arg_is_artifact_ref` | `requires_artifact_ownership` | your own namespace only |
 
-Trust permits a trusted namespace to delete another's artifact, and it still
-does *by UUID*. What the narrow rule prevents is a name resolving into another
-namespace on a route that then destroys what it found:
-`sf-client artifact delete build-cache`, run somewhere with no `build-cache`
-of its own, must fail rather than delete the one belonging to a namespace that
-happens to trust it. A misresolved name is a nuisance on a read and a disaster
-on a delete, so the two routes get different answers.
-
 The split follows the authorization guard, not the HTTP verb — `GET
 /artifacts/{ref}/metadata` is ownership-guarded and therefore resolves
 narrowly. Either decorator also drops back to the narrow behaviour when the
 caller named a namespace in the request body, since that caller asked about
 one namespace specifically.
+
+Since `requires_artifact_ownership` no longer honours trust, narrow resolution
+mostly agrees with the guard that follows it, and the split is defence in
+depth rather than the only thing standing between a name and somebody else's
+artifact. It still earns its place twice over. It keeps resolution from
+silently following if the guard is ever widened again, and it is observable:
+faced with a name matching two artifacts the caller can see but does not own,
+the read route must answer `400` and ask which one, while a write route
+answers a flat `404` rather than confirming that two exist.
 
 Instances and networks have the same shape in `arg_is_instance_ref` and
 `arg_is_network_ref` and have not been widened. Sharing is an artifact-only

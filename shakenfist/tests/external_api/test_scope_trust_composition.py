@@ -14,13 +14,15 @@ object it is reaching for lives in a namespace that trusts it. If it
 did, trust would be a scope-escape hatch: mint a narrowly scoped key,
 point it at a trusting namespace, and get the wildcard back.
 
-The tests run against the three artifact paths where trust is the
-gate: listing and reading by uuid, which both filter through
-namespace_or_shared_filter, and delete, which is guarded by
-requires_artifact_ownership. Each refusal is paired with a control
-showing the same request succeeding when the one thing under test is
-changed -- otherwise a 403 for some unrelated reason would read as the
-property holding.
+The tests run against the artifact paths trust governs: listing and
+reading by uuid, which both filter through namespace_or_shared_filter.
+Delete appears too, but as the boundary rather than as a path across
+it -- trust is a visibility mechanism, so requires_artifact_ownership
+tests the caller's own namespace and nothing else, and a scoped key
+therefore has its own artifacts to delete and no others. Each refusal
+is paired with a control showing the same request succeeding when the
+one thing under test is changed -- otherwise a 403 for some unrelated
+reason would read as the property holding.
 
 Whether a caller may see an artifact at all is a separate question,
 tested separately in test_artifact_access.py. Here it is only the
@@ -212,28 +214,59 @@ class ScopeTrustCompositionTestCase(TrustCompositionFixture):
         # The same credential, the same object, the same trust -- and
         # refused, because artifact.read is not artifact.delete. This
         # is the property open question 11 asks for.
+        #
+        # Note this is a 403 rather than a 404: the scope gate runs
+        # before the object is ever resolved, so the caller is turned
+        # away for the scope, not for the ownership test which would
+        # also have refused them. The pair of tests below separate the
+        # two, since a refusal that happens for two reasons at once
+        # proves neither of them.
         self._trust()
         token = self._token('scratch', 'sekrit6', ['artifact.read'])
 
         self.assertEqual(403, self._delete(token).status_code)
 
-    def test_the_delete_refusal_is_the_scope_and_not_the_trust(self):
-        # The control. A wildcard key in the same namespace, reaching
-        # the same object across the same trust, deletes it -- so the
-        # 403 above was the scope talking and not the trust.
-        self._trust()
+    def test_the_delete_refusal_is_the_scope_and_not_the_ownership(self):
+        # The control. A wildcard key deleting an artifact of its own
+        # succeeds, so the 403 above was the scope talking. Deleting
+        # *its own* rather than the cache's, because trust no longer
+        # authorises writing to somebody else's namespace -- see
+        # test_trust_does_not_authorise_deletion below.
+        own = Artifact.new(
+            Artifact.TYPE_OTHER, 'http://example.com/mine.tgz',
+            name='mine', namespace='scratch')
+        own.state = Artifact.STATE_CREATED
         token = self._token('scratch', 'sekrit7')
 
-        self.assertEqual(200, self._delete(token).status_code)
+        self.assertEqual(200, self.client.delete(
+            '/artifacts/%s' % own.uuid,
+            headers={'Authorization': token}).status_code)
 
     def test_the_delete_scope_granted_permits_the_delete(self):
-        # The other control: the right scope works across trust, so
-        # the boundary is not simply read-only for scoped callers.
-        self._trust()
+        # The other control: the right scope does work, so a scoped
+        # key is not simply read only.
+        own = Artifact.new(
+            Artifact.TYPE_OTHER, 'http://example.com/mine.tgz',
+            name='mine', namespace='scratch')
+        own.state = Artifact.STATE_CREATED
         token = self._token(
             'scratch', 'sekrit8', ['artifact.read', 'artifact.delete'])
 
-        self.assertEqual(200, self._delete(token).status_code)
+        self.assertEqual(200, self.client.delete(
+            '/artifacts/%s' % own.uuid,
+            headers={'Authorization': token}).status_code)
+
+    def test_trust_does_not_authorise_deletion(self):
+        # Trust composes with scopes on the read paths and does not
+        # compose at all on the write ones, because it is a visibility
+        # mechanism. A correctly scoped key, across a live trust, with
+        # the right UUID, still cannot delete the cache's artifact.
+        self._trust()
+        token = self._token(
+            'scratch', 'sekritf', ['artifact.read', 'artifact.delete'])
+
+        self.assertEqual(200, self._read(token).status_code)
+        self.assertEqual(404, self._delete(token).status_code)
 
     def test_the_delete_scope_is_not_enough_without_trust(self):
         # Scope does not substitute for visibility. Without the trust

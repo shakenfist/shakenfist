@@ -240,3 +240,25 @@ What we implemented was:
   them to the `ci-images` namespace via a label.
 * jobs which need to boot a test image can now see the images from the `ci-images`
   namespace by virtue of this trust relationship.
+
+### What a trust does and does not grant
+
+A trust grants **visibility**. It is the system namespace's ability to see
+across namespaces, scaled down, and that is all it is. A namespace you trust
+can list and read your objects. It cannot delete them, rename them, share
+them, or change their metadata — those all require the object's own namespace,
+or `system`.
+
+Giving is a separate question from taking, and it is still allowed: a
+namespace you trust may *create* an object in your namespace, which is exactly
+the "gift" step in the `ci-images` example above. Creation is additive, you
+opted into it by extending the trust, and nothing you already had is lost by
+it. Deletion is none of those things.
+
+!!! note
+
+    Artifacts behaved differently until recently: a trusted namespace could
+    delete another namespace's artifacts. Instances and networks never
+    permitted this, and artifacts now match them. If you have tooling which
+    relied on deleting artifacts across a trust, it needs a key in the owning
+    namespace, or the `system` namespace, instead.
