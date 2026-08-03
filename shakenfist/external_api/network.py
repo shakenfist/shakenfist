@@ -137,7 +137,7 @@ network_delete_example = """
 class NetworkEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network information.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True),
          ('namespace', 'body', 'namespace',
           'The namespace to contain the network.', False)],
@@ -151,7 +151,7 @@ class NetworkEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'networks', 'Delete a network.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True)],
         [(202,
           'Deletion has been queued. The response body identifies the cluster '

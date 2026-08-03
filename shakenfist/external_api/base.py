@@ -86,6 +86,16 @@ SWAGGER_PARAMETER_LOCATIONS = frozenset(
     ['query', 'header', 'path', 'formData', 'body'])
 
 
+# The name an endpoint uses to declare that it consumes the raw
+# request body rather than a named parameter, as
+# ``(RAW_BODY_PARAMETER, 'body', 'binary', ...)``. It never appears
+# in a handler signature -- the handler reads flask.request directly
+# -- so schema compilation and the declaration audit both skip it.
+# OpenAPI 2.0 permits at most one body parameter and conventionally
+# names it 'body'.
+RAW_BODY_PARAMETER = 'body'
+
+
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):

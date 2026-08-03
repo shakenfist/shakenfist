@@ -46,7 +46,8 @@ class UploadDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Append data to an upload.',
         [('upload_uuid', 'path', 'uuid', 'The upload UUID.', True),
-         ('binary data', 'body', 'binary', 'Binary data to append to the upload.', True)],
+         (api_base.RAW_BODY_PARAMETER, 'body', 'binary',
+          'Binary data to append to the upload.', True)],
         [(200, 'The new size of the uploaded object.', '1500')]))
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request

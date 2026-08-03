@@ -454,11 +454,11 @@ class InstancesEndpoint(api_base.Resource):
              'A list of diskspecs defining the disk devices for this instance. '
              'See https://shakenfist.com/developer_guide/api_reference/instances/#diskspec '
              'for more details on diskspecs.', True),
-            ('sshkey', 'body', 'string',
+            ('ssh_key', 'body', 'string',
              'A ssh public key to add to the default users authorized_keys file '
              'via cloud-init. Requires that both configdrive be enabled, and that '
              'cloud-init be installed on the instance before boot.', False),
-            ('userdata', 'body', 'string',
+            ('user_data', 'body', 'string',
              'Other user-data to be provided to cloud-init. Requires that both '
              'configdrive be enabled, and that cloud-init be installed on the '
              'instance before boot.', False),

@@ -67,7 +67,7 @@ node_delete_example = """{
 class NodeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get information for a node.',
-        [('node_name', 'query', 'node', 'The name of a node.', True)],
+        [('node', 'path', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_get_example),
          (404, 'Node not found.', None)]))
     @api_base.caller_is_admin
@@ -80,7 +80,7 @@ class NodeEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'nodes', 'Delete a node.',
-        [('node_name', 'query', 'node', 'The name of a node.', True)],
+        [('node', 'path', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_delete_example),
          (404, 'Node not found.', None)]))
     @api_base.caller_is_admin
