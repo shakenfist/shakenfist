@@ -40,6 +40,10 @@ on:
 
 jobs:
   indirect-dependencies:
+    # The pull_request trigger above fires precisely when someone edits the
+    # script this job then executes, on a self-hosted runner. Defence in
+    # depth: never run that self-test for a branch pushed from a fork.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     # The apt steps below need passwordless sudo (build deps + the gh
     # install), which the shared static pool does not grant, so this stays
     # on an ephemeral vm runner.
@@ -101,12 +105,25 @@ jobs:
       # persists into http.https://github.com/.extraheader, not with
       # GITHUB_TOKEN from the environment, and the job's default token is
       # restricted to contents: read.
+      #
+      # On pull_request it drops back to the job's own token and persists
+      # nothing, because this event runs the PR's own copy of the script:
+      # a persisted DEPENDENCIES_TOKEN would be readable by whatever that
+      # copy chooses to do.
+      #
+      # Both conditions below are written as "!= 'pull_request' && <secret>
+      # || <fallback>" rather than the more natural "== 'pull_request' &&
+      # <fallback> || <secret>". Actions has no real ternary: && / || yield
+      # values, and an empty string is falsy, so a falsy true-branch is
+      # discarded and the || arm fires regardless of the condition. The
+      # true-branch therefore has to be the truthy value.
       - name: Checkout shakenfist
         uses: actions/checkout@v7
         with:
           path: shakenfist
           fetch-depth: 0
-          token: ${{ secrets.DEPENDENCIES_TOKEN }}
+          token: ${{ github.event_name != 'pull_request' && secrets.DEPENDENCIES_TOKEN || github.token }}
+          persist-credentials: ${{ github.event_name != 'pull_request' }}
 
       - name: Reconcile pinned indirect dependencies
         env:
@@ -114,7 +131,7 @@ jobs:
           # print-the-diff-only path. A pull_request checkout is a detached
           # HEAD at the merge commit, so pushing a branch from one would
           # carry the whole pull request into an automated pin update.
-          GITHUB_TOKEN: ${{ github.event_name == 'pull_request' && '' || secrets.DEPENDENCIES_TOKEN }}
+          GITHUB_TOKEN: ${{ github.event_name != 'pull_request' && secrets.DEPENDENCIES_TOKEN || '' }}
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
           tools/pin-indirect-dependencies.sh
