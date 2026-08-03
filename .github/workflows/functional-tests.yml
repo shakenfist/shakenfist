@@ -223,6 +223,10 @@ jobs:
   automated_delinter:
     name: "Automated delinter"
     runs-on: [self-hosted, claude-code]
+    # Without this the job inherits the six hour GitHub default, so a
+    # wedged Claude run would hold a scarce claude-code runner for the
+    # rest of the day.
+    timeout-minutes: 60
     needs: [sanity_checks, check_bot_commit]
     # The same-repo check keeps fork PRs from running their own copy of the
     # delinter script on the credential-bearing claude-code runners.
@@ -277,32 +281,21 @@ jobs:
 
   automated_reviewer:
     name: "Automated reviewer"
+    # The needs: list is the "review only once CI has passed" gate:
+    # a job skipped because a dependency failed never starts the
+    # reusable workflow. Everything else about the reviewer --
+    # runner, timeout, fork restriction, bot-commit check --
+    # lives in the shared workflow so it stays in step with the
+    # rest of the fleet.
+    needs: [sanity_checks, smoke_collection]
+    # A cross-repository reusable workflow cannot grant itself more
+    # token scope than its caller has, so the permissions go here.
     permissions:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: [self-hosted, claude-code]
-    needs: [sanity_checks, smoke_collection, check_bot_commit]
-    # The same-repo check keeps fork PRs off the credential-bearing
-    # claude-code runners.
-    if: |
-      github.event_name == 'pull_request' &&
-      needs.check_bot_commit.outputs.is_bot != 'true' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-reviewer
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Run automated reviewer
-        uses: shakenfist/actions/review-pr-with-claude@main
-        with:
-          pr-number: ${{ github.event.pull_request.number }}
+    uses: shakenfist/actions/.github/workflows/pr-auto-review.yml@main
+    secrets: inherit
 
   # Multi-node merge-queue functional coverage: each matrix entry deploys a
   # topology (slim-primary / slim-tier) via the shakenfist.shakenfist collection

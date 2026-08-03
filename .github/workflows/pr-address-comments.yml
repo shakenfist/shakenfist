@@ -45,6 +45,8 @@ jobs:
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '@shakenfist-bot please address comments')
     runs-on: [self-hosted, static]
+    # Just a few gh API calls, so anything beyond this is a hang.
+    timeout-minutes: 10
     outputs:
       authorized: ${{ steps.trigger.outputs.authorized }}
       pr_ref: ${{ steps.trigger.outputs.pr-ref }}
