@@ -773,7 +773,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'query', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('max_versions', 'post', 'integer',
+            ('max_versions', 'body', 'integer',
              'The maximum number of versions, or revert to the default it not set.',
              False)
         ],
@@ -874,7 +874,7 @@ class ArtifactUnshareEndpoint(api_base.Resource):
 class ArtifactMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Fetch metadata for an artifact.',
-        [('artifact_ref', 'qeury', 'uuidorname',
+        [('artifact_ref', 'query', 'uuidorname',
           'The artifact to fetch metadata for.', True)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],

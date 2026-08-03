@@ -78,6 +78,14 @@ def handles_credentials():
     return path == '/auth' or path.startswith('/auth/')
 
 
+# The parameter locations OpenAPI 2.0 defines. swagger_helper()
+# rejects anything else, so a mistyped location is an import-time
+# failure rather than a declaration silently ignored by the docs
+# generator and wrong in the published API.
+SWAGGER_PARAMETER_LOCATIONS = frozenset(
+    ['query', 'header', 'path', 'formData', 'body'])
+
+
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
@@ -189,6 +197,17 @@ def swagger_helper(section, description, parameters, responses,
         out['parameters'][-1].update(argtypes['bearer'])
 
     for (name, location, argtype, argdescription, argrequired) in parameters:
+        # The type token has always been validated by the argtypes
+        # lookup below, but the location never was, so 'post' and
+        # 'qeury' both survived in the tree until they were found by
+        # audit. Fail at import time instead: these declarations are
+        # the input to request validation, not just documentation.
+        if location not in SWAGGER_PARAMETER_LOCATIONS:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares location %r, which is not one of %s'
+                % (section, name, location,
+                   ', '.join(sorted(SWAGGER_PARAMETER_LOCATIONS))))
+
         out['parameters'].append({
             'name': name,
             'in': location,
