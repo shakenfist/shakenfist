@@ -60,7 +60,17 @@
 # Template source:
 #   https://github.com/shakenfist/development/tree/main/templates/pin-indirect-dependencies/
 
+# pipefail matters here because the marker extraction below is a series of
+# sed pipelines. Without it only the last stage's status is checked, so a
+# failure in the first stage yields an empty output file and the run
+# continues -- and an empty constraints.txt silently lets every transitive
+# package resolve to its newest version, which the script would then commit
+# as a wholesale bump attributed to reconciliation.
+#
+# Deliberately not asserting constraints.txt is non-empty: a repository
+# adopting this for the first time legitimately has an empty pinned block.
 set -e
+set -o pipefail
 
 if [ ! -f pyproject.toml ]; then
     echo 'This script must be run from the repository root.' >&2

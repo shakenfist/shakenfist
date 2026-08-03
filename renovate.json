@@ -35,15 +35,6 @@
       ]
     },
     {
-      "description": "Group things entangled with wraps",
-      "groupName": "entangled-wraps",
-      "matchPackageNames": [
-        "/wraps/",
-        "/iters/",
-        "/async-extensions/"
-      ]
-    },
-    {
       "description": "Group zope updates together",
       "groupName": "zope",
       "matchPackageNames": [
