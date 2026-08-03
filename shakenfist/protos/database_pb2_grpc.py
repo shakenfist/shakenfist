@@ -1114,6 +1114,26 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.DeleteClusterOperationErrorRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.RecordFederatedExchange = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RecordFederatedExchange',
+                request_serializer=database__pb2.RecordFederatedExchangeRequest.SerializeToString,
+                response_deserializer=database__pb2.RecordFederatedExchangeReply.FromString,
+                _registered_method=True)
+        self.CountFederatedAttempt = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CountFederatedAttempt',
+                request_serializer=database__pb2.CountFederatedAttemptRequest.SerializeToString,
+                response_deserializer=database__pb2.CountFederatedAttemptReply.FromString,
+                _registered_method=True)
+        self.ReapFederationReplay = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReapFederationReplay',
+                request_serializer=database__pb2.ReapFederationReplayRequest.SerializeToString,
+                response_deserializer=database__pb2.ReapFederationReply.FromString,
+                _registered_method=True)
+        self.ReapFederationRateLimits = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReapFederationRateLimits',
+                request_serializer=database__pb2.ReapFederationRateLimitsRequest.SerializeToString,
+                response_deserializer=database__pb2.ReapFederationReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer:
@@ -2514,6 +2534,35 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RecordFederatedExchange(self, request, context):
+        """Federation Abuse Resistance (MariaDB)
+        Replay refusal and rate limiting for /auth/federated. Both counters
+        live in the database rather than in the API worker so the
+        protection is cluster wide -- a per process counter would let a
+        caller multiply their allowance by the number of workers.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CountFederatedAttempt(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReapFederationReplay(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReapFederationRateLimits(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -3596,6 +3645,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteClusterOperationError,
                     request_deserializer=database__pb2.DeleteClusterOperationErrorRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'RecordFederatedExchange': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordFederatedExchange,
+                    request_deserializer=database__pb2.RecordFederatedExchangeRequest.FromString,
+                    response_serializer=database__pb2.RecordFederatedExchangeReply.SerializeToString,
+            ),
+            'CountFederatedAttempt': grpc.unary_unary_rpc_method_handler(
+                    servicer.CountFederatedAttempt,
+                    request_deserializer=database__pb2.CountFederatedAttemptRequest.FromString,
+                    response_serializer=database__pb2.CountFederatedAttemptReply.SerializeToString,
+            ),
+            'ReapFederationReplay': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReapFederationReplay,
+                    request_deserializer=database__pb2.ReapFederationReplayRequest.FromString,
+                    response_serializer=database__pb2.ReapFederationReply.SerializeToString,
+            ),
+            'ReapFederationRateLimits': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReapFederationRateLimits,
+                    request_deserializer=database__pb2.ReapFederationRateLimitsRequest.FromString,
+                    response_serializer=database__pb2.ReapFederationReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -9430,6 +9499,114 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/DeleteClusterOperationError',
             database__pb2.DeleteClusterOperationErrorRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordFederatedExchange(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RecordFederatedExchange',
+            database__pb2.RecordFederatedExchangeRequest.SerializeToString,
+            database__pb2.RecordFederatedExchangeReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CountFederatedAttempt(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CountFederatedAttempt',
+            database__pb2.CountFederatedAttemptRequest.SerializeToString,
+            database__pb2.CountFederatedAttemptReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReapFederationReplay(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReapFederationReplay',
+            database__pb2.ReapFederationReplayRequest.SerializeToString,
+            database__pb2.ReapFederationReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReapFederationRateLimits(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReapFederationRateLimits',
+            database__pb2.ReapFederationRateLimitsRequest.SerializeToString,
+            database__pb2.ReapFederationReply.FromString,
             options,
             channel_credentials,
             insecure,

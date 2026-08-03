@@ -454,3 +454,177 @@ class ValidateForRuleTestCase(FederationTestCase):
 
         _, satisfied = federation.validate_for_rule(token, rule)
         self.assertEqual({'groups': 'sf-ci'}, satisfied)
+
+
+class TokenIdentityTestCase(FederationTestCase):
+    """The value replay refusal is keyed on."""
+
+    def test_the_jti_is_used_when_the_issuer_provides_one(self):
+        token = self._token(claims={'jti': 'abc-123'})
+        self.assertEqual(
+            'abc-123',
+            federation.token_identity(token, {'jti': 'abc-123'}))
+
+    def test_a_token_with_no_jti_falls_back_to_its_signature(self):
+        token = self._token()
+        identity = federation.token_identity(token, {})
+
+        self.assertTrue(identity.startswith('sha256:'))
+        self.assertEqual(71, len(identity))
+
+    def test_the_fallback_is_stable_for_one_token(self):
+        token = self._token()
+        self.assertEqual(federation.token_identity(token, {}),
+                         federation.token_identity(token, {}))
+
+    def test_the_fallback_differs_between_tokens(self):
+        first = self._token(claims={'ref': 'refs/heads/develop'})
+        second = self._token(claims={'ref': 'refs/heads/main'})
+
+        self.assertNotEqual(federation.token_identity(first, {}),
+                            federation.token_identity(second, {}))
+
+    def test_the_fallback_does_not_contain_the_signature(self):
+        # The signature is the secret half of the credential and has no
+        # business sitting in a table, which is why it is hashed.
+        token = self._token()
+        signature = token.rsplit('.', 1)[-1]
+
+        self.assertNotIn(signature, federation.token_identity(token, {}))
+
+    def test_an_absurdly_long_jti_falls_back_rather_than_truncating(self):
+        # A truncated identity would make two different tokens look
+        # like the same one, which is a false replay refusal.
+        token = self._token()
+        identity = federation.token_identity(token, {'jti': 'x' * 4096})
+
+        self.assertTrue(identity.startswith('sha256:'))
+
+    def test_a_non_string_jti_falls_back(self):
+        token = self._token()
+        for junk in (12345, ['a'], {'a': 1}, None, ''):
+            self.assertTrue(
+                federation.token_identity(token, {'jti': junk}).startswith(
+                    'sha256:'),
+                f'{junk!r} was not rejected as a jti')
+
+
+class RateLimitTestCase(FederationTestCase):
+    def test_under_the_limit_is_allowed(self):
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 5):
+            for _ in range(5):
+                federation.enforce_rate_limit('10.0.0.1')
+
+    def test_over_the_limit_raises(self):
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 2):
+            federation.enforce_rate_limit('10.0.0.1')
+            federation.enforce_rate_limit('10.0.0.1')
+            self.assertRaises(
+                exceptions.RateLimited,
+                federation.enforce_rate_limit, '10.0.0.1')
+
+    def test_sources_are_counted_separately(self):
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 1):
+            federation.enforce_rate_limit('10.0.0.1')
+            federation.enforce_rate_limit('10.0.0.2')
+
+            self.assertRaises(
+                exceptions.RateLimited,
+                federation.enforce_rate_limit, '10.0.0.1')
+
+    def test_zero_writes_no_rows_at_all(self):
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 0):
+            for _ in range(100):
+                federation.enforce_rate_limit('10.0.0.1')
+
+        self.assertEqual({}, self.mock_mariadb.federation_rate_limits)
+
+    def test_a_negative_limit_disables_rather_than_refusing_everything(self):
+        # An operator who types -1 meaning "off" gets off, not a
+        # cluster where federation refuses every request.
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', -1):
+            federation.enforce_rate_limit('10.0.0.1')
+
+    def test_the_window_is_a_whole_number_of_windows_from_the_epoch(self):
+        # Every node must agree on where the window starts, or the
+        # limit is per node rather than cluster wide.
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 10):
+            federation.enforce_rate_limit('10.0.0.1')
+
+        [(_, window)] = self.mock_mariadb.federation_rate_limits
+        self.assertEqual(0, window % federation.RATE_LIMIT_WINDOW_SECONDS)
+        self.assertLessEqual(window, time.time())
+        self.assertGreater(
+            window + federation.RATE_LIMIT_WINDOW_SECONDS, time.time())
+
+    def test_a_database_failure_propagates_rather_than_allowing(self):
+        with mock.patch.object(
+                federation.config,
+                'FEDERATION_RATE_LIMIT_PER_MINUTE', 10), \
+                mock.patch('shakenfist.mariadb.count_federated_attempt',
+                           side_effect=exceptions.DatabaseUnavailable('x')):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                federation.enforce_rate_limit, '10.0.0.1')
+
+
+class ReplayRefusalTestCase(FederationTestCase):
+    def setUp(self):
+        super().setUp()
+        self.rule = MappingRule.new(
+            'ci', 'ryll', 'github', {'repository': 'shakenfist/ryll'},
+            ['blob.read'], 3600, 'ryll-ci')
+
+    def test_the_first_presentation_is_allowed(self):
+        federation.refuse_replay(
+            self._token(), {'jti': 'a', 'exp': time.time() + 300},
+            self.rule)
+
+    def test_the_second_presentation_raises(self):
+        claims = {'jti': 'a', 'exp': time.time() + 300}
+        federation.refuse_replay(self._token(), claims, self.rule)
+
+        self.assertRaises(
+            exceptions.TokenReplayed, federation.refuse_replay,
+            self._token(), claims, self.rule)
+
+    def test_the_same_token_against_a_second_rule_is_allowed(self):
+        other = MappingRule.new(
+            'ci', 'ryll-two', 'github', {'repository': 'shakenfist/ryll'},
+            ['blob.read'], 3600, 'ryll-ci')
+        claims = {'jti': 'a', 'exp': time.time() + 300}
+
+        federation.refuse_replay(self._token(), claims, self.rule)
+        federation.refuse_replay(self._token(), claims, other)
+
+    def test_the_record_carries_the_tokens_own_expiry(self):
+        expiry = time.time() + 1234
+        federation.refuse_replay(
+            self._token(), {'jti': 'a', 'exp': expiry}, self.rule)
+
+        self.assertEqual(
+            [expiry], list(self.mock_mariadb.federation_replay.values()))
+
+    def test_a_token_with_no_exp_is_refused_rather_than_given_one(self):
+        # validate_token requires exp, so reaching here without one
+        # means validation was skipped. Inventing a lifetime for the
+        # replay record would be inventing how long the protection
+        # lasts.
+        for junk in (None, 'soon', True):
+            self.assertRaises(
+                exceptions.TokenValidationFailed, federation.refuse_replay,
+                self._token(), {'jti': 'a', 'exp': junk}, self.rule)
+
+    def test_a_database_failure_propagates_rather_than_allowing(self):
+        with mock.patch('shakenfist.mariadb.record_federated_exchange',
+                        side_effect=exceptions.DatabaseUnavailable('x')):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable, federation.refuse_replay,
+                self._token(), {'jti': 'a', 'exp': time.time() + 300},
+                self.rule)

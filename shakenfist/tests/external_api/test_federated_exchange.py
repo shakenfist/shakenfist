@@ -24,6 +24,7 @@ from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.util import credentials
+from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist.config import config
 
@@ -53,6 +54,7 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
             public_exponent=65537, key_size=2048)
         self.keys = {'key-1': self.key}
         self.fetches = []
+        self.jti_counter = 0
 
         federation.JWKS_CACHE = federation.JWKSCache()
         self.issuer = TrustedIssuer.new(
@@ -87,15 +89,23 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
         return response
 
     def _token(self, claims=None, audience=AUDIENCE, issuer=GITHUB,
-               exp_delta=300, key=None, kid='key-1'):
+               exp_delta=300, key=None, kid='key-1', jti=None):
+        # A distinct jti per token by default, which is what a real
+        # issuer does -- two runs of the same workflow are two separate
+        # identities, not one presented twice. Tests which want to
+        # exercise replay pass an explicit jti to say so, and jti=False
+        # leaves the claim out altogether the way some issuers do.
+        self.jti_counter += 1
         now = int(time.time())
         body = {
             'iss': issuer, 'aud': audience, 'iat': now,
-            'exp': now + exp_delta, 'jti': 'jti-%d' % now,
+            'exp': now + exp_delta,
             'sub': 'repo:shakenfist/ryll:ref:refs/heads/develop',
             'repository': 'shakenfist/ryll',
             'ref': 'refs/heads/develop'
         }
+        if jti is not False:
+            body['jti'] = jti or 'jti-%d-%d' % (now, self.jti_counter)
         if claims:
             body.update(claims)
         return jwt.encode(body, key or self.key, algorithm='RS256',
@@ -106,6 +116,12 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
         if token is not False:
             body['token'] = token if token is not None else self._token()
         return self.client.post('/auth/federated', data=json.dumps(body))
+
+    def _rate_limit(self, limit):
+        patcher = mock.patch.object(
+            config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', limit)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
 
 class SuccessfulExchangeTestCase(FederatedExchangeTestCase):
@@ -158,7 +174,9 @@ class SuccessfulExchangeTestCase(FederatedExchangeTestCase):
 
     def test_a_rerun_gets_its_own_key_rather_than_rotating(self):
         # A discriminator on the name, so a workflow re-run never
-        # rotates the secret out from under a still-running job.
+        # rotates the secret out from under a still-running job. A
+        # re-run presents a fresh token, which is why this is not
+        # refused as a replay.
         first = self._exchange().get_json()
         second = self._exchange().get_json()
 
@@ -340,3 +358,197 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
         for message, extra in recorded:
             self.assertNotIn(minted['key'], json.dumps(extra or {}))
             self.assertNotIn(minted['key'], message)
+
+
+class ReplayRefusalTestCase(FederatedExchangeTestCase):
+    """One token, one rule, one key.
+
+    Refusal is per (token, rule) rather than per token, because
+    exchanging one identity against two rules to reach two namespaces
+    is a pattern the CI conductor design depends on, while
+    re-exchanging it against the same rule is not.
+    """
+
+    def test_the_same_token_twice_through_one_rule_is_refused(self):
+        token = self._token()
+
+        self.assertEqual(200, self._exchange(token=token).status_code)
+        self.assertEqual(401, self._exchange(token=token).status_code)
+
+    def test_a_replay_mints_nothing(self):
+        token = self._token()
+        self._exchange(token=token)
+
+        before = len(self.mock_mariadb.namespace_key_objects)
+        self._exchange(token=token)
+        self.assertEqual(
+            before, len(self.mock_mariadb.namespace_key_objects))
+
+    def test_the_same_token_through_a_second_rule_is_allowed(self):
+        MappingRule.new(
+            'system', 'ryll-admin', 'github',
+            {'repository': 'shakenfist/ryll'}, ['node.read'], 3600, 'ryll')
+        token = self._token()
+
+        self.assertEqual(200, self._exchange(token=token).status_code)
+        self.assertEqual(200, self._exchange(
+            token=token, namespace='system',
+            rule='ryll-admin').status_code)
+
+    def test_a_fresh_token_after_a_replay_still_works(self):
+        token = self._token()
+        self._exchange(token=token)
+        self.assertEqual(401, self._exchange(token=token).status_code)
+
+        self.assertEqual(200, self._exchange().status_code)
+
+    def test_a_token_with_no_jti_is_still_protected(self):
+        # Not every issuer stamps a jti, and letting those through
+        # unprotected would leave open exactly the hole this closes.
+        # The signature identifies the token just as well.
+        token = self._token(jti=False)
+
+        self.assertEqual(200, self._exchange(token=token).status_code)
+        self.assertEqual(401, self._exchange(token=token).status_code)
+
+    def test_two_no_jti_tokens_are_told_apart(self):
+        # The fallback must identify the token, not the shape of it.
+        first = self._token(jti=False)
+        second = self._token(jti=False, claims={'ref': 'refs/heads/main'})
+
+        self.assertEqual(200, self._exchange(token=first).status_code)
+        self.assertEqual(200, self._exchange(token=second).status_code)
+
+    def test_the_record_expires_with_the_token(self):
+        token = self._token(exp_delta=300)
+        self._exchange(token=token)
+
+        [expires_at] = self.mock_mariadb.federation_replay.values()
+        self.assertGreater(expires_at, time.time() + 200)
+        self.assertLess(expires_at, time.time() + 400)
+
+    def test_a_claim_failure_does_not_burn_the_tokens_one_use(self):
+        # The replay claim is the last gate before minting precisely so
+        # that a refusal for some other reason leaves the token usable.
+        # An operator who fixes their rule and retries with a token
+        # that is still valid should succeed.
+        token = self._token(claims={'ref': 'refs/heads/wip'})
+        self.assertEqual(401, self._exchange(token=token).status_code)
+
+        self.rule.update(
+            'github',
+            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/wip'},
+            ['blob.read'], 3600, 'ryll-ci')
+        self.assertEqual(200, self._exchange(token=token).status_code)
+
+    def test_a_replay_is_audited_against_the_rule(self):
+        token = self._token()
+        self._exchange(token=token)
+
+        with mock.patch.object(MappingRule, 'add_event') as add_event:
+            self._exchange(token=token)
+
+        messages = [c.args[1] for c in add_event.call_args_list
+                    if len(c.args) > 1]
+        self.assertIn('federated exchange refused', messages)
+
+    def test_an_unreadable_replay_table_refuses_rather_than_mints(self):
+        # Both answers this check can give authorise something, so an
+        # outage must not be allowed to look like either one.
+        before = len(self.mock_mariadb.namespace_key_objects)
+        with mock.patch('shakenfist.mariadb.record_federated_exchange',
+                        side_effect=exceptions.DatabaseUnavailable('down')):
+            resp = self._exchange()
+
+        self.assertEqual(503, resp.status_code)
+        self.assertEqual(
+            before, len(self.mock_mariadb.namespace_key_objects))
+
+
+class RateLimitTestCase(FederatedExchangeTestCase):
+    def test_the_limit_trips_and_then_recovers(self):
+        self._rate_limit(3)
+
+        for _ in range(3):
+            self.assertEqual(200, self._exchange().status_code)
+        self.assertEqual(429, self._exchange().status_code)
+
+        # A new window is a clean slate. Rather than sleep a minute,
+        # move the recorded window into the past the way time passing
+        # would.
+        self.mock_mariadb.federation_rate_limits.clear()
+        self.assertEqual(200, self._exchange().status_code)
+
+    def test_the_limit_counts_unverifiable_tokens_too(self):
+        # Verification is the expensive part, so a limit that only
+        # applied to well formed requests would not limit anything.
+        self._rate_limit(2)
+
+        other = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048)
+        for _ in range(2):
+            self.assertEqual(
+                401, self._exchange(token=self._token(key=other)).status_code)
+
+        self.assertEqual(429, self._exchange().status_code)
+
+    def test_an_untrusted_issuer_costs_no_counter_row(self):
+        # Refused before the counter, so a flood of garbage from one
+        # source cannot fill the table.
+        self._rate_limit(10)
+        self._exchange(token=self._token(issuer='https://evil.example.com'))
+
+        self.assertEqual({}, self.mock_mariadb.federation_rate_limits)
+
+    def test_zero_disables_rate_limiting(self):
+        self._rate_limit(0)
+
+        for _ in range(5):
+            self.assertEqual(200, self._exchange().status_code)
+        self.assertEqual({}, self.mock_mariadb.federation_rate_limits)
+
+    def test_the_counter_is_keyed_on_the_source_address(self):
+        self._rate_limit(10)
+        self._exchange()
+
+        [(source, window)] = self.mock_mariadb.federation_rate_limits
+        self.assertEqual('127.0.0.1', source)
+        self.assertEqual(0, window % federation.RATE_LIMIT_WINDOW_SECONDS)
+
+    def test_a_rate_limited_caller_is_told_nothing_useful(self):
+        self._rate_limit(1)
+        self._exchange()
+        resp = self._exchange()
+
+        body = resp.get_data(as_text=True)
+        self.assertEqual(429, resp.status_code)
+        self.assertNotIn('ryll', body)
+        self.assertNotIn('github', body)
+
+    def test_an_unwritable_counter_refuses_rather_than_mints(self):
+        self._rate_limit(10)
+
+        before = len(self.mock_mariadb.namespace_key_objects)
+        with mock.patch('shakenfist.mariadb.count_federated_attempt',
+                        side_effect=exceptions.DatabaseUnavailable('down')):
+            resp = self._exchange()
+
+        self.assertEqual(503, resp.status_code)
+        self.assertEqual(
+            before, len(self.mock_mariadb.namespace_key_objects))
+
+    def test_rate_limiting_precedes_the_jwks_fetch(self):
+        # The point of the ordering: a limited caller must not still be
+        # able to make us dial out on every attempt.
+        #
+        # The second token carries an unknown key id, which is what
+        # makes this test say anything. A token reusing key-1 would hit
+        # PyJWKClient's cache and fetch nothing even with no rate limit
+        # at all, so the assertion would hold for the wrong reason.
+        self._rate_limit(1)
+        self._exchange()
+
+        before = len(self.fetches)
+        self.assertEqual(429, self._exchange(
+            token=self._token(kid='key-2')).status_code)
+        self.assertEqual(before, len(self.fetches))

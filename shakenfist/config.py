@@ -174,6 +174,19 @@ class SFConfig(BaseSettings):
             'it does not delay recognising a newly rotated key.'
         )
     )
+    FEDERATION_RATE_LIMIT_PER_MINUTE: int = Field(
+        60,
+        description=(
+            'How many federated exchange attempts one source address may '
+            'make per minute before being refused with a 429. Counted in '
+            'MariaDB rather than in the worker, so the limit is cluster '
+            'wide rather than per gunicorn worker. Set to 0 to disable '
+            'rate limiting entirely. Note that behind a reverse proxy '
+            'which does not rewrite the source address every request '
+            'appears to come from the proxy, which makes this a single '
+            'global limit -- size it accordingly.'
+        )
+    )
     API_ADVERTISED_HOST: str = Field(
         'localhost',
         description='The DNS name of the REST API host as advertised to users.'

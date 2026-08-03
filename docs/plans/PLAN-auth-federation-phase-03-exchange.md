@@ -216,8 +216,8 @@ the cheapest rejections happen first:
 3. Rate limit per source address.
 4. Verify the signature against cached JWKS.
 5. Check `aud`, `exp`, `nbf`.
-6. Refuse if this `(jti, rule)` pair has been seen.
-7. Load the named rule in the named namespace; check bound claims.
+6. Load the named rule in the named namespace; check bound claims.
+7. Refuse if this `(token, rule)` pair has been seen.
 8. Mint the key.
 
 Steps 1 and 2 preceding step 4 matter more than they look.
@@ -225,25 +225,52 @@ Steps 1 and 2 preceding step 4 matter more than they look.
 unfiltered path would let anyone with a made-up `iss` tie up a
 gunicorn worker on an outbound HTTP call.
 
+Steps 6 and 7 were the other way around when this section was first
+written, which is not implementable: the pair being claimed is
+`(token, rule_uuid)`, and there is no rule uuid until the rule has
+been read. Ordering the replay claim *last*, after claim matching and
+after the namespace check, is also the behaviour worth having — a
+refusal for any other reason must not consume the token's single use,
+or an operator who fixes a rule cannot retry with a token that is
+still perfectly valid. Being the last gate before minting is what
+makes it effective against concurrency: two simultaneous
+presentations of one token cannot both get past it, because the
+second one's insert collides with the first one's.
+
 **JWKS caching** uses `PyJWKClient` (PyJWT 2.13.0 is already a
 dependency — no new package), with `cache_jwk_set` and an explicit
 `lifespan`. An unknown `kid` triggers at most one refetch, guarded so
 concurrent requests for the same issuer collapse into a single fetch
 rather than a thundering herd against the IdP.
 
-**Replay** is refused per `(jti, rule)`, not per `jti`: exchanging one
+**Replay** is refused per `(token, rule)`, not per token: exchanging one
 token against two rules to reach two namespaces is a legitimate
 pattern the CI conductor design depends on, while re-exchanging the
 same token against the same rule is not. Seen pairs are stored in a
 small table with the inbound token's `exp` as their own expiry, and a
-unique index on `(jti, rule_uuid)` does the arbitration — the insert
-failing *is* the replay detection, with no read-then-write race. They
-are reaped like any other expiring row.
+composite primary key on `(token_id, rule_uuid)` does the arbitration
+— the insert failing *is* the replay detection, with no
+read-then-write race. They are reaped like any other expiring row.
+
+`token_id` is the token's `jti` where the issuer provides a usable
+one, and a SHA-256 of its signature otherwise. Not every identity
+provider stamps a `jti` — the claim is optional in the spec — and
+refusing those outright would rule out conforming issuers, while
+letting them through unprotected would leave open exactly the hole
+this table exists to close. The signature is unique per token by
+construction, so it identifies the token just as well; it is hashed
+rather than stored because it is the secret half of the credential.
 
 **Rate limiting** is per source address, backed by MariaDB so the
 limit is cluster-wide rather than per gunicorn worker. Request volume
 on this endpoint is low by nature (once per CI job), so a row per
-source per window is affordable.
+source per window is affordable. Windows are fixed rather than
+sliding: the boundary lets a determined caller send two allowances
+back to back, which at this volume is not worth what a sliding window
+costs in rows. Both this counter and the replay claim fail *closed* —
+a database error refuses the exchange with a 503 rather than being
+read as "under the limit" or "not seen before", since both of those
+readings authorise something.
 
 **Auditing.** A successful exchange writes an audit event against the
 minted key and its namespace, carrying the satisfied claims and the

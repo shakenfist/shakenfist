@@ -376,6 +376,16 @@ class DatabaseServiceStub:
     """
     GetClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationErrorRequest, _database_pb2.GetClusterOperationErrorReply]
     DeleteClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationErrorRequest, _database_pb2.StatusReply]
+    RecordFederatedExchange: _grpc.UnaryUnaryMultiCallable[_database_pb2.RecordFederatedExchangeRequest, _database_pb2.RecordFederatedExchangeReply]
+    """Federation Abuse Resistance (MariaDB)
+    Replay refusal and rate limiting for /auth/federated. Both counters
+    live in the database rather than in the API worker so the
+    protection is cluster wide -- a per process counter would let a
+    caller multiply their allowance by the number of workers.
+    """
+    CountFederatedAttempt: _grpc.UnaryUnaryMultiCallable[_database_pb2.CountFederatedAttemptRequest, _database_pb2.CountFederatedAttemptReply]
+    ReapFederationReplay: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationReplayRequest, _database_pb2.ReapFederationReply]
+    ReapFederationRateLimits: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]
 
 @_typing.type_check_only
 class DatabaseServiceAsyncStub(DatabaseServiceStub):
@@ -725,6 +735,16 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     """
     GetClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationErrorRequest, _database_pb2.GetClusterOperationErrorReply]  # type: ignore[assignment]
     DeleteClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationErrorRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    RecordFederatedExchange: _aio.UnaryUnaryMultiCallable[_database_pb2.RecordFederatedExchangeRequest, _database_pb2.RecordFederatedExchangeReply]  # type: ignore[assignment]
+    """Federation Abuse Resistance (MariaDB)
+    Replay refusal and rate limiting for /auth/federated. Both counters
+    live in the database rather than in the API worker so the
+    protection is cluster wide -- a per process counter would let a
+    caller multiply their allowance by the number of workers.
+    """
+    CountFederatedAttempt: _aio.UnaryUnaryMultiCallable[_database_pb2.CountFederatedAttemptRequest, _database_pb2.CountFederatedAttemptReply]  # type: ignore[assignment]
+    ReapFederationReplay: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationReplayRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
+    ReapFederationRateLimits: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
 
 class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -2367,5 +2387,39 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.DeleteClusterOperationErrorRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def RecordFederatedExchange(
+        self,
+        request: _database_pb2.RecordFederatedExchangeRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.RecordFederatedExchangeReply, _abc.Awaitable[_database_pb2.RecordFederatedExchangeReply]]:
+        """Federation Abuse Resistance (MariaDB)
+        Replay refusal and rate limiting for /auth/federated. Both counters
+        live in the database rather than in the API worker so the
+        protection is cluster wide -- a per process counter would let a
+        caller multiply their allowance by the number of workers.
+        """
+
+    @_abc_1.abstractmethod
+    def CountFederatedAttempt(
+        self,
+        request: _database_pb2.CountFederatedAttemptRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.CountFederatedAttemptReply, _abc.Awaitable[_database_pb2.CountFederatedAttemptReply]]: ...
+
+    @_abc_1.abstractmethod
+    def ReapFederationReplay(
+        self,
+        request: _database_pb2.ReapFederationReplayRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ReapFederationReply, _abc.Awaitable[_database_pb2.ReapFederationReply]]: ...
+
+    @_abc_1.abstractmethod
+    def ReapFederationRateLimits(
+        self,
+        request: _database_pb2.ReapFederationRateLimitsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ReapFederationReply, _abc.Awaitable[_database_pb2.ReapFederationReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

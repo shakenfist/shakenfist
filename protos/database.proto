@@ -361,6 +361,16 @@ service DatabaseService {
   rpc SetClusterOperationError (SetClusterOperationErrorRequest) returns (StatusReply) {}
   rpc GetClusterOperationError (GetClusterOperationErrorRequest) returns (GetClusterOperationErrorReply) {}
   rpc DeleteClusterOperationError (DeleteClusterOperationErrorRequest) returns (StatusReply) {}
+
+  // Federation Abuse Resistance (MariaDB)
+  // Replay refusal and rate limiting for /auth/federated. Both counters
+  // live in the database rather than in the API worker so the
+  // protection is cluster wide -- a per process counter would let a
+  // caller multiply their allowance by the number of workers.
+  rpc RecordFederatedExchange (RecordFederatedExchangeRequest) returns (RecordFederatedExchangeReply) {}
+  rpc CountFederatedAttempt (CountFederatedAttemptRequest) returns (CountFederatedAttemptReply) {}
+  rpc ReapFederationReplay (ReapFederationReplayRequest) returns (ReapFederationReply) {}
+  rpc ReapFederationRateLimits (ReapFederationRateLimitsRequest) returns (ReapFederationReply) {}
 }
 
 // Generic status reply
@@ -2396,4 +2406,46 @@ message GetClusterOperationErrorReply {
 
 message DeleteClusterOperationErrorRequest {
   string op_uuid = 1;             // Operation UUID as string
+}
+
+// Federation Abuse Resistance (MariaDB)
+
+message RecordFederatedExchangeRequest {
+  string token_id = 1;      // jti, or a hash of the signature
+  string rule_uuid = 2;     // MappingRule UUID as string
+  double expires_at = 3;    // The inbound token's exp
+}
+
+message RecordFederatedExchangeReply {
+  // True if this (token, rule) pair was recorded for the first time,
+  // false if it was already present and this is therefore a replay.
+  bool recorded = 1;
+  // Set only when we could not find out. "Already claimed" is not an
+  // error, and the distinction matters: recorded=false means refuse
+  // the exchange as a replay, whereas error set means refuse it
+  // because we do not know. Both refuse, but only one is worth paging
+  // an operator about.
+  string error = 2;
+}
+
+message CountFederatedAttemptRequest {
+  string source = 1;        // Source address of the attempt
+  int64 window_start = 2;   // Unix timestamp of the one minute window
+}
+
+message CountFederatedAttemptReply {
+  int32 attempts = 1;       // Attempts in this window, including this one
+  string error = 2;         // Set if the counter could not be written
+}
+
+message ReapFederationReplayRequest {
+  double cutoff = 1;        // Delete rows whose token expired before this
+}
+
+message ReapFederationRateLimitsRequest {
+  int64 cutoff = 1;         // Delete windows which started before this
+}
+
+message ReapFederationReply {
+  int32 removed = 1;
 }

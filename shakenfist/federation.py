@@ -15,7 +15,9 @@
 # can be refused without the network must be refused without it, or an
 # unauthenticated caller with a made-up issuer can tie up workers.
 
+import hashlib
 import threading
+import time
 from typing import Any
 from typing import Optional
 
@@ -24,6 +26,7 @@ from jwt import PyJWKClient
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
@@ -281,6 +284,101 @@ def match_claims(claims: dict[str, Any],
         satisfied[claim] = claims[claim]
 
     return satisfied
+
+
+# The rate limiting window, in seconds. Fixed rather than sliding: the
+# window boundary lets a determined caller send two full allowances back
+# to back, which for an endpoint whose legitimate volume is once per CI
+# job is not worth the extra table rows a sliding window costs.
+RATE_LIMIT_WINDOW_SECONDS = 60
+
+# The longest jti we will store verbatim. Comfortably longer than the
+# UUID real issuers use; anything beyond it falls back to the signature
+# hash rather than being truncated, because a truncated identity would
+# make two different tokens look like the same one.
+MAX_JTI_LENGTH = 128
+
+
+def token_identity(token: str, claims: dict[str, Any]) -> str:
+    """A stable, bounded identity for one token, for replay refusal.
+
+    The jti claim where the issuer provides a usable one, since that is
+    what jti is for and it keeps the stored value legible to an
+    operator reading the table.
+
+    Otherwise a hash of the token's signature. Not every identity
+    provider issues a jti, and refusing those outright would rule out
+    conforming issuers for a claim the spec makes optional -- while
+    letting them through unprotected would leave exactly the hole this
+    table exists to close. The signature is unique per token by
+    construction, so it identifies the token just as well; it is
+    hashed rather than stored because it is the secret part of the
+    credential and must not be sitting in a table.
+    """
+    jti = claims.get('jti')
+    if isinstance(jti, str) and 0 < len(jti) <= MAX_JTI_LENGTH:
+        return jti
+
+    signature = token.rsplit('.', 1)[-1]
+    return 'sha256:' + hashlib.sha256(signature.encode('utf-8')).hexdigest()
+
+
+def enforce_rate_limit(source: str) -> None:
+    """Count an exchange attempt, raising RateLimited if over the limit.
+
+    Counted before the token is verified, because verification is the
+    expensive part and a limit that only applies to well formed
+    requests does not limit anything. Counted after the free local
+    rejections, so a flood of garbage from one source does not fill
+    the table with rows.
+
+    A database failure propagates as DatabaseUnavailable rather than
+    being swallowed. Treating an unreadable counter as "under the
+    limit" would turn a database wobble into an open door, and the
+    exchange needs the database to complete anyway, so failing here
+    costs nothing that was going to work.
+    """
+    limit = config.FEDERATION_RATE_LIMIT_PER_MINUTE
+    if limit <= 0:
+        return
+
+    window = int(time.time() // RATE_LIMIT_WINDOW_SECONDS) * \
+        RATE_LIMIT_WINDOW_SECONDS
+    attempts = mariadb.count_federated_attempt(source, window)
+    if attempts > limit:
+        raise exceptions.RateLimited(
+            f'{attempts} federated exchange attempts from {source} in this '
+            f'minute, limit is {limit}')
+
+
+def refuse_replay(token: str, claims: dict[str, Any], rule: Any) -> None:
+    """Claim this (token, rule) pair, raising TokenReplayed if taken.
+
+    The claim is an unconditional insert against a composite primary
+    key, so the duplicate key error *is* the detection. Nothing reads
+    first, which means two concurrent replays cannot both find the
+    pair absent and both proceed.
+
+    The row expires with the token: past its exp the token is refused
+    by validation before this check is reached, so the record has
+    nothing left to protect.
+    """
+    expires_at = claims.get('exp')
+    # bool is a subclass of int, and True would silently become an
+    # expiry of 1.0 -- a record the very next sweep deletes.
+    if isinstance(expires_at, bool) or \
+            not isinstance(expires_at, (int, float)):
+        # validate_token requires exp, so reaching here means the
+        # caller skipped validation. Refuse rather than invent a
+        # lifetime for the replay record.
+        raise exceptions.TokenValidationFailed(
+            'token has no usable exp claim')
+
+    if not mariadb.record_federated_exchange(
+            token_identity(token, claims), rule.uuid, float(expires_at)):
+        raise exceptions.TokenReplayed(
+            f'this token has already been exchanged through rule '
+            f'{rule.namespace}/{rule.name}')
 
 
 def validate_for_rule(token: str, rule: Any) -> tuple[dict[str, Any],

@@ -155,6 +155,20 @@ class ClaimMismatch(FederationException):
     """The token is genuine, but does not satisfy the rule's claims."""
 
 
+class TokenReplayed(FederationException):
+    """This token has already been exchanged through this rule.
+
+    Per (token, rule) rather than per token: exchanging one identity
+    against two rules to reach two namespaces is a legitimate pattern
+    the CI conductor design depends on, while re-exchanging the same
+    identity against the same rule is not.
+    """
+
+
+class RateLimited(FederationException):
+    """Too many federated exchange attempts from one source address."""
+
+
 class CorruptMappingRule(DatabaseException):
     """A mapping rule's policy columns could not be decoded.
 

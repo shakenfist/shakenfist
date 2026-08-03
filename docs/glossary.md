@@ -91,9 +91,12 @@ namespace and a [mapping rule](#mapping-rule) name, and exchanged for a scoped
 [namespace key](#namespace-key). The token is verified against the
 [trusted issuer](#trusted-issuer) named by its `iss` claim: signature against
 that issuer's published keys, using asymmetric algorithms only, then audience,
-issuer and lifetime, then the rule's bound claims. Validation is defined in
-`shakenfist/federation.py` and the exchange in
-`shakenfist/external_api/auth.py`.
+issuer and lifetime, then the rule's bound claims. An identity token is
+single-use *per rule*: once exchanged through a given
+[mapping rule](#mapping-rule) it cannot be exchanged through that rule again,
+though the same token may still be exchanged through a *different* rule to
+reach a second namespace. Validation is defined in `shakenfist/federation.py`
+and the exchange in `shakenfist/external_api/auth.py`.
 
 **instance**{#instance} -- The virtual machine object: a running (or startable)
 VM with disks, network interfaces, and a lifecycle. Defined in
@@ -247,7 +250,7 @@ as an administrator. Defined in `shakenfist/external_api/base.py`.
 **token**{#token} -- Primary sense: an [access token](#access-token). Not to be
 confused with the release pipeline's GitHub Actions / Sigstore OIDC token
 (`docs/developer_guide/release_process.md`), which is unrelated to runtime
-authentication and is closest in nature to the planned
+authentication and is closest in nature to an
 [identity token](#identity-token).
 
 **trust**{#trust} -- The existing namespace-to-namespace visibility grant: if

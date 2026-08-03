@@ -286,6 +286,8 @@ _node_metrics_table: Optional[sa.Table] = None
 _node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
 _cluster_operation_errors_table: Optional[sa.Table] = None
+_federation_replay_table: Optional[sa.Table] = None
+_federation_rate_limits_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
 _events_table: Optional[sa.Table] = None
 _event_objects_table: Optional[sa.Table] = None
@@ -352,6 +354,8 @@ NODE_METRICS_VERSION = 3
 NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 CLUSTER_OPERATION_ERRORS_VERSION = 1
+FEDERATION_REPLAY_VERSION = 1
+FEDERATION_RATE_LIMITS_VERSION = 1
 WORK_QUEUE_VERSION = 2
 # v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
 # and introduces a refresh path so live holders can extend their lease.
@@ -421,6 +425,8 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'node_daemon_states': NODE_DAEMON_STATES_VERSION,
     'cluster_operations': CLUSTER_OPERATIONS_VERSION,
     'cluster_operation_errors': CLUSTER_OPERATION_ERRORS_VERSION,
+    'federation_replay': FEDERATION_REPLAY_VERSION,
+    'federation_rate_limits': FEDERATION_RATE_LIMITS_VERSION,
     'work_queue': WORK_QUEUE_VERSION,
     'cluster_locks': CLUSTER_LOCKS_VERSION,
     'cluster_config': CLUSTER_CONFIG_VERSION,
@@ -1869,6 +1875,147 @@ def _ensure_cluster_operation_errors_schema(
     }
 
 
+def _get_federation_replay_table() -> sa.Table:
+    """Get or create the federation_replay table definition.
+
+    One row per identity token already exchanged through one mapping
+    rule. The composite primary key on (token_id, rule_uuid) is the
+    whole mechanism: the exchange inserts unconditionally and a
+    duplicate key error *is* the replay detection, so there is no
+    read-then-write window for two concurrent replays to slip through.
+
+    Refusal is per (token, rule) rather than per token because
+    exchanging one identity against two rules to reach two namespaces
+    is a legitimate pattern, while re-exchanging it against the same
+    rule is not.
+
+    ``token_id`` is the token's ``jti`` claim where it has a usable
+    one, and a hash of its signature otherwise -- see
+    ``federation.token_identity``. 128 characters is generous for a
+    jti (they are typically a UUID) and keeps the composite key
+    comfortably inside InnoDB's index length limit under any row
+    format.
+
+    ``expires_at`` is the inbound token's own ``exp``. The row only
+    has to outlive the token: once the token is expired, step five of
+    the exchange refuses it before the replay check is ever reached.
+    The cluster daemon reaps on this column.
+    """
+    global _federation_replay_table
+    if _federation_replay_table is None:
+        with TABLE_CREATION_LOCK:
+            if _federation_replay_table is not None:
+                return _federation_replay_table
+            metadata = _get_metadata()
+            _federation_replay_table = sa.Table(
+                'federation_replay',
+                metadata,
+                sa.Column('token_id', sa.String(128), primary_key=True),
+                sa.Column('rule_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('expires_at', sa.Double(), nullable=False),
+                sa.Index('idx_federation_replay_expires', 'expires_at'),
+            )
+    return _federation_replay_table
+
+
+def _ensure_federation_replay_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the federation_replay table schema is up to date."""
+    table_name = 'federation_replay'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_federation_replay_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': FEDERATION_REPLAY_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_federation_rate_limits_table() -> sa.Table:
+    """Get or create the federation_rate_limits table definition.
+
+    One row per source address per one minute window, holding a count
+    of federated exchange attempts. The counter lives in MariaDB
+    rather than in the worker so the limit is cluster wide: a per
+    process counter would let an attacker multiply their allowance by
+    the number of gunicorn workers behind the load balancer, which is
+    the opposite of a limit.
+
+    Volume is low by nature -- a real caller exchanges once per CI job
+    -- so a row per source per window is affordable, and the reaper
+    keeps the table to roughly the number of distinct sources seen in
+    the last few minutes.
+
+    ``source`` is 64 characters, which fits an IPv6 address (45 at
+    most) with room to spare.
+    """
+    global _federation_rate_limits_table
+    if _federation_rate_limits_table is None:
+        with TABLE_CREATION_LOCK:
+            if _federation_rate_limits_table is not None:
+                return _federation_rate_limits_table
+            metadata = _get_metadata()
+            _federation_rate_limits_table = sa.Table(
+                'federation_rate_limits',
+                metadata,
+                sa.Column('source', sa.String(64), primary_key=True),
+                sa.Column('window_start', sa.BigInteger(), primary_key=True),
+                sa.Column('attempts', sa.Integer(), nullable=False),
+                sa.Index('idx_federation_rate_limits_window', 'window_start'),
+            )
+    return _federation_rate_limits_table
+
+
+def _ensure_federation_rate_limits_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the federation_rate_limits table schema is up to date."""
+    table_name = 'federation_rate_limits'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_federation_rate_limits_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': FEDERATION_RATE_LIMITS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def _get_work_queue_table() -> sa.Table:
     """Get or create the work_queue table definition.
 
@@ -3158,6 +3305,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_daemon_states_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
     results.append(_ensure_cluster_operation_errors_schema(engine))
+    results.append(_ensure_federation_replay_schema(engine))
+    results.append(_ensure_federation_rate_limits_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
@@ -3236,6 +3385,8 @@ def register_all_tables() -> None:
     _get_node_daemon_states_table()
     _get_cluster_operations_table()
     _get_cluster_operation_errors_table()
+    _get_federation_replay_table()
+    _get_federation_rate_limits_table()
     _get_work_queue_table()
     _get_cluster_locks_table()
     _get_cluster_config_table()
@@ -19874,6 +20025,116 @@ def _direct_delete_cluster_operation_error(op_uuid: UUID) -> bool:
 
 
 # =============================================================================
+# Federation Abuse Resistance Direct Access Functions
+# =============================================================================
+
+def _direct_record_federated_exchange(
+        token_id: str, rule_uuid: UUID, expires_at: float) -> bool:
+    """Claim a (token, rule) pair, returning False if already claimed.
+
+    The insert is the check. A duplicate key error means some other
+    request -- possibly on another API node, possibly microseconds ago
+    -- already exchanged this token through this rule, and there is no
+    window between deciding and recording for a second attempt to slip
+    through.
+
+    A database failure raises rather than returning either answer. On
+    this path False means "replayed" and True means "go ahead and mint
+    a credential"; inventing either one during an outage is a security
+    decision made by accident, so the caller is told the truth instead
+    and refuses.
+    """
+    engine = _get_engine()
+    table = _get_federation_replay_table()
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(sa.insert(table).values(
+                token_id=token_id,
+                rule_uuid=rule_uuid,
+                expires_at=expires_at))
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.error(f'MariaDB write failed for federation_replay '
+                  f'{token_id}/{rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange replay check failed: {e}') from e
+
+
+def _direct_count_federated_attempt(source: str, window_start: int) -> int:
+    """Count one exchange attempt from a source, returning the new total.
+
+    The increment is atomic in the database, so no attempt is lost
+    under concurrency. The read that follows it is not part of the
+    same atomic step: two concurrent attempts can both increment and
+    then both see the higher total. That errs towards refusing
+    slightly early during a burst, which is the correct direction for
+    a rate limiter to be wrong in, and the alternative idioms for
+    reading back an exact per-caller value are MariaDB specific and
+    considerably harder to read.
+    """
+    engine = _get_engine()
+    table = _get_federation_rate_limits_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                source=source, window_start=window_start, attempts=1)
+            stmt = stmt.on_duplicate_key_update(
+                attempts=table.c.attempts + 1)
+            conn.execute(stmt)
+            result = conn.execute(
+                sa.select(table.c.attempts).where(sa.and_(
+                    table.c.source == source,
+                    table.c.window_start == window_start))).fetchone()
+            conn.commit()
+            # The row was just written, so a missing one means something
+            # is badly wrong. Report the attempt we know we made rather
+            # than zero, which would read as "no attempts yet".
+            return int(result.attempts) if result else 1
+    except (IntegrityError, OperationalError) as e:
+        LOG.error(f'MariaDB write failed for federation_rate_limits '
+                  f'{source}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange rate limit check failed: {e}') from e
+
+
+def _direct_reap_federation_replay(cutoff: float) -> int:
+    """Delete replay rows for tokens which expired before cutoff."""
+    engine = _get_engine()
+    table = _get_federation_replay_table()
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                sa.delete(table).where(table.c.expires_at < cutoff))
+            conn.commit()
+            return int(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for federation_replay: {e}')
+        return 0
+
+
+def _direct_reap_federation_rate_limits(cutoff: int) -> int:
+    """Delete rate limit rows for windows which closed before cutoff."""
+    engine = _get_engine()
+    table = _get_federation_rate_limits_table()
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                sa.delete(table).where(table.c.window_start < cutoff))
+            conn.commit()
+            return int(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for federation_rate_limits: {e}')
+        return 0
+
+
+# =============================================================================
 # Cluster Operations gRPC Client Functions
 # =============================================================================
 
@@ -20083,6 +20344,75 @@ def _grpc_delete_cluster_operation_error(op_uuid: UUID) -> bool:
             f'gRPC DeleteClusterOperationError failed for '
             f'{op_uuid}: {e}')
         return False
+
+
+# =============================================================================
+# Federation Abuse Resistance gRPC Client Functions
+# =============================================================================
+
+def _grpc_record_federated_exchange(
+        token_id: str, rule_uuid: UUID, expires_at: float) -> bool:
+    """Claim a (token, rule) pair via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RecordFederatedExchangeRequest(
+            token_id=token_id, rule_uuid=str(rule_uuid),
+            expires_at=expires_at)
+        reply = _grpc_call(stub.RecordFederatedExchange, request)
+        if reply.error:
+            # The daemon distinguishes "already claimed" (recorded
+            # False, no error) from a failure to find out, and only
+            # the former is a replay.
+            raise exceptions.DatabaseUnavailable(
+                f'federated exchange replay check failed: {reply.error}')
+        return bool(reply.recorded)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC RecordFederatedExchange failed for '
+                  f'{token_id}/{rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange replay check failed: {e}') from e
+
+
+def _grpc_count_federated_attempt(source: str, window_start: int) -> int:
+    """Count one exchange attempt via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CountFederatedAttemptRequest(
+            source=source, window_start=window_start)
+        reply = _grpc_call(stub.CountFederatedAttempt, request)
+        if reply.error:
+            raise exceptions.DatabaseUnavailable(
+                f'federated exchange rate limit check failed: '
+                f'{reply.error}')
+        return int(reply.attempts)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC CountFederatedAttempt failed for {source}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange rate limit check failed: {e}') from e
+
+
+def _grpc_reap_federation_replay(cutoff: float) -> int:
+    """Reap expired replay rows via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReapFederationReplayRequest(cutoff=cutoff)
+        reply = _grpc_call(stub.ReapFederationReplay, request)
+        return int(reply.removed)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC ReapFederationReplay failed: {e}')
+        return 0
+
+
+def _grpc_reap_federation_rate_limits(cutoff: int) -> int:
+    """Reap closed rate limit windows via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReapFederationRateLimitsRequest(cutoff=cutoff)
+        reply = _grpc_call(stub.ReapFederationRateLimits, request)
+        return int(reply.removed)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC ReapFederationRateLimits failed: {e}')
+        return 0
 
 
 # =============================================================================
@@ -20534,6 +20864,71 @@ def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
     if _use_database_service():
         return _grpc_delete_cluster_operation_error(u)
     return _direct_delete_cluster_operation_error(u)
+
+
+def record_federated_exchange(
+        token_id: str, rule_uuid: 'str | UUID', expires_at: float) -> bool:
+    """Claim a (token, rule) pair for a federated exchange.
+
+    Args:
+        token_id: The token's identity, from
+            ``federation.token_identity``.
+        rule_uuid: The mapping rule being exchanged through.
+        expires_at: The inbound token's ``exp``, which is when this
+            row stops being needed.
+
+    Returns:
+        True if the pair was recorded, meaning this is the first
+        exchange of this token through this rule. False if it was
+        already present, meaning a replay.
+
+    Raises:
+        DatabaseUnavailable: if we could not find out. Never guessed,
+        because both answers authorise something.
+    """
+    u = _ensure_uuid(rule_uuid)
+    if _use_database_service():
+        return _grpc_record_federated_exchange(token_id, u, expires_at)
+    return _direct_record_federated_exchange(token_id, u, expires_at)
+
+
+def count_federated_attempt(source: str, window_start: int) -> int:
+    """Count one federated exchange attempt and return the window total.
+
+    Args:
+        source: The source address the attempt came from.
+        window_start: Unix timestamp of the start of the one minute
+            window the attempt falls in.
+
+    Returns:
+        The number of attempts recorded from this source in this
+        window, including this one.
+
+    Raises:
+        DatabaseUnavailable: if the counter could not be written.
+    """
+    if _use_database_service():
+        return _grpc_count_federated_attempt(source, window_start)
+    return _direct_count_federated_attempt(source, window_start)
+
+
+def reap_federation_replay(cutoff: float) -> int:
+    """Delete replay rows for tokens which expired before cutoff.
+
+    Returns the number of rows removed, or 0 on a database error --
+    this is housekeeping, and a failed sweep is retried in fifteen
+    minutes rather than being worth raising over.
+    """
+    if _use_database_service():
+        return _grpc_reap_federation_replay(cutoff)
+    return _direct_reap_federation_replay(cutoff)
+
+
+def reap_federation_rate_limits(cutoff: int) -> int:
+    """Delete rate limit rows for windows which closed before cutoff."""
+    if _use_database_service():
+        return _grpc_reap_federation_rate_limits(cutoff)
+    return _direct_reap_federation_rate_limits(cutoff)
 
 
 # =============================================================================

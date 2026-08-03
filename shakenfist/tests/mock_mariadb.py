@@ -100,6 +100,11 @@ class MockMariaDB():
         self.trusted_issuer_attributes = {}  # ... and their attributes
         self.mapping_rules = {}  # Mock MariaDB mapping rule storage
         self.mapping_rule_attributes = {}  # ... and their attributes
+        # Federated exchange abuse resistance. Keyed the same way the
+        # real tables are: (token_id, rule_uuid) -> expires_at, and
+        # (source, window_start) -> attempts.
+        self.federation_replay = {}
+        self.federation_rate_limits = {}
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
         self.object_references = {}  # Mock MariaDB object references
@@ -422,7 +427,11 @@ class MockMariaDB():
                      'create_mapping_rule_attributes',
                      'get_mapping_rule_attributes',
                      'update_mapping_rule_attributes',
-                     'delete_mapping_rule_attributes'):
+                     'delete_mapping_rule_attributes',
+                     'record_federated_exchange',
+                     'count_federated_attempt',
+                     'reap_federation_replay',
+                     'reap_federation_rate_limits'):
             patcher = mock.patch(
                 f'shakenfist.mariadb.{name}',
                 side_effect=getattr(self, f'_mariadb_{name}'))
@@ -3501,3 +3510,30 @@ class MockMariaDB():
     def _mariadb_delete_mapping_rule_attributes(self, rule_uuid):
         return self.mapping_rule_attributes.pop(
             str(rule_uuid), None) is not None
+
+    def _mariadb_record_federated_exchange(
+            self, token_id, rule_uuid, expires_at):
+        key = (token_id, str(rule_uuid))
+        if key in self.federation_replay:
+            return False
+        self.federation_replay[key] = expires_at
+        return True
+
+    def _mariadb_count_federated_attempt(self, source, window_start):
+        key = (source, window_start)
+        self.federation_rate_limits[key] = \
+            self.federation_rate_limits.get(key, 0) + 1
+        return self.federation_rate_limits[key]
+
+    def _mariadb_reap_federation_replay(self, cutoff):
+        stale = [k for k, expires_at in self.federation_replay.items()
+                 if expires_at < cutoff]
+        for k in stale:
+            del self.federation_replay[k]
+        return len(stale)
+
+    def _mariadb_reap_federation_rate_limits(self, cutoff):
+        stale = [k for k in self.federation_rate_limits if k[1] < cutoff]
+        for k in stale:
+            del self.federation_rate_limits[k]
+        return len(stale)

@@ -8476,3 +8476,171 @@ class DeleteClusterOperationErrorRequest(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DeleteClusterOperationErrorRequest: _TypeAlias = DeleteClusterOperationErrorRequest  # noqa: Y015
+
+@_typing.final
+class RecordFederatedExchangeRequest(_message.Message):
+    """Federation Abuse Resistance (MariaDB)"""
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    TOKEN_ID_FIELD_NUMBER: _builtins.int
+    RULE_UUID_FIELD_NUMBER: _builtins.int
+    EXPIRES_AT_FIELD_NUMBER: _builtins.int
+    token_id: _builtins.str
+    """jti, or a hash of the signature"""
+    rule_uuid: _builtins.str
+    """MappingRule UUID as string"""
+    expires_at: _builtins.float
+    """The inbound token's exp"""
+    def __init__(
+        self,
+        *,
+        token_id: _builtins.str = ...,
+        rule_uuid: _builtins.str = ...,
+        expires_at: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_at", b"expires_at", "rule_uuid", b"rule_uuid", "token_id", b"token_id"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___RecordFederatedExchangeRequest: _TypeAlias = RecordFederatedExchangeRequest  # noqa: Y015
+
+@_typing.final
+class RecordFederatedExchangeReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    RECORDED_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    recorded: _builtins.bool
+    """True if this (token, rule) pair was recorded for the first time,
+    false if it was already present and this is therefore a replay.
+    """
+    error: _builtins.str
+    """Set only when we could not find out. "Already claimed" is not an
+    error, and the distinction matters: recorded=false means refuse
+    the exchange as a replay, whereas error set means refuse it
+    because we do not know. Both refuse, but only one is worth paging
+    an operator about.
+    """
+    def __init__(
+        self,
+        *,
+        recorded: _builtins.bool = ...,
+        error: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "recorded", b"recorded"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___RecordFederatedExchangeReply: _TypeAlias = RecordFederatedExchangeReply  # noqa: Y015
+
+@_typing.final
+class CountFederatedAttemptRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SOURCE_FIELD_NUMBER: _builtins.int
+    WINDOW_START_FIELD_NUMBER: _builtins.int
+    source: _builtins.str
+    """Source address of the attempt"""
+    window_start: _builtins.int
+    """Unix timestamp of the one minute window"""
+    def __init__(
+        self,
+        *,
+        source: _builtins.str = ...,
+        window_start: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["source", b"source", "window_start", b"window_start"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CountFederatedAttemptRequest: _TypeAlias = CountFederatedAttemptRequest  # noqa: Y015
+
+@_typing.final
+class CountFederatedAttemptReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ATTEMPTS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    attempts: _builtins.int
+    """Attempts in this window, including this one"""
+    error: _builtins.str
+    """Set if the counter could not be written"""
+    def __init__(
+        self,
+        *,
+        attempts: _builtins.int = ...,
+        error: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempts", b"attempts", "error", b"error"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CountFederatedAttemptReply: _TypeAlias = CountFederatedAttemptReply  # noqa: Y015
+
+@_typing.final
+class ReapFederationReplayRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CUTOFF_FIELD_NUMBER: _builtins.int
+    cutoff: _builtins.float
+    """Delete rows whose token expired before this"""
+    def __init__(
+        self,
+        *,
+        cutoff: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cutoff", b"cutoff"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReapFederationReplayRequest: _TypeAlias = ReapFederationReplayRequest  # noqa: Y015
+
+@_typing.final
+class ReapFederationRateLimitsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CUTOFF_FIELD_NUMBER: _builtins.int
+    cutoff: _builtins.int
+    """Delete windows which started before this"""
+    def __init__(
+        self,
+        *,
+        cutoff: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cutoff", b"cutoff"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReapFederationRateLimitsRequest: _TypeAlias = ReapFederationRateLimitsRequest  # noqa: Y015
+
+@_typing.final
+class ReapFederationReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    REMOVED_FIELD_NUMBER: _builtins.int
+    removed: _builtins.int
+    def __init__(
+        self,
+        *,
+        removed: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["removed", b"removed"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReapFederationReply: _TypeAlias = ReapFederationReply  # noqa: Y015

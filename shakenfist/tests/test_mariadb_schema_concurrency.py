@@ -189,6 +189,8 @@ EXPECTED_TABLE_NAMES = sorted([
     'node_daemon_states',
     'cluster_operations',
     'cluster_operation_errors',
+    'federation_replay',
+    'federation_rate_limits',
     'work_queue',
     'cluster_locks',
     'cluster_config',

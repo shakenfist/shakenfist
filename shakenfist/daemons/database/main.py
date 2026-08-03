@@ -5503,6 +5503,80 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def RecordFederatedExchange(
+        self,
+        request: database_pb2.RecordFederatedExchangeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.RecordFederatedExchangeReply:
+        """Claim a (token, rule) pair for a federated exchange."""
+        try:
+            self.monitor.counters['record_federated_exchange'].inc()
+            recorded = mariadb._direct_record_federated_exchange(
+                request.token_id,
+                UUID(request.rule_uuid),
+                request.expires_at)
+            return database_pb2.RecordFederatedExchangeReply(
+                recorded=recorded, error='')
+        except Exception as e:
+            # Reported in the reply body rather than as an RPC error so
+            # the client can tell "we could not find out" apart from
+            # "already claimed". Both refuse the exchange, but only one
+            # of them means the database is in trouble.
+            util_exceptions.ignore_exception(
+                'database RecordFederatedExchange failed', e)
+            return database_pb2.RecordFederatedExchangeReply(
+                recorded=False, error=str(e))
+
+    def CountFederatedAttempt(
+        self,
+        request: database_pb2.CountFederatedAttemptRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.CountFederatedAttemptReply:
+        """Count one federated exchange attempt from a source address."""
+        try:
+            self.monitor.counters['count_federated_attempt'].inc()
+            attempts = mariadb._direct_count_federated_attempt(
+                request.source, request.window_start)
+            return database_pb2.CountFederatedAttemptReply(
+                attempts=attempts, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CountFederatedAttempt failed', e)
+            return database_pb2.CountFederatedAttemptReply(
+                attempts=0, error=str(e))
+
+    def ReapFederationReplay(
+        self,
+        request: database_pb2.ReapFederationReplayRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReapFederationReply:
+        """Delete replay rows for tokens which have expired."""
+        try:
+            self.monitor.counters['reap_federation_replay'].inc()
+            return database_pb2.ReapFederationReply(
+                removed=mariadb._direct_reap_federation_replay(
+                    request.cutoff))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReapFederationReplay failed', e)
+            return database_pb2.ReapFederationReply(removed=0)
+
+    def ReapFederationRateLimits(
+        self,
+        request: database_pb2.ReapFederationRateLimitsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReapFederationReply:
+        """Delete rate limit rows for windows which have closed."""
+        try:
+            self.monitor.counters['reap_federation_rate_limits'].inc()
+            return database_pb2.ReapFederationReply(
+                removed=mariadb._direct_reap_federation_rate_limits(
+                    request.cutoff))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReapFederationRateLimits failed', e)
+            return database_pb2.ReapFederationReply(removed=0)
+
     def _cluster_operation_to_proto(
             self,
             data: dict[str, Any]
@@ -5809,6 +5883,11 @@ class Monitor(daemon.WorkerPoolDaemon):
             'set_cluster_operation_error',
             'get_cluster_operation_error',
             'delete_cluster_operation_error',
+            # MariaDB federation abuse resistance operations
+            'record_federated_exchange',
+            'count_federated_attempt',
+            'reap_federation_replay',
+            'reap_federation_rate_limits',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
             'find_network_interfaces',

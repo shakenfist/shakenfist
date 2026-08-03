@@ -420,6 +420,44 @@ def reap_expired_namespace_keys() -> None:
             'reconcile_orphaned_objects repairs these')
 
 
+# How long after a token's own expiry its replay record is kept.
+#
+# A replay record only has to outlive the token it describes: once the
+# token is expired the exchange refuses it during validation and never
+# reaches the replay check. The hour of margin covers clock skew
+# between the node running this sweep and whichever node verifies a
+# token. A node running behind would otherwise still accept a token
+# whose replay record a node running ahead had already deleted, which
+# is exactly the replay this table exists to refuse. At the volume this
+# endpoint sees, an hour of stale rows costs nothing.
+REPLAY_REAP_GRACE = 3600
+
+# How long a closed rate limiting window is kept. Only the current
+# window is ever counted against, so anything older is dead weight.
+# Two windows of margin keeps the sweep from racing a request which is
+# mid-flight across a boundary.
+RATE_LIMIT_REAP_GRACE = 120
+
+
+def reap_federation_records() -> None:
+    """Delete spent federated exchange replay and rate limit rows.
+
+    Both tables are write-mostly and neither row is read once it has
+    gone stale, so without this they would grow for the life of the
+    cluster. Nothing depends on the sweep having run: it removes rows
+    that no longer affect any decision.
+    """
+    replayed = mariadb.reap_federation_replay(
+        time.time() - REPLAY_REAP_GRACE)
+    if replayed:
+        LOG.info(f'Removed {replayed} expired federation replay records')
+
+    windows = mariadb.reap_federation_rate_limits(
+        int(time.time()) - RATE_LIMIT_REAP_GRACE)
+    if windows:
+        LOG.info(f'Removed {windows} closed federation rate limit windows')
+
+
 def prune_events() -> None:
     """Daily prune sweep of the events / event_objects tables.
 

@@ -1131,7 +1131,10 @@ class AuthFederatedEndpoint(api_base.Resource):
                'again.', federated_example),
          (400, 'A required field is missing.', None),
          (401, 'The exchange was refused.', None),
-         (413, 'The request body is too large.', None)],
+         (413, 'The request body is too large.', None),
+         (429, 'Too many exchange attempts from this source.', None),
+         (503, 'The database is unavailable, so the exchange could not '
+               'be checked for replay.', None)],
         requires_auth=False))
     def post(self, token=None, namespace=None, rule=None):
         # The order below is the one in the phase 3 design section, and
@@ -1164,9 +1167,19 @@ class AuthFederatedEndpoint(api_base.Resource):
             return _federated_refusal(
                 None, 'untrusted issuer', str(e), namespace=namespace)
 
-        # 3. Rate limiting per source address arrives in step 3h. The
-        #    ordering slot is deliberate: it belongs after the free
-        #    local rejections and before the first outbound request.
+        # 3. Rate limit per source address. Here, rather than earlier,
+        #    because the checks above are free and writing a counter row
+        #    is not; and here, rather than later, because everything
+        #    below this line costs an outbound request or a database
+        #    read done on an anonymous caller's behalf.
+        source = flask.request.remote_addr or 'unknown'
+        try:
+            federation.enforce_rate_limit(source)
+        except exceptions.RateLimited as e:
+            LOG.with_fields({
+                'namespace': namespace, 'source': source
+            }).info(f'Federated exchange rate limited: {e}')
+            return sf_api.error(429, 'too many federated exchange attempts')
 
         # 4 and 5. Signature, then audience, issuer and lifetime.
         try:
@@ -1174,8 +1187,6 @@ class AuthFederatedEndpoint(api_base.Resource):
         except exceptions.TokenValidationFailed as e:
             return _federated_refusal(
                 None, 'token rejected', str(e), namespace=namespace)
-
-        # 6. Replay refusal on (jti, rule) arrives in step 3h.
 
         # 7. Only now look up the rule. Doing it after verification
         #    means an anonymous caller holding no valid token cannot
@@ -1210,9 +1221,6 @@ class AuthFederatedEndpoint(api_base.Resource):
                 rule_from_db, 'no such namespace',
                 f'rule {namespace}/{rule} names a namespace which is gone')
 
-        # 8. Mint. The name carries a random discriminator so a
-        #    workflow re-run gets its own key rather than silently
-        #    rotating the secret out from under a still-running job.
         scopes = rule_from_db.scopes
         key_ttl = rule_from_db.key_ttl
         if not scopes or not key_ttl:
@@ -1220,6 +1228,39 @@ class AuthFederatedEndpoint(api_base.Resource):
                 rule_from_db, 'rule is unusable',
                 'rule has no scopes or no key_ttl')
 
+        # 6. Refuse a replay of this token through this rule.
+        #
+        # The design section numbers this ahead of the rule lookup, but
+        # it cannot run there: the pair being claimed is (token, rule
+        # uuid), and there is no rule uuid until the rule has been read.
+        # It sits here rather than immediately after the lookup so that
+        # a refusal for any *other* reason -- claims that do not match, a
+        # namespace that has gone, a rule with no scopes -- does not
+        # consume the token's single use. A caller who fixes their rule
+        # and retries with the same still-valid token should succeed.
+        #
+        # It is the last gate before minting, which is what makes it
+        # effective: two concurrent presentations of the same token
+        # cannot both get past this line, because the second one's
+        # insert collides with the first one's.
+        #
+        # If minting then fails, the token's use is spent with no key to
+        # show for it. That is the right way round to be wrong -- the
+        # caller asks their identity provider for another token, which
+        # costs them a second, whereas the alternative is a window in
+        # which a token mints twice.
+        try:
+            federation.refuse_replay(token, claims, rule_from_db)
+        except exceptions.TokenReplayed as e:
+            return _federated_refusal(
+                rule_from_db, 'token already used', str(e))
+        except exceptions.TokenValidationFailed as e:
+            return _federated_refusal(
+                rule_from_db, 'token rejected', str(e))
+
+        # 8. Mint. The name carries a random discriminator so a
+        #    workflow re-run gets its own key rather than silently
+        #    rotating the secret out from under a still-running job.
         key_name = '%s-%s' % (
             rule_from_db.key_name_prefix, sf_random.random_id()[:8])
         secret = credentials.generate()
