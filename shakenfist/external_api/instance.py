@@ -1088,6 +1088,7 @@ class InstanceEventsEndpoint(api_base.Resource):
              'The number of events to return, defaults to 100.', False)
         ],
         [(200, 'Event information about a single instance.', instance_events_example),
+         (400, 'The limit must be an integer.', None),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

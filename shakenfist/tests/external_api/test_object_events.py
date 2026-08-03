@@ -94,3 +94,103 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
         error = resp.get_json()['error']
         self.assertEqual('limit must be an integer', error)
         self.get_object_events.assert_not_called()
+
+    def test_non_scalar_limit_is_a_clean_400(self):
+        """A list or a dict is what the new `except TypeError` is for --
+        int() raises TypeError rather than ValueError for these."""
+        for value in ([], {}, [5]):
+            self.get_object_events.reset_mock()
+            resp = self.client.get('/events', json={'limit': value})
+
+            self.assertEqual(400, resp.status_code,
+                             'limit=%r should be a 400' % (value,))
+            self.assertEqual('limit must be an integer',
+                             resp.get_json()['error'])
+            self.get_object_events.assert_not_called()
+
+    def test_oversized_limit_is_capped_not_a_500(self):
+        """A limit larger than int32 used to be coerced successfully and
+        then blow up in protobuf message construction with
+        'ValueError: Value out of range', which escaped as a 500 -- the
+        same failure class issue 3609 is about, with a different
+        exception name in the body. Clamping happens in the API layer so
+        the value handed to mariadb is always serialisable."""
+        resp = self.client.get('/events', json={'limit': 2 ** 40})
+
+        self.assertEqual(200, resp.status_code)
+        self.get_object_events.assert_called_once_with(
+            'node', 'sf-1', limit=1000, event_type=None)
+
+    def test_limit_above_the_cap_is_capped(self):
+        resp = self.client.get('/events', json={'limit': 5000})
+
+        self.assertEqual(200, resp.status_code)
+        self.get_object_events.assert_called_once_with(
+            'node', 'sf-1', limit=1000, event_type=None)
+
+    def test_negative_limit_becomes_the_default(self):
+        """Matches the hardening documented on
+        mariadb._direct_get_object_events, so the two layers agree."""
+        resp = self.client.get('/events', json={'limit': -1})
+
+        self.assertEqual(200, resp.status_code)
+        self.get_object_events.assert_called_once_with(
+            'node', 'sf-1', limit=100, event_type=None)
+
+    def test_non_string_event_type_is_a_clean_400(self):
+        """event_type arrives through the same unvalidated body merge as
+        limit and lands in a protobuf string field, so a non-string
+        raised TypeError and leaked the interpreter message by exactly
+        the route issue 3609 describes."""
+        resp = self.client.get('/events', json={'event_type': 5})
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('event_type must be a string',
+                         resp.get_json()['error'])
+        self.get_object_events.assert_not_called()
+
+    def test_string_event_type_passes_through(self):
+        resp = self.client.get('/events', json={'event_type': 'audit'})
+
+        self.assertEqual(200, resp.status_code)
+        self.get_object_events.assert_called_once_with(
+            'node', 'sf-1', limit=100, event_type='audit')
+
+
+class ObjectEventsSharingTestCase(base.ShakenFistTestCase):
+    """Every events endpoint must route through the shared helper.
+
+    The coercion above only protects an endpoint which actually calls
+    object_events_response. This pins that all five do, so a future
+    endpoint which open-codes the read cannot quietly reintroduce
+    issue 3609 without this failing.
+    """
+
+    def test_all_events_endpoints_use_the_shared_helper(self):
+        import inspect
+
+        from shakenfist.external_api import artifact
+        from shakenfist.external_api import blob
+        from shakenfist.external_api import instance
+        from shakenfist.external_api import network
+        from shakenfist.external_api import node
+
+        endpoints = [
+            (node, 'NodeEventsEndpoint'),
+            (instance, 'InstanceEventsEndpoint'),
+            (artifact, 'ArtifactEventsEndpoint'),
+            (blob, 'BlobEventsEndpoint'),
+            (network, 'NetworkEventsEndpoint'),
+        ]
+
+        for module, name in endpoints:
+            endpoint = getattr(module, name)
+            source = inspect.getsource(endpoint)
+            self.assertIn(
+                'object_events_response', source,
+                '%s.%s must read events through '
+                'api_base.object_events_response' % (module.__name__, name))
+            self.assertIn(
+                "(400, 'The limit must be an integer.', None)", source,
+                '%s.%s must declare the 400 the shared helper can '
+                'return' % (module.__name__, name))

@@ -391,6 +391,7 @@ class NetworkEventsEndpoint(api_base.Resource):
              'The number of events to return, defaults to 100.', False)
         ],
         [(200, 'Event information about a single network.', network_events_example),
+         (400, 'The limit must be an integer.', None),
          (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership

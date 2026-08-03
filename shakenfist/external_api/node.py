@@ -166,6 +166,7 @@ class NodeEventsEndpoint(api_base.Resource):
              'The number of events to return, defaults to 100.', False)
         ],
         [(200, 'Event information about a single node.', node_events_example),
+         (400, 'The limit must be an integer.', None),
          (404, 'Node not found.', None)]))
     @api_base.caller_is_admin
     @api_base.log_token_use

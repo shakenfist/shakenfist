@@ -273,6 +273,7 @@ class BlobEventsEndpoint(api_base.Resource):
              'The number of events to return, defaults to 100.', False)
         ],
         [(200, 'Event information about a single blob.', blob_events_example),
+         (400, 'The limit must be an integer.', None),
          (404, 'Blob not found.', None)]))
     @api_base.log_token_use
     def get(self, blob_uuid=None, event_type=None, limit=100):

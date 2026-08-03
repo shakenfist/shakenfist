@@ -567,6 +567,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
              'The number of events to return, defaults to 100.', False)
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
+         (400, 'The limit must be an integer.', None),
          (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_access
@@ -652,8 +653,15 @@ class ArtifactVersionsEndpoint(api_base.Resource):
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
         try:
             mv = int(max_versions)
-        except ValueError:
-            return sf_api.error(400, 'max version is not an integer')
+        except (TypeError, ValueError):
+            # TypeError as well as ValueError: log_request merges JSON
+            # body values into kwargs verbatim, so {'max_versions':
+            # null} arrives at int() as None. Catching only ValueError
+            # let that escape to handle_authorization_exceptions, which
+            # turns any TypeError into a 400 carrying the interpreter's
+            # own message -- the same defect as issue 3609.
+            return sf_api.error(400, 'max version is not an integer',
+                                suppress_traceback=True)
         artifact_from_db.add_event(
             EVENT_TYPE_AUDIT, 'max versions set from REST API')
         artifact_from_db.max_versions = mv
@@ -678,8 +686,11 @@ class ArtifactVersionEndpoint(api_base.Resource):
     def delete(self, artifact_ref=None, artifact_from_db=None, version_id=0):
         try:
             ver_index = int(version_id)
-        except ValueError:
-            return sf_api.error(400, 'version index is not an integer')
+        except (TypeError, ValueError):
+            # See the note on ArtifactMaxVersionsEndpoint.post: a JSON
+            # null reaches int() as None, which is a TypeError.
+            return sf_api.error(400, 'version index is not an integer',
+                                suppress_traceback=True)
 
         indexes = list(artifact_from_db.get_all_indexes())
         for idx in indexes:

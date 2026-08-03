@@ -656,6 +656,22 @@ def handle_authorization_exceptions(func):
             return func(*args, **kwargs)
 
         except TypeError as e:
+            # This is deliberately broad and that is a known hazard.
+            # log_request merges every JSON body key into the handler's
+            # kwargs with no type checking, so any handler which does
+            # arithmetic or string work on a body value can be made to
+            # raise TypeError from arbitrarily deep in the stack -- and
+            # str(e) then hands the interpreter's own message to the
+            # client. Issue 3609 was one instance of that (the events
+            # endpoints' `limit`); the endpoints validate their typed
+            # body parameters explicitly for exactly this reason.
+            #
+            # The systemic fix is to validate body parameters
+            # declaratively with the webargs use_kwargs schemas already
+            # used for query args, and then narrow this handler to the
+            # JWT-related TypeErrors it was written for. That is a
+            # larger change than any single endpoint fix, so it is
+            # recorded here rather than done in passing.
             return sf_api.error(400, str(e), suppress_traceback=False)
 
         except DecodeError:
@@ -761,17 +777,46 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     delegates the read-and-shape step here so the wire-format change
     only happens in one place.
 
-    ``limit`` is coerced to int here because log_request merges JSON
-    body values into handler kwargs verbatim, so a caller sending
-    ``{'limit': '5'}`` delivers a str. Left uncoerced, the range check
-    in mariadb.get_object_events raised TypeError, which
-    handle_authorization_exceptions turned into a 400 leaking the
-    interpreter message to the client (issue 3609).
+    Both body parameters are validated here because log_request merges
+    JSON body values into handler kwargs verbatim, so a caller sending
+    ``{'limit': '5'}`` delivers a str and ``{'event_type': 5}``
+    delivers an int. Left unchecked, the range comparison in
+    mariadb._grpc_get_object_events (and _direct_get_object_events)
+    raised TypeError for the first, and building the protobuf's
+    ``event_type_filter`` string field raised TypeError for the
+    second. handle_authorization_exceptions turns any TypeError into a
+    400 carrying str(e), so either leaked an interpreter message to
+    the client (issue 3609).
+
+    ``limit`` is clamped here as well, not just coerced. The lower
+    bound and the 1000 ceiling are applied by
+    _direct_get_object_events, but on a real deployment the read goes
+    through the gRPC path, which builds a request whose ``limit`` is
+    an int32 -- so an out-of-range value raises ValueError while the
+    message is being constructed, before any server-side clamping can
+    happen, and escapes as a 500. Clamping at this layer makes the
+    API's guarantee about ``limit`` complete rather than partial, and
+    keeps the two layers agreeing on the ceiling.
     """
     try:
         limit = int(limit)
     except (TypeError, ValueError):
-        return sf_api.error(400, 'limit must be an integer')
+        # suppress_traceback because this is ordinary bad client input,
+        # not a server fault: sys.exc_info() is still live inside the
+        # except block, so without it the whole int() traceback is
+        # logged for every malformed request.
+        return sf_api.error(400, 'limit must be an integer',
+                            suppress_traceback=True)
+
+    # Mirrors the hardening documented on
+    # mariadb._direct_get_object_events.
+    if limit <= 0:
+        limit = 100
+    limit = min(limit, 1000)
+
+    if event_type is not None and not isinstance(event_type, str):
+        return sf_api.error(400, 'event_type must be a string',
+                            suppress_traceback=True)
 
     return [
         row.model_dump(mode='json')
