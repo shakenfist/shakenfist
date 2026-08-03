@@ -5074,7 +5074,7 @@ def _direct_prune_events() -> int:
 
 
 def _direct_get_object_events(
-        object_type: str, object_uuid: str, limit: int = 100,
+        object_type: str, object_uuid: str, limit: int = EVENTS_LIMIT_DEFAULT,
         event_type: Optional[str] = None) -> list[EventReadRow]:
     """Read events for one (object_type, object_uuid) directly.
 
@@ -5301,7 +5301,7 @@ def prune_events() -> int:
 
 
 def _grpc_get_object_events(
-        object_type: str, object_uuid: str, limit: int = 100,
+        object_type: str, object_uuid: str, limit: int = EVENTS_LIMIT_DEFAULT,
         event_type: Optional[str] = None) -> list[EventReadRow]:
     """Fetch per-object events via the database microservice.
 
@@ -5393,7 +5393,7 @@ def _grpc_delete_object_events(
 
 def get_object_events(
         object_type: str, object_uuid: Any,
-        limit: int = 100,
+        limit: int = EVENTS_LIMIT_DEFAULT,
         event_type: Optional[str] = None) -> list[EventReadRow]:
     """Read events for one (object_type, object_uuid).
 

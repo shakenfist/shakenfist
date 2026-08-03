@@ -1,9 +1,14 @@
 # Copyright 2019 Michael Still and contributors
 import json
+import os
+import shutil
+import tempfile
 from unittest import mock
 
 import flask
 
+from shakenfist.config import config
+from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import instance as api_instance
@@ -169,3 +174,119 @@ class InstanceAgentPutModeTestCase(base.ShakenFistTestCase):
 
                 self.assertEqual(404, resp.status_code, 'mode %r' % (mode,))
                 self.assertEqual('blob not found', resp.get_json()['error'])
+
+
+class UploadTruncateOffsetTestCase(base.ShakenFistTestCase):
+    """The truncate offset must be bounded at both ends.
+
+    os.truncate() is not safe for an arbitrary integer: beyond a C
+    long it raises OverflowError, beyond the filesystem's maximum file
+    size it raises OSError(EFBIG), and in between it succeeds and
+    grows the upload into a large sparse file. All three are reachable
+    from a URL path segment with no request body at all.
+    """
+
+    UPLOAD_UUID = '4f2b6d5a-9e4c-4d0e-9f2a-1b7c5d3e8a90'
+    CONTENT = b'0123456789'
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        self.storage_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.storage_path, ignore_errors=True)
+        os.makedirs(os.path.join(self.storage_path, 'uploads'))
+        self.upload_path = os.path.join(
+            self.storage_path, 'uploads', self.UPLOAD_UUID)
+        with open(self.upload_path, 'wb') as f:
+            f.write(self.CONTENT)
+
+        fake_config = SFConfig(STORAGE_PATH=self.storage_path)
+        p = mock.patch('shakenfist.external_api.upload.config', fake_config)
+        p.start()
+        self.addCleanup(p.stop)
+
+        # MockMariaDB does not cover uploads, so the object lookup the
+        # decorator does is mocked directly. node matches this node so
+        # redirect_upload_request does not proxy the request away.
+        self.upload = mock.MagicMock()
+        self.upload.uuid = self.UPLOAD_UUID
+        self.upload.node = config.NODE_NAME
+        p = mock.patch('shakenfist.external_api.base.Upload.from_db',
+                       return_value=self.upload)
+        p.start()
+        self.addCleanup(p.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+        # The client must be created after all the mocks, or the mocks
+        # are not correctly applied.
+        self.client = external_api.app.test_client()
+
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _truncate(self, offset):
+        return self.client.post(
+            '/upload/%s/truncate/%s' % (self.UPLOAD_UUID, offset),
+            headers={'Authorization': self.auth_token})
+
+    def _size(self):
+        return os.stat(self.upload_path).st_size
+
+    def test_truncate_within_the_upload(self):
+        resp = self._truncate(4)
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(4, self._size())
+
+    def test_offset_at_the_end_is_allowed(self):
+        """Truncating to exactly the current length is a no-op rather
+        than an error, so a client which has just sent that many bytes
+        does not have to special-case it."""
+        resp = self._truncate(len(self.CONTENT))
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(len(self.CONTENT), self._size())
+
+    def test_oversized_offsets_are_a_clean_400(self):
+        # 2**70 is beyond a C long (OverflowError), 2**50 is beyond
+        # most filesystems' maximum file size (OSError EFBIG), and 11
+        # is merely past the end of this file -- which used to succeed
+        # and leave a sparse file behind.
+        for offset in (2 ** 70, 2 ** 50, len(self.CONTENT) + 1):
+            resp = self._truncate(offset)
+
+            self.assertEqual(400, resp.status_code, 'offset %s' % offset)
+            self.assertEqual('offset is beyond the end of the upload',
+                             resp.get_json()['error'])
+            self.assertEqual(len(self.CONTENT), self._size(),
+                             'offset %s changed the file' % offset)
+
+    def test_negative_offset_is_a_clean_400(self):
+        resp = self._truncate(-1)
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('offset must not be negative',
+                         resp.get_json()['error'])
+
+    def test_non_numeric_offset_is_a_clean_400(self):
+        resp = self._truncate('banana')
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('offset is not an integer',
+                         resp.get_json()['error'])
+
+    def test_upload_with_no_data_is_a_404(self):
+        os.unlink(self.upload_path)
+        resp = self._truncate(0)
+
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('upload has no data', resp.get_json()['error'])

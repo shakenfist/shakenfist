@@ -1093,7 +1093,8 @@ class InstanceEventsEndpoint(api_base.Resource):
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
-    def get(self, instance_ref=None, event_type=None, limit=100, instance_from_db=None):
+    def get(self, instance_ref=None, event_type=None,
+            limit=api_base.EVENTS_LIMIT_DEFAULT, instance_from_db=None):
         return api_base.object_events_response(
             'instance', instance_from_db.uuid, limit, event_type)
 
@@ -1375,12 +1376,11 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
             # as a float infinity. Those raise TypeError and
             # OverflowError, neither of which the ValueError-only guard
             # here used to catch, so both leaked to the client -- the
-            # same defect as issue 3609. Returning None rather than
-            # raising also means the sf_api.error call below has no
-            # active traceback, which would otherwise be logged.
+            # same defect as issue 3609.
             parsed_length = api_base.coerce_int(length)
             if parsed_length is None:
-                return sf_api.error(400, 'length is not an integer')
+                return sf_api.error(400, 'length is not an integer',
+                                    suppress_traceback=True)
 
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'get console data request from REST API')

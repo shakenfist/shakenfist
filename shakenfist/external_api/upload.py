@@ -73,7 +73,8 @@ class UploadTruncateEndpoint(api_base.Resource):
         [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
          ('offset', 'query', 'integer', 'The new length of the object.', True)],
         [(200, 'No return value', ''),
-         (400, 'The offset must be a non-negative integer.', None)]))
+         (400, 'The offset must be an integer within the upload.', None),
+         (404, 'The upload has no data to truncate.', None)]))
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
     @api_base.log_token_use
@@ -93,9 +94,32 @@ class UploadTruncateEndpoint(api_base.Resource):
             return sf_api.error(400, 'offset must not be negative',
                                 suppress_traceback=True)
 
-        upload_from_db.add_event(EVENT_TYPE_AUDIT, 'truncate request from REST API')
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
-
         upload_path = os.path.join(upload_dir, str(upload_from_db.uuid))
+
+        try:
+            current_size = os.stat(upload_path).st_size
+        except FileNotFoundError:
+            # Nothing has been sent for this upload yet. os.truncate
+            # would raise FileNotFoundError, which becomes a 500.
+            return sf_api.error(404, 'upload has no data',
+                                suppress_traceback=True)
+
+        # Bounded above as well as below. Truncating past the end of an
+        # upload is not a meaningful operation for this endpoint, and
+        # it is not even reliably possible: an offset beyond a C long
+        # raises OverflowError and one beyond the filesystem's maximum
+        # file size raises OSError(EFBIG), both of which escape as a
+        # 500 with an interpreter message. An offset between those and
+        # the current length instead succeeds, growing the upload into
+        # an arbitrarily large sparse file at the caller's choosing.
+        if truncate_to > current_size:
+            return sf_api.error(400, 'offset is beyond the end of the upload',
+                                suppress_traceback=True)
+
+        # No makedirs here any more: the stat above only succeeds if
+        # the directory and the upload file both already exist, which
+        # the data endpoint guarantees before there is anything to
+        # truncate.
+        upload_from_db.add_event(EVENT_TYPE_AUDIT, 'truncate request from REST API')
         os.truncate(upload_path, truncate_to)

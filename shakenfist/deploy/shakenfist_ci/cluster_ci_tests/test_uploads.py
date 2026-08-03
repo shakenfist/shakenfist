@@ -36,19 +36,24 @@ class TestUploads(base.BaseNamespacedTestCase):
     def test_truncate_rejects_a_bad_offset(self):
         # The truncate offset used to reach os.truncate through an
         # unguarded int(): a non-numeric offset raised ValueError and
-        # became a 500 with a ValueError repr in the body, and a
-        # negative one raised OSError and did the same. Both are client
-        # input, so both must be a 400. This is the same defect class
-        # as issue 3609.
+        # became a 500 with a ValueError repr in the body, a negative
+        # one raised OSError and did the same, and an offset past the
+        # end of the file raised either OverflowError (beyond a C long)
+        # or OSError EFBIG (beyond the filesystem maximum) and did the
+        # same again. All are client input, so all must be a 400. This
+        # is the same defect class as issue 3609.
         upl = self.test_client.create_upload()
         self.test_client.send_upload(upl['uuid'], string.ascii_letters)
 
         # Assert the specific message per case: 'offset' alone matches
-        # either, so it could not tell the two rejection paths apart
-        # and would keep passing if one regressed into the other.
+        # all of them, so it could not tell the rejection paths apart
+        # and would keep passing if one regressed into another.
         cases = (
             ('banana', 'offset is not an integer'),
             ('-1', 'offset must not be negative'),
+            ('99999999999999999999', 'offset is beyond the end of the upload'),
+            (str(len(string.ascii_letters) + 1),
+             'offset is beyond the end of the upload'),
         )
         for offset, expected in cases:
             exc = self.assertRaises(

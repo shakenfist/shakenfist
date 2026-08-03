@@ -396,7 +396,8 @@ class NetworkEventsEndpoint(api_base.Resource):
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
-    def get(self, network_ref=None, event_type=None, limit=100, network_from_db=None):
+    def get(self, network_ref=None, event_type=None,
+            limit=api_base.EVENTS_LIMIT_DEFAULT, network_from_db=None):
         return api_base.object_events_response(
             'network', network_from_db.uuid, limit, event_type)
 

@@ -572,7 +572,8 @@ class ArtifactEventsEndpoint(api_base.Resource):
     @arg_is_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
-    def get(self, artifact_ref=None, event_type=None, limit=100, artifact_from_db=None):
+    def get(self, artifact_ref=None, event_type=None,
+            limit=api_base.EVENTS_LIMIT_DEFAULT, artifact_from_db=None):
         return api_base.object_events_response(
             'artifact', artifact_from_db.uuid, limit, event_type)
 

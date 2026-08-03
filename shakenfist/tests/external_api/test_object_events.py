@@ -47,8 +47,13 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             # merge in log_request and limit coercion in
             # object_events_response, which are the same whether or not
             # the caller was authenticated.
+            #
+            # The default is the constant rather than a literal 100 for
+            # the same reason the real handlers use it: otherwise
+            # test_default_limit would assert two independent literals
+            # against each other and pass whatever the constant said.
             @api_base.public
-            def get(self, event_type=None, limit=100):
+            def get(self, event_type=None, limit=api_base.EVENTS_LIMIT_DEFAULT):
                 return api_base.object_events_response(
                     'node', 'sf-1', limit, event_type)
 
@@ -81,6 +86,18 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
 
     def test_default_limit(self):
         resp = self.client.get('/events')
+
+        self.assertEqual(200, resp.status_code)
+        self.get_object_events.assert_called_once_with(
+            'node', 'sf-1', limit=api_base.EVENTS_LIMIT_DEFAULT,
+            event_type=None)
+
+    def test_query_string_limit_is_ignored(self):
+        """Only JSON body keys are merged into handler kwargs, so a
+        query parameter has never had any effect. Pinned because the
+        operator guide used to describe limit as a query parameter and
+        now explicitly says it is not."""
+        resp = self.client.get('/events?limit=5')
 
         self.assertEqual(200, resp.status_code)
         self.get_object_events.assert_called_once_with(
@@ -255,6 +272,33 @@ class ObjectEventsSharingTestCase(base.ShakenFistTestCase):
             if name == 'object_events_response':
                 return True
         return False
+
+    def _limit_default(self, endpoint):
+        """The `limit` default in the endpoint's get() signature, as
+        source rather than as a value: what matters is that it is
+        spelled as the shared constant, not that it happens to equal
+        it today."""
+        tree = ast.parse(inspect.getsource(endpoint))
+        for element in ast.walk(tree):
+            if not isinstance(element, ast.FunctionDef) or element.name != 'get':
+                continue
+            args = element.args.args[-len(element.args.defaults):]
+            for arg, default in zip(args, element.args.defaults):
+                if arg.arg == 'limit':
+                    return ast.unparse(default)
+        return None
+
+    def test_all_events_endpoints_default_to_the_shared_limit(self):
+        # A literal 100 here would make EVENTS_LIMIT_DEFAULT
+        # decorative: changing the constant would change the published
+        # description and the clamp while a request omitting limit
+        # kept returning 100 rows.
+        for module, name in self.ENDPOINTS:
+            endpoint = getattr(module, name)
+            self.assertEqual(
+                'api_base.EVENTS_LIMIT_DEFAULT', self._limit_default(endpoint),
+                '%s.%s must default limit to api_base.EVENTS_LIMIT_DEFAULT'
+                % (module.__name__, name))
 
     def test_all_events_endpoints_use_the_shared_helper(self):
         for module, name in self.ENDPOINTS:

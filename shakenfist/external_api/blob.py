@@ -276,7 +276,8 @@ class BlobEventsEndpoint(api_base.Resource):
          (400, 'The limit or event_type parameter was malformed.', None),
          (404, 'Blob not found.', None)]))
     @api_base.log_token_use
-    def get(self, blob_uuid=None, event_type=None, limit=100):
+    def get(self, blob_uuid=None, event_type=None,
+            limit=api_base.EVENTS_LIMIT_DEFAULT):
         return api_base.object_events_response(
             'blob', blob_uuid, limit, event_type)
 
