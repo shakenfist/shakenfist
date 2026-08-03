@@ -241,6 +241,53 @@ sentinel. A separate test case covers `swagger_helper()`'s
 rejections directly, because the tree-scanning assertions cannot
 fail once enforcement happens at import time.
 
+A fourth defect, found in the second review round: the
+generalised derivation rule rewrote `ClusterOperationsEndpoint`'s
+`target_object_type` and `target_uuid` to `body`, because they
+appear in no route and no webargs schema. But that handler falls
+back to `flask.request.args.get()` for both, so a raw
+`?target_...=` GET keeps working, and that is the form AGENTS.md
+documents. The phase whose purpose is making declarations true
+made one endpoint less true. It also mattered downstream:
+decision D6 grants a query-string fallback only to parameters
+declared `query`, so compiling this would have deleted a fallback
+the handler deliberately implements.
+
+Fixed the same way as the others — by adding the missing
+derivation source rather than the missing declaration. A name the
+handler reads from `flask.request.args` is a query parameter
+whatever else it also is, in both the fixer and the test. The
+script now derives all four sources, and `header` and `formData`
+declarations — derivable from none of them — are reported and
+left alone instead of being rewritten to `body`.
+
+The re-runnable check is now enforced rather than documented:
+`check-api-parameter-locations` runs the script in report mode on
+every commit touching `external_api/`.
+
+### Known remaining gap: multiple body parameters
+
+Swagger 2.0 permits at most one `in: body` parameter per
+operation, and it must carry a `schema` rather than
+`type`/`format`. `swagger_helper()` emits `type`/`format` for
+every parameter regardless of location, and operations declaring
+more than one body parameter go from **23 on develop to 29 on
+this branch** — the metadata POST endpoints in particular move
+`key` from query to body, joining `value`.
+
+Each individual move is correct (the client does send `key` in
+the body) and the defect predates this phase, but it means the
+"anyone generating a client from the published specification gets
+a broken client" problem this plan opens with is only partly
+closed. Fixing it means restructuring how `swagger_helper()`
+emits body parameters — collapsing the N declarations into one
+`body` parameter with a generated `schema` object — which is
+phase 2 work, not something to bolt onto a mechanical audit. It
+is recorded as a work item there.
+
+Nothing in CI would catch the next such regression: no test
+validates the generated specification. Also a phase 2 item.
+
 ### Deferred to phase 2
 
 Type-token normalisation. `namespace` is declared with the

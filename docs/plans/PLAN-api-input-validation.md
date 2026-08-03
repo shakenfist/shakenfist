@@ -275,12 +275,37 @@ declarations are good enough to compile.
 |-------|--------|-------------|
 | 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion |
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
-| 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI so the bounds are visible to callers rather than invisible the way the events `limit` cap was |
+| 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI so the bounds are visible to callers rather than invisible the way the events `limit` cap was. Also: collapse the N body parameters of an operation into one `body` parameter carrying a generated `schema`, and add a test that validates the generated specification — see below |
 | 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs |
 | 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the four hand-authored `get_args` schemas into the compiled path |
 | 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors; fix the attribution issues (#3523, #3371, #3606, #3615) |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
 
+
+### Carried into phase 2 from phase 1
+
+Phase 1 corrected which location each parameter declares. It did
+not change how `swagger_helper()` renders them, which leaves two
+specification-validity problems for phase 2 to pick up:
+
+* **Multiple body parameters per operation.** Swagger 2.0 permits
+  at most one `in: body` parameter, and it must carry a `schema`
+  rather than `type`/`format`; `swagger_helper()` emits
+  `type`/`format` for everything. 29 operations declare more than
+  one body parameter (23 before phase 1 — correcting `key` from
+  query to body on the metadata endpoints added most of the
+  rest). Every individual declaration is now right and the
+  specification is still invalid, so the generated-client problem
+  this plan opens with is only partly closed. The fix is to
+  collapse an operation's body parameters into a single `body`
+  parameter with a generated `schema` object, which is a change to
+  the renderer rather than to any declaration.
+* **Nothing validates the generated specification.** Phase 1's
+  path-implies-required rule exists to satisfy linters and client
+  generators, and was checked by hand. A unit test running
+  `openapi_spec_validator` over flasgger's output would catch the
+  next regression, including the body-parameter one above. The
+  only current functional coverage fetches `swagger-ui.css`.
 
 ## Open questions for phase 0
 
