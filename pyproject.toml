@@ -19,6 +19,15 @@ dependencies = [
     # A bit vague because we expect this to come from an OS package
     #     Debian 12 shipped with psutil 5.9.4
     #     Ubuntu 24.04 shiped with psutil 5.9.8
+    #
+    # Both are deliberately left to float. Each has historically been
+    # exciting in terms of what distros package, so a range which accepts
+    # the system package is worth more here than reproducibility. Being
+    # declared as ranges means the reconciler treats them as already
+    # constrained and does not add them to the pinned indirect block, so
+    # Renovate has no pin to bump for either and upgrades land silently
+    # rather than as a reviewable PR. That is intended; pin them exactly
+    # here if it ever stops being.
     "psutil>=5.9.4",                      # bsd
     "uv>=0.8.0",                          # mit
 
