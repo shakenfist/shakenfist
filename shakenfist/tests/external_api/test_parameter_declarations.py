@@ -96,6 +96,31 @@ def _query_schema_keys(cls_node):
     return out
 
 
+def _request_args_keys(fn):
+    """Names a handler reads straight out of flask.request.args."""
+    out = set()
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'get'
+                and _is_request_args(node.func.value)
+                and node.args):
+            key = _literal(node.args[0])
+        elif isinstance(node, ast.Subscript) and _is_request_args(node.value):
+            key = _literal(node.slice)
+        else:
+            continue
+        if key is not None:
+            out.add(key)
+    return out
+
+
+def _is_request_args(node):
+    """Is this node ``request.args``, however ``request`` was imported?"""
+    return (isinstance(node, ast.Attribute) and node.attr == 'args'
+            and ast.unparse(node.value).split('.')[-1] == 'request')
+
+
 def _route_parameters():
     """Path parameter names per endpoint class, from the mounted routes."""
     out = collections.defaultdict(set)
@@ -204,18 +229,26 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     '%s.%s declares %r in %r, which is not an OpenAPI 2.0 '
                     'parameter location' % (cls, method, name, location))
 
-    def test_query_schema_keys_are_declared_as_query(self):
-        """A webargs schema is unambiguous about where a value comes from.
+    def test_query_parameters_are_declared_as_query(self):
+        """Two ways of reading the query string, one declaration.
 
         Three endpoints carrying @use_kwargs(get_args, location='query')
         were given `all` declared as a body parameter. webargs updates
         kwargs from the query string after log_request has merged the
         body, so a caller following that documentation would have had
-        their value silently overwritten by the default. The code says
-        query; the declaration has to agree.
+        their value silently overwritten by the default.
+
+        ClusterOperationsEndpoint.get reads its target parameters from
+        flask.request.args directly, as a fallback behind the body
+        merge, and AGENTS.md documents the query-string form. Declaring
+        those `body` cost nothing today but would have told phase 3 to
+        drop a fallback the handler deliberately implements: decision D6
+        grants a query-string fallback only to parameters declared
+        `query`. Either way of reading the query string means the
+        declaration says `query`.
         """
         for cls, method, fn, cls_node in _endpoints():
-            query_keys = _query_schema_keys(cls_node)
+            query_keys = _query_schema_keys(cls_node) | _request_args_keys(fn)
             if not query_keys:
                 continue
             for name, location, _ in _declared_parameters(fn):
@@ -223,8 +256,8 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     continue
                 self.assertEqual(
                     'query', location,
-                    '%s.%s parses %r from the query string with webargs but '
-                    'declares it in %r' % (cls, method, name, location))
+                    '%s.%s reads %r from the query string but declares it '
+                    'in %r' % (cls, method, name, location))
 
     def test_path_parameters_are_required(self):
         """OpenAPI 2.0 requires it: the route cannot match without them.
@@ -328,8 +361,22 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
 
     def test_unknown_type_is_rejected(self):
         self.assertRaises(
-            KeyError, self._helper,
+            exceptions.InvalidAPIDeclaration, self._helper,
             [('thing', 'body', 'stringy', 'A thing.', False)])
+
+    def test_rejection_names_the_endpoint_and_parameter(self):
+        """A malformed declaration aborts sf-api startup, so the message
+        has to say which one without the reader walking the traceback."""
+        for bad in (('thing', 'qeury', 'string', 'A thing.', False),
+                    ('thing', 'body', 'stringy', 'A thing.', False),
+                    ('thing', 'path', 'string', 'A thing.', False)):
+            try:
+                self._helper([bad])
+            except exceptions.InvalidAPIDeclaration as e:
+                self.assertIn('test', str(e))
+                self.assertIn('thing', str(e))
+            else:
+                self.fail('%r was accepted' % (bad,))
 
     def test_optional_path_parameter_is_rejected(self):
         """A path parameter must be required, or the specification is

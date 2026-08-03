@@ -207,11 +207,10 @@ def swagger_helper(section, description, parameters, responses,
         out['parameters'][-1].update(argtypes['bearer'])
 
     for (name, location, argtype, argdescription, argrequired) in parameters:
-        # The type token has always been validated by the argtypes
-        # lookup below, but the location never was, so 'post' and
-        # 'qeury' both survived in the tree until they were found by
-        # audit. Fail at import time instead: these declarations are
-        # the input to request validation, not just documentation.
+        # The location was never validated, so 'post' and 'qeury' both
+        # survived in the tree until they were found by audit. Fail at
+        # import time instead: these declarations are the input to
+        # request validation, not just documentation.
         if location not in SWAGGER_PARAMETER_LOCATIONS:
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares location %r, which is not one of %s'
@@ -226,6 +225,17 @@ def swagger_helper(section, description, parameters, responses,
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s is in the path, so it must be required'
                 % (section, name))
+
+        # An unknown type token used to surface as a bare KeyError from
+        # the argtypes lookup below, naming the token but neither the
+        # endpoint nor the parameter it came from. Report it the way a
+        # bad location is reported, so every malformed declaration
+        # raises one exception type that phase 3's compiler can catch
+        # uniformly.
+        if argtype not in argtypes:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares type %r, which is not one of %s'
+                % (section, name, argtype, ', '.join(sorted(argtypes))))
 
         out['parameters'].append({
             'name': name,

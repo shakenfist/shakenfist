@@ -299,9 +299,9 @@ class ClusterOperationsEndpoint(api_base.Resource):
         'clusteroperations',
         'List cluster operations targeting a specific object.',
         [
-            ('target_object_type', 'body', 'string',
+            ('target_object_type', 'query', 'string',
              'The ObjectType of the target object (e.g. "network").', True),
-            ('target_uuid', 'body', 'uuid',
+            ('target_uuid', 'query', 'uuid',
              'The UUID of the target object.', True),
         ],
         [(200, 'A list of cluster operation summary dicts, newest-first.',
