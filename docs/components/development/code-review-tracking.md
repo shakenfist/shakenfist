@@ -11,14 +11,20 @@ The full design rationale is in
 
 The automation lives in this repository:
 `scripts/review-tracking.py` (subcommands `stamp`, `prune`, `regen`,
-and `next`), with tests in `scripts/test_review_tracking.py`. It is
-run by hand -- deliberately not from git hooks. An earlier iteration
+`next`, and `status`), with tests in
+`scripts/test_review_tracking.py`. In a developer's clone it is run
+by hand -- deliberately not from git hooks. An earlier iteration
 wired `stamp` and `prune` into the pre-commit, post-merge,
 post-checkout, and post-rewrite hooks, but review state silently
 changing in the middle of unrelated git operations proved more
-confusing than helpful. Target repositories carry a thin wrapper
-(for example ryll's `tools/review-tracking.sh`) that locates a
-local clone of this repository and passes through to the script.
+confusing than helpful. That objection does not apply to CI running
+against a repository's own main branch, so in steady state two
+subcommands also run automatically: `prune` from an adopting repo's
+`prune-reviews` workflow on every push to main, and `status` from
+the consistency audit's `review-coverage` check (see "Steady state"
+below). Target repositories carry a thin wrapper (for example
+ryll's `tools/review-tracking.sh`) that locates a local clone of
+this repository and passes through to the script.
 
 ## The pieces
 
@@ -138,6 +144,34 @@ local clone of this repository and passes through to the script.
    * Commit the wrapper, corrected weAudit state, sidecar, and
      REVIEWS.md together (signed).
 
+7. Copy the steady-state prune automation (see below): the
+   `prune-reviews` workflow and its `tools/ci-prune-reviews.sh`
+   script, from ryll. The consistency audit's `review-coverage`
+   check needs no per-repo setup -- it notices the scope config
+   and starts checking the repo automatically.
+
+8. Teach the repository's build and analysis workflows to ignore
+   review-only changes, so a review session (or a bot prune) does
+   not burn a CI run on files no build reads:
+
+   ```yaml
+   on:
+     pull_request:
+       branches: [develop]
+       paths-ignore:
+         - 'REVIEWS.md'
+         - '.vscode/*.weaudit'
+         - '.vscode/*.weaudit-shas.json'
+         - '.vscode/review-scope.toml'
+   ```
+
+   Apply it to the code-shaped workflows (unit tests, lint, CodeQL,
+   functional lanes) but *not* to content scanners like gitleaks or
+   the bidi/zero-width check: review notes are prose, and prose is a
+   place secrets or Unicode smuggling could land. This is only safe
+   while no skipped workflow is a required status check -- a skipped
+   required check sits "expected" forever and blocks the merge.
+
 ## The review account
 
 Reviews are performed from a dedicated user account on the review
@@ -220,7 +254,12 @@ A session therefore looks like:
    candidate work queue for the session. If VSCode was already
    open, reload the window (or toggle the weAudit tree view) so
    the ticks refresh -- weAudit does not watch its state file for
-   external changes.
+   external changes. Note the pull is load-bearing, not just
+   hygiene: the `prune-reviews` workflow commits prunes to
+   origin/main between sessions, and marking reviews on a clone
+   that has not picked those up risks a review-state commit that
+   conflicts on push. The local prune usually finds nothing left
+   to do.
 2. Pick a file:
 
    ```
@@ -259,11 +298,13 @@ any mark -- whole-file or region -- whose stamped SHA no longer
 matches `HEAD`, regenerating `REVIEWS.md` to match. Region marks
 are pruned wholesale with the file: line ranges shift as files
 change, so a partial review of a changed file is not trusted
-either. Because nothing runs automatically, pruning is part of the
-session discipline: run it after every pull (and after any merge
-or rebase in a clone carrying review state). See the plan for the
-full design, including why the stamps live in a sidecar rather
-than in weAudit's own JSON.
+either. On the default branch the `prune-reviews` workflow does
+this automatically after every push (see "Steady state" below); in
+clones, pruning remains part of the session discipline: run it
+after every pull (and after any merge or rebase in a clone
+carrying review state). See the plan for the full design,
+including why the stamps live in a sidecar rather than in
+weAudit's own JSON.
 
 Three behaviours worth knowing about:
 
@@ -282,3 +323,56 @@ Three behaviours worth knowing about:
   they are never stamped or listed in `REVIEWS.md`, and prune
   removes them when a file inside stops being reviewed (mirroring
   what weAudit itself does when a file is unmarked in its UI).
+
+## Steady state
+
+Once a repository approaches full coverage, the interesting
+questions change: reviews go stale as PRs merge, and someone needs
+to notice when enough staleness has accumulated to be worth a
+session. Two pieces of automation cover this.
+
+**Automatic pruning.** Each adopting repository carries a
+`prune-reviews` workflow (see ryll's
+`.github/workflows/prune-reviews.yml` and
+`tools/ci-prune-reviews.sh`) that runs on every push to main --
+the only event that can create staleness there. It clones this
+repository for the script, runs `prune`, and if anything was
+pruned commits the updated review state and regenerated
+`REVIEWS.md` directly back to main as shakenfist-bot, using the
+same rebase-then-push landing pattern as this repository's audit
+compliance-table commits. A concurrency group serialises
+overlapping merges, and the loop terminates structurally: pushes
+made with the workflow's own token do not trigger workflows, and a
+second prune would find nothing to do anyway.
+
+The bot's prune commits are not signed, and do not need to be:
+prune can only *remove* marks, never add or refresh them ('a
+stamped entry is never re-stamped while it exists', above, is
+enforced by `stamp`, which the automation never runs). The
+attestations live in the signed review-state commits already in
+history, and verifying a mark means verifying the signed commit
+that *introduced* its stamp -- an unsigned later commit that
+deletes marks weakens nothing. Removing a mark is always safe; it
+merely queues the file for re-review.
+
+**Backlog alerting.** The daily consistency audit runs a
+`review-coverage` check (`audits/review-coverage.md`) against
+every repository in its matrix. Repositories without a
+`.vscode/review-scope.toml` are reported as not applicable, so
+adopting the tooling automatically opts a repository in. The check
+runs `review-tracking.py status`, which recomputes coverage
+against HEAD -- which marks are still valid, which files are stale
+or never reviewed -- rather than trusting the committed
+`REVIEWS.md`, so alerting stays honest even if the prune
+automation breaks. When 5 or more in-scope files need review
+(`REVIEW_BACKLOG_THRESHOLD` in `scripts/audit-check.py`), the
+audit files a `Consistency: Human review coverage` issue on the
+repository listing the files needing review -- a ready-made
+session work queue -- and closes it once a session brings the
+backlog back under the threshold. Expect the issue to open and
+close routinely: a single feature PR can touch five in-scope
+files, and the issue is a standing nudge rather than an alarm.
+
+`status` is also useful interactively: run
+`./tools/review-tracking.sh status` in any clone to see effective
+coverage at that clone's HEAD without touching any state.
