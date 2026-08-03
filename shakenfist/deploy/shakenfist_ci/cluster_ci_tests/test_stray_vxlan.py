@@ -25,6 +25,12 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
     node carries a device for every active network, so if the reaper is
     too eager the control network's bridge disappears with the orphan.
 
+    A second orphan is planted with a foreign device enslaved to its
+    bridge, standing in for a guest tap. The database view of that
+    orphan is identical to the first one's, so it is the host side
+    cross-check and nothing else which has to save it. It costs no
+    extra wall clock, because both orphans age out over the same wait.
+
     The wait is real: maintain only acts once a device has been stray for
     MAINTAIN_STRAY_VXLAN_GRACE_SECONDS (five minutes by default), which
     is why this test is slow. A deployment which sets that option lower
@@ -76,14 +82,29 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
 
         self.fail('Could not find an unused vxid after 20 attempts')
 
-    def _remove_devices(self, vxid):
-        for device in ['br-vxlan-%06x' % vxid, 'vxlan-%06x' % vxid]:
+    def _remove_devices(self, vxid, extra=None):
+        devices = ['br-vxlan-%06x' % vxid, 'vxlan-%06x' % vxid]
+        devices.extend(extra or [])
+        for device in devices:
             try:
                 self._node_exec(
                     self.node, ['ip', 'link', 'delete', device],
                     sudo=True, check_exit_code=False)
             except processutils.ProcessExecutionError:
                 pass
+
+    def _plant_orphan(self, vxid, mesh_nic):
+        """Create a vxlan device and bridge for a vxid no network holds."""
+        self._node_exec(
+            self.node,
+            ['ip', 'link', 'add', 'vxlan-%06x' % vxid, 'mtu', '1400',
+             'type', 'vxlan', 'id', str(vxid), 'dev', mesh_nic,
+             'dstport', '0'],
+            sudo=True)
+        self._node_exec(
+            self.node,
+            ['ip', 'link', 'add', 'br-vxlan-%06x' % vxid, 'type', 'bridge'],
+            sudo=True)
 
     def test_orphan_vxlan_is_reaped_and_live_network_survives(self):
         # A live network for the control assertion. The network node
@@ -102,24 +123,38 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
             'network, but %s is missing' % live_bridge)
 
         # Plant the orphan.
-        vxid = self._unused_vxid()
         mesh_nic = self._node_config_value('NODE_MESH_NIC', 'eth0')
+        vxid = self._unused_vxid()
         self.addCleanup(self._remove_devices, vxid)
+        self._plant_orphan(vxid, mesh_nic)
 
+        # And a second orphan which is identical as far as the database
+        # is concerned, but which has a device Shaken Fist did not
+        # create enslaved to its bridge -- a stand in for a guest tap.
+        # Only the host side cross-check can save this one.
+        occupied_vxid = self._unused_vxid()
+        # A veth pair rather than a dummy device: Shaken Fist already
+        # creates veths on every node, so the module is known to be
+        # there, and deleting one end removes both.
+        tap = 'sfci-t-%06x' % occupied_vxid
+        self.addCleanup(
+            self._remove_devices, occupied_vxid, extra=[tap])
+        self._plant_orphan(occupied_vxid, mesh_nic)
         self._node_exec(
             self.node,
-            ['ip', 'link', 'add', 'vxlan-%06x' % vxid, 'mtu', '1400',
-             'type', 'vxlan', 'id', str(vxid), 'dev', mesh_nic,
-             'dstport', '0'],
+            ['ip', 'link', 'add', tap, 'type', 'veth',
+             'peer', 'name', 'sfci-p-%06x' % occupied_vxid],
             sudo=True)
         self._node_exec(
             self.node,
-            ['ip', 'link', 'add', 'br-vxlan-%06x' % vxid, 'type', 'bridge'],
+            ['ip', 'link', 'set', tap, 'master',
+             'br-vxlan-%06x' % occupied_vxid],
             sudo=True)
 
         links = self._node_link_names(self.node)
         self.assertIn('vxlan-%06x' % vxid, links)
         self.assertIn('br-vxlan-%06x' % vxid, links)
+        self.assertIn('vxlan-%06x' % occupied_vxid, links)
 
         # Maintain only acts after the grace period, and then only on its
         # next pass, so allow the grace period plus a few passes.
@@ -165,3 +200,16 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
         self.assertIn(
             live_bridge, links,
             'The reaper removed the bridge of a live network')
+
+        # The second control: an orphan the database cannot tell apart
+        # from the first, saved only by the device enslaved to its
+        # bridge. This is the guard against a missing placement record
+        # taking a live domain's network away.
+        self.assertIn(
+            'vxlan-%06x' % occupied_vxid, links,
+            'The reaper removed a vxlan whose bridge still had a foreign '
+            'device enslaved to it')
+        self.assertIn(
+            'br-vxlan-%06x' % occupied_vxid, links,
+            'The reaper removed a bridge which still had a foreign device '
+            'enslaved to it')

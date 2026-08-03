@@ -278,10 +278,14 @@ exists but no instance on this node uses it, *is* enqueued: it becomes a
 it stays inside the dispatcher and serialises against any concurrent
 create for the same network.
 
-Two properties make the direct case safe. First, the networks row is
+Three properties make the direct case safe. First, the networks row is
 written before any device is created, so a device whose vxid has no row
 can never be a network under construction — it can only be residue.
-Second, deletion is idempotent and guarded by `check_for_interface()`, so
+Second, neither mutating branch commits until the host agrees: if a
+device Shaken Fist did not create is still enslaved to `br-vxlan-<vxid>`
+then a domain is attached to that bridge right now, whatever the
+database records say, and the stray is protected instead. Third,
+deletion is idempotent and guarded by `check_for_interface()`, so
 racing the net-worker's own `network_destroy` teardown of the same device
 is harmless; each device is deleted inside its own `try`/`except` which
 logs and re-arms the grace period rather than killing the maintain

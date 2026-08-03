@@ -569,7 +569,9 @@ vxlan devices itself, on the maintain thread, because the queue path
 requires an object to target and these devices are precisely the ones
 whose network object no longer exists. That is the whole of the
 exception: a stray whose network *does* still exist is enqueued as a
-`node_net_op` `network_destroy` like any other host mutation. Deletes
+`node_net_op` `network_destroy` like any other host mutation. Neither
+branch acts until the host itself agrees the bridge is idle — a guest
+tap still enslaved to it vetoes both. Deletes
 are idempotent, guarded by `check_for_interface()` and wrapped
 per-device so that racing the net-worker's own teardown of the same
 device logs and retries rather than killing the pass. See "Stray vxlan

@@ -248,6 +248,20 @@ artifact, and "checked in at least once" for a node. Defined in
 that removes it from MariaDB; and that instances additionally have an orthogonal
 power-state axis (`docs/operator_guide/power_states.md`).
 
+**stray vxlan**{#stray-vxlan} -- A vxlan device present on a node which matches
+no [network](#network) that node should be carrying. Strays are residue: from a
+teardown which did not finish, or from a network which has since been hard
+deleted. A stray which has persisted for `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`
+is *reaped* (its devices deleted, with a `reaped stray vxlan` audit event on
+the node) when no `networks` row claims its VXLAN id, torn down through an
+ordinary network operation when the network still exists but no local instance
+uses it, and otherwise left alone and logged once. Defined in
+`shakenfist/daemons/network/maintain.py`; the operator view is
+[stray vxlan reaping](operator_guide/networking/overview.md#stray-vxlan-reaping).
+Not to be confused with a network in `delete_wait` whose devices are still
+present: that network's row still exists, so its devices are not stray and are
+never reaped.
+
 **system namespace**{#system-namespace} -- The reserved administrative
 [namespace](#namespace). Membership of `system` is exactly what `caller_is_admin`
 checks today: a caller whose token resolves to the `system` namespace is treated

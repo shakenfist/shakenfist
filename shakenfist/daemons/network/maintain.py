@@ -31,14 +31,21 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.schema.operations.node_net_op \
     import model_tasks as nn_tasks
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import network as util_network
 
 
 LOG, _ = logs.setup(__name__)
 
 
-EXTRA_VLANS_HISTORY = {}
-EXTRA_VLANS_WARNED = set()
+# When each stray vxid was first seen, and which things we have already
+# reported about it. EXTRA_VLANS_WARNED maps a vxid to the set of report
+# keys already emitted for it during this stray episode, so a stray whose
+# disposition changes (or whose devices fail to delete for a new reason)
+# is still reported, while nothing is reported twice. Both are dropped
+# for a vxid when the stray leaves the host or is reaped.
+EXTRA_VLANS_HISTORY: dict[int, float] = {}
+EXTRA_VLANS_WARNED: dict[int, set[str]] = {}
 
 
 # Instance states in which a domain on this node may still be attached
@@ -87,7 +94,7 @@ class Job(util_concurrency.Job):
             total += processing + queued + deferred
         return total
 
-    def _local_instance_vxids(self, this_node):
+    def _local_instance_vxids(self, this_node: Node | None) -> set[int] | None:
         """The vxids of every network an instance on this node is attached to.
 
         ``host_networks`` in the main pass deliberately covers only
@@ -106,10 +113,17 @@ class Job(util_concurrency.Job):
         ``this_node_filter``: that filter is a Python side predicate
         over ``inst.placement``, so it hydrates every active instance in
         the cluster and then issues a further interface query for each.
-        A protected stray is deliberately never reaped, so this runs on
-        every 30 second pass for as long as the stray survives -- which
-        is exactly the sustained background load CLAUDE.md asks us to
-        push down to the database.
+
+        This is still O(instances on this node) hydrations plus one
+        network hydration per distinct network, and a stray which is
+        deliberately protected forever pays that on every 30 second
+        pass for as long as it survives. Pushing the whole question
+        down to a single indexed query -- object_references joined to
+        network_interfaces joined to networks, filtered by instance
+        state -- is the improvement CLAUDE.md asks for and is tracked
+        separately; it is not done here because the cost is bounded by
+        one node's instance count and only accrues while a protected
+        stray exists.
         """
         if not this_node:
             return None
@@ -133,21 +147,56 @@ class Job(util_concurrency.Job):
                 vxids.add(n.vxid)
         return vxids
 
-    def _warn_once(self, vxid, reason):
-        """Warn about a stray vxlan once per stray episode.
+    def _first_report(self, vxid: int, key: str) -> bool:
+        """Has ``key`` already been reported for this stray episode?
 
-        EXTRA_VLANS_WARNED is cleared when the stray leaves the host or
-        is reaped, so a vxid which is randomly reissued to a later
-        network is warned about on its own merits rather than being
-        silently suppressed.
+        Returns True the first time a given key is reported for a vxid
+        and False thereafter. EXTRA_VLANS_WARNED is cleared for a vxid
+        when the stray leaves the host or is reaped, so a vxid which is
+        randomly reissued to a later network is reported on its own
+        merits rather than being silently suppressed.
+
+        Keys are per reason rather than per vxid so that a stray whose
+        disposition changes -- say from "an instance is attached" to
+        "the instances on this node could not be determined" -- is
+        still reported, while the steady state stays silent.
         """
-        if vxid in EXTRA_VLANS_WARNED:
-            return
-        EXTRA_VLANS_WARNED.add(vxid)
-        LOG.with_fields({'vxid': vxid, 'reason': reason}).warning(
-            'Extra vxlan present!')
+        reported = EXTRA_VLANS_WARNED.setdefault(vxid, set())
+        if key in reported:
+            return False
+        reported.add(key)
+        return True
 
-    def _delete_stray_devices(self, vxid):
+    def _warn_once(self, vxid: int, reason: str, **fields) -> None:
+        """Warn about a stray vxlan once per reason per stray episode."""
+        if not self._first_report(vxid, 'stray: %s' % reason):
+            return
+        LOG.with_fields(
+            {'vxid': vxid, 'reason': reason, **fields}).warning(
+                'Extra vxlan present!')
+
+    def _foreign_bridge_members(self, vxid: int) -> list[str] | None:
+        """Devices enslaved to br-vxlan-<vxid> which Shaken Fist did not put
+        there.
+
+        A guest tap enslaved to the bridge means a domain is attached to
+        it right now, whatever the placement and interface records say.
+        Returns None when the question could not be answered, which
+        callers must treat as "protect".
+        """
+        bridge = 'br-vxlan-%06x' % vxid
+        try:
+            members = util_network.get_bridge_members(bridge)
+        except Exception as e:
+            LOG.with_fields({'vxid': vxid, 'bridge': bridge}).warning(
+                'Failed to list stray vxlan bridge members: %s' % e)
+            return None
+
+        ours = {'vxlan-%06x' % vxid, 'veth-%06x-o' % vxid,
+                'egr-%06x-o' % vxid}
+        return sorted(set(members) - ours)
+
+    def _delete_stray_devices(self, vxid: int) -> tuple[list[str], list[str]]:
         """Delete the host devices Shaken Fist names from a stray vxid.
 
         Returns ``(deleted, failed)``. Each device is attempted
@@ -159,8 +208,8 @@ class Job(util_concurrency.Job):
         sibling device survives would hide the leftovers from every
         future pass -- no rediscovery, therefore no retry and no event.
         """
-        deleted = []
-        failed = []
+        deleted: list[str] = []
+        failed: list[str] = []
 
         def _delete(device):
             try:
@@ -173,8 +222,15 @@ class Job(util_concurrency.Job):
                 # is expected. Do not let one bad device abort the
                 # maintenance pass -- this code runs outside the
                 # dispatcher, so nothing else would catch it.
-                LOG.with_fields({'vxid': vxid, 'device': device}).warning(
-                    'Failed to reap stray vxlan device: %s' % e)
+                #
+                # A device which cannot be deleted is retried once per
+                # grace period forever, so this is reported once per
+                # device per stray episode. Otherwise an undeletable
+                # device becomes a slower version of the log storm this
+                # reaper exists to end.
+                if self._first_report(vxid, 'device failure: %s' % device):
+                    LOG.with_fields({'vxid': vxid, 'device': device}).warning(
+                        'Failed to reap stray vxlan device: %s' % e)
                 failed.append(device)
 
         # The netns and the NAT rules a network node also owns are keyed
@@ -189,9 +245,28 @@ class Job(util_concurrency.Job):
 
         return deleted, failed
 
-    def _reap_stray_vxlan(self, vxid, reason, this_node):
+    def _reap_stray_vxlan(
+            self, vxid: int, reason: str, this_node: Node | None) -> None:
         """Delete the devices for a vxid no network row claims."""
         deleted, failed = self._delete_stray_devices(vxid)
+
+        if deleted:
+            # Record the reap whenever anything was actually deleted,
+            # including a partial one. Devices were removed from the
+            # host, and this event is the only durable record of which
+            # ones -- a warning naming the device which failed does not
+            # name the ones which went.
+            message = 'reaped stray vxlan: %s' % reason
+            extra = {'vxid': vxid, 'devices': deleted}
+            if failed:
+                message = 'partially reaped stray vxlan: %s' % reason
+                extra['failed'] = failed
+            if this_node:
+                this_node.add_event(EVENT_TYPE_AUDIT, message, extra=extra)
+            else:
+                # add_event() echoes into the log stream, so this only
+                # fires when the event could not be recorded at all.
+                LOG.with_fields(extra).info(message)
 
         if failed:
             # Re-arm the grace period rather than retrying on every 30
@@ -215,24 +290,14 @@ class Job(util_concurrency.Job):
             EXTRA_VLANS_HISTORY[vxid] = time.time()
             return
 
-        if this_node:
-            this_node.add_event(
-                EVENT_TYPE_AUDIT,
-                'reaped stray vxlan: %s' % reason,
-                extra={'vxid': vxid, 'devices': deleted})
-        else:
-            # add_event() echoes into the log stream, so this only
-            # fires when the event could not be recorded at all.
-            LOG.with_fields({'vxid': vxid, 'devices': deleted}).info(
-                'Reaped stray vxlan: %s' % reason)
-
         # Forget the stray so a reappearance gets a fresh grace
         # period, and a later network which is randomly allocated
         # this vxid can be warned about on its own merits.
         del EXTRA_VLANS_HISTORY[vxid]
-        EXTRA_VLANS_WARNED.discard(vxid)
+        EXTRA_VLANS_WARNED.pop(vxid, None)
 
-    def _enqueue_stray_teardown(self, vxid, network_uuid, this_node):
+    def _enqueue_stray_teardown(
+            self, vxid: int, network_uuid: str, this_node: Node | None) -> None:
         """Enqueue teardown of a stray whose network still exists.
 
         Unlike the objectless case this device does have an object, so
@@ -262,7 +327,7 @@ class Job(util_concurrency.Job):
         # dropped by the housekeeping loop once the device is gone.
         EXTRA_VLANS_HISTORY[vxid] = time.time()
 
-    def _handle_stray_vxlans(self, overdue):
+    def _handle_stray_vxlans(self, overdue: list[int]) -> None:
         """Reap or warn about vxlan devices which have been stray for
         longer than the grace period.
 
@@ -284,8 +349,13 @@ class Job(util_concurrency.Job):
           here. The network node is excluded because it carries a device
           for every active network whether or not it hosts instances.
 
-        Anything else is left alone and warned about once per stray
-        episode rather than on every pass.
+        Both of those dispositions are then cross-checked against the
+        host itself before anything is mutated: a bridge with a device
+        enslaved to it that Shaken Fist did not put there is carrying a
+        live domain, whatever the database records say.
+
+        Anything else is left alone and warned about once per reason
+        per stray episode rather than on every pass.
         """
         # Re-check the networks table immediately before deleting
         # anything. We deliberately test for the presence of the static
@@ -294,10 +364,12 @@ class Job(util_concurrency.Job):
         # (row gone) network is reapable on this test.
         claims = mariadb.find_network_vxids(overdue)
 
-        # Only pay for the node and instance lookups if a claimed stray
-        # might be cleanable on this node. The warn-only path is the
-        # steady state for a stray we deliberately never touch, and it
-        # has nothing to record, so it must not read a row every pass.
+        # Only pay for the node and instance lookups when a claimed
+        # stray might be cleanable on this node. On the network node,
+        # and when nothing claimed is overdue, there is no disposition
+        # the instance list could change, so skip it entirely. Note
+        # that a claimed stray which is protected forever does pay for
+        # this on every pass -- see _local_instance_vxids().
         this_node = None
         node_loaded = False
         protected_vxids = None
@@ -310,23 +382,53 @@ class Job(util_concurrency.Job):
         teardown = []
         for vxid in overdue:
             if vxid not in claims:
-                reapable.append((vxid, 'no network claims this vxid'))
+                disposition = 'reap'
+                reason = 'no network claims this vxid'
+            elif config.NODE_IS_NETWORK_NODE:
+                self._warn_once(
+                    vxid, 'network node hosts every active network')
                 continue
-
-            if config.NODE_IS_NETWORK_NODE:
-                reason = 'network node hosts every active network'
             elif protected_vxids is None:
                 # Either this node has no row, or we could not read it.
                 # Without the instance list we cannot tell a leaked
                 # device from a live one, so protect it.
-                reason = 'the instances on this node could not be determined'
+                self._warn_once(
+                    vxid, 'the instances on this node could not be determined')
+                continue
             elif vxid in protected_vxids:
-                reason = 'an instance on this node is attached to it'
+                self._warn_once(
+                    vxid, 'an instance on this node is attached to it')
+                continue
             else:
-                teardown.append((vxid, claims[vxid]))
+                disposition = 'teardown'
+                reason = 'no instance on this node uses this network'
+
+            # An independent, host local second opinion before we touch
+            # anything. Everything above this point is the database's
+            # view: that a network row is gone, or that no instance
+            # record places a user of this network here. Both are the
+            # correct sources, but both are records rather than
+            # observations, and a lost update or a missed placement row
+            # would look exactly like a leaked device after the grace
+            # period. A guest tap enslaved to the bridge is proof that
+            # a domain is attached to it right now, so one `ip link`
+            # call on the paths which are about to mutate buys us
+            # agreement between the records and the host.
+            foreign = self._foreign_bridge_members(vxid)
+            if foreign is None:
+                self._warn_once(
+                    vxid, 'the members of the bridge could not be determined')
+                continue
+            if foreign:
+                self._warn_once(
+                    vxid, 'devices which are not ours are enslaved to the '
+                    'bridge', enslaved=foreign)
                 continue
 
-            self._warn_once(vxid, reason)
+            if disposition == 'reap':
+                reapable.append((vxid, reason))
+            else:
+                teardown.append((vxid, claims[vxid]))
 
         if not (teardown or reapable):
             return
@@ -579,7 +681,7 @@ class Job(util_concurrency.Job):
             for vxid in EXTRA_VLANS_HISTORY.copy():
                 if vxid not in extra_vxids:
                     del EXTRA_VLANS_HISTORY[vxid]
-                    EXTRA_VLANS_WARNED.discard(vxid)
+                    EXTRA_VLANS_WARNED.pop(vxid, None)
             for vxid in extra_vxids:
                 if vxid not in EXTRA_VLANS_HISTORY:
                     EXTRA_VLANS_HISTORY[vxid] = time.time()
@@ -591,4 +693,20 @@ class Job(util_concurrency.Job):
                 if (time.time() - EXTRA_VLANS_HISTORY[vxid]
                     > config.MAINTAIN_STRAY_VXLAN_GRACE_SECONDS)]
             if overdue:
-                self._handle_stray_vxlans(overdue)
+                try:
+                    self._handle_stray_vxlans(overdue)
+                except Exception as e:
+                    # This is the last thing the pass does, and the
+                    # only part of it which depends on an RPC added
+                    # after the rest of the daemon shipped. An sf-net
+                    # talking to an sf-database which does not
+                    # implement FindNetworkVxids yet answers
+                    # UNIMPLEMENTED, which is not retryable, so without
+                    # this the maintain thread would die and be
+                    # restarted by the monitor every 30 seconds for the
+                    # length of the mixed version window -- taking the
+                    # rest of the pass with it. Stray vxlans are the
+                    # least urgent thing maintain does; nothing else
+                    # here should be lost because of them.
+                    util_exceptions.ignore_exception(
+                        'network maintain stray vxlan handling', e)

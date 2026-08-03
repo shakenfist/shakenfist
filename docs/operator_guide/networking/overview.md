@@ -440,7 +440,10 @@ Once a stray has been present for `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`
   `vxlan-<vxid>` itself, and records a **`reaped stray vxlan`** audit
   event on the node. The `extra` field of that event names the devices
   which were actually removed, and the message says why the vxid was
-  considered reapable.
+  considered reapable. If some devices were removed but others could
+  not be deleted, the event is **`partially reaped stray vxlan`**
+  instead and `extra` carries a `failed` list alongside `devices`; the
+  remaining devices are retried after another grace period.
 * If the network still exists but no instance on this hypervisor uses
   it, the maintainer enqueues an ordinary network teardown operation
   for that network on that node instead of touching the devices
@@ -451,10 +454,20 @@ Once a stray has been present for `MAINTAIN_STRAY_VXLAN_GRACE_SECONDS`
   cluster produced thousands of identical `Extra vxlan present!` lines
   per day (github issue #3597).
 
-Both audit events are worth watching for. Neither is an error on its
+Before either of the first two outcomes touches anything, the
+maintainer also asks the host itself: if a device it did not create --
+a guest's tap interface -- is still enslaved to `br-vxlan-<vxid>`,
+then a virtual machine is attached to that bridge right now whatever
+the database says, and the stray is protected and logged instead. If
+that question cannot be answered at all, the stray is likewise
+protected.
+
+All three audit events are worth watching for. None is an error on its
 own -- the maintainer is doing the job it exists to do -- but a node
 producing them repeatedly is a node where network teardown is failing
-somewhere upstream, and that is worth investigating.
+somewhere upstream, and that is worth investigating. A repeated
+`partially reaped stray vxlan` in particular means a device on that
+host will not go away, which usually needs manual attention.
 
 **A reap on the network node implies manual cleanup.** The devices
 listed above are all named from the VXLAN id, so the maintainer can

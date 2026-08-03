@@ -444,8 +444,17 @@ device for every active network whether or not it hosts instances.
 warning fired on every pass forever, which on one production cluster was
 ~5,700 identical log lines per day per stray (issue #3597). Every non-actioned
 outcome — a failed delete, a vxid which maps to no Shaken Fist-named device —
-also re-arms the grace period rather than retrying every thirty seconds, so no
-path here can reintroduce that log storm.
+also re-arms the grace period rather than retrying every thirty seconds.
+
+Suppression is keyed on `(vxid, reason)`, in `EXTRA_VLANS_WARNED`, and the
+per-device delete failure warning goes through the same mechanism keyed on
+`(vxid, device)`. Both are dropped for a vxid when the stray leaves the host or
+is reaped, so a vxid randomly reissued to a later network is reported on its
+own merits. Keying on the reason rather than on the vxid alone matters in both
+directions: a stray whose disposition changes is still reported, and a stray
+whose disposition is stable — including one whose devices persistently refuse
+to be deleted — is reported exactly once per episode. No path here logs on a
+per-pass cadence.
 
 Deciding whether an instance protects its network reads this node's
 `INSTANCE_LOCATION` references (`Node.instances`) rather than filtering
@@ -455,7 +464,26 @@ is deliberately never reaped, so that cost would be permanent. The states which
 protect are `Instance.ACTIVE_STATES` plus `delete-wait-error`: the latter is
 not in `ACTIVE_STATES` but by definition means teardown did not complete, so a
 domain may well still be attached to the bridge. If this node's row cannot be
-read at all, every claimed stray is protected.
+read at all, every claimed stray is protected. Note that a claimed stray which
+is protected indefinitely does pay for this lookup on every pass; pushing the
+whole question into a single indexed join (`object_references` →
+`network_interfaces` → `networks`) is a worthwhile follow-up, bounded today by
+one node's instance count.
+
+**The host gets a veto.** Everything above this point is the database's view:
+that a networks row is gone, or that no instance record places a user of this
+network here. Both are the correct sources, and both are *records* rather than
+observations — a lost update or a missing placement row looks exactly like a
+leaked device once the grace period has passed, and the consequence on the
+teardown path is a live domain losing its network. So immediately before either
+mutating branch commits, `_foreign_bridge_members()` asks the host directly:
+`ip link show master br-vxlan-<vxid>`, minus the devices Shaken Fist itself
+enslaves (`vxlan-`, `veth-...-o`, `egr-...-o`). Anything left is a guest tap,
+which is proof that a domain is attached right now, and the stray is protected
+and warned about instead. If the question cannot be answered at all, the stray
+is protected — "could not ask the host" is not "the host says nobody is using
+it". This is one `ip` invocation per candidate vxid, only on the paths which
+are about to mutate.
 
 Racing the net-worker is harmless. Deletion is guarded by
 `check_for_interface()` and each device is deleted inside its own
@@ -474,14 +502,31 @@ they are unreachable once the row is gone; that residue is a known limitation,
 and is called out for operators in
 [the networking overview](../operator_guide/networking/overview.md#stray-vxlan-reaping).
 Each reap records an audit event on the node naming the devices actually
-removed, which is the operator-visible record of what happened and why. An
-audit event is *not* recorded when nothing was removed.
+removed, which is the operator-visible record of what happened and why. A reap
+in which some devices went and others could not be deleted records
+`partially reaped stray vxlan` instead, with both the `devices` which were
+removed and the `failed` ones in `extra` — devices left the host either way,
+and the warning names only the failure. An audit event is *not* recorded when
+nothing at all was removed.
 
 The database check uses `mariadb.find_network_vxids()`, an indexed
 `WHERE vxid IN (...)` against the UNIQUE index on `networks.vxid`. Unlike most
 getters it deliberately does not swallow database errors: an empty result means
 "nothing claims these vxids" and the caller deletes host devices on the
 strength of it, so a failed query must raise rather than present as an answer.
+`shakenfist/tests/test_mariadb_find.py` pins that contract on both the direct
+and gRPC paths, and pins the servicer's `INTERNAL` status on failure — the
+sibling finders in that module all assert the *opposite* contract, so without
+those tests a refactor which made them consistent would turn a database outage
+into cluster-wide device deletion.
+
+Because the whole stray check depends on an RPC newer than the rest of the
+daemon, `execute()` wraps `_handle_stray_vxlans()` in a `try`/`except`. An
+`sf-net` talking to an `sf-database` which predates `FindNetworkVxids` gets
+`UNIMPLEMENTED`, which `_grpc_call()` does not retry; without the guard the
+maintain thread would die and be restarted by the monitor every thirty seconds
+for the length of the mixed-version window, losing the rest of the pass with
+it. Stray vxlans are the least urgent thing maintain does, so they fail alone.
 
 ### New config knobs
 

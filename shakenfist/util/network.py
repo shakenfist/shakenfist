@@ -120,6 +120,27 @@ def check_for_interface(
     return True
 
 
+def get_bridge_members(name: str, netns: str | None = None) -> list[str]:
+    """The names of the interfaces currently enslaved to a bridge.
+
+    An empty list is returned both when the bridge has no members and
+    when the bridge does not exist, because "nothing is attached to it"
+    is the honest answer in both cases. Errors other than a missing
+    bridge are raised, so a caller which is about to delete something
+    can tell "no members" from "could not ask".
+    """
+    stdout, stderr = concurrency.execute(
+        'ip -pretty -json link show master %s' % name,
+        check_exit_code=[0, 1], netns=netns,
+        suppress_command_logging=True)
+
+    if stderr and stderr.rstrip('\n').endswith(' does not exist.'):
+        return []
+
+    return [elem['ifname'] for elem in _clean_ip_json(stdout)
+            if elem.get('ifname')]
+
+
 def get_interface_addresses(name: str, netns: str | None = None) -> list[str]:
     stdout, _ = concurrency.execute(
         'ip -pretty -json addr show %s' % name,
