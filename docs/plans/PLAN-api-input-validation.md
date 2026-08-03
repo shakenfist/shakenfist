@@ -123,15 +123,25 @@ job at four sites (`blob.py:187`, `network.py:796`,
 ### The catch, stated up front
 
 Because nothing has ever read these declarations, nothing has
-ever checked them. There is direct evidence of drift in the tree
-right now:
+ever checked them. Phase 0 measured the damage: parameter
+*names* are 97% accurate, but parameter *locations* are not.
 
-* `artifact.py:742` declares a location of `'qeury'` — a typo.
-* `artifact.py:641` declares a location of `'post'`, which is not
-  an OpenAPI parameter location at all.
+**116 of the 119 parameters that appear in a URL path are
+declared as something other than `path`** — 104 as `query`, 11
+as `body`, and one as `'qeury'`, a typo. Only 3 are correct. A
+second declaration says `'post'`, which is not an OpenAPI
+location at all. Since location is exactly what a parser uses to
+decide *where to look for a value*, compiling these as written
+would look for `artifact_ref` in the query string of a request
+that carries it in the path.
 
-Both are silently ignored today and would become enforcement
-bugs. `required` is likely worse: `mode` on
+This is less alarming than it sounds, because the mounted routes
+in `app.py` are ground truth: which names are path parameters is
+derivable, not a matter of judgement, so the fix is mechanical
+rather than an audit. But it makes the declaration audit a
+**precondition** for compiling, not a tidy-up that can follow it.
+
+`required` is a separate and probably worse problem: `mode` on
 `POST /instances/<ref>/agent/put` is declared required while
 omitting it has always been accepted, so enforcing required-ness
 naively would break working clients.
@@ -207,37 +217,6 @@ the same decorator chain.
 * [#3308](https://github.com/shakenfist/shakenfist/issues/3308) — the ansible collection's networkspec parser makes every non-empty value truthy. A *consumer* of this contract, and a good end-to-end test of it, but fixed in the collection.
 * [#764](https://github.com/shakenfist/shakenfist/issues/764) and [#121](https://github.com/shakenfist/shakenfist/issues/121) — validating fetched image content. Validation, but of downloaded bytes rather than API input. Out of scope.
 
-## Shape of the work
-
-Sketch only. Phase 0 decides the real structure; this exists so
-the open questions have something to argue about.
-
-1. **Audit and normalise the declarations.** Fix the two known
-   typos, reconcile every declared type and location against what
-   the handler actually reads, and make `swagger_helper()` reject
-   an unknown location the way it already rejects an unknown type.
-   This is mechanical and can land immediately — it is a docs
-   correctness fix on its own merits.
-2. **Extend the type vocabulary** to cover unsigned and bounded
-   integers, and format-constrained strings, keeping the
-   generated OpenAPI honest about the new constraints.
-3. **Compile declarations to a schema** and validate in
-   **warn-only** mode: log the endpoint, parameter, declared
-   type and offending value that *would* have been rejected.
-   Deploy to sfcbr. Read the logs.
-4. **Enforce types**, once the warn-only logs are quiet, with a
-   single consistent malformed-input response shape that never
-   contains interpreter text.
-5. **Narrow the exception handlers.** With inputs typed,
-   `handle_authorization_exceptions` can be narrowed to the JWT
-   errors it was written for, and the attribution issues
-   (#3523, #3371, #3606) can be fixed against a chain that no
-   longer sees client-input errors at all.
-6. **Enforce `required`,** or decide not to. Separate and later,
-   because it is the change most likely to break working clients.
-7. **Structured and semantic validators** for the specs in #936,
-   and the semantic checks in #323, #534 and #3269.
-
 ## Decisions
 
 Resolved by phase 0. The measurements behind each are in
@@ -295,12 +274,12 @@ declarations are good enough to compile.
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion |
-| 1: Declaration audit | Not started | Fix 2 invalid locations, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI), 20 undeclared parameters; make `swagger_helper()` reject unknown locations |
-| 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI |
+| 1: Declaration audit | Not started | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
+| 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI so the bounds are visible to callers rather than invisible the way the events `limit` cap was |
 | 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs |
-| 4: Enforce | Not started | Turn on rejection; fold the four hand-authored `get_args` schemas into the compiled path |
+| 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the four hand-authored `get_args` schemas into the compiled path |
 | 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors; fix the attribution issues (#3523, #3371, #3606, #3615) |
-| 6: Required and semantics | Not started | Enforce `required`; semantic validators for #534, #3269, #323, #936 |
+| 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
 
 
 ## Open questions for phase 0

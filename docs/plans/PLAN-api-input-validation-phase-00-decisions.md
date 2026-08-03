@@ -99,6 +99,33 @@ Two declarations name a location that does not exist:
 dict lookup but never validates the location, so both are
 silently ignored today.
 
+### Accuracy — locations
+
+The name measurement above was taken first and is not the whole
+story. Cross-referencing every declaration against the routes
+each resource is actually mounted on in `app.py`:
+
+| Measure | Value |
+|---|---|
+| Parameters that appear in a mounted URL path | 119 |
+| ...declared correctly as `path` | **3** |
+| ...declared as `query` | 104 |
+| ...declared as `body` | 11 |
+| ...declared as `qeury` | 1 |
+
+So names are 97% right and path locations are 3% right. The
+published OpenAPI documents almost every path parameter as a
+query parameter, which is wrong for anyone generating a client
+from it, and would be actively broken under a parser that uses
+location to decide where to look for a value.
+
+This does not overturn D2. The route table is ground truth —
+which names are path parameters is *derivable* rather than a
+matter of judgement — so the correction is mechanical, and a
+test can keep it correct afterwards. What it does change is
+sequencing: the audit is a precondition for compiling, not
+optional tidying that can follow it.
+
 ### The four hand-authored schemas already drift
 
 `BlobDataEndpoint` declares `offset` and `limit` **twice** —
@@ -292,7 +319,9 @@ registered against a token, not part of the token itself.
 
 The audit backlog, ready to execute:
 
-1. Two invalid locations (`'post'`, `'qeury'`), and a
+1. 116 path parameters declared as something other than
+   `path`, correctable mechanically from the route table; two
+   invalid location tokens (`'post'`, `'qeury'`); and a
    `swagger_helper()` that should reject an unknown location the
    way it already rejects an unknown type.
 2. Five wrong parameter names, two of which (`sshkey`,
