@@ -89,6 +89,15 @@ app.logger.handlers = [HANDLER]
 #
 # We only record non-HTTP exceptions (actual errors), not expected HTTP
 # responses like 404 Not Found or 401 Unauthorized.
+#
+# This deliberately does not pass already_logged=True, unlike the
+# record_exception decorator in base.py. Flask logs this path itself,
+# via app.log_exception() after the signal fires, and we have no way to
+# attach the exception_hash to a line we do not emit -- so suppressing
+# our WARNING here would take the only correlation fields with it
+# (issue 3590). The duplicate is accepted because this signal only sees
+# response-serialisation failures, which are rare, rather than the
+# per-task volume that motivated the change.
 def _record_exception(sender, exception, **extra):
     from werkzeug.exceptions import HTTPException
     if isinstance(exception, HTTPException):

@@ -1,5 +1,8 @@
 # Copyright 2019 Michael Still and contributors
 import logging
+import os
+import shutil
+import tempfile
 from unittest import mock
 
 import flask
@@ -85,6 +88,58 @@ class ServerErrorLoggingTestCase(base.ShakenFistTestCase):
         # exception_class / stack_trace enrichment.
         self.assertIsNotNone(record.exc_info)
         self.assertIs(ValueError, record.exc_info[0])
+
+    def test_server_error_is_the_only_shipped_line_and_carries_the_hash(self):
+        """The record_exception decorator sits immediately inside
+        suppress_exceptions_to_client, so before issue 3590 an endpoint
+        exception produced two shipped lines with two different message
+        signatures: 'Recorded new exception' at WARNING and 'Server
+        error' at ERROR. Only the ERROR should now be emitted, and it
+        must carry the correlation fields the WARNING used to, or the
+        link to /srv/shakenfist/exceptions/<hash>.json is lost.
+        """
+        exceptions_capture = _CaptureHandler()
+        util_log = logging.getLogger('shakenfist.util.exceptions')
+        util_log.addHandler(exceptions_capture)
+        self.addCleanup(util_log.removeHandler, exceptions_capture)
+        original_level = util_log.level
+        util_log.setLevel(logging.DEBUG)
+        self.addCleanup(util_log.setLevel, original_level)
+
+        temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, temp_dir, True)
+        real_os_open = os.open
+
+        def redirect_open(path, flags, mode):
+            return real_os_open(
+                path.replace('/srv/shakenfist/exceptions', temp_dir),
+                flags, mode)
+
+        self.mock_record_exception_patcher.stop()
+        try:
+            with mock.patch('shakenfist.util.exceptions.os.makedirs'):
+                with mock.patch('shakenfist.util.exceptions.os.open',
+                                side_effect=redirect_open):
+                    resp = self.client.get('/boom')
+        finally:
+            self.mock_record_exception_patcher.start()
+
+        self.assertEqual(500, resp.status_code)
+
+        # The recorder must not have emitted anything above DEBUG.
+        shipped = [r for r in exceptions_capture.records
+                   if r.levelno > logging.DEBUG]
+        self.assertEqual(
+            [], [r.getMessage() for r in shipped],
+            'The recorder emitted a duplicate shipped line')
+
+        records = self._server_error_records()
+        self.assertEqual(1, len(records))
+        fields = records[0].extra_fields
+        self.assertEqual(1, fields['count'])
+        self.assertEqual('ValueError', fields['exception_class'])
+        self.assertEqual(['%s.json' % fields['exception_hash']],
+                         os.listdir(temp_dir))
 
     def test_recorder_failure_does_not_misattribute(self):
         # If the on-disk exception recorder itself fails (for example
