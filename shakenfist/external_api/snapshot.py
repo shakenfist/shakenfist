@@ -1,6 +1,6 @@
 # Documentation state:
 #   - Has metadata calls:
-#   - OpenAPI complete:
+#   - OpenAPI complete: yes
 #   - Covered in user or operator docs:
 #   - API reference docs exist:
 #        - and link to OpenAPI docs:

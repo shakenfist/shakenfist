@@ -218,6 +218,15 @@ def swagger_helper(section, description, parameters, responses,
                 % (section, name, location,
                    ', '.join(sorted(SWAGGER_PARAMETER_LOCATIONS))))
 
+        # OpenAPI 2.0 requires that a path parameter be required, because
+        # the route cannot match without it. A specification saying
+        # otherwise fails validation in linters and client generators,
+        # which are the readers this exists for.
+        if location == 'path' and argrequired is not True:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s is in the path, so it must be required'
+                % (section, name))
+
         out['parameters'].append({
             'name': name,
             'in': location,

@@ -803,7 +803,7 @@ class ArtifactVersionEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('version_id', 'path', 'integer', 'The version number to remove.', False)
+            ('version_id', 'path', 'integer', 'The version number to remove.', True)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact index not found.', None)]))
@@ -889,7 +889,7 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
         'artifacts', 'Add metadata for an artifact.',
         [
             ('artifact_ref', 'path', 'uuidorname', 'The artifact to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -986,7 +986,7 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
         'artifacts', 'Get the outstanding cluster operations for an artifact.',
         [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True),
-         ('all', 'body', 'boolean',
+         ('all', 'query', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],
         [(

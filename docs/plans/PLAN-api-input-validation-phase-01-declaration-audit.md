@@ -199,6 +199,58 @@ official client has never sent it.
 phase 0's D8 predicted: `interface_uuid`, `key_name` and
 `namespace`, all ordinary path segments.
 
+### Corrected during review
+
+Three defects in the first cut of this phase, all found by the
+automated reviewer on PR #3620:
+
+* **The route regex did not understand Werkzeug converters.**
+  `<path:label_name>` did not match `<([a-z_]+)>`, so three
+  `LabelEndpoint` declarations stayed wrong *and the test meant
+  to catch that passed anyway*. The success criterion above was
+  really 119 of 122. Both the fixer and the test now take the
+  name after the last colon, which also covers `<int:x>` and
+  `<uuid:x>`.
+* **Three `all` declarations said `body` where the code says
+  `query`.** The outstanding-operations endpoints carry
+  `@use_kwargs(get_args, location='query')`, which updates kwargs
+  *after* `log_request` merges the body, so a caller following
+  the new documentation would have had their value silently
+  overwritten by the default. Declaring drift while removing
+  drift.
+* **`version_id` was `path` with `required=False`,** which
+  OpenAPI 2.0 forbids — a path parameter must be required — so
+  the generated specification would have failed a linter.
+
+The response was to make each derivable rather than to fix the
+three instances. `tools/fix-api-parameter-locations.py` now
+derives *every* location, not just `path`: a name in the route is
+`path`, a name in a webargs query schema is `query`, everything
+else is `body`, because `log_request` merges the JSON body and
+nothing reads the query string. Re-running it is now the check
+that the tree still agrees, and it reports no changes. That also
+closed the query-versus-body drift the reviewer raised separately
+— eight `key` and `target_*` parameters documented as query
+strings which the client has always sent in the body.
+
+`swagger_helper()` gained the path-implies-required rule
+alongside the location check, and the test gained assertions for
+webargs agreement, path requiredness, statically-unreadable
+declarations, and a handler kwarg colliding with the raw-body
+sentinel. A separate test case covers `swagger_helper()`'s
+rejections directly, because the tree-scanning assertions cannot
+fail once enforcement happens at import time.
+
+### Deferred to phase 2
+
+Type-token normalisation. `namespace` is declared with the
+`string` token throughout `auth.py` even though a `namespace`
+token exists. Tokens are cosmetic until phase 2 makes them select
+a validator, and normalising them before that vocabulary is
+settled would be premature. The two `external_namespace`
+declarations were made consistent with each other since one was
+added here.
+
 ## Notes for the executing session
 
 The two measurement scripts phase 0 used are worth rebuilding as

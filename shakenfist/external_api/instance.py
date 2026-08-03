@@ -224,7 +224,7 @@ class InstanceEndpoint(api_base.Resource):
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
          ('namespace', 'body', 'namespace',
-          'The namespace to contain the network.', False)],
+          'Scope the name lookup to this namespace.', False)],
         [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
@@ -1253,7 +1253,7 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         'instances', 'Add metadata for an instance.',
         [
             ('instance_ref', 'path', 'uuidorname', 'The instance to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1772,7 +1772,7 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
         'instances', 'Get the outstanding cluster operations for an instance.',
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
-         ('all', 'body', 'boolean',
+         ('all', 'query', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],
         [(

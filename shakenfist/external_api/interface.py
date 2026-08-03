@@ -149,7 +149,7 @@ class InterfaceMetadatasEndpoint(api_base.Resource):
         'interfaces', 'Add metadata for an interface.',
         [
             ('interface_uuid', 'path', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),

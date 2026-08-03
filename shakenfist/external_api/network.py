@@ -788,7 +788,7 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
         'networks', 'Get the outstanding cluster operations for a network.',
         [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True),
-         ('all', 'body', 'boolean',
+         ('all', 'query', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],
         [(

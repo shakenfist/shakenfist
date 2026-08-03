@@ -219,7 +219,7 @@ class NodeMetadatasEndpoint(api_base.Resource):
         'nodes', 'Add metadata for a node.',
         [
             ('node', 'path', 'node', 'The node to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),

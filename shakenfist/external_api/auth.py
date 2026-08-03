@@ -593,7 +593,7 @@ class AuthMetadatasEndpoint(api_base.Resource):
         'auth', 'Add metadata for a namespace.',
         [
             ('namespace', 'path', 'string', 'The namespace to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -695,7 +695,7 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
         [
             ('namespace', 'path', 'string',
              'The namespace to alter.', True),
-            ('external_namespace', 'path', 'string',
+            ('external_namespace', 'path', 'namespace',
              'The namespace to no longer trust.', True)
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),

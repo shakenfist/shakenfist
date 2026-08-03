@@ -371,7 +371,7 @@ class BlobMetadatasEndpoint(api_base.Resource):
         'blobs', 'Add metadata for a blob.',
         [
             ('blob_uuid', 'path', 'uuid', 'The blob to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
