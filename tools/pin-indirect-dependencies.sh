@@ -20,15 +20,25 @@
 #     strip matters: a stale pin is otherwise itself a requirement which
 #     forces its own installation, so it would never look stale.
 #   - The block is then rewritten from pip freeze: every installed package
-#     not already exactly pinned ("name==...") elsewhere in pyproject.toml
-#     is recorded, sorted case-insensitively.
+#     not already constrained elsewhere in pyproject.toml is recorded,
+#     sorted case-insensitively.
 #
-# The "already pinned elsewhere" comparison uses PEP 503 canonical names
-# ("-", "_" and "." are interchangeable) and tolerates extras on direct
-# pins (e.g. "gunicorn[gevent]==..."). Both of those mismatches have
-# historically created duplicate pins which broke dependency resolution
-# once Renovate bumped only one of the duplicates (see shakenfist#3398,
-# shakenfist#3399 and shakenfist#3462).
+# The "already constrained elsewhere" comparison uses PEP 503 canonical
+# names ("-", "_" and "." are interchangeable), tolerates extras on direct
+# pins (e.g. "gunicorn[gevent]==...") and accepts any version operator, not
+# just "==". A direct dependency declared as a range (e.g. "psutil>=5.9.4")
+# is still a declaration of intent about that package, so re-emitting it
+# into the block as an exact pin would both duplicate it and override the
+# deliberately loose bound. All of these mismatches have historically
+# created duplicate pins which broke dependency resolution once Renovate
+# bumped only one of the duplicates (see shakenfist#3398, shakenfist#3399
+# and shakenfist#3462).
+#
+# The resolve runs once, in whatever environment invoked it -- in CI that
+# is the lowest supported Python on Linux. Dependencies guarded by
+# environment markers are therefore resolved for that environment only, so
+# the block is complete for it but may omit packages needed only on a newer
+# Python or another platform.
 #
 # Some packages must never be pinned even though they are installed. The
 # canonical example is pydantic-core: pydantic pins it exactly (==), so an
@@ -47,7 +57,8 @@
 # variant (pinned block in [project] dependencies) and the library variant
 # (pinned block in the "pinned" extra of [project.optional-dependencies]).
 #
-# Template source: shakenfist/development/templates/pin-indirect-dependencies/
+# Template source:
+#   https://github.com/shakenfist/development/tree/main/templates/pin-indirect-dependencies/
 
 set -e
 
@@ -91,8 +102,19 @@ python3 -m venv "${workdir}/uv"
 # the complete dependency closure, and anything the system happened to
 # provide would be wrongly dropped from the pinned block as stale.
 python3 -m venv "${workdir}/venv"
-"${workdir}/uv/bin/uv" pip install --python "${workdir}/venv/bin/python" \
-    -r "${workdir}/pyproject.toml" -c "${workdir}/constraints.txt"
+if ! "${workdir}/uv/bin/uv" pip install --python "${workdir}/venv/bin/python" \
+        -r "${workdir}/pyproject.toml" -c "${workdir}/constraints.txt"; then
+    echo >&2
+    echo 'The resolve failed with the existing pins applied as constraints.' >&2
+    echo 'A direct dependency most likely now requires a transitive package' >&2
+    echo 'at a version above its current pin, which the constraint forbids.' >&2
+    echo 'The resolver output above names the conflicting pair. Let Renovate' >&2
+    echo 'bump that pin, or bump it by hand in pyproject.toml, and re-run.' >&2
+    echo >&2
+    echo 'Until that is resolved no pins are reconciled, so obsolete pins' >&2
+    echo 'will accumulate as well as new ones being missed.' >&2
+    exit 1
+fi
 
 echo
 echo 'Resolved dependencies:'
@@ -113,12 +135,27 @@ touch "${workdir}/pins.txt"
         continue
     fi
 
+    # Packaging machinery is never a runtime dependency of the project.
+    # pip freeze happens to omit these today, but that exclusion list has
+    # changed across pip releases and setuptools is declared in
+    # [build-system] requires where the scan below will not see it, so a
+    # newer pip in a rebuilt runner image could otherwise silently pin a
+    # build-time package as a runtime one.
+    case ${canon} in
+        pip|setuptools|wheel|distribute) continue ;;
+    esac
+
     depre=$(echo "${dep}" | sed -E 's/[-_.]+/[-_.]/g')
-    if [ "$(grep -Eic "\"${depre}(\[[a-z0-9,_.-]+\])?==" "${workdir}/pyproject.toml")" -lt 1 ]; then
+    if [ "$(grep -Eic "\"${depre}(\[[a-z0-9,_.-]+\])?(==|>=|<=|~=|!=|===|>|<)" "${workdir}/pyproject.toml")" -lt 1 ]; then
         echo "${depver}" >> "${workdir}/pins.txt"
     fi
 done
-sort -f "${workdir}/pins.txt" > "${workdir}/pins_sorted.txt"
+
+# The collation is pinned because glibc's locale-aware ordering ignores "-"
+# and "_" in its first pass, so an unpinned sort orders the block
+# differently on a UTF-8 workstation than on the C/POSIX CI runner. That
+# turns a local dry run into a diff made entirely of reordering noise.
+LC_ALL=C sort -f "${workdir}/pins.txt" > "${workdir}/pins_sorted.txt"
 
 awk -v pins="${workdir}/pins_sorted.txt" '
     /# START_OF_INDIRECT_DEPS/ {
@@ -158,6 +195,21 @@ if [ -z "${GITHUB_TOKEN}" ]; then
     exit 0
 fi
 
+# A pull_request checkout is a detached HEAD at the merge commit, so a
+# branch cut from here would carry the whole pull request into what is
+# meant to be a pin-only update. The workflow withholds GITHUB_TOKEN on
+# pull_request events so this should be unreachable, but the consequence
+# of getting it wrong is a bogus automated pull request, so check anyway.
+case ${GITHUB_REF} in
+    refs/pull/*)
+        echo >&2
+        echo 'Refusing to push: this is a pull request merge ref, so the' >&2
+        echo 'branch would contain the pull request rather than just the' >&2
+        echo 'reconciled pins. Unset GITHUB_TOKEN to take the diff-only path.' >&2
+        exit 1
+        ;;
+esac
+
 datestamp=$(date '+%Y%m%d')
 git checkout -b "pin-dependencies-${datestamp}"
 
@@ -171,6 +223,15 @@ echo
 gh label create dependencies --color 0075ca \
     --description 'Pull requests that update a dependency file' \
     2>/dev/null || true
+
+# A second run on the same UTC day force-pushes onto the existing branch,
+# which correctly updates the open pull request. gh pr create would then
+# exit non-zero because one already exists, failing a job which had in
+# fact done its work.
+if gh pr view "pin-dependencies-${datestamp}" >/dev/null 2>&1; then
+    echo 'Existing pull request updated.'
+    exit 0
+fi
 
 gh pr create \
     --assignee mikalstill \

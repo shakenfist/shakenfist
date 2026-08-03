@@ -4,16 +4,16 @@
 # dependencies and removing pins nothing requires any more. This
 # complements Renovate, which bumps the versions of existing pins.
 #
-# The heavy lifting lives in tools/pin-indirect-dependencies.sh (copied
-# from this template directory), which demotes the existing pins to pip
-# constraints for a fresh resolve. See that script's header comment for
-# details, including the "# never-pin: <name>" escape hatch.
+# The heavy lifting lives in tools/pin-indirect-dependencies.sh, which
+# demotes the existing pins to pip constraints for a fresh resolve. See
+# that script's header comment for details, including the
+# "# never-pin: <name>" escape hatch.
 #
 # Requirements:
 #   - pyproject.toml must contain "# START_OF_INDIRECT_DEPS" and
 #     "# END_OF_INDIRECT_DEPS" marker comments delimiting the pinned
 #     block inside the [project] dependencies list.
-#   - pin-indirect-dependencies.sh from this template directory copied
+#   - pin-indirect-dependencies.sh from the template directory copied
 #     to tools/pin-indirect-dependencies.sh (keep it executable).
 #   - A repository secret called DEPENDENCIES_TOKEN with push and PR
 #     permissions.
@@ -21,7 +21,8 @@
 # Placeholders to replace:
 #   shakenfist  -- repository / checkout directory name
 #
-# Template source: shakenfist/development/templates/pin-indirect-dependencies/
+# Template source:
+#   https://github.com/shakenfist/development/tree/main/templates/pin-indirect-dependencies/
 
 name: Pin indirect dependencies
 
@@ -45,11 +46,18 @@ jobs:
     runs-on: [self-hosted, vm, debian-12]
     timeout-minutes: 60
     env:
-      PIP_INDEX_URL: http://192.168.1.15:3141/root/pypi/+simple/
+      http_proxy: http://192.168.1.15:3128
+      https_proxy: http://192.168.1.15:3128
+      PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
       # Fall back to pypi so a devpi cold-cache miss (empty index on a
       # first-touch package) cannot hard-fail the job.
       PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
-      PIP_TRUSTED_HOST: 192.168.1.15
+      # uv does not read pip's PIP_* variables, so the mirror has to be
+      # named again for it. Without these the bootstrap pip3 install would
+      # use devpi but the resolve that actually produces the pins would go
+      # straight to pypi.
+      UV_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+      UV_EXTRA_INDEX_URL: https://pypi.org/simple/
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -59,12 +67,11 @@ jobs:
         run: |
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
-      - name: Checkout shakenfist
-        uses: actions/checkout@v7
-        with:
-          path: shakenfist
-          fetch-depth: 0
-
+      # This runs before the checkout because actions/checkout needs git.
+      # Without git it silently falls back to a REST API tarball, which
+      # leaves no .git directory and no persisted credentials, so every
+      # git operation in the script below fails for a non-obvious reason.
+      #
       # Add any additional system-level build dependencies here. The
       # resolve runs in an isolated venv, so anything which compiles at
       # install time needs its build dependencies present. For example,
@@ -72,9 +79,14 @@ jobs:
       #   sudo apt install -y pkg-config build-essential python3-dev \
       #       default-libmysqlclient-dev
 
-      - name: Install the github command line
+      - name: Install system build dependencies
         run: |
           sudo apt update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+            install git python3-dev python3-pip python3-venv python3-wheel
+
+      - name: Install the github command line
+        run: |
           sudo apt install -y curl
 
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -84,14 +96,25 @@ jobs:
           sudo apt update
           sudo apt install -y gh
 
-      - name: Install system build dependencies
-        run: |
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
-            install git python3-dev python3-pip python3-venv python3-wheel
+      # The token has to be on the checkout, not just on the step below.
+      # A plain "git push" authenticates with the credential checkout
+      # persists into http.https://github.com/.extraheader, not with
+      # GITHUB_TOKEN from the environment, and the job's default token is
+      # restricted to contents: read.
+      - name: Checkout shakenfist
+        uses: actions/checkout@v7
+        with:
+          path: shakenfist
+          fetch-depth: 0
+          token: ${{ secrets.DEPENDENCIES_TOKEN }}
 
       - name: Reconcile pinned indirect dependencies
         env:
-          GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
+          # Withheld on pull_request so the self-test takes the script's
+          # print-the-diff-only path. A pull_request checkout is a detached
+          # HEAD at the merge commit, so pushing a branch from one would
+          # carry the whole pull request into an automated pin update.
+          GITHUB_TOKEN: ${{ github.event_name == 'pull_request' && '' || secrets.DEPENDENCIES_TOKEN }}
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
           tools/pin-indirect-dependencies.sh
