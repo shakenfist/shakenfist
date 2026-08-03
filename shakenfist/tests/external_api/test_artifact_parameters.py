@@ -12,11 +12,9 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class ArtifactIntegerParameterTestCase(base.ShakenFistTestCase):
     """The artifact endpoints must reject non-integer body parameters.
 
-    Same defect class as issue 3609: log_request merges JSON body
-    values into handler kwargs verbatim, so a JSON null reaches int()
-    as None. Guarding only ValueError let that TypeError escape to
-    handle_authorization_exceptions, which returned the interpreter's
-    own message to the client as a 400.
+    Same defect class as issue 3609: a JSON null reaches int() as
+    None, and guarding only ValueError let that TypeError escape and
+    return the interpreter's message to the client.
     """
 
     def setUp(self):
@@ -94,11 +92,9 @@ class ArtifactIntegerParameterTestCase(base.ShakenFistTestCase):
                          resp.get_json()['error'])
 
     def test_negative_max_versions_is_a_clean_400(self):
-        """Not merely meaningless: delete_old_versions() computes
-        sorted(indexes)[:-max], so a maximum of -1 makes the length
-        guard always true and the slice [:1], deleting the oldest
-        version immediately and again on every subsequent index add --
-        data destruction with no error returned to the caller."""
+        """Destructive, not just meaningless: delete_old_versions()
+        computes sorted(indexes)[:-max], so -1 deletes the oldest
+        version on every index add with no error to the caller."""
         for value in (-1, '-2'):
             resp = self.client.post(
                 '/artifacts/%s/versions' % self.artifact.uuid,
@@ -122,10 +118,8 @@ class ArtifactIntegerParameterTestCase(base.ShakenFistTestCase):
                          self.artifact.max_versions)
 
     def test_a_negative_stored_maximum_is_harmless(self):
-        """The API rejects negatives now, but a row written before it
-        did still has to be safe: the getter must treat it the same way
-        it treats zero rather than letting delete_old_versions() act on
-        it."""
+        """A row written before the API rejected negatives still has
+        to be safe, so the getter treats it the way it treats zero."""
         self.artifact._update_attributes(max_versions=-1)
 
         self.assertEqual(config.ARTIFACT_MAX_VERSIONS_DEFAULT,
@@ -156,12 +150,10 @@ class ArtifactIntegerParameterTestCase(base.ShakenFistTestCase):
                          resp.get_json()['error'])
 
     def test_negative_version_id_is_a_404(self):
-        """A negative index is a well formed integer which cannot
-        match any index, so it falls through to the not-found branch
-        rather than being rejected. Pinned because it is the one
-        integer parameter in this file with no range check, and that
-        is deliberate: unlike max_versions, an out of range version id
-        does nothing."""
+        """A negative index is well formed but cannot match, so it
+        falls through to not-found. Pinned because the missing range
+        check is deliberate: unlike max_versions, an out of range
+        version id does nothing."""
         resp = self.client.delete(
             '/artifacts/%s/versions/-1' % self.artifact.uuid,
             headers=self._headers())

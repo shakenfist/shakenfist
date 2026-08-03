@@ -79,29 +79,20 @@ class UploadTruncateEndpoint(api_base.Resource):
     @api_base.redirect_upload_request
     @api_base.log_token_use
     def post(self, upload_uuid=None, offset=None, upload_from_db=None):
-        # Logged before validation, not after: a client repeatedly
-        # attempting out of range truncates is exactly what an operator
-        # would want to see, so the attempt is recorded whether or not
-        # it is accepted, and each rejection below records why.
+        # Logged before validation so that rejected attempts are
+        # audited too, with each rejection recording why.
         upload_from_db.add_event(EVENT_TYPE_AUDIT, 'truncate request from REST API',
                                  extra={'offset': str(offset)})
 
         def _reject(status, message):
-            # str(offset) because offset is whatever the client sent:
-            # a float infinity or a nested structure would otherwise
-            # have to survive JSON serialisation into the event row.
+            # str() because offset is whatever the client sent, and an
+            # infinity or a nested structure has to reach the event
+            # row's JSON intact.
             upload_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'truncate request rejected',
                 extra={'offset': str(offset), 'reason': message})
             return sf_api.error(status, message, suppress_traceback=True)
 
-        # The same defect as issue 3609: this used to be an unguarded
-        # int(), so {'offset': null} returned a 400 carrying the
-        # interpreter's own TypeError message, while a non-numeric
-        # offset raised ValueError, escaped to
-        # suppress_exceptions_to_client and became a 500 with a
-        # ValueError repr in the body. A negative offset took the same
-        # 500 path out of os.truncate.
         truncate_to = api_base.coerce_int(offset)
         if truncate_to is None:
             return _reject(400, 'offset is not an integer')
@@ -114,28 +105,20 @@ class UploadTruncateEndpoint(api_base.Resource):
         try:
             current_size = os.stat(upload_path).st_size
         except FileNotFoundError:
-            # Nothing has been sent for this upload yet. os.truncate
-            # would raise FileNotFoundError, which becomes a 500.
-            # Truncating an empty upload to zero is a no-op rather than
-            # an error though, so a client which resets before writing
-            # -- or retries a reset -- does not have to special case it.
+            # Nothing sent yet, so os.truncate would raise
+            # FileNotFoundError and become a 500. Truncating to zero is
+            # a no-op rather than an error, so a client which resets
+            # before writing does not have to special case it.
             if truncate_to == 0:
                 return
             return _reject(404, 'upload has no data')
 
-        # Bounded above as well as below. Truncating past the end of an
-        # upload is not a meaningful operation for this endpoint, and
-        # it is not even reliably possible: an offset beyond a C long
-        # raises OverflowError and one beyond the filesystem's maximum
-        # file size raises OSError(EFBIG), both of which escape as a
-        # 500 with an interpreter message. An offset between those and
-        # the current length instead succeeds, growing the upload into
-        # an arbitrarily large sparse file at the caller's choosing.
+        # Bounded above too. os.truncate() past the end of the file
+        # raises OverflowError beyond a C long and OSError(EFBIG)
+        # beyond the filesystem maximum -- and between the two it
+        # succeeds, growing the upload into a large sparse file.
         if truncate_to > current_size:
             return _reject(400, 'offset is beyond the end of the upload')
 
-        # No makedirs here: the stat above only succeeds if the
-        # directory and the upload file both already exist, which the
-        # data endpoint guarantees before there is anything to
-        # truncate.
+        # No makedirs: a successful stat proves the directory exists.
         os.truncate(upload_path, truncate_to)

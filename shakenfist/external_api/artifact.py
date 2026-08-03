@@ -653,24 +653,15 @@ class ArtifactVersionsEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, artifact_ref=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
-        # api_base.coerce_int rather than int(): log_request merges
-        # JSON body values into kwargs verbatim, so {'max_versions':
-        # null} arrives as None and {'max_versions': Infinity} as a
-        # float infinity. Those raise TypeError and OverflowError
-        # respectively, and either escaping to
-        # handle_authorization_exceptions leaks an interpreter message
-        # to the client -- the same defect as issue 3609.
         mv = api_base.coerce_int(max_versions)
         if mv is None:
             return sf_api.error(400, 'max version is not an integer',
                                 suppress_traceback=True)
 
-        # Range checked as well as type checked. A negative maximum is
-        # not merely meaningless: delete_old_versions() computes
-        # sorted(indexes)[:-max], so setting -1 deletes the oldest
-        # version immediately and again on every subsequent index add,
-        # with no error to the caller. Zero keeps its documented
-        # meaning of "revert to the configured default".
+        # A negative maximum is destructive, not just meaningless:
+        # delete_old_versions() computes sorted(indexes)[:-max], so -1
+        # silently deletes the oldest version on every index add. Zero
+        # keeps its documented "revert to the default" meaning.
         if mv < 0:
             return sf_api.error(400, 'max version must not be negative',
                                 suppress_traceback=True)
@@ -697,8 +688,6 @@ class ArtifactVersionEndpoint(api_base.Resource):
     @requires_artifact_ownership
     @api_base.log_token_use
     def delete(self, artifact_ref=None, artifact_from_db=None, version_id=0):
-        # See the note on ArtifactVersionsEndpoint.post: a body value
-        # of the wrong type reaches this without any type checking.
         ver_index = api_base.coerce_int(version_id)
         if ver_index is None:
             return sf_api.error(400, 'version index is not an integer',

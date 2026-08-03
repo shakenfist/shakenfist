@@ -27,11 +27,10 @@ EVENT_ROWS = [
 class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
     """The events endpoints must validate limit before using it.
 
-    Issue 3609: log_request merges JSON body values into handler kwargs
-    verbatim, so a caller sending {'limit': '5'} delivers a str. The
-    range check in mariadb.get_object_events then raised TypeError,
-    which handle_authorization_exceptions returned to the client as
-    400 "'<=' not supported between instances of 'str' and 'int'".
+    Issue 3609: a body value of {'limit': '5'} reached
+    mariadb.get_object_events as a str and its range check raised
+    TypeError, which was returned as 400 "'<=' not supported between
+    instances of 'str' and 'int'".
     """
 
     def setUp(self):
@@ -93,10 +92,9 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             event_type=None)
 
     def test_query_string_limit_is_ignored(self):
-        """Only JSON body keys are merged into handler kwargs, so a
-        query parameter has never had any effect. Pinned because the
-        operator guide used to describe limit as a query parameter and
-        now explicitly says it is not."""
+        """Only body keys are merged into handler kwargs, so this has
+        never had an effect. Pinned because the operator guide used to
+        claim otherwise."""
         resp = self.client.get('/events?limit=5')
 
         self.assertEqual(200, resp.status_code)
@@ -105,10 +103,8 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             event_type=None)
 
     def test_fractional_limit_is_a_clean_400(self):
-        """A fractional row count has no meaning, and int() would
-        silently truncate it to a plausible-looking answer. The string
-        form '5.5' has always been a 400, so this makes the two JSON
-        spellings of the same value agree."""
+        """int() would truncate to a plausible-looking answer, and
+        the string form '5.5' has always been a 400."""
         resp = self.client.get('/events', json={'limit': 5.9})
 
         self.assertEqual(400, resp.status_code)
@@ -154,13 +150,10 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             self.get_object_events.assert_not_called()
 
     def test_infinite_limit_is_a_clean_400(self):
-        """int(float('inf')) raises OverflowError, which neither of the
-        two obvious guards catches, so this used to be a 500 carrying
-        'OverflowError(...)' -- issue 3609 with a third exception name.
-        Python's JSON parser accepts the non-standard Infinity and NaN
-        literals, so the raw body is sent here: the json= kwarg would
-        re-encode through the same permissive encoder, but sending the
-        bytes is what a client actually does."""
+        """Formerly a 500: int(float('inf')) is an OverflowError,
+        which neither of the two obvious guards catches. Sent as a raw
+        body because Python's JSON parser accepts these non-standard
+        literals and a client can therefore send them."""
         for body in ('{"limit": Infinity}', '{"limit": -Infinity}',
                      '{"limit": NaN}'):
             self.get_object_events.reset_mock()
@@ -173,10 +166,8 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             self.get_object_events.assert_not_called()
 
     def test_boolean_limit_is_a_clean_400(self):
-        """bool is a subclass of int, so without an explicit check
-        {'limit': true} silently returns exactly one event and
-        {'limit': false} silently returns the default. Both are
-        surprising answers to obviously malformed input."""
+        """bool subclasses int, so unchecked this returns exactly one
+        event for true and the default for false."""
         for value in (True, False):
             self.get_object_events.reset_mock()
             resp = self.client.get('/events', json={'limit': value})
@@ -188,12 +179,9 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             self.get_object_events.assert_not_called()
 
     def test_oversized_limit_is_capped_not_a_500(self):
-        """A limit larger than int32 used to be coerced successfully and
-        then blow up in protobuf message construction with
-        'ValueError: Value out of range', which escaped as a 500 -- the
-        same failure class issue 3609 is about, with a different
-        exception name in the body. Clamping happens in the API layer so
-        the value handed to mariadb is always serialisable."""
+        """Formerly a 500: a limit beyond int32 coerced fine and then
+        overflowed the protobuf field during message construction.
+        Clamping in the API layer keeps the value serialisable."""
         resp = self.client.get('/events', json={'limit': 2 ** 40})
 
         self.assertEqual(200, resp.status_code)
@@ -219,10 +207,8 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             event_type=None)
 
     def test_non_string_event_type_is_a_clean_400(self):
-        """event_type arrives through the same unvalidated body merge as
-        limit and lands in a protobuf string field, so a non-string
-        raised TypeError and leaked the interpreter message by exactly
-        the route issue 3609 describes."""
+        """event_type lands in a protobuf string field, so a
+        non-string leaked a TypeError by the issue 3609 route."""
         resp = self.client.get('/events', json={'event_type': 5})
 
         self.assertEqual(400, resp.status_code)
@@ -239,9 +225,8 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             event_type='audit')
 
     def test_empty_event_type_is_no_filter(self):
-        """An empty string is passed through unchanged: both mariadb
-        read paths document '' as meaning 'any event type', which is
-        the same thing None means, so there is nothing to reject."""
+        """Both mariadb read paths document '' as meaning any event
+        type, which is what None means, so it passes through."""
         resp = self.client.get('/events', json={'event_type': ''})
 
         self.assertEqual(200, resp.status_code)
@@ -283,10 +268,9 @@ class ObjectEventsSharingTestCase(base.ShakenFistTestCase):
         return False
 
     def _limit_default(self, endpoint):
-        """The `limit` default in the endpoint's get() signature, as
-        source rather than as a value: what matters is that it is
-        spelled as the shared constant, not that it happens to equal
-        it today."""
+        """The limit default as source rather than as a value: what
+        matters is that it is spelled as the shared constant, not that
+        it happens to equal it today."""
         tree = ast.parse(inspect.getsource(endpoint))
         for element in ast.walk(tree):
             if not isinstance(element, ast.FunctionDef) or element.name != 'get':

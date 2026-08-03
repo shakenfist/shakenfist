@@ -20,11 +20,9 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class CoerceIntTestCase(base.ShakenFistTestCase):
     """The shared coercion for integer body parameters.
 
-    Every endpoint reading an integer out of a request body goes
-    through this, because log_request merges JSON body values into
-    handler kwargs with no type checking (issue 3612) and a wrong
-    guard leaks the interpreter's own message to the client as a 400
-    or a 500 (issue 3609).
+    Every endpoint reading an integer out of a body goes through this,
+    because body values are untyped (issue 3612) and a wrong guard
+    leaks an interpreter message to the client (issue 3609).
     """
 
     def test_integers_pass_through(self):
@@ -79,9 +77,7 @@ class InstanceMetadataAffinityTestCase(base.ShakenFistTestCase):
     """Affinity metadata values must be integers, checked cleanly.
 
     The validator guarded int() with ValueError only, so a null or
-    Infinity affinity value raised TypeError or OverflowError and
-    escaped to handle_authorization_exceptions, which handed the
-    interpreter's message to the client.
+    Infinity value escaped and leaked an interpreter message.
     """
 
     def setUp(self):
@@ -112,11 +108,9 @@ class InstanceMetadataAffinityTestCase(base.ShakenFistTestCase):
 class InstanceAgentPutModeTestCase(base.ShakenFistTestCase):
     """A missing or wrong-typed file mode must not leak.
 
-    mode is documented as required but nothing enforces that, so it
-    defaults to None -- and both int(None) and
-    symbolic_to_numeric_permissions(None) raise TypeError. This was
-    therefore reachable by simply omitting the field, with no
-    malformed value required.
+    mode is documented as required but nothing enforces it, and both
+    int(None) and symbolic_to_numeric_permissions(None) raise
+    TypeError, so omitting the field was enough to leak.
     """
 
     def setUp(self):
@@ -171,12 +165,9 @@ class InstanceAgentPutModeTestCase(base.ShakenFistTestCase):
 
     def test_valid_mode_reaches_the_blob_lookup(self):
         """The type check must not reject input the handler used to
-        accept, so a well formed mode gets through to the next step.
-
-        That step is also asserted: it used to call self.api_error,
-        which does not exist on Resource, so an unknown blob raised
-        AttributeError and returned a 500 carrying an interpreter
-        message rather than a 404. Blob.from_db is mocked because
+        accept, so a well formed mode reaches the blob lookup -- which
+        used to call the non-existent self.api_error and return a 500
+        rather than this 404. Blob.from_db is mocked because
         MockMariaDB does not cover blobs."""
         with mock.patch('shakenfist.external_api.instance.Blob.from_db',
                         return_value=None):
@@ -192,11 +183,9 @@ class InstanceAgentPutModeTestCase(base.ShakenFistTestCase):
 class UploadTruncateOffsetTestCase(base.ShakenFistTestCase):
     """The truncate offset must be bounded at both ends.
 
-    os.truncate() is not safe for an arbitrary integer: beyond a C
-    long it raises OverflowError, beyond the filesystem's maximum file
-    size it raises OSError(EFBIG), and in between it succeeds and
-    grows the upload into a large sparse file. All three are reachable
-    from a URL path segment with no request body at all.
+    os.truncate() raises OverflowError beyond a C long, OSError(EFBIG)
+    beyond the filesystem maximum, and in between grows the upload
+    into a large sparse file -- all from a URL path segment.
     """
 
     UPLOAD_UUID = '4f2b6d5a-9e4c-4d0e-9f2a-1b7c5d3e8a90'

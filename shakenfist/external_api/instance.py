@@ -1293,11 +1293,6 @@ def _validate_instance_metadata(key, value):
             return sf_api.error(
                 400, 'value for "affinity" key should be a valid JSON dictionary')
 
-        # api_base.coerce_int rather than int(): a null, list or
-        # Infinity affinity value raises something other than
-        # ValueError, which escaped this guard and was returned to the
-        # client as a 400 carrying the interpreter's own message --
-        # the same defect as issue 3609.
         for key_type, dv in value.items():
             if api_base.coerce_int(dv) is None:
                 return sf_api.error(400, 'affinity dictionary values should be integers')
@@ -1370,13 +1365,6 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         if not length:
             parsed_length = 10240
         else:
-            # api_base.coerce_int rather than int(): log_request merges
-            # JSON body values into kwargs verbatim, so a {'length':
-            # [5]} body reaches this as a list and {'length': Infinity}
-            # as a float infinity. Those raise TypeError and
-            # OverflowError, neither of which the ValueError-only guard
-            # here used to catch, so both leaked to the client -- the
-            # same defect as issue 3609.
             parsed_length = api_base.coerce_int(length)
             if parsed_length is None:
                 return sf_api.error(400, 'length is not an integer',
@@ -1583,19 +1571,11 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
-        # mode reaches here through the untyped body-to-kwargs merge
-        # and is not enforced as required despite the swagger saying
-        # so, so it can be absent (None) or any JSON type. Both int()
-        # and symbolic_to_numeric_permissions() raise TypeError for
-        # those, which handle_authorization_exceptions returned to the
-        # client as a 400 carrying the interpreter's own message --
-        # the same defect as issue 3609, reachable here by simply
-        # omitting the field.
-        #
-        # A missing mode is a 400 like every other missing parameter,
-        # while a present but unusable one keeps this endpoint's
-        # existing 406, so a client can tell "you forgot it" from
-        # "that is not a mode".
+        # mode is documented as required but nothing enforces that, so
+        # it can be absent or any JSON type. A missing one is a 400
+        # like every other missing parameter; a present but unusable
+        # one keeps this endpoint's existing 406, so a client can tell
+        # the two apart.
         if mode is None:
             return sf_api.error(400, 'no mode specified')
         if not isinstance(mode, (str, int)) or isinstance(mode, bool):
@@ -1609,11 +1589,8 @@ class InstanceAgentPutEndpoint(api_base.Resource):
 
         b = Blob.from_db(blob_uuid)
         if not b:
-            # sf_api.error, not self.api_error: Resource has no
-            # api_error method, so putting a file with a blob_uuid
-            # which does not exist raised AttributeError and became a
-            # 500 carrying an interpreter message rather than this
-            # 404. This was the only use of that spelling in the tree.
+            # sf_api.error, not self.api_error: Resource has no such
+            # method, so this raised AttributeError and became a 500.
             return sf_api.error(404, 'blob not found')
 
         commands = [

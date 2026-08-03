@@ -661,24 +661,15 @@ def handle_authorization_exceptions(func):
             return func(*args, **kwargs)
 
         except TypeError as e:
-            # This is deliberately broad and that is a known hazard.
-            # log_request merges every JSON body key into the handler's
-            # kwargs with no type checking, so any handler which does
-            # arithmetic or string work on a body value can be made to
-            # raise TypeError from arbitrarily deep in the stack -- and
-            # str(e) then hands the interpreter's own message to the
-            # client. Issue 3609 was one instance of that (the events
-            # endpoints' `limit`); the endpoints validate their typed
-            # body parameters explicitly for exactly this reason, and
-            # any handler reading an integer out of a body should use
-            # coerce_int() below rather than calling int() itself.
-            #
-            # The systemic fix is to validate body parameters
-            # declaratively with the webargs use_kwargs schemas already
-            # used for query args, and then narrow this handler to the
-            # JWT-related TypeErrors it was written for. That is a
-            # larger change than any single endpoint fix, so it is
-            # tracked as issue 3612 rather than done in passing.
+            # Deliberately broad, and a known hazard: log_request
+            # merges body keys into handler kwargs untyped, so any
+            # handler doing arithmetic on one can be made to raise
+            # TypeError from deep in the stack, and str(e) then hands
+            # the interpreter's message to the client (issue 3609).
+            # Read integers with coerce_int() below rather than int().
+            # Issue 3612 tracks the fix: validate body parameters with
+            # webargs, then narrow this to the JWT TypeErrors it was
+            # written for.
             return sf_api.error(400, str(e), suppress_traceback=False)
 
         except DecodeError:
@@ -788,43 +779,21 @@ EVENTS_LIMIT_DESCRIPTION = (
 def coerce_int(value: Any) -> Optional[int]:
     """Coerce a request parameter to an int, or None if it cannot be.
 
-    Every endpoint which reads an integer out of a request body should
-    use this rather than calling int() itself, because getting the
-    exception tuple right is easy to get wrong and getting it wrong is
-    not a local mistake: log_request merges JSON body values into
-    handler kwargs verbatim (issue 3612), and
-    handle_authorization_exceptions turns any escaping TypeError into
-    a 400 carrying the interpreter's own message. int() raises three
-    different exceptions for input a client can actually send:
+    Endpoints must use this rather than calling int() themselves.
+    Request body values arrive untyped (issue 3612), so a client can
+    reach int() with anything, and the three exceptions it raises for
+    JSON input -- TypeError, ValueError and OverflowError, the last
+    for the Infinity literal Python's parser accepts -- are easy to
+    guard incompletely. Whatever escapes becomes a 400 carrying the
+    interpreter's message, or a 500 (issue 3609).
 
-      * TypeError for null, a list or a dict;
-      * ValueError for a non-numeric string, and for NaN;
-      * OverflowError for Infinity and -Infinity. Python's JSON parser
-        accepts those non-standard literals, and int(float('inf')) is
-        an OverflowError rather than a ValueError, so a guard catching
-        only the first two answers a malformed body with a 500 and a
-        recorded server exception. The float check below now rejects
-        both before int() is reached, but the exception stays in the
-        tuple: this helper is not only called with values which came
-        from JSON, and the point of it is that no caller has to know
-        which of the three applies to them.
+    bools and fractional floats are rejected rather than converted:
+    int(True) is 1 and int(5.9) is 5, and a plausible number is a
+    worse answer to malformed input than an error. auth.py's
+    _validate_key_expiry takes the same posture.
 
-    Two kinds of value which int() would happily convert are rejected
-    instead, because answering obviously malformed input with a
-    plausible number is worse than rejecting it -- the posture
-    auth.py's `_validate_key_expiry` already takes:
-
-      * booleans, since bool subclasses int and int(True) is 1;
-      * floats with a fractional part, so that 5.9 is not silently
-        answered as 5. This also makes the JSON number and JSON string
-        forms agree, since '5.5' has always been rejected. An integral
-        float such as 5.0 is still accepted, and this is what rejects
-        Infinity and NaN before int() ever sees them.
-
-    Returning None rather than raising keeps the caller's
-    sf_api.error() call outside an except block, where sys.exc_info()
-    is no longer live and the full int() traceback is not logged for
-    what is ordinary bad client input.
+    None rather than an exception, so the caller's sf_api.error() call
+    is not inside an except block where the traceback would be logged.
     """
     if isinstance(value, bool):
         return None
@@ -842,46 +811,23 @@ def object_events_response(
         event_type: Any) -> Union[list[dict[str, Any]], flask.Response]:
     """Build the per-object events REST response.
 
-    Returns either the shaped event list or, for a malformed ``limit``
-    or ``event_type``, the 400 response itself -- flask_restful
-    short-circuits on a Response, and all five callers return this
-    value directly and unmodified.
-
     Shared by the /{instance,artifact,network,node,blob}/<u>/events
     endpoints: each handler does authn / authz / object lookup, then
-    delegates the read-and-shape step here so the wire-format change
-    only happens in one place.
+    delegates the read-and-shape step here so the wire format changes
+    in one place. Returns the shaped event list, or the 400 response
+    itself for a malformed parameter -- flask_restful short-circuits
+    on a Response and all five callers return this value unmodified.
 
-    Both body parameters are validated here because log_request merges
-    JSON body values into handler kwargs verbatim, so a caller sending
-    ``{'limit': '5'}`` delivers a str and ``{'event_type': 5}``
-    delivers an int. Left unchecked, the range comparison in
-    mariadb._grpc_get_object_events (and _direct_get_object_events)
-    raised TypeError for the first, and building the protobuf's
-    ``event_type_filter`` string field raised TypeError for the
-    second. handle_authorization_exceptions turns any TypeError into a
-    400 carrying str(e), so either leaked an interpreter message to
-    the client (issue 3609).
-
-    ``limit`` is clamped here as well, not just coerced. The lower
-    bound and the 1000 ceiling are applied by
-    _direct_get_object_events, but on a real deployment the read goes
-    through the gRPC path, which builds a request whose ``limit`` is
-    an int32 -- so an out-of-range value raises ValueError while the
-    message is being constructed, before any server-side clamping can
-    happen, and escapes as a 500. Clamping at this layer makes the
-    API's guarantee about ``limit`` complete rather than partial, and
-    keeps the two layers agreeing on the ceiling.
+    limit is clamped here, not only coerced. mariadb clamps too, but
+    the gRPC read path builds a request whose limit field is an int32,
+    so an out of range value raises during message construction before
+    any server-side clamping can run (issue 3609).
     """
     limit = coerce_int(limit)
     if limit is None:
-        # suppress_traceback because this is ordinary bad client input,
-        # not a server fault.
         return sf_api.error(400, 'limit must be an integer',
                             suppress_traceback=True)
 
-    # Mirrors the hardening in mariadb._direct_get_object_events and
-    # _grpc_get_object_events, from the same constants.
     if limit <= 0:
         limit = EVENTS_LIMIT_DEFAULT
     limit = min(limit, EVENTS_LIMIT_MAX)
