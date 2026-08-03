@@ -8,6 +8,7 @@
 #   - Has complete CI coverage:
 from functools import partial
 
+from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
@@ -32,13 +33,26 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0, thin=None):
+        # The other entry point for max_versions. It flows into
+        # Artifact.from_url() and is persisted verbatim, so it needs
+        # the same checking ArtifactVersionsEndpoint does: a negative
+        # maximum makes delete_old_versions() silently remove the
+        # oldest version on every subsequent index add.
+        mv = api_base.coerce_int(max_versions)
+        if mv is None:
+            return sf_api.error(400, 'max version is not an integer',
+                                suppress_traceback=True)
+        if mv < 0:
+            return sf_api.error(400, 'max version must not be negative',
+                                suppress_traceback=True)
+
         if not thin:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
 
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'snapshot request from REST API')
         return instance_from_db.snapshot(
-            all=all, device=device, max_versions=max_versions, thin=thin)
+            all=all, device=device, max_versions=mv, thin=thin)
 
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

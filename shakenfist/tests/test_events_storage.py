@@ -1374,3 +1374,37 @@ class HardDeleteEventsCleanupTestCase(base.ShakenFistTestCase):
         obj.hard_delete()
 
         mock_del_events.assert_called_once_with(obj.object_type, TEST_UUID)
+
+
+class GrpcGetObjectEventsLimitTestCase(base.ShakenFistTestCase):
+    """_grpc_get_object_events clamps limit before building the request.
+
+    The REST API clamps first, so this path is only reached with an
+    out of range limit by a caller which is not the REST API. It still
+    has to hold: the request's limit field is an int32, so an
+    unclamped value raises ValueError during message construction --
+    a 500 rather than a result.
+    """
+
+    def _request_for(self, limit):
+        stub = mock.MagicMock()
+        stub.GetObjectEvents.return_value = mock.MagicMock(events=[])
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub):
+            mariadb._grpc_get_object_events('instance', _OBJ_UUID_X, limit=limit)
+        return stub.GetObjectEvents.call_args[0][0]
+
+    def test_limit_passed_through_when_in_range(self):
+        self.assertEqual(5, self._request_for(5).limit)
+
+    def test_limit_capped_at_the_maximum(self):
+        for limit in (mariadb.EVENTS_LIMIT_MAX + 1, 2 ** 40):
+            self.assertEqual(mariadb.EVENTS_LIMIT_MAX,
+                             self._request_for(limit).limit,
+                             'limit %s' % limit)
+
+    def test_non_positive_limit_becomes_the_default(self):
+        for limit in (0, -1):
+            self.assertEqual(mariadb.EVENTS_LIMIT_DEFAULT,
+                             self._request_for(limit).limit,
+                             'limit %s' % limit)

@@ -340,7 +340,15 @@ class Artifact(dbowo):
         if self.in_memory_only:
             return config.ARTIFACT_MAX_VERSIONS_DEFAULT
         attrs = self._load_attributes()
-        if not attrs or attrs.max_versions == 0:
+        if not attrs or attrs.max_versions <= 0:
+            # Zero has always meant "use the configured default". A
+            # negative value is not meaningful and must be treated the
+            # same way, because delete_old_versions() computes
+            # sorted(indexes)[:-max]: with max of -1 the length guard
+            # is always true and the slice is [:1], so it silently
+            # deletes the oldest version on every index add. The API
+            # rejects negatives now, but a row written before that
+            # still has to be harmless.
             return config.ARTIFACT_MAX_VERSIONS_DEFAULT
         return attrs.max_versions
 

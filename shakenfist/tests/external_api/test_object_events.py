@@ -104,12 +104,21 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
             'node', 'sf-1', limit=api_base.EVENTS_LIMIT_DEFAULT,
             event_type=None)
 
-    def test_float_limit_is_truncated(self):
-        """int() truncates rather than rounds, and that is fine -- a
-        fractional row count has no meaning. Pinned because the
-        coercion is deliberately lenient about numeric types while
-        being strict about non-numeric ones."""
+    def test_fractional_limit_is_a_clean_400(self):
+        """A fractional row count has no meaning, and int() would
+        silently truncate it to a plausible-looking answer. The string
+        form '5.5' has always been a 400, so this makes the two JSON
+        spellings of the same value agree."""
         resp = self.client.get('/events', json={'limit': 5.9})
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('limit must be an integer',
+                         resp.get_json()['error'])
+        self.get_object_events.assert_not_called()
+
+    def test_integral_float_limit_is_accepted(self):
+        """5.0 is exactly 5, so there is nothing to be surprised by."""
+        resp = self.client.get('/events', json={'limit': 5.0})
 
         self.assertEqual(200, resp.status_code)
         self.get_object_events.assert_called_once_with(
@@ -295,10 +304,15 @@ class ObjectEventsSharingTestCase(base.ShakenFistTestCase):
         # kept returning 100 rows.
         for module, name in self.ENDPOINTS:
             endpoint = getattr(module, name)
-            self.assertEqual(
-                'api_base.EVENTS_LIMIT_DEFAULT', self._limit_default(endpoint),
-                '%s.%s must default limit to api_base.EVENTS_LIMIT_DEFAULT'
-                % (module.__name__, name))
+            default = self._limit_default(endpoint)
+            # endswith rather than equality: importing the constant
+            # directly instead of via api_base is an equally correct
+            # spelling, and this is meant to reject a bare literal, not
+            # to pin one import style.
+            self.assertTrue(
+                default and default.endswith('EVENTS_LIMIT_DEFAULT'),
+                '%s.%s must default limit to EVENTS_LIMIT_DEFAULT, not %s'
+                % (module.__name__, name, default))
 
     def test_all_events_endpoints_use_the_shared_helper(self):
         for module, name in self.ENDPOINTS:

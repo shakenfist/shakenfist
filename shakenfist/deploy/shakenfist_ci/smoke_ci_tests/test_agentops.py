@@ -139,6 +139,27 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
 
+        # A malformed mode must be rejected cleanly. mode is documented
+        # as required but nothing enforced it, so omitting it used to
+        # return a 400 carrying an interpreter TypeError message, and a
+        # wrong-typed one did the same. Same defect class as issue
+        # 3609. The client helper always sends a string, so the body is
+        # driven directly here.
+        url = '/instances/' + inst['uuid'] + '/agent/put'
+        exc = self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.test_client._request_url, 'POST', url,
+            data={'blob_uuid': input_blob, 'path': '/tmp/fibonacci.py'})
+        self.assertEqual(400, exc.status_code)
+        self.assertIn('no mode specified', exc.text)
+        self.assertNotIn('NoneType', exc.text)
+
+        # The present-but-wrong-typed case stays unit-only: it is a 406,
+        # which the client treats as "dependencies not ready" and
+        # retries for the full 60 second ASYNC_PAUSE deadline before
+        # raising. Not worth a minute of CI wall clock to re-prove what
+        # InstanceAgentPutModeTestCase already covers.
+
         # Request that the agent copy the file to the instance
         op = self.test_client.instance_put_blob(
             inst['uuid'], input_blob, '/tmp/fibonacci.py', 'ugo+rx')

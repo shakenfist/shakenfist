@@ -803,12 +803,23 @@ def coerce_int(value: Any) -> Optional[int]:
         accepts those non-standard literals, and int(float('inf')) is
         an OverflowError rather than a ValueError, so a guard catching
         only the first two answers a malformed body with a 500 and a
-        recorded server exception.
+        recorded server exception. The float check below now rejects
+        both before int() is reached, but the exception stays in the
+        tuple: this helper is not only called with values which came
+        from JSON, and the point of it is that no caller has to know
+        which of the three applies to them.
 
-    Booleans are rejected rather than coerced. bool subclasses int, so
-    int(True) is 1: answering obviously malformed input with a
-    plausible number is worse than rejecting it. This matches the
-    posture auth.py's `_validate_key_expiry` already takes.
+    Two kinds of value which int() would happily convert are rejected
+    instead, because answering obviously malformed input with a
+    plausible number is worse than rejecting it -- the posture
+    auth.py's `_validate_key_expiry` already takes:
+
+      * booleans, since bool subclasses int and int(True) is 1;
+      * floats with a fractional part, so that 5.9 is not silently
+        answered as 5. This also makes the JSON number and JSON string
+        forms agree, since '5.5' has always been rejected. An integral
+        float such as 5.0 is still accepted, and this is what rejects
+        Infinity and NaN before int() ever sees them.
 
     Returning None rather than raising keeps the caller's
     sf_api.error() call outside an except block, where sys.exc_info()
@@ -816,6 +827,8 @@ def coerce_int(value: Any) -> Optional[int]:
     what is ordinary bad client input.
     """
     if isinstance(value, bool):
+        return None
+    if isinstance(value, float) and not value.is_integer():
         return None
 
     try:

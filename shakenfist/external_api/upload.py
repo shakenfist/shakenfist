@@ -79,6 +79,22 @@ class UploadTruncateEndpoint(api_base.Resource):
     @api_base.redirect_upload_request
     @api_base.log_token_use
     def post(self, upload_uuid=None, offset=None, upload_from_db=None):
+        # Logged before validation, not after: a client repeatedly
+        # attempting out of range truncates is exactly what an operator
+        # would want to see, so the attempt is recorded whether or not
+        # it is accepted, and each rejection below records why.
+        upload_from_db.add_event(EVENT_TYPE_AUDIT, 'truncate request from REST API',
+                                 extra={'offset': str(offset)})
+
+        def _reject(status, message):
+            # str(offset) because offset is whatever the client sent:
+            # a float infinity or a nested structure would otherwise
+            # have to survive JSON serialisation into the event row.
+            upload_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'truncate request rejected',
+                extra={'offset': str(offset), 'reason': message})
+            return sf_api.error(status, message, suppress_traceback=True)
+
         # The same defect as issue 3609: this used to be an unguarded
         # int(), so {'offset': null} returned a 400 carrying the
         # interpreter's own TypeError message, while a non-numeric
@@ -88,11 +104,9 @@ class UploadTruncateEndpoint(api_base.Resource):
         # 500 path out of os.truncate.
         truncate_to = api_base.coerce_int(offset)
         if truncate_to is None:
-            return sf_api.error(400, 'offset is not an integer',
-                                suppress_traceback=True)
+            return _reject(400, 'offset is not an integer')
         if truncate_to < 0:
-            return sf_api.error(400, 'offset must not be negative',
-                                suppress_traceback=True)
+            return _reject(400, 'offset must not be negative')
 
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         upload_path = os.path.join(upload_dir, str(upload_from_db.uuid))
@@ -102,8 +116,12 @@ class UploadTruncateEndpoint(api_base.Resource):
         except FileNotFoundError:
             # Nothing has been sent for this upload yet. os.truncate
             # would raise FileNotFoundError, which becomes a 500.
-            return sf_api.error(404, 'upload has no data',
-                                suppress_traceback=True)
+            # Truncating an empty upload to zero is a no-op rather than
+            # an error though, so a client which resets before writing
+            # -- or retries a reset -- does not have to special case it.
+            if truncate_to == 0:
+                return
+            return _reject(404, 'upload has no data')
 
         # Bounded above as well as below. Truncating past the end of an
         # upload is not a meaningful operation for this endpoint, and
@@ -114,12 +132,10 @@ class UploadTruncateEndpoint(api_base.Resource):
         # the current length instead succeeds, growing the upload into
         # an arbitrarily large sparse file at the caller's choosing.
         if truncate_to > current_size:
-            return sf_api.error(400, 'offset is beyond the end of the upload',
-                                suppress_traceback=True)
+            return _reject(400, 'offset is beyond the end of the upload')
 
-        # No makedirs here any more: the stat above only succeeds if
-        # the directory and the upload file both already exist, which
-        # the data endpoint guarantees before there is anything to
+        # No makedirs here: the stat above only succeeds if the
+        # directory and the upload file both already exist, which the
+        # data endpoint guarantees before there is anything to
         # truncate.
-        upload_from_db.add_event(EVENT_TYPE_AUDIT, 'truncate request from REST API')
         os.truncate(upload_path, truncate_to)

@@ -641,11 +641,12 @@ class ArtifactVersionsEndpoint(api_base.Resource):
             ('artifact_ref', 'query', 'uuidorname',
              'The UUID or name of the artifact.', True),
             ('max_versions', 'post', 'integer',
-             'The maximum number of versions, or revert to the default it not set.',
+             'The maximum number of versions, which must not be negative. '
+             'Zero reverts to the configured default.',
              False)
         ],
         [(200, 'No return value', ''),
-         (400, 'The max_versions must be an integer.', None),
+         (400, 'The max_versions must be a non-negative integer.', None),
          (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_ownership
@@ -662,6 +663,16 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         mv = api_base.coerce_int(max_versions)
         if mv is None:
             return sf_api.error(400, 'max version is not an integer',
+                                suppress_traceback=True)
+
+        # Range checked as well as type checked. A negative maximum is
+        # not merely meaningless: delete_old_versions() computes
+        # sorted(indexes)[:-max], so setting -1 deletes the oldest
+        # version immediately and again on every subsequent index add,
+        # with no error to the caller. Zero keeps its documented
+        # meaning of "revert to the configured default".
+        if mv < 0:
+            return sf_api.error(400, 'max version must not be negative',
                                 suppress_traceback=True)
         artifact_from_db.add_event(
             EVENT_TYPE_AUDIT, 'max versions set from REST API')

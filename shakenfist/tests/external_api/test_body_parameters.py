@@ -35,8 +35,17 @@ class CoerceIntTestCase(base.ShakenFistTestCase):
         self.assertEqual(5, api_base.coerce_int('5'))
         self.assertEqual(-1, api_base.coerce_int('-1'))
 
-    def test_floats_are_truncated(self):
-        self.assertEqual(5, api_base.coerce_int(5.9))
+    def test_integral_floats_are_accepted(self):
+        self.assertEqual(5, api_base.coerce_int(5.0))
+        self.assertEqual(-2, api_base.coerce_int(-2.0))
+
+    def test_fractional_floats_are_rejected(self):
+        """int() would truncate 5.9 to 5. The string '5.5' has always
+        been rejected, so accepting the float form would mean the two
+        JSON spellings of the same value disagreed."""
+        for value in (5.9, -0.5, 0.1):
+            self.assertIsNone(api_base.coerce_int(value),
+                              'coerce_int(%r) should be None' % (value,))
 
     def test_type_errors_are_rejected(self):
         """int() raises TypeError, not ValueError, for these."""
@@ -140,15 +149,19 @@ class InstanceAgentPutModeTestCase(base.ShakenFistTestCase):
             headers={'Authorization': self.auth_token},
             data=json.dumps(body))
 
-    def test_missing_mode_is_a_clean_406(self):
-        resp = self._put({'blob_uuid': 'b', 'path': '/tmp/f'})
+    def test_missing_mode_is_a_clean_400(self):
+        """A missing required parameter is a 400 like every other one.
+        A present but unusable mode keeps this endpoint's existing 406,
+        so a client can tell the two apart."""
+        for body in ({'blob_uuid': 'b', 'path': '/tmp/f'},
+                     {'blob_uuid': 'b', 'path': '/tmp/f', 'mode': None}):
+            resp = self._put(body)
 
-        self.assertEqual(406, resp.status_code)
-        self.assertEqual('invalid mode: must be a string or integer',
-                         resp.get_json()['error'])
+            self.assertEqual(400, resp.status_code, '%r' % (body,))
+            self.assertEqual('no mode specified', resp.get_json()['error'])
 
     def test_wrong_typed_mode_is_a_clean_406(self):
-        for mode in (None, [], {}, True, 0.5):
+        for mode in ([], {}, True, 0.5):
             resp = self._put(
                 {'blob_uuid': 'b', 'path': '/tmp/f', 'mode': mode})
 
@@ -286,7 +299,17 @@ class UploadTruncateOffsetTestCase(base.ShakenFistTestCase):
 
     def test_upload_with_no_data_is_a_404(self):
         os.unlink(self.upload_path)
-        resp = self._truncate(0)
+        resp = self._truncate(1)
 
         self.assertEqual(404, resp.status_code)
         self.assertEqual('upload has no data', resp.get_json()['error'])
+
+    def test_truncating_an_empty_upload_to_zero_succeeds(self):
+        """A no-op rather than an error, so a client which resets
+        before writing -- or retries a reset -- does not have to
+        special case the 404."""
+        os.unlink(self.upload_path)
+        resp = self._truncate(0)
+
+        self.assertEqual(200, resp.status_code)
+        self.assertFalse(os.path.exists(self.upload_path))

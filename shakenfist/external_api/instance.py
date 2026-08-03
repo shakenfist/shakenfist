@@ -1571,7 +1571,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
              'The mode of the file once written, in symbolic or numeric form.', True)
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance.', None),
+         (400, 'No agent connection to instance, or no mode specified.', None),
          (404, 'Instance or blob not found.', None),
          (406, 'Invalid mode specified', None)]))
     @api_base.arg_is_instance_ref
@@ -1591,6 +1591,13 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         # client as a 400 carrying the interpreter's own message --
         # the same defect as issue 3609, reachable here by simply
         # omitting the field.
+        #
+        # A missing mode is a 400 like every other missing parameter,
+        # while a present but unusable one keeps this endpoint's
+        # existing 406, so a client can tell "you forgot it" from
+        # "that is not a mode".
+        if mode is None:
+            return sf_api.error(400, 'no mode specified')
         if not isinstance(mode, (str, int)) or isinstance(mode, bool):
             return sf_api.error(406, 'invalid mode: must be a string or integer')
 
