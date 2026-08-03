@@ -109,15 +109,39 @@ cp /path/to/development/templates/test-drift-fix/test-drift-fix.yml \
 
 ### Step 2: Add Automated Reviewer to CI
 
-Modify your main CI workflow (e.g. `functional-tests.yml`) to add:
+Modify your main CI workflow (e.g. `functional-tests.yml`) to add an
+`automated_reviewer` job which calls the shared reusable workflow:
 
-1. A top-level `permissions` block with `pull-requests: write`
-2. A `check-bot-commit` job to prevent infinite review loops
-3. An `automated_reviewer` job that runs after tests pass
+```yaml
+  automated_reviewer:
+    name: "Automated reviewer"
+    needs: [sanity_checks, smoke_collection]
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    uses: shakenfist/actions/.github/workflows/pr-auto-review.yml@main
+```
+
+Only two things are per-project: the `needs:` list, which names that
+project's test jobs and is therefore the "review only once CI has
+passed" gate, and the `permissions:` block, which has to be at the call
+site because a cross-repository reusable workflow cannot grant itself
+more token scope than its caller has.
+
+Do not add `secrets: inherit`. Neither the reusable workflow nor the
+`review-pr-with-claude` action reads a secret -- both authenticate with
+`github.token` -- so inheriting would hand every secret the calling
+repository has to a workflow in another repository for no benefit.
+
+Projects do not need their own `check-bot-commit` job for the reviewer;
+the reusable workflow does that check itself. A project may still keep
+one for other automation, as Shaken Fist does for its
+`automated_delinter`.
 
 See the
 [template README](https://github.com/shakenfist/development/tree/main/templates/ci-review-automation/README.md)
-for the exact YAML snippets.
+for the other snippets.
 
 ### Step 3: Ensure Runner Labels
 
@@ -129,8 +153,14 @@ Your self-hosted runners need these labels:
 
 ## Preventing Infinite Loops
 
-The `check-bot-commit` job detects if the last commit was authored
-by `bot@shakenfist.com`. If so, the automated reviewer is skipped.
+The reusable review workflow reads the PR head commit over the API and
+skips the review if it was authored by `bot@shakenfist.com` or by
+`noreply@anthropic.com` (the address a Claude Code commit made on a
+runner carries). Reading the head commit by SHA rather than taking the
+last element of the PR commits list matters, because that endpoint pages
+at thirty and an "address comments" run which makes one commit per
+review item passes thirty easily.
+
 This prevents loops where:
 
 1. Bot makes a commit (from test fixing or comment addressing)
@@ -149,7 +179,14 @@ repository:
 - **pr-bot-trigger** -- parses `@shakenfist-bot` commands, checks
   permissions, adds reactions, posts status messages
 - **review-pr-with-claude** -- runs automated code reviews with
-  structured JSON output and embedded review data
+  structured JSON output and embedded review data. Called directly by
+  `pr-re-review.yml`, which passes `force` so that a human asking for a
+  re-review is the only way to get a second review on a PR
+- **.github/workflows/pr-auto-review.yml** -- a reusable workflow
+  wrapping `review-pr-with-claude` for the CI reviewer. It owns the
+  runner, the 60 minute timeout, the pull-request-event and
+  same-repository restrictions, its own concurrency group, and the
+  bot-commit check, so those cannot drift between projects
 
 ## Projects Using This Automation
 

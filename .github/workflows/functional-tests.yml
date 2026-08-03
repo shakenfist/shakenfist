@@ -32,6 +32,11 @@ jobs:
     name: "Check bot commit"
     if: github.event_name == 'pull_request'
     runs-on: [self-hosted, static]
+    # A checkout and one git command. These small jobs are not on the
+    # scarce claude-code runners, but a wedged one still occupies a
+    # static runner for GitHub's six hour default, and a gate job which
+    # has not finished in minutes is never going to.
+    timeout-minutes: 10
     outputs:
       is_bot: ${{ steps.check.outputs.is_bot }}
     steps:
@@ -58,6 +63,7 @@ jobs:
   check_paths:
     name: "Check paths"
     runs-on: [self-hosted, static]
+    timeout-minutes: 10
     outputs:
       code_changed: ${{ steps.filter.outputs.code || 'true' }}
     steps:
@@ -101,6 +107,10 @@ jobs:
       contents: read
       pull-requests: write
     runs-on: [self-hosted, static]
+    # The steps below carry their own timeouts, which add up to forty
+    # minutes; this is the backstop for the checkout and for any step
+    # added later without one.
+    timeout-minutes: 45
     needs: [check_paths]
     if: needs.check_paths.outputs.code_changed != 'false'
     outputs:
@@ -283,10 +293,30 @@ jobs:
     name: "Automated reviewer"
     # The needs: list is the "review only once CI has passed" gate:
     # a job skipped because a dependency failed never starts the
-    # reusable workflow. Everything else about the reviewer --
-    # runner, timeout, fork restriction, bot-commit check --
-    # lives in the shared workflow so it stays in step with the
-    # rest of the fleet.
+    # reusable workflow. Everything else about the reviewer lives in
+    # the shared workflow, so it stays in step with the rest of the
+    # fleet instead of drifting per project. Specifically, the review
+    # job there:
+    #
+    #   * runs on [self-hosted, claude-code] with timeout-minutes: 60,
+    #   * is guarded by "github.event_name == 'pull_request' &&
+    #     github.event.pull_request.head.repo.full_name ==
+    #     github.repository", so merge_group, workflow_dispatch and
+    #     fork PRs never reach it,
+    #   * declares its own concurrency group
+    #     "pr-auto-review-<repo>-<pr number>" with
+    #     cancel-in-progress: true, which is a narrower group than the
+    #     per-workflow one this job used to carry,
+    #   * checks the head commit's author over the API (by head SHA,
+    #     not the paged commits list) and skips when it is
+    #     bot@shakenfist.com or noreply@anthropic.com, before it even
+    #     checks the repository out. That is the same loop protection
+    #     check_bot_commit gives automated_delinter below, done
+    #     without a runner and matching one more address.
+    #
+    # Those guards are deliberately not repeated here: the shared
+    # workflow owns them so no project can lose one by editing its own
+    # CI.
     needs: [sanity_checks, smoke_collection]
     # A cross-repository reusable workflow cannot grant itself more
     # token scope than its caller has, so the permissions go here.
@@ -294,8 +324,13 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+    # No "secrets: inherit": neither this workflow nor the
+    # review-pr-with-claude action it calls reads a secret -- both
+    # authenticate with github.token, which comes from the permissions
+    # above. Inheriting would hand every secret this repository has,
+    # including DEPENDENCIES_TOKEN, to a workflow in another
+    # repository for no benefit.
     uses: shakenfist/actions/.github/workflows/pr-auto-review.yml@main
-    secrets: inherit
 
   # Multi-node merge-queue functional coverage: each matrix entry deploys a
   # topology (slim-primary / slim-tier) via the shakenfist.shakenfist collection
@@ -403,6 +438,10 @@ jobs:
       && needs.check_paths.outputs.code_changed != 'false'
     needs: [check_paths]
     runs-on: [self-hosted, vm, debian-12]
+    # The deploy and test steps below are capped at 90 and 60 minutes;
+    # this is the backstop for the setup and teardown around them, and
+    # is still far short of GitHub's six hour default.
+    timeout-minutes: 180
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle-collection
       cancel-in-progress: true
@@ -602,6 +641,8 @@ jobs:
   can_see_status:
     name: "Can see status"
     runs-on: [self-hosted, static]
+    # Runs "true", so five minutes is generous even on a busy runner.
+    timeout-minutes: 5
     steps:
       - name: "Immediate success"
         run: true
@@ -616,6 +657,8 @@ jobs:
     permissions:
       actions: read
     runs-on: [self-hosted, static]
+    # A jq expression over the needs context.
+    timeout-minutes: 5
     steps:
       - env:
           NEEDS_JSON: "${{toJSON(needs)}}"
@@ -637,6 +680,8 @@ jobs:
     permissions:
       actions: read
     runs-on: [self-hosted, static]
+    # A jq expression over the needs context.
+    timeout-minutes: 5
     steps:
       - env:
           NEEDS_JSON: "${{toJSON(needs)}}"
