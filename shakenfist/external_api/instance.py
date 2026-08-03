@@ -1771,7 +1771,10 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get the outstanding cluster operations for an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('all', 'body', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(
             200,
             'A list of the cluster operations not yet executed for this instance.',

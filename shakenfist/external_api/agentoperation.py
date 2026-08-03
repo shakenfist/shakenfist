@@ -182,7 +182,10 @@ class InstanceAgentOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List agent operations for an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('all', 'body', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(200, 'Information about a agentoperations for an instance.',
           agentoperation_instance_example),
          (404, 'Instance not found.', None)]))

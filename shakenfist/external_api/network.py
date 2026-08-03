@@ -152,7 +152,9 @@ class NetworkEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Delete a network.',
         [('network_ref', 'path', 'uuidorname',
-          'The UUID or name of the network.', True)],
+          'The UUID or name of the network.', True),
+         ('namespace', 'body', 'namespace',
+          'Scope the name lookup to this namespace.', False)],
         [(202,
           'Deletion has been queued. The response body identifies the cluster '
           'operation that will perform the work; clients should poll the '
@@ -785,7 +787,10 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get the outstanding cluster operations for a network.',
         [('network_ref', 'path', 'uuidorname',
-          'The UUID or name of the network.', True)],
+          'The UUID or name of the network.', True),
+         ('all', 'body', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(
             200,
             'A list of the cluster operations not yet executed for this network.',

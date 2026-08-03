@@ -664,7 +664,9 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Trust an external namespace.',
         [
-            ('namespace', 'path', 'string', 'The namespace to trust.', True)
+            ('namespace', 'path', 'string', 'The namespace to trust.', True),
+            ('external_namespace', 'body', 'namespace',
+             'The namespace being granted trust.', True)
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
          (400, 'No external namespace specified.', None),
