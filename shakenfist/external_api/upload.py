@@ -78,16 +78,15 @@ class UploadTruncateEndpoint(api_base.Resource):
     @api_base.redirect_upload_request
     @api_base.log_token_use
     def post(self, upload_uuid=None, offset=None, upload_from_db=None):
-        # The same defect as issue 3609: log_request merges JSON body
-        # values into kwargs verbatim, so {'offset': null} reached
-        # int() as None and returned a 400 carrying the interpreter's
-        # own TypeError message, while {'offset': 'banana'} raised
-        # ValueError, escaped to suppress_exceptions_to_client and
-        # became a 500 with a ValueError repr in the body. A negative
-        # offset took the same 500 path out of os.truncate.
-        try:
-            truncate_to = int(offset)
-        except (TypeError, ValueError):
+        # The same defect as issue 3609: this used to be an unguarded
+        # int(), so {'offset': null} returned a 400 carrying the
+        # interpreter's own TypeError message, while a non-numeric
+        # offset raised ValueError, escaped to
+        # suppress_exceptions_to_client and became a 500 with a
+        # ValueError repr in the body. A negative offset took the same
+        # 500 path out of os.truncate.
+        truncate_to = api_base.coerce_int(offset)
+        if truncate_to is None:
             return sf_api.error(400, 'offset is not an integer',
                                 suppress_traceback=True)
         if truncate_to < 0:

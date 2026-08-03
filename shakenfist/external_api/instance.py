@@ -1292,10 +1292,13 @@ def _validate_instance_metadata(key, value):
             return sf_api.error(
                 400, 'value for "affinity" key should be a valid JSON dictionary')
 
+        # api_base.coerce_int rather than int(): a null, list or
+        # Infinity affinity value raises something other than
+        # ValueError, which escaped this guard and was returned to the
+        # client as a 400 carrying the interpreter's own message --
+        # the same defect as issue 3609.
         for key_type, dv in value.items():
-            try:
-                int(dv)
-            except ValueError:
+            if api_base.coerce_int(dv) is None:
                 return sf_api.error(400, 'affinity dictionary values should be integers')
 
 
@@ -1363,25 +1366,19 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.log_token_use
     def get(self, instance_ref=None, length=None, instance_from_db=None):
-        parsed_length = None
-
         if not length:
             parsed_length = 10240
         else:
-            try:
-                parsed_length = int(length)
-            except (TypeError, ValueError):
-                # TypeError as well as ValueError: log_request merges
-                # JSON body values into kwargs verbatim, so a
-                # {'length': [5]} body reaches int() as a list. Catching
-                # only ValueError let that escape to
-                # handle_authorization_exceptions, which turns any
-                # TypeError into a 400 carrying the interpreter's own
-                # message -- the same defect as issue 3609.
-                pass
-
-            # This is done this way so that there is no active traceback for
-            # the sf_api.error call, otherwise it would be logged.
+            # api_base.coerce_int rather than int(): log_request merges
+            # JSON body values into kwargs verbatim, so a {'length':
+            # [5]} body reaches this as a list and {'length': Infinity}
+            # as a float infinity. Those raise TypeError and
+            # OverflowError, neither of which the ValueError-only guard
+            # here used to catch, so both leaked to the client -- the
+            # same defect as issue 3609. Returning None rather than
+            # raising also means the sf_api.error call below has no
+            # active traceback, which would otherwise be logged.
+            parsed_length = api_base.coerce_int(length)
             if parsed_length is None:
                 return sf_api.error(400, 'length is not an integer')
 
@@ -1586,9 +1583,18 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
-        try:
-            int(mode)
-        except ValueError:
+        # mode reaches here through the untyped body-to-kwargs merge
+        # and is not enforced as required despite the swagger saying
+        # so, so it can be absent (None) or any JSON type. Both int()
+        # and symbolic_to_numeric_permissions() raise TypeError for
+        # those, which handle_authorization_exceptions returned to the
+        # client as a 400 carrying the interpreter's own message --
+        # the same defect as issue 3609, reachable here by simply
+        # omitting the field.
+        if not isinstance(mode, (str, int)) or isinstance(mode, bool):
+            return sf_api.error(406, 'invalid mode: must be a string or integer')
+
+        if api_base.coerce_int(mode) is None:
             try:
                 symbolicmode.symbolic_to_numeric_permissions(mode)
             except ValueError as e:
@@ -1596,7 +1602,12 @@ class InstanceAgentPutEndpoint(api_base.Resource):
 
         b = Blob.from_db(blob_uuid)
         if not b:
-            return self.api_error(404, 'blob not found')
+            # sf_api.error, not self.api_error: Resource has no
+            # api_error method, so putting a file with a blob_uuid
+            # which does not exist raised AttributeError and became a
+            # 500 carrying an interpreter message rather than this
+            # 404. This was the only use of that spelling in the tree.
+            return sf_api.error(404, 'blob not found')
 
         commands = [
             {

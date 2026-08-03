@@ -43,13 +43,20 @@ class TestUploads(base.BaseNamespacedTestCase):
         upl = self.test_client.create_upload()
         self.test_client.send_upload(upl['uuid'], string.ascii_letters)
 
-        for offset in ('banana', '-1'):
+        # Assert the specific message per case: 'offset' alone matches
+        # either, so it could not tell the two rejection paths apart
+        # and would keep passing if one regressed into the other.
+        cases = (
+            ('banana', 'offset is not an integer'),
+            ('-1', 'offset must not be negative'),
+        )
+        for offset, expected in cases:
             exc = self.assertRaises(
                 apiclient.RequestMalformedException,
                 self.test_client._request_url,
                 'POST', '/upload/' + upl['uuid'] + '/truncate/' + offset)
             self.assertEqual(400, exc.status_code, 'offset %s' % offset)
-            self.assertIn('offset', exc.text)
+            self.assertIn(expected, exc.text, 'offset %s' % offset)
 
         # A valid truncate still works after the rejections, so the
         # upload was not damaged by them.

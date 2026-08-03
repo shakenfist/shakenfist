@@ -66,6 +66,32 @@ class ArtifactIntegerParameterTestCase(base.ShakenFistTestCase):
         self.assertEqual('max version is not an integer',
                          resp.get_json()['error'])
 
+    def test_infinite_max_versions_is_a_clean_400(self):
+        # int(float('inf')) raises OverflowError rather than TypeError
+        # or ValueError, so this used to be a 500 with an interpreter
+        # message in the body. The raw body is sent because Python's
+        # JSON parser accepts the non-standard Infinity literal.
+        resp = self.client.post(
+            '/artifacts/%s/versions' % self.artifact.uuid,
+            headers=self._headers(),
+            data='{"max_versions": Infinity}',
+            content_type='application/json')
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('max version is not an integer',
+                         resp.get_json()['error'])
+
+    def test_infinite_version_id_is_a_clean_400(self):
+        resp = self.client.delete(
+            '/artifacts/%s/versions/1' % self.artifact.uuid,
+            headers=self._headers(),
+            data='{"version_id": -Infinity}',
+            content_type='application/json')
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('version index is not an integer',
+                         resp.get_json()['error'])
+
     def test_max_versions_is_set(self):
         with mock.patch.object(Artifact, 'max_versions',
                                new_callable=mock.PropertyMock) as mv:

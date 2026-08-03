@@ -43,6 +43,8 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
+from shakenfist.constants import EVENTS_LIMIT_DEFAULT
+from shakenfist.constants import EVENTS_LIMIT_MAX
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -5083,8 +5085,9 @@ def _direct_get_object_events(
     the SQL ``(:event_type_filter = '' OR ...)`` clause short-circuits
     so no rows are excluded.
 
-    Limit hardening: ``limit <= 0`` is replaced with the default 100,
-    and ``limit > 1000`` is capped at 1000. The current REST API
+    Limit hardening: ``limit <= 0`` is replaced with
+    constants.EVENTS_LIMIT_DEFAULT, and a larger limit is capped at
+    constants.EVENTS_LIMIT_MAX. The current REST API
     allows negative limit which the legacy ``EventLog.read_events()``
     interprets as "all rows"; this caps that foot-gun. Cursor-style
     pagination is deferred (see Future work in the master plan).
@@ -5102,9 +5105,9 @@ def _direct_get_object_events(
         match.
     """
     if limit <= 0:
-        limit = 100
-    if limit > 1000:
-        limit = 1000
+        limit = EVENTS_LIMIT_DEFAULT
+    if limit > EVENTS_LIMIT_MAX:
+        limit = EVENTS_LIMIT_MAX
 
     engine = _get_engine()
 
@@ -5317,7 +5320,9 @@ def _grpc_get_object_events(
     try:
         stub = _get_database_stub()
         if limit <= 0:
-            limit = 100
+            limit = EVENTS_LIMIT_DEFAULT
+        if limit > EVENTS_LIMIT_MAX:
+            limit = EVENTS_LIMIT_MAX
         request = database_pb2.GetObjectEventsRequest(
             object_type=cast(
                 shakenfist_enums_pb2.ObjectType.ValueType,

@@ -21,6 +21,20 @@ ETCD_ATTEMPT_TIMEOUT = 60
 CLUSTER_LOCK_LEASE_SECONDS = 60
 
 
+# Bounds on the number of events a single per-object events read may
+# return. Enforced in three places: the REST API layer clamps before
+# building a request (an out of range value would otherwise overflow
+# the protobuf int32 limit field), and both mariadb read paths clamp
+# again for callers which are not the REST API. Lives here rather than
+# in either of those so all three agree without
+# ``shakenfist.external_api.base`` and ``shakenfist.mariadb`` having to
+# import each other -- base.py already imports mariadb, so the reverse
+# would be circular. The API's swagger description is built from these
+# values, so the published contract cannot drift from what is enforced.
+EVENTS_LIMIT_DEFAULT = 100
+EVENTS_LIMIT_MAX = 1000
+
+
 # The resources daemon publishes a per-second rate for each raw psutil
 # counter by appending this suffix to the counter name. The full key for
 # the disk busy rate is spelled out here because both the scheduler and

@@ -75,10 +75,16 @@ Five REST endpoints return events for each object type:
 | `GET /nodes/<node>/events` | Node |
 | `GET /blobs/<uuid>/events` | Blob |
 
-All endpoints accept an optional `limit` query parameter
-(default 100). The server enforces a hard cap of 1000 rows
-per request; a `limit` of 0 or any negative value is treated
-as the default 100.
+All endpoints accept an optional `limit` parameter (default
+100) and an optional `event_type` filter. Both are read from
+the JSON request body, not from the query string -- a
+`?limit=5` query parameter is ignored. The server enforces a
+hard cap of 1000 rows per request; a `limit` of 0 or any
+negative value is treated as the default 100.
+
+A `limit` which is not an integer, or an `event_type` which is
+not a string, is rejected with HTTP 400 and an error message
+naming the offending parameter.
 
 Events are returned newest-first. Each event in the response
 includes at minimum:

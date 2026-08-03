@@ -127,6 +127,25 @@ class ObjectEventsLimitTestCase(base.ShakenFistTestCase):
                              resp.get_json()['error'])
             self.get_object_events.assert_not_called()
 
+    def test_infinite_limit_is_a_clean_400(self):
+        """int(float('inf')) raises OverflowError, which neither of the
+        two obvious guards catches, so this used to be a 500 carrying
+        'OverflowError(...)' -- issue 3609 with a third exception name.
+        Python's JSON parser accepts the non-standard Infinity and NaN
+        literals, so the raw body is sent here: the json= kwarg would
+        re-encode through the same permissive encoder, but sending the
+        bytes is what a client actually does."""
+        for body in ('{"limit": Infinity}', '{"limit": -Infinity}',
+                     '{"limit": NaN}'):
+            self.get_object_events.reset_mock()
+            resp = self.client.get('/events', data=body,
+                                   content_type='application/json')
+
+            self.assertEqual(400, resp.status_code, body)
+            self.assertEqual('limit must be an integer',
+                             resp.get_json()['error'])
+            self.get_object_events.assert_not_called()
+
     def test_boolean_limit_is_a_clean_400(self):
         """bool is a subclass of int, so without an explicit check
         {'limit': true} silently returns exactly one event and

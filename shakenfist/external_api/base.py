@@ -1,6 +1,9 @@
 import json
 import sys
 import traceback
+from typing import Any
+from typing import Optional
+from typing import Union
 
 import flask
 import flask_restful
@@ -28,6 +31,8 @@ from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENTS_LIMIT_DEFAULT
+from shakenfist.constants import EVENTS_LIMIT_MAX
 from shakenfist.daemons import daemon
 from shakenfist.external_api import scopes as api_scopes
 from shakenfist.instance import Instance
@@ -664,7 +669,9 @@ def handle_authorization_exceptions(func):
             # str(e) then hands the interpreter's own message to the
             # client. Issue 3609 was one instance of that (the events
             # endpoints' `limit`); the endpoints validate their typed
-            # body parameters explicitly for exactly this reason.
+            # body parameters explicitly for exactly this reason, and
+            # any handler reading an integer out of a body should use
+            # coerce_int() below rather than calling int() itself.
             #
             # The systemic fix is to validate body parameters
             # declaratively with the webargs use_kwargs schemas already
@@ -769,20 +776,63 @@ def suppress_exceptions_to_client(func):
     return wrapper
 
 
-# The bounds object_events_response enforces on limit. The endpoints
-# state them in their swagger parameter description via
-# EVENTS_LIMIT_DESCRIPTION, so the published API contract and the code
-# cannot drift apart.
-EVENTS_LIMIT_DEFAULT = 100
-EVENTS_LIMIT_MAX = 1000
+# The bounds object_events_response enforces on limit, described for
+# the published OpenAPI. The values themselves live in constants.py
+# because mariadb enforces them too and cannot import this module.
 EVENTS_LIMIT_DESCRIPTION = (
     'The number of events to return, defaults to %d, maximum %d. Values of '
     'zero or less are treated as the default.'
     % (EVENTS_LIMIT_DEFAULT, EVENTS_LIMIT_MAX))
 
 
-def object_events_response(object_type, object_uuid, limit, event_type):
+def coerce_int(value: Any) -> Optional[int]:
+    """Coerce a request parameter to an int, or None if it cannot be.
+
+    Every endpoint which reads an integer out of a request body should
+    use this rather than calling int() itself, because getting the
+    exception tuple right is easy to get wrong and getting it wrong is
+    not a local mistake: log_request merges JSON body values into
+    handler kwargs verbatim (issue 3612), and
+    handle_authorization_exceptions turns any escaping TypeError into
+    a 400 carrying the interpreter's own message. int() raises three
+    different exceptions for input a client can actually send:
+
+      * TypeError for null, a list or a dict;
+      * ValueError for a non-numeric string, and for NaN;
+      * OverflowError for Infinity and -Infinity. Python's JSON parser
+        accepts those non-standard literals, and int(float('inf')) is
+        an OverflowError rather than a ValueError, so a guard catching
+        only the first two answers a malformed body with a 500 and a
+        recorded server exception.
+
+    Booleans are rejected rather than coerced. bool subclasses int, so
+    int(True) is 1: answering obviously malformed input with a
+    plausible number is worse than rejecting it. This matches the
+    posture auth.py's `_validate_key_expiry` already takes.
+
+    Returning None rather than raising keeps the caller's
+    sf_api.error() call outside an except block, where sys.exc_info()
+    is no longer live and the full int() traceback is not logged for
+    what is ordinary bad client input.
+    """
+    if isinstance(value, bool):
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def object_events_response(
+        object_type: str, object_uuid: str, limit: Any,
+        event_type: Any) -> Union[list[dict[str, Any]], flask.Response]:
     """Build the per-object events REST response.
+
+    Returns either the shaped event list or, for a malformed ``limit``
+    or ``event_type``, the 400 response itself -- flask_restful
+    short-circuits on a Response, and all five callers return this
+    value directly and unmodified.
 
     Shared by the /{instance,artifact,network,node,blob}/<u>/events
     endpoints: each handler does authn / authz / object lookup, then
@@ -810,27 +860,15 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     API's guarantee about ``limit`` complete rather than partial, and
     keeps the two layers agreeing on the ceiling.
     """
-    # bool is a subclass of int, so int(True) is 1 and int(False) is 0.
-    # Coercing those silently would answer obviously malformed input
-    # with exactly one event, or with the default, which is more
-    # surprising than a rejection -- and the event_type check below
-    # already rejects a wrong-typed value outright.
-    if isinstance(limit, bool):
-        return sf_api.error(400, 'limit must be an integer',
-                            suppress_traceback=True)
-
-    try:
-        limit = int(limit)
-    except (TypeError, ValueError):
+    limit = coerce_int(limit)
+    if limit is None:
         # suppress_traceback because this is ordinary bad client input,
-        # not a server fault: sys.exc_info() is still live inside the
-        # except block, so without it the whole int() traceback is
-        # logged for every malformed request.
+        # not a server fault.
         return sf_api.error(400, 'limit must be an integer',
                             suppress_traceback=True)
 
-    # Mirrors the hardening documented on
-    # mariadb._direct_get_object_events.
+    # Mirrors the hardening in mariadb._direct_get_object_events and
+    # _grpc_get_object_events, from the same constants.
     if limit <= 0:
         limit = EVENTS_LIMIT_DEFAULT
     limit = min(limit, EVENTS_LIMIT_MAX)
