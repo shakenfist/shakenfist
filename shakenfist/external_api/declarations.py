@@ -109,7 +109,7 @@ def literal(node):
         return CONSTANTS.get(ast.unparse(node).split('.')[-1])
 
 
-def route_parameters():
+def route_parameters(app=APP):
     """Path parameter names per endpoint class, from the mounted routes.
 
     Werkzeug routes may name a converter, as in ``<path:label_name>`` or
@@ -118,7 +118,7 @@ def route_parameters():
     so silently skipped three LabelEndpoint declarations.
     """
     out = collections.defaultdict(set)
-    for node in ast.walk(_parse(APP)):
+    for node in ast.walk(_parse(app)):
         if not isinstance(node, ast.Call):
             continue
         if getattr(node.func, 'attr', '') != 'add_resource':
@@ -161,10 +161,22 @@ def query_parameters(fn, scopes):
 
 
 def _schema_keys(scopes, name):
-    """The keys of the dict assigned to ``name`` in any of ``scopes``."""
-    out = set()
+    """The keys of the dict assigned to ``name``, innermost scope first.
+
+    The scopes are searched in order and the first one to define the
+    name wins, rather than every definition being unioned together.
+    Each scope contributes only its own assignments -- a module's are
+    its top-level statements, not everything nested inside it -- so one
+    endpoint class's ``get_args`` cannot leak into the derivation for
+    another class in the same file. That leak was real: it made the
+    fixer willing to rewrite a correct `body` declaration to `query`,
+    and phase 3 would then have compiled a query-string fallback for a
+    parameter which never arrives that way. Drift introduced by the
+    machinery built to prevent drift.
+    """
     for scope in scopes:
-        for node in ast.walk(scope):
+        out = set()
+        for node in scope.body:
             if not isinstance(node, ast.Assign):
                 continue
             if not any(ast.unparse(t) == name for t in node.targets):
@@ -174,7 +186,9 @@ def _schema_keys(scopes, name):
                     value = literal(key)
                     if value is not None:
                         out.add(value)
-    return out
+        if out:
+            return out
+    return set()
 
 
 def request_args_parameters(fn):
@@ -216,11 +230,19 @@ def handler_kwargs(fn):
             if a.arg != 'self' and not a.arg.endswith(INJECTED_SUFFIX)]
 
 
-def handlers():
-    """Yield (source path, class node, method node) for every endpoint."""
-    for path in sorted(glob.glob(os.path.join(API_DIR, '*.py'))):
+def handlers(api_dir=API_DIR):
+    """Yield (source path, module, class, method) for every endpoint.
+
+    An endpoint is a Resource subclass with an HTTP method. Matching on
+    the method name alone would pull in any helper class with a ``get``
+    accessor, and then demand a ``swag_from`` on it.
+    """
+    for path in sorted(glob.glob(os.path.join(api_dir, '*.py'))):
         tree = _parse(path)
         for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
+            if not any(ast.unparse(base).endswith('Resource')
+                       for base in cls.bases):
+                continue
             for fn in [n for n in cls.body if isinstance(n, ast.FunctionDef)]:
                 if fn.name in HANDLER_METHODS:
                     yield path, tree, cls, fn
@@ -244,16 +266,29 @@ def declarations(fn, path=None, cls=None):
             out.append(Declaration(path, cls, fn.name, None, None, None, None))
             continue
         for item in call.args[2].elts:
-            if not (isinstance(item, ast.Tuple) and len(item.elts) >= 2):
+            # swagger_helper() destructures a fixed five elements, so a
+            # tuple of any other length is malformed however readable
+            # its parts are.
+            if not (isinstance(item, ast.Tuple) and len(item.elts) == 5):
                 out.append(
                     Declaration(path, cls, fn.name, None, None, None, None))
                 continue
             out.append(Declaration(
                 path, cls, fn.name, literal(item.elts[0]),
-                literal(item.elts[1]),
-                literal(item.elts[4]) if len(item.elts) > 4 else None,
-                item.elts[1]))
+                literal(item.elts[1]), literal(item.elts[4]), item.elts[1]))
     return out
+
+
+def documented(fn):
+    """Does this handler carry a swagger_helper declaration at all?
+
+    Distinct from declaring parameters. Eight endpoints correctly
+    declare an empty parameter list because they accept none, so
+    "declares nothing" and "is absent from the published API" are
+    different questions and only the second is a defect.
+    """
+    return any('swagger_helper' in ast.unparse(dec)
+               for dec in fn.decorator_list)
 
 
 def derived_location(name, fn, tree, cls, routes):
@@ -266,19 +301,22 @@ def derived_location(name, fn, tree, cls, routes):
     return 'body'
 
 
-def audit():
+def audit(api_dir=API_DIR, app=None):
     """Compare every declaration against the code that reads it.
 
     Returns (drifted, underivable). Each entry is a (Declaration, want)
     pair; ``want`` is None for the underivable ones. An empty drifted
     list is the property both consumers care about: the fixer has
     nothing to rewrite, and the audit test passes.
+
+    The directory is a parameter so the fixer's rewrite path can be
+    exercised against a constructed tree. It defaults to this package.
     """
-    routes = route_parameters()
+    routes = route_parameters(app or os.path.join(api_dir, 'app.py'))
     drifted = []
     underivable = []
 
-    for path, tree, cls, fn in handlers():
+    for path, tree, cls, fn in handlers(api_dir):
         for declared in declarations(fn, path=path, cls=cls.name):
             if declared.location in UNDERIVABLE_LOCATIONS:
                 underivable.append((declared, None))

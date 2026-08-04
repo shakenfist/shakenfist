@@ -31,8 +31,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from shakenfist.external_api import declarations  # noqa: E402
 
 
-def main(apply_edits):
-    drifted, underivable = declarations.audit()
+def main(apply_edits, api_dir=declarations.API_DIR, app=None):
+    drifted, underivable = declarations.audit(api_dir, app)
 
     by_file = collections.defaultdict(list)
     for declared, want in drifted:

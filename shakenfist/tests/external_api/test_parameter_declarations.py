@@ -1,5 +1,9 @@
 # Copyright 2019 Michael Still and contributors
 import ast
+import importlib.util
+import os
+import shutil
+import tempfile
 
 from shakenfist import exceptions
 from shakenfist.external_api import base as api_base
@@ -21,6 +25,17 @@ UNDECLARED_BY_DESIGN = {
     ('BlobMetadataEndpoint', 'delete', 'value'),
     ('InterfaceMetadataEndpoint', 'delete', 'value'),
     ('NodeMetadataEndpoint', 'delete', 'value'),
+}
+
+# Handlers deliberately absent from the published API. These three are
+# the unauthenticated health probes a load balancer polls, listed in
+# api_base.HEALTH_PROBE_PATHS: they are part of the deployment contract
+# rather than of the tenant-facing API, and documenting them would
+# invite callers to treat them as such.
+UNDOCUMENTED_BY_DESIGN = {
+    ('Root', 'get'),
+    ('Livez', 'get'),
+    ('Readyz', 'get'),
 }
 
 
@@ -179,22 +194,32 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     'rather than sent by a caller'
                     % (cls, method, parameter.name))
 
-    def test_every_endpoint_declares_its_parameters(self):
-        """A handler taking parameters must document them at all."""
+    def test_every_endpoint_is_documented(self):
+        """A handler with no swag_from is absent from the published API.
+
+        Taking no parameters is not a reason to be undocumented: the
+        endpoint whose absence this phase discovered by accident,
+        InstanceSnapshotEndpoint.get, takes none either. Checking only
+        the handlers with parameters would catch half the class of bug
+        that found it.
+
+        Carrying a declaration is the question, not declaring any
+        parameters: eight endpoints correctly declare an empty list
+        because they accept nothing.
+        """
         undocumented = []
         for cls, method, fn in _endpoints():
-            if declarations.declarations(fn):
+            if declarations.documented(fn):
                 continue
-            if declarations.handler_kwargs(fn):
-                undocumented.append('%s.%s' % (cls, method))
+            if (cls, method) in UNDOCUMENTED_BY_DESIGN:
+                continue
+            undocumented.append('%s.%s' % (cls, method))
 
-        # Endpoints which take no parameters legitimately have no
-        # declaration; ones which take parameters must have one, or the
-        # compiled schema in phase 3 has nothing to work from.
         self.assertEqual(
             [], undocumented,
-            'these handlers accept parameters but declare none: %s'
-            % ', '.join(undocumented))
+            'these handlers are missing from the published API: %s. '
+            'Declare them, or add them to UNDOCUMENTED_BY_DESIGN with a '
+            'reason.' % ', '.join(undocumented))
 
 
 class DerivationTestCase(base.ShakenFistTestCase):
@@ -214,6 +239,62 @@ class DerivationTestCase(base.ShakenFistTestCase):
         # <path:label_name>, which a bare <([a-z_]+)> regex missed.
         self.assertIn('label_name', routes['LabelEndpoint'])
         self.assertIn('artifact_ref', routes['ArtifactEndpoint'])
+
+    def test_query_derivation_does_not_cross_classes(self):
+        """One class's schema is not another's.
+
+        The scopes searched for a schema name used to be unioned, and
+        the module was always one of them, so every `get_args` in a
+        file contributed to every handler in it. The consequence was
+        not merely a wrong test result: the fixer would have rewritten
+        a correct `body` declaration to `query`, and phase 3 would have
+        compiled a query-string fallback for a parameter that never
+        arrives from the query string.
+        """
+        source = '''
+class A(api_base.Resource):
+    get_args = {'alpha': None}
+
+    @use_kwargs(get_args, location='query')
+    def get(self, alpha=None):
+        pass
+
+
+class B(api_base.Resource):
+    get_args = {'beta': None}
+
+    @use_kwargs(get_args, location='query')
+    def get(self, beta=None):
+        pass
+'''
+        tree = ast.parse(source)
+        a, b = tree.body[0], tree.body[1]
+
+        self.assertEqual(
+            {'alpha'},
+            declarations.query_parameters(a.body[-1], [a, tree]))
+        self.assertEqual(
+            {'beta'},
+            declarations.query_parameters(b.body[-1], [b, tree]))
+
+    def test_module_level_schema_is_found(self):
+        """Falling back to the module scope still works, and picks up
+        only the module's own assignments."""
+        source = '''
+get_args = {'alpha': None}
+
+
+class A(api_base.Resource):
+    @use_kwargs(get_args, location='query')
+    def get(self, alpha=None):
+        pass
+'''
+        tree = ast.parse(source)
+        cls = tree.body[1]
+
+        self.assertEqual(
+            {'alpha'},
+            declarations.query_parameters(cls.body[0], [cls, tree]))
 
     def test_query_derivation_reads_the_use_kwargs_location(self):
         """A schema bound at a location other than query is not a query
@@ -274,6 +355,38 @@ class Thing:
         self.assertIsNone(declared[0].name)
         self.assertIsNone(declared[0].location)
 
+    def test_wrong_arity_declaration_is_reported(self):
+        """swagger_helper() destructures five elements, so a tuple of
+        any other length is malformed however readable its parts are."""
+        source = '''
+class Thing(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'things', 'A thing.',
+        [('name', 'body', 'string', 'A name.')],
+        []))
+    def get(self, name=None):
+        pass
+'''
+        cls = self._parse_class(source)
+        declared = declarations.declarations(cls.body[0])
+
+        self.assertEqual(1, len(declared))
+        self.assertIsNone(declared[0].name)
+
+    def test_only_resource_subclasses_are_endpoints(self):
+        """A helper class with a get() accessor is not an endpoint, and
+        must not be asked to document itself."""
+        source = '''
+class Helper:
+    def get(self, thing):
+        return self.things[thing]
+'''
+        path = os.path.join(self.tempdir, 'helper.py')
+        with open(path, 'w') as f:
+            f.write(source)
+
+        self.assertEqual([], list(declarations.handlers(self.tempdir)))
+
     def test_raw_body_sentinel_resolves(self):
         """RAW_BODY_PARAMETER is referenced rather than spelled out, and
         is read from base.py's source rather than imported."""
@@ -281,8 +394,90 @@ class Thing:
             api_base.RAW_BODY_PARAMETER,
             declarations.CONSTANTS['RAW_BODY_PARAMETER'])
 
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
     def _parse_class(self, source):
         return ast.parse(source).body[0]
+
+
+class FixerTestCase(base.ShakenFistTestCase):
+    """The rewrite path of tools/fix-api-parameter-locations.py.
+
+    test_declared_locations_are_derivable tells a reader to run that
+    script, and the script only ever runs against a clean tree in CI, so
+    a regression in the parts which live only in it -- the byte-offset
+    splice, the bottom-up ordering that keeps not-yet-applied edits
+    valid, the guards -- would not be noticed until someone needed it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.abspath(declarations.__file__)))),
+            'tools', 'fix-api-parameter-locations.py')
+        spec = importlib.util.spec_from_file_location('fixer', path)
+        self.fixer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.fixer)
+
+    def _write(self, name, source):
+        with open(os.path.join(self.tempdir, name), 'w') as f:
+            f.write(source)
+
+    def test_rewrites_a_wrong_location(self):
+        # Two declarations on one physical line, which is what the
+        # reverse ordering exists for and which no declaration in the
+        # tree currently exhibits.
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, '/fakes/<fake_ref>/parts/<part_ref>')
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('fake_ref', 'query', 'uuid', 'A ref.', True), ('part_ref', 'body', 'uuid', 'A part.', True)],
+        []))
+    def get(self, fake_ref=None, part_ref=None):
+        pass
+''')
+
+        self.assertEqual(1, self.fixer.main(False, self.tempdir))
+        self.assertEqual(0, self.fixer.main(True, self.tempdir))
+
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            rewritten = f.read()
+        self.assertIn(
+            "[('fake_ref', 'path', 'uuid', 'A ref.', True), "
+            "('part_ref', 'path', 'uuid', 'A part.', True)]",
+            rewritten)
+
+        # Idempotent, and the only thing that changed is the two tokens.
+        self.assertEqual(0, self.fixer.main(False, self.tempdir))
+
+    def test_leaves_a_correct_tree_alone(self):
+        self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('name', 'body', 'string', 'A name.', False)],
+        []))
+    def post(self, name=None):
+        pass
+''')
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            before = f.read()
+
+        self.assertEqual(0, self.fixer.main(True, self.tempdir))
+
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            self.assertEqual(before, f.read())
 
 
 class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
@@ -318,6 +513,15 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             exceptions.InvalidAPIDeclaration, self._helper,
             [('thing', 'body', 'stringy', 'A thing.', False)])
 
+    def test_wrong_arity_is_rejected(self):
+        """The one malformed declaration that used to arrive as a bare
+        ValueError from the five-element unpack."""
+        for parameters in ([('thing', 'body', 'string', 'A thing.')],
+                           [('thing', 'body', 'string', 'A thing.', False, 1)],
+                           [()]):
+            self.assertRaises(
+                exceptions.InvalidAPIDeclaration, self._helper, parameters)
+
     def test_bearer_is_not_declarable(self):
         """swagger_helper injects the Authorization header itself; an
         endpoint declaring a parameter of that type is confused."""
@@ -332,9 +536,15 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             exceptions.InvalidAPIDeclaration, self._helper,
             [('thing', 'path', 'string', 'A thing.', False)])
 
-    def test_rejection_names_the_endpoint_and_parameter(self):
+    def test_rejection_names_the_section_and_parameter(self):
         """A malformed declaration aborts sf-api startup, so the message
-        has to say which one without the reader walking the traceback."""
+        has to narrow down which one.
+
+        The section, not the endpoint: swagger_helper() is called as an
+        argument expression before the decorator is applied, so it never
+        learns the class or method it belongs to. The traceback's file
+        and line are what locate it exactly.
+        """
         for bad in (('thing', 'qeury', 'string', 'A thing.', False),
                     ('thing', 'body', 'stringy', 'A thing.', False),
                     ('thing', 'path', 'string', 'A thing.', False)):

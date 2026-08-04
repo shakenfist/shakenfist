@@ -206,7 +206,18 @@ def swagger_helper(section, description, parameters, responses,
         })
         out['parameters'][-1].update(argtypes['bearer'])
 
-    for (name, location, argtype, argdescription, argrequired) in parameters:
+    for parameter in parameters:
+        # Destructuring five elements directly means a tuple of any
+        # other length raises ValueError before any check below runs,
+        # which is the one malformed declaration that would not arrive
+        # as an InvalidAPIDeclaration.
+        if len(parameter) != 5:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s declares a parameter with %d elements rather than the '
+                'expected (name, location, type, description, required): %r'
+                % (section, len(parameter), parameter))
+        (name, location, argtype, argdescription, argrequired) = parameter
+
         # The location was never validated, so 'post' and 'qeury' both
         # survived in the tree until they were found by audit. Fail at
         # import time instead: these declarations are the input to
