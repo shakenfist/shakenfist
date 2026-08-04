@@ -206,16 +206,20 @@ def swagger_helper(section, description, parameters, responses,
         })
         out['parameters'][-1].update(argtypes['bearer'])
 
+    declarable = set(argtypes) - {'bearer'}
+
     for parameter in parameters:
-        # Destructuring five elements directly means a tuple of any
-        # other length raises ValueError before any check below runs,
-        # which is the one malformed declaration that would not arrive
-        # as an InvalidAPIDeclaration.
-        if len(parameter) != 5:
+        # Checked explicitly, and first, because every malformed
+        # declaration has to arrive as an InvalidAPIDeclaration for
+        # phase 3's compiler to catch one exception type. Destructuring
+        # five elements raises ValueError on a shorter tuple and len()
+        # raises TypeError on anything unsized, so neither is left to
+        # happen by itself.
+        if not isinstance(parameter, (tuple, list)) or len(parameter) != 5:
             raise exceptions.InvalidAPIDeclaration(
-                '%s declares a parameter with %d elements rather than the '
-                'expected (name, location, type, description, required): %r'
-                % (section, len(parameter), parameter))
+                '%s declares a parameter which is not a 5-element (name, '
+                'location, type, description, required) tuple: %r'
+                % (section, parameter))
         (name, location, argtype, argdescription, argrequired) = parameter
 
         # The location was never validated, so 'post' and 'qeury' both
@@ -245,7 +249,6 @@ def swagger_helper(section, description, parameters, responses,
         # uniformly. 'bearer' describes the Authorization header this
         # function injects itself, so it is not a token an endpoint may
         # declare.
-        declarable = set(argtypes) - {'bearer'}
         if argtype not in declarable:
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares type %r, which is not one of %s'

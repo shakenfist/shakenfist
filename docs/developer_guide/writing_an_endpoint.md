@@ -15,17 +15,23 @@ declarations already in the tree, is in
 
 ## The shape of a handler
 
+This is `InstanceEndpoint.get`, verbatim from
+`shakenfist/external_api/instance.py`:
+
 ```python
 class InstanceEndpoint(api_base.Resource):
-    @jwt_required()
-    @arg_is_instance_ref
     @swag_from(api_base.swagger_helper(
-        'instances', 'Fetch an instance.',
+        'instances', 'Get instance information.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
-        [(200, 'Information about an instance.', None),
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          'Scope the name lookup to this namespace.', False)],
+        [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
-    def get(self, instance_ref=None, instance_from_db=None):
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.log_token_use
+    def get(self, instance_ref=None, instance_from_db=None, namespace=None):
         return instance_from_db.external_view()
 ```
 
@@ -35,7 +41,17 @@ Each parameter is a five-element tuple:
 (name, location, type, description, required)
 ```
 
-Decorator order matters; see the comments in `external_api/app.py`.
+**There is no per-handler authentication decorator.** Authentication is
+the default, applied to every handler by `_authenticate_unless_public`
+in `api_base.Resource.method_decorators`; an endpoint opts *out* rather
+than in. Decorator order matters, and the outer decorator runs first —
+so `@swag_from` goes outermost, above the `@api_base.arg_is_*` and
+ownership decorators, which is what every handler in the tree does. See
+the banner comment in `external_api/app.py`.
+
+Note that `instance_from_db` is injected by `@arg_is_instance_ref` and
+is not a parameter: it is not declared, and declaring it fails the
+audit.
 
 ## The rules
 
@@ -114,6 +130,12 @@ Two known gaps:
 * Swagger 2.0 allows at most one `in: body` parameter per operation,
   carrying a `schema` rather than a `type`. `swagger_helper()` emits
   one parameter per declaration, so operations with several body
-  parameters render an invalid specification. Phase 2 collapses them;
+  parameters render an invalid specification — **29 of 126 operations
+  today, up from 23 of 124 before the declaration audit**, because
+  correcting a parameter to `body` is individually right and moves this
+  count the wrong way. The published specification is not yet
+  linter-clean. Phase 2 collapses the parameters into a generated
+  `schema`;
   [issue #3626](https://github.com/shakenfist/shakenfist/issues/3626)
-  tracks the specification-validation test that will prove it.
+  tracks the specification-validation test that will prove the count
+  reaches zero rather than asserting it.

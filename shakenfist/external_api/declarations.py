@@ -196,8 +196,23 @@ def route_parameters(app: str = APP,
         for arg in node.args[1:]:
             route = literal(arg)
             if isinstance(route, str):
-                out[cls] |= {segment.split(':')[-1]
-                             for segment in re.findall(r'<([^>]+)>', route)}
+                names = {segment.split(':')[-1]
+                         for segment in re.findall(r'<([^>]+)>', route)}
+                # Routes are merged per class, and derived_location()
+                # asks only whether a name is in the class's set. Two
+                # routes of different shapes -- the collection and item
+                # pair, /things and /things/<thing_ref> -- would give the
+                # collection handler a path parameter it never receives,
+                # and the fixer would rewrite a correct declaration to
+                # match. Nothing in the tree does this today.
+                if cls in out and out[cls] != names and problems is not None:
+                    problems.append(
+                        '%s is mounted on routes with different parameters '
+                        '(%s and %s), so which of them any one handler '
+                        'receives cannot be derived'
+                        % (cls, ', '.join(sorted(out[cls])) or 'none',
+                           ', '.join(sorted(names)) or 'none'))
+                out[cls] |= names
             elif problems is not None:
                 problems.append(
                     '%s is mounted on a route this cannot read (%s), so its '
@@ -465,8 +480,17 @@ def audit(api_dir: str = API_DIR, app: Optional[str] = None
                 underivable.append((declared, None))
                 continue
             if declared.name is None or declared.location is None:
-                # Unreadable, and so unfixable by the script. The audit
-                # test reports these separately and in more detail.
+                # Unreadable, and so unfixable by the script -- which is
+                # exactly why it has to be reported. Skipping it silently
+                # let the fixer, and so the pre-commit hook, answer "0
+                # locations would change" for a tree carrying a
+                # declaration it could not parse. The audit test still
+                # reports these per-field and in more detail.
+                problems.append(
+                    '%s.%s has a declaration this cannot read (its %s is '
+                    'not a literal or an api_base constant)'
+                    % (cls.name, fn.name,
+                       'name' if declared.name is None else 'location'))
                 continue
             want = derived_location(
                 declared.name, fn, tree, cls, routes, problems)

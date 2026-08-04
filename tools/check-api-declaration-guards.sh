@@ -34,6 +34,13 @@
 # survives a failure part-way through.
 set -u
 
+# Run from the repository root whatever the caller's directory. Every
+# path below is relative and this script edits real source files, so
+# starting anywhere else means the backup copies nothing, every sed
+# fails, and there is no tree left to restore.
+root=$(git rev-parse --show-toplevel) || exit 2
+cd "${root}" || exit 2
+
 PYTHON=.tox/py3/bin/python
 if [ ! -x "${PYTHON}" ]; then
     echo "No ${PYTHON}: build it with 'tox -e py3 --notest' first." >&2
@@ -42,6 +49,12 @@ fi
 
 BACKUP=$(mktemp -d)
 cp -a shakenfist/external_api/. "${BACKUP}"/
+if [ -z "$(ls -A "${BACKUP}")" ]; then
+    echo 'The backup of shakenfist/external_api is empty, so a mutation' >&2
+    echo 'could not be undone. Refusing to mutate the tree.' >&2
+    rm -rf "${BACKUP}"
+    exit 2
+fi
 trap 'cp -a "${BACKUP}"/. shakenfist/external_api/; rm -rf "${BACKUP}"' EXIT
 
 total=0

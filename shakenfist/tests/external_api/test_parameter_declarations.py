@@ -156,6 +156,37 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     'parameter location'
                     % (cls, method, parameter.name, parameter.location))
 
+    def test_exemptions_still_describe_real_handlers(self):
+        """An allowlist entry that no longer matches anything is a
+        silent exemption waiting for a name to be reused.
+
+        Both lists exempt a handler from an assertion, so a stale entry
+        is invisible until the day something is called `Root.get`
+        again. Every entry must name a handler that exists, and an
+        UNDECLARED_BY_DESIGN entry must name a kwarg that handler still
+        accepts -- which is also what makes the deferred `value` on the
+        metadata deletes fail loudly once it is removed, rather than
+        leaving a line here nobody revisits.
+        """
+        handlers = {(cls, method): fn for cls, method, fn in _endpoints()}
+
+        for cls, method in UNDOCUMENTED_BY_DESIGN:
+            self.assertIn(
+                (cls, method), handlers,
+                '%s.%s is in UNDOCUMENTED_BY_DESIGN but is not an endpoint '
+                'handler; remove the entry' % (cls, method))
+
+        for cls, method, kwarg in UNDECLARED_BY_DESIGN:
+            self.assertIn(
+                (cls, method), handlers,
+                '%s.%s is in UNDECLARED_BY_DESIGN but is not an endpoint '
+                'handler; remove the entry' % (cls, method))
+            self.assertIn(
+                kwarg, declarations.handler_kwargs(handlers[(cls, method)]),
+                '%s.%s no longer accepts %r, so the UNDECLARED_BY_DESIGN '
+                'entry exempting it is stale; remove it'
+                % (cls, method, kwarg))
+
     def test_path_parameters_are_required(self):
         """OpenAPI 2.0 requires it: the route cannot match without them.
 
@@ -583,6 +614,58 @@ class FakeEndpoint(api_base.Resource):
                 % (app, problems))
             self.assertIn('cannot read', problems[0])
 
+    def test_differing_routes_for_one_class_are_reported(self):
+        """Routes are merged per class, so the collection-plus-item
+        shape would give the collection handler a path parameter it
+        never receives -- and the fixer would rewrite a correct
+        declaration to match. Only Readyz is mounted twice today, on
+        two parameter-free routes, so this needs constructed sources.
+        """
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, '/fakes')
+api.add_resource(FakeEndpoint, '/fakes/<fake_ref>')
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('name', 'body', 'string', 'A name.', False)],
+        []))
+    def post(self, name=None):
+        pass
+''')
+
+        _, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('routes with different parameters', problems[0])
+
+    def test_unreadable_declaration_reaches_problems(self):
+        """The module docstring promises both consumers fail on
+        anything unreadable, and the fixer is the consumer that only
+        looks at problems.
+
+        Skipping these silently had the fixer -- and so the pre-commit
+        hook -- answer "0 locations would change" for a tree carrying a
+        declaration it could not parse.
+        """
+        self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [(NAME, 'body', 'string', 'A name.', False)],
+        []))
+    def post(self, name=None):
+        pass
+''')
+
+        _, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('declaration this cannot read', problems[0])
+        self.assertIn('FakeEndpoint.post', problems[0])
+
     def test_unresolvable_query_schema_is_reported(self):
         source = '''
 class Thing(api_base.Resource):
@@ -762,10 +845,20 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
 
     def test_wrong_arity_is_rejected(self):
         """The one malformed declaration that used to arrive as a bare
-        ValueError from the five-element unpack."""
+        ValueError from the five-element unpack.
+
+        The unsized cases matter for the same reason: len() raises
+        TypeError on them, which is the other way a malformed
+        declaration escapes the single exception type that phase 3's
+        compiler catches.
+        """
         for parameters in ([('thing', 'body', 'string', 'A thing.')],
                            [('thing', 'body', 'string', 'A thing.', False, 1)],
-                           [()]):
+                           [()],
+                           [None],
+                           [42],
+                           [(x for x in range(5))],
+                           ['a five character string']):
             self.assertRaises(
                 exceptions.InvalidAPIDeclaration, self._helper, parameters)
 
