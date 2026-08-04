@@ -183,7 +183,7 @@ def swagger_helper(section, description, parameters, responses,
         'binary': {'type': 'string', 'format': 'Binary data'},
         'boolean': {'type': 'boolean', 'format': 'boolean'},
         'dict': {'type': 'string', 'format': 'a JSON dictionary'},
-        'integer': {'type': 'integer', 'type': 'integer'},
+        'integer': {'type': 'integer', 'format': 'an integer'},
         'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
         'namespace': {'type': 'string', 'format': 'the name of a namespace'},
         'node': {'type': 'string', 'format': 'the name of a node'},
@@ -231,11 +231,14 @@ def swagger_helper(section, description, parameters, responses,
         # endpoint nor the parameter it came from. Report it the way a
         # bad location is reported, so every malformed declaration
         # raises one exception type that phase 3's compiler can catch
-        # uniformly.
-        if argtype not in argtypes:
+        # uniformly. 'bearer' describes the Authorization header this
+        # function injects itself, so it is not a token an endpoint may
+        # declare.
+        declarable = set(argtypes) - {'bearer'}
+        if argtype not in declarable:
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares type %r, which is not one of %s'
-                % (section, name, argtype, ', '.join(sorted(argtypes))))
+                % (section, name, argtype, ', '.join(sorted(declarable))))
 
         out['parameters'].append({
             'name': name,
