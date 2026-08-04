@@ -8658,6 +8658,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    webrtc-rs 0.20 upgrade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10831,6 +10859,13 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>Ship <code>ryll</code> on PyPI so <code>pip install ryll</code> (typically via the client's <code>[vdi]</code> extra) puts a working <code>ryll</code> on PATH, the way <code>pip install kerbside</code> ships <code>kerbside-proxy</code>. Phase 3 of the cross-repo Shaken Fist VDI console tokens plan. A per-arch <code>manylinux_2_28</code> maturin (<code>bindings = "bin"</code>) wheel that embeds the compiled GUI binary — no runtime download — built natively for x86_64 and aarch64 and published to PyPI via OIDC Trusted Publishers</td>
 <td>Complete</td>
 <td>maturin bin wheel, build/sign/publish jobs in release.yml, and docs (phases inline in this master)</td>
+</tr>
+<tr>
+<td>2026-08-04</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade/">webrtc-rs 0.20 upgrade</a></td>
+<td>Port <code>shakenfist-spice-webrtc</code> from webrtc-rs 0.17.1 to 0.20.x. 0.20 re-homes the crate on a sans-io <code>rtc</code> core behind a thin async layer, moving <code>RTCPeerConnection</code>'s operations onto a trait, collapsing the per-object callbacks into a single <code>PeerConnectionEventHandler</code>, dropping <code>gathering_complete_promise</code> and <code>connection_state</code>, and requiring explicit UDP bind addresses. Deferred from Renovate PR #245, which was repurposed to carry the <code>&lt; 0.18</code> pin and this plan.</td>
+<td>Not started</td>
+<td>1. Pre-work on 0.17, 2. Atomic bump, 3. Socket binding config, 4. Soak and docs (phase plans pending)</td>
 </tr>
 </tbody>
 </table>
