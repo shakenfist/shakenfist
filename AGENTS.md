@@ -284,7 +284,11 @@ can never be a network under construction — it can only be residue.
 Second, neither mutating branch commits until the host agrees: if a
 device Shaken Fist did not create is still enslaved to `br-vxlan-<vxid>`
 then a domain is attached to that bridge right now, whatever the
-database records say, and the stray is protected instead. Third,
+database records say, and the stray is protected instead. A bridge
+which does not exist answers that question with "nothing" rather than
+failing to answer it — teardown deletes the bridge before the vxlan
+interface and rediscovery keys on the interface, so a vxlan device with
+no bridge is the commonest stray shape and must stay reapable. Third,
 deletion is idempotent and guarded by `check_for_interface()`, so
 racing the net-worker's own `network_destroy` teardown of the same device
 is harmless; each device is deleted inside its own `try`/`except` which

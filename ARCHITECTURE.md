@@ -571,7 +571,11 @@ whose network object no longer exists. That is the whole of the
 exception: a stray whose network *does* still exist is enqueued as a
 `node_net_op` `network_destroy` like any other host mutation. Neither
 branch acts until the host itself agrees the bridge is idle — a guest
-tap still enslaved to it vetoes both. Deletes
+tap still enslaved to it vetoes both. A bridge which is absent is an
+answer to that question rather than a failure to answer it, which
+matters because teardown deletes the bridge before the vxlan interface
+and rediscovery keys on the interface, so "vxlan device with no bridge"
+is the commonest stray shape there is. Deletes
 are idempotent, guarded by `check_for_interface()` and wrapped
 per-device so that racing the net-worker's own teardown of the same
 device logs and retries rather than killing the pass. See "Stray vxlan

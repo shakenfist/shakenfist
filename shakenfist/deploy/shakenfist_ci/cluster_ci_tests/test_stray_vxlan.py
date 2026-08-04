@@ -31,6 +31,13 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
     cross-check and nothing else which has to save it. It costs no
     extra wall clock, because both orphans age out over the same wait.
 
+    A third orphan is planted as a bare vxlan device with no bridge at
+    all. That is not an exotic shape: hypervisor teardown deletes the
+    bridge before the vxlan interface, so an interrupted teardown leaves
+    exactly this, and it is the case where a host side cross-check which
+    treated a missing bridge as unanswerable would protect the residue
+    forever.
+
     The wait is real: maintain only acts once a device has been stray for
     MAINTAIN_STRAY_VXLAN_GRACE_SECONDS (five minutes by default), which
     is why this test is slow. A deployment which sets that option lower
@@ -93,18 +100,27 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
             except processutils.ProcessExecutionError:
                 pass
 
-    def _plant_orphan(self, vxid, mesh_nic):
-        """Create a vxlan device and bridge for a vxid no network holds."""
+    def _plant_orphan(self, vxid, mesh_nic, with_bridge=True):
+        """Create a vxlan device, and usually its bridge, for a vxid no
+        network holds.
+
+        ``with_bridge=False`` plants the residue an interrupted
+        hypervisor teardown leaves behind: the bridge is deleted before
+        the vxlan interface, so a teardown which died in the middle
+        leaves the interface with no bridge.
+        """
         self._node_exec(
             self.node,
             ['ip', 'link', 'add', 'vxlan-%06x' % vxid, 'mtu', '1400',
              'type', 'vxlan', 'id', str(vxid), 'dev', mesh_nic,
              'dstport', '0'],
             sudo=True)
-        self._node_exec(
-            self.node,
-            ['ip', 'link', 'add', 'br-vxlan-%06x' % vxid, 'type', 'bridge'],
-            sudo=True)
+        if with_bridge:
+            self._node_exec(
+                self.node,
+                ['ip', 'link', 'add', 'br-vxlan-%06x' % vxid,
+                 'type', 'bridge'],
+                sudo=True)
 
     def test_orphan_vxlan_is_reaped_and_live_network_survives(self):
         # A live network for the control assertion. The network node
@@ -151,10 +167,21 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
              'br-vxlan-%06x' % occupied_vxid],
             sudo=True)
 
+        # And a third with no bridge at all -- what an interrupted
+        # hypervisor teardown actually leaves behind, because the bridge
+        # is deleted before the vxlan interface. Rediscovery keys on the
+        # interface, so maintain sees this one on every pass; it must
+        # still be reaped even though there is no bridge to interrogate.
+        bridgeless_vxid = self._unused_vxid()
+        self.addCleanup(self._remove_devices, bridgeless_vxid)
+        self._plant_orphan(bridgeless_vxid, mesh_nic, with_bridge=False)
+
         links = self._node_link_names(self.node)
         self.assertIn('vxlan-%06x' % vxid, links)
         self.assertIn('br-vxlan-%06x' % vxid, links)
         self.assertIn('vxlan-%06x' % occupied_vxid, links)
+        self.assertIn('vxlan-%06x' % bridgeless_vxid, links)
+        self.assertNotIn('br-vxlan-%06x' % bridgeless_vxid, links)
 
         # Maintain only acts after the grace period, and then only on its
         # next pass, so allow the grace period plus a few passes.
@@ -162,9 +189,10 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
             'MAINTAIN_STRAY_VXLAN_GRACE_SECONDS', 300))
         deadline = time.time() + grace + 180
 
+        reapable = ['vxlan-%06x' % vxid, 'vxlan-%06x' % bridgeless_vxid]
         while time.time() < deadline:
             links = self._node_link_names(self.node)
-            if 'vxlan-%06x' % vxid not in links:
+            if not [d for d in reapable if d in links]:
                 break
             time.sleep(10)
 
@@ -195,6 +223,15 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
             'br-vxlan-%06x' % vxid, links,
             'Orphaned vxlan bridge was not reaped within %d seconds'
             % (grace + 180))
+
+        # The residue an interrupted teardown leaves: no bridge to ask
+        # about, so a host side cross-check which cannot tell "the
+        # bridge is absent" from "I could not ask" protects this
+        # forever.
+        self.assertNotIn(
+            'vxlan-%06x' % bridgeless_vxid, links,
+            'Orphaned vxlan device with no bridge was not reaped within '
+            '%d seconds' % (grace + 180))
 
         # The control: a live network must be untouched by the reap.
         self.assertIn(

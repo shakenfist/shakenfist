@@ -120,6 +120,24 @@ def check_for_interface(
     return True
 
 
+# iproute2 reports a missing device differently depending on whether it
+# is the subject of the command or a filter argument to it:
+#
+#   $ ip -pretty -json link show banana0
+#   Device "banana0" does not exist.
+#   EXIT=1
+#   $ ip -pretty -json link show master banana0
+#   Error: argument "banana0" is wrong: Device does not exist
+#   EXIT=255
+#
+# check_for_interface() only ever asks the first question so it can match
+# the first form inline, but get_bridge_members() asks the second, which
+# both fails the check_exit_code allowlist and words the message
+# differently. Match either form.
+_DEVICE_MISSING_RE = re.compile(
+    r'(Device "[^"]*" does not exist\.|Device does not exist)\s*$')
+
+
 def get_bridge_members(name: str, netns: str | None = None) -> list[str]:
     """The names of the interfaces currently enslaved to a bridge.
 
@@ -129,12 +147,23 @@ def get_bridge_members(name: str, netns: str | None = None) -> list[str]:
     bridge are raised, so a caller which is about to delete something
     can tell "no members" from "could not ask".
     """
-    stdout, stderr = concurrency.execute(
-        'ip -pretty -json link show master %s' % name,
-        check_exit_code=[0, 1], netns=netns,
-        suppress_command_logging=True)
+    try:
+        stdout, stderr = concurrency.execute(
+            'ip -pretty -json link show master %s' % name,
+            check_exit_code=[0, 1], netns=netns,
+            suppress_command_logging=True)
+    except ProcessExecutionError as e:
+        # A missing bridge exits 255, which is outside the allowlist
+        # above, so it arrives here rather than as a return value. 255 is
+        # iproute2's catch-all failure code, so match on the message
+        # rather than widening check_exit_code -- otherwise every other
+        # way ip can fail would produce an empty member list, and an
+        # empty member list is what authorises deleting devices.
+        if _DEVICE_MISSING_RE.search(e.stderr or ''):
+            return []
+        raise
 
-    if stderr and stderr.rstrip('\n').endswith(' does not exist.'):
+    if stderr and _DEVICE_MISSING_RE.search(stderr):
         return []
 
     return [elem['ifname'] for elem in _clean_ip_json(stdout)

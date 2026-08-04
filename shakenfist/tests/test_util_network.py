@@ -73,20 +73,50 @@ class UtilTestCase(base.ShakenFistTestCase):
 
     @mock.patch(
         'shakenfist.util.concurrency.execute',
-        return_value=(None, 'Device "br-vxlan-000123" does not exist.'))
+        side_effect=ProcessExecutionError(
+            stdout='',
+            stderr=('Error: argument "br-vxlan-000123" is wrong: Device '
+                    'does not exist\n'),
+            exit_code=255,
+            cmd='ip -pretty -json link show master br-vxlan-000123'))
     def test_get_bridge_members_missing_bridge(self, mock_execute):
         """A bridge which is not there has nothing attached to it. The
         stray vxlan reaper asks about bridges which may well already be
-        gone, so this must not be an error."""
+        gone -- indeed that is the common shape, because hypervisor
+        teardown deletes the bridge before the vxlan interface -- so
+        this must not be an error.
+
+        The mocked failure is exactly what iproute2 produces here, which
+        is *not* the message ``ip link show <dev>`` produces for the same
+        condition: a missing filter argument exits 255 with 'Error:
+        argument ... is wrong: Device does not exist', not 1 with
+        'Device "..." does not exist.'.
+        """
         self.assertEqual(
             [], util_network.get_bridge_members('br-vxlan-000123'))
 
-    @mock.patch('shakenfist.util.concurrency.execute',
-                side_effect=ProcessExecutionError('ip exploded', 1))
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        return_value=(None, 'Device "br-vxlan-000123" does not exist.'))
+    def test_get_bridge_members_missing_bridge_subject_wording(
+            self, mock_execute):
+        """Older iproute2 releases word a missing device the same way
+        whether it is the subject of the command or a filter argument to
+        it. Accept that form too."""
+        self.assertEqual(
+            [], util_network.get_bridge_members('br-vxlan-000123'))
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        side_effect=ProcessExecutionError(
+            stdout='', stderr='RTNETLINK answers: Operation not permitted',
+            exit_code=255,
+            cmd='ip -pretty -json link show master br-vxlan-000123'))
     def test_get_bridge_members_error_raises(self, mock_execute):
         """Anything other than a missing bridge must raise. A caller
         about to delete a device has to be able to tell "no members"
-        from "could not ask"."""
+        from "could not ask" -- and 255 is iproute2's catch-all failure
+        code, so exit status alone cannot make that distinction."""
         self.assertRaises(
             ProcessExecutionError, util_network.get_bridge_members,
             'br-vxlan-000123')

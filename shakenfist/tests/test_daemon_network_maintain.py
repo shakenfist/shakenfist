@@ -10,6 +10,7 @@ each guard.
 
 from unittest import mock
 
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.tests import base
 
 
@@ -891,7 +892,12 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
     def test_claimed_stray_teardown_not_enqueued_while_op_pending(self):
         """A cluster operation already targeting the network will do the
-        teardown, so a second one must not be piled on top of it."""
+        teardown, so a second one must not be piled on top of it.
+
+        The grace period is re-armed anyway. Leaving the vxid overdue
+        would make every 30 second pass repeat the whole candidate
+        evaluation for it -- the vxid lookup, the instance hydration and
+        an ip link call -- for as long as the other operation runs."""
         from shakenfist.daemons.network import maintain
 
         maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
@@ -904,6 +910,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['nn_create_and_enqueue'].assert_not_called()
         active['util_concurrency'].execute.assert_not_called()
+        self.assertEqual(10_000.0, maintain.EXTRA_VLANS_HISTORY[0x123])
 
     def test_claimed_stray_protected_by_unhealthy_local_instance(self):
         """An instance on this node which is not healthy -- still
@@ -1002,6 +1009,13 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         # Untouched, so the stray is reconsidered as soon as the node
         # row can be read again.
         self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
+
+        # A missing row is looked up on every pass for as long as the
+        # stray survives, and from_db() logs one as an error level audit
+        # event. The _warn_once() report above is the rate limited
+        # operator signal; the audit event would not be.
+        for call in active['node'].from_db.call_args_list:
+            self.assertEqual(True, call.kwargs.get('suppress_failure_audit'))
 
     def test_reap_without_node_row_falls_back_to_logging(self):
         """An unclaimed stray is still reaped when this node's row
@@ -1125,6 +1139,82 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['util_concurrency'].execute.assert_not_called()
         self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
 
+    def test_stray_with_no_bridge_at_all_is_reaped(self):
+        """The canonical interrupted teardown residue: the bridge is
+        already gone and only the vxlan interface and its veths survive.
+        ``_apply_delete_on_hypervisor`` deletes the bridge first and the
+        vxlan interface second, so this is the shape a teardown which
+        died in the middle actually leaves behind -- and
+        ``discover_interfaces()`` keys stray detection on the interface
+        which survives, so maintain sees it on every pass.
+
+        A bridge which does not exist has nothing enslaved to it, so the
+        host side veto must return "no members" rather than "could not
+        ask". ``MaintainBridgeVetoTest`` pins that answer against the
+        real iproute2 failure; this test pins what maintain does with
+        it."""
+        from shakenfist.daemons.network import maintain
+
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[],
+            present_devices={'veth-000123-o', 'egr-000123-o', 'vxlan-000123'},
+        )
+
+        # The absent bridge is skipped rather than attempted, and
+        # everything which did survive goes.
+        self.assertEqual(
+            [mock.call('ip link delete veth-000123-o'),
+             mock.call('ip link delete egr-000123-o'),
+             mock.call('ip link delete vxlan-000123')],
+            active['util_concurrency'].execute.call_args_list)
+        node = active['node'].from_db.return_value
+        self.assertIn(
+            'reaped stray vxlan', node.add_event.call_args.args[1])
+        self.assertNotIn(0x123, maintain.EXTRA_VLANS_HISTORY)
+
+    def test_partial_reap_retries_the_survivors_on_a_later_pass(self):
+        """A partial reap deletes the bridge and then fails, so the next
+        pass sees a stray with no bridge. That must not become "the
+        members of the bridge could not be determined" -- otherwise the
+        survivors are protected forever and the documented retry never
+        happens."""
+        from shakenfist.daemons.network import maintain
+
+        def _fail_on_egress(command):
+            if command.endswith('egr-000123-o'):
+                raise Exception('Cannot delete device')
+
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[],
+            execute_side_effect=_fail_on_egress,
+        )
+        # Re-armed, and the vxlan interface survives so the stray is
+        # still discoverable.
+        self.assertEqual(10_000.0, maintain.EXTRA_VLANS_HISTORY[0x123])
+
+        # A later pass, by which time the grace period has expired
+        # again. The bridge and veth went last time; only the egress
+        # device and the vxlan interface are left.
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[],
+            present_devices={'egr-000123-o', 'vxlan-000123'},
+        )
+
+        self.assertEqual(
+            [mock.call('ip link delete egr-000123-o'),
+             mock.call('ip link delete vxlan-000123')],
+            active['util_concurrency'].execute.call_args_list)
+        self.assertNotIn(0x123, maintain.EXTRA_VLANS_HISTORY)
+
     def test_a_changed_reason_is_reported_again(self):
         """Suppression is per reason, not per vxid. A stray which stops
         being protected for one reason and starts being protected for
@@ -1206,3 +1296,71 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['mariadb'].find_network_vxids.assert_called_once()
         active['util_concurrency'].execute.assert_not_called()
         self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
+
+
+class MaintainBridgeVetoTest(base.ShakenFistTestCase):
+    """The host side veto, exercised through the real
+    ``util_network.get_bridge_members()`` rather than a stub.
+
+    The tests above patch ``util_network`` wholesale, which is right for
+    testing what maintain does with each answer but means they can never
+    observe how the helper behaves against a real ``ip`` invocation.
+    The distinction between "no members" and "could not ask" decides
+    whether devices are deleted, so the seam between the two is worth
+    pinning directly.
+    """
+
+    def _job(self):
+        from shakenfist.daemons.network.maintain import Job
+        job = Job.__new__(Job)
+        job.name = 'test-maintain'
+        return job
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        side_effect=ProcessExecutionError(
+            stdout='',
+            stderr=('Error: argument "br-vxlan-000123" is wrong: Device '
+                    'does not exist\n'),
+            exit_code=255,
+            cmd='ip -pretty -json link show master br-vxlan-000123'))
+    def test_absent_bridge_reports_no_foreign_members(self, mock_execute):
+        """An interrupted hypervisor teardown leaves the vxlan interface
+        with no bridge, which is the shape maintain most often sees. The
+        veto must answer "nothing is attached", not "I could not ask" --
+        the latter protects the residue forever."""
+        self.assertEqual([], self._job()._foreign_bridge_members(0x123))
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        side_effect=ProcessExecutionError(
+            stdout='', stderr='RTNETLINK answers: Operation not permitted',
+            exit_code=255,
+            cmd='ip -pretty -json link show master br-vxlan-000123'))
+    def test_unanswerable_question_still_protects(self, mock_execute):
+        """Any other failure is genuinely unanswerable and must keep the
+        stray on the protect path."""
+        self.assertIsNone(self._job()._foreign_bridge_members(0x123))
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        return_value=(
+            """[ {},{
+        "ifindex": 19,
+        "ifname": "vxlan-000123",
+        "link_type": "ether",
+        "master": "br-vxlan-000123"
+    },{
+        "ifindex": 22,
+        "ifname": "vnet7",
+        "link_type": "ether",
+        "master": "br-vxlan-000123"
+    } ]""", ''))
+    def test_guest_tap_is_reported_and_our_own_devices_are_not(
+            self, mock_execute):
+        """Only devices Shaken Fist did not put on the bridge count as
+        evidence that a domain is attached."""
+        self.assertEqual(['vnet7'], self._job()._foreign_bridge_members(0x123))
+        mock_execute.assert_called_with(
+            'ip -pretty -json link show master br-vxlan-000123',
+            check_exit_code=[0, 1], netns=None, suppress_command_logging=True)

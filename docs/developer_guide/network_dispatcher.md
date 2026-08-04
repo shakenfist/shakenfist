@@ -485,6 +485,21 @@ is protected — "could not ask the host" is not "the host says nobody is using
 it". This is one `ip` invocation per candidate vxid, only on the paths which
 are about to mutate.
 
+The line between those two answers is load-bearing, and iproute2 makes it easy
+to get wrong. `_apply_delete_on_hypervisor()` deletes `br-vxlan-<vxid>` before
+`vxlan-<vxid>`, and `discover_interfaces()` keys stray detection on the latter,
+so *the most common stray shape is a vxlan interface whose bridge is already
+gone*. That has to read as "nothing is enslaved to it", not as "I could not
+ask" — otherwise the reaper protects precisely the residue it exists to remove,
+and a partial reap (which deletes the bridge first) can never retry its
+survivors. `util_network.get_bridge_members()` therefore returns `[]` for a
+missing bridge. It cannot decide that on exit status alone: `ip link show
+master <missing>` exits 255 — iproute2's catch-all failure code — with
+`Error: argument "<name>" is wrong: Device does not exist`, which is neither
+the exit code nor the wording `ip link show <missing>` produces for the same
+condition. The message is therefore matched explicitly and every other failure
+still raises, because an empty member list is what authorises deleting devices.
+
 Racing the net-worker is harmless. Deletion is guarded by
 `check_for_interface()` and each device is deleted inside its own
 `try`/`except`, so a `network_destroy` running concurrently on the same node

@@ -183,6 +183,16 @@ class Job(util_concurrency.Job):
         it right now, whatever the placement and interface records say.
         Returns None when the question could not be answered, which
         callers must treat as "protect".
+
+        A bridge which does not exist is an answer, not a failure --
+        ``get_bridge_members()`` returns an empty list for it. That case
+        is the common one rather than the exotic one: hypervisor
+        teardown deletes the bridge before the vxlan interface (see
+        BridgedVXLanNetwork._apply_delete_on_hypervisor), so an interrupted
+        teardown leaves exactly a surviving ``vxlan-<vxid>`` with no
+        bridge, and ``discover_interfaces()`` keys stray detection on
+        that interface. Treating it as unanswerable would protect the
+        residue this reaper exists to remove.
         """
         bridge = 'br-vxlan-%06x' % vxid
         try:
@@ -309,6 +319,14 @@ class Job(util_concurrency.Job):
         if mariadb.has_pending_cluster_operation_target(
                 target_object_type=ObjectType.NETWORK,
                 target_uuid=str(network_uuid)):
+            # Re-arm for the same reason the success path below does: an
+            # operation targeting this network is running and will
+            # probably remove the device. Returning without re-arming
+            # would leave the vxid overdue, so every 30 second pass
+            # would repeat the whole candidate evaluation for it -- the
+            # vxid lookup, the instance hydration and an ip link call --
+            # for as long as that operation takes.
+            EXTRA_VLANS_HISTORY[vxid] = time.time()
             return
 
         nn_create_and_enqueue(
@@ -374,7 +392,13 @@ class Job(util_concurrency.Job):
         node_loaded = False
         protected_vxids = None
         if not config.NODE_IS_NETWORK_NODE and claims:
-            this_node = Node.from_db(config.NODE_NAME)
+            # suppress_failure_audit because this runs on every pass for
+            # as long as a claimed stray survives, and from_db() logs a
+            # missing row as an error level audit event. The
+            # _warn_once() reports below are the rate limited operator
+            # signal for a node we cannot read.
+            this_node = Node.from_db(
+                config.NODE_NAME, suppress_failure_audit=True)
             node_loaded = True
             protected_vxids = self._local_instance_vxids(this_node)
 
@@ -434,7 +458,8 @@ class Job(util_concurrency.Job):
             return
 
         if not node_loaded:
-            this_node = Node.from_db(config.NODE_NAME)
+            this_node = Node.from_db(
+                config.NODE_NAME, suppress_failure_audit=True)
 
         for vxid, network_uuid in teardown:
             self._enqueue_stray_teardown(vxid, network_uuid, this_node)

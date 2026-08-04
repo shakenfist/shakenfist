@@ -462,6 +462,14 @@ the database says, and the stray is protected and logged instead. If
 that question cannot be answered at all, the stray is likewise
 protected.
 
+A bridge which does not exist is an answer to that question, not a
+failure to answer it -- nothing can be attached to a bridge which is
+not there. This matters because teardown deletes `br-vxlan-<vxid>`
+before `vxlan-<vxid>`, so a teardown which was interrupted leaves the
+vxlan interface behind with no bridge. That is the most common stray
+shape there is, and treating it as unanswerable would protect exactly
+the residue this reaping exists to remove.
+
 All three audit events are worth watching for. None is an error on its
 own -- the maintainer is doing the job it exists to do -- but a node
 producing them repeatedly is a node where network teardown is failing
