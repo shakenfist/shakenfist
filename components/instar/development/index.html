@@ -11095,11 +11095,23 @@ These issues are linked in the review comment with "Closes #N" syntax, so they'r
 automatically closed when the PR merges.</p>
 <h3 id="workflows">Workflows<a class="headerlink" href="#workflows" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Automated Review</strong>: PRs automatically receive code review after CI passes,
-  and GitHub issues are created for actionable items</li>
+<li><strong>Automated Review</strong>: same-repository PRs automatically receive code review
+  after CI passes, and GitHub issues are created for actionable items</li>
 <li><strong>Test Fixing</strong>: On-demand test failure resolution via PR comment</li>
 <li><strong>Comment Addressing</strong>: On-demand resolution of review feedback via PR comment</li>
 </ul>
+<p>Pull requests from forks are not reviewed automatically. The reviewer runs
+Claude Code with <code>--dangerously-skip-permissions</code> on a runner holding a token
+with <code>pull-requests: write</code>, and the PR diff it reads is untrusted input, so a
+prompt injection in a fork's diff could reach a write-capable token. Fork
+contributions are reviewed by a human instead; asking a maintainer to push the
+branch to this repository will get it the automated review as well.</p>
+<p>The reviewer itself is not defined here. <code>automated_reviewer</code> in
+<code>.github/workflows/functional-tests.yml</code> is a thin caller which names this
+project's test jobs in its <code>needs:</code> list -- the "CI passed" gate -- and
+delegates everything else to
+<code>shakenfist/actions/.github/workflows/pr-auto-review.yml</code>, which is shared
+across the Shaken Fist projects.</p>
 <p>See <code>.github/workflows/</code> for implementation details.</p>
 <h3 id="differential-fuzzing">Differential fuzzing<a class="headerlink" href="#differential-fuzzing" title="Permanent link">&para;</a></h3>
 <p>On-demand differential fuzzing compares instar against qemu-img on randomly
