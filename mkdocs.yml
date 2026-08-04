@@ -344,6 +344,7 @@ nav:
                 - "Stream caps and flap diagnostics": components/ryll/plans/PLAN-stream-caps-and-flap.md
                 - "Self-hosted runner migration": components/ryll/plans/PLAN-self-hosted-runners.md
                 - "Pip-installable ryll": components/ryll/plans/PLAN-pip-distribution.md
+                - "webrtc-rs 0.20 upgrade": components/ryll/plans/PLAN-webrtc-0.20-upgrade.md
     - Features: features.md
     - Glossary: glossary.md
     - Release notes:
