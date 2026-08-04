@@ -18,7 +18,7 @@ The repository uses several GitHub Actions workflows:
 |----------|---------|---------|
 | `functional-tests.yml` | Main CI: lint, unit tests, functional tests | PR, merge_group |
 | `documentation-tests.yml` | Build and test documentation | PR |
-| `pin-indirect-dependencies.yml` | Keep indirect dependencies pinned | Daily schedule |
+| `pin-indirect-dependencies.yml` | Reconcile pinned indirect dependencies, adding new ones and removing obsolete ones (runs `tools/pin-indirect-dependencies.sh`) | Daily schedule, PR self-test |
 | `export-repo-config.yml` | Export GitHub repo settings to version control | Daily schedule |
 | `pr-re-review.yml` | Re-review PR on bot command | `@shakenfist-bot please re-review` |
 | `pr-address-comments.yml` | Address review comments on bot command | `@shakenfist-bot please address comments` |

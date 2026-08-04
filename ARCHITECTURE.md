@@ -974,7 +974,12 @@ traffic through local caches:
   general HTTP downloads.
 - **PyPI mirror**: `PIP_INDEX_URL` set to
   `https://devpi.home.stillhq.com/root/pypi/+simple/` (devpi) for
-  pip and uv package installs.
+  pip package installs.
+- **uv mirror**: `uv` does not read pip's `PIP_*` variables, so
+  workflows that resolve with `uv` must also set `UV_INDEX_URL` (and
+  `UV_EXTRA_INDEX_URL` if a fallback index is wanted) to the same
+  values. Setting only `PIP_INDEX_URL` silently sends the uv resolve
+  straight to pypi.
 
 CI VMs provisioned by the `shakenfist/actions` Ansible playbooks also
 get system-level config files (`/etc/apt/apt.conf.d/01proxy` and
