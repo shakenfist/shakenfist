@@ -65,8 +65,22 @@ issues.
 
 ### Automated Reviewer
 
-After successful tests, the `automated_reviewer` job uses the shared
-`shakenfist/actions/review-pr-with-claude@main` action to review the PR.
+After successful tests, the `automated_reviewer` job calls the shared
+`shakenfist/actions/.github/workflows/pr-auto-review.yml@main` reusable
+workflow, which reviews the PR with the `review-pr-with-claude` action.
+All the gating other than "CI passed" lives in that shared workflow: the
+runner, the 60 minute timeout, the pull-request-event and
+same-repository restrictions, its own concurrency group, and the
+bot-commit check which keeps a bot push from triggering a review which
+triggers another bot push. What this repository supplies is the `needs:`
+list naming the test jobs and the token `permissions`, which a
+cross-repository reusable workflow cannot grant itself.
+
+The `@shakenfist-bot please re-review` command in `pr-re-review.yml`
+still uses the `shakenfist/actions/review-pr-with-claude@main` action
+directly, because it deliberately passes `force` to review a PR the bot
+has already reviewed.
+
 The reviewer produces structured JSON reviews, creates GitHub issues for
 actionable items, and embeds the JSON in the PR comment for automation.
 

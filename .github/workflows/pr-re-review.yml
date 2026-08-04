@@ -22,6 +22,10 @@ jobs:
       contains(github.event.comment.body, '@shakenfist-bot please re-review')
     runs-on: [self-hosted, claude-code]
     name: "Re-review PR"
+    # A review typically takes a handful of minutes. Without this the
+    # job inherits the six hour GitHub default, so a wedged Claude run
+    # would hold a scarce claude-code runner for the rest of the day.
+    timeout-minutes: 60
 
     steps:
       - name: Check commenter permissions
