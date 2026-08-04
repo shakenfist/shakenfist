@@ -10954,33 +10954,15 @@ templates which provide <code>pr-fix-tests.yml</code> and
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Then customise test-drift-fix.yml for your project</span>
 </code></pre></div>
 <h3 id="step-2-add-automated-reviewer-to-ci">Step 2: Add Automated Reviewer to CI<a class="headerlink" href="#step-2-add-automated-reviewer-to-ci" title="Permanent link">&para;</a></h3>
-<p>Modify your main CI workflow (e.g. <code>functional-tests.yml</code>) to add an
-<code>automated_reviewer</code> job which calls the shared reusable workflow:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="w">  </span><span class="nt">automated_reviewer</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Automated</span><span class="nv"> </span><span class="s">reviewer&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sanity_checks</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">smoke_collection</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="nt">pull-requests</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="nt">issues</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shakenfist/actions/.github/workflows/pr-auto-review.yml@main</span>
-</code></pre></div>
-<p>Only two things are per-project: the <code>needs:</code> list, which names that
-project's test jobs and is therefore the "review only once CI has
-passed" gate, and the <code>permissions:</code> block, which has to be at the call
-site because a cross-repository reusable workflow cannot grant itself
-more token scope than its caller has.</p>
-<p>Do not add <code>secrets: inherit</code>. Neither the reusable workflow nor the
-<code>review-pr-with-claude</code> action reads a secret -- both authenticate with
-<code>github.token</code> -- so inheriting would hand every secret the calling
-repository has to a workflow in another repository for no benefit.</p>
-<p>Projects do not need their own <code>check-bot-commit</code> job for the reviewer;
-the reusable workflow does that check itself. A project may still keep
-one for other automation, as Shaken Fist does for its
-<code>automated_delinter</code>.</p>
+<p>Modify your main CI workflow (e.g. <code>functional-tests.yml</code>) to add:</p>
+<ol>
+<li>A top-level <code>permissions</code> block with <code>pull-requests: write</code></li>
+<li>A <code>check-bot-commit</code> job to prevent infinite review loops</li>
+<li>An <code>automated_reviewer</code> job that runs after tests pass</li>
+</ol>
 <p>See the
 <a href="https://github.com/shakenfist/development/tree/main/templates/ci-review-automation/README.md">template README</a>
-for the other snippets.</p>
+for the exact YAML snippets.</p>
 <h3 id="step-3-ensure-runner-labels">Step 3: Ensure Runner Labels<a class="headerlink" href="#step-3-ensure-runner-labels" title="Permanent link">&para;</a></h3>
 <p>Your self-hosted runners need these labels:</p>
 <ul>
@@ -10989,14 +10971,9 @@ for the other snippets.</p>
   parsing, permission checks)</li>
 </ul>
 <h2 id="preventing-infinite-loops">Preventing Infinite Loops<a class="headerlink" href="#preventing-infinite-loops" title="Permanent link">&para;</a></h2>
-<p>The reusable review workflow reads the PR head commit over the API and
-skips the review if it was authored by <code>bot@shakenfist.com</code> or by
-<code>noreply@anthropic.com</code> (the address a Claude Code commit made on a
-runner carries). Reading the head commit by SHA rather than taking the
-last element of the PR commits list matters, because that endpoint pages
-at thirty and an "address comments" run which makes one commit per
-review item passes thirty easily.</p>
-<p>This prevents loops where:</p>
+<p>The <code>check-bot-commit</code> job detects if the last commit was authored
+by <code>bot@shakenfist.com</code>. If so, the automated reviewer is skipped.
+This prevents loops where:</p>
 <ol>
 <li>Bot makes a commit (from test fixing or comment addressing)</li>
 <li>CI runs on the new commit</li>
@@ -11013,14 +10990,7 @@ repository:</p>
 <li><strong>pr-bot-trigger</strong> -- parses <code>@shakenfist-bot</code> commands, checks
   permissions, adds reactions, posts status messages</li>
 <li><strong>review-pr-with-claude</strong> -- runs automated code reviews with
-  structured JSON output and embedded review data. Called directly by
-  <code>pr-re-review.yml</code>, which passes <code>force</code> so that a human asking for a
-  re-review is the only way to get a second review on a PR</li>
-<li><strong>.github/workflows/pr-auto-review.yml</strong> -- a reusable workflow
-  wrapping <code>review-pr-with-claude</code> for the CI reviewer. It owns the
-  runner, the 60 minute timeout, the pull-request-event and
-  same-repository restrictions, its own concurrency group, and the
-  bot-commit check, so those cannot drift between projects</li>
+  structured JSON output and embedded review data</li>
 </ul>
 <h2 id="projects-using-this-automation">Projects Using This Automation<a class="headerlink" href="#projects-using-this-automation" title="Permanent link">&para;</a></h2>
 <table>
