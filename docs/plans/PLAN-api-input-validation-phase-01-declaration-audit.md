@@ -308,6 +308,46 @@ class-level `get_args` dict as a query schema for every handler
 in the class. That was a latent wrong answer for a class with a
 webargs `get` beside a `post` declaring a same-named parameter.
 
+A fourth round found that this fixed *handler* attribution but
+not *name* resolution: the scopes searched for the schema name
+were unioned, and the module was always one of them, so every
+`get_args` in a file contributed to every handler in it. Two
+endpoint classes in one module would have derived each other's
+query parameters — and the fixer would then have rewritten a
+correct `body` declaration to `query`, teaching phase 3 to accept
+a parameter from the query string that never arrives there.
+Resolution is now innermost-scope-first, and each scope
+contributes only its own assignments. It could not fire yet:
+each of the four modules with a webargs schema contains exactly
+one.
+
+The same round widened `test_every_endpoint_is_documented` from
+"a handler with parameters must declare them" to "a handler must
+carry a declaration", which is the property that would have
+caught `InstanceSnapshotEndpoint` directly rather than by
+accident — its `get` takes no parameters, so the narrower test
+never covered it. Widening it turned up that "declares no
+parameters" and "carries no declaration" are different questions:
+eight endpoints correctly declare an empty list because they
+accept nothing, and only the three unauthenticated health probes
+(`Root`, `Livez`, `Readyz`) genuinely have no declaration. They
+are now exempt by name and reason rather than by accident of
+taking no arguments.
+
+Three smaller things from the same round. `swagger_helper()`
+checks the arity of a declaration tuple before destructuring it,
+so a four- or six-element tuple raises `InvalidAPIDeclaration`
+rather than the one `ValueError` that escaped the "one exception
+type" goal. `handlers()` requires a `Resource` base rather than
+trusting a method name, so a helper class with a `get()` accessor
+is not asked to document itself. And `argtypes['integer']`
+carried a duplicated `type` key where the second was meant to be
+`format`, so integer parameters rendered without one while every
+other token had it — a real if cosmetic change to the published
+specification, made inside a change set otherwise described as a
+location audit, and recorded here so a later bisect is not
+confusing.
+
 ### Known remaining gap: multiple body parameters
 
 Swagger 2.0 permits at most one `in: body` parameter per
