@@ -114,15 +114,18 @@ def arg_is_artifact_ref(func):
     Pair this with `requires_artifact_ownership`, which is to say use
     it on everything that changes an artifact.
 
-    A name here means "mine". Trust does permit a trusted namespace to
-    delete somebody else's artifact, and `requires_artifact_ownership`
-    still allows that by UUID -- but *resolving* a name into another
-    namespace and then destroying what it landed on is a different
-    proposition. `sf-client artifact delete build-cache` run in a
-    namespace that has no `build-cache` of its own should say so, not
-    quietly find and delete the one belonging to a namespace which
-    happens to trust it. Destructive actions get the narrow, boring
-    reading of an ambiguous name.
+    A name here means "mine". `requires_artifact_ownership` is the
+    gate that actually refuses somebody else's artifact, and it does so
+    whichever way the artifact was named -- trust no longer reaches
+    past reading, so a uuid gets the same refusal a name does. This
+    decorator is defence in depth on top of that: *resolving* a name
+    into another namespace and then destroying what it landed on is a
+    different proposition from being handed a uuid. `sf-client artifact
+    delete build-cache` run in a namespace that has no `build-cache` of
+    its own should say so, not quietly find the one belonging to a
+    namespace which happens to trust it and then refuse with a 404 that
+    looks like the name was wrong. Destructive actions get the narrow,
+    boring reading of an ambiguous name.
     """
     return _resolve_artifact_ref(func, widen=False)
 
@@ -189,7 +192,10 @@ def requires_artifact_access(func):
     # Requires that @arg_is_visible_artifact_ref has already run.
     #
     # The wider test, for read only routes: ownership as above, plus
-    # any artifact explicitly marked shared. This is exactly the
+    # any artifact explicitly marked shared, plus anything owned by a
+    # namespace which trusts the caller. That last one is the whole of
+    # what trust now buys -- sight, on the read routes, and nothing on
+    # the routes which change things. This is exactly the
     # predicate the artifact listing filters on, and it reuses that
     # function rather than restating it -- "appears in the list" and
     # "is readable by uuid" have to be one rule, because two copies of

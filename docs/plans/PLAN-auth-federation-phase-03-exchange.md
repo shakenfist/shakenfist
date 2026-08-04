@@ -573,6 +573,8 @@ fix is reverted:
   generic 500 handler answers with `repr(e)` and `CorruptMappingRule`
   names the rule; on the one endpoint anybody may call, that hands a
   stranger an identifier. Caught and turned into a generic refusal.
+  The first attempt guarded the wrong call and protected nothing; see
+  the pull request review below.
 
 Assessed and accepted:
 
@@ -598,6 +600,77 @@ Assessed and accepted:
 * **The `federation_replay` and `federation_rate_limits` tables grow
   with traffic.** Both are already swept by the cluster daemon's
   reapers, so this was addressed before the review ran.
+
+## Pull request review (#3625)
+
+The automated reviewer on the pull request raised eight items. Three
+were marked for fixing, five as things to consider. All eight were
+addressed; the two that turned out to matter most are the first two,
+because between them they show a mitigation and its own regression
+test agreeing with each other and both being wrong.
+
+Fixed:
+
+* **The `CorruptMappingRule` guard was wrapped around a call that
+  cannot raise it.** The exception comes from decoding `bound_claims`
+  or `scopes`, which happens on the *attributes* read;
+  `MappingRule.from_db_by_name` reads the static row and the object
+  state and touches neither. The first read that could actually fail
+  was the `issuer` comparison, outside the `try`, so the UUID leak the
+  guard was written to prevent was still open. The endpoint now reads
+  the whole policy once, inside a `try` that covers it, via the new
+  `MappingRule.policy()`.
+* **The regression test mocked the one function that cannot raise.**
+  It patched `from_db_by_name`, so it passed against the broken guard
+  — which is why the guard shipped in the wrong place. It now patches
+  the attribute read, asserts the lookup really did succeed first, and
+  was verified to fail (`401 != 500`) against the unguarded endpoint.
+* **`arg_is_artifact_ref`'s docstring described the trust behaviour
+  this branch removes**, telling the reader that ownership still lets a
+  trusted namespace delete by UUID. It does not, as every other
+  document in the branch says. Rewritten, and the trust case added to
+  the `requires_artifact_access` comment, which had omitted it.
+
+Considered, and changed:
+
+* **Issuer resolution ran above the rate limit**, and the comment
+  justified that ordering by calling the preceding steps free.
+  `issuer_claiming_url` scans every configured issuer and reads state
+  and attributes per row, so it was the one unauthenticated, unmetered
+  database amplification path in the new code — and the ordering was
+  backwards on its own logic, since the counter row it was avoiding
+  costs less than the scan it was permitting. The meter moved above
+  the lookup. Counting is one row per source per window, the same row
+  a caller naming a real issuer already earned, so the table grows no
+  faster. The test that asserted the old contract now asserts the new
+  one.
+* **`issuer_url` uniqueness was a check-then-write with nothing
+  serialising it**, while three documents described it as an
+  invariant. It cannot have a unique index, because a soft-deleted
+  issuer keeps its row so its URL stays reusable, so both endpoints
+  now hold a cluster lock across the check and the write — the
+  `vsock_cids` pattern from `instance.py`. Tested by asserting the
+  create happens between the acquire and the release.
+* **Every attribute access re-read the row.** One exchange made five
+  round trips for one rule. `policy()` reads once; the exchange and
+  `external_view()` both use it. This fell out of the first fix.
+
+Considered, and documented rather than changed:
+
+* **Anonymous requests write an audit row before the rate limit
+  applies.** `log_request_info` events every request to `API_REQUESTS`
+  ahead of routing, so `_federated_refusal`'s care not to let an
+  anonymous caller write unbounded rows into a *namespace's* log does
+  not extend to the API's own. This is pre-existing and shared with
+  `POST /auth`, the other public route, so it is out of scope for this
+  branch — but the docstring no longer reads as though the exposure is
+  closed.
+* **Widened artifact name resolution does a trust lookup per
+  candidate.** A popular name across many namespaces fans out to one
+  trust read each. It only runs when the caller's own namespace has no
+  match, so the common case is untouched. Recorded in the docstring as
+  a deliberate choice, with the SQL pushdown that would fix it if it
+  ever shows up in a profile.
 
 ## Back brief
 

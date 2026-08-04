@@ -185,6 +185,14 @@ source address, every request appears to come from the proxy and the
 limit becomes a single global one -- size it accordingly, or disable
 it and rate limit at the proxy instead.
 
+Every attempt is counted, including ones refused for naming an issuer
+this cluster does not trust. Only the checks that read nothing but the
+request itself -- a missing field, an oversized body -- happen before
+the counter. So a misconfigured workflow pointed at the wrong issuer
+consumes its source's budget in the same way a wrong key does, which
+is worth knowing when a CI fleet sharing one NAT address starts
+seeing 429s.
+
 Both checks fail closed: if the database cannot be reached the
 exchange answers 503 rather than assuming the request is fine.
 

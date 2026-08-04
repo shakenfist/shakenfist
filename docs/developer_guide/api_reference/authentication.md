@@ -322,6 +322,14 @@ issuer would believe they had while some requests kept verifying
 against the old JWKS. Deleting an issuer frees both its name and its
 URL for reuse.
 
+The two are enforced by different mechanisms. `name` has a unique
+index behind it, so the database is the arbiter. `issuer_url` cannot
+easily have one -- a soft-deleted issuer keeps its row precisely so
+that its URL stays reusable -- so the create and update endpoints
+instead hold a cluster-wide lock across the duplicate check and the
+write it guards. The invariant holds either way, including when two
+administrators configure the same provider at the same moment.
+
 ???+ tip "REST API calls"
 
     * [GET /auth/issuers](https://openapi.shakenfist.com/#/auth/get_auth_issuers): List all trusted issuers.

@@ -418,6 +418,23 @@ class MappingRule(dbo):
     def _attributes(self) -> Optional[MappingRuleAttributesData]:
         return mariadb.get_mapping_rule_attributes(_as_uuid(self.uuid))
 
+    def policy(self) -> Optional[MappingRuleAttributesData]:
+        """The whole of the rule's policy in a single read.
+
+        Each property below issues its own database read, which is
+        fine for a one-off and wasteful for a caller that wants more
+        than one of them: the federated exchange reads five, so it
+        made five round trips for one row.
+
+        Reading once also gives CorruptMappingRule a single place to
+        be caught. The exception comes from decoding bound_claims or
+        scopes, so it is raised here and by the properties, never by
+        from_db_by_name -- that reads the static row only. A caller
+        which wants to handle a damaged rule rather than let it become
+        a 500 has to wrap this call, not the lookup.
+        """
+        return self._attributes()
+
     @property
     def issuer(self) -> Optional[str]:
         attrs = self._attributes()
@@ -480,14 +497,17 @@ class MappingRule(dbo):
 
     def external_view(self) -> dict[str, Any]:
         retval = self._external_view()
+
+        # One read rather than five, see policy().
+        attrs = self.policy()
         retval.update({
             'namespace': self.namespace,
             'name': self.name,
-            'issuer': self.issuer,
-            'bound_claims': self.bound_claims,
-            'scopes': self.scopes,
-            'key_ttl': self.key_ttl,
-            'key_name_prefix': self.key_name_prefix
+            'issuer': attrs.issuer if attrs else None,
+            'bound_claims': attrs.bound_claims if attrs else None,
+            'scopes': attrs.scopes if attrs else None,
+            'key_ttl': attrs.key_ttl if attrs else None,
+            'key_name_prefix': attrs.key_name_prefix if attrs else None
         })
         return retval
 

@@ -444,6 +444,40 @@ kept verifying against the old JWKS. The create and update endpoints refuse a
 duplicate by calling `federation.issuer_claiming_url`, the same function the
 resolution path uses.
 
+A check-then-write is not an invariant on its own. `issuer_url` lives in the
+attributes row and has no unique index -- and cannot easily get one, because a
+soft-deleted issuer keeps its row and its URL is deliberately reusable -- so
+both endpoints hold `_issuer_url_lock()` across the check *and* the write it
+guards. Without that, two administrators configuring one provider at the same
+moment both read "free" and both write. This is the `vsock_cids` pattern from
+`instance.py`: where a unique index cannot be the arbiter, a cluster lock
+around the check-then-act has to be.
+
+### Put the meter above the expensive thing, not below it
+
+`/auth/federated` is unauthenticated, so every step above the rate limit is a
+step an anonymous caller gets for free, as often as they can send. Ordering
+there is a security property, and the question to ask of each step is not "is
+this cheap?" but "does this touch the database or the network?". Issuer
+resolution reads once per configured issuer, so it belongs *below* the meter
+even though there are only ever a handful of issuers; only the argument
+checks, which touch nothing but the request, belong above it. The original
+ordering had this backwards on its own stated logic -- it placed the meter
+below the lookup to avoid writing a counter row, when the lookup it was
+skipping cost more than the row did. If you add a step to that endpoint, place
+it relative to `enforce_rate_limit` on that basis, and say why in a comment.
+
+### A guard has to sit where the exception is raised
+
+`CorruptMappingRule` comes from decoding `bound_claims` or `scopes`, which
+only happens on the *attributes* read. `MappingRule.from_db_by_name` reads the
+static row and the object state, so wrapping the lookup in a `try` looks like
+protection and is none. Before writing a guard, find the raise site; before
+believing a regression test, check that the thing it patches is on the path
+that can actually fail. Use `MappingRule.policy()` to read the whole policy in
+one go when you need more than one field -- it is also the single place to
+catch this.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

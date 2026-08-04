@@ -906,6 +906,15 @@ claim matching against a rule. The endpoint composes these in a fixed order —
 cheap local rejections before anything that costs a network round trip — and
 that order is a security property rather than a style, asserted by tests.
 
+The rate limit is the dividing line in that order, and only the argument
+checks sit above it. Issuer resolution in particular sits *below* it: it scans
+the configured issuers and reads state and attributes per row, so although a
+cluster only ever has a handful of issuers, leaving that above the meter gave
+an anonymous caller a way to multiply one request into database work with
+nothing counting it. The rule for anything added to this endpoint is that the
+meter goes above whatever touches the database or the network, not merely
+above whatever is slow.
+
 Two plain (non-DBO) tables back the abuse resistance, both reaped by the
 cluster daemon's `reap_federation_records`:
 

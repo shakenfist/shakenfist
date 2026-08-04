@@ -22,6 +22,7 @@ from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist import instance
+from shakenfist import locks
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -755,6 +756,26 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience):
     return None
 
 
+def _issuer_url_lock():
+    """Serialise the check-then-write on issuer_url.
+
+    issuer_url lives in trusted_issuer_attributes and has no unique
+    index to enforce it -- and could not easily have one, because a
+    soft-deleted issuer keeps its row and its URL is deliberately
+    available for reuse. So uniqueness here is a read followed by a
+    write, and without a lock two administrators configuring the same
+    provider at the same moment can both read "free" and both write.
+
+    That is the same shape as the vsock CID allocator in instance.py,
+    and it takes the same remedy: one cluster wide lock held across
+    both halves. Cheap, because these are admin-only endpoints that
+    run about as often as a cluster gains an identity provider.
+    """
+    return locks.ClusterLock(
+        'trusted_issuer_urls', None, 'global',
+        op='Claim trusted issuer URL', timeout=30)
+
+
 def _issuer_url_taken(issuer_url, by_someone_other_than=None):
     """Refuse a second issuer record for one iss value.
 
@@ -762,6 +783,9 @@ def _issuer_url_taken(issuer_url, by_someone_other_than=None):
     claiming the same URL make which provider's keys we trust depend on
     listing order. An operator repointing an issuer would believe they
     had, while some requests kept verifying against the old JWKS.
+
+    Callers must hold _issuer_url_lock() across this check and the
+    write it guards, or the check is advisory only.
     """
     existing = federation.issuer_claiming_url(issuer_url)
     if not existing or existing.name == by_someone_other_than:
@@ -817,11 +841,15 @@ class AuthIssuersEndpoint(api_base.Resource):
         if err:
             return err
 
-        err = _issuer_url_taken(issuer_url)
-        if err:
-            return err
+        # The URL check and the create are one decision, so they are
+        # taken together. See _issuer_url_lock.
+        with _issuer_url_lock():
+            err = _issuer_url_taken(issuer_url)
+            if err:
+                return err
 
-        issuer = TrustedIssuer.new(name, issuer_url, jwks_uri, audience)
+            issuer = TrustedIssuer.new(name, issuer_url, jwks_uri, audience)
+
         if not issuer:
             return sf_api.error(409, 'issuer already exists')
         return issuer.external_view()
@@ -873,11 +901,17 @@ class AuthIssuerEndpoint(api_base.Resource):
 
         # Excluding this issuer, or repointing anything else about an
         # issuer while leaving its URL alone would conflict with itself.
-        err = _issuer_url_taken(issuer_url, by_someone_other_than=issuer_name)
-        if err:
-            return err
+        # Held under the same lock as the create path, for the same
+        # reason: two concurrent repoints onto one URL would otherwise
+        # both see it free.
+        with _issuer_url_lock():
+            err = _issuer_url_taken(
+                issuer_url, by_someone_other_than=issuer_name)
+            if err:
+                return err
 
-        issuer.update(issuer_url, jwks_uri, audience)
+            issuer.update(issuer_url, jwks_uri, audience)
+
         return issuer.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -1153,6 +1187,16 @@ def _federated_refusal(rule, reason, detail, namespace=None):
     would hand an anonymous caller a way to write unbounded rows into
     a namespace's audit log, or into no namespace at all.
 
+    That restraint is about the *namespace* audit log, and it should
+    not be read as a claim that an anonymous request writes nothing.
+    app.py's log_request_info hook events every request to
+    API_REQUESTS before routing, this endpoint included, and it runs
+    ahead of the rate limit inside the method. So a flood does still
+    write a row per request, just against the API's own log rather
+    than a tenant's. That is pre-existing and shared with POST /auth,
+    which is the other public route -- worth knowing, and not
+    something this function fixes.
+
     The caller is told less than the log records. "federated exchange
     refused" plus a category is enough for an operator debugging their
     own workflow, and withholding which claim missed avoids turning
@@ -1219,19 +1263,24 @@ class AuthFederatedEndpoint(api_base.Resource):
         if not rule or not isinstance(rule, str):
             return sf_api.error(400, 'no rule specified')
 
-        # 2. Resolve the issuer from the unverified iss. No network yet:
-        #    a made-up issuer must not be able to make us dial out.
-        try:
-            issuer = federation.issuer_for_token(token)
-        except exceptions.UntrustedIssuer as e:
-            return _federated_refusal(
-                None, 'untrusted issuer', str(e), namespace=namespace)
-
-        # 3. Rate limit per source address. Here, rather than earlier,
-        #    because the checks above are free and writing a counter row
-        #    is not; and here, rather than later, because everything
-        #    below this line costs an outbound request or a database
-        #    read done on an anonymous caller's behalf.
+        # 2. Rate limit per source address. Here, rather than earlier,
+        #    because the argument checks above touch nothing but the
+        #    request; and here, rather than after the issuer lookup,
+        #    because that lookup is not free.
+        #
+        #    The design section had this the other way around, on the
+        #    grounds that resolving an issuer was free and writing a
+        #    counter row was not. That was wrong about the first half:
+        #    issuer_claiming_url scans every configured issuer and
+        #    reads state and attributes per row, so an anonymous caller
+        #    who can produce a syntactically valid JWT with any iss at
+        #    all could drive that scan as fast as they could send. It
+        #    was the one unmetered database amplification path in the
+        #    exchange, and it sat above the meter.
+        #
+        #    Counting the request costs one row per source per window,
+        #    which is the same row that source would get by naming a
+        #    real issuer, so nothing about the table's growth changes.
         source = flask.request.remote_addr or 'unknown'
         try:
             federation.enforce_rate_limit(source)
@@ -1240,6 +1289,14 @@ class AuthFederatedEndpoint(api_base.Resource):
                 'namespace': namespace, 'source': source
             }).info(f'Federated exchange rate limited: {e}')
             return sf_api.error(429, 'too many federated exchange attempts')
+
+        # 3. Resolve the issuer from the unverified iss. No network yet:
+        #    a made-up issuer must not be able to make us dial out.
+        try:
+            issuer = federation.issuer_for_token(token)
+        except exceptions.UntrustedIssuer as e:
+            return _federated_refusal(
+                None, 'untrusted issuer', str(e), namespace=namespace)
 
         # 4 and 5. Signature, then audience, issuer and lifetime.
         try:
@@ -1251,36 +1308,59 @@ class AuthFederatedEndpoint(api_base.Resource):
         # 7. Only now look up the rule. Doing it after verification
         #    means an anonymous caller holding no valid token cannot
         #    use this endpoint to discover which rules exist.
-        #
-        #    A damaged rule row is refused rather than allowed to
-        #    escape as an exception. The generic 500 handler answers
-        #    with repr(e), and CorruptMappingRule names the rule's
-        #    UUID -- which on the one endpoint anybody may call would
-        #    hand a stranger an identifier they should not have.
-        try:
-            rule_from_db = MappingRule.from_db_by_name(namespace, rule)
-        except exceptions.CorruptMappingRule as e:
-            LOG.with_fields({
-                'namespace': namespace, 'rule': rule
-            }).error(f'Federated exchange hit a damaged rule: {e}')
-            return _federated_refusal(
-                None, 'rule is unusable', 'rule could not be read',
-                namespace=namespace)
-
+        rule_from_db = MappingRule.from_db_by_name(namespace, rule)
         if not rule_from_db:
             return _federated_refusal(
                 None, 'no such rule', f'no rule {namespace}/{rule}',
                 namespace=namespace)
 
-        if rule_from_db.issuer != issuer.name:
+        #    Read the whole policy in one go, and refuse a damaged row
+        #    rather than let it escape as an exception. The generic 500
+        #    handler answers with repr(e), and CorruptMappingRule names
+        #    the rule's UUID -- which on the one endpoint anybody may
+        #    call would hand a stranger an identifier they should not
+        #    have.
+        #
+        #    The guard belongs here and not around the lookup above.
+        #    from_db_by_name reads the static row and the object state,
+        #    neither of which decodes bound_claims or scopes, so it
+        #    cannot raise this. Wrapping it looked like protection and
+        #    was none: the first read that can actually fail was the
+        #    issuer comparison below.
+        #
+        #    The refusal is evented against the rule, as the "rule has
+        #    no scopes" one below is. The owner has been identified by
+        #    this point, and a damaged rule is precisely the thing they
+        #    need told. What the *caller* gets back is still the bare
+        #    category, which is what keeps the UUID out of the answer.
+        try:
+            policy = rule_from_db.policy()
+        except exceptions.CorruptMappingRule as e:
+            LOG.with_fields({
+                'namespace': namespace, 'rule': rule
+            }).error(f'Federated exchange hit a damaged rule: {e}')
+            return _federated_refusal(
+                rule_from_db, 'rule is unusable', 'rule could not be read')
+
+        if not policy:
+            # The static row outlived its attributes row. Same refusal
+            # as a rule that cannot be decoded: there is no policy to
+            # apply, so there is nothing to mint against.
+            LOG.with_fields({
+                'namespace': namespace, 'rule': rule
+            }).error('Federated exchange found a rule with no attributes')
+            return _federated_refusal(
+                rule_from_db, 'rule is unusable', 'rule has no attributes')
+
+        if policy.issuer != issuer.name:
             return _federated_refusal(
                 rule_from_db, 'wrong issuer',
-                f'rule accepts {rule_from_db.issuer}, token is from '
+                f'rule accepts {policy.issuer}, token is from '
                 f'{issuer.name}')
 
         try:
             satisfied = federation.match_claims(
-                claims, rule_from_db.bound_claims or {})
+                claims, policy.bound_claims or {})
         except exceptions.ClaimMismatch as e:
             return _federated_refusal(
                 rule_from_db, 'claims do not match', str(e))
@@ -1296,8 +1376,8 @@ class AuthFederatedEndpoint(api_base.Resource):
                 rule_from_db, 'no such namespace',
                 f'rule {namespace}/{rule} names a namespace which is gone')
 
-        scopes = rule_from_db.scopes
-        key_ttl = rule_from_db.key_ttl
+        scopes = policy.scopes
+        key_ttl = policy.key_ttl
         if not scopes or not key_ttl:
             return _federated_refusal(
                 rule_from_db, 'rule is unusable',
@@ -1337,7 +1417,7 @@ class AuthFederatedEndpoint(api_base.Resource):
         #    workflow re-run gets its own key rather than silently
         #    rotating the secret out from under a still-running job.
         key_name = '%s-%s' % (
-            rule_from_db.key_name_prefix, sf_random.random_id()[:8])
+            policy.key_name_prefix, sf_random.random_id()[:8])
         secret = credentials.generate()
 
         minted = NamespaceKey.new(

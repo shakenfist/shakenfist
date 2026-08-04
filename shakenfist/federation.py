@@ -175,9 +175,15 @@ def issuer_claiming_url(issuer_url: str) -> TrustedIssuer | None:
     """The live trusted issuer configured for this iss value, if any.
 
     Issuers are cluster level and there is one per identity provider,
-    so the listing is small. Comparison is exact: no normalisation and
-    no trailing slash tolerance, because a loose comparison here is a
-    way to accept tokens from somewhere else entirely.
+    so the listing is small. It is not free, though: this is a scan,
+    and reading each candidate's state and issuer_url is a database
+    round trip apiece. On the exchange path that is why the rate limit
+    sits above this call rather than below it -- N is small, but an
+    anonymous caller must not be able to multiply it without a meter.
+
+    Comparison is exact: no normalisation and no trailing slash
+    tolerance, because a loose comparison here is a way to accept
+    tokens from somewhere else entirely.
 
     This is also what the issuer endpoints use to refuse a second
     issuer for the same URL. Two records claiming one iss would make
@@ -368,9 +374,11 @@ def enforce_rate_limit(source: str) -> None:
 
     Counted before the token is verified, because verification is the
     expensive part and a limit that only applies to well formed
-    requests does not limit anything. Counted after the free local
-    rejections, so a flood of garbage from one source does not fill
-    the table with rows.
+    requests does not limit anything. Counted after the argument
+    checks, which touch nothing but the request, so a flood of garbage
+    from one source does not fill the table with rows -- and before
+    issuer_claiming_url, which reads the database once per configured
+    issuer and so must not be reachable by an unmetered caller.
 
     A database failure propagates as DatabaseUnavailable rather than
     being swallowed. Treating an unreadable counter as "under the

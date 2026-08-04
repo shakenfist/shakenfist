@@ -274,6 +274,17 @@ class Artifact(dbowo):
 
         Phase one is also the fast path, and stays free of the
         per-candidate trust lookups phase two needs.
+
+        Phase two's cost scales with how many namespaces have picked
+        the same name: the query is unscoped, and
+        ``namespace_or_shared_filter`` then does a trust lookup per
+        candidate. On a cluster where everybody has a `debian-11`,
+        that is a trust read per tenant. Accepted rather than
+        overlooked, because it only runs when the caller's own
+        namespace came up empty. If it ever shows up in a profile the
+        fix is to push the filter into SQL -- both halves of it, the
+        shared flag and the set of namespaces which trust the
+        requestor, are known before the scan starts.
         """
         if object_ref and util_general.valid_uuid4(object_ref):
             return cls.from_db(object_ref)

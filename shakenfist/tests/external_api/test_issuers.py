@@ -12,9 +12,11 @@ import sys
 from unittest import mock
 
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.trusted_issuer import TrustedIssuer
 
 
 GITHUB = 'https://token.actions.githubusercontent.com'
@@ -99,6 +101,48 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(409, resp.status_code)
         self.assertIn('github', resp.get_json()['error'])
+
+    def test_the_url_check_and_the_write_happen_under_one_lock(self):
+        # issuer_url has no unique index behind it -- it lives in the
+        # attributes row, and a soft-deleted issuer keeps its URL so
+        # that the URL can be reused. Uniqueness is therefore a read
+        # followed by a write, and only the lock makes that a decision
+        # rather than a race: without it, two administrators
+        # configuring the same provider at once both read "free" and
+        # both write.
+        events = []
+
+        real_acquire = mariadb.acquire_cluster_lock
+        real_release = mariadb.release_cluster_lock
+
+        def acquire(objecttype, subtype, name, lock_data):
+            events.append(('acquire', objecttype))
+            return real_acquire(objecttype, subtype, name, lock_data)
+
+        def release(objecttype, subtype, name, lock_data):
+            events.append(('release', objecttype))
+            return real_release(objecttype, subtype, name, lock_data)
+
+        original_new = TrustedIssuer.new
+
+        def new(*args, **kwargs):
+            events.append(('create', None))
+            return original_new(*args, **kwargs)
+
+        with mock.patch('shakenfist.mariadb.acquire_cluster_lock', acquire), \
+                mock.patch(
+                    'shakenfist.mariadb.release_cluster_lock', release), \
+                mock.patch.object(TrustedIssuer, 'new', new):
+            self.assertEqual(200, self._create().status_code)
+
+        # The create has to sit strictly between an acquire and the
+        # matching release of the issuer URL lock.
+        relevant = [e for e in events
+                    if e[1] == 'trusted_issuer_urls' or e[0] == 'create']
+        self.assertEqual(
+            [('acquire', 'trusted_issuer_urls'),
+             ('create', None),
+             ('release', 'trusted_issuer_urls')], relevant)
 
     def test_a_deleted_issuers_url_can_be_reused(self):
         # The conflict is with live issuers only, or disowning a

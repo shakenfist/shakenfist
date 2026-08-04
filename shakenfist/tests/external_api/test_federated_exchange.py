@@ -359,16 +359,56 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
         # CorruptMappingRule names the rule. /auth/federated is the one
         # endpoint anybody may call, so that repr would hand a stranger
         # an identifier they have no business holding.
+        #
+        # The exception is raised where the policy is decoded, not
+        # where the rule is looked up: from_db_by_name reads the static
+        # row and the state, and neither touches bound_claims or
+        # scopes. So the attribute read is what gets sabotaged here.
+        # Patching the lookup instead would exercise a path that cannot
+        # raise, and would pass against an endpoint whose guard sits in
+        # the wrong place.
         rule_uuid = MappingRule.from_db_by_name('ci', 'ryll').uuid
 
         with mock.patch.object(
-                MappingRule, 'from_db_by_name',
+                MappingRule, '_attributes',
                 side_effect=exceptions.CorruptMappingRule(
-                    f'mapping rule {rule_uuid} has undecodable scopes')):
+                    f'mapping rule {rule_uuid} has undecodable scopes')
+                ) as attributes:
             resp = self._exchange()
+
+        # The lookup has to have succeeded, or this proves nothing
+        # about the read which follows it.
+        attributes.assert_called()
 
         self.assertEqual(401, resp.status_code)
         self.assertNotIn(str(rule_uuid), json.dumps(resp.get_json()))
+
+    def test_a_damaged_rule_is_audited_against_its_owner(self):
+        # The caller is told nothing but the category. The rule's
+        # owner, who by this point has been identified, is the one who
+        # needs to know their rule is unusable.
+        rule_uuid = MappingRule.from_db_by_name('ci', 'ryll').uuid
+
+        with mock.patch.object(MappingRule, 'add_event') as add_event, \
+                mock.patch.object(
+                    MappingRule, '_attributes',
+                    side_effect=exceptions.CorruptMappingRule(
+                        f'mapping rule {rule_uuid} has undecodable scopes')):
+            self._exchange()
+
+        messages = [c.args[1] for c in add_event.call_args_list
+                    if len(c.args) > 1]
+        self.assertIn('federated exchange refused', messages)
+
+    def test_a_rule_with_no_attributes_row_is_refused(self):
+        # The other way a policy read comes back unusable: a static row
+        # which outlived its attributes row. There is no policy to
+        # apply, so the exchange refuses rather than reading the rule
+        # as one which happens to grant nothing.
+        with mock.patch.object(MappingRule, '_attributes', return_value=None):
+            resp = self._exchange()
+
+        self.assertEqual(401, resp.status_code)
 
     def test_an_oversized_body_is_refused(self):
         # Refused on size before anything parses it, because parsing an
@@ -558,13 +598,41 @@ class RateLimitTestCase(FederatedExchangeTestCase):
 
         self.assertEqual(429, self._exchange().status_code)
 
-    def test_an_untrusted_issuer_costs_no_counter_row(self):
-        # Refused before the counter, so a flood of garbage from one
-        # source cannot fill the table.
+    def test_an_untrusted_issuer_is_still_counted(self):
+        # This reverses an earlier reading of the ordering. The counter
+        # used to sit below the issuer lookup, on the grounds that the
+        # lookup was free and a counter row was not, so garbage was
+        # refused without costing a row.
+        #
+        # The lookup is not free: issuer_claiming_url scans every
+        # configured issuer and reads state and attributes per row. Any
+        # caller who could produce a syntactically valid JWT could
+        # drive that scan unmetered, which made it the one place in the
+        # exchange where an anonymous request multiplied into database
+        # work with nothing counting it.
+        #
+        # The table cost of counting is one row per source per window,
+        # which is the same row that source earns by naming a real
+        # issuer, so nothing about the table's growth changes.
         self._rate_limit(10)
         self._exchange(token=self._token(issuer='https://evil.example.com'))
 
-        self.assertEqual({}, self.mock_mariadb.federation_rate_limits)
+        [(source, _)] = self.mock_mariadb.federation_rate_limits
+        self.assertEqual('127.0.0.1', source)
+
+    def test_a_flood_of_untrusted_issuers_trips_the_limit(self):
+        # Which is the point of counting them: the scan is behind the
+        # meter, so it stops when the meter does.
+        self._rate_limit(2)
+
+        for _ in range(2):
+            self.assertEqual(401, self._exchange(
+                token=self._token(
+                    issuer='https://evil.example.com')).status_code)
+
+        self.assertEqual(429, self._exchange(
+            token=self._token(
+                issuer='https://evil.example.com')).status_code)
 
     def test_zero_disables_rate_limiting(self):
         self._rate_limit(0)
