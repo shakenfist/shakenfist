@@ -278,7 +278,7 @@ declarations are good enough to compile.
 | 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See [phase 0](PLAN-api-input-validation-phase-00-decisions.md) |
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
 | 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI so the bounds are visible to callers rather than invisible the way the events `limit` cap was. Also: collapse the N body parameters of an operation into one `body` parameter carrying a generated `schema`, and add a test that validates the generated specification — see below |
-| 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs |
+| 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Precondition: generate the derivation's input space rather than sampling it — see below |
 | 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the four hand-authored `get_args` schemas into the compiled path |
 | 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors; fix the attribution issues (#3523, #3371, #3606, #3615) |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
@@ -324,6 +324,58 @@ specification-validity problems for phase 2 to pick up:
   so it is not gated on the renderer work — the test is worth
   having before the fix, since it turns "invalid in N places"
   into a number that moves.
+
+### Carried into phase 3 from phase 1
+
+**Generate the derivation's input space rather than sampling it.**
+A precondition for compiling, in the same way the audit itself
+was.
+
+Phase 1 took five review rounds, and four of them found a defect
+in the machinery added by the round before: the Werkzeug
+converter regex, the `flask.request.args` fallback, the webargs
+scope leak, and an emptied parameter list. Every one was
+`declarations.py` misreading source, and every one was a shape
+that did not occur anywhere in the tree — so no amount of testing
+against the tree could have found them, and neither could
+mutating it, which only permutes shapes already present.
+
+While the declarations are documentation, a misread costs a wrong
+line in the published API. Once phase 3 compiles them, the same
+misread rejects a valid request: a `path` parameter derived as
+`body` produces a schema hunting the JSON body for a URL segment,
+and decision D6's query-string fallback is granted only to
+parameters derived as `query`. The cost of the defect class rises
+sharply exactly here, which is why this belongs to phase 3 and
+not earlier.
+
+The shape to build is a **combinatorial generator**, not a
+fuzzer. Enumerate the axes and assert the derivation recovers
+what the source was constructed to mean:
+
+| Axis | Values |
+|---|---|
+| Route | absent, `<x>`, `<path:x>`, `<int(min=1):x>`, non-literal |
+| webargs | none, `get_args` on the class, on the module, inline dict, `location='json'` |
+| `request.args` | absent, `.get()`, subscript, on a non-request object |
+| Declaration | well-formed, wrong arity, non-literal name, raw-body sentinel |
+
+A few dozen cases, deterministic, well under a second. The oracle
+is free because the source is constructed knowing where the
+parameter comes from, which is what makes this different from
+mutating declarations in the tree: `audit()` derives the truth
+and compares, so flipping a declared location and asserting drift
+tests the comparison, not the derivation. Every real defect was
+on the other side of that comparison.
+
+No new dependency. `hypothesis` is not in the project, and
+randomness buys nothing over enumerating a space this small —
+the value is in covering the axes, not in sampling them.
+
+`tools/check-api-declaration-guards.sh` stays as it is. It
+mutates the real tree to prove the *guards* fire, which is a
+different question from whether the *derivation* is right, and
+the two are complementary.
 
 ## Open questions for phase 0
 
