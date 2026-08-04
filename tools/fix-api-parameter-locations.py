@@ -32,7 +32,16 @@ from shakenfist.external_api import declarations  # noqa: E402
 
 
 def main(apply_edits, api_dir=declarations.API_DIR, app=None):
-    drifted, underivable = declarations.audit(api_dir, app)
+    drifted, underivable, problems = declarations.audit(api_dir, app)
+
+    # Rewriting on top of input that could not be read means rewriting
+    # correct declarations: an unreadable route empties a class's path
+    # set, and every one of its parameters then derives to 'body'.
+    if problems:
+        for problem in problems:
+            print('  %s' % problem)
+        raise SystemExit(
+            '\nrefusing to derive from input which could not be read')
 
     by_file = collections.defaultdict(list)
     for declared, want in drifted:

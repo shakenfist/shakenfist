@@ -79,8 +79,18 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         applies, imported rather than reimplemented, so what the script
         would rewrite is what this test fails on.
         """
-        drifted, _ = declarations.audit()
+        drifted, _, problems = declarations.audit()
 
+        # Unreadable input first. A route the derivation cannot read
+        # makes every parameter of that class look like a body
+        # parameter, so asserting the drift first reports "blob_uuid is
+        # declared path but arrives in the body" -- which would send a
+        # reader to change a correct declaration. The cause has to be
+        # named before the symptom.
+        self.assertEqual(
+            [], problems,
+            'the derivation could not read some of its input, so any '
+            'locations derived below came from an incomplete picture')
         self.assertEqual(
             [], ['%s.%s declares %r in %r, but it arrives in the %s'
                  % (d.cls, d.method, d.name, d.location, want)
@@ -107,12 +117,19 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     % (cls, method, parameter.name, ', '.join(sorted(accepted))))
 
     def test_accepted_parameters_are_declared(self):
-        """A parameter a caller can send must appear in the published API."""
+        """A parameter a caller can send must appear in the published API.
+
+        Gated on carrying a declaration, not on declaring parameters.
+        Skipping a handler whose declaration list is empty exempts the
+        one shape this assertion exists to catch: a `swag_from` whose
+        parameters have been emptied while the handler still accepts
+        them. The three UNDOCUMENTED_BY_DESIGN handlers take no kwargs,
+        so this loop is a no-op for them.
+        """
         for cls, method, fn in _endpoints():
-            declared = declarations.declarations(fn)
-            if not declared:
+            if not declarations.documented(fn):
                 continue
-            names = {d.name for d in declared}
+            names = {d.name for d in declarations.declarations(fn)}
             for kwarg in declarations.handler_kwargs(fn):
                 if (cls, method, kwarg) in UNDECLARED_BY_DESIGN:
                     continue
@@ -381,11 +398,69 @@ class Helper:
     def get(self, thing):
         return self.things[thing]
 '''
-        path = os.path.join(self.tempdir, 'helper.py')
-        with open(path, 'w') as f:
-            f.write(source)
+        self._write('helper.py', source)
 
-        self.assertEqual([], list(declarations.handlers(self.tempdir)))
+        problems = []
+        self.assertEqual(
+            [], list(declarations.handlers(self.tempdir, problems)))
+        self.assertEqual([], problems)
+
+    def test_unreadable_input_is_reported_not_skipped(self):
+        """Every source here answers "not found" and "cannot tell" with
+        the same empty set, so a skipped input is a wrong answer rather
+        than a missing one.
+
+        A route it cannot read empties the class's path set, which
+        derives every parameter to `body` -- and the fixer, trusting the
+        derivation, would rewrite a correct `path` declaration.
+        """
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, *ROUTES)
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('fake_ref', 'path', 'uuid', 'A ref.', True)],
+        []))
+    def get(self, fake_ref=None):
+        pass
+
+
+class InheritedEndpoint(FakeEndpoint):
+    def post(self, fake_ref=None):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        reported = '\n'.join(problems)
+        self.assertEqual(
+            2, len(problems), 'expected the route and the subclass: %s'
+            % reported)
+        self.assertIn('route this cannot read', reported)
+        self.assertIn('subclasses an endpoint', reported)
+
+        # And the wrong answer the problems are protecting against.
+        self.assertEqual(
+            [('fake_ref', 'path', 'body')],
+            [(d.name, d.location, want) for d, want in drifted])
+
+    def test_unresolvable_query_schema_is_reported(self):
+        source = '''
+class Thing(api_base.Resource):
+    @use_kwargs({'alpha': None}, location='query')
+    def get(self, alpha=None):
+        pass
+'''
+        cls = self._parse_class(source)
+        problems = []
+
+        self.assertEqual(
+            set(),
+            declarations.query_parameters(cls.body[0], [cls], problems))
+        self.assertEqual(1, len(problems))
+        self.assertIn('cannot resolve', problems[0])
 
     def test_raw_body_sentinel_resolves(self):
         """RAW_BODY_PARAMETER is referenced rather than spelled out, and
@@ -401,6 +476,10 @@ class Helper:
 
     def _parse_class(self, source):
         return ast.parse(source).body[0]
+
+    def _write(self, name, source):
+        with open(os.path.join(self.tempdir, name), 'w') as f:
+            f.write(source)
 
 
 class FixerTestCase(base.ShakenFistTestCase):

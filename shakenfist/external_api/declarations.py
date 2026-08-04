@@ -23,6 +23,11 @@ Four sources decide where a parameter comes from, in order:
 ``header`` and ``formData`` say where a value comes from in a way none of
 those can check, so they are reported as underivable and left alone.
 
+Every source here answers "not found" and "cannot read this" with the
+same empty set, so input which is skipped produces a confident wrong
+answer rather than a missing one. Anything unreadable is collected into
+``problems`` and both consumers fail on it.
+
 Two consumers share this: ``tools/fix-api-parameter-locations.py``
 rewrites the declarations to agree, and
 ``shakenfist/tests/external_api/test_parameter_declarations.py`` fails
@@ -40,6 +45,11 @@ import collections
 import glob
 import os
 import re
+from collections.abc import Iterator
+from typing import Any
+from typing import NamedTuple
+from typing import Optional
+from typing import Union
 
 
 API_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -57,18 +67,34 @@ INJECTED_SUFFIX = '_from_db'
 # a wrong one.
 UNDERIVABLE_LOCATIONS = frozenset(['header', 'formData'])
 
+# A scope a name can be defined in. Both carry a ``body`` of their own
+# statements, which is what makes innermost-first resolution possible.
+Scope = Union[ast.Module, ast.ClassDef]
 
-Declaration = collections.namedtuple(
-    'Declaration', ['path', 'cls', 'method', 'name', 'location',
-                    'required', 'location_node'])
+
+class Declaration(NamedTuple):
+    """One parameter as an endpoint declares it.
+
+    ``location_node`` is the AST node holding the location literal,
+    which is what the fixer rewrites in place. The resolved fields are
+    None when they could not be read statically.
+    """
+
+    path: Optional[str]
+    cls: Optional[str]
+    method: str
+    name: Optional[str]
+    location: Optional[str]
+    required: Optional[bool]
+    location_node: Optional[ast.expr]
 
 
-def _parse(path):
+def _parse(path: str) -> ast.Module:
     with open(path) as f:
         return ast.parse(f.read())
 
 
-def _base_constants():
+def _base_constants() -> dict[str, Any]:
     """Module-level string constants of base.py, by name.
 
     ``RAW_BODY_PARAMETER`` is referenced rather than spelled out in the
@@ -77,7 +103,7 @@ def _base_constants():
     Read from source rather than imported, because importing base.py
     means importing flask.
     """
-    out = {}
+    out: dict[str, Any] = {}
     for node in _parse(BASE).body:
         if not isinstance(node, ast.Assign):
             continue
@@ -94,7 +120,7 @@ def _base_constants():
 CONSTANTS = _base_constants()
 
 
-def literal(node):
+def literal(node: Optional[ast.AST]) -> Any:
     """A declaration element's value, or None if it is not static.
 
     An ``api_base.SOMETHING`` reference resolves to the constant's
@@ -109,15 +135,23 @@ def literal(node):
         return CONSTANTS.get(ast.unparse(node).split('.')[-1])
 
 
-def route_parameters(app=APP):
+def route_parameters(app: str = APP,
+                     problems: Optional[list[str]] = None
+                     ) -> dict[str, set[str]]:
     """Path parameter names per endpoint class, from the mounted routes.
 
     Werkzeug routes may name a converter, as in ``<path:label_name>`` or
     ``<int(min=1):x>``, so the parameter name is whatever follows the
     last colon. An earlier version of this matched only bare names and
     so silently skipped three LabelEndpoint declarations.
+
+    A route this cannot read is recorded in ``problems`` rather than
+    dropped. Dropping it empties the class's route set, which derives
+    every one of its parameters to ``body`` -- so the fixer would
+    rewrite a *correct* ``path`` declaration, and phase 3 would compile
+    a schema looking in the JSON body for a URL segment.
     """
-    out = collections.defaultdict(set)
+    out: dict[str, set[str]] = collections.defaultdict(set)
     for node in ast.walk(_parse(app)):
         if not isinstance(node, ast.Call):
             continue
@@ -129,10 +163,16 @@ def route_parameters(app=APP):
             if isinstance(route, str):
                 out[cls] |= {segment.split(':')[-1]
                              for segment in re.findall(r'<([^>]+)>', route)}
+            elif problems is not None:
+                problems.append(
+                    '%s is mounted on a route this cannot read (%s), so its '
+                    'path parameters cannot be derived'
+                    % (cls, ast.unparse(arg)))
     return out
 
 
-def query_parameters(fn, scopes):
+def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
+                     problems: Optional[list[str]] = None) -> set[str]:
     """Names the handler parses from the query string with webargs.
 
     Read off the handler's own ``@use_kwargs`` decorator: its
@@ -144,7 +184,7 @@ def query_parameters(fn, scopes):
     ``post`` declaring a same-named parameter, would both have been
     derived wrongly.
     """
-    out = set()
+    out: set[str] = set()
     for dec in fn.decorator_list:
         if not isinstance(dec, ast.Call) or not dec.args:
             continue
@@ -156,11 +196,19 @@ def query_parameters(fn, scopes):
                 location = literal(keyword.value)
         if location != 'query':
             continue
-        out |= _schema_keys(scopes, ast.unparse(dec.args[0]))
+        keys = _schema_keys(scopes, ast.unparse(dec.args[0]))
+        if not keys and problems is not None:
+            # An inline dict literal, or a name defined somewhere this
+            # cannot follow. Deriving nothing from it means every one of
+            # its parameters falls through to 'body'.
+            problems.append(
+                '%s parses the query string with a schema this cannot '
+                'resolve (%s)' % (fn.name, ast.unparse(dec.args[0])))
+        out |= keys
     return out
 
 
-def _schema_keys(scopes, name):
+def _schema_keys(scopes: list[Scope], name: str) -> set[str]:
     """The keys of the dict assigned to ``name``, innermost scope first.
 
     The scopes are searched in order and the first one to define the
@@ -175,7 +223,7 @@ def _schema_keys(scopes, name):
     machinery built to prevent drift.
     """
     for scope in scopes:
-        out = set()
+        out: set[str] = set()
         for node in scope.body:
             if not isinstance(node, ast.Assign):
                 continue
@@ -191,7 +239,7 @@ def _schema_keys(scopes, name):
     return set()
 
 
-def request_args_parameters(fn):
+def request_args_parameters(fn: ast.FunctionDef) -> set[str]:
     """Names the handler reads straight out of flask.request.args.
 
     ``ClusterOperationsEndpoint.get`` accepts its target parameters as
@@ -200,7 +248,7 @@ def request_args_parameters(fn):
     keeps working -- the form AGENTS.md documents. A parameter read this
     way is a query parameter whatever else it also is.
     """
-    out = set()
+    out: set[str] = set()
     for node in ast.walk(fn):
         if (isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Attribute)
@@ -217,38 +265,58 @@ def request_args_parameters(fn):
     return out
 
 
-def _is_request_args(node):
+def _is_request_args(node: ast.AST) -> bool:
     """Is this node ``request.args``, however ``request`` was imported?"""
     return (isinstance(node, ast.Attribute) and node.attr == 'args'
             and ast.unparse(node.value).split('.')[-1] == 'request')
 
 
-def handler_kwargs(fn):
+def handler_kwargs(fn: ast.FunctionDef) -> list[str]:
     """Every parameter a caller could populate, keyword-only included."""
     args = list(fn.args.args) + list(fn.args.kwonlyargs)
     return [a.arg for a in args
             if a.arg != 'self' and not a.arg.endswith(INJECTED_SUFFIX)]
 
 
-def handlers(api_dir=API_DIR):
+def handlers(api_dir: str = API_DIR,
+             problems: Optional[list[str]] = None
+             ) -> Iterator[tuple[str, ast.Module, ast.ClassDef,
+                                 ast.FunctionDef]]:
     """Yield (source path, module, class, method) for every endpoint.
 
     An endpoint is a Resource subclass with an HTTP method. Matching on
     the method name alone would pull in any helper class with a ``get``
-    accessor, and then demand a ``swag_from`` on it.
+    accessor and then demand a ``swag_from`` on it.
+
+    A class whose base is another *endpoint* is a different matter: it
+    is an endpoint by inheritance, and skipping it would exempt it from
+    every assertion here rather than merely omit it. Recorded in
+    ``problems`` so that reads as the unhandled case it is.
     """
     for path in sorted(glob.glob(os.path.join(api_dir, '*.py'))):
         tree = _parse(path)
         for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
-            if not any(ast.unparse(base).endswith('Resource')
-                       for base in cls.bases):
+            methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)
+                       and n.name in HANDLER_METHODS]
+            if not methods:
                 continue
-            for fn in [n for n in cls.body if isinstance(n, ast.FunctionDef)]:
-                if fn.name in HANDLER_METHODS:
-                    yield path, tree, cls, fn
+
+            bases = [ast.unparse(base) for base in cls.bases]
+            if not any(base.endswith('Resource') for base in bases):
+                if problems is not None and any(
+                        base.endswith('Endpoint') for base in bases):
+                    problems.append(
+                        '%s subclasses an endpoint (%s) rather than Resource, '
+                        'so its declarations are not audited'
+                        % (cls.name, ', '.join(bases)))
+                continue
+
+            for fn in methods:
+                yield path, tree, cls, fn
 
 
-def declarations(fn, path=None, cls=None):
+def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
+                 cls: Optional[str] = None) -> list[Declaration]:
     """The parameters a handler declares, as Declaration tuples.
 
     A declaration which cannot be read statically is returned with None
@@ -279,7 +347,7 @@ def declarations(fn, path=None, cls=None):
     return out
 
 
-def documented(fn):
+def documented(fn: ast.FunctionDef) -> bool:
     """Does this handler carry a swagger_helper declaration at all?
 
     Distinct from declaring parameters. Eight endpoints correctly
@@ -291,32 +359,40 @@ def documented(fn):
                for dec in fn.decorator_list)
 
 
-def derived_location(name, fn, tree, cls, routes):
+def derived_location(name: str, fn: ast.FunctionDef, tree: ast.Module,
+                     cls: ast.ClassDef, routes: dict[str, set[str]],
+                     problems: Optional[list[str]] = None) -> str:
     """Where a parameter of this name actually arrives."""
     if name in routes.get(cls.name, set()):
         return 'path'
-    if (name in query_parameters(fn, [cls, tree])
+    if (name in query_parameters(fn, [cls, tree], problems)
             or name in request_args_parameters(fn)):
         return 'query'
     return 'body'
 
 
-def audit(api_dir=API_DIR, app=None):
+def audit(api_dir: str = API_DIR, app: Optional[str] = None
+          ) -> tuple[list[tuple[Declaration, str]],
+                     list[tuple[Declaration, None]], list[str]]:
     """Compare every declaration against the code that reads it.
 
-    Returns (drifted, underivable). Each entry is a (Declaration, want)
-    pair; ``want`` is None for the underivable ones. An empty drifted
-    list is the property both consumers care about: the fixer has
-    nothing to rewrite, and the audit test passes.
+    Returns (drifted, underivable, problems). The first two hold
+    (Declaration, want) pairs, with ``want`` None for the underivable
+    ones; ``problems`` holds input this module could not read.
 
-    The directory is a parameter so the fixer's rewrite path can be
-    exercised against a constructed tree. It defaults to this package.
+    An empty ``drifted`` is the property both consumers care about: the
+    fixer has nothing to rewrite and the audit test passes. An empty
+    ``problems`` is what makes that meaningful, because a source which
+    could not be read produces the same empty set as one with nothing
+    in it, and the derivation then confidently returns a wrong answer.
     """
-    routes = route_parameters(app or os.path.join(api_dir, 'app.py'))
+    problems: list[str] = []
+    routes = route_parameters(
+        app or os.path.join(api_dir, 'app.py'), problems)
     drifted = []
     underivable = []
 
-    for path, tree, cls, fn in handlers(api_dir):
+    for path, tree, cls, fn in handlers(api_dir, problems):
         for declared in declarations(fn, path=path, cls=cls.name):
             if declared.location in UNDERIVABLE_LOCATIONS:
                 underivable.append((declared, None))
@@ -325,8 +401,9 @@ def audit(api_dir=API_DIR, app=None):
                 # Unreadable, and so unfixable by the script. The audit
                 # test reports these separately and in more detail.
                 continue
-            want = derived_location(declared.name, fn, tree, cls, routes)
+            want = derived_location(
+                declared.name, fn, tree, cls, routes, problems)
             if declared.location != want:
                 drifted.append((declared, want))
 
-    return drifted, underivable
+    return drifted, underivable, sorted(set(problems))
