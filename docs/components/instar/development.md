@@ -296,10 +296,24 @@ automatically closed when the PR merges.
 
 ### Workflows
 
-- **Automated Review**: PRs automatically receive code review after CI passes,
-  and GitHub issues are created for actionable items
+- **Automated Review**: same-repository PRs automatically receive code review
+  after CI passes, and GitHub issues are created for actionable items
 - **Test Fixing**: On-demand test failure resolution via PR comment
 - **Comment Addressing**: On-demand resolution of review feedback via PR comment
+
+Pull requests from forks are not reviewed automatically. The reviewer runs
+Claude Code with `--dangerously-skip-permissions` on a runner holding a token
+with `pull-requests: write`, and the PR diff it reads is untrusted input, so a
+prompt injection in a fork's diff could reach a write-capable token. Fork
+contributions are reviewed by a human instead; asking a maintainer to push the
+branch to this repository will get it the automated review as well.
+
+The reviewer itself is not defined here. `automated_reviewer` in
+`.github/workflows/functional-tests.yml` is a thin caller which names this
+project's test jobs in its `needs:` list -- the "CI passed" gate -- and
+delegates everything else to
+`shakenfist/actions/.github/workflows/pr-auto-review.yml`, which is shared
+across the Shaken Fist projects.
 
 See `.github/workflows/` for implementation details.
 
