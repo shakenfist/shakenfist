@@ -157,10 +157,24 @@ substring matching on source text.
 
 ## Success criteria
 
-- [x] All 119 path parameters declared as `path`, derived from
-      the route table rather than by hand.
-- [x] No location outside the Swagger 2.0 set, enforced at import
-      time via `InvalidAPIDeclaration`.
+- [x] Every declared location is the one the code reads the value
+      from — a name in a mounted route is `path`, a name in a
+      webargs query schema or a `flask.request.args` read is
+      `query`, everything else is `body` — derived rather than
+      decided by hand, and enforced by
+      `test_declared_locations_are_derivable`.
+
+      Stated as a property because the counts moved during the
+      phase and are only meaningful against the commit they were
+      measured on. Against `b844fd98e`, before the audit added any
+      declaration, 119 parameters appeared in a route and 3 of
+      them were declared `path`; the branch now carries 128 `path`
+      declarations, the growth coming from W3/W4's new
+      declarations and from the Werkzeug-converter fix described
+      below. The number will keep moving. The property will not.
+- [x] No location outside the Swagger 2.0 set, and no type token
+      outside the `argtypes` vocabulary, enforced at import time
+      via `InvalidAPIDeclaration`.
 - [x] The 5 wrong names corrected, and the raw-body
       pseudo-parameter given a representation the compiler can
       skip (`api_base.RAW_BODY_PARAMETER`).
@@ -238,8 +252,8 @@ alongside the location check, and the test gained assertions for
 webargs agreement, path requiredness, statically-unreadable
 declarations, and a handler kwarg colliding with the raw-body
 sentinel. A separate test case covers `swagger_helper()`'s
-rejections directly, because the tree-scanning assertions cannot
-fail once enforcement happens at import time.
+rejections directly, because the tree-scanning assertions read
+declarations out of the AST and never execute one.
 
 A fourth defect, found in the second review round: the
 generalised derivation rule rewrote `ClusterOperationsEndpoint`'s
@@ -261,9 +275,38 @@ script now derives all four sources, and `header` and `formData`
 declarations — derivable from none of them — are reported and
 left alone instead of being rewritten to `body`.
 
-The re-runnable check is now enforced rather than documented:
-`check-api-parameter-locations` runs the script in report mode on
-every commit touching `external_api/`.
+The re-runnable check runs on every commit touching
+`external_api/` as the `check-api-parameter-locations` pre-commit
+hook.
+
+A third round found that this was not the same thing as being
+enforced. No workflow runs `pre-commit`, so the hook only fires
+for contributors who have run `pre-commit install`, and the test
+asserted two directions of the derivation rather than all of it:
+path-to-path and query-source-to-query, but nothing said a
+parameter declared `query` is read from the query string.
+Declaring `event_type` on the blob events endpoint as `query`
+passed every assertion while the script reported it — drift of
+exactly the class W6 exists to prevent, and the class phase 3
+compiles into a live query-string fallback under D6.
+
+The derivation now lives in one place,
+`shakenfist/external_api/declarations.py`, which both the script
+and the test import; the test asserts that its `audit()` finds
+nothing, which is the same question the script asks. That closes
+the gap in CI and removes the duplication the reviewer raised
+alongside it — five near-identical functions across the two
+files, already diverged in how they resolved a non-literal
+parameter name. `DerivationTestCase` covers the four sources on
+constructed sources rather than on the tree, since the cases each
+of them was added for are by definition not in the tree any more.
+
+The webargs source became per-method and `use_kwargs`-aware in
+the process: it now reads the decorator's `location` keyword and
+resolves the schema argument it names, rather than treating any
+class-level `get_args` dict as a query schema for every handler
+in the class. That was a latent wrong answer for a class with a
+webargs `get` beside a `post` declaring a same-named parameter.
 
 ### Known remaining gap: multiple body parameters
 

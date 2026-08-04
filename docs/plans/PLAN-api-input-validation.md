@@ -306,6 +306,10 @@ specification-validity problems for phase 2 to pick up:
   `openapi_spec_validator` over flasgger's output would catch the
   next regression, including the body-parameter one above. The
   only current functional coverage fetches `swagger-ui.css`.
+  Filed as [#3626](https://github.com/shakenfist/shakenfist/issues/3626)
+  so it is not gated on the renderer work — the test is worth
+  having before the fix, since it turns "invalid in N places"
+  into a number that moves.
 
 ## Open questions for phase 0
 
