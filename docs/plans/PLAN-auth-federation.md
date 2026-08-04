@@ -789,6 +789,15 @@ The GitHub example must stand alone for any reader running
 their own runners; nothing in `docs/` should describe or
 depend on the private CI conductor implementation.
 
+Phase 3 shipped most of the developer and operator guide
+halves of this as it went, because a security decision is
+cheapest to write down while it is being made. What remains
+is the user guide page, which does not exist at all:
+`docs/user_guide/authentication.md` needs writing from
+scratch. Phase 4 should also re-read the two existing guides
+end to end, rather than assuming a series of incremental
+additions composes into a coherent page.
+
 ### Phase 5: OIDC plan refresh
 
 Rewrite `PLAN-oidc-authentication.md` (the human-login
@@ -1110,12 +1119,55 @@ Phase 3:
   `namespace_or_shared_filter`: owner, a namespace which
   trusts the caller, system, or shared. "Appears in the
   list" and "is readable by UUID" are now one rule rather
-  than two copies of a rule. `requires_artifact_ownership`
-  is unchanged and still ignores the shared flag, so
-  publishing an artifact for reading does not hand out a
-  delete button. Four routes were affected: the artifact
-  itself, its events, its versions and its cluster
+  than two copies of a rule. Four routes were affected: the
+  artifact itself, its events, its versions and its cluster
   operations.
+
+* **Artifact names would not resolve to shared or trusted
+  artifacts.** `docs/user_guide/objects.md` has long said a
+  by-name lookup searches everything visible to the caller,
+  including shared artifacts. It did not:
+  `arg_is_artifact_ref` handed `from_db_by_ref` the caller's
+  own namespace, so a tenant could read a shared image's
+  name out of `GET /artifacts` and then get a 404 asking for
+  it by that name.
+
+  `Artifact.from_db_by_ref_visible_to` resolves in two
+  phases. The first is exactly `from_db_by_ref` against the
+  caller's own namespace, so whatever that resolves to still
+  wins; only on a miss does it widen to what
+  `namespace_or_shared_filter` admits. The ordering is the
+  part that matters — without it, sharing an artifact named
+  `debian-11` would silently retarget every tenant who
+  already had one. This mirrors `Artifact.from_url`, which
+  has resolved URLs by the same "everything visible, prefer
+  local" rule since `9faa90c71`, so the two resolution paths
+  now agree.
+
+  Widening applies to reading only. The ref decorator split
+  into `arg_is_visible_artifact_ref` (paired with
+  `requires_artifact_access`) and `arg_is_artifact_ref`
+  (paired with `requires_artifact_ownership`), so a name
+  cannot resolve into another namespace on a route which
+  then changes what it found.
+
+* **A namespace trust authorised artifact mutation.**
+  `requires_artifact_ownership` tested
+  `namespace_is_trusted`, so a trusted namespace could
+  delete, share, unshare, retag and rewrite the metadata of
+  the trusting namespace's artifacts. It now tests
+  `request_namespace() not in [a.namespace, 'system']`,
+  which is what `requires_instance_ownership` and
+  `requires_network_ownership` have always used; artifacts
+  were the one object type where trust reached past reading.
+  Creating an object *in* a namespace which trusts you is
+  untouched, so the operator guide's `ci-images` "gifting"
+  pattern still works.
+
+  This is a behaviour change for anyone whose tooling
+  deleted artifacts across a trust; they need a key in the
+  owning namespace, or system. Recorded in the v0.7 to v0.8
+  release notes.
 
 Phase 2:
 

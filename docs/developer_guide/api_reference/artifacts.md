@@ -397,9 +397,8 @@ for commonly used "official" images which many users will want to use.
 Sharing grants reading, and only reading. A shared artifact appears in every
 namespace's `GET /artifacts` listing and can be fetched by UUID, along with its
 events, versions and cluster operations. It cannot be deleted, unshared,
-retagged or otherwise modified by anyone but its owning namespace, a namespace
-that owner trusts, or `system` — the write paths do not consult the shared flag
-at all.
+retagged or otherwise modified by anyone but its owning namespace or `system` —
+the write paths consult neither the shared flag nor the trust list.
 
 Read access is otherwise exactly the set the artifact listing shows you: your
 own namespace's artifacts, those of any namespace which
