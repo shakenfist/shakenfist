@@ -147,22 +147,51 @@ node is deleted. NULL-columned metrics rows (written by an
 old resources daemon mid-upgrade) leave the previous limits
 in place rather than zeroing them.
 
-Capacity rows exist per **hypervisor**, not per node. The
-resources daemon runs on every cluster node and upserts
-`node_metrics` unconditionally, so a network-only or
-database-only node has a metrics row with perfectly good
-capacity columns describing capacity no instance can ever be
-placed on. `scheduler.py` drops non-hypervisor candidates
-before any capacity arithmetic and the reconciler must do the
-same, so phase 2 adds `is_hypervisor` to
-`NODE_METRICS_EXTRACTION_SPEC` (`node_metrics` v3 → v4) and
-filters on the typed column in SQL. A node that stops being a
-hypervisor loses its capacity row, which is also how rows
-written by a pre-filter release get cleaned up on upgrade. A
-NULL `is_hypervisor` — a metrics row not yet rewritten after
-the upgrade — is treated as no evidence either way: it neither
-creates nor destroys a row, and an existing row keeps its
-limits until the next 60-second upsert settles the question.
+Capacity rows exist per **schedulable hypervisor**, not per
+node. A row describing capacity the scheduler would never use
+is worse than no row at all, because it inflates the cluster
+totals that a phase 3 D14 guard reads. Three filters enforce
+this, each mirroring something `scheduler.py` already does
+before it will consider a node:
+
+* **Role.** The resources daemon runs on every cluster node
+  and upserts `node_metrics` unconditionally, so a
+  network-only or database-only node has a metrics row with
+  perfectly good capacity columns. `scheduler.py` drops
+  non-hypervisor candidates before any capacity arithmetic, so
+  phase 2 adds `is_hypervisor` to
+  `NODE_METRICS_EXTRACTION_SPEC` (`node_metrics` v3 → v4) and
+  filters on the typed column in SQL. A NULL `is_hypervisor` —
+  a metrics row not yet rewritten after the upgrade — is
+  treated as no evidence either way: it neither creates nor
+  destroys a row, and an existing row keeps its limits until
+  the next 60-second upsert settles the question.
+* **State.** The scheduler builds its candidate set from
+  `Nodes([], prefilter='active')`, so an errored, missing,
+  stopping, stopped or deleted node is not a placement
+  candidate. A hypervisor that the node-health cascade has
+  taken out of service must stop contributing its limits, not
+  sit there advertising capacity nothing can be placed on. The
+  filter is expressed as `state_value NOT IN` the active set
+  (`constants.NODE_ACTIVE_STATES`, which `Node.ACTIVE_STATES`
+  is now defined from so the two cannot drift) rather than
+  `IN` an inactive set, so a state added to the state machine
+  later is excluded by default — an unrecognised state is not
+  evidence that a node can be scheduled onto.
+* **Freshness.** `node_metrics` rows are only deleted when the
+  node is, so a node whose resources daemon has died would
+  otherwise contribute its last-known limits forever. Rows
+  older than `RECONCILE_METRICS_MAX_AGE_SECONDS` (15 minutes:
+  three reconcile cadences, fifteen publish intervals) are
+  ignored. Deliberately *not* the scheduler's 120-second
+  window, which is tuned for an on-demand cache and would sit
+  below this pass's five-minute period, making rows flap in
+  and out between passes and rendering the reply's
+  `nodes_added`/`nodes_removed` counts meaningless.
+
+A node failing any of these loses its capacity row, which is
+also how rows written by a release before the filters existed
+get cleaned up on upgrade.
 
 ### The reconciler (D5)
 
@@ -291,6 +320,7 @@ surface yet: the admin capacity view migrates in phase 5.
 | 6 | Management-session code review against the checklist | medium | management session | none | Complete — checklist verified 2026-08-02 |
 | 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | In progress — PR #3614 open |
 | 8 | Address automated review of PR #3614 | medium | management session | none | Complete — see Review response |
+| 9 | Address second automated review of PR #3614 | medium | management session | none | Complete — see Second review response |
 
 ## Validation
 
@@ -422,6 +452,97 @@ times after a third election, and so on. Fixed with a
 `schedule.clear()` before registration. Pre-existing, not
 introduced by this phase, but it would have doubled up the
 reconcile pass this phase adds.
+
+### Step 9: response to the second automated review (2026-08-04)
+
+Nine items. One real bug of the same class as the first
+round's, one stale documentation reference, and seven
+improvements — all adopted this time.
+
+**Fixed — capacity rows for nodes the scheduler would never
+consider.** The only node-state exclusion was `deleted`, but
+`scheduler.py` builds its candidates from
+`Nodes([], prefilter='active')`, so errored, missing, stopping
+and stopped nodes are not placement candidates either. A
+hypervisor taken out of service by the node-health cascade
+kept its row and its full limits stayed in
+`cluster_capacity.total_*`. Exactly the defect the first
+review found with `is_hypervisor`, in a second dimension — so
+the fix generalises rather than patches: the filter is now
+`NOT IN` the active set, and the active set moved to
+`constants.NODE_ACTIVE_STATES` with `Node.ACTIVE_STATES`
+defined from it, so the reconciler can read it in SQL without
+importing `shakenfist.node` and the two definitions cannot
+drift. See the limit-derivation section for all three filters.
+
+**Also fixed — the same class again, one dimension further
+out.** Review item 3 noted `node_metrics` rows are only
+deleted when the node is, so a hypervisor whose resources
+daemon has died keeps contributing its last-known limits
+indefinitely while the node itself still looks healthy. The
+review judged this largely subsumed by the state filter, but
+it is not: a node whose resources daemon dies while its
+sentinels keep reporting stays in an active state. Metrics
+older than `RECONCILE_METRICS_MAX_AGE_SECONDS` (15 minutes)
+are now ignored, with the window chosen well above the
+five-minute cadence for the flapping reason the review itself
+gave.
+
+**Adopted:**
+
+* README and `docs/operator_guide/installation.md` both
+  advertised MariaDB 10.6.0+. The review found the README one;
+  the installation guide was a second stale reference it
+  missed.
+* The `_derive_cpu_memory_limits` docstring claimed
+  `limit_memory_mb` mirrors `_has_sufficient_ram`. It does
+  not: it blends that check's overcommit ceiling with the
+  reservation term from the separate free-memory check.
+  Reworded here, in the docstring and in AGENTS.md.
+* Both `object_references` queries now constrain
+  `source_object_type` and `target_object_type` as well as
+  `relationship`. Defensive only — nothing writes an
+  `INSTANCE_LOCATION` row with other endpoint types — but the
+  table's indexes lead with those columns so it is free.
+* The servicer checks `context.is_active()` before starting a
+  pass, so a caller that has already hit its deadline does not
+  get work done on its behalf. The docstring records *why*
+  overlapping passes are benign today (sole writer, idempotent
+  recompute) and that phase 3 ends that property.
+* `_disk_spec_virtual_gb`'s docstring no longer describes the
+  JSON_TABLE fallback decision as open; it is now stated to be
+  the executable specification, and a live test asserts it
+  agrees with the SQL on the same payloads, making it an
+  oracle rather than prose.
+* Schedule registration is hoisted out of the election loop
+  entirely, which was the review's preferred fix over the
+  `schedule.clear()` added in step 8. `schedule.every()`
+  computes each job's next run at registration, so
+  re-registering on every election restarted every period from
+  zero — on a cluster whose maintenance lock changes hands
+  more often than daily, `prune_events` might never have run.
+  Registering once at daemon start fixes the duplication and
+  the timer reset together, and `run_pending()` is still only
+  called while elected.
+
+**New CI coverage (review item 7).** Every reconcile test ran
+against a mocked connection and asserted on compiled SQL text,
+which cannot catch the failure modes that matter: the
+JSON_TABLE aggregation, the dashed/undashed uuid joins, the
+nullable-BOOL and NOT-IN filters, and the two upserts. All of
+those fail as *silently wrong numbers* rather than errors —
+pitfall 6 in CLAUDE.md exists precisely because a mismatched
+uuid comparison matches nothing instead of raising. Step 4's
+docker validation covered them once, by hand, and would not
+catch a regression six months from now.
+`shakenfist/tests/test_mariadb_capacity_reconcile_live.py` now
+runs the real SQL against a real MariaDB with the step 4
+fixture (11 tests), driven by
+`tools/ci-capacity-reconcile-test.sh` from a new "Scheduler
+capacity reconciler" job gated by `can_merge`, following the
+existing `schema_enum_widening` pattern. Verified as a real
+guard rather than a passing formality: removing the
+`REPLACE()` transform from the usage join fails 8 of the 11.
 
 ## Administration and logistics
 

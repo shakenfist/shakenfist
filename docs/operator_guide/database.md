@@ -493,7 +493,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus typed nullable columns projecting the capacity-relevant fields and the node's hypervisor role |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
 | `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
-| `scheduler_node_capacity` | One row per hypervisor: schedulable limits derived from the typed `node_metrics` columns, materialised usage counters, and a decaying expected-demand signal |
+| `scheduler_node_capacity` | One row per schedulable hypervisor: limits derived from the typed `node_metrics` columns, materialised usage counters, and a decaying expected-demand signal |
 | `namespace_claims` | One row per namespace capacity claim: limits, usage counters, state and server-side expiry. Created empty in this release — the claims API arrives later |
 | `cluster_capacity` | A singleton row (id always 1): cluster-wide totals, capacity claimed by active claims, and usage by namespaces without a claim |
 
@@ -542,6 +542,16 @@ observability is the `scheduler_capacity_*` family of prometheus metrics
 reconcile pass/failure counters, last-success timestamp and duration)
 exported from the cluster daemon's metrics port (`CLUSTER_METRICS_PORT`,
 default `13007`), plus one structured log line per reconcile pass.
+
+A node only has a capacity row while it could actually be scheduled
+onto, so expect rows to appear and disappear as nodes change state. A
+node loses its row when it stops being a hypervisor, when it leaves the
+active states (so anything the node-health cascade takes out of service
+stops contributing to the cluster totals), or when its `node_metrics`
+row goes stale — more than fifteen minutes without an update, which
+means the resources daemon has stopped publishing even though the node
+itself still looks alive. Each of those mirrors a filter the scheduler
+already applies before considering a node as a placement candidate.
 
 Two things to know when reading those numbers. The `used_*` counters are
 allocation ledgers: they sum what every placed, non-deleted instance was

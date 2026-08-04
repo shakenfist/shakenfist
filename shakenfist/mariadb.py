@@ -45,6 +45,7 @@ from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import GiB
+from shakenfist.constants import NODE_ACTIVE_STATES
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -500,6 +501,19 @@ GRPC_RETRY_DELAY = 0.5
 # watchdog pet -- hostage. Used as the connect/read/write timeout on the
 # bounded direct engine and as the gRPC deadline for bounded calls.
 BOUNDED_QUERY_TIMEOUT = 10
+
+# How old a node_metrics row may be before the capacity reconciler stops
+# treating it as evidence of a live node's capacity. The resources daemon
+# publishes every 60 seconds and the reconciler runs every 5 minutes, so
+# this is three reconcile cadences and fifteen publish intervals: long
+# enough that an ordinary slow pass or a daemon restart cannot make a
+# node's capacity row flap in and out (which would also make the pass's
+# nodes_added/nodes_removed counts meaningless), short enough that a node
+# whose resources daemon has died stops inflating the cluster totals
+# within the quarter hour. Deliberately not the scheduler's 120 second
+# window: that is tuned for a cache refreshed on demand, and copying it
+# here would put the threshold below the reconcile period.
+RECONCILE_METRICS_MAX_AGE_SECONDS = 900
 
 
 def _get_database_stub() -> Any:
@@ -23260,13 +23274,22 @@ def _derive_cpu_memory_limits(
         ram_overcommit_ratio: float) -> tuple[Optional[int], Optional[int]]:
     """Derive (limit_cpus, limit_memory_mb) from typed node_metrics values.
 
-    Mirrors the scheduler's arithmetic: ``limit_cpus`` is the
+    ``limit_cpus`` mirrors one scheduler check exactly: the
     _has_sufficient_cpu bound ``floor(cpu_schedulable ×
-    CPU_OVERCOMMIT_RATIO)``; ``limit_memory_mb`` is the
-    _has_sufficient_ram overcommit bound ``floor(memory_max ×
-    RAM_OVERCOMMIT_RATIO) - memory_reserved_mb`` (an allocation ledger,
-    not the KSM-aware actual-usage check, which remains a phase 3
-    candidate filter).
+    CPU_OVERCOMMIT_RATIO)``.
+
+    ``limit_memory_mb`` does not mirror a single check. It is a
+    deliberately conservative blend of two independent ones: the
+    overcommit ceiling from _has_sufficient_ram (``memory_max ×
+    RAM_OVERCOMMIT_RATIO``, which has no reservation term), reduced by
+    the node's published reservation, which comes from the separate
+    free-memory check (that one tests ``memory_available -
+    memory_reserved_mb``, a measurement of what is free right now rather
+    than a ceiling on what may be allocated). Neither scheduler test has
+    this shape. It is an allocation ledger, not the KSM-aware
+    actual-usage check; the actual-free and actual-usage checks remain
+    phase 3 candidate *filters* over the typed node_metrics columns per
+    D7, with this as the allocation backstop underneath them.
 
     A dimension whose inputs are NULL (a metrics row written by an old
     resources daemon mid-upgrade) derives as None so the caller keeps
@@ -23333,12 +23356,14 @@ def _decayed_demand_contribution(
 def _disk_spec_virtual_gb(disk_spec: Any) -> int:
     """Sum the virtual sizes (in GB) of a disk_spec JSON list.
 
-    This is the Python reference implementation of the JSON_TABLE
-    aggregation in _RECONCILE_USAGE_SQL, kept for unit tests of the
-    intended semantics and as the fallback if step 4 validation finds
-    JSON_TABLE unworkable against real payloads: elements without a
-    numeric ``size`` (missing, null, or garbage) contribute 0, and a
-    disk_spec that is not a list contributes 0 with a warning.
+    This is the executable specification of the JSON_TABLE aggregation in
+    _RECONCILE_USAGE_SQL: elements without a numeric ``size`` (missing,
+    null, or garbage) contribute 0, and a disk_spec that is not a list
+    contributes 0 with a warning. Production reads the SQL, not this --
+    validation settled that question in JSON_TABLE's favour -- but
+    ``tools/ci-capacity-reconcile-test.sh`` asserts the two agree on the
+    same payloads against a real MariaDB, so this stays an oracle rather
+    than becoming stale prose.
     """
     if not isinstance(disk_spec, list):
         LOG.warning(f'Malformed disk_spec (not a list): {disk_spec!r}')
@@ -23408,6 +23433,13 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # pass (see _disk_spec_virtual_gb for the reference semantics). The
 # enum-valued columns (object_type, relationship) are bound as parameters
 # because SQLAlchemy persists enum member names, not values.
+#
+# The reference row's endpoint types are constrained as well as its
+# relationship. Nothing writes an INSTANCE_LOCATION row with other
+# endpoint types today, so that is defensive rather than load-bearing --
+# but the table's primary key and its source index both lead with the
+# type columns, so it costs nothing and says out loud what shape of row
+# the query expects.
 _RECONCILE_USAGE_SQL = sa.text('''
     SELECT r.source_uuid AS node_uuid,
            i.namespace AS namespace,
@@ -23432,6 +23464,8 @@ _RECONCILE_USAGE_SQL = sa.text('''
         ON s.object_uuid = r.target_uuid
        AND s.object_type = :instance_object_type
      WHERE r.relationship = :instance_location
+       AND r.source_object_type = :node_object_type
+       AND r.target_object_type = :instance_object_type
        AND (s.state_value IS NULL OR s.state_value != 'deleted')
      GROUP BY r.source_uuid, i.namespace
 ''')
@@ -23448,6 +23482,7 @@ def _reconcile_fetch_usage(
     usage: dict[tuple[UUID, str], tuple[int, int, int]] = {}
     rows = conn.execute(_RECONCILE_USAGE_SQL, {
         'instance_object_type': ObjectType.INSTANCE.name,
+        'node_object_type': ObjectType.NODE.name,
         'instance_location': RelationshipType.INSTANCE_LOCATION.name,
     }).fetchall()
     for row in rows:
@@ -23498,6 +23533,8 @@ def _reconcile_fetch_demand(
         refs.c.source_uuid, refs.c.created, instances.c.cpus
     ).select_from(joined).where(sa.and_(
         refs.c.relationship == RelationshipType.INSTANCE_LOCATION,
+        refs.c.source_object_type == ObjectType.NODE,
+        refs.c.target_object_type == ObjectType.INSTANCE,
         sa.or_(
             states.c.state_value.is_(None),
             states.c.state_value != 'deleted'),
@@ -23570,12 +23607,21 @@ def _direct_reconcile_scheduler_capacity(
                 previous[row.node_uuid] = row
 
             # The typed capacity columns from node_metrics (phase 1),
-            # restricted to hypervisors. sf-resources publishes metrics
-            # from every node whatever its roles, but only a hypervisor
-            # can host an instance -- the scheduler drops non-hypervisor
-            # candidates before any capacity arithmetic, so capacity rows
-            # exist per hypervisor, not per node, and the cluster totals
-            # only sum capacity that can actually be scheduled onto.
+            # restricted to hypervisors with fresh metrics.
+            #
+            # sf-resources publishes metrics from every node whatever its
+            # roles, but only a hypervisor can host an instance -- the
+            # scheduler drops non-hypervisor candidates before any
+            # capacity arithmetic, so capacity rows exist per hypervisor,
+            # not per node, and the cluster totals only sum capacity that
+            # can actually be scheduled onto.
+            #
+            # Freshness matters because node_metrics rows are only
+            # deleted when the node is, so a node whose resources daemon
+            # has died would otherwise keep contributing its last-known
+            # limits forever. The node-state filter below catches a node
+            # that has gone missing outright; this catches the narrower
+            # case of a live node that has stopped publishing.
             #
             # A NULL is_hypervisor (a metrics row written by a
             # pre-upgrade resources daemon, before the first upsert
@@ -23584,6 +23630,7 @@ def _direct_reconcile_scheduler_capacity(
             # below and out of non_hypervisors, so an existing row keeps
             # its limits and no row is created or destroyed on the
             # strength of a missing value.
+            fresh_after = now - RECONCILE_METRICS_MAX_AGE_SECONDS
             metrics_rows = {}
             for row in conn.execute(sa.select(
                     metrics.c.node_uuid,
@@ -23591,8 +23638,9 @@ def _direct_reconcile_scheduler_capacity(
                     metrics.c.memory_max,
                     metrics.c.memory_reserved_mb,
                     metrics.c.disk_free_instances,
-                    metrics.c.disk_reservation_gb).where(
-                        metrics.c.is_hypervisor.is_(True))).fetchall():
+                    metrics.c.disk_reservation_gb).where(sa.and_(
+                        metrics.c.is_hypervisor.is_(True),
+                        metrics.c.timestamp > fresh_after))).fetchall():
                 metrics_rows[row.node_uuid] = row
 
             non_hypervisors = {
@@ -23600,17 +23648,35 @@ def _direct_reconcile_scheduler_capacity(
                     sa.select(metrics.c.node_uuid).where(
                         metrics.c.is_hypervisor.is_(False))).fetchall()}
 
-            # Node existence and deletion ground truth.
+            stale_metrics_nodes = {
+                row.node_uuid for row in conn.execute(
+                    sa.select(metrics.c.node_uuid).where(
+                        metrics.c.timestamp <= fresh_after)).fetchall()}
+
+            # Node existence and schedulability ground truth. The
+            # scheduler builds its candidate set from
+            # Nodes([], prefilter='active'), so a node in any state
+            # outside NODE_ACTIVE_STATES -- errored, missing, stopping,
+            # stopped, deleted -- is not a scheduling candidate and its
+            # resources are not capacity. A node taken out of service by
+            # the node-health cascade must stop contributing to the
+            # cluster totals, not sit there advertising capacity nothing
+            # can be placed on. The query is expressed as NOT IN the
+            # active set rather than IN an inactive set so a new state
+            # added to the state machine is excluded by default: an
+            # unrecognised state is not evidence that a node can be
+            # scheduled onto.
             known_nodes = {
                 row.uuid for row in
                 conn.execute(sa.select(nodes.c.uuid)).fetchall()}
-            deleted_nodes = set()
+            inactive_nodes = set()
             for row in conn.execute(sa.select(states.c.object_uuid).where(
                     sa.and_(
                         states.c.object_type == ObjectType.NODE,
-                        states.c.state_value == 'deleted'))).fetchall():
+                        states.c.state_value.notin_(
+                            sorted(NODE_ACTIVE_STATES))))).fetchall():
                 try:
-                    deleted_nodes.add(UUID(str(row.object_uuid)))
+                    inactive_nodes.add(UUID(str(row.object_uuid)))
                 except ValueError:
                     pass
 
@@ -23633,22 +23699,23 @@ def _direct_reconcile_scheduler_capacity(
                     totals[2] += used_row[2]
 
             # (2) Refresh node rows. A node has a capacity row while it
-            # has a hypervisor node_metrics row (and is not deleted); an
+            # is an active hypervisor with a node_metrics row; an
             # existing row also survives a missing metrics row while the
             # node itself still exists, and NULL metrics columns keep the
-            # previous limits rather than zeroing them. A node that has
-            # stopped being a hypervisor loses its row, which is also how
-            # rows written before the hypervisor filter existed get
-            # cleaned up on upgrade.
+            # previous limits rather than zeroing them. A node that stops
+            # being a hypervisor, or leaves the active states, loses its
+            # row -- which is also how rows written before these filters
+            # existed get cleaned up on upgrade.
             removals = [
                 node_uuid for node_uuid in previous
-                if node_uuid in deleted_nodes
+                if node_uuid in inactive_nodes
                 or node_uuid in non_hypervisors
+                or node_uuid in stale_metrics_nodes
                 or (node_uuid not in metrics_rows and
                     node_uuid not in known_nodes)]
             candidates = (
                 set(previous) | set(metrics_rows)
-            ) - deleted_nodes - set(removals)
+            ) - inactive_nodes - set(removals)
 
             nodes_added = 0
             reply_nodes = []

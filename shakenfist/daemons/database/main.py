@@ -2456,9 +2456,24 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.ReconcileSchedulerCapacityRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.ReconcileSchedulerCapacityReply:
-        """Run one scheduler capacity reconcile pass (phase 2, D5)."""
+        """Run one scheduler capacity reconcile pass (phase 2, D5).
+
+        The client calls with a bounded deadline, so check the call is
+        still alive before starting what is deliberately one long
+        analytical query: a caller that has already given up should not
+        have a pass run on its behalf. Overlapping passes are benign in
+        this release regardless -- the reconciler is the sole writer and
+        every statement is an idempotent recompute from ground truth --
+        but that stops being true in phase 3, when guarded UPDATEs give
+        these counters a second writer, so do not lean on it.
+        """
         try:
             self.monitor.counters['reconcile_scheduler_capacity'].inc()
+            if not context.is_active():
+                LOG.info('Skipping scheduler capacity reconcile pass: the '
+                         'caller has already abandoned the call')
+                return database_pb2.ReconcileSchedulerCapacityReply(
+                    success=False)
             result = mariadb._direct_reconcile_scheduler_capacity(
                 request.demand_per_vcpu, request.demand_decay_seconds)
             if result is None:

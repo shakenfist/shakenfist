@@ -638,6 +638,44 @@ jobs:
         timeout-minutes: 15
         run: bash tools/ci-enum-widening-test.sh ci-test-password
 
+  # The scheduler capacity reconciler is one long analytical query whose
+  # other tests run against a mocked connection, so they assert the
+  # shape of the SQL rather than its behaviour. The parts most likely to
+  # break need a real server: the JSON_TABLE disk aggregation with its
+  # ON EMPTY / ON ERROR defaults, the REPLACE(dashed, '-', '') joins
+  # landing on the instances CHAR(32) primary key (comparing the two
+  # uuid forms directly matches nothing rather than erroring, so a
+  # broken join looks like an empty cluster), the is_hypervisor and
+  # node-state filters against real nullable columns, and both
+  # ON DUPLICATE KEY UPDATE upserts. The functional matrix cannot cover
+  # this either: nothing consumes these tables until phase 3, so a wrong
+  # number is invisible from the API. Gated by can_merge.
+  capacity_reconcile:
+    name: "Scheduler capacity reconciler"
+    if: >-
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
+      && needs.check_paths.outputs.code_changed != 'false'
+    needs: [check_paths]
+    runs-on: [self-hosted, vm, debian-12]
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-capacity-reconcile
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install MariaDB
+        timeout-minutes: 10
+        run: |
+          sudo bash tools/ci-install-mariadb.sh \
+              tools/bootstrap-mariadb.sql '' ci-test-password
+
+      - name: Run live capacity reconciler tests
+        timeout-minutes: 15
+        run: bash tools/ci-capacity-reconcile-test.sh ci-test-password
+
   can_see_status:
     name: "Can see status"
     runs-on: [self-hosted, static]
@@ -675,6 +713,7 @@ jobs:
       - ansible_modules_collection
       - node_lifecycle_collection
       - schema_enum_widening
+      - capacity_reconcile
       - check_paths
     if: always() && github.event_name == 'merge_group'
     permissions:

@@ -396,12 +396,26 @@ two legitimately disagree and phase 3 has to choose between them
 explicitly rather than assume parity. The reconciler maintains the
 `scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
 tables from the elected cluster node every five minutes. Rows exist
-per *hypervisor*, not per node: sf-resources publishes metrics from
-every node whatever its roles, so the reconciler filters on the
-`is_hypervisor` column projected into `node_metrics`, the same way
-`scheduler.py` drops non-hypervisor candidates before any capacity
-arithmetic. In this release nothing consumes the tables for admission
+per *schedulable hypervisor*, not per node, because a row that
+describes capacity the scheduler would never use is worse than no row
+at all: it inflates the cluster totals. Three filters enforce that,
+and all three mirror something `scheduler.py` already does — the
+`is_hypervisor` column projected into `node_metrics` (sf-resources
+publishes metrics from every node whatever its roles), node state
+against `constants.NODE_ACTIVE_STATES` (the scheduler builds its
+candidates from `Nodes([], prefilter='active')`), and metrics
+freshness against `RECONCILE_METRICS_MAX_AGE_SECONDS` (the scheduler
+discards metrics older than 120s; the reconciler's window is much
+wider because its cadence is). If you add a capacity consumer, it
+inherits these filters by reading the tables — do not re-derive
+capacity from `node_metrics` directly. In this release nothing
+consumes the tables for admission
 (`docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md`).
+The SQL itself is covered by
+`shakenfist/tests/test_mariadb_capacity_reconcile_live.py`, which runs
+against a real MariaDB in the "Scheduler capacity reconciler" CI job;
+the mocked unit tests cannot catch a broken uuid join or a JSON_TABLE
+change, because both fail as silently wrong numbers rather than errors.
 Operator-facing documentation is
 [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).
 

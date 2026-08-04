@@ -362,11 +362,18 @@ def _metrics_row(node_uuid, cpu_schedulable=None, memory_max=None,
 def _is_non_hypervisor_query(text):
     """Is this the node_metrics query for confirmed non-hypervisors?
 
-    The reconciler issues two node_metrics selects: the capacity columns
-    for hypervisors, and the uuids of nodes known not to be hypervisors.
-    They are told apart by the polarity of the is_hypervisor predicate.
+    The reconciler issues three node_metrics selects: the capacity
+    columns for hypervisors with fresh metrics, the uuids of nodes known
+    not to be hypervisors, and the uuids of nodes whose metrics have gone
+    stale. The first two are told apart by the polarity of the
+    is_hypervisor predicate.
     """
     return 'is_hypervisor IS false' in text
+
+
+def _is_stale_metrics_query(text):
+    """Is this the node_metrics query for stale rows?"""
+    return 'node_metrics.timestamp <=' in text
 
 
 def _capacity_row(node_uuid, limit_cpus, limit_memory_mb, limit_disk_gb,
@@ -407,11 +414,13 @@ class _ReconcileRouterMixin:
         if 'FROM node_metrics' in text:
             if _is_non_hypervisor_query(text):
                 return self._fake_result(rows=self.non_hypervisor_rows)
+            if _is_stale_metrics_query(text):
+                return self._fake_result(rows=self.stale_metrics_rows)
             return self._fake_result(rows=self.metrics_rows)
         if 'FROM nodes' in text:
             return self._fake_result(rows=self.node_rows)
         if 'FROM object_states' in text:
-            return self._fake_result(rows=self.deleted_rows)
+            return self._fake_result(rows=self.inactive_rows)
         if 'FROM namespace_claims' in text:
             return self._fake_result(rows=self.claim_rows)
         self.executed.append((text, stmt))
@@ -450,7 +459,7 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
         self.node_rows = [
             SimpleNamespace(uuid=NODE1), SimpleNamespace(uuid=NODE2),
             SimpleNamespace(uuid=NODE4), SimpleNamespace(uuid=NODE5)]
-        self.deleted_rows = [
+        self.inactive_rows = [
             SimpleNamespace(object_uuid=str(NODE4)),
             SimpleNamespace(object_uuid=str(NODE5))]
         self.claim_rows = [
@@ -458,6 +467,7 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
                             limit_memory_mb=8192, limit_disk_gb=100,
                             state='active')]
         self.non_hypervisor_rows = []
+        self.stale_metrics_rows = []
         self.executed = []
 
         usage = {
@@ -575,12 +585,13 @@ class ReconcileHypervisorFilterTestCase(
     """
 
     def _run_roles(self, previous_rows, metrics_rows, non_hypervisor_rows,
-                   node_rows):
+                   node_rows, inactive_rows=None, stale_metrics_rows=None):
         self.previous_rows = previous_rows
         self.metrics_rows = metrics_rows
         self.non_hypervisor_rows = non_hypervisor_rows
         self.node_rows = node_rows
-        self.deleted_rows = []
+        self.inactive_rows = inactive_rows or []
+        self.stale_metrics_rows = stale_metrics_rows or []
         self.claim_rows = []
         self.executed = []
 
@@ -614,12 +625,16 @@ class ReconcileHypervisorFilterTestCase(
                 continue
             if 'FROM node_metrics' in text:
                 metrics_queries.append(text)
-        self.assertEqual(2, len(metrics_queries))
+        self.assertEqual(3, len(metrics_queries))
         hypervisor = [t for t in metrics_queries
-                      if not _is_non_hypervisor_query(t)]
+                      if not _is_non_hypervisor_query(t)
+                      and not _is_stale_metrics_query(t)]
         self.assertEqual(1, len(hypervisor))
         self.assertIn('is_hypervisor IS true', hypervisor[0])
         self.assertIn('cpu_schedulable', hypervisor[0])
+        # The capacity columns are also gated on metrics freshness, so a
+        # node whose resources daemon died stops contributing.
+        self.assertIn('node_metrics.timestamp >', hypervisor[0])
 
     def test_non_hypervisor_gets_no_capacity_row(self):
         # NODE1 is a hypervisor, NODE2 is a network-only node: it has a
@@ -680,6 +695,110 @@ class ReconcileHypervisorFilterTestCase(
         self.assertEqual(str(NODE2), result['nodes'][0]['node_uuid'])
         self.assertEqual(10, result['nodes'][0]['limit_cpus'])
         self.assertEqual(0, result['nodes_removed'])
+
+
+class ReconcileNodeStateFilterTestCase(
+        _ReconcileRouterMixin, base.ShakenFistTestCase):
+    """Only active nodes get capacity rows.
+
+    The scheduler builds its candidate set from
+    Nodes([], prefilter='active'), so an errored, missing, stopping or
+    stopped node is not a scheduling candidate. A hypervisor taken out of
+    service by the node-health cascade must stop contributing its limits
+    to the cluster totals rather than advertising capacity nothing can be
+    placed on.
+    """
+
+    _run_roles = ReconcileHypervisorFilterTestCase._run_roles
+
+    def test_state_query_excludes_the_active_set(self):
+        _, conn = self._run_roles(
+            previous_rows=[], metrics_rows=[], non_hypervisor_rows=[],
+            node_rows=[])
+        state_queries = []
+        for call in conn.execute.call_args_list:
+            try:
+                compiled = call.args[0].compile(dialect=MYSQL_DIALECT)
+            except AttributeError:
+                continue
+            if 'FROM object_states' in str(compiled):
+                state_queries.append(compiled)
+        self.assertEqual(1, len(state_queries))
+        text = str(state_queries[0])
+        # Expressed as NOT IN the active set, so a state added to the
+        # state machine later is excluded by default rather than silently
+        # counting as schedulable.
+        self.assertIn('state_value NOT IN', text)
+        bound = set()
+        for value in state_queries[0].params.values():
+            # The IN list binds as a single expanding parameter.
+            if isinstance(value, (list, tuple)):
+                bound.update(value)
+            else:
+                bound.add(value)
+        for state in mariadb.NODE_ACTIVE_STATES:
+            self.assertIn(state, bound)
+
+    def test_errored_node_gets_no_capacity_row(self):
+        # A hypervisor with good, fresh metrics that the node-health
+        # cascade has moved to error.
+        result, _ = self._run_roles(
+            previous_rows=[],
+            metrics_rows=[
+                _metrics_row(NODE1, cpu_schedulable=10, memory_max=1024,
+                             memory_reserved_mb=0,
+                             disk_free_instances=100 * GiB,
+                             disk_reservation_gb=0),
+                _metrics_row(NODE2, cpu_schedulable=64, memory_max=65536,
+                             memory_reserved_mb=0,
+                             disk_free_instances=500 * GiB,
+                             disk_reservation_gb=0)],
+            non_hypervisor_rows=[],
+            node_rows=[SimpleNamespace(uuid=NODE1),
+                       SimpleNamespace(uuid=NODE2)],
+            inactive_rows=[SimpleNamespace(object_uuid=str(NODE2))])
+
+        self.assertEqual([str(NODE1)],
+                         [n['node_uuid'] for n in result['nodes']])
+        # NODE2's 64 schedulable threads are nowhere in the totals.
+        self.assertEqual(30, result['cluster']['total_cpus'])
+
+    def test_node_entering_error_loses_its_row(self):
+        result, conn = self._run_roles(
+            previous_rows=[_capacity_row(NODE2, 192, 196608, 500)],
+            metrics_rows=[],
+            non_hypervisor_rows=[],
+            node_rows=[SimpleNamespace(uuid=NODE2)],
+            inactive_rows=[SimpleNamespace(object_uuid=str(NODE2))])
+
+        self.assertEqual([], result['nodes'])
+        self.assertEqual(2, result['nodes_removed'])
+        deletes = [str(call.args[0].compile(dialect=MYSQL_DIALECT))
+                   for call in conn.execute.call_args_list
+                   if isinstance(call.args[0], sa.sql.expression.Delete)]
+        self.assertEqual(1, len(deletes))
+        self.assertEqual(0, result['cluster']['total_cpus'])
+
+    def test_stale_metrics_node_loses_its_row(self):
+        # node_metrics rows are only deleted when the node is, so a live
+        # node whose resources daemon has died would otherwise contribute
+        # its last known limits forever.
+        result, _ = self._run_roles(
+            previous_rows=[_capacity_row(NODE2, 192, 196608, 500)],
+            metrics_rows=[],
+            non_hypervisor_rows=[],
+            node_rows=[SimpleNamespace(uuid=NODE2)],
+            stale_metrics_rows=[SimpleNamespace(node_uuid=NODE2)])
+
+        self.assertEqual([], result['nodes'])
+        self.assertEqual(2, result['nodes_removed'])
+        self.assertEqual(0, result['cluster']['total_cpus'])
+
+    def test_staleness_window_is_above_the_reconcile_cadence(self):
+        # A window at or below the five minute pass cadence would make
+        # rows flap in and out between passes and make the reply's
+        # nodes_added/nodes_removed counts meaningless.
+        self.assertGreater(mariadb.RECONCILE_METRICS_MAX_AGE_SECONDS, 300)
 
 
 class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):

@@ -506,6 +506,40 @@ class Monitor(daemon.Daemon):
         last_defer_message = 0
         last_loop_run = 0
 
+        # Set up the maintenance schedule once, for the life of the
+        # daemon, rather than on each election. schedule.every() appends
+        # to a module-global job list and computes each job's next run
+        # from the moment it is registered, so registering inside the
+        # election loop had two problems: a node elected twice ran every
+        # task twice per cadence (three times after a third election, and
+        # so on), and re-registering restarted every period from zero, so
+        # on a cluster where the maintenance lock changes hands often the
+        # long-period tasks -- prune_events daily, reconcile_orphaned
+        # _objects hourly -- could go indefinitely without ever running.
+        # Registering once fixes both: run_pending() below is only called
+        # while elected, so an idle node still does no maintenance, but
+        # the timers are continuous and a newly elected node promptly
+        # runs whatever fell due while it was idle.
+        schedule.every(1).minutes.do(
+            scheduled_tasks.log_cluster_queue_lengths)
+        schedule.every(1).minutes.do(
+            scheduled_tasks.reap_stuck_cluster_operation_jobs)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.per_blob_checks)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.per_instance_checks_and_usage)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.reconcile_scheduler_capacity)
+        schedule.every(15).minutes.do(
+            scheduled_tasks.per_deleted_object_checks)
+        schedule.every(15).minutes.do(
+            scheduled_tasks.reap_expired_namespace_keys)
+        schedule.every(15).minutes.do(
+            scheduled_tasks.reap_federation_records)
+        schedule.every(60).minutes.do(
+            scheduled_tasks.reconcile_orphaned_objects)
+        schedule.every(1).days.do(scheduled_tasks.prune_events)
+
         while daemon.check_abort_path(self.abort_path):
             util_concurrency.set_thread_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
@@ -520,32 +554,6 @@ class Monitor(daemon.Daemon):
                     last_defer_message = time.time()
                 self.idle(60)
                 continue
-
-            # Setup a schedule of things to do. Clear first: this block
-            # runs on every election and schedule.every() appends to a
-            # module-global job list, so without this a node elected a
-            # second time would run every maintenance task twice per
-            # cadence, three times after a third election, and so on.
-            schedule.clear()
-            schedule.every(1).minutes.do(
-                scheduled_tasks.log_cluster_queue_lengths)
-            schedule.every(1).minutes.do(
-                scheduled_tasks.reap_stuck_cluster_operation_jobs)
-            schedule.every(5).minutes.do(
-                scheduled_tasks.per_blob_checks)
-            schedule.every(5).minutes.do(
-                scheduled_tasks.per_instance_checks_and_usage)
-            schedule.every(5).minutes.do(
-                scheduled_tasks.reconcile_scheduler_capacity)
-            schedule.every(15).minutes.do(
-                scheduled_tasks.per_deleted_object_checks)
-            schedule.every(15).minutes.do(
-                scheduled_tasks.reap_expired_namespace_keys)
-            schedule.every(15).minutes.do(
-                scheduled_tasks.reap_federation_records)
-            schedule.every(60).minutes.do(
-                scheduled_tasks.reconcile_orphaned_objects)
-            schedule.every(1).days.do(scheduled_tasks.prune_events)
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
