@@ -377,6 +377,23 @@ mutates the real tree to prove the *guards* fire, which is a
 different question from whether the *derivation* is right, and
 the two are complementary.
 
+**D6's query-string fallback has a caller waiting on it.**
+[Issue #3629](https://github.com/shakenfist/shakenfist/issues/3629):
+`all` on the four outstanding-operations endpoints is bound with
+`@use_kwargs(get_args, location='query')`, and webargs finishes
+with `kwargs.update(parsed_args)`, so the `load_default=False`
+from an absent query string overwrites the `all=True` that
+`log_request` merged in from the JSON body. The shipped client
+only ever sends a body, so the parameter has never worked
+through it.
+
+Phase 1 declared these `query`, which is accurate about where
+the code parses them from. Making the declaration *true of the
+client* is what D6 is for, so #3629 closes when phase 3 lands
+the fallback — or sooner, with `location=('query', 'json')` at
+those four sites, if the two are kept in agreement about
+precedence.
+
 ## Open questions for phase 0
 
 All answered above; retained as the record of what phase 0

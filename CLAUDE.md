@@ -328,6 +328,31 @@ class InstanceEndpoint(Resource):
 
 **IMPORTANT**: Decorator order matters! See comments in `external_api/app.py`.
 
+#### Parameter declarations are enforced
+
+`swagger_helper()` validates every declaration when the module is
+imported, so a malformed one raises `InvalidAPIDeclaration` and **sf-api
+does not start**. The rules, in full in
+`docs/developer_guide/writing_an_endpoint.md`:
+
+1. Every handler carries a `swag_from(swagger_helper(...))`, even one
+   that takes no parameters. An empty parameter list is a valid
+   declaration; no declaration at all means the endpoint is absent from
+   the published API.
+2. `location` is one of `api_base.SWAGGER_PARAMETER_LOCATIONS`, and must
+   be where the parameter actually arrives: a route segment is `path`, a
+   `@use_kwargs(..., location='query')` schema key or a
+   `flask.request.args` read is `query`, everything else is `body`
+   (`log_request` merges the JSON body into kwargs).
+3. A `path` parameter must be `required=True`.
+4. A raw request body is declared as `api_base.RAW_BODY_PARAMETER`.
+5. Every kwarg the handler accepts is declared; decorator-injected
+   `*_from_db` objects are not parameters.
+
+`python3 tools/fix-api-parameter-locations.py --apply` corrects drift
+mechanically. The check runs as a pre-commit hook and, because no
+workflow runs pre-commit, as `test_parameter_declarations.py` in CI.
+
 ### REST API URL Structure
 
 The REST API is documented via OpenAPI at https://openapi.shakenfist.com. Key

@@ -1,0 +1,119 @@
+Writing an API endpoint
+===
+
+Every REST endpoint declares the parameters it accepts, and those
+declarations are checked. Getting one wrong is not a documentation bug
+that lands quietly: `swagger_helper()` validates each declaration when
+the module is imported, so a malformed one raises
+`shakenfist.exceptions.InvalidAPIDeclaration` and `sf-api` does not
+start.
+
+This page is the reference for what a declaration has to look like.
+The reasoning behind the rules, and the audit that found ~120 wrong
+declarations already in the tree, is in
+[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
+
+## The shape of a handler
+
+```python
+class InstanceEndpoint(api_base.Resource):
+    @jwt_required()
+    @arg_is_instance_ref
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Fetch an instance.',
+        [('instance_ref', 'path', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(200, 'Information about an instance.', None),
+         (404, 'Instance not found.', None)]))
+    def get(self, instance_ref=None, instance_from_db=None):
+        return instance_from_db.external_view()
+```
+
+Each parameter is a five-element tuple:
+
+```
+(name, location, type, description, required)
+```
+
+Decorator order matters; see the comments in `external_api/app.py`.
+
+## The rules
+
+**1. Every handler carries a declaration.** A `get`, `post`, `put` or
+`delete` on a `Resource` subclass must have a
+`@swag_from(api_base.swagger_helper(...))`, even if it takes no
+parameters — an empty parameter list is a legitimate declaration, and
+eight endpoints have one. A handler with no `swag_from` at all is
+absent from the published OpenAPI, so a generated client cannot call
+it. The only exceptions are the unauthenticated health probes, which
+are listed in `UNDOCUMENTED_BY_DESIGN` in
+`shakenfist/tests/external_api/test_parameter_declarations.py`.
+
+**2. `location` must be one of the OpenAPI 2.0 set** —
+`api_base.SWAGGER_PARAMETER_LOCATIONS`: `path`, `query`, `body`,
+`header` or `formData`. It must also be the location the parameter
+*actually* arrives at, which is derivable from the code:
+
+| The parameter is | Its location is |
+|---|---|
+| a segment of the mounted route in `app.py` | `path` |
+| in a schema bound with `@use_kwargs(..., location='query')` | `query` |
+| read from `flask.request.args` | `query` |
+| anything else | `body` |
+
+That last row is the default because `log_request` merges the JSON
+request body into the handler's kwargs, and the official client sends
+a JSON body for every method including `GET`.
+
+**3. A `path` parameter must be `required=True`.** The route cannot
+match without it, and an optional path parameter makes the published
+specification invalid — client generators reject it outright.
+
+**4. A raw request body is declared as `api_base.RAW_BODY_PARAMETER`.**
+Upload endpoints read the body from `flask.request` rather than
+receiving it as a kwarg. Use the constant rather than inventing a name,
+so the "declared but not accepted" check knows to let it through.
+
+**5. Every kwarg the handler accepts is declared.** An accepted-but-
+undeclared parameter is invisible to anyone reading the API, which is
+how `sshkey` and `userdata` sat in the published specification for
+years while the handler read `ssh_key` and `user_data`. If a kwarg
+genuinely must not be published, add it to `UNDECLARED_BY_DESIGN` with
+a reason. Objects the decorators inject — anything ending in
+`_from_db` — are not parameters and must not be declared.
+
+## Checking your work
+
+The audit derives the correct location for every declaration and
+compares it against what is declared:
+
+```bash
+python3 tools/fix-api-parameter-locations.py            # report drift
+python3 tools/fix-api-parameter-locations.py --apply    # correct it
+```
+
+The same derivation runs as a pre-commit hook
+(`check-api-parameter-locations`) and, more importantly, as a unit
+test — `shakenfist/tests/external_api/test_parameter_declarations.py`,
+which is what CI actually enforces, since no workflow runs pre-commit.
+
+`tools/check-api-declaration-guards.sh` mutation-tests those
+assertions: it breaks each property on purpose and confirms the guard
+fires. Run it if you change the derivation or add an assertion, since
+a guard that passes on a deliberately broken tree is not a guard.
+
+## What is not checked yet
+
+The declarations are documentation today. Compiling them into
+per-endpoint request validation is phase 3 of the plan; until then a
+correct declaration does not stop a caller sending something else.
+Two known gaps:
+
+* `header` and `formData` cannot be derived from the code, so they are
+  reported rather than corrected. No endpoint uses either today.
+* Swagger 2.0 allows at most one `in: body` parameter per operation,
+  carrying a `schema` rather than a `type`. `swagger_helper()` emits
+  one parameter per declaration, so operations with several body
+  parameters render an invalid specification. Phase 2 collapses them;
+  [issue #3626](https://github.com/shakenfist/shakenfist/issues/3626)
+  tracks the specification-validation test that will prove it.

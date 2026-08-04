@@ -375,6 +375,34 @@ derivation could not read reported "`blob_uuid` is declared
 `path` but arrives in the body" — a message that sends the reader
 to change a correct declaration.
 
+A sixth round broke the streak: its one `fix` was against the
+mutation harness rather than the derivation, and is recorded
+below. The rest were hardening. `route_parameters()` and
+`handlers()` key on the bare class name, so two endpoint classes
+sharing one would each derive the other's URL segments as `path`
+— the third case the module's docstring did not cover, neither
+"not found" nor "cannot read this" but a confident wrong answer.
+Both now record it in `problems`. `literal()` and
+`_base_constants()` caught only `ValueError` from
+`ast.literal_eval`, so a node that parses but does not evaluate
+would escape as a traceback from a helper documented to answer
+with `None`; both now catch `TypeError` as well. And the
+redundant empty-declaration guard left in
+`test_declared_names_are_real_parameters` is gone: it was inert
+there, but it is the same shape as the load-bearing one round
+five removed next door, and leaving it invites a reader to
+conclude the pattern is endorsed.
+
+The endpoint-authoring rules this phase makes enforceable —
+carry a declaration, use a valid location, require path
+parameters, use `RAW_BODY_PARAMETER`, declare every kwarg — now
+live in `docs/developer_guide/writing_an_endpoint.md`, with
+summaries in `CLAUDE.md` and `AGENTS.md`. Their failure mode is
+an import-time `InvalidAPIDeclaration` that stops `sf-api`
+starting, and a plan document is a record of decisions rather
+than the page a contributor adding an endpoint next month will
+find.
+
 ### Mutation-testing the guards
 
 `tools/check-api-declaration-guards.sh` breaks each property the
@@ -396,6 +424,36 @@ import-time enforcement working as designed.
 Not wired into CI — it takes a couple of minutes and mutates the
 tree — so it belongs in the pre-push checklist for changes to
 this machinery.
+
+A sixth review round found the script had the defect it was
+written to hunt. `check()` inferred a catch from the *absence* of
+`Failed: 0`, so a run that never reached the tests — and a
+mutation whose `sed` had quietly stopped matching — both reported
+a catch nobody had observed. Rewriting it to name its verdict
+rather than infer it (`caught`, `caught-import`, `NOT CAUGHT`,
+`NO-OP`, `HARNESS BROKEN`), to diff against the backup before
+trusting a mutation, and to exit non-zero, immediately showed two
+of the ten proving nothing:
+
+* the unreadable-route mutation referenced an undefined
+  `BLOB_ROUTES`, so it was a `NameError` at import rather than a
+  route the derivation could not read. It now defines the name,
+  and fails a named test.
+* a mutation added in the same round for colliding endpoint class
+  names cannot be expressed in this tree at all: `flask_restful`
+  derives its endpoint name from the class name and refuses the
+  second registration outright (`ValueError: This endpoint
+  (nodeendpoint) is already set to the class NodeEndpoint`). That
+  makes the collision unreachable in a running `sf-api`, so the
+  audit's report of it is an earlier and clearer message rather
+  than the only defence, and the coverage belongs in a
+  constructed-source unit test.
+
+The harness's own guards were then mutation-tested in turn: a
+deliberately broken `sed` reports `NO-OP`, a missing `.tox/py3`
+and a failing baseline each abort with status 2, and
+`HARNESS BROKEN` was observed for real on the two mutations
+above.
 
 ### Known remaining gap: multiple body parameters
 
