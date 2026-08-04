@@ -32,11 +32,13 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phase 0 complete.** The open questions at the bottom
-are answered in the Decisions section; see
+**Status: phases 0 and 1 complete.** The open questions at the
+bottom are answered in the Decisions section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
-for the measurements behind them. Phases 1 onward are not yet
-cut into per-phase files.
+for the measurements behind them and
+[`PLAN-api-input-validation-phase-01-declaration-audit.md`](PLAN-api-input-validation-phase-01-declaration-audit.md)
+for what the audit found. Phases 2 onward are not yet cut into
+per-phase files.
 
 ## Situation
 
@@ -273,7 +275,7 @@ declarations are good enough to compile.
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion |
+| 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See [phase 0](PLAN-api-input-validation-phase-00-decisions.md) |
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
 | 2: Type vocabulary | Not started | New tokens and the constraints element, rendered into the OpenAPI so the bounds are visible to callers rather than invisible the way the events `limit` cap was. Also: collapse the N body parameters of an operation into one `body` parameter carrying a generated `schema`, and add a test that validates the generated specification — see below |
 | 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs |
@@ -300,6 +302,18 @@ specification-validity problems for phase 2 to pick up:
   collapse an operation's body parameters into a single `body`
   parameter with a generated `schema` object, which is a change to
   the renderer rather than to any declaration.
+* **`schemes` renders as a string, not an array.**
+  `API_ADVERTISED_HTTP_SCHEMES` is typed `str` in `config.py` while
+  its own description calls it a "space separated list", and
+  `app.py` feeds it straight into the specification's top-level
+  `schemes` key, which OpenAPI 2.0 requires to be an array of
+  strings. A default deployment therefore publishes
+  `schemes: 'http'`, and a two-scheme one publishes a single
+  nonsense string rather than two entries. Pre-existing —
+  introduced in `01ef8a563`, not by this plan — but it is the
+  *first* thing a validator trips over, ahead of the body
+  parameters above, so #3626 has to fix or explicitly waive it to
+  reach anything else.
 * **Nothing validates the generated specification.** Phase 1's
   path-implies-required rule exists to satisfy linters and client
   generators, and was checked by hand. A unit test running

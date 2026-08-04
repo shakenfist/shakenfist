@@ -348,6 +348,55 @@ specification, made inside a change set otherwise described as a
 location audit, and recorded here so a later bisect is not
 confusing.
 
+A fifth round found the same shape once more, in the assertion
+next door: `test_accepted_parameters_are_declared` skipped any
+handler whose declaration list was empty, which exempts a
+`swag_from` whose parameters have been *emptied* while the
+handler still accepts them. `documented()` existed by then —
+added in round four for precisely this distinction — and was not
+used here. Emptying `BlobEndpoint.get`'s list left all 27 tests
+green while `blob_uuid` vanished from the published API.
+
+The rest of that round closed the silent-skip class properly
+rather than instance by instance. Every source in
+`declarations.py` answered "not found" and "cannot read this"
+with the same empty set, which makes a skipped input a confident
+wrong answer rather than a missing one: an unreadable route
+empties a class's path set, so every one of its parameters
+derives to `body`, and the fixer rewrites correct `path`
+declarations. `audit()` now returns a third value, `problems`,
+which both consumers refuse to proceed past — the script exits
+without rewriting, and the test asserts it *before* the drift
+list, so the cause is reported rather than the symptom.
+
+That ordering was found by the mutation pass described below,
+not by review: with the problems assertion second, a route the
+derivation could not read reported "`blob_uuid` is declared
+`path` but arrives in the body" — a message that sends the reader
+to change a correct declaration.
+
+### Mutation-testing the guards
+
+`tools/check-api-declaration-guards.sh` breaks each property the
+audit claims and confirms the guard fires. Ten mutations: a path
+parameter declared `query`, a body parameter declared `query`, an
+emptied parameter list, a missing `swag_from`, an undeclared
+kwarg, an optional path parameter, an unknown type token, a
+four-element tuple, an unreadable route, and a decorator-injected
+object declared as a parameter.
+
+It exists because four of the five review rounds on the PR that
+landed this phase found the same thing: an assertion that passed
+for a reason other than the one it was written for. Reading a
+guard cannot distinguish "this holds" from "this cannot fail";
+breaking the tree can. Three of the ten surface as an aborted
+test collection rather than a named failure, which is the
+import-time enforcement working as designed.
+
+Not wired into CI — it takes a couple of minutes and mutates the
+tree — so it belongs in the pre-push checklist for changes to
+this machinery.
+
 ### Known remaining gap: multiple body parameters
 
 Swagger 2.0 permits at most one `in: body` parameter per
