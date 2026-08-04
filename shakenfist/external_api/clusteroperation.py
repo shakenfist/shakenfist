@@ -111,7 +111,8 @@ class ClusterOperationEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'clusteroperations', 'Get information for a cluster operation.',
         [
-            ('operation_type', 'path', 'uuid', 'The UUID of the operation.', True),
+            ('operation_type', 'path', 'string',
+             'The type of the operation, for example "net_op".', True),
             ('operation_uuid', 'path', 'uuid', 'The UUID of the operation.', True)
         ],
         [(200, 'Information about a single cluster operation.', clusteroperation_get_example),
