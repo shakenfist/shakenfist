@@ -99,13 +99,17 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             'these, or correct the handler if the declaration is right')
 
     def test_declared_names_are_real_parameters(self):
-        """A declared name must be something the handler can receive."""
+        """A declared name must be something the handler can receive.
+
+        An empty declaration list is legitimate -- eight endpoints
+        accept nothing -- and needs no guard, because the loop below is
+        already a no-op for one. The sibling assertion's version of that
+        guard was load-bearing and wrong, so it is deliberately absent
+        here rather than kept for symmetry.
+        """
         for cls, method, fn in _endpoints():
-            declared = declarations.declarations(fn)
-            if not declared:
-                continue
             accepted = declarations.handler_kwargs(fn)
-            for parameter in declared:
+            for parameter in declarations.declarations(fn):
                 if parameter.name == api_base.RAW_BODY_PARAMETER:
                     # Documents the raw request body, read from
                     # flask.request rather than passed as a kwarg.
@@ -342,6 +346,69 @@ class Thing:
         self.assertEqual(
             set(), declarations.query_parameters(handlers['delete'], [cls]))
 
+    def test_query_derivation_reads_a_tuple_of_locations(self):
+        """webargs accepts a tuple of locations, and one containing
+        'query' is a query binding.
+
+        No site uses this today. It is the shape a fix for issue 3629,
+        and decision D6's fallback, would introduce -- and reading it
+        as "not query" would send the fixer to rewrite the very
+        declarations that fix had just made true. An unreadable
+        location is a third answer and must not wear the same face as
+        an absent one, which means webargs' json default.
+        """
+        source = '''
+class Thing(api_base.Resource):
+    get_args = {'all': None}
+
+    @use_kwargs(get_args, location=('query', 'json'))
+    def get(self, all=None):
+        pass
+
+    @use_kwargs(get_args, location=['json', 'query'])
+    def post(self, all=None):
+        pass
+
+    @use_kwargs(get_args, location=('json', 'form'))
+    def put(self, all=None):
+        pass
+
+    @use_kwargs(get_args, location=SOMETHING_UNREADABLE)
+    def delete(self, all=None):
+        pass
+
+    @use_kwargs(get_args)
+    def patch(self, all=None):
+        pass
+'''
+        cls = self._parse_class(source)
+        handlers = {fn.name: fn for fn in cls.body
+                    if isinstance(fn, ast.FunctionDef)}
+
+        for method in ('get', 'post'):
+            self.assertEqual(
+                {'all'},
+                declarations.query_parameters(handlers[method], [cls]),
+                '%s binds a tuple containing query' % method)
+
+        # A tuple without query, and no location at all (webargs
+        # defaults to json), are both correctly not query bindings.
+        for method in ('put', 'patch'):
+            problems = []
+            self.assertEqual(
+                set(),
+                declarations.query_parameters(
+                    handlers[method], [cls], problems))
+            self.assertEqual([], problems)
+
+        problems = []
+        self.assertEqual(
+            set(),
+            declarations.query_parameters(
+                handlers['delete'], [cls], problems))
+        self.assertEqual(1, len(problems))
+        self.assertIn('cannot read', problems[0])
+
     def test_request_args_reads_are_found(self):
         source = '''
 class Thing:
@@ -446,6 +513,76 @@ class InheritedEndpoint(FakeEndpoint):
             [('fake_ref', 'path', 'body')],
             [(d.name, d.location, want) for d, want in drifted])
 
+    def test_colliding_class_names_are_reported(self):
+        """Routes are looked up by bare class name, so two endpoints
+        sharing one is a third failure case.
+
+        Not "not found" and not "cannot read this", but a confident
+        wrong answer: each class derives the other's URL segments as
+        `path`, and the fixer would rewrite correct declarations to
+        match. No collision exists in the tree, so only a constructed
+        source can reach this.
+        """
+        self._write('app.py', '''
+api.add_resource(api_one.FakeEndpoint, '/ones/<one_ref>')
+api.add_resource(api_two.FakeEndpoint, '/twos/<two_ref>')
+''')
+        self._write('one.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'ones', 'A one.',
+        [('one_ref', 'path', 'uuid', 'A ref.', True)],
+        []))
+    def get(self, one_ref=None):
+        pass
+''')
+        self._write('two.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'twos', 'A two.',
+        [('two_ref', 'path', 'uuid', 'A ref.', True)],
+        []))
+    def get(self, two_ref=None):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        reported = '\n'.join(problems)
+        self.assertIn('mounted from two modules', reported)
+        self.assertIn('is defined twice', reported)
+
+        # Both declarations are correct, and the merged route set hides
+        # that from the drift check -- which is the whole reason the
+        # collision has to be reported rather than derived through.
+        self.assertEqual([], [(d.name, want) for d, want in drifted])
+
+    def test_unreadable_resource_argument_is_reported(self):
+        """The class being mounted has to be readable too.
+
+        An unreadable *route* was already reported; an unreadable
+        *resource* silently empties some class's route set in exactly
+        the same way, and the empty-args case used to raise IndexError
+        out of the audit rather than report anything.
+        """
+        for app in ("api.add_resource()\n",
+                    'api.add_resource(*everything)\n',
+                    "api.add_resource(REGISTRY['Fake'], '/fakes/<x>')\n",
+                    "api.add_resource(make(), '/fakes/<x>')\n"):
+            self._write('app.py', app)
+            self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    def get(self):
+        pass
+''')
+
+            _, _, problems = declarations.audit(self.tempdir)
+
+            self.assertEqual(
+                1, len(problems), 'expected one problem for %r: %s'
+                % (app, problems))
+            self.assertIn('cannot read', problems[0])
+
     def test_unresolvable_query_schema_is_reported(self):
         source = '''
 class Thing(api_base.Resource):
@@ -538,6 +675,37 @@ class FakeEndpoint(api_base.Resource):
 
         # Idempotent, and the only thing that changed is the two tokens.
         self.assertEqual(0, self.fixer.main(False, self.tempdir))
+
+    def test_refuses_to_rewrite_from_unreadable_input(self):
+        """A derivation with holes in it must not be written to disk.
+
+        The guard exists because an unreadable route empties a class's
+        path set, which derives every one of its parameters to `body`:
+        rewriting on that basis corrupts declarations which were right
+        to begin with. Asserting the file is untouched is the part that
+        matters -- SystemExit alone would be satisfied by a script that
+        exited after writing.
+        """
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, *ROUTES)
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('fake_ref', 'path', 'uuid', 'A ref.', True)],
+        []))
+    def get(self, fake_ref=None):
+        pass
+''')
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            before = f.read()
+
+        self.assertRaises(
+            SystemExit, self.fixer.main, True, self.tempdir)
+
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            self.assertEqual(before, f.read())
 
     def test_leaves_a_correct_tree_alone(self):
         self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")

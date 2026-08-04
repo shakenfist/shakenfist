@@ -109,7 +109,7 @@ def _base_constants() -> dict[str, Any]:
             continue
         try:
             value = ast.literal_eval(node.value)
-        except ValueError:
+        except (ValueError, TypeError):
             continue
         for target in node.targets:
             if isinstance(target, ast.Name):
@@ -131,7 +131,12 @@ def literal(node: Optional[ast.AST]) -> Any:
         return None
     try:
         return ast.literal_eval(node)
-    except ValueError:
+    except (ValueError, TypeError):
+        # ValueError is the common "not a literal" answer for a Name, an
+        # Attribute or a Call. TypeError arrives from a node which parses
+        # but cannot be evaluated. Both mean "not static", which is what
+        # every caller here is asking, so neither should escape as a
+        # traceback from a helper documented to answer with None.
         return CONSTANTS.get(ast.unparse(node).split('.')[-1])
 
 
@@ -150,14 +155,44 @@ def route_parameters(app: str = APP,
     every one of its parameters to ``body`` -- so the fixer would
     rewrite a *correct* ``path`` declaration, and phase 3 would compile
     a schema looking in the JSON body for a URL segment.
+
+    Keyed on the bare class name, which is what the caller has. Two
+    endpoint classes of the same name in different modules would
+    therefore share one merged route set and each derive the other's
+    URL segments as ``path`` -- a confidently wrong answer rather than
+    an empty one, so it is recorded too.
+
+    The class being mounted has to be readable for any of that to
+    apply: a registration whose first argument is not a plain name or
+    attribute names no class this can match, which silently empties
+    some class's route set exactly as an unreadable route would.
     """
     out: dict[str, set[str]] = collections.defaultdict(set)
+    qualified: dict[str, str] = {}
     for node in ast.walk(_parse(app)):
         if not isinstance(node, ast.Call):
             continue
         if getattr(node.func, 'attr', '') != 'add_resource':
             continue
-        cls = ast.unparse(node.args[0]).split('.')[-1]
+
+        resource = node.args[0] if node.args else None
+        if not isinstance(resource, (ast.Name, ast.Attribute)):
+            if problems is not None:
+                problems.append(
+                    'a resource is mounted by an expression this cannot read '
+                    '(%s), so the routes of whichever class it names are '
+                    'missing' % (ast.unparse(node) if resource is None
+                                 else ast.unparse(resource)))
+            continue
+
+        mounted = ast.unparse(resource)
+        cls = mounted.split('.')[-1]
+        if qualified.setdefault(cls, mounted) != mounted and (
+                problems is not None):
+            problems.append(
+                '%s is mounted from two modules (%s and %s), so their path '
+                'parameters cannot be told apart'
+                % (cls, qualified[cls], mounted))
         for arg in node.args[1:]:
             route = literal(arg)
             if isinstance(route, str):
@@ -183,6 +218,13 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
     at ``location='json'``, or a class with a webargs ``get`` beside a
     ``post`` declaring a same-named parameter, would both have been
     derived wrongly.
+
+    webargs accepts a tuple of locations as well as a single one, so a
+    schema bound at ``('query', 'json')`` is a query schema too. No site
+    uses that today, but it is the shape a fix for issue 3629 -- and
+    decision D6's fallback -- would introduce, and reading it as "not
+    query" would send the fixer to rewrite the very declarations the fix
+    had just made true.
     """
     out: set[str] = set()
     for dec in fn.decorator_list:
@@ -190,11 +232,23 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
             continue
         if ast.unparse(dec.func).split('.')[-1] != 'use_kwargs':
             continue
-        location = None
-        for keyword in dec.keywords:
-            if keyword.arg == 'location':
-                location = literal(keyword.value)
-        if location != 'query':
+
+        declared = [k for k in dec.keywords if k.arg == 'location']
+        location = literal(declared[-1].value) if declared else None
+        if declared and location is None:
+            # Absent means webargs' default of json, which is not this.
+            # Present but unreadable is a different answer wearing the
+            # same face, and resolves to 'body' for every key it binds.
+            if problems is not None:
+                problems.append(
+                    '%s binds a webargs schema at a location this cannot '
+                    'read (%s)'
+                    % (fn.name, ast.unparse(declared[-1].value)))
+            continue
+        if isinstance(location, (tuple, list)):
+            if 'query' not in location:
+                continue
+        elif location != 'query':
             continue
         keys = _schema_keys(scopes, ast.unparse(dec.args[0]))
         if not keys and problems is not None:
@@ -292,7 +346,12 @@ def handlers(api_dir: str = API_DIR,
     is an endpoint by inheritance, and skipping it would exempt it from
     every assertion here rather than merely omit it. Recorded in
     ``problems`` so that reads as the unhandled case it is.
+
+    Two endpoint classes sharing a name is recorded for the same
+    reason: ``derived_location()`` looks their routes up by bare name,
+    so a collision gives each of them the other's path parameters.
     """
+    seen: dict[str, str] = {}
     for path in sorted(glob.glob(os.path.join(api_dir, '*.py'))):
         tree = _parse(path)
         for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
@@ -310,6 +369,14 @@ def handlers(api_dir: str = API_DIR,
                         'so its declarations are not audited'
                         % (cls.name, ', '.join(bases)))
                 continue
+
+            if cls.name in seen and problems is not None:
+                problems.append(
+                    '%s is defined twice (%s), so route lookups by class '
+                    'name give each of them the other\'s path parameters'
+                    % (cls.name, seen[cls.name] if seen[cls.name] == path
+                       else '%s and %s' % (seen[cls.name], path)))
+            seen.setdefault(cls.name, path)
 
             for fn in methods:
                 yield path, tree, cls, fn
