@@ -10,7 +10,12 @@ import json
 import logging
 import sys
 
+from shakenfist import mariadb
 from shakenfist.external_api import app as external_api
+from shakenfist.namespace import Namespace
+from shakenfist.namespace_key import NamespaceKey
+from shakenfist.schema.namespace_key_attributes import (
+    NamespaceKeyAttributesData)
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
@@ -196,3 +201,107 @@ class RuleEndpointTestCase(base.ShakenFistTestCase):
             '/auth/namespaces/ci/rules/nope',
             headers={'Authorization': self.owner})
         self.assertEqual(404, resp.status_code)
+
+
+class RuleScopeCeilingTestCase(RuleEndpointTestCase):
+    """A rule may not grant scopes its author does not hold.
+
+    A rule is a standing instruction to mint a key, so it is subject to
+    the same ceiling `_namespace_keys_putpost` applies when minting one
+    directly. Without it there is a two hop privilege escalation: write
+    a rule granting `*`, satisfy its bound claims with an identity
+    token, exchange that for a wildcard key. In the system namespace
+    the wildcard reaches cluster-admin.
+    """
+
+    def _scoped_token(self, namespace, secret, scopes_granted):
+        """A token whose key carries exactly `scopes_granted`."""
+        name = 'scoped-%s' % secret
+        ns = Namespace.from_db(namespace)
+        ns.add_key(name, secret)
+
+        key = ns.lookup_key(name)
+        obj = NamespaceKey.from_db_by_name(namespace, name)
+        mariadb.update_namespace_key_attributes(
+            NamespaceKeyAttributesData(
+                uuid=obj.uuid, key=key.key, nonce=key.nonce,
+                expiry=key.expiry, scopes=scopes_granted, provenance=None))
+
+        return self._token(namespace, secret)
+
+    def test_a_rule_writer_cannot_grant_the_wildcard(self):
+        # The escalation, refused. `rule.write` is not `*`, so it
+        # cannot author a rule which hands out `*`.
+        token = self._scoped_token('ci', 'narrow1', ['rule.write'])
+
+        resp = self._create(token=token, scopes=['*'])
+        self.assertEqual(403, resp.status_code)
+        self.assertIn('do not hold', resp.get_data(as_text=True))
+
+    def test_a_rule_writer_cannot_grant_cluster_admin(self):
+        token = self._scoped_token('ci', 'narrow2', ['rule.write'])
+
+        self.assertEqual(
+            403, self._create(token=token, scopes=['cluster-admin']
+                              ).status_code)
+
+    def test_a_rule_writer_cannot_grant_an_unrelated_family(self):
+        token = self._scoped_token(
+            'ci', 'narrow3', ['rule.write', 'blob.read'])
+
+        resp = self._create(token=token, scopes=['instance.delete'])
+        self.assertEqual(403, resp.status_code)
+
+    def test_a_rule_writer_cannot_widen_a_family_it_holds_one_verb_of(self):
+        # Holding `blob.read` must not let you grant `blob.*`.
+        token = self._scoped_token(
+            'ci', 'narrow4', ['rule.write', 'blob.read'])
+
+        self.assertEqual(
+            403, self._create(token=token, scopes=['blob.*']).status_code)
+
+    def test_a_rule_writer_can_grant_what_it_holds(self):
+        # The control. Without this the 403s above could be the scope
+        # gate on the endpoint itself rather than the ceiling.
+        token = self._scoped_token(
+            'ci', 'narrow5', ['rule.write', 'blob.read'])
+
+        resp = self._create(token=token, scopes=['blob.read'])
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(['blob.read'], resp.get_json()['scopes'])
+
+    def test_a_family_wildcard_holder_can_grant_a_verb_in_it(self):
+        token = self._scoped_token(
+            'ci', 'narrow6', ['rule.write', 'blob.*'])
+
+        resp = self._create(token=token, scopes=['blob.read'])
+        self.assertEqual(200, resp.status_code)
+
+    def test_an_unscoped_caller_is_unrestricted(self):
+        # Every operator holding a legacy key is in this state, and
+        # their rules have to keep working exactly as before.
+        resp = self._create(token=self.owner, scopes=['*'])
+        self.assertEqual(200, resp.status_code)
+
+    def test_the_ceiling_applies_to_update_as_well_as_create(self):
+        # Otherwise the escalation is just one request longer: create a
+        # modest rule, then widen it.
+        self.assertEqual(200, self._create().status_code)
+        token = self._scoped_token('ci', 'narrow7', ['rule.write'])
+
+        resp = self.client.put(
+            '/auth/namespaces/ci/rules/ryll',
+            headers={'Authorization': token},
+            data=json.dumps({
+                'issuer': 'github',
+                'bound_claims': {'repository': 'shakenfist/ryll'},
+                'scopes': ['*'],
+                'key_ttl': 3600,
+                'key_name_prefix': 'ryll-ci'}))
+        self.assertEqual(403, resp.status_code)
+
+        # And the stored rule is untouched.
+        rule = self.client.get(
+            '/auth/namespaces/ci/rules/ryll',
+            headers={'Authorization': self.owner}).get_json()
+        self.assertEqual(['blob.read'], rule['scopes'])

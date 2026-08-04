@@ -89,6 +89,56 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
         resp = self._create()
         self.assertEqual(409, resp.status_code)
 
+    def test_a_second_issuer_for_one_url_is_refused(self):
+        # Token validation resolves an issuer by its URL, so two live
+        # records claiming the same URL would make which provider's
+        # keys we trust depend on listing order.
+        self.assertEqual(200, self._create().status_code)
+        resp = self._create(
+            name='github-again', jwks_uri='https://evil.example.com/jwks')
+
+        self.assertEqual(409, resp.status_code)
+        self.assertIn('github', resp.get_json()['error'])
+
+    def test_a_deleted_issuers_url_can_be_reused(self):
+        # The conflict is with live issuers only, or disowning a
+        # compromised provider would make its URL unusable forever.
+        self._create()
+        self.assertEqual(200, self.client.delete(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin}).status_code)
+
+        self.assertEqual(200, self._create(name='github2').status_code)
+
+    def test_update_cannot_steal_another_issuers_url(self):
+        self._create()
+        self._create(name='authentik', issuer_url='https://auth.example.com',
+                     jwks_uri='https://auth.example.com/jwks')
+
+        resp = self.client.put(
+            '/auth/issuers/authentik',
+            headers={'Authorization': self.admin},
+            data=json.dumps({
+                'issuer_url': GITHUB,
+                'jwks_uri': 'https://evil.example.com/jwks',
+                'audience': 'https://sf.example.com'}))
+        self.assertEqual(409, resp.status_code)
+
+    def test_update_can_leave_the_url_alone(self):
+        # The conflict check must not trip over the issuer being
+        # updated, or no issuer could ever change its audience.
+        self._create()
+        resp = self.client.put(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin},
+            data=json.dumps({
+                'issuer_url': GITHUB, 'jwks_uri': GITHUB_JWKS,
+                'audience': 'https://sf3.example.com'}))
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('https://sf3.example.com',
+                         resp.get_json()['audience'])
+
     def test_required_fields_are_required(self):
         for field in ('name', 'issuer_url', 'jwks_uri', 'audience'):
             resp = self._create(**{field: None})
@@ -204,7 +254,8 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
 
     def test_listing(self):
         self._create()
-        self._create(name='authentik')
+        self._create(name='authentik', issuer_url='https://auth.example.com',
+                     jwks_uri='https://auth.example.com/jwks')
         resp = self.client.get(
             '/auth/issuers', headers={'Authorization': self.admin})
         self.assertEqual(200, resp.status_code)

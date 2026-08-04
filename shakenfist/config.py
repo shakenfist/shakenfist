@@ -174,6 +174,17 @@ class SFConfig(BaseSettings):
             'it does not delay recognising a newly rotated key.'
         )
     )
+    FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS: int = Field(
+        5,
+        description=(
+            'How long in seconds to wait for a trusted issuer\'s JWKS '
+            'endpoint before giving up. The fetch happens while holding '
+            'that issuer\'s refetch lock, so this is also the longest one '
+            'unreachable identity provider can pin an API worker. PyJWT '
+            'defaults to 30 seconds, which is long enough that a provider '
+            'blackholing traffic exhausts the worker pool.'
+        )
+    )
     FEDERATION_RATE_LIMIT_PER_MINUTE: int = Field(
         60,
         description=(

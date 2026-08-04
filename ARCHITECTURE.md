@@ -919,6 +919,20 @@ cluster daemon's `reap_federation_records`:
 Both fail closed: a database error refuses the exchange rather than being read
 as "not seen before" or "under the limit".
 
+The replay record is keyed on the token's `jti` when the issuer supplies one,
+and otherwise on a hash of the token's *signed material* — header and payload.
+Not the signature: base64url leaves four don't-care bits in the final
+character of an RS256 signature and the padding is optional, so one signature
+has dozens of spellings which all verify, and keying on the text would have
+given an attacker one replay slot per spelling. The signature commits to the
+signed material, so an attacker cannot vary it without invalidating the token.
+
+Because the endpoint is unauthenticated, its input bound is enforced in an
+`@app.before_request` hook (`limit_federated_body_size`) rather than in the
+method. By the time a `flask_restful` method runs, `log_request` has already
+parsed the body, so a check there cannot prevent the work it exists to
+prevent.
+
 ## Configuration
 
 Configuration uses Pydantic with a two-stage bootstrap:
@@ -1045,8 +1059,11 @@ The develop branch uses:
 - Namespace keys are database-backed objects with optional expiry, enforced
   when the key is used rather than by a sweep
 - Credentials never enter events, which are shipped to syslog and Loki;
-  events record the key name, and request tracing does not log bodies for
-  routes under `/auth`
+  events record the key name, and neither of the two request loggers records
+  a body for routes under `/auth`. Both consult one predicate,
+  `api_base.handles_credentials()`, and drop the body wholesale rather than
+  redacting named fields — a name-based rule leaks the day a route arrives
+  whose credential field it has not heard of
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 

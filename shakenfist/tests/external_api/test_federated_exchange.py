@@ -18,6 +18,7 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import base as api_base
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.tests import base
@@ -332,6 +333,43 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
         with external_api.app.test_request_context('/auth/federated'):
             self.assertTrue(external_api._handles_credentials())
 
+    def test_the_identity_token_is_not_written_to_the_api_log(self):
+        # app.py's redaction covers the audit event stream, but
+        # log_request logs the parsed body a second time as the
+        # decorated method's kwargs, and that copy is what ships to the
+        # log aggregator. The identity token is a bearer credential
+        # until it expires, so a reader of the logs must not be able to
+        # replay it.
+        token = self._token()
+
+        with mock.patch.object(api_base, 'LOG') as log:
+            self._exchange(token=token)
+
+        logged = json.dumps(
+            [[str(c.args), str(c.kwargs)]
+             for c in log.with_fields.call_args_list])
+        self.assertNotIn(token, logged)
+
+        # The route is still logged, or the redaction has thrown away
+        # the audit trail along with the credential.
+        self.assertIn('/auth/federated', logged)
+
+    def test_a_damaged_rule_does_not_leak_its_uuid(self):
+        # The generic 500 handler answers with repr(e), and
+        # CorruptMappingRule names the rule. /auth/federated is the one
+        # endpoint anybody may call, so that repr would hand a stranger
+        # an identifier they have no business holding.
+        rule_uuid = MappingRule.from_db_by_name('ci', 'ryll').uuid
+
+        with mock.patch.object(
+                MappingRule, 'from_db_by_name',
+                side_effect=exceptions.CorruptMappingRule(
+                    f'mapping rule {rule_uuid} has undecodable scopes')):
+            resp = self._exchange()
+
+        self.assertEqual(401, resp.status_code)
+        self.assertNotIn(str(rule_uuid), json.dumps(resp.get_json()))
+
     def test_an_oversized_body_is_refused(self):
         # Refused on size before anything parses it, because parsing an
         # attacker-sized JWT is work done on their behalf.
@@ -339,6 +377,34 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
             'token': 'a' * (config.FEDERATION_MAX_TOKEN_BYTES + 1),
             'namespace': 'ci', 'rule': 'ryll'}))
         self.assertEqual(413, resp.status_code)
+
+    def test_an_oversized_body_is_refused_before_it_is_parsed(self):
+        # The endpoint's own size check runs after log_request has
+        # already called get_json(force=True), so it cannot prevent the
+        # parse it claims to prevent. The refusal has to come from a
+        # request hook, and this is what proves it does.
+        body = json.dumps({
+            'token': 'a' * (config.FEDERATION_MAX_TOKEN_BYTES + 1),
+            'namespace': 'ci', 'rule': 'ryll'})
+
+        with mock.patch('flask.Request.get_json') as get_json:
+            resp = self.client.post('/auth/federated', data=body)
+
+        self.assertEqual(413, resp.status_code)
+        get_json.assert_not_called()
+
+    def test_a_body_with_no_declared_length_is_refused(self):
+        # content_length is None for chunked transfer encoding. Treating
+        # unknown as small enough would let anyone opt out of the size
+        # limit by choosing a header, so it is refused instead.
+        body = json.dumps({
+            'token': 'a' * (config.FEDERATION_MAX_TOKEN_BYTES + 1),
+            'namespace': 'ci', 'rule': 'ryll'})
+        resp = self.client.post(
+            '/auth/federated', data=body,
+            headers={'Transfer-Encoding': 'chunked'})
+
+        self.assertEqual(411, resp.status_code)
 
     def test_a_real_sized_token_is_comfortably_under_the_limit(self):
         # The limit must not be tight enough to refuse genuine tokens.

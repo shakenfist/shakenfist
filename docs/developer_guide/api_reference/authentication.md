@@ -313,6 +313,15 @@ tokens must be minted for. The `jwks_uri` always comes from this
 record and never from the token, because a token naming its own key
 source is a token vouching for itself.
 
+Both the `name` and the `issuer_url` must be unique among live issuers,
+and a second issuer claiming either is refused with a 409. Uniqueness
+on the URL matters because token validation resolves an issuer by it:
+two records claiming one URL would make which provider's keys are
+trusted depend on listing order, so an administrator repointing an
+issuer would believe they had while some requests kept verifying
+against the old JWKS. Deleting an issuer frees both its name and its
+URL for reuse.
+
 ???+ tip "REST API calls"
 
     * [GET /auth/issuers](https://openapi.shakenfist.com/#/auth/get_auth_issuers): List all trusted issuers.
@@ -364,7 +373,7 @@ A rule carries:
 | `issuer` | The trusted issuer whose tokens this rule accepts |
 | `bound_claims` | Claims a token must carry, and the values they must have |
 | `scopes` | The scopes minted keys receive |
-| `key_ttl` | How long a minted key lives, in seconds |
+| `key_ttl` | How long a minted key lives, in seconds. At most 86400 |
 | `key_name_prefix` | Prefix for minted key names; the cluster appends a random discriminator |
 
 `bound_claims` values are exact strings, or lists of exact strings
@@ -375,6 +384,26 @@ are exactly what reviewers get wrong. A rule must bind at least one
 claim and grant at least one scope, both enforced at creation, because
 a rule that binds nothing matches every identity the issuer will ever
 sign.
+
+Three further limits are enforced at creation and on update, so that a
+rule which exists is one that was safe to write:
+
+* A rule may not grant a scope its author does not itself hold.
+  Otherwise a token scoped `rule.write` could write a rule granting
+  `*`, satisfy that rule's own claims, and exchange it for a wildcard
+  key. Holders of legacy unscoped keys are unrestricted, as they are
+  everywhere else.
+* `key_ttl` is capped at one day. A federated key stands in for an
+  identity token that is typically valid for minutes, so a key
+  outliving its own justification by more than a working day is not a
+  policy anyone chose on purpose. Create a namespace key directly if a
+  long lived credential is what you want.
+* `key_name_prefix` may not be a name Shaken Fist reserves for the
+  credentials it mints for itself (`service_key`, or anything starting
+  `_service_key`), the same reservation the key endpoints enforce.
+
+Every field is length bounded. Exceeding a bound is a 400 naming the
+field, rather than a 500 from the database.
 
 ???+ tip "REST API calls"
 

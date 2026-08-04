@@ -28,6 +28,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import scopes as api_scopes
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.mapping_rule import MappingRules
 from shakenfist.mapping_rule import RuleValidationError
@@ -95,8 +96,13 @@ def _validate_key_name(key_name):
     Both patterns are now rejected on both paths (phase 2 Decision 2
     of the auth federation plan). Returns an error response, or None
     if the name is acceptable.
+
+    The patterns themselves live in util.credentials, because a mapping
+    rule's key_name_prefix has to be held to the same standard and
+    mapping_rule.py cannot import a module that returns Flask
+    responses.
     """
-    if key_name == 'service_key' or key_name.startswith('_service_key'):
+    if credentials.is_reserved_key_name(key_name):
         return sf_api.error(403, 'illegal key name')
     return None
 
@@ -749,6 +755,22 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience):
     return None
 
 
+def _issuer_url_taken(issuer_url, by_someone_other_than=None):
+    """Refuse a second issuer record for one iss value.
+
+    Token validation resolves an issuer by its URL, so two live records
+    claiming the same URL make which provider's keys we trust depend on
+    listing order. An operator repointing an issuer would believe they
+    had, while some requests kept verifying against the old JWKS.
+    """
+    existing = federation.issuer_claiming_url(issuer_url)
+    if not existing or existing.name == by_someone_other_than:
+        return None
+    return sf_api.error(
+        409, f'issuer {existing.name} is already configured for '
+             f'{issuer_url}')
+
+
 class AuthIssuersEndpoint(api_base.Resource):
     scope_family = 'issuer'
 
@@ -792,6 +814,10 @@ class AuthIssuersEndpoint(api_base.Resource):
             return sf_api.error(400, 'name is not a valid string')
 
         err = _validate_issuer_arguments(issuer_url, jwks_uri, audience)
+        if err:
+            return err
+
+        err = _issuer_url_taken(issuer_url)
         if err:
             return err
 
@@ -842,6 +868,12 @@ class AuthIssuerEndpoint(api_base.Resource):
             return sf_api.error(404, 'issuer not found')
 
         err = _validate_issuer_arguments(issuer_url, jwks_uri, audience)
+        if err:
+            return err
+
+        # Excluding this issuer, or repointing anything else about an
+        # issuer while leaving its URL alone would conflict with itself.
+        err = _issuer_url_taken(issuer_url, by_someone_other_than=issuer_name)
         if err:
             return err
 
@@ -900,6 +932,32 @@ def _rule_arguments(issuer, bound_claims, scopes, key_ttl, key_name_prefix):
     if missing:
         return None, sf_api.error(
             400, 'missing required field(s): %s' % ', '.join(missing))
+
+    # A rule may not grant scopes its author does not itself hold.
+    #
+    # This is the cap `_namespace_keys_putpost` applies when minting a
+    # key directly, and it belongs here for the same reason with one
+    # extra hop in between. A rule is a standing instruction to mint a
+    # key, so without this a token scoped `rule.write` could write a
+    # rule granting `*`, satisfy that rule's own bound claims with an
+    # identity token from a trusted issuer, and exchange it for a
+    # wildcard key. In the system namespace the wildcard reaches
+    # cluster-admin, routing straight around Decision 3. The exchange
+    # endpoint cannot catch it either, because by that point the rule
+    # is indistinguishable from a legitimately authored one.
+    #
+    # None from caller_scopes() means unrestricted, which is every
+    # operator holding a legacy key, so their rules are unaffected.
+    held = api_base.caller_scopes()
+    if held is not None and isinstance(scopes, list):
+        ungranted = sorted({
+            s for s in scopes
+            if isinstance(s, str) and not api_scopes.satisfies(held, s)
+        })
+        if ungranted:
+            return None, sf_api.error(
+                403, 'a rule cannot grant scopes you do not hold: %s'
+                     % ', '.join(ungranted))
 
     return {
         'issuer': issuer,
@@ -1143,11 +1201,13 @@ class AuthFederatedEndpoint(api_base.Resource):
         # JWKS fetch, a bcrypt hash -- sit behind checks that an
         # anonymous caller cannot pass by guessing.
 
-        # 1. Size, before any parsing. Nothing else rejects on size --
-        #    app.py's 1kb threshold only decides whether to log a body,
-        #    not whether to accept it -- so this is the only thing
-        #    standing between an anonymous caller and us parsing a JWT
-        #    as large as they care to send.
+        # 1. Size. The refusal that actually protects us is
+        #    app.py's limit_federated_body_size hook, because by the
+        #    time this method runs log_request has already parsed the
+        #    body -- a check here cannot stop work that has happened.
+        #    This copy stays as a backstop for callers that reach the
+        #    method without going through the app's request hooks, and
+        #    it is deliberately the same limit.
         if (flask.request.content_length or 0) > \
                 config.FEDERATION_MAX_TOKEN_BYTES:
             return sf_api.error(413, 'request body too large')
@@ -1191,7 +1251,22 @@ class AuthFederatedEndpoint(api_base.Resource):
         # 7. Only now look up the rule. Doing it after verification
         #    means an anonymous caller holding no valid token cannot
         #    use this endpoint to discover which rules exist.
-        rule_from_db = MappingRule.from_db_by_name(namespace, rule)
+        #
+        #    A damaged rule row is refused rather than allowed to
+        #    escape as an exception. The generic 500 handler answers
+        #    with repr(e), and CorruptMappingRule names the rule's
+        #    UUID -- which on the one endpoint anybody may call would
+        #    hand a stranger an identifier they should not have.
+        try:
+            rule_from_db = MappingRule.from_db_by_name(namespace, rule)
+        except exceptions.CorruptMappingRule as e:
+            LOG.with_fields({
+                'namespace': namespace, 'rule': rule
+            }).error(f'Federated exchange hit a damaged rule: {e}')
+            return _federated_refusal(
+                None, 'rule is unusable', 'rule could not be read',
+                namespace=namespace)
+
         if not rule_from_db:
             return _federated_refusal(
                 None, 'no such rule', f'no rule {namespace}/{rule}',

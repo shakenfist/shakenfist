@@ -10,6 +10,7 @@ the (namespace, name) pair is unambiguous.
 from functools import partial
 from unittest import mock
 
+from shakenfist import mapping_rule
 from shakenfist.baseobject import state_filter
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.mapping_rule import MappingRules
@@ -187,6 +188,60 @@ class MappingRuleValidationTestCase(base.ShakenFistTestCase):
         self.assertRaises(RuleValidationError, validate_key_ttl, 'an hour')
         # bool is a subclass of int, and "key_ttl": true is not a time.
         self.assertRaises(RuleValidationError, validate_key_ttl, True)
+
+    def test_key_ttl_has_an_upper_bound(self):
+        # A federated key stands in for an identity token valid for
+        # minutes. Without a ceiling a rule can mint a credential that
+        # outlives the thing which justified it by a year.
+        self.assertEqual(
+            mapping_rule.MAX_KEY_TTL_SECONDS,
+            validate_key_ttl(mapping_rule.MAX_KEY_TTL_SECONDS))
+        self.assertRaises(
+            RuleValidationError, validate_key_ttl,
+            mapping_rule.MAX_KEY_TTL_SECONDS + 1)
+
+    def test_a_reserved_key_name_prefix_is_refused(self):
+        # The key endpoints refuse these names, so a rule minting keys
+        # with them would be a way around that check.
+        for prefix in ('service_key', '_service_key', '_service_key-ci'):
+            self.assertRaises(
+                RuleValidationError,
+                mapping_rule.validate_key_name_prefix, prefix)
+
+    def test_a_reserved_prefix_cannot_be_smuggled_in_through_a_rule(self):
+        self.assertRaises(
+            RuleValidationError, MappingRule.new, 'ci', 'ryll', 'github',
+            dict(CLAIMS), list(SCOPES), 3600, '_service_key')
+        self.assertIsNone(MappingRule.from_db_by_name('ci', 'ryll'))
+
+    def test_oversized_fields_are_refused_rather_than_stored(self):
+        # Every one of these is a field with no natural bound, so
+        # without a check the refusal happens at the database and the
+        # operator gets a 500 instead of a message they can act on.
+        too_long = 'x' * 10000
+        cases = [
+            ('key_name_prefix',
+             lambda: mapping_rule.validate_key_name_prefix(too_long)),
+            ('claim name',
+             lambda: validate_bound_claims({too_long: 'a'})),
+            ('claim value',
+             lambda: validate_bound_claims({'repository': too_long})),
+            ('claim alternative',
+             lambda: validate_bound_claims({'repository': [too_long]})),
+            ('claim count',
+             lambda: validate_bound_claims(
+                 {str(i): 'a' for i in range(
+                     mapping_rule.MAX_BOUND_CLAIMS + 1)})),
+            ('alternative count',
+             lambda: validate_bound_claims(
+                 {'ref': ['a'] * (mapping_rule.MAX_CLAIM_ALTERNATIVES + 1)})),
+            ('scope length', lambda: validate_scopes([too_long])),
+            ('scope count',
+             lambda: validate_scopes(
+                 ['blob.read'] * (mapping_rule.MAX_SCOPES + 1))),
+        ]
+        for name, call in cases:
+            self.assertRaises(RuleValidationError, call)
 
     def test_the_issuer_must_exist(self):
         self.assertRaises(

@@ -88,3 +88,27 @@ def looks_valid(secret):
     if any(c not in ALPHABET for c in secret[len(PREFIX):]):
         return False
     return secrets.compare_digest(presented, _checksum(payload))
+
+
+# Key names the cluster mints for itself, which an operator may not
+# claim. Shaken Fist stores a namespace's own service credential under
+# 'service_key' and the per-node ones under '_service_key...', so a
+# caller who could create a key by either name would be writing over
+# machinery rather than adding a credential of their own.
+#
+# Kept here rather than in external_api/auth.py because two entry
+# points need the same answer: the key endpoints, which are handed a
+# name directly, and a mapping rule's key_name_prefix, which becomes
+# the front of every key that rule ever mints. The rule path used to
+# not ask at all, which made a rule a way around the check the key
+# endpoints perform.
+RESERVED_KEY_NAME = 'service_key'
+RESERVED_KEY_NAME_PREFIX = '_service_key'
+
+
+def is_reserved_key_name(key_name):
+    """Is this a key name reserved for internally minted service keys?"""
+    if not isinstance(key_name, str):
+        return False
+    return (key_name == RESERVED_KEY_NAME
+            or key_name.startswith(RESERVED_KEY_NAME_PREFIX))

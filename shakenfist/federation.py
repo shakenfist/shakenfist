@@ -84,6 +84,14 @@ class JWKSCache:
     the other forty-nine then find the key already there. The lock is
     per issuer so a slow or unreachable provider cannot block tokens
     from a healthy one.
+
+    The fetch happens under that lock, so the fetch timeout is what
+    bounds how long a dead provider holds it. PyJWT's default of thirty
+    seconds is far too long for a request path: an unreachable issuer
+    would pin a worker for thirty seconds per queued request, which is
+    a denial of service anyone able to reach the provider's network
+    path can arrange. FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS is passed
+    explicitly for that reason.
     """
 
     def __init__(self):
@@ -104,7 +112,8 @@ class JWKSCache:
                 client = PyJWKClient(
                     jwks_uri,
                     cache_jwk_set=True,
-                    lifespan=config.FEDERATION_JWKS_CACHE_SECONDS)
+                    lifespan=config.FEDERATION_JWKS_CACHE_SECONDS,
+                    timeout=config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS)
                 self._clients[issuer_uuid] = client
                 self._locks[issuer_uuid] = threading.Lock()
             return client, self._locks[issuer_uuid]
@@ -162,6 +171,28 @@ def unverified_issuer(token: str) -> Optional[str]:
     return issuer
 
 
+def issuer_claiming_url(issuer_url: str) -> TrustedIssuer | None:
+    """The live trusted issuer configured for this iss value, if any.
+
+    Issuers are cluster level and there is one per identity provider,
+    so the listing is small. Comparison is exact: no normalisation and
+    no trailing slash tolerance, because a loose comparison here is a
+    way to accept tokens from somewhere else entirely.
+
+    This is also what the issuer endpoints use to refuse a second
+    issuer for the same URL. Two records claiming one iss would make
+    the answer below depend on listing order, so the cluster could
+    verify against either provider's keys from one request to the next.
+    Both callers must ask the question the same way, which is why there
+    is only one copy of it.
+    """
+    for issuer in TrustedIssuers([]):
+        if issuer.state.value != TrustedIssuer.STATE_DELETED and (
+                issuer.issuer_url == issuer_url):
+            return issuer
+    return None
+
+
 def issuer_for_token(token: str) -> TrustedIssuer:
     """The trusted issuer this token claims to come from.
 
@@ -173,14 +204,9 @@ def issuer_for_token(token: str) -> TrustedIssuer:
     if not claimed:
         raise exceptions.UntrustedIssuer('token carries no readable iss claim')
 
-    # Issuers are cluster level and there is one per identity provider,
-    # so the listing is small. Comparison is exact: no normalisation and
-    # no trailing slash tolerance, because a loose comparison here is a
-    # way to accept tokens from somewhere else entirely.
-    for issuer in TrustedIssuers([]):
-        if issuer.state.value != TrustedIssuer.STATE_DELETED and (
-                issuer.issuer_url == claimed):
-            return issuer
+    issuer = issuer_claiming_url(claimed)
+    if issuer:
+        return issuer
 
     raise exceptions.UntrustedIssuer(
         f'no trusted issuer configured for {claimed}')
@@ -306,21 +332,35 @@ def token_identity(token: str, claims: dict[str, Any]) -> str:
     what jti is for and it keeps the stored value legible to an
     operator reading the table.
 
-    Otherwise a hash of the token's signature. Not every identity
-    provider issues a jti, and refusing those outright would rule out
-    conforming issuers for a claim the spec makes optional -- while
-    letting them through unprotected would leave exactly the hole this
-    table exists to close. The signature is unique per token by
-    construction, so it identifies the token just as well; it is
-    hashed rather than stored because it is the secret part of the
-    credential and must not be sitting in a table.
+    Otherwise a hash of the token's signed material -- the header and
+    payload segments, exactly as they appeared on the wire, including
+    the dot between them. Not every identity provider issues a jti, and
+    refusing those outright would rule out conforming issuers for a
+    claim the spec makes optional, while letting them through
+    unprotected would leave exactly the hole this table exists to
+    close.
+
+    Those two segments are what the signature is computed over, so no
+    two textual forms of one accepted token can differ in them: change
+    a byte and the signature stops verifying. That is the property this
+    needs, and it is the reason not to hash the signature segment
+    instead. Base64url has four don't-care bits in its final character
+    and Python's decoder tolerates both those and optional padding, so
+    one signature has many spellings which all verify -- measured at 48
+    for an RS256 token. Keying on the signature text would have given
+    each spelling its own row, and a single identity token would have
+    been exchangeable once per spelling.
+
+    Hashed rather than stored because the payload carries the subject
+    and whatever else the issuer chose to assert, none of which needs
+    to sit in a table forever.
     """
     jti = claims.get('jti')
     if isinstance(jti, str) and 0 < len(jti) <= MAX_JTI_LENGTH:
         return jti
 
-    signature = token.rsplit('.', 1)[-1]
-    return 'sha256:' + hashlib.sha256(signature.encode('utf-8')).hexdigest()
+    signed = token.rsplit('.', 1)[0]
+    return 'sha256:' + hashlib.sha256(signed.encode('utf-8')).hexdigest()
 
 
 def enforce_rate_limit(source: str) -> None:
@@ -379,24 +419,3 @@ def refuse_replay(token: str, claims: dict[str, Any], rule: Any) -> None:
         raise exceptions.TokenReplayed(
             f'this token has already been exchanged through rule '
             f'{rule.namespace}/{rule.name}')
-
-
-def validate_for_rule(token: str, rule: Any) -> tuple[dict[str, Any],
-                                                      dict[str, Any]]:
-    """Validate a token and check it against a rule.
-
-    Returns (claims, satisfied_claims). Raises UntrustedIssuer,
-    TokenValidationFailed or ClaimMismatch. The rule's own issuer is
-    checked against the token's, so a token from issuer A cannot be
-    exchanged through a rule that trusts issuer B.
-    """
-    issuer = issuer_for_token(token)
-
-    if rule.issuer != issuer.name:
-        raise exceptions.UntrustedIssuer(
-            f'rule {rule.namespace}/{rule.name} accepts tokens from '
-            f'{rule.issuer}, not {issuer.name}')
-
-    claims = validate_token(token, issuer)
-    satisfied = match_claims(claims, rule.bound_claims or {})
-    return claims, satisfied

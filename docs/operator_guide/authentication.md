@@ -193,7 +193,8 @@ exchange answers 503 rather than assuming the request is fine.
 | Setting | Default | Notes |
 |---------|---------|-------|
 | `FEDERATION_JWKS_CACHE_SECONDS` | 300 | How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id always triggers an immediate refetch, so raising this does not delay recognising a rotated key |
-| `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes |
+| `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
+| `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
 | `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Exchange attempts allowed per source address per minute. `0` disables rate limiting entirely |
 
 ### If nobody uses it

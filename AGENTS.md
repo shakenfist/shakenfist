@@ -395,10 +395,54 @@ admits. Two rules to preserve if you touch this:
 - The caller's own namespace must win, or sharing an object silently
   retargets every tenant who already used that name.
 - Routes which change an object use plain `arg_is_artifact_ref` and resolve
-  names narrowly. Trust still permits the write by UUID; what must not happen
-  is a name resolving into someone else's namespace on a route that then
-  deletes what it found. New route, ownership guard, narrow ref decorator —
-  the pairing goes together.
+  names narrowly. The ownership guard already refuses the write whichever way
+  the object was named, so this is defence in depth rather than the only
+  gate — but a name must never resolve into someone else's namespace on a
+  route that then deletes what it found. New route, ownership guard, narrow
+  ref decorator — the pairing goes together.
+
+### Credential-carrying routes are not logged, not redacted
+
+Two independent loggers see a request body: `app.py`'s `before_request` audit
+event, and `log_request` in `base.py`, which merges the parsed body into the
+decorated method's kwargs and logs those. Both ask
+`api_base.handles_credentials()` — one predicate, in one place — and drop the
+whole body when it answers yes.
+
+Redacting by field name was tried and is wrong. `key` means a metadata key
+name on most endpoints and a secret on a few, so a name-based rule has to know
+which route it is on anyway, and it silently starts leaking the day somebody
+adds a route it has not heard of. That is exactly what happened: the federated
+exchange's credential field is `token`, which was on neither redaction list,
+so identity tokens were logged verbatim at INFO and shipped to the log
+aggregator.
+
+Every route which takes a credential lives under `/auth/`. Keep it that way,
+or extend the predicate — never the redaction lists.
+
+### A check that runs after the parse is not a check
+
+The endpoint-method decorators are not the outermost thing in a request.
+`log_request` calls `get_json(force=True)` before any method body runs, so a
+size or shape check written inside a `post()` cannot prevent work that has
+already happened. Anything protecting an *unauthenticated* endpoint from
+attacker-controlled input has to be an `@app.before_request` hook registered
+ahead of `log_request_info` — see `limit_federated_body_size`.
+
+While you are there: `flask.request.content_length` is `None` for chunked
+transfer encoding. Treating unknown as small enough lets any caller opt out of
+a size limit by choosing a header, so refuse with 411 rather than measuring.
+
+### Two records must not claim one lookup key
+
+`federation.issuer_for_token` resolves a trusted issuer by scanning for a
+matching `issuer_url`. Uniqueness on that column is therefore a correctness
+property, not tidiness: two live records claiming one URL make which
+provider's signing keys are trusted depend on listing order, so an
+administrator repointing an issuer would believe they had while some requests
+kept verifying against the old JWKS. The create and update endpoints refuse a
+duplicate by calling `federation.issuer_claiming_url`, the same function the
+resolution path uses.
 
 ### Key Directories
 

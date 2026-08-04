@@ -78,7 +78,7 @@ def _maintain_version_cache(max_cache_age):
     # replacing the previous per-node get_node (used only for fqdn) plus a
     # per-node get_node_metrics fan-out. Nodes without a metrics row are simply
     # absent here, exactly as the old loop skipped them.
-    for d in mariadb.get_all_node_metrics():
+    for d in mariadb.get_all_node_metrics():  # nopushdown: every node wanted
         if not d.get('metrics'):
             continue
         node_uuid_str = str(d['node_uuid'])

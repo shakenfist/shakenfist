@@ -241,7 +241,7 @@ class TrustedIssuers(dbo_iter):
         # Issuers are cluster level rather than namespaced, and there
         # is one per identity provider, so a full listing is both
         # correct and cheap.
-        for data in mariadb.get_all_trusted_issuers():
+        for data in mariadb.get_all_trusted_issuers():  # nopushdown: as above
             yield str(data.uuid), TrustedIssuer._static_values_to_dict(data)
 
     def __iter__(self):

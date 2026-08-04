@@ -26,9 +26,30 @@ from shakenfist.schema.mapping_rule_attributes import MappingRuleAttributesData
 from shakenfist.schema.mapping_rule_data import MappingRuleData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.trusted_issuer import TrustedIssuer
+from shakenfist.util import credentials
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# Upper bounds on what a rule may say. Every one of these exists
+# because the field is stored, and a field with no bound is a way for
+# an operator to turn a 400 into a database error and a 500. The
+# numbers are chosen to be far above any real rule: a GitHub Actions
+# rule binds a handful of claims whose values are repository paths and
+# branch refs.
+MAX_KEY_NAME_PREFIX_LENGTH = 64
+MAX_CLAIM_NAME_LENGTH = 128
+MAX_CLAIM_VALUE_LENGTH = 512
+MAX_BOUND_CLAIMS = 32
+MAX_CLAIM_ALTERNATIVES = 64
+MAX_SCOPES = 64
+MAX_SCOPE_LENGTH = 128
+
+# One day. A federated key stands in for an identity token that is
+# typically valid for minutes, so a key outliving its own justification
+# by more than a working day is not a policy anyone chose on purpose.
+MAX_KEY_TTL_SECONDS = 86400
 
 
 class RuleValidationError(Exception):
@@ -43,6 +64,13 @@ def _as_uuid(value: Any) -> UUID:
     if isinstance(value, UUID):
         return value
     return UUID(str(value))
+
+
+def _validate_claim_value(claim: str, value: str) -> None:
+    if len(value) > MAX_CLAIM_VALUE_LENGTH:
+        raise RuleValidationError(
+            f'the matcher for claim "{claim}" may not be longer than '
+            f'{MAX_CLAIM_VALUE_LENGTH} characters')
 
 
 def validate_bound_claims(bound_claims: Any) -> dict[str, Any]:
@@ -67,16 +95,25 @@ def validate_bound_claims(bound_claims: Any) -> dict[str, Any]:
             'a rule must bind at least one claim, otherwise it accepts '
             'every identity the issuer will ever vouch for')
 
+    if len(bound_claims) > MAX_BOUND_CLAIMS:
+        raise RuleValidationError(
+            f'a rule may bind at most {MAX_BOUND_CLAIMS} claims')
+
     validated: dict[str, Any] = {}
     for claim, matcher in bound_claims.items():
         if not isinstance(claim, str) or not claim:
             raise RuleValidationError('claim names must be non-empty strings')
+        if len(claim) > MAX_CLAIM_NAME_LENGTH:
+            raise RuleValidationError(
+                f'claim names may not be longer than '
+                f'{MAX_CLAIM_NAME_LENGTH} characters')
 
         if isinstance(matcher, str):
             if not matcher:
                 raise RuleValidationError(
                     f'the matcher for claim "{claim}" is an empty string, '
                     'which no claim value can equal')
+            _validate_claim_value(claim, matcher)
             validated[claim] = matcher
             continue
 
@@ -85,11 +122,16 @@ def validate_bound_claims(bound_claims: Any) -> dict[str, Any]:
                 raise RuleValidationError(
                     f'the matcher for claim "{claim}" is an empty list, '
                     'which no claim value can match')
+            if len(matcher) > MAX_CLAIM_ALTERNATIVES:
+                raise RuleValidationError(
+                    f'the matcher for claim "{claim}" may offer at most '
+                    f'{MAX_CLAIM_ALTERNATIVES} alternatives')
             for alternative in matcher:
                 if not isinstance(alternative, str) or not alternative:
                     raise RuleValidationError(
                         f'the matcher for claim "{claim}" must contain only '
                         'non-empty strings')
+                _validate_claim_value(claim, alternative)
             validated[claim] = list(matcher)
             continue
 
@@ -120,10 +162,18 @@ def validate_scopes(scopes: Any) -> list[str]:
             'a rule must grant at least one scope; a rule granting nothing '
             'can only mint keys that can do nothing')
 
+    if len(scopes) > MAX_SCOPES:
+        raise RuleValidationError(
+            f'a rule may grant at most {MAX_SCOPES} scopes')
+
     for scope in scopes:
         if not isinstance(scope, str) or not scope:
             raise RuleValidationError(
                 'scopes must be non-empty strings')
+        if len(scope) > MAX_SCOPE_LENGTH:
+            raise RuleValidationError(
+                f'scopes may not be longer than {MAX_SCOPE_LENGTH} '
+                'characters')
 
     return list(scopes)
 
@@ -137,7 +187,39 @@ def validate_key_ttl(key_ttl: Any) -> int:
         raise RuleValidationError(
             'key_ttl must be positive; a rule minting already-expired keys '
             'is a configuration error rather than a policy')
+    if key_ttl > MAX_KEY_TTL_SECONDS:
+        raise RuleValidationError(
+            f'key_ttl may not exceed {MAX_KEY_TTL_SECONDS} seconds; a '
+            'federated key stands in for an identity token that has '
+            'already expired, so a long lived one outlives the thing '
+            'that justified it. Create a namespace key directly if a '
+            'long lived credential is what you want')
     return key_ttl
+
+
+def validate_key_name_prefix(key_name_prefix: Any) -> str:
+    """Check the front of every key name this rule will ever mint.
+
+    Held to the same reserved-name standard as a directly created key.
+    Without this a rule is a way around the check the key endpoints
+    perform: a prefix of `_service_key` mints keys that collide with
+    the cluster's own service credentials.
+    """
+    if not isinstance(key_name_prefix, str) or not key_name_prefix:
+        raise RuleValidationError(
+            'key_name_prefix must be a non-empty string')
+
+    if len(key_name_prefix) > MAX_KEY_NAME_PREFIX_LENGTH:
+        raise RuleValidationError(
+            f'key_name_prefix may not be longer than '
+            f'{MAX_KEY_NAME_PREFIX_LENGTH} characters')
+
+    if credentials.is_reserved_key_name(key_name_prefix):
+        raise RuleValidationError(
+            f'"{key_name_prefix}" is reserved for keys the cluster mints '
+            'for itself')
+
+    return key_name_prefix
 
 
 def validate_issuer(issuer: Any) -> str:
@@ -272,10 +354,7 @@ class MappingRule(dbo):
         bound_claims = validate_bound_claims(bound_claims)
         scopes = validate_scopes(scopes)
         key_ttl = validate_key_ttl(key_ttl)
-
-        if not isinstance(key_name_prefix, str) or not key_name_prefix:
-            raise RuleValidationError(
-                'key_name_prefix must be a non-empty string')
+        key_name_prefix = validate_key_name_prefix(key_name_prefix)
 
         if cls.from_db_by_name(namespace, name):
             return None
@@ -383,10 +462,7 @@ class MappingRule(dbo):
         bound_claims = validate_bound_claims(bound_claims)
         scopes = validate_scopes(scopes)
         key_ttl = validate_key_ttl(key_ttl)
-
-        if not isinstance(key_name_prefix, str) or not key_name_prefix:
-            raise RuleValidationError(
-                'key_name_prefix must be a non-empty string')
+        key_name_prefix = validate_key_name_prefix(key_name_prefix)
 
         mariadb.update_mapping_rule_attributes(
             MappingRuleAttributesData(

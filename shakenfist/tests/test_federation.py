@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import io
 import json
+import string
 import threading
 import time
 from unittest import mock
@@ -266,6 +267,21 @@ class TokenValidationTestCase(FederationTestCase):
 
 
 class JWKSCachingTestCase(FederationTestCase):
+    def test_the_fetch_timeout_is_short_enough_to_free_a_worker(self):
+        # The fetch happens while holding the issuer's refetch lock, so
+        # PyJWT's thirty second default would let an unreachable
+        # provider pin an API worker for thirty seconds per queued
+        # request. That is a denial of service arranged by anyone able
+        # to interfere with the provider's network path.
+        federation.validate_token(self._token(), self.issuer)
+        client, _ = federation.JWKS_CACHE._client_and_lock(
+            str(self.issuer.uuid), self.issuer.jwks_uri)
+
+        self.assertEqual(
+            federation.config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS,
+            client.timeout)
+        self.assertLessEqual(client.timeout, 10)
+
     def test_the_key_set_is_fetched_once_and_then_cached(self):
         for _ in range(5):
             federation.validate_token(self._token(), self.issuer)
@@ -396,66 +412,6 @@ class ClaimMatchingTestCase(base.ShakenFistTestCase):
             {'repository': 'shakenfist/ryll'}, {})
 
 
-class ValidateForRuleTestCase(FederationTestCase):
-    def setUp(self):
-        super().setUp()
-        self.rule = MappingRule.new(
-            'ci', 'ryll', 'github',
-            {'repository': 'shakenfist/ryll',
-             'ref': ['refs/heads/develop', 'refs/heads/main']},
-            ['blob.read'], 3600, 'ryll-ci')
-
-    def test_a_good_token_satisfies_its_rule(self):
-        claims, satisfied = federation.validate_for_rule(
-            self._token(), self.rule)
-
-        self.assertEqual(GITHUB, claims['iss'])
-        self.assertEqual(
-            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop'},
-            satisfied)
-
-    def test_a_token_from_the_wrong_branch_is_refused(self):
-        self.assertRaises(
-            exceptions.ClaimMismatch, federation.validate_for_rule,
-            self._token(claims={'ref': 'refs/heads/wip'}), self.rule)
-
-    def test_a_token_from_the_wrong_repository_is_refused(self):
-        self.assertRaises(
-            exceptions.ClaimMismatch, federation.validate_for_rule,
-            self._token(claims={'repository': 'shakenfist/evil'}), self.rule)
-
-    def test_a_rule_bound_to_another_issuer_refuses_the_token(self):
-        # A token from issuer A must not be exchangeable through a rule
-        # that trusts issuer B, even though both are trusted here.
-        TrustedIssuer.new(
-            'authentik', 'https://auth.example.com',
-            'https://auth.example.com/jwks', AUDIENCE)
-        other = MappingRule.new(
-            'ci', 'via-authentik', 'authentik',
-            {'repository': 'shakenfist/ryll'}, ['blob.read'], 3600, 'x')
-
-        self.assertRaises(
-            exceptions.UntrustedIssuer, federation.validate_for_rule,
-            self._token(), other)
-
-    def test_an_authentik_style_token_needs_no_different_code(self):
-        # The phase plan's proof obligation: a second issuer with
-        # entirely different claims works through the same machinery.
-        TrustedIssuer.new(
-            'authentik', 'https://auth.example.com',
-            'https://auth.example.com/jwks', AUDIENCE)
-        rule = MappingRule.new(
-            'ci', 'via-groups', 'authentik', {'groups': ['sf-ci']},
-            ['blob.read'], 3600, 'ci')
-
-        token = self._token(
-            issuer='https://auth.example.com',
-            claims={'groups': 'sf-ci', 'sub': 'service-account'})
-
-        _, satisfied = federation.validate_for_rule(token, rule)
-        self.assertEqual({'groups': 'sf-ci'}, satisfied)
-
-
 class TokenIdentityTestCase(FederationTestCase):
     """The value replay refusal is keyed on."""
 
@@ -465,12 +421,43 @@ class TokenIdentityTestCase(FederationTestCase):
             'abc-123',
             federation.token_identity(token, {'jti': 'abc-123'}))
 
-    def test_a_token_with_no_jti_falls_back_to_its_signature(self):
+    def test_a_token_with_no_jti_falls_back_to_a_hash(self):
         token = self._token()
         identity = federation.token_identity(token, {})
 
         self.assertTrue(identity.startswith('sha256:'))
         self.assertEqual(71, len(identity))
+
+    def test_re_encoding_the_signature_does_not_change_the_identity(self):
+        # base64url leaves four don't-care bits in the final character of
+        # a 256 byte signature, and the padding is optional, so one
+        # signature has many spellings which all verify. If the identity
+        # were derived from the signature text an attacker could replay a
+        # token as many times as it has spellings, so it is derived from
+        # the signed material instead.
+        token = self._token()
+        head, signature = token.rsplit('.', 1)
+        identities = set()
+        variants = 0
+
+        for char in string.ascii_letters + string.digits + '-_':
+            for padding in ('', '=', '=='):
+                candidate = head + '.' + signature[:-1] + char + padding
+                try:
+                    jwt.decode(
+                        candidate, self.key.public_key(),
+                        algorithms=['RS256'], audience=AUDIENCE,
+                        issuer=GITHUB)
+                except Exception:
+                    continue
+
+                variants += 1
+                identities.add(federation.token_identity(candidate, {}))
+
+        # If only the original spelling verified the test would prove
+        # nothing at all.
+        self.assertGreater(variants, 1)
+        self.assertEqual(1, len(identities))
 
     def test_the_fallback_is_stable_for_one_token(self):
         token = self._token()

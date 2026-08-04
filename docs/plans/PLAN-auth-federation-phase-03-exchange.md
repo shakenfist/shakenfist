@@ -503,12 +503,101 @@ the security boundary of this whole plan. After 3i:
       bcrypt comparison; and the rotation caveat for a pre-existing
       `sfk_`-prefixed secret is in the operator guide.
 - [x] `pre-commit run --all-files` clean; `tox -e genprotos` no-op;
-      unit tests green. Functional CI green on the branch **before**
-      the PR merges — this one cannot be ticked from a local tree and
-      is the operator's gate at pull request time.
+      unit tests green. Re-confirmed by the pre-push audit after the
+      rebase onto develop.
+- [ ] Functional CI green on the branch **before** the PR merges.
+      Deliberately left unticked: it cannot be established from a
+      local tree and is the operator's gate at pull request time.
 - [x] Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10 and 11
       marked resolved; phase status updated in the Execution table
       and `docs/plans/index.md`; glossary and guides updated.
+- [x] Pre-push security review findings triaged: every high fixed,
+      every medium and low either fixed or recorded below with the
+      reason it was accepted.
+
+## Pre-push security review
+
+The pre-push audit's security agent read the whole phase 3 diff. What
+it found and what was done, kept here because the reasoning for an
+accepted finding is worth more later than the finding itself.
+
+Fixed, each with a regression test that was verified to fail when the
+fix is reverted:
+
+* **A rule could grant scopes its author did not hold.** A token scoped
+  `rule.write` could write a rule granting `*`, satisfy that rule's own
+  bound claims, and exchange it for a wildcard key — which in the
+  system namespace reaches cluster-admin. `_rule_arguments` now applies
+  the same ceiling `_namespace_keys_putpost` applies when minting a key
+  directly.
+* **Replay refusal was keyed on the token's signature text.** base64url
+  leaves four don't-care bits in the final character of a 256 byte
+  signature and the padding is optional, so one signature has many
+  spellings that all verify — measured at 48 for an RS256 token. Each
+  spelling was a separate replay slot. The identity is now derived from
+  the signed material (header and payload), which the signature commits
+  to and an attacker cannot vary.
+* **The identity token was written to the API log.** `log_request`
+  merges the request body into the decorated method's kwargs and logs
+  them, redacting by field name — and the federated endpoint's
+  credential field is `token`, which was not on the list. The body is
+  now dropped entirely for any route under `/auth/`, matching what
+  `app.py` already did for the audit event stream, with the predicate
+  shared so the two cannot disagree.
+* **The JWKS fetch used PyJWT's 30 second default timeout** while
+  holding the issuer's refetch lock, so an unreachable provider could
+  pin an API worker for 30 seconds per queued request. Now
+  `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS`, default 5.
+* **The exchange's body size check could not do its job.** It ran in
+  the endpoint method, by which point `log_request` had already called
+  `get_json(force=True)` and parsed the whole body; and it read
+  `content_length`, which is `None` for chunked encoding, so a header
+  choice opted out of the limit entirely. The refusal moved to a
+  request hook ahead of every reader of the body, and a body with no
+  declared length is now refused with 411 rather than measured.
+* **Two trusted issuers could claim the same issuer URL**, making which
+  provider's keys are trusted depend on listing order — an operator
+  repointing an issuer would believe they had while some requests kept
+  verifying against the old JWKS. Refused on create and update, using
+  the same lookup token validation uses.
+* **A mapping rule's `key_name_prefix` bypassed the reserved key name
+  check.** A rule with the prefix `_service_key` minted keys colliding
+  with the cluster's own service credentials, which is precisely what
+  the key endpoints refuse. The reserved-name patterns moved to
+  `util.credentials` so both paths ask the same question.
+* **Rule fields had no upper bounds**, so an oversized value reached
+  the database and returned a 500 instead of a message the operator
+  could act on. `key_ttl` additionally had no ceiling, so a rule could
+  mint a key outliving by a year the identity token that justified it.
+* **A damaged rule row leaked its UUID to an anonymous caller.** The
+  generic 500 handler answers with `repr(e)` and `CorruptMappingRule`
+  names the rule; on the one endpoint anybody may call, that hands a
+  stranger an identifier. Caught and turned into a generic refusal.
+
+Assessed and accepted:
+
+* **The rate limiter keys on `remote_addr` with no `ProxyFix`.** Behind
+  a reverse proxy that does not rewrite the source address this is one
+  global limit rather than a per-caller one. Trusting
+  `X-Forwarded-For` unconditionally would be worse — it would let any
+  caller choose their own rate limit bucket — and whether the header
+  can be trusted is a property of a deployment we cannot see from here.
+  Documented in both the config description and the operator guide
+  instead.
+* **The refusal reasons are coarse categories.** A caller learns
+  "untrusted issuer" versus "token rejected" versus "no such rule".
+  This is deliberate: the rule lookup happens after token validation,
+  so an anonymous caller holding no valid token cannot use it to
+  enumerate rules, and an operator debugging their own workflow needs
+  to know which stage refused them. Which claim missed is still
+  withheld.
+* **`PyJWKClient` follows redirects when fetching a JWKS.** Reaching
+  this requires the ability to register a trusted issuer, which is
+  cluster-admin — an actor who already has total control. The `https://`
+  requirement on `jwks_uri` stands.
+* **The `federation_replay` and `federation_rate_limits` tables grow
+  with traffic.** Both are already swept by the cluster daemon's
+  reapers, so this was addressed before the review ran.
 
 ## Back brief
 
