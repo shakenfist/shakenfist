@@ -139,6 +139,15 @@ Two known gaps:
   using one requires an `UNDERIVABLE_BY_DESIGN` entry in
   `test_parameter_declarations.py` — otherwise the declaration would be
   a silent opt-out from the whole audit.
+* A schema bound with `@use_kwargs` must be a dict literal defined in
+  the handler's own class or module. The derivation refuses anything it
+  cannot resolve — a schema imported from another module, a marshmallow
+  `Schema` class — and CI stays red until `declarations.py` is taught to
+  read the new form. There is deliberately no allowlist for this,
+  unlike locations: an unresolvable schema means the audit does not
+  know which parameters arrive in the query string, so an opt-out
+  entry would have to restate the schema's keys by hand — exactly the
+  second source of truth this machinery exists to remove.
 * Swagger 2.0 allows at most one `in: body` parameter per operation,
   carrying a `schema` rather than a `type`. `swagger_helper()` emits
   one parameter per declaration, so operations with several body

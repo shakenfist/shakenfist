@@ -183,7 +183,10 @@ def swagger_helper(section, description, parameters, responses,
         'binary': {'type': 'string', 'format': 'Binary data'},
         'boolean': {'type': 'boolean', 'format': 'boolean'},
         'dict': {'type': 'string', 'format': 'a JSON dictionary'},
-        'integer': {'type': 'integer', 'format': 'an integer'},
+        # The prose formats on the string types carry description-like
+        # information a generator passes through; integer has standard
+        # formats, and these are byte offsets and blob sizes, so int64.
+        'integer': {'type': 'integer', 'format': 'int64'},
         'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
         'namespace': {'type': 'string', 'format': 'the name of a namespace'},
         'node': {'type': 'string', 'format': 'the name of a node'},

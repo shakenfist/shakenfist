@@ -32,6 +32,9 @@
 # so it belongs in the pre-push checklist rather than in a hook. It
 # restores from a copy rather than with git, so uncommitted work
 # survives a failure part-way through.
+#
+# Requires GNU sed: the mutations use `sed -i` without a backup suffix,
+# which BSD/macOS sed parses differently.
 set -u
 
 # Run from the repository root whatever the caller's directory. Every
@@ -101,12 +104,20 @@ check() {  # name
     output=$(run)
     counts=$(echo "${output}" | grep -E '^ - (Passed|Failed):' | tr '\n' ' ')
 
-    if echo "${output}" | grep -q 'InvalidAPIDeclaration'; then
-        report 'caught-import' "${name}" 'rejected by swagger_helper()'
-    elif echo "${counts}" | grep -qE 'Failed: [1-9]'; then
+    # Counts first, and the exception-name grep only when there are no
+    # counts at all. Assertion messages and tracebacks in a *test*
+    # failure can also contain the string 'InvalidAPIDeclaration', so
+    # consulting the grep first mislabels a named test failure as an
+    # import-time rejection -- inferring the verdict from a substring
+    # rather than observing it, which is the defect this script exists
+    # to hunt. An import-time abort is recognised by what it prevents:
+    # a test run.
+    if echo "${counts}" | grep -qE 'Failed: [1-9]'; then
         report 'caught' "${name}" "${counts}"
     elif echo "${counts}" | grep -q 'Failed: 0'; then
         report 'NOT CAUGHT' "${name}" "${counts}"
+    elif echo "${output}" | grep -q 'InvalidAPIDeclaration'; then
+        report 'caught-import' "${name}" 'rejected before the tests could run'
     else
         report 'HARNESS BROKEN' "${name}" 'the run produced no test counts'
     fi
@@ -207,16 +218,35 @@ sed -i "s/('blob_uuid', 'path', 'uuid'/('blob_uuid', 'header', 'uuid'/" \
     shakenfist/external_api/blob.py
 check 'underivable location declared'
 
-# There is no mutation here for two endpoint classes sharing a name,
-# which a route lookup keyed on the bare name cannot tell apart. It
-# cannot be expressed in this tree: flask_restful derives its endpoint
-# name from the class name and refuses the second registration with
-# "ValueError: This endpoint (nodeendpoint) is already set to the class
-# NodeEndpoint", so any mutation that creates the collision breaks
-# app.py at import and the run reports that instead of the audit's
-# verdict. The audit reports it anyway, one step earlier and by name,
-# and DerivationTestCase.test_colliding_class_names_are_reported covers
-# that on constructed sources.
+# 12. Two endpoint classes sharing a name, which a route lookup keyed
+# on the bare name cannot tell apart. An earlier revision claimed this
+# was unreachable in a running sf-api because flask_restful derives
+# its endpoint name from the class name and refuses the second
+# registration -- but that only holds for the default name, and app.py
+# itself passes endpoint='healthz' to mount Readyz twice, so an
+# explicit endpoint= registers a same-named class from another module
+# just fine. The audit's by-name report is a genuine defence, not a
+# redundant early warning. A *registered* collision still breaks
+# import, so the mutation defines the duplicate without registering
+# it; the class is otherwise fully compliant (declared, empty
+# parameter list, no kwargs) so the collision report is the only guard
+# it can trip. DerivationTestCase.test_colliding_class_names_are_reported
+# covers the message shape on constructed sources.
+python3 - <<'PY'
+p = 'shakenfist/external_api/blob.py'
+s = open(p).read()
+s += '''
+
+class NodeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'nodes', 'A deliberate name collision with node.py.', [],
+        [(200, 'Nothing.', None)]))
+    def get(self):
+        return None
+'''
+open(p, 'w').write(s)
+PY
+check 'two endpoint classes sharing a name'
 
 echo
 if [ "${failures}" -ne 0 ]; then

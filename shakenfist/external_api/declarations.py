@@ -338,7 +338,8 @@ def _schema_keys(scopes: list[Scope], name: str,
     return None
 
 
-def request_args_parameters(fn: ast.FunctionDef) -> set[str]:
+def request_args_parameters(fn: ast.FunctionDef,
+                            problems: Optional[list[str]] = None) -> set[str]:
     """Names the handler reads straight out of flask.request.args.
 
     ``ClusterOperationsEndpoint.get`` accepts its target parameters as
@@ -346,21 +347,47 @@ def request_args_parameters(fn: ast.FunctionDef) -> set[str]:
     ``flask.request.args.get()`` for each so a raw ``?target_...=`` GET
     keeps working -- the form AGENTS.md documents. A parameter read this
     way is a query parameter whatever else it also is.
+
+    Only two read forms are recognised: a ``.get()`` call with a
+    literal key, and a literal subscript. Anything else touching
+    ``request.args`` -- a non-literal key, ``.getlist()``,
+    ``.to_dict()``, iterating the whole MultiDict -- reads query
+    parameters this walk cannot name, so it lands in ``problems``
+    rather than being silently dropped. Without that, the parameter
+    derives to ``body`` with an empty problems list: the confident
+    wrong answer the rest of this module was rewritten to refuse.
     """
     out: set[str] = set()
+    recognised: set[int] = set()
     for node in ast.walk(fn):
         if (isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Attribute)
                 and node.func.attr == 'get'
                 and _is_request_args(node.func.value)
                 and node.args):
+            recognised.add(id(node.func.value))
             key = literal(node.args[0])
         elif isinstance(node, ast.Subscript) and _is_request_args(node.value):
+            recognised.add(id(node.value))
             key = literal(node.slice)
         else:
             continue
-        if key is not None:
+        if key is None:
+            if problems is not None:
+                problems.append(
+                    '%s reads flask.request.args with a key which is not a '
+                    'literal, so a query parameter is missing from the '
+                    'derivation' % fn.name)
+        else:
             out.add(key)
+
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Attribute) and _is_request_args(node)
+                and id(node) not in recognised and problems is not None):
+            problems.append(
+                '%s touches flask.request.args other than via .get() with a '
+                'literal key or a literal subscript, so query parameters '
+                'read that way are missing from the derivation' % fn.name)
     return out
 
 
@@ -477,8 +504,12 @@ def derived_location(name: str, fn: ast.FunctionDef, tree: ast.Module,
     """Where a parameter of this name actually arrives."""
     if name in routes.get(cls.name, set()):
         return 'path'
-    if (name in query_parameters(fn, [cls, tree], problems)
-            or name in request_args_parameters(fn)):
+    # Both sources are always consulted, rather than short-circuiting on
+    # the first hit, so that a problem in the second is collected even
+    # for a name the first already resolved.
+    in_query = name in query_parameters(fn, [cls, tree], problems)
+    in_args = name in request_args_parameters(fn, problems)
+    if in_query or in_args:
         return 'query'
     return 'body'
 

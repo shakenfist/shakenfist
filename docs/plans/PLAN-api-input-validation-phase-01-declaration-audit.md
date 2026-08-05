@@ -487,24 +487,60 @@ class, `security` rendered as an object rather than an array,
 was missing from that list. It is now recorded there with the
 counts, and on issue #3626.
 
+The tenth round found the defect shape rounds four, five, six
+and eight had each found in a different derivation source —
+'not found' and 'cannot read this' sharing an empty answer —
+surviving in the one source never given the treatment:
+`request_args_parameters()` took no `problems` argument at all,
+so a non-literal key or a `.getlist()` call derived the
+parameter to `body` with an empty problems list. It now
+recognises exactly two read forms (a `.get()` call with a
+literal key, a literal subscript) and reports every other touch
+of `request.args`, and `derived_location()` consults both query
+sources without short-circuiting so the second's problems are
+collected even when the first resolves the name. Latent rather
+than live — both reads in the tree are literals — but phase 3
+would have compiled the wrong answer into request validation.
+
+The same round corrected the fifth round's collision reasoning
+(see the mutation list below), pointed out that the enforcement
+story rests on an unstated import-resolution invariant — the
+package installs as a wheel, and the tests audit the checkout
+only because unittest discovery puts the repository root first
+on `sys.path` — which is now asserted by
+`test_the_audit_reads_this_checkout` and by anchoring the fixer
+path on the test file's own location, and swapped `integer`'s
+prose `format` (`'an integer'`) for the standard `int64`. The
+truncate 404 behaviour change got its release-notes line, and
+`version_id` — the API's other path integer — keeps its bare
+segment deliberately: its handler already returns a clean 400,
+so a converter would swap one correct response for another in a
+phase that promises no behaviour changes. One consider was
+declined: an allowlist for `use_kwargs` schemas the derivation
+cannot resolve (a schema imported from another module, a
+marshmallow class) would have to restate the schema's keys by
+hand — the second source of truth this machinery exists to
+remove — so the hard failure stands, and the guide now says so.
+
 ### Mutation-testing the guards
 
 `tools/check-api-declaration-guards.sh` breaks each property the
-audit claims and confirms the guard fires. Eleven mutations: a
+audit claims and confirms the guard fires. Twelve mutations: a
 path parameter declared `query`, a body parameter declared
 `query`, an emptied parameter list, a missing `swag_from`, an
 undeclared kwarg, an optional path parameter, an unknown type
 token, a four-element tuple, an unreadable route, a
-decorator-injected object declared as a parameter, and a
-parameter declared at an underivable location (`header`), which
+decorator-injected object declared as a parameter, a parameter
+declared at an underivable location (`header`), which
 swagger_helper() accepts and which was a silent opt-out before
-the `UNDERIVABLE_BY_DESIGN` canary.
+the `UNDERIVABLE_BY_DESIGN` canary, and two endpoint classes
+sharing a name.
 
 It exists because four of the five review rounds on the PR that
 landed this phase found the same thing: an assertion that passed
 for a reason other than the one it was written for. Reading a
 guard cannot distinguish "this holds" from "this cannot fail";
-breaking the tree can. Three of the ten surface as an aborted
+breaking the tree can. Three of the twelve surface as an aborted
 test collection rather than a named failure, which is the
 import-time enforcement working as designed.
 
@@ -527,14 +563,19 @@ of the ten proving nothing:
   route the derivation could not read. It now defines the name,
   and fails a named test.
 * a mutation added in the same round for colliding endpoint class
-  names cannot be expressed in this tree at all: `flask_restful`
-  derives its endpoint name from the class name and refuses the
-  second registration outright (`ValueError: This endpoint
-  (nodeendpoint) is already set to the class NodeEndpoint`). That
-  makes the collision unreachable in a running `sf-api`, so the
-  audit's report of it is an earlier and clearer message rather
-  than the only defence, and the coverage belongs in a
-  constructed-source unit test.
+  names *registered* the duplicate, and `flask_restful` refuses
+  the second registration outright (`ValueError: This endpoint
+  (nodeendpoint) is already set to the class NodeEndpoint`), so
+  the run reported a broken import rather than the audit's
+  verdict. This round concluded the collision was unreachable in
+  a running `sf-api`; the tenth round corrected that — the
+  refusal only applies to the *default* class-derived endpoint
+  name, and an explicit `endpoint=` kwarg (which `app.py` itself
+  uses to mount `Readyz` on `/healthz`) registers a same-named
+  class from another module without complaint. The audit's
+  by-name report is a genuine defence, and mutation 12 now
+  expresses the collision by defining the duplicate without
+  registering it.
 
 The harness's own guards were then mutation-tested in turn: a
 deliberately broken `sed` reports `NO-OP`, a missing `.tox/py3`
@@ -556,6 +597,16 @@ any mutation having landed. Verified both ways: the ten
 mutations are caught with a planted stale `__pycache__`, and a
 deliberate non-matching `sed` reports `NO-OP` where the
 unexcluded diff misreported it.
+
+The tenth round removed the last inferred verdict. `check()`
+recognised `caught-import` by grepping the whole test output for
+`InvalidAPIDeclaration` *before* consulting the counts, and a
+named test failure can print that string too — an assertion
+message, a traceback — so a test-level catch could be mislabelled
+as an import-time rejection. The counts now come first and the
+grep is consulted only when there are no counts at all, so an
+import-time abort is recognised by what it prevents (a test run)
+rather than by a substring a completed run can also emit.
 
 ### Known remaining gap: multiple body parameters
 

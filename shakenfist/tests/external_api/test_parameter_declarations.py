@@ -11,6 +11,18 @@ from shakenfist.external_api import declarations
 from shakenfist.tests import base
 
 
+# Everything in this module audits the working tree: declarations reads
+# the external_api sources adjacent to its own file, and FixerTestCase
+# loads the fixer out of tools/. tox installs the package as a wheel
+# (isolated_build, no usedevelop), so these tests see the checkout only
+# because unittest discovery puts the repository root at the front of
+# sys.path and that copy wins the import. If that ever shifts, the
+# audit would pass against a stale installed copy -- so the invariant
+# is asserted (test_the_audit_reads_this_checkout) rather than assumed.
+REPO_ROOT = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', '..', '..'))
+
+
 # Handler kwargs which are deliberately not part of the published API.
 #
 # The metadata delete endpoints accept `value` and none of them read it.
@@ -75,6 +87,23 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
     Structural assertions against the AST and the route table, so they
     describe the contract rather than the source text.
     """
+
+    def test_the_audit_reads_this_checkout(self):
+        """Every other test here is meaningless if this fails.
+
+        See the REPO_ROOT comment: the package is installed as a wheel
+        into the tox venv, and the audit reads the tree adjacent to
+        wherever declarations was imported from. If import resolution
+        ever preferred the installed copy, the audit would confidently
+        pass against stale sources and the mutation harness would
+        mutate files nothing reads.
+        """
+        self.assertTrue(
+            os.path.abspath(declarations.API_DIR).startswith(
+                REPO_ROOT + os.sep),
+            'declarations was imported from %s, which is not under this '
+            'checkout (%s): the audit is running against an installed '
+            'copy, not the working tree' % (declarations.API_DIR, REPO_ROOT))
 
     def test_declared_locations_are_derivable(self):
         """The declared location must be where the value really arrives.
@@ -638,6 +667,63 @@ class Thing:
         self.assertEqual(
             {'a', 'b'}, declarations.request_args_parameters(fn))
 
+    def test_unreadable_request_args_reads_are_reported(self):
+        """Every way of touching request.args that the walk cannot name
+        must land in problems, not silently derive to body.
+
+        Four earlier review rounds each found a derivation source
+        returning the same empty answer for 'nothing there' and 'could
+        not read this'; this was the last source without the
+        treatment.
+        """
+        source = '''
+class Thing:
+    def get(self, a=None, b=None, c=None, d=None):
+        a = flask.request.args.get(TARGET_KEY)
+        b = request.args[key_for('b')]
+        c = flask.request.args.getlist('c')
+        for d in flask.request.args:
+            pass
+'''
+        cls = self._parse_class(source)
+        fn = cls.body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.request_args_parameters(fn, problems))
+        self.assertEqual(4, len(problems))
+        self.assertEqual(
+            2, len([p for p in problems if 'not a literal' in p]),
+            problems)
+        self.assertEqual(
+            2, len([p for p in problems if 'other than via' in p]),
+            problems)
+
+        # And without a problems list, still no confident wrong answer
+        # in the return value.
+        self.assertEqual(set(), declarations.request_args_parameters(fn))
+
+    def test_underivable_request_args_read_is_a_problem(self):
+        """The reviewer's demonstration case: a handler reading
+        flask.request.args.get(TARGET_KEY) derives to body -- which is
+        the best answer available -- but must say so in problems, so
+        the consumers refuse to trust it."""
+        source = '''
+class Thing:
+    def get(self, a=None):
+        a = flask.request.args.get(TARGET_KEY)
+'''
+        tree = ast.parse(source)
+        cls = tree.body[0]
+        fn = cls.body[0]
+
+        problems = []
+        self.assertEqual(
+            'body',
+            declarations.derived_location('a', fn, tree, cls, {}, problems))
+        self.assertEqual(1, len(problems))
+        self.assertIn('not a literal', problems[0])
+
     def test_unreadable_declaration_is_reported_not_skipped(self):
         """A declaration this module cannot destructure must fail the
         audit rather than escape every assertion in it."""
@@ -901,10 +987,13 @@ class FixerTestCase(base.ShakenFistTestCase):
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-        path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(
-                os.path.abspath(declarations.__file__)))),
-            'tools', 'fix-api-parameter-locations.py')
+        # Anchored on this test file's own location rather than on
+        # declarations.__file__: tools/ is not part of the installed
+        # package, so resolving through an installed copy of the module
+        # would be a FileNotFoundError here while the audit silently
+        # read the wrong tree. test_the_audit_reads_this_checkout
+        # asserts the module side of the same invariant.
+        path = os.path.join(REPO_ROOT, 'tools', 'fix-api-parameter-locations.py')
         spec = importlib.util.spec_from_file_location('fixer', path)
         self.fixer = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.fixer)
