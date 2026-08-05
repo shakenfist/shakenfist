@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci/">
       
       
-        <link rel="prev" href="../PLAN-kerbside-vdi-tokens/">
+        <link rel="prev" href="../PLAN-two-tier-ci-phase-01-ovirt-kerbside/">
       
       
         <link rel="next" href="../PLAN-use-case-docs/">
@@ -5675,6 +5675,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 1: the oVirt lane deploys and drives kerbside
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -11062,8 +11090,8 @@ nightly CI catches independently), this is a good trade.</p>
 <tbody>
 <tr>
 <td>1. oVirt lane deploys kerbside</td>
-<td>PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Promote sf-e2e to PR smoke gate</td>
@@ -11089,8 +11117,15 @@ nightly CI catches independently), this is a good trade.</p>
   proxied-console check (open question 5). This settles
   the architecture (a) decision in practice; the
   operator-facing documentation of that architecture is
-  phase 4's deliverable. Touches <code>shakenfist/actions</code> as
-  well as this repo.</li>
+  phase 4's deliverable. Detailed planning (2026-08-02)
+  concluded that kerbside runs on the CI runner rather than
+  on the Rocky 8 oVirt node — <code>requires-python &gt;= 3.11</code>
+  rules the latter out — and that consequently <strong>no
+  <code>shakenfist/actions</code> change is required</strong>, unlike the
+  sf-e2e lane which needed a composite action to reach a
+  remote primary. See the phase plan for the grounded
+  environment facts (console ports, host subject) taken
+  from the 2026-08-01 green run.</li>
 <li><strong>Phase 2</strong> flips <code>sf-e2e-functional.yml</code> to also run on
   pull_request once the promotion criteria are met, and
   removes the phase-9 "not a PR gate" caveat.</li>
