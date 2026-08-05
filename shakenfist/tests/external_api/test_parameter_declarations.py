@@ -27,6 +27,22 @@ UNDECLARED_BY_DESIGN = {
     ('NodeMetadataEndpoint', 'delete', 'value'),
 }
 
+# Deferred to phase 4 for the same reason: InstanceSnapshotEndpoint.post
+# treats an explicit `thin: false` as unset. The official client has
+# always transmitted the key (`--thin/--flatten` defaults to False and
+# apiclient sends it unconditionally), so honouring false today would
+# make SNAPSHOTS_DEFAULT_TO_THIN inert for every shipped client. The
+# absent-versus-false distinction needs the schema layer plus a client
+# release that omits the key when unset.
+
+# Declarations exempt from location derivation. `header` and `formData`
+# cannot be derived from the code, so a declaration using one bypasses
+# the audit entirely -- the fixer prints it and moves on, and nothing
+# fails. That makes this list the boundary of the enforcement this
+# phase builds: a new entry must be a deliberate, reviewed act, not a
+# side effect of choosing an exotic location. (cls, method, name).
+UNDERIVABLE_BY_DESIGN = set()
+
 # Handlers deliberately absent from the published API. These three are
 # the unauthenticated health probes a load balancer polls, listed in
 # api_base.HEALTH_PROBE_PATHS: they are part of the deployment contract
@@ -97,6 +113,61 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                  for d, want in drifted],
             'run tools/fix-api-parameter-locations.py --apply to correct '
             'these, or correct the handler if the declaration is right')
+
+    def test_underivable_locations_are_allowlisted(self):
+        """`header` and `formData` are an opt-out, so gate the opting.
+
+        A declaration using either location bypasses derivation: the
+        fixer prints it and exits zero, and the drift assertion never
+        sees it. Without this canary the opt-out grows silently --
+        declaring a parameter `header` would exempt it from the entire
+        audit without failing anything, which is the silent-skip shape
+        this suite exists to close. Both directions are asserted so an
+        allowlist entry cannot outlive the declaration it exempts.
+        """
+        _, underivable, _ = declarations.audit()
+        found = {(d.cls, d.method, d.name) for d, _ in underivable}
+
+        self.assertEqual(
+            set(), found - UNDERIVABLE_BY_DESIGN,
+            'these declarations use a location the audit cannot derive '
+            '(header or formData), which exempts them from location '
+            'checking entirely; add them to UNDERIVABLE_BY_DESIGN with '
+            'a reason if that is intended')
+        self.assertEqual(
+            set(), UNDERIVABLE_BY_DESIGN - found,
+            'these UNDERIVABLE_BY_DESIGN entries no longer match an '
+            'underivable declaration; remove them')
+
+    def test_route_parameters_are_declared(self):
+        """Every route segment is declared as a path parameter.
+
+        The drift assertion checks each *declared* parameter against
+        its derived location, so a route segment that is never declared
+        at all is compared against nothing -- and renders a path
+        template with an undefined variable, the largest single error
+        class in the specification this branch fixed. Today the
+        property holds transitively (flask_restful passes segments as
+        kwargs, and accepted kwargs must be declared), but that chain
+        has exemption lists in it; this states the property directly.
+        """
+        declared_path: dict = {}
+        for cls, _, fn in _endpoints():
+            for parameter in declarations.declarations(fn):
+                if parameter.location == 'path':
+                    declared_path.setdefault(cls, set()).add(parameter.name)
+
+        problems: list = []
+        for cls, names in declarations.route_parameters(
+                problems=problems).items():
+            for name in names:
+                self.assertIn(
+                    name, declared_path.get(cls, set()),
+                    '%s is mounted on a route carrying %r, but no handler '
+                    'on it declares that path parameter; the published '
+                    'path template would reference an undefined variable'
+                    % (cls, name))
+        self.assertEqual([], problems)
 
     def test_declared_names_are_real_parameters(self):
         """A declared name must be something the handler can receive.
@@ -800,7 +871,7 @@ class Thing(api_base.Resource):
         is read from base.py's source rather than imported."""
         self.assertEqual(
             api_base.RAW_BODY_PARAMETER,
-            declarations.CONSTANTS['RAW_BODY_PARAMETER'])
+            declarations.base_constants()['RAW_BODY_PARAMETER'])
 
     def setUp(self):
         super().setUp()

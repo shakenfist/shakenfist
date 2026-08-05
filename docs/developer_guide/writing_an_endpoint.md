@@ -90,6 +90,15 @@ Upload endpoints read the body from `flask.request` rather than
 receiving it as a kwarg. Use the constant rather than inventing a name,
 so the "declared but not accepted" check knows to let it through.
 
+**A constraint on routing rather than on declarations:** a class
+mounted on more than one route must carry the same parameters on
+each. The derivation merges a class's routes and refuses to proceed
+when their parameter sets differ, so mounting one `Resource` on both
+`/things` and `/things/<thing_ref>` fails the audit. Split the
+collection and item endpoints into two classes, which is what the
+tree does everywhere (`Readyz`, the only class mounted twice, has two
+parameter-free routes).
+
 **5. Every kwarg the handler accepts is declared.** An accepted-but-
 undeclared parameter is invisible to anyone reading the API, which is
 how `sshkey` and `userdata` sat in the published specification for
@@ -126,7 +135,10 @@ correct declaration does not stop a caller sending something else.
 Two known gaps:
 
 * `header` and `formData` cannot be derived from the code, so they are
-  reported rather than corrected. No endpoint uses either today.
+  reported rather than corrected. No endpoint uses either today, and
+  using one requires an `UNDERIVABLE_BY_DESIGN` entry in
+  `test_parameter_declarations.py` — otherwise the declaration would be
+  a silent opt-out from the whole audit.
 * Swagger 2.0 allows at most one `in: body` parameter per operation,
   carrying a `schema` rather than a `type`. `swagger_helper()` emits
   one parameter per declaration, so operations with several body

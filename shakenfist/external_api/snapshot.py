@@ -40,8 +40,9 @@ class InstanceSnapshotEndpoint(api_base.Resource):
              'snapshot artifacts, or zero for the configured default.', False),
             ('thin', 'body', 'boolean',
              'Take a thin snapshot, which records only the differences from '
-             'the backing image. Defaults to SNAPSHOTS_DEFAULT_TO_THIN.',
-             False)
+             'the backing image. False is currently treated the same as '
+             'omitting the parameter: both fall back to '
+             'SNAPSHOTS_DEFAULT_TO_THIN.', False)
         ],
         [(200, 'Information about the snapshots taken.', None),
          (404, 'Instance not found.', None),
@@ -54,10 +55,15 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0, thin=None):
-        # `is None` rather than falsiness: an explicit `thin: false` is a
-        # request for a thick snapshot, not an omission for the config
-        # default to override.
-        if thin is None:
+        # Falsiness rather than `is None`, deliberately: the official
+        # client has always transmitted `thin: false` when the caller did
+        # not ask for thin (the CLI flag defaults to False), so honouring
+        # an explicit false here would make SNAPSHOTS_DEFAULT_TO_THIN
+        # inert for every shipped client. The absent-versus-false
+        # distinction cannot be drawn until phase 4 of
+        # PLAN-api-input-validation, alongside a client that omits the
+        # key when unset.
+        if not thin:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
 
         instance_from_db.add_event(

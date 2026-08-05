@@ -42,6 +42,7 @@ analysed.
 """
 import ast
 import collections
+import functools
 import glob
 import os
 import re
@@ -94,8 +95,15 @@ def _parse(path: str) -> ast.Module:
         return ast.parse(f.read())
 
 
-def _base_constants() -> dict[str, Any]:
+@functools.cache
+def base_constants() -> dict[str, Any]:
     """Module-level string constants of base.py, by name.
+
+    Cached and called lazily rather than computed at import: this
+    module ships inside the runtime package, and opening base.py's
+    source as a side effect of import would fail in any deployment
+    where the source is not on disk. A missing file should surface at
+    use, from the consumer that needed it.
 
     ``RAW_BODY_PARAMETER`` is referenced rather than spelled out in the
     one declaration that documents a raw request body, so resolving it
@@ -117,9 +125,6 @@ def _base_constants() -> dict[str, Any]:
     return out
 
 
-CONSTANTS = _base_constants()
-
-
 def literal(node: Optional[ast.AST]) -> Any:
     """A declaration element's value, or None if it is not static.
 
@@ -137,7 +142,7 @@ def literal(node: Optional[ast.AST]) -> Any:
         # but cannot be evaluated. Both mean "not static", which is what
         # every caller here is asking, so neither should escape as a
         # traceback from a helper documented to answer with None.
-        return CONSTANTS.get(ast.unparse(node).split('.')[-1])
+        return base_constants().get(ast.unparse(node).split('.')[-1])
 
 
 def route_parameters(app: str = APP,

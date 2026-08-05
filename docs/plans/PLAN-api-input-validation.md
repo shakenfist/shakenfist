@@ -287,8 +287,14 @@ declarations are good enough to compile.
 ### Carried into phase 2 from phase 1
 
 Phase 1 corrected which location each parameter declares. It did
-not change how `swagger_helper()` renders them, which leaves two
-specification-validity problems for phase 2 to pick up:
+not change how `swagger_helper()` renders them, which leaves three
+specification-validity problems for phase 2 to pick up. Measured
+with `openapi_spec_validator` over the flasgger output (raised by
+the ninth review round and re-measured independently): develop
+produces 363 validation errors, this branch 241, with the entire
+"path template variable has no corresponding path parameter"
+class eliminated by the location audit. The 241 that remain
+decompose exactly into the three items below: 126, 114 and 1.
 
 * **Multiple body parameters per operation.** Swagger 2.0 permits
   at most one `in: body` parameter, and it must carry a `schema`
@@ -314,6 +320,16 @@ specification-validity problems for phase 2 to pick up:
   *first* thing a validator trips over, ahead of the body
   parameters above, so #3626 has to fix or explicitly waive it to
   reach anything else.
+* **`security` renders as an object, not an array.**
+  `swagger_helper()` emits `'security': {'bearerAuth': []}`, but
+  OpenAPI 2.0 requires `security` to be an *array* of requirement
+  objects. At 126 of the 241 remaining validator errors this is
+  the largest single class left — more than the body-parameter
+  one (114) and `schemes` (1) combined — and unlike `schemes` it
+  is emitted by `swagger_helper()` itself. The fix is one line
+  (`'security': [{'bearerAuth': []}]`) and belongs with the
+  renderer work here rather than in phase 1, whose scope was the
+  declarations, not what they render to.
 * **Nothing validates the generated specification.** Phase 1's
   path-implies-required rule exists to satisfy linters and client
   generators, and was checked by hand. A unit test running

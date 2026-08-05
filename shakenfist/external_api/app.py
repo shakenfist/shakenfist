@@ -479,5 +479,9 @@ api.add_resource(api_node.NodeMetadataEndpoint, '/nodes/<node>/metadata/<key>')
 
 api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
 api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')
+# The int converter makes the declared `integer` true at runtime:
+# Werkzeug rejects a non-numeric segment with a 404 before the handler
+# runs, where a bare <offset> arrived as a string and int() raised out
+# of the handler as a 500.
 api.add_resource(api_upload.UploadTruncateEndpoint,
-                 '/upload/<upload_uuid>/truncate/<offset>')
+                 '/upload/<upload_uuid>/truncate/<int:offset>')

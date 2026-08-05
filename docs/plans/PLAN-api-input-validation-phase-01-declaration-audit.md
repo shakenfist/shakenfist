@@ -434,26 +434,71 @@ exemptions are mounted on exactly
 `api_base.HEALTH_PROBE_PATHS`, so the exemption list and the
 deployment contract cannot drift apart unnoticed.
 
-One semantic fix beyond the audit's scope, recorded here for the
-same bisect-clarity reason as the `argtypes` one.
-`InstanceSnapshotEndpoint.post` tested `thin` for falsiness
-before applying `SNAPSHOTS_DEFAULT_TO_THIN`, so an explicit
-`thin: false` was indistinguishable from omission and the config
-default overrode it — on a thin-by-default cluster a caller
-could not request a thick snapshot at all. The defect predates
-this branch, but this branch is what published the parameter,
-turning a latent bug into a documented promise; the handler now
-tests `is None`.
+One semantic fix beyond the audit's scope was attempted in that
+round and reverted in the next, and the shape of the mistake is
+worth recording. `InstanceSnapshotEndpoint.post` tested `thin`
+for falsiness before applying `SNAPSHOTS_DEFAULT_TO_THIN`, so an
+explicit `thin: false` was indistinguishable from omission;
+round eight changed it to `is None` so a caller could request a
+thick snapshot. The ninth round pointed out what that fix
+ignored: the official client has *always* transmitted
+`thin: false` when the caller did not ask for thin (the CLI flag
+defaults to False and apiclient sends the key unconditionally,
+verified against client-python), so honouring an explicit false
+makes `SNAPSHOTS_DEFAULT_TO_THIN` inert for every shipped client
+— the only runtime behaviour change in a phase whose plan says
+there are none, invisible to CI because the functional tests
+either pass `thin=True` or rely on the False default. Reverted
+to falsiness with a comment, the swagger description now states
+that false is treated as omission, and the absent-versus-false
+distinction is deferred to phase 4 alongside the metadata
+deletes' `value` kwarg, next to which it is recorded in
+`test_parameter_declarations.py`. The general lesson: a
+parameter's semantics cannot be corrected server-side while the
+deployed clients encode the old semantics in what they transmit;
+absent-versus-false is exactly the distinction the schema layer
+exists to draw, and drawing it early breaks the callers who were
+relying on the blur.
+
+The rest of the ninth round hardened the enforcement boundary.
+`header` and `formData` declarations were an unbounded opt-out:
+routed into `audit()`'s `underivable` list, printed by the fixer
+without affecting its exit status, and asserted by nothing — so
+declaring a parameter `header` silently exempted it from the
+entire audit. A canary test now requires `underivable` to be
+empty save for a named `UNDERIVABLE_BY_DESIGN` allowlist
+(currently empty), so the opt-out is a reviewed act. A second
+new test states the plan's route-coverage property directly —
+every route segment appears among its class's `path`
+declarations — where before it held only transitively through
+`handler_kwargs`, a chain with exemption lists in it. The
+truncate route gained the `<int:offset>` converter so its
+published `integer` is enforced by Werkzeug (404) rather than
+surfacing as an `int()` ValueError 500 in the handler. And
+`CONSTANTS` became the lazy, cached `base_constants()`, so
+importing `declarations.py` — which ships in the runtime package
+— no longer reads `base.py` off disk as an import side effect.
+
+The ninth round also measured the published specification on
+both branches with `openapi_spec_validator` (363 errors on
+develop, 241 here; re-measured independently and recorded in the
+main plan's phase 2 carry list) and found the largest remaining
+class, `security` rendered as an object rather than an array,
+was missing from that list. It is now recorded there with the
+counts, and on issue #3626.
 
 ### Mutation-testing the guards
 
 `tools/check-api-declaration-guards.sh` breaks each property the
-audit claims and confirms the guard fires. Ten mutations: a path
-parameter declared `query`, a body parameter declared `query`, an
-emptied parameter list, a missing `swag_from`, an undeclared
-kwarg, an optional path parameter, an unknown type token, a
-four-element tuple, an unreadable route, and a decorator-injected
-object declared as a parameter.
+audit claims and confirms the guard fires. Eleven mutations: a
+path parameter declared `query`, a body parameter declared
+`query`, an emptied parameter list, a missing `swag_from`, an
+undeclared kwarg, an optional path parameter, an unknown type
+token, a four-element tuple, an unreadable route, a
+decorator-injected object declared as a parameter, and a
+parameter declared at an underivable location (`header`), which
+swagger_helper() accepts and which was a silent opt-out before
+the `UNDERIVABLE_BY_DESIGN` canary.
 
 It exists because four of the five review rounds on the PR that
 landed this phase found the same thing: an assertion that passed

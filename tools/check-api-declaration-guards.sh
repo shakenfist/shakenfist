@@ -198,6 +198,15 @@ sed -i "s/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)/('blob_fr
     shakenfist/external_api/blob.py
 check 'decorator-injected object declared'
 
+# 11. A parameter declared at an underivable location. `header` is a
+# valid OpenAPI 2.0 location so swagger_helper() accepts it, and until
+# the UNDERIVABLE_BY_DESIGN canary this was a silent opt-out from the
+# whole audit: the fixer printed it and exited zero, and no test read
+# the underivable list.
+sed -i "s/('blob_uuid', 'path', 'uuid'/('blob_uuid', 'header', 'uuid'/" \
+    shakenfist/external_api/blob.py
+check 'underivable location declared'
+
 # There is no mutation here for two endpoint classes sharing a name,
 # which a route lookup keyed on the bare name cannot tell apart. It
 # cannot be expressed in this tree: flask_restful derives its endpoint
