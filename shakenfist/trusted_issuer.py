@@ -21,6 +21,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.trusted_issuer_attributes import (
@@ -147,6 +148,7 @@ class TrustedIssuer(dbo):
             return None
 
         superseded = cls.from_db_by_name(name, include_deleted=True)
+        superseded_uuid = str(superseded.uuid) if superseded else None
         if superseded:
             superseded.hard_delete()
 
@@ -169,6 +171,18 @@ class TrustedIssuer(dbo):
 
         i.state = cls.STATE_INITIAL
         i.state = cls.STATE_CREATED
+
+        if superseded_uuid:
+            # Same reasoning as MappingRule.new(): reclaiming the name
+            # hard deletes the old row, and hard_delete() takes its
+            # events with it. An issuer's trail is thinner than a rule's,
+            # but "who repointed this issuer, and when" is exactly the
+            # question asked after a federation starts trusting the wrong
+            # provider.
+            i.add_event(
+                EVENT_TYPE_AUDIT, 'replaced a deleted issuer of the same name',
+                extra={'superseded_issuer': superseded_uuid})
+
         return i
 
     # Static values
@@ -179,6 +193,26 @@ class TrustedIssuer(dbo):
     # Mutable attributes
     def _attributes(self) -> Optional[TrustedIssuerAttributesData]:
         return mariadb.get_trusted_issuer_attributes(_as_uuid(self.uuid))
+
+    def configuration(self) -> Optional[TrustedIssuerAttributesData]:
+        """The whole of the issuer's configuration in a single read.
+
+        The counterpart to MappingRule.policy(), and for the same
+        reason: each property below issues its own database read, which
+        is fine for a one-off and wasteful for a caller that wants more
+        than one of them.
+
+        The federated exchange is that caller. Resolving an issuer
+        already scans every configured issuer, and validate_token then
+        went back to the same row three more times -- jwks_uri to find
+        the signing key, then audience and issuer_url to verify the
+        claims. Reading once turns those three into one.
+
+        Named configuration rather than policy because that is what it
+        is: where a rule's policy says who may act as a namespace, this
+        says only where an issuer's keys live and what it must say.
+        """
+        return self._attributes()
 
     @property
     def issuer_url(self) -> Optional[str]:
@@ -219,11 +253,14 @@ class TrustedIssuer(dbo):
 
     def external_view(self) -> dict[str, Any]:
         retval = self._external_view()
+
+        # One read rather than three, see configuration().
+        attrs = self.configuration()
         retval.update({
             'name': self.name,
-            'issuer_url': self.issuer_url,
-            'jwks_uri': self.jwks_uri,
-            'audience': self.audience
+            'issuer_url': attrs.issuer_url if attrs else None,
+            'jwks_uri': attrs.jwks_uri if attrs else None,
+            'audience': attrs.audience if attrs else None
         })
         return retval
 

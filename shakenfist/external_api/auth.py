@@ -1305,7 +1305,7 @@ class AuthFederatedEndpoint(api_base.Resource):
             return _federated_refusal(
                 None, 'token rejected', str(e), namespace=namespace)
 
-        # 7. Only now look up the rule. Doing it after verification
+        # 6. Only now look up the rule. Doing it after verification
         #    means an anonymous caller holding no valid token cannot
         #    use this endpoint to discover which rules exist.
         rule_from_db = MappingRule.from_db_by_name(namespace, rule)
@@ -1383,12 +1383,13 @@ class AuthFederatedEndpoint(api_base.Resource):
                 rule_from_db, 'rule is unusable',
                 'rule has no scopes or no key_ttl')
 
-        # 6. Refuse a replay of this token through this rule.
+        # 7. Refuse a replay of this token through this rule.
         #
-        # The design section numbers this ahead of the rule lookup, but
-        # it cannot run there: the pair being claimed is (token, rule
-        # uuid), and there is no rule uuid until the rule has been read.
-        # It sits here rather than immediately after the lookup so that
+        # An early draft of the design section numbered this ahead of the
+        # rule lookup, which is not implementable: the pair being claimed
+        # is (token, rule uuid), and there is no rule uuid until the rule
+        # has been read. It sits after claim matching rather than
+        # immediately after the lookup so that
         # a refusal for any *other* reason -- claims that do not match, a
         # namespace that has gone, a rule with no scopes -- does not
         # consume the token's single use. A caller who fixes their rule

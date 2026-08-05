@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
 from shakenfist.mapping_rule import MappingRule
+from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -188,6 +189,24 @@ class SuccessfulExchangeTestCase(FederatedExchangeTestCase):
             auth = self.client.post('/auth', data=json.dumps(
                 {'namespace': 'ci', 'key': minted['key']}))
             self.assertEqual(200, auth.status_code)
+
+    def test_minting_does_not_rotate_a_key_named_for_the_prefix(self):
+        # NamespaceKey.new() rotates rather than creating when the name
+        # already exists, so the discriminator is the only thing standing
+        # between a rule and an operator's own key. The prefix is the
+        # name an operator would plausibly have chosen themselves, and it
+        # must never be the name the exchange mints under.
+        ns = Namespace.from_db('ci')
+        ns.add_key('ryll-ci', 'the-operators-own-secret')
+
+        minted = self._exchange().get_json()
+        self.assertNotEqual('ryll-ci', minted['key_name'])
+
+        # The operator's secret still authenticates, which it would not
+        # if the mint had rotated it: rotation changes the nonce.
+        auth = self.client.post('/auth', data=json.dumps(
+            {'namespace': 'ci', 'key': 'the-operators-own-secret'}))
+        self.assertEqual(200, auth.status_code)
 
     def test_an_enumerated_claim_alternative_is_accepted(self):
         resp = self._exchange(

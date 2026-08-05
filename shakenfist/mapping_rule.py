@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -360,6 +361,7 @@ class MappingRule(dbo):
             return None
 
         superseded = cls.from_db_by_name(namespace, name, include_deleted=True)
+        superseded_uuid = str(superseded.uuid) if superseded else None
         if superseded:
             superseded.hard_delete()
 
@@ -385,6 +387,25 @@ class MappingRule(dbo):
 
         r.state = cls.STATE_INITIAL
         r.state = cls.STATE_CREATED
+
+        if superseded_uuid:
+            # hard_delete() takes the old rule's events with it, and on a
+            # rule those events are the refusal trail -- a stream of
+            # near-miss claim failures is what probing looks like. The
+            # natural response to spotting it is to delete the rule and
+            # write a tighter one under the same name, which is exactly
+            # this path, so the evidence would be erased by acting on it.
+            #
+            # Recorded on the replacement rather than on the namespace
+            # because namespace.py imports this module, and because this
+            # is where somebody asking "what happened to rule ryll" will
+            # look. The detail is still gone; what survives is that there
+            # was a previous rule of this name and its identifier, which
+            # is enough to find it in a log aggregator that has the
+            # events this database no longer does.
+            r.add_event(
+                EVENT_TYPE_AUDIT, 'replaced a deleted rule of the same name',
+                extra={'superseded_rule': superseded_uuid})
 
         if namespace == 'system':
             # Not refused: a cluster's own automation legitimately
@@ -505,7 +526,30 @@ class MappingRule(dbo):
         retval = self._external_view()
 
         # One read rather than five, see policy().
-        attrs = self.policy()
+        #
+        # A damaged rule is described rather than raised here, unlike on
+        # the exchange path, because the two callers want opposite
+        # things. The exchange must refuse: a rule it cannot read is a
+        # rule whose bound claims it cannot check, and minting against
+        # that would be authorising on a guess.
+        #
+        # These are the CRUD routes, where raising takes the listing
+        # down with it -- one undecodable column would turn GET
+        # .../rules into a 500 and hide every healthy rule in the
+        # namespace -- and where delete() builds its response *after*
+        # doing the work, so a damaged rule would be deleted and still
+        # report failure, on the one call that would have cleaned it up.
+        # The owner needs to be told which rule is broken, which means
+        # answering.
+        try:
+            attrs = self.policy()
+            unusable = False
+        except exceptions.CorruptMappingRule as e:
+            self.log.with_fields({'error': str(e)}).error(
+                'Mapping rule attributes could not be decoded')
+            attrs = None
+            unusable = True
+
         retval.update({
             'namespace': self.namespace,
             'name': self.name,
@@ -513,7 +557,11 @@ class MappingRule(dbo):
             'bound_claims': attrs.bound_claims if attrs else None,
             'scopes': attrs.scopes if attrs else None,
             'key_ttl': attrs.key_ttl if attrs else None,
-            'key_name_prefix': attrs.key_name_prefix if attrs else None
+            'key_name_prefix': attrs.key_name_prefix if attrs else None,
+            # Only ever True. A missing attributes row also yields nulls
+            # above, and that is a different fault with a different fix,
+            # so the two are not collapsed into one flag.
+            'unusable': unusable
         })
         return retval
 

@@ -432,19 +432,27 @@ implementation detail, because the endpoint is reachable by anyone:
 
 1. Refuse if the body is larger than `FEDERATION_MAX_TOKEN_BYTES`,
    before anything parses it.
-2. Read the `iss` claim **without verifying anything** and refuse if no
+2. Count the attempt against the source address's rate limit.
+3. Read the `iss` claim **without verifying anything** and refuse if no
    trusted issuer matches. No network yet.
-3. Count the attempt against the source address's rate limit.
 4. Verify the signature against the issuer's JWKS.
 5. Check `aud`, `exp` and `nbf`.
 6. Load the named rule and check its bound claims.
 7. Claim this `(token, rule)` pair, refusing a replay.
 8. Mint the key.
 
-Steps 1 and 2 preceding step 4 matter more than they look. The JWKS
+Steps 1 to 3 preceding step 4 matter more than they look. The JWKS
 fetch is a synchronous outbound HTTP request made inside a request
 worker, so an unfiltered path would let anyone with a made-up `iss`
 tie up workers on connections to a host of their choosing.
+
+The meter is step 2 rather than step 3, and that is the ordering most
+likely to be undone by accident. Only the argument checks sit above it.
+Resolving the issuer is a scan of every configured issuer, reading
+state and URL per row, so it is itself work worth metering -- with the
+meter below it the cheapest request to send would be among the more
+expensive ones to answer. A new step belongs below step 2 unless it
+touches neither the database nor the network.
 
 Signature verification is pinned to asymmetric algorithms. If `HS256`
 were accepted, an attacker could sign a token using the issuer's

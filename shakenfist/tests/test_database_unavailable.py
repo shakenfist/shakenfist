@@ -19,6 +19,7 @@ from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import main as queues_main
+from shakenfist.protos import database_pb2
 from shakenfist.tests import base
 
 
@@ -421,3 +422,72 @@ class BlockUntilHealthyTestCase(base.ShakenFistTestCase):
         # then terminates the loop.
         queues_main._block_until_healthy(abort_path='/run/sf/queues.abort')
         mock_checks.assert_called_once()
+
+
+class FederationRepliesFailClosedTestCase(base.ShakenFistTestCase):
+    """A reply nobody could produce must not read as a permissive one.
+
+    Both federation replies used to signal failure by carrying a
+    non-empty `error`, which left the fail closed property resting on
+    string formatting. An exception raised with no args -- `KeyError()`,
+    a bare `AttributeError()` -- has an empty `str()`, so the reply
+    arrived as `attempts=0, error=''`. Read as a count, that says
+    "nobody has tried this minute", which is an allow on the one
+    unauthenticated endpoint in the API.
+
+    `ok` has to be set deliberately on the success path, so no
+    formatting accident can produce one. Each refusal below is paired
+    with the corresponding success, because a client which raised
+    unconditionally would satisfy the refusals on its own.
+    """
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_counter_failure_with_no_message_still_refuses(self, mock_stub):
+        mock_stub.return_value.CountFederatedAttempt.return_value = \
+            database_pb2.CountFederatedAttemptReply(
+                attempts=0, error='', ok=False)
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_count_federated_attempt, '10.0.0.1', 1234)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_counted_attempt_is_returned(self, mock_stub):
+        mock_stub.return_value.CountFederatedAttempt.return_value = \
+            database_pb2.CountFederatedAttemptReply(
+                attempts=7, error='', ok=True)
+
+        self.assertEqual(
+            7, mariadb._grpc_count_federated_attempt('10.0.0.1', 1234))
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_claim_failure_with_no_message_still_refuses(self, mock_stub):
+        mock_stub.return_value.RecordFederatedExchange.return_value = \
+            database_pb2.RecordFederatedExchangeReply(
+                recorded=False, error='', ok=False)
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_record_federated_exchange,
+            'token-1', uuid.uuid4(), 1.0)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_first_claim_is_recorded(self, mock_stub):
+        mock_stub.return_value.RecordFederatedExchange.return_value = \
+            database_pb2.RecordFederatedExchangeReply(
+                recorded=True, error='', ok=True)
+
+        self.assertTrue(mariadb._grpc_record_federated_exchange(
+            'token-1', uuid.uuid4(), 1.0))
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_an_already_claimed_pair_is_a_replay_not_a_failure(self, mock_stub):
+        # recorded False with ok True is the replay answer. It has to stay
+        # distinguishable from "we could not find out": both refuse the
+        # exchange, but only one of them should wake anybody up.
+        mock_stub.return_value.RecordFederatedExchange.return_value = \
+            database_pb2.RecordFederatedExchangeReply(
+                recorded=False, error='', ok=True)
+
+        self.assertFalse(mariadb._grpc_record_federated_exchange(
+            'token-1', uuid.uuid4(), 1.0))

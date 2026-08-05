@@ -157,6 +157,19 @@ class TokenValidationTestCase(FederationTestCase):
         self.assertEqual(GITHUB, claims['iss'])
         self.assertEqual('shakenfist/ryll', claims['repository'])
 
+    def test_validation_reads_the_issuer_row_once(self):
+        # It used to read three times -- jwks_uri to find the signing
+        # key, then audience and issuer_url to check the claims -- on the
+        # one endpoint anybody may call, on top of the scan that resolved
+        # the issuer in the first place. Asserted rather than described,
+        # because nothing else would notice the third read coming back.
+        with mock.patch.object(
+                TrustedIssuer, '_attributes',
+                wraps=self.issuer._attributes) as attributes:
+            federation.validate_token(self._token(), self.issuer)
+
+        self.assertEqual(1, attributes.call_count)
+
     def test_a_token_signed_by_the_wrong_key_is_refused(self):
         self.assertRaises(
             exceptions.TokenValidationFailed, federation.validate_token,

@@ -118,9 +118,15 @@ class JWKSCache:
                 self._locks[issuer_uuid] = threading.Lock()
             return client, self._locks[issuer_uuid]
 
-    def signing_key(self, issuer: TrustedIssuer, token: str) -> Any:
-        """The key that signed this token, fetching the JWKS if needed."""
-        jwks_uri = issuer.jwks_uri
+    def signing_key(self, issuer: TrustedIssuer, token: str,
+                    jwks_uri: Optional[str]) -> Any:
+        """The key that signed this token, fetching the JWKS if needed.
+
+        jwks_uri is passed in rather than read off the issuer, because
+        the only caller has already read the issuer's configuration and
+        reading it again here would be a second round trip for a column
+        it is holding.
+        """
         if not jwks_uri:
             raise exceptions.TokenValidationFailed(
                 f'trusted issuer {issuer.name} has no jwks_uri')
@@ -226,10 +232,20 @@ def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
     TokenValidationFailed for every failure, with a message intended
     for the audit log rather than for the caller.
     """
-    signing_key = JWKS_CACHE.signing_key(issuer, token)
+    # One read of the issuer's row for all three columns this needs.
+    # Three separate property reads was three round trips on the one
+    # endpoint anybody may call, on top of the scan that resolved the
+    # issuer in the first place.
+    configuration = issuer.configuration()
+    if not configuration:
+        raise exceptions.TokenValidationFailed(
+            f'trusted issuer {issuer.name} has no configuration')
 
-    audience = issuer.audience
-    issuer_url = issuer.issuer_url
+    signing_key = JWKS_CACHE.signing_key(
+        issuer, token, configuration.jwks_uri)
+
+    audience = configuration.audience
+    issuer_url = configuration.issuer_url
     if not audience or not issuer_url:
         raise exceptions.TokenValidationFailed(
             f'trusted issuer {issuer.name} is incompletely configured')

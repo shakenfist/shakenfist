@@ -252,17 +252,31 @@ What we implemented was:
 
 ### What a trust does and does not grant
 
-A trust grants **visibility**. It is the system namespace's ability to see
-across namespaces, scaled down, and that is all it is. A namespace you trust
-can list and read your objects. It cannot delete them, rename them, share
-them, or change their metadata — those all require the object's own namespace,
-or `system`.
+A trust grants **visibility** over your *resources* — instances, networks,
+artifacts and the like. It is the system namespace's ability to see across
+namespaces, scaled down. A namespace you trust can list and read those
+objects. It cannot delete them, rename them, share them, or change their
+metadata — those all require the object's own namespace, or `system`.
 
 Giving is a separate question from taking, and it is still allowed: a
 namespace you trust may *create* an object in your namespace, which is exactly
 the "gift" step in the `ci-images` example above. Creation is additive, you
 opted into it by extending the trust, and nothing you already had is lost by
 it. Deletion is none of those things.
+
+**Namespace administration is the exception, and it is a large one.**
+Adding a key to your namespace, and writing a mapping rule in it, are both
+gated on this same trust relationship rather than on ownership. A namespace
+you trust can therefore mint credentials in yours — directly with
+`add-key`, or by writing a mapping rule, which is a standing offer to mint
+a key for anyone holding a matching identity token. It can also delete the
+rules you wrote.
+
+So a trust is not only a window onto your resources; it is administrative
+access to your namespace's credentials. Extend one to a namespace you would
+be willing to hand a key to, and read
+[Federated identity](#federated-identity) before extending one to a
+namespace that has mapping rules configured.
 
 !!! note
 

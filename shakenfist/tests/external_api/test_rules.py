@@ -9,9 +9,12 @@ somebody it is trusted by) may write one.
 import json
 import logging
 import sys
+from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.external_api import app as external_api
+from shakenfist.mapping_rule import MappingRule
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.schema.namespace_key_attributes import (
@@ -305,3 +308,136 @@ class RuleScopeCeilingTestCase(RuleEndpointTestCase):
             '/auth/namespaces/ci/rules/ryll',
             headers={'Authorization': self.owner}).get_json()
         self.assertEqual(['blob.read'], rule['scopes'])
+
+
+class RuleNameReclaimTestCase(RuleEndpointTestCase):
+    """Reusing the name of a deleted rule.
+
+    The unique index on (namespace, name) means the old row has to go,
+    and hard_delete() takes its events with it. On a rule those events
+    are the refusal trail, and a stream of near-miss claim failures is
+    what probing looks like -- so the operator response to noticing it
+    (delete the rule, write a tighter one under the same name) is the
+    very path that erased the evidence.
+    """
+
+    def test_the_name_can_be_reclaimed(self):
+        # The control. If this stops working the assertions below are
+        # about a path nobody takes.
+        first = self._create().get_json()
+        self.assertEqual(200, self.client.delete(
+            '/auth/namespaces/ci/rules/ryll',
+            headers={'Authorization': self.owner}).status_code)
+
+        second = self._create().get_json()
+        self.assertEqual('ryll', second['name'])
+        self.assertNotEqual(first['uuid'], second['uuid'])
+
+    def test_the_replacement_records_what_it_superseded(self):
+        first = self._create().get_json()
+        self.client.delete(
+            '/auth/namespaces/ci/rules/ryll',
+            headers={'Authorization': self.owner})
+
+        with mock.patch.object(MappingRule, 'add_event') as add_event:
+            self._create()
+
+        superseded = [
+            call for call in add_event.call_args_list
+            if (call.kwargs.get('extra') or {}).get('superseded_rule')
+            == first['uuid']]
+        self.assertEqual(1, len(superseded))
+
+    def test_a_first_creation_supersedes_nothing(self):
+        # Otherwise the event above would be noise on every rule ever
+        # created, which is the same as not having it.
+        with mock.patch.object(MappingRule, 'add_event') as add_event:
+            self._create()
+
+        self.assertEqual([], [
+            call for call in add_event.call_args_list
+            if (call.kwargs.get('extra') or {}).get('superseded_rule')])
+
+
+class DamagedRuleTestCase(RuleEndpointTestCase):
+    """A rule whose stored policy will not decode.
+
+    The exchange refuses such a rule, and must: bound claims it cannot
+    read are bound claims it cannot check. These are the CRUD routes,
+    where refusing is the wrong answer -- the owner is here to find out
+    which rule is broken and get rid of it, and a 500 tells them
+    neither.
+
+    `_attributes` is what gets sabotaged, not the lookup. The exception
+    is raised where the policy is decoded; `from_db_by_name` reads the
+    static row and the state and touches neither `bound_claims` nor
+    `scopes`, so patching the lookup would exercise a path that cannot
+    raise.
+    """
+
+    def _damage(self):
+        return mock.patch.object(
+            MappingRule, '_attributes',
+            side_effect=exceptions.CorruptMappingRule(
+                'mapping rule %s has undecodable scopes'
+                % MappingRule.from_db_by_name('ci', 'ryll').uuid))
+
+    def test_a_damaged_rule_is_described_rather_than_raised(self):
+        self._create()
+
+        with self._damage():
+            resp = self.client.get(
+                '/auth/namespaces/ci/rules/ryll',
+                headers={'Authorization': self.owner})
+
+        self.assertEqual(200, resp.status_code)
+        self.assertTrue(resp.get_json()['unusable'])
+        self.assertIsNone(resp.get_json()['scopes'])
+
+    def test_a_healthy_rule_is_not_flagged_unusable(self):
+        # The control. Without it an implementation which flagged
+        # everything would pass the test above.
+        self._create()
+
+        resp = self.client.get(
+            '/auth/namespaces/ci/rules/ryll',
+            headers={'Authorization': self.owner})
+
+        self.assertEqual(200, resp.status_code)
+        self.assertFalse(resp.get_json()['unusable'])
+        self.assertEqual(['blob.read'], resp.get_json()['scopes'])
+
+    def test_one_damaged_rule_does_not_hide_the_listing(self):
+        # The failure that mattered. The listing maps external_view over
+        # every rule, so one bad row took the whole namespace's rules
+        # down with it.
+        self._create()
+        self._create(name='second')
+
+        with self._damage():
+            resp = self.client.get(
+                '/auth/namespaces/ci/rules',
+                headers={'Authorization': self.owner})
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            {'ryll', 'second'}, {r['name'] for r in resp.get_json()})
+
+    def test_a_damaged_rule_can_still_be_deleted(self):
+        # delete() does the work and then builds the response, so a
+        # raising external_view reported failure for a delete which had
+        # already succeeded -- on the one call that would have cleaned
+        # the row up.
+        self._create()
+
+        with self._damage():
+            resp = self.client.delete(
+                '/auth/namespaces/ci/rules/ryll',
+                headers={'Authorization': self.owner})
+
+        self.assertEqual(200, resp.status_code)
+
+        gone = self.client.get(
+            '/auth/namespaces/ci/rules/ryll',
+            headers={'Authorization': self.owner})
+        self.assertEqual(404, gone.status_code)

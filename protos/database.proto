@@ -2444,6 +2444,13 @@ message RecordFederatedExchangeReply {
   // because we do not know. Both refuse, but only one is worth paging
   // an operator about.
   string error = 2;
+  // Whether the claim was actually evaluated. Carried here for symmetry
+  // with CountFederatedAttemptReply rather than because this message
+  // needs it: recorded=false with an empty error degrades to "treat as
+  // a replay", which refuses, so this one already failed closed. Having
+  // both replies answer the same way keeps the next reader from having
+  // to work out which of the two was the safe one.
+  bool ok = 3;
 }
 
 message CountFederatedAttemptRequest {
@@ -2453,7 +2460,18 @@ message CountFederatedAttemptRequest {
 
 message CountFederatedAttemptReply {
   int32 attempts = 1;       // Attempts in this window, including this one
-  string error = 2;         // Set if the counter could not be written
+  string error = 2;         // Diagnostics only. Never test this to decide.
+  // Whether attempts means anything. Set true only on the success path.
+  //
+  // The client used to infer this from error being non-empty, which put
+  // the fail closed property in the hands of message formatting: an
+  // exception whose str() is empty -- KeyError(), a bare
+  // AttributeError(), anything raised with no args -- arrived as
+  // attempts=0, error='' and read as "nobody has tried this minute",
+  // which is the one answer this reply must never be able to give by
+  // accident. A field that has to be set deliberately cannot be
+  // produced by a formatting accident.
+  bool ok = 3;
 }
 
 message ReapFederationReplayRequest {

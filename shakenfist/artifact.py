@@ -361,11 +361,57 @@ class Artifact(dbowo):
     @staticmethod
     def from_url(artifact_type, url, name=None, max_versions=0, namespace=None,
                  create_if_new=False):
+        """Resolve a URL to an artifact this namespace can see.
+
+        Resolution is by *visibility*, so the artifact returned may
+        belong to somebody else -- a shared one, or one whose owner
+        trusts us. That is the right answer for a caller which wants to
+        read the result or boot from it.
+
+        It is the wrong answer for a caller which wants to write to it.
+        Adding a version is a mutation, and it takes ownership rather
+        than visibility, because add_index ends in delete_old_versions
+        and so destroys the owner's older versions once the count passes
+        max_versions. A write path wants owned_from_url().
+        """
+        return Artifact._resolve_url(
+            artifact_type, url, namespace_or_shared_filter, name=name,
+            max_versions=max_versions, namespace=namespace,
+            create_if_new=create_if_new)
+
+    @staticmethod
+    def owned_from_url(artifact_type, url, namespace=None):
+        """Resolve a URL to an artifact this namespace owns, or None.
+
+        The write side counterpart to from_url(). ``namespace`` here is
+        the namespace the artifact should live in, so the predicate is a
+        plain ownership test and neither sharing nor a trust appears in
+        it. Both of those grant visibility, and the invariant this PR
+        states is that changing an object takes its owning namespace or
+        system.
+
+        Note that there is no system escape in the predicate itself,
+        because the argument is the target namespace rather than the
+        requestor. System naming a namespace explicitly still lands on
+        that namespace's artifact; what the caller may then do with it
+        is the caller's own ownership check to make.
+
+        Deliberately does not create. The caller has to authorise the
+        existing and the brand new cases differently: a trust is enough
+        to gift a namespace an artifact it did not have, and not enough
+        to replace what one it already owns resolves to.
+        """
+        return Artifact._resolve_url(
+            artifact_type, url, namespace_exact_filter, namespace=namespace)
+
+    @staticmethod
+    def _resolve_url(artifact_type, url, visibility, name=None, max_versions=0,
+                     namespace=None, create_if_new=False):
         artifacts = list(Artifacts([
             partial(url_filter, url),
             partial(type_filter, artifact_type),
             not_dead_states_filter,
-            partial(namespace_or_shared_filter, namespace)]))
+            partial(visibility, namespace)]))
 
         if len(artifacts) == 0:
             if create_if_new:

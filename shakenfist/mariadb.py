@@ -20477,12 +20477,19 @@ def _grpc_record_federated_exchange(
             token_id=token_id, rule_uuid=str(rule_uuid),
             expires_at=expires_at)
         reply = _grpc_call(stub.RecordFederatedExchange, request)
-        if reply.error:
+        if not reply.ok:
             # The daemon distinguishes "already claimed" (recorded
-            # False, no error) from a failure to find out, and only
-            # the former is a replay.
+            # False, ok True) from a failure to find out, and only the
+            # former is a replay.
+            #
+            # Decided on ok rather than on error being non-empty: an
+            # exception with an empty str() would otherwise arrive
+            # looking like a successful answer. See the field comment on
+            # CountFederatedAttemptReply.ok, where that misreading was
+            # the permissive direction rather than this one.
             raise exceptions.DatabaseUnavailable(
-                f'federated exchange replay check failed: {reply.error}')
+                f'federated exchange replay check failed: '
+                f'{reply.error or "no detail reported"}')
         return bool(reply.recorded)
     except grpc.RpcError as e:
         LOG.error(f'gRPC RecordFederatedExchange failed for '
@@ -20498,10 +20505,15 @@ def _grpc_count_federated_attempt(source: str, window_start: int) -> int:
         request = database_pb2.CountFederatedAttemptRequest(
             source=source, window_start=window_start)
         reply = _grpc_call(stub.CountFederatedAttempt, request)
-        if reply.error:
+        if not reply.ok:
+            # Never `if reply.error`. attempts=0 with an empty error is
+            # what an exception raised with no args produces, and read as
+            # a count it says "nobody has tried this minute, allow" --
+            # which turns a database failure into an open door on the one
+            # unauthenticated endpoint in the API.
             raise exceptions.DatabaseUnavailable(
                 f'federated exchange rate limit check failed: '
-                f'{reply.error}')
+                f'{reply.error or "no detail reported"}')
         return int(reply.attempts)
     except grpc.RpcError as e:
         LOG.error(f'gRPC CountFederatedAttempt failed for {source}: {e}')

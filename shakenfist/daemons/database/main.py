@@ -5518,16 +5518,19 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 UUID(request.rule_uuid),
                 request.expires_at)
             return database_pb2.RecordFederatedExchangeReply(
-                recorded=recorded, error='')
+                recorded=recorded, error='', ok=True)
         except Exception as e:
             # Reported in the reply body rather than as an RPC error so
             # the client can tell "we could not find out" apart from
             # "already claimed". Both refuse the exchange, but only one
             # of them means the database is in trouble.
+            #
+            # ok is set on the success path only, so it stays false here
+            # whatever str(e) turns out to be.
             util_exceptions.ignore_exception(
                 'database RecordFederatedExchange failed', e)
             return database_pb2.RecordFederatedExchangeReply(
-                recorded=False, error=str(e))
+                recorded=False, error=str(e), ok=False)
 
     def CountFederatedAttempt(
         self,
@@ -5540,12 +5543,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             attempts = mariadb._direct_count_federated_attempt(
                 request.source, request.window_start)
             return database_pb2.CountFederatedAttemptReply(
-                attempts=attempts, error='')
+                attempts=attempts, error='', ok=True)
         except Exception as e:
+            # attempts=0 is not a safe default here -- read as a real
+            # count it means "under the limit, allow" -- so the client
+            # decides on ok rather than on this reply having managed to
+            # produce a non-empty error string.
             util_exceptions.ignore_exception(
                 'database CountFederatedAttempt failed', e)
             return database_pb2.CountFederatedAttemptReply(
-                attempts=0, error=str(e))
+                attempts=0, error=str(e), ok=False)
 
     def ReapFederationReplay(
         self,

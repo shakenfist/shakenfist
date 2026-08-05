@@ -571,3 +571,130 @@ class ArtifactMutationTestCase(ArtifactAccessFixture):
         self.assertNotEqual(
             Artifact.STATE_DELETED,
             Artifact.from_db(self.artifact.uuid).state.value)
+
+
+class ArtifactWriteTargetTestCase(ArtifactAccessFixture):
+    """Which artifact a write route is allowed to land on.
+
+    The routes above take a uuid, so the ownership check has something
+    to check. The upload and cache routes instead resolve a
+    caller-supplied url, and they used to resolve it with
+    `Artifact.from_url`, whose predicate is *visibility*. A trusted
+    namespace could therefore name the owner's source_url, land on the
+    owner's artifact, and have its own blob added as the newest version
+    -- and `add_index` ends in `delete_old_versions`, so the owner's
+    older versions went with it.
+
+    Resolution is by ownership now, so there are two distinct outcomes
+    and both matter. A caller who names somebody else's namespace is
+    refused outright. A caller who names nobody's lands on an artifact in
+    its *own* namespace even when the url collides with the owner's --
+    source_url is not a cluster wide key, and owning an artifact that
+    claims a url somebody else also claims has never been forbidden.
+
+    Refusals are distinguished by *reason* rather than status, because
+    both outcomes are a 404 here: a caller turned away at the gate is
+    told the namespace does not exist, while one who gets past it goes on
+    to fail on the deliberately absent blob. Comparing the two proves the
+    gate moved rather than merely that something returned 404.
+    """
+
+    MISSING_BLOB = '9f0f3e64-4b64-4b9f-9f2c-0f5e0a2c9a01'
+
+    def _upload(self, requestor, target=None, source_url=None, name='thing'):
+        # The blob is made absent on purpose. It is the marker for
+        # "authorisation passed": the lookup sits inside the artifact
+        # lock, well past the gate, so only a caller entitled to write
+        # ever sees 'blob not found'. Everybody else is turned away
+        # earlier with 'namespace not found' and never reaches it.
+        body = {
+            'blob_uuid': self.MISSING_BLOB,
+            'source_url': source_url or self.artifact.source_url,
+            'artifact_type': 'other'}
+        if target:
+            body['namespace'] = target
+
+        with mock.patch(
+                'shakenfist.external_api.artifact.Blob.from_db',
+                return_value=None):
+            return self.client.post(
+                '/artifacts/upload/%s' % name,
+                headers={'Authorization': self._token(requestor)},
+                data=json.dumps(body))
+
+    def _indexes(self):
+        return len(list(
+            Artifact.from_db(self.artifact.uuid).get_all_indexes()))
+
+    def test_the_owner_reaches_the_write(self):
+        # The control. 'blob not found' means authorisation passed and
+        # the route got as far as looking for the blob, which is as far
+        # as this test wants it to get.
+        resp = self._upload('owner')
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('blob not found', resp.get_json()['error'])
+
+    def test_system_reaches_the_write(self):
+        resp = self._upload('system')
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('blob not found', resp.get_json()['error'])
+
+    def test_a_trusted_namespace_cannot_write_to_the_owners_namespace(self):
+        # The bug. Naming the owner's namespace used to resolve the
+        # owner's artifact and then pass the trust check, so a trusted
+        # caller's blob became the newest version of it.
+        resp = self._upload('trusted', target='owner')
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('namespace not found', resp.get_json()['error'])
+
+    def test_a_stranger_cannot_write_to_the_owners_namespace(self):
+        resp = self._upload('stranger', target='owner')
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('namespace not found', resp.get_json()['error'])
+
+    def test_sharing_does_not_make_an_artifact_writable(self):
+        # Sharing is the other half of the visibility predicate that used
+        # to be consulted here, so it gets its own case even though the
+        # trust check refused this one already.
+        self._share()
+        resp = self._upload('trusted', target='owner')
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('namespace not found', resp.get_json()['error'])
+
+    def test_a_colliding_url_lands_in_the_callers_own_namespace(self):
+        # Not a refusal, and should not be one. The caller named no
+        # namespace, so the write goes to an artifact of its own -- even
+        # though the url collides with the owner's, because source_url is
+        # not a cluster wide key.
+        resp = self._upload('trusted')
+        self.assertEqual('blob not found', resp.get_json()['error'])
+
+        mine = Artifact.owned_from_url(
+            Artifact.TYPE_OTHER, self.artifact.source_url,
+            namespace='trusted')
+        self.assertIsNotNone(mine)
+        self.assertNotEqual(str(self.artifact.uuid), str(mine.uuid))
+
+    def test_the_owners_artifact_gains_no_version_from_a_collision(self):
+        # The property the reasons above stand in for. Asserted on the
+        # object, because a route which wrote and then refused would
+        # satisfy every status assertion in this class.
+        before = self._indexes()
+        self._upload('trusted')
+        self._upload('trusted', target='owner')
+        self.assertEqual(before, self._indexes())
+
+    def test_the_owners_artifact_gains_no_event_from_a_refusal(self):
+        # The audit event used to be written before the authorisation
+        # check, which let a refused caller append to the event log of a
+        # namespace it was about to be told does not exist.
+        with mock.patch.object(Artifact, 'add_event') as add_event:
+            self._upload('trusted', target='owner')
+        add_event.assert_not_called()
+
+    def test_the_event_is_still_written_when_the_write_is_allowed(self):
+        # The control for the ordering change. Moving the event after the
+        # gate must not lose it for callers who pass.
+        with mock.patch.object(Artifact, 'add_event') as add_event:
+            self._upload('owner')
+        add_event.assert_called()

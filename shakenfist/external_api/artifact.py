@@ -451,8 +451,20 @@ class ArtifactsEndpoint(api_base.Resource):
         if not namespace_is_trusted(namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
 
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
-                              create_if_new=True)
+        # As on the upload route, resolve by ownership. The trust check
+        # above only establishes that we may act on the named namespace;
+        # from_url would additionally have matched an artifact belonging
+        # to a third namespace which shares with, or is trusted by, that
+        # one, and the image_fetch queued below adds a version to
+        # whatever it lands on.
+        a = Artifact.owned_from_url(Artifact.TYPE_IMAGE, url,
+                                    namespace=namespace)
+        if a:
+            if request_namespace() not in [a.namespace, 'system']:
+                return sf_api.error(404, 'namespace not found')
+        else:
+            a = Artifact.new(Artifact.TYPE_IMAGE, url, namespace=namespace)
+
         a.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
         # Only admin can create shared artifacts
@@ -592,12 +604,33 @@ class ArtifactUploadEndpoint(api_base.Resource):
         else:
             return sf_api.error(403, 'invalid artifact type specified')
 
-        a = Artifact.from_url(artifact_type_value, source_url, name=artifact_name,
-                              namespace=namespace, create_if_new=True)
-        a.add_event(EVENT_TYPE_AUDIT, 'convert upload to artifact from REST API')
+        # Resolve by ownership rather than visibility, then authorise the
+        # two cases apart. from_url would have matched an artifact owned
+        # by anyone who merely shares with us or trusts us, and the write
+        # below is add_index, which ends in delete_old_versions -- so a
+        # trusted namespace could replace what somebody else's artifact
+        # resolves to and destroy the versions underneath it.
+        #
+        # Creating is additive and a trust is enough for it, which is what
+        # the operator guide promises. Pushing a version into an artifact
+        # a namespace already owns is not additive, so that takes the
+        # owning namespace or system, exactly as requires_artifact_
+        # ownership demands everywhere else.
+        a = Artifact.owned_from_url(artifact_type_value, source_url,
+                                    namespace=namespace)
+        if a:
+            if request_namespace() not in [a.namespace, 'system']:
+                return sf_api.error(404, 'namespace not found')
+        else:
+            if not namespace_is_trusted(namespace, request_namespace()):
+                return sf_api.error(404, 'namespace not found')
+            a = Artifact.new(artifact_type_value, source_url,
+                             name=artifact_name, namespace=namespace)
 
-        if not namespace_is_trusted(a.namespace, request_namespace()):
-            return sf_api.error(404, 'namespace not found')
+        # The audit event is written after the authorisation check, not
+        # before it, so a refused caller cannot append to the event log of
+        # a namespace it has just been told does not exist.
+        a.add_event(EVENT_TYPE_AUDIT, 'convert upload to artifact from REST API')
 
         # Only admin can create shared artifacts
         if shared:

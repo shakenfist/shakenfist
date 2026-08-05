@@ -414,6 +414,30 @@ admits. Two rules to preserve if you touch this:
   route that then deletes what it found. New route, ownership guard, narrow
   ref decorator — the pairing goes together.
 
+The same split applies to *url* resolution, and this is where it was missed.
+`Artifact.from_url` filters by `namespace_or_shared_filter`, so it can return
+an artifact belonging to whoever shares with or trusts the caller. That is the
+right answer for a caller which will read the result and the wrong one for a
+caller which will write to it: the upload and cache routes used it to pick a
+write target, so a trusted namespace could name the owner's `source_url` and
+have its own blob added as the newest version — and because `add_index` ends in
+`delete_old_versions`, the owner's older versions went with it. Write paths use
+`Artifact.owned_from_url()`, which resolves by ownership and does not create.
+
+Two rules fell out of fixing it, and both generalise past artifacts:
+
+- **A predicate is part of a function's contract, not an implementation
+  detail.** If one lookup serves both intents, say which it is in the name and
+  make the other one a separate function. A default that silently suits readers
+  is how a write path inherits a read's authorisation.
+- **Creating and modifying are different grants.** A trust may let a namespace
+  *give* you an object it did not have — additive, and the operator guide
+  promises it. It must not let that namespace replace what an object you
+  already own resolves to. When a route can do either, authorise the two cases
+  separately rather than once at the top, and put the audit event *after* the
+  check so a refused caller cannot write to the event log of a namespace it is
+  about to be told does not exist.
+
 ### Credential-carrying routes are not logged, not redacted
 
 Two independent loggers see a request body: `app.py`'s `before_request` audit
@@ -490,6 +514,34 @@ believing a regression test, check that the thing it patches is on the path
 that can actually fail. Use `MappingRule.policy()` to read the whole policy in
 one go when you need more than one field -- it is also the single place to
 catch this.
+
+The same guard has to answer differently in different places, and that is not
+inconsistency. The exchange endpoint *refuses* a damaged rule, because bound
+claims it cannot read are bound claims it cannot check and minting anyway would
+be authorising on a guess. `MappingRule.external_view()` *describes* one, with
+an explicit `unusable` marker, because the CRUD routes exist to tell an owner
+which rule is broken -- raising there turned one bad row into a 500 that hid
+every healthy rule in the namespace, and made a successful delete report
+failure on the one call that would have cleaned it up. Ask what the caller will
+do with the answer before choosing.
+
+### Fail closed on a field, not on a formatting accident
+
+A reply that says "this went wrong" must say so in a field set only on the
+success path. `CountFederatedAttemptReply` used to signal failure by carrying a
+non-empty `error`, and the client read anything else as an answer -- so an
+exception raised with no args, whose `str()` is empty, arrived as
+`attempts=0, error=''` and was read as "nobody has tried this minute, allow".
+That is the one direction a rate limiter must never fail, on the one endpoint
+anybody may call.
+
+Both federation replies now carry `bool ok`, set only where the work actually
+succeeded, and the client tests that. `error` is diagnostics. When you add an
+RPC whose reply has a permissive-looking default -- a zero count, an empty
+list, a `False` that means "go ahead" -- carry an explicit success field rather
+than inferring one, and write the test that returns the empty-error reply and
+asserts the refusal. The invariant is not that today's code produces a message;
+it is that no reply can be mistaken for a permissive one.
 
 ### Key Directories
 

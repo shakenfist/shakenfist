@@ -211,19 +211,28 @@ the cheapest rejections happen first:
 
 1. Reject if the body exceeds `FEDERATION_MAX_TOKEN_BYTES`. No
    parsing.
-2. Parse the JWT header and claims **without verifying** to read
+2. Rate limit per source address.
+3. Parse the JWT header and claims **without verifying** to read
    `iss`. Reject if no `TrustedIssuer` matches. No network yet.
-3. Rate limit per source address.
 4. Verify the signature against cached JWKS.
 5. Check `aud`, `exp`, `nbf`.
 6. Load the named rule in the named namespace; check bound claims.
 7. Refuse if this `(token, rule)` pair has been seen.
 8. Mint the key.
 
-Steps 1 and 2 preceding step 4 matter more than they look.
+Steps 1 to 3 preceding step 4 matter more than they look.
 `PyJWKClient` fetches synchronously inside the request, so an
 unfiltered path would let anyone with a made-up `iss` tie up a
 gunicorn worker on an outbound HTTP call.
+
+Steps 2 and 3 were also the other way around when this section was
+first written, on the reasoning that refusing an unknown issuer first
+kept the rate limit table from growing a row per made-up `iss`. That
+reasoning does not survive being stated: resolving the issuer is a scan
+of every configured issuer with two reads per row, so the ordering
+avoided one cheap insert by permitting an unbounded number of reads
+above the meter. The review that caught it is recorded below; the meter
+is now second, and only the argument checks sit above it.
 
 Steps 6 and 7 were the other way around when this section was first
 written, which is not implementable: the pair being claimed is
@@ -671,6 +680,127 @@ Considered, and documented rather than changed:
   match, so the common case is untouched. Recorded in the docstring as
   a deliberate choice, with the SQL pushdown that would fix it if it
   ever shows up in a profile.
+
+## Second pull request review (#3625)
+
+A re-review after the first round raised seven further items: two to
+fix, one documentation correction, four to consider. All seven were
+addressed. None of them contradicted a fix from the first round, and
+the severity fell — the first round found a security hole with a
+regression test that agreed with it, this one found one live
+authorisation gap and otherwise inconsistencies between what the code
+does and what this branch's own documents claim it does.
+
+Fixed:
+
+* **A trust still authorised destructive mutation of another
+  namespace's artifact.** `ArtifactUploadEndpoint.post` and the cache
+  route resolved a caller-supplied url with `Artifact.from_url`, whose
+  predicate is *visibility* — so a trusted namespace could name the
+  owner's `source_url`, land on the owner's artifact, and have its own
+  blob added as the newest version. `add_index` ends in
+  `delete_old_versions`, so the owner's older versions went with it.
+  The root cause was one function serving both a read and a write
+  intent, which is the same defect this phase already fixed for *name*
+  resolution when it split `arg_is_artifact_ref` from
+  `arg_is_visible_artifact_ref`. `from_url` now documents that it
+  resolves by visibility, and the new `Artifact.owned_from_url()` is
+  what a write path uses. Both routes then authorise the existing and
+  the brand new cases apart: a trust is enough to gift a namespace an
+  artifact it did not have, and not enough to replace what one it
+  already owns resolves to. The audit event also moved below the check,
+  so a refused caller can no longer append to the event log of a
+  namespace it is about to be told does not exist.
+* **Two documents still described the pre-reorder exchange sequence.**
+  The developer guide and this plan both listed issuer resolution above
+  the rate limit, and this plan contradicted itself within one file.
+  Both lists now match the code, and the inline step comments in
+  `AuthFederatedEndpoint.post` — which read 2, 3, 4-5, 7, 6, 8 — are
+  renumbered, since an ordering argument that cannot be audited against
+  the code is not much of an argument.
+* **The operator guide overstated what a trust withholds.** It claimed
+  a trusted namespace cannot change your objects' metadata, but
+  `requires_namespace_ownership` *is* `namespace_is_trusted`, so a
+  trusted namespace can add keys and write mapping rules in yours — the
+  most privilege-bearing objects this phase adds. The behaviour matches
+  the documented `add-key` precedent and is deliberate; the blanket
+  claim was what needed narrowing. The section now says plainly that a
+  trust is administrative access to a namespace's credentials, not only
+  a window onto its resources.
+
+Considered, and changed:
+
+* **The rate limiter could fail open.** Both federation replies
+  signalled failure by carrying a non-empty `error`, which left the
+  fail-closed property resting on string formatting: an exception
+  raised with no args has an empty `str()`, so the reply arrived as
+  `attempts=0, error=''` and read as "nobody has tried this minute".
+  Not reachable through any current path, because
+  `_direct_count_federated_attempt` converts the plausible failures
+  into `DatabaseUnavailable` with text — but an invariant carried by a
+  string being non-empty is not one a future contributor will know to
+  preserve. Both replies now carry an explicit `bool ok`, set only on
+  the success path, and the client decides on that.
+* **A damaged rule took the whole CRUD listing down.**
+  `external_view()` called `policy()`, so one undecodable column turned
+  a namespace's entire rule listing into a 500 and hid every healthy
+  rule. Worse, `delete()` does the work and *then* builds the
+  response, so a damaged rule was soft-deleted successfully and the
+  caller still got a 500 — on the one operation that would have cleaned
+  it up. `external_view()` now describes such a rule with an explicit
+  `unusable` marker instead of raising. Note this is the opposite
+  choice from the exchange, deliberately: the exchange must refuse,
+  because bound claims it cannot read are bound claims it cannot check,
+  while the CRUD routes exist to tell an owner which rule is broken.
+* **`TrustedIssuer` was left with the read-per-property shape
+  `MappingRule.policy()` was written to fix.** `validate_token` went
+  back to the same row three times — `jwks_uri`, then `audience` and
+  `issuer_url`. The new `TrustedIssuer.configuration()` reads once, and
+  `JWKS_CACHE.signing_key()` takes the `jwks_uri` its caller is already
+  holding rather than reading it again. Pinned by a test asserting the
+  read count, because nothing else would notice a third read coming
+  back. The `issuer_claiming_url` SQL pushdown the reviewer also
+  suggested was *not* done: the scan is now below the meter, which was
+  the security half, and pushing the match into SQL is a larger change
+  than this branch should carry.
+* **Reclaiming a rule name destroyed the superseded rule's events.**
+  `hard_delete()` deletes object events, and on a rule those events are
+  the refusal trail — a stream of near-miss claim failures is what
+  probing looks like. The natural response to spotting it is to delete
+  the rule and write a tighter one under the same name, which is this
+  exact path, so acting on the evidence erased it. Both `MappingRule`
+  and `TrustedIssuer` now record the supersession, with the superseded
+  uuid, on the replacement object. Recorded there rather than on the
+  namespace because `namespace.py` imports `mapping_rule`, and because
+  the replacement is where somebody asking what happened to a rule will
+  look. This preserves the fact and the identifier, not the trail
+  itself; a fuller fix would copy the events, and the unique index
+  means the old row still has to go.
+
+Not done, and why:
+
+* **A CI assertion for the artifact upload gap.** The reviewer
+  suggested one in `test_trusts` alongside the delete assertions. The
+  `shakenfist_client` package is not installed in the development
+  environment, so `cache_artifact`'s signature could not be verified,
+  and a functional test written against a guessed client API is worse
+  than none. The unit coverage pins both halves of the fix instead, and
+  each half was confirmed by reverting it and watching the specific
+  tests fail.
+* **A test that `reap_federation_records` is registered on the cluster
+  daemon schedule.** True gap, but a uniform one: no test in the tree
+  asserts schedule registration for any of the ten cluster tasks, and
+  the block sits inside the elected loop where reaching it means
+  refactoring `daemons/cluster/main.py`. Covering one task and not the
+  nine beside it would read as assurance that is not there.
+* **A test that a `key_name_prefix` collision does not rotate an
+  existing key.** Investigated rather than accepted: the minted name
+  carries an eight character random discriminator, so a collision is
+  not reachable, and a test of that would be a test of probability.
+  What *was* missing is the property the discriminator exists to
+  protect — that the bare prefix is never used as a key name — so there
+  is now a test that an operator's key named for the prefix still
+  authenticates after a mint.
 
 ## Back brief
 

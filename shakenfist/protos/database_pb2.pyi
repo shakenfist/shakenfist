@@ -8539,6 +8539,7 @@ class RecordFederatedExchangeReply(_message.Message):
 
     RECORDED_FIELD_NUMBER: _builtins.int
     ERROR_FIELD_NUMBER: _builtins.int
+    OK_FIELD_NUMBER: _builtins.int
     recorded: _builtins.bool
     """True if this (token, rule) pair was recorded for the first time,
     false if it was already present and this is therefore a replay.
@@ -8550,15 +8551,24 @@ class RecordFederatedExchangeReply(_message.Message):
     because we do not know. Both refuse, but only one is worth paging
     an operator about.
     """
+    ok: _builtins.bool
+    """Whether the claim was actually evaluated. Carried here for symmetry
+    with CountFederatedAttemptReply rather than because this message
+    needs it: recorded=false with an empty error degrades to "treat as
+    a replay", which refuses, so this one already failed closed. Having
+    both replies answer the same way keeps the next reader from having
+    to work out which of the two was the safe one.
+    """
     def __init__(
         self,
         *,
         recorded: _builtins.bool = ...,
         error: _builtins.str = ...,
+        ok: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "recorded", b"recorded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "ok", b"ok", "recorded", b"recorded"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -8594,19 +8604,33 @@ class CountFederatedAttemptReply(_message.Message):
 
     ATTEMPTS_FIELD_NUMBER: _builtins.int
     ERROR_FIELD_NUMBER: _builtins.int
+    OK_FIELD_NUMBER: _builtins.int
     attempts: _builtins.int
     """Attempts in this window, including this one"""
     error: _builtins.str
-    """Set if the counter could not be written"""
+    """Diagnostics only. Never test this to decide."""
+    ok: _builtins.bool
+    """Whether attempts means anything. Set true only on the success path.
+
+    The client used to infer this from error being non-empty, which put
+    the fail closed property in the hands of message formatting: an
+    exception whose str() is empty -- KeyError(), a bare
+    AttributeError(), anything raised with no args -- arrived as
+    attempts=0, error='' and read as "nobody has tried this minute",
+    which is the one answer this reply must never be able to give by
+    accident. A field that has to be set deliberately cannot be
+    produced by a formatting accident.
+    """
     def __init__(
         self,
         *,
         attempts: _builtins.int = ...,
         error: _builtins.str = ...,
+        ok: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempts", b"attempts", "error", b"error"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempts", b"attempts", "error", b"error", "ok", b"ok"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
