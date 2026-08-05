@@ -71,6 +71,31 @@ committing the result back as shakenfist-bot, and the daily
 consistency audit in shakenfist/development files an issue when five
 or more in-scope files need review.
 
+### Signing review marks
+
+A review mark is an attestation, so the commit that introduces one
+must be signed -- that signature is what binds the reviewer to the
+exact content reviewed. Signing is configured per clone and is easy
+to forget in a fresh one; check it before stamping, because an
+unsigned review commit records a mark that nothing vouches for:
+
+```bash
+git config gpg.format x509
+git config gpg.x509.program gitsign
+git config commit.gpgsign true
+git config tag.gpgsign true
+```
+
+Verify with `git log --format='%h %G? %s'`; review commits should
+report `U` (signed, with gitsign's Fulcio chain not in a local trust
+store) rather than `N` (unsigned). `gitsign` needs an interactive
+Sigstore login on first use, so run `gitsign-credential-cache &` to
+authenticate once per session instead of once per commit.
+
+The bot's `prune` commits are deliberately unsigned: pruning only
+ever removes marks, so it cannot manufacture an attestation. Only
+the commits that add marks need signatures.
+
 ## Vendored web assets
 
 ### Bootstrap CSS
