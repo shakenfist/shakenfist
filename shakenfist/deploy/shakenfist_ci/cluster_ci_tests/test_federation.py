@@ -7,12 +7,16 @@ route that mints a real credential, and none of that is exercised by
 a test which mocks the database away.
 
 Most of this needs no external identity provider. The successful
-exchange does -- the cluster has to fetch a JWKS over HTTP -- so this
-stands up a throwaway JWKS server in the test process and hands the
-issuer its address. Whether the cluster can route back to the test
-runner depends on the deployment, so that half detects reachability
-and skips rather than failing, in the same spirit as the Kerbside VDI
-token test. The parts that need no network always run.
+exchange does -- the cluster has to fetch a JWKS -- so this stands up
+a throwaway JWKS server in the test process and hands the issuer its
+address. That server speaks TLS behind a certificate it signs itself,
+because the API refuses a plaintext jwks_uri and should keep doing so.
+The cluster refuses the certificate in turn, so that half detects
+whether the JWKS was actually served and skips rather than failing, in
+the same spirit as the Kerbside VDI token test. Issue #3639 tracks
+giving CI a certificate the cluster trusts, which is what this file
+needs before the exchange can be tested for real. The parts that need
+no callback always run.
 
 The requests library is used directly for anything where the exact
 status code is the assertion, because the client library maps
@@ -21,15 +25,25 @@ file cares about (401 refused, 403 out of scope, 413 too large, 429
 rate limited).
 """
 
+import datetime
 import http.server
+import ipaddress
 import json
+import os
+import shutil
 import socket
+import ssl
+import tempfile
 import threading
 import time
 
 import jwt
 import requests
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 from testtools import content
 
 from shakenfist_ci import base
@@ -88,27 +102,94 @@ class TestFederation(base.BaseNamespacedTestCase):
             ]
         }
 
+        # The address has to be settled before the server starts, since
+        # it is what the certificate has to be issued for.
+        local_ip = self._local_ip()
+
         server = http.server.ThreadingHTTPServer(('0.0.0.0', 0), _JWKSHandler)
         server.jwks = jwks
         server.fetches = []
+        server.socket = self._tls_context(local_ip).wrap_socket(
+            server.socket, server_side=True)
         self.jwks_server = server
 
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(server.shutdown)
 
-        # The address the cluster would have to come back to. Asking a
-        # socket which local interface routes towards the API is more
-        # reliable than guessing at hostnames.
+        return 'https://%s:%d/jwks' % (local_ip, server.server_port)
+
+    def _local_ip(self):
+        """The address the cluster would have to come back to.
+
+        Asking a socket which local interface routes towards the API is
+        more reliable than guessing at hostnames.
+        """
         probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             host = self.base_url.split('://', 1)[-1].split('/')[0]
             probe.connect((host.split(':')[0], 80))
-            local_ip = probe.getsockname()[0]
+            return probe.getsockname()[0]
         finally:
             probe.close()
 
-        return 'http://%s:%d/jwks' % (local_ip, server.server_port)
+    def _tls_context(self, local_ip):
+        """Serve the JWKS over TLS, behind a self signed certificate.
+
+        The API refuses a jwks_uri that is not https, and it is right
+        to: a JWKS fetched over plaintext can be substituted by anyone
+        on the path, which turns signature verification into theatre.
+        So the test server has to speak TLS, and the only certificate a
+        test can conjure for an ephemeral address is one it signs
+        itself.
+
+        The cluster fetches through PyJWKClient, which verifies against
+        the system trust store, so it will refuse this certificate and
+        the handler will never run. That is a known limitation rather
+        than an accident: _require_reachable_jwks sees the JWKS was
+        never served and skips, so the exchange stays honestly
+        uncovered here instead of the validation being weakened to suit
+        the test. Issue #3639 tracks giving CI a certificate the
+        cluster trusts.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        name = x509.Name(
+            [x509.NameAttribute(NameOID.COMMON_NAME, local_ip)])
+
+        # The JWKS signing key doubles as the transport key. A second
+        # 2048 bit key per test buys nothing when the certificate is
+        # untrusted by design.
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(self.key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(minutes=5))
+            .not_valid_after(now + datetime.timedelta(hours=1))
+            .add_extension(
+                x509.SubjectAlternativeName(
+                    [x509.IPAddress(ipaddress.ip_address(local_ip))]),
+                critical=False)
+            .sign(self.key, hashes.SHA256()))
+
+        # load_cert_chain has no in-memory equivalent, so these have to
+        # touch disk.
+        tmpdir = tempfile.mkdtemp(prefix='sf-ci-jwks-')
+        self.addCleanup(shutil.rmtree, tmpdir, ignore_errors=True)
+        certfile = os.path.join(tmpdir, 'cert.pem')
+        keyfile = os.path.join(tmpdir, 'key.pem')
+        with open(certfile, 'wb') as f:
+            f.write(certificate.public_bytes(serialization.Encoding.PEM))
+        with open(keyfile, 'wb') as f:
+            f.write(self.key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()))
+
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certfile, keyfile)
+        return context
 
     def _delete_issuer(self):
         try:
@@ -171,11 +252,15 @@ class TestFederation(base.BaseNamespacedTestCase):
 
         if not self.jwks_server.fetches:
             self.skipTest(
-                'This cluster cannot reach the test runner at %s, so the '
-                'JWKS could not be served and the signature could not be '
-                'verified. The exchange logic is covered by the unit '
-                'tests; the parts of this file which need no callback '
-                'still ran.' % self.jwks_uri)
+                'The cluster never fetched %s, so the signature could not '
+                'be verified. Expected until issue #3639 gives CI a '
+                'certificate the cluster trusts: the test server can only '
+                'sign its own, and the cluster verifies against the system '
+                'trust store. The other possibility is that the cluster '
+                'cannot route back to the test runner at all. Either way '
+                'the exchange logic is covered by the unit tests, and the '
+                'parts of this file which need no callback still ran.'
+                % self.jwks_uri)
 
         self.addDetail('exchange_response',
                        content.text_content(resp.text))

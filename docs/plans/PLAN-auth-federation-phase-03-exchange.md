@@ -802,6 +802,49 @@ Not done, and why:
   is now a test that an operator's key named for the prefix still
   authenticates after a mint.
 
+## Merge queue failure (#3625)
+
+The first attempt to merge failed for two unrelated reasons. Three
+matrix jobs died because the home lab pip mirror and proxy were
+unreachable for about two minutes, which is infrastructure and not
+this branch. The fourth found a real defect.
+
+Every one of the sixteen tests in
+`cluster_ci_tests/test_federation.py` failed in `setUp` with
+`400 jwks_uri must be https`. `_start_jwks_server()` handed the issuer
+an `http://` address, and `_validate_issuer_arguments` has refused
+non-HTTPS `jwks_uri` since the `TrustedIssuer` object was added in
+`6d9092944`. The test, written later in `0a6f5d651`, contradicted a
+constraint that already existed. It went unnoticed because the
+`(collection)` matrix is skipped on `pull_request` and only runs on
+`merge_group`, so these tests had never executed.
+
+The API is right and the test was wrong, so the test changed: the
+throwaway JWKS server now speaks TLS behind a certificate it signs
+itself, and the issuer is registered with an `https://` address. No
+loopback or private-address exemption was added to the validator. A
+JWKS fetched over plaintext can be substituted by anyone on the path,
+and a rule with a hole in it for the convenience of tests is a rule
+that will eventually be exercised in production.
+
+The cost is stated rather than hidden. The cluster verifies against
+the system trust store, so it refuses a self-signed certificate and
+never reaches the handler; `_require_reachable_jwks` sees the JWKS was
+never served and skips. Eleven tests — issuer and rule CRUD, ownership
+gates, validation, malformed and oversized bodies, the unauthenticated
+route — now run for real. The five that need a live callback skip with
+a message naming the reason. Issue #3639 tracks giving CI a
+certificate the cluster trusts, and records that reachability is
+almost certainly not the obstacle, since the tests run on the primary
+node alongside the API they call.
+
+This is also the item the second review round raised and this plan
+declined, on the grounds that `shakenfist_client` was not installed
+locally so the call could not be verified. That was wrong: the client
+installs from PyPI into a scratch venv without difficulty, and doing
+so reproduces the failure in seconds. The lesson is recorded in
+`AGENTS.md` under "Cluster CI tests only run in the merge queue".
+
 ## Back brief
 
 Before executing any step of this phase, the implementing sub-agent

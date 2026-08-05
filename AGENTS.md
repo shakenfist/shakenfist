@@ -543,6 +543,28 @@ than inferring one, and write the test that returns the empty-error reply and
 asserts the refusal. The invariant is not that today's code produces a message;
 it is that no reply can be mistaken for a permissive one.
 
+### Cluster CI tests only run in the merge queue
+
+The `(collection)` matrix in `Functional tests` -- everything under
+`deploy/shakenfist_ci/cluster_ci_tests/` -- is skipped on `pull_request` and
+runs on `merge_group`. A green PR therefore says nothing about whether those
+tests pass, or whether they can even reach their first assertion.
+
+`cluster_ci_tests/test_federation.py` sat through four commits registering a
+trusted issuer with an `http://` `jwks_uri` while the API had refused
+non-HTTPS `jwks_uri` since the object was added. Every test in the class died
+in `setUp` on a 400, and nothing said so until the branch entered the queue.
+
+Two habits follow. When you add or change a cluster CI test, run it, or at
+minimum drive the validator it depends on directly -- these tests import
+cleanly given `pip install shakenfist-client testtools oslo.concurrency
+prettytable` in a scratch venv, so "the client is not installed" is not a
+reason to skip verification. And when a test needs input that a validator
+rejects, the validator is usually right: change the test, never carve a
+loopback or test-only exemption into a security check. If that makes the test
+unrunnable, make it skip loudly and file the issue -- see #3639 for the JWKS
+certificate case.
+
 ### Key Directories
 
 - `shakenfist/` - Core package
