@@ -238,7 +238,7 @@ Phases will get detailed plan files as each is started.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. oVirt lane deploys kerbside | PLAN-two-tier-ci-phase-01-ovirt-kerbside.md | Not started |
+| 1. oVirt lane deploys kerbside | [PLAN-two-tier-ci-phase-01-ovirt-kerbside.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/) | Complete |
 | 2. Promote sf-e2e to PR smoke gate | PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md | Blocked on precondition |
 | 3. Merge queue adoption and tier split | PLAN-two-tier-ci-phase-03-merge-queue.md | Not started |
 | 4. Documentation | PLAN-two-tier-ci-phase-04-docs.md | Not started |
@@ -249,8 +249,15 @@ Phases will get detailed plan files as each is started.
   proxied-console check (open question 5). This settles
   the architecture (a) decision in practice; the
   operator-facing documentation of that architecture is
-  phase 4's deliverable. Touches `shakenfist/actions` as
-  well as this repo.
+  phase 4's deliverable. Detailed planning (2026-08-02)
+  concluded that kerbside runs on the CI runner rather than
+  on the Rocky 8 oVirt node — `requires-python >= 3.11`
+  rules the latter out — and that consequently **no
+  `shakenfist/actions` change is required**, unlike the
+  sf-e2e lane which needed a composite action to reach a
+  remote primary. See the phase plan for the grounded
+  environment facts (console ports, host subject) taken
+  from the 2026-08-01 green run.
 - **Phase 2** flips `sf-e2e-functional.yml` to also run on
   pull_request once the promotion criteria are met, and
   removes the phase-9 "not a PR gate" caveat.
