@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 import uuid
 from unittest import mock
@@ -19,6 +20,7 @@ class _SpoolRootMixin:
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.mkdtemp(prefix='sf-eventlog-test-')
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self._original_root = eventlog_spool.SPOOL_ROOT
         eventlog_spool.SPOOL_ROOT = self.tmp
         eventlog_spool.reset_for_tests()

@@ -7,6 +7,7 @@ are the things that have to work right -- everything else in
 """
 import fcntl
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -22,6 +23,7 @@ class _SpoolRootMixin:
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.mkdtemp(prefix='sf-spool-test-')
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self._original_root = eventlog_spool.SPOOL_ROOT
         eventlog_spool.SPOOL_ROOT = self.tmp
         # Reset module-level singletons between tests so each test

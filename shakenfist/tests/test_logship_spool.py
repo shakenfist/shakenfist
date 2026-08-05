@@ -8,6 +8,7 @@ suite mirrors ``test_eventlog_spool.py``.
 """
 import fcntl
 import os
+import shutil
 import tempfile
 from unittest import mock
 
@@ -21,6 +22,7 @@ class _SpoolRootMixin:
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.mkdtemp(prefix='sf-logship-spool-test-')
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self._original_root = logship_spool.SPOOL_ROOT
         logship_spool.SPOOL_ROOT = self.tmp
         logship_spool.reset_for_tests()

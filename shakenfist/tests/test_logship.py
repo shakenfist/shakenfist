@@ -10,6 +10,7 @@ under v0.9.0 it is the library's instance. We assert *type*
 """
 import json
 import logging
+import shutil
 import tempfile
 import uuid
 from logging.handlers import SysLogHandler
@@ -26,6 +27,7 @@ class _SpoolRootMixin:
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.mkdtemp(prefix='sf-logship-test-')
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self._original_root = logship_spool.SPOOL_ROOT
         logship_spool.SPOOL_ROOT = self.tmp
         logship_spool.reset_for_tests()

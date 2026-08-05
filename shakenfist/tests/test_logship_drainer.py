@@ -6,6 +6,7 @@ tenant/auth headers, and the failure-handling branches (push
 failure, backoff, row retention). Mirrors
 ``test_eventlog_drainer.py``.
 """
+import shutil
 import tempfile
 from unittest import mock
 
@@ -20,6 +21,7 @@ class _SpoolRootMixin:
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.mkdtemp(prefix='sf-logship-drainer-test-')
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self._original_root = logship_spool.SPOOL_ROOT
         logship_spool.SPOOL_ROOT = self.tmp
         logship_spool.reset_for_tests()
