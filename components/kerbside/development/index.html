@@ -4812,6 +4812,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Review tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#signing-review-marks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing review marks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -10699,6 +10716,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Review tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#signing-review-marks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing review marks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -10812,6 +10846,25 @@ report effective coverage at HEAD. On develop itself the
 committing the result back as shakenfist-bot, and the daily
 consistency audit in shakenfist/development files an issue when five
 or more in-scope files need review.</p>
+<h3 id="signing-review-marks">Signing review marks<a class="headerlink" href="#signing-review-marks" title="Permanent link">&para;</a></h3>
+<p>A review mark is an attestation, so the commit that introduces one
+must be signed -- that signature is what binds the reviewer to the
+exact content reviewed. Signing is configured per clone and is easy
+to forget in a fresh one; check it before stamping, because an
+unsigned review commit records a mark that nothing vouches for:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>config<span class="w"> </span>gpg.format<span class="w"> </span>x509
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>config<span class="w"> </span>gpg.x509.program<span class="w"> </span>gitsign
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>config<span class="w"> </span>commit.gpgsign<span class="w"> </span><span class="nb">true</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>git<span class="w"> </span>config<span class="w"> </span>tag.gpgsign<span class="w"> </span><span class="nb">true</span>
+</code></pre></div>
+<p>Verify with <code>git log --format='%h %G? %s'</code>; review commits should
+report <code>U</code> (signed, with gitsign's Fulcio chain not in a local trust
+store) rather than <code>N</code> (unsigned). <code>gitsign</code> needs an interactive
+Sigstore login on first use, so run <code>gitsign-credential-cache &amp;</code> to
+authenticate once per session instead of once per commit.</p>
+<p>The bot's <code>prune</code> commits are deliberately unsigned: pruning only
+ever removes marks, so it cannot manufacture an attestation. Only
+the commits that add marks need signatures.</p>
 <h2 id="vendored-web-assets">Vendored web assets<a class="headerlink" href="#vendored-web-assets" title="Permanent link">&para;</a></h2>
 <h3 id="bootstrap-css">Bootstrap CSS<a class="headerlink" href="#bootstrap-css" title="Permanent link">&para;</a></h3>
 <p>Kerbside uses bootstrap CSS for styling. This was constructed by
