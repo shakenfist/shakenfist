@@ -265,47 +265,72 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
                 continue
         elif location != 'query':
             continue
-        keys = _schema_keys(scopes, ast.unparse(dec.args[0]))
-        if not keys and problems is not None:
+        keys = _schema_keys(scopes, ast.unparse(dec.args[0]), problems)
+        if keys is None:
             # An inline dict literal, or a name defined somewhere this
             # cannot follow. Deriving nothing from it means every one of
             # its parameters falls through to 'body'.
-            problems.append(
-                '%s parses the query string with a schema this cannot '
-                'resolve (%s)' % (fn.name, ast.unparse(dec.args[0])))
+            if problems is not None:
+                problems.append(
+                    '%s parses the query string with a schema this cannot '
+                    'resolve (%s)' % (fn.name, ast.unparse(dec.args[0])))
+            continue
         out |= keys
     return out
 
 
-def _schema_keys(scopes: list[Scope], name: str) -> set[str]:
+def _schema_keys(scopes: list[Scope], name: str,
+                 problems: Optional[list[str]] = None) -> Optional[set[str]]:
     """The keys of the dict assigned to ``name``, innermost scope first.
 
-    The scopes are searched in order and the first one to define the
-    name wins, rather than every definition being unioned together.
-    Each scope contributes only its own assignments -- a module's are
-    its top-level statements, not everything nested inside it -- so one
-    endpoint class's ``get_args`` cannot leak into the derivation for
-    another class in the same file. That leak was real: it made the
-    fixer willing to rewrite a correct `body` declaration to `query`,
-    and phase 3 would then have compiled a query-string fallback for a
-    parameter which never arrives that way. Drift introduced by the
-    machinery built to prevent drift.
+    The scopes are searched in order and the first one to *define* the
+    name wins, rather than every definition being unioned together --
+    and rather than the first definition to yield a key, which is what
+    an earlier version implemented. Under that rule a class-level
+    ``get_args = {}``, or one whose keys could not be read, fell
+    through to a same-named module-level dict: the cross-scope leak
+    with an extra step. Each scope contributes only its own assignments
+    -- a module's are its top-level statements, not everything nested
+    inside it -- so one endpoint class's ``get_args`` cannot leak into
+    the derivation for another class in the same file. That leak was
+    real: it made the fixer willing to rewrite a correct `body`
+    declaration to `query`, and phase 3 would then have compiled a
+    query-string fallback for a parameter which never arrives that way.
+    Drift introduced by the machinery built to prevent drift.
+
+    Returns None when no scope defines the name, which the caller
+    reports. A defining scope whose content cannot be read is reported
+    here instead, by name, and never falls through: 'not found' and
+    'cannot read this' must not share an answer. An empty literal dict
+    is neither -- it is readable and legitimately binds nothing.
     """
     for scope in scopes:
+        defined = False
+        unreadable = False
         out: set[str] = set()
         for node in scope.body:
             if not isinstance(node, ast.Assign):
                 continue
             if not any(ast.unparse(t) == name for t in node.targets):
                 continue
-            if isinstance(node.value, ast.Dict):
-                for key in node.value.keys:
-                    value = literal(key)
-                    if value is not None:
-                        out.add(value)
-        if out:
+            defined = True
+            if not isinstance(node.value, ast.Dict):
+                unreadable = True
+                continue
+            for key in node.value.keys:
+                value = literal(key)
+                if value is None:
+                    unreadable = True
+                else:
+                    out.add(value)
+        if defined:
+            if unreadable and problems is not None:
+                problems.append(
+                    '%s is assigned something this cannot read (a value '
+                    'which is not a dict literal, or a key which is not a '
+                    'literal), so keys bound from it are missing' % name)
             return out
-    return set()
+    return None
 
 
 def request_args_parameters(fn: ast.FunctionDef) -> set[str]:

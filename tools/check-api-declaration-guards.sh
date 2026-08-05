@@ -47,6 +47,12 @@ if [ ! -x "${PYTHON}" ]; then
     exit 2
 fi
 
+# tox sets this in its own environments but this script calls the venv
+# python directly, and a test run that writes __pycache__ into
+# external_api/ after the backup was taken would make every subsequent
+# NO-OP comparison report a difference that is not a mutation.
+export PYTHONDONTWRITEBYTECODE=1
+
 BACKUP=$(mktemp -d)
 cp -a shakenfist/external_api/. "${BACKUP}"/
 if [ -z "$(ls -A "${BACKUP}")" ]; then
@@ -81,8 +87,12 @@ check() {  # name
 
     # The mutation has to have landed before its result means anything.
     # Compared against the backup rather than against git, so unrelated
-    # uncommitted work does not read as a mutation.
-    if diff -rq "${BACKUP}" shakenfist/external_api/ >/dev/null 2>&1; then
+    # uncommitted work does not read as a mutation. Bytecode is
+    # excluded as well as suppressed above: a developer tree may hold
+    # __pycache__ from before the backup, and a stale .pyc recompiled
+    # by the baseline run differs without any mutation having landed.
+    if diff -rq -x '__pycache__' -x '*.pyc' "${BACKUP}" \
+            shakenfist/external_api/ >/dev/null 2>&1; then
         report 'NO-OP' "${name}" 'the mutation did not change the tree'
         restore
         return

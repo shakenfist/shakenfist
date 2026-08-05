@@ -403,6 +403,48 @@ starting, and a plan document is a record of decisions rather
 than the page a contributor adding an endpoint next month will
 find.
 
+A seventh round's only `fix` was against that guide itself: its
+example handler carried a `@jwt_required()` decorator that
+appears nowhere in `external_api` — authentication is applied to
+every handler by `Resource.method_decorators`, so an endpoint
+opts *out* rather than in — with the decorator order inverted
+relative to every real handler. The page written to teach the
+convention taught an invented one; it now shows
+`InstanceEndpoint.get` verbatim. An eighth round found the same
+inversion restated in `AGENTS.md`'s hook inventory, which
+described `check-endpoint-authentication` as requiring the
+per-handler decorator the guide had just finished saying does
+not exist. Documentation contradicting itself inside one PR is
+the documentation version of the assertion that passes for the
+wrong reason.
+
+The eighth round also found a remaining silent fall-through in
+the derivation: `_schema_keys()` documented "the first scope to
+define the name wins" but implemented "the first scope to yield
+a key", so a class-level `get_args = {}` — or one assigned
+something unreadable — fell through to a same-named module-level
+dict and answered with another handler's keys: the cross-scope
+leak with an extra step, and confidently wrong rather than
+empty. Unreachable today (no module defines the same schema name
+twice), but the first defining scope now wins whatever it
+yields, and unreadable content in it is reported by name. The
+same round added coverage for the two `SystemExit` guards on the
+fixer's splice path and a test that the `UNDOCUMENTED_BY_DESIGN`
+exemptions are mounted on exactly
+`api_base.HEALTH_PROBE_PATHS`, so the exemption list and the
+deployment contract cannot drift apart unnoticed.
+
+One semantic fix beyond the audit's scope, recorded here for the
+same bisect-clarity reason as the `argtypes` one.
+`InstanceSnapshotEndpoint.post` tested `thin` for falsiness
+before applying `SNAPSHOTS_DEFAULT_TO_THIN`, so an explicit
+`thin: false` was indistinguishable from omission and the config
+default overrode it — on a thin-by-default cluster a caller
+could not request a thick snapshot at all. The defect predates
+this branch, but this branch is what published the parameter,
+turning a latent bug into a documented promise; the handler now
+tests `is None`.
+
 ### Mutation-testing the guards
 
 `tools/check-api-declaration-guards.sh` breaks each property the
@@ -454,6 +496,21 @@ deliberately broken `sed` reports `NO-OP`, a missing `.tox/py3`
 and a failing baseline each abort with status 2, and
 `HARNESS BROKEN` was observed for real on the two mutations
 above.
+
+An eighth round found the `NO-OP` guard itself misdiagnosing.
+The script calls the venv python directly, so tox's
+`PYTHONDONTWRITEBYTECODE` is not in effect and the baseline run
+wrote `__pycache__` into `external_api/` after the backup was
+taken — from then on the diff always reported a difference, and
+a no-op mutation fell through to `NOT CAUGHT`, sending a reader
+hunting for a hole in the audit instead of a `sed` that stopped
+matching. Bytecode is now both suppressed and excluded from the
+comparison; excluding is the load-bearing half, since a stale
+pre-existing `.pyc` recompiled by the baseline differs without
+any mutation having landed. Verified both ways: the ten
+mutations are caught with a planted stale `__pycache__`, and a
+deliberate non-matching `sed` reports `NO-OP` where the
+unexcluded diff misreported it.
 
 ### Known remaining gap: multiple body parameters
 

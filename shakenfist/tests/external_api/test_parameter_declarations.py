@@ -187,6 +187,39 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                 'entry exempting it is stale; remove it'
                 % (cls, method, kwarg))
 
+    def test_undocumented_by_design_is_exactly_the_health_probes(self):
+        """The exemption list and the deployment contract cannot drift.
+
+        The comment above UNDOCUMENTED_BY_DESIGN claims its entries are
+        exactly the health probes in api_base.HEALTH_PROBE_PATHS, but
+        the two lists live in different files and nothing else ties
+        them together: an exempt class quietly gaining a tenant-facing
+        route, or a probe path moving to a documented class, would
+        falsify the comment without failing a test.
+        """
+        exempt = {cls for cls, _ in UNDOCUMENTED_BY_DESIGN}
+        with open(os.path.join(declarations.API_DIR, 'app.py')) as f:
+            tree = ast.parse(f.read())
+
+        routes = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if ast.unparse(node.func).split('.')[-1] != 'add_resource':
+                continue
+            if not node.args:
+                continue
+            if ast.unparse(node.args[0]).split('.')[-1] not in exempt:
+                continue
+            for arg in node.args[1:]:
+                routes.add(declarations.literal(arg))
+
+        self.assertEqual(
+            set(api_base.HEALTH_PROBE_PATHS), routes,
+            'The routes mounted on the UNDOCUMENTED_BY_DESIGN classes are '
+            'not exactly api_base.HEALTH_PROBE_PATHS; update whichever of '
+            'the two lists is wrong')
+
     def test_path_parameters_are_required(self):
         """OpenAPI 2.0 requires it: the route cannot match without them.
 
@@ -347,6 +380,86 @@ class A(api_base.Resource):
         self.assertEqual(
             {'alpha'},
             declarations.query_parameters(cls.body[0], [cls, tree]))
+
+    def test_empty_inner_schema_does_not_fall_through(self):
+        """The first scope to *define* the name wins, even when empty.
+
+        An earlier version took the first scope to yield a key, so a
+        class-level `get_args = {}` fell through to a same-named
+        module-level dict -- the cross-scope leak with an extra step,
+        and confidently wrong rather than empty. An empty literal dict
+        is readable and legitimately binds nothing, so it is not a
+        problem either.
+        """
+        source = '''
+get_args = {'leak': None}
+
+
+class Thing(api_base.Resource):
+    get_args = {}
+
+    @use_kwargs(get_args, location='query')
+    def get(self):
+        pass
+'''
+        tree = ast.parse(source)
+        cls = tree.body[1]
+        problems = []
+
+        self.assertEqual(
+            set(),
+            declarations.query_parameters(cls.body[-1], [cls, tree],
+                                          problems))
+        self.assertEqual([], problems)
+
+    def test_unreadable_inner_schema_is_reported_not_fallen_through(self):
+        """A defining scope this cannot read is a problem, not a miss.
+
+        If the class scope assigns the name something other than a
+        dict literal, falling through to the module scope answers with
+        another handler's keys, and 'cannot read this' must never wear
+        the same face as 'not found'.
+        """
+        source = '''
+get_args = {'leak': None}
+
+
+class Thing(api_base.Resource):
+    get_args = build_schema()
+
+    @use_kwargs(get_args, location='query')
+    def get(self):
+        pass
+'''
+        tree = ast.parse(source)
+        cls = tree.body[1]
+        problems = []
+
+        self.assertEqual(
+            set(),
+            declarations.query_parameters(cls.body[-1], [cls, tree],
+                                          problems))
+        self.assertEqual(1, len(problems))
+        self.assertIn('cannot read', problems[0])
+
+    def test_partially_readable_schema_keeps_what_it_can(self):
+        """A non-literal key is reported, and its siblings still count."""
+        source = '''
+class Thing(api_base.Resource):
+    get_args = {'alpha': None, KEY: None}
+
+    @use_kwargs(get_args, location='query')
+    def get(self, alpha=None):
+        pass
+'''
+        cls = self._parse_class(source)
+        problems = []
+
+        self.assertEqual(
+            {'alpha'},
+            declarations.query_parameters(cls.body[-1], [cls], problems))
+        self.assertEqual(1, len(problems))
+        self.assertIn('cannot read', problems[0])
 
     def test_query_derivation_reads_the_use_kwargs_location(self):
         """A schema bound at a location other than query is not a query
@@ -786,6 +899,68 @@ class FakeEndpoint(api_base.Resource):
 
         self.assertRaises(
             SystemExit, self.fixer.main, True, self.tempdir)
+
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            self.assertEqual(before, f.read())
+
+    def test_refuses_a_multiline_location_literal(self):
+        """The splice edits one physical line, and must say so rather
+        than corrupt source it cannot edit.
+
+        Implicit string concatenation across a line break parses to a
+        single Constant spanning two lines, which the derivation reads
+        happily -- so the guard in the rewrite path is the only thing
+        standing between that shape and a mangled file.
+        """
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, '/fakes/<fake_ref>')
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('fake_ref', 'que'
+                      'ry', 'uuid', 'A ref.', True)],
+        []))
+    def get(self, fake_ref=None):
+        pass
+''')
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            before = f.read()
+
+        self.assertRaisesRegex(
+            SystemExit, 'multi-line location literal',
+            self.fixer.main, True, self.tempdir)
+
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            self.assertEqual(before, f.read())
+
+    def test_refuses_an_offset_that_does_not_hold_the_literal(self):
+        """The splice checks the bytes it is about to replace.
+
+        A double-quoted location has the same value but not the same
+        repr, so the slice comparison fails -- standing in for any
+        drift between the AST offsets and the file, which is the
+        failure that turns a targeted edit into corruption.
+        """
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, '/fakes/<fake_ref>')
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('fake_ref', "query", 'uuid', 'A ref.', True)],
+        []))
+    def get(self, fake_ref=None):
+        pass
+''')
+        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+            before = f.read()
+
+        self.assertRaisesRegex(
+            SystemExit, 'does not hold',
+            self.fixer.main, True, self.tempdir)
 
         with open(os.path.join(self.tempdir, 'fake.py')) as f:
             self.assertEqual(before, f.read())

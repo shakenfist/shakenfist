@@ -54,7 +54,10 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0, thin=None):
-        if not thin:
+        # `is None` rather than falsiness: an explicit `thin: false` is a
+        # request for a thick snapshot, not an omission for the config
+        # default to override.
+        if thin is None:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
 
         instance_from_db.add_event(

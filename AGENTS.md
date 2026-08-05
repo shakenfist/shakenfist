@@ -241,8 +241,11 @@ Current hooks:
 - `py3` - Unit tests via tox
 - `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a
   namespace, so an endpoint cannot fetch across tenants
-- `check-endpoint-authentication` - Every endpoint handler carries an
-  authentication decorator
+- `check-endpoint-authentication` - Endpoints inherit authentication from
+  `api_base.Resource.method_decorators` rather than each carrying a
+  decorator; this rejects resources that subclass `flask_restful.Resource`
+  directly, and `@api_base.public` markers that are not the outermost
+  decorator
 - `check-api-parameter-locations` - Every `swagger_helper()` parameter is
   declared at the location it actually arrives at
 - `mypy` - Type checking via tox (incremental rollout)
