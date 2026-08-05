@@ -438,7 +438,7 @@ class _ReconcileRouterMixin:
         if 'FROM nodes' in text:
             return self._fake_result(rows=self.node_rows)
         if 'FROM object_states' in text:
-            return self._fake_result(rows=self.inactive_rows)
+            return self._fake_result(rows=self.active_rows)
         if 'FROM namespace_claims' in text:
             return self._fake_result(rows=self.claim_rows)
         self.executed.append((text, stmt))
@@ -449,12 +449,13 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
     """A populated pass: add, keep-on-NULL-metrics, remove, claims."""
 
     def _run_scenario(self):
-        # node1: fresh metrics, no previous row -> added.
+        # node1: fresh metrics, active, no previous row -> added.
         # node2: previous row, metrics row with NULL capacity columns
         #        -> limits kept, usage refreshed.
         # node3: previous row, no metrics row, not in nodes -> removed.
-        # node4: previous row, has metrics, but node deleted -> removed.
-        # node5: metrics row but node deleted -> never inserted.
+        # node4: previous row, has metrics, but not in the active state
+        #        set (deleted) -> removed.
+        # node5: metrics row but not active -> never inserted.
         self.previous_rows = [
             _capacity_row(NODE2, 10, 1000, 50, used_cpus=5,
                           used_memory_mb=500, used_disk_gb=10),
@@ -477,9 +478,9 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
         self.node_rows = [
             SimpleNamespace(uuid=NODE1), SimpleNamespace(uuid=NODE2),
             SimpleNamespace(uuid=NODE4), SimpleNamespace(uuid=NODE5)]
-        self.inactive_rows = [
-            SimpleNamespace(object_uuid=str(NODE4)),
-            SimpleNamespace(object_uuid=str(NODE5))]
+        self.active_rows = [
+            SimpleNamespace(object_uuid=str(NODE1)),
+            SimpleNamespace(object_uuid=str(NODE2))]
         self.claim_rows = [
             SimpleNamespace(uuid=CLAIM1, namespace='ns1', limit_cpus=8,
                             limit_memory_mb=8192, limit_disk_gb=100,
@@ -492,6 +493,11 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
             (NODE1, 'ns1'): (2, 2048, 30),
             (NODE1, 'ns2'): (4, 4096, 8),
             (NODE2, 'ns2'): (1, 1024, 5),
+            # Stranded on a node that ends the pass without a capacity
+            # row (node3 is removed): counts toward nothing at cluster
+            # scope, so the singleton stays a closed accounting over the
+            # schedulable cluster.
+            (NODE3, 'ns2'): (7, 7168, 70),
         }
         demand = {NODE1: 10.0}
 
@@ -549,6 +555,10 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
             'claimed_cpus': 8, 'claimed_memory_mb': 8192,
             'claimed_disk_gb': 100,
             # ns2 has no active claim: (4 + 1, 4096 + 1024, 8 + 5).
+            # The (NODE3, ns2) usage is absent because node3 holds no
+            # capacity row -- that exclusion is a decision, not an
+            # accident (a stranded instance may not inflate the used
+            # side of a total its node contributes nothing to).
             'unclaimed_used_cpus': 5, 'unclaimed_used_memory_mb': 5120,
             'unclaimed_used_disk_gb': 13,
         }, result['cluster'])
@@ -603,12 +613,19 @@ class ReconcileHypervisorFilterTestCase(
     """
 
     def _run_roles(self, previous_rows, metrics_rows, non_hypervisor_rows,
-                   node_rows, inactive_rows=None, stale_metrics_rows=None):
+                   node_rows, active_rows=None, stale_metrics_rows=None):
+        # Nodes named in node_rows default to active: these tests are
+        # about the role, freshness and existence filters, and the state
+        # filter would otherwise mask them all (a node with no active
+        # state row never qualifies).
         self.previous_rows = previous_rows
         self.metrics_rows = metrics_rows
         self.non_hypervisor_rows = non_hypervisor_rows
         self.node_rows = node_rows
-        self.inactive_rows = inactive_rows or []
+        if active_rows is None:
+            active_rows = [SimpleNamespace(object_uuid=str(row.uuid))
+                           for row in node_rows]
+        self.active_rows = active_rows
         self.stale_metrics_rows = stale_metrics_rows or []
         self.claim_rows = []
         self.executed = []
@@ -729,7 +746,7 @@ class ReconcileNodeStateFilterTestCase(
 
     _run_roles = ReconcileHypervisorFilterTestCase._run_roles
 
-    def test_state_query_excludes_the_active_set(self):
+    def test_state_query_selects_the_active_set(self):
         _, conn = self._run_roles(
             previous_rows=[], metrics_rows=[], non_hypervisor_rows=[],
             node_rows=[])
@@ -743,10 +760,14 @@ class ReconcileNodeStateFilterTestCase(
                 state_queries.append(compiled)
         self.assertEqual(1, len(state_queries))
         text = str(state_queries[0])
-        # Expressed as NOT IN the active set, so a state added to the
-        # state machine later is excluded by default rather than silently
-        # counting as schedulable.
-        self.assertIn('state_value NOT IN', text)
+        # Expressed as IN the active set (with candidates intersected
+        # against the result), so both a state added to the state
+        # machine later and a node with no state row at all are excluded
+        # by default rather than silently counting as schedulable. An
+        # earlier NOT-IN-the-inactive-set form let stateless nodes
+        # through.
+        self.assertIn('state_value IN', text)
+        self.assertNotIn('NOT IN', text)
         bound = set()
         for value in state_queries[0].params.values():
             # The IN list binds as a single expanding parameter.
@@ -774,11 +795,41 @@ class ReconcileNodeStateFilterTestCase(
             non_hypervisor_rows=[],
             node_rows=[SimpleNamespace(uuid=NODE1),
                        SimpleNamespace(uuid=NODE2)],
-            inactive_rows=[SimpleNamespace(object_uuid=str(NODE2))])
+            active_rows=[SimpleNamespace(object_uuid=str(NODE1))])
 
         self.assertEqual([str(NODE1)],
                          [n['node_uuid'] for n in result['nodes']])
         # NODE2's 64 schedulable threads are nowhere in the totals.
+        self.assertEqual(30, result['cluster']['total_cpus'])
+
+    def test_stateless_node_gets_no_capacity_row(self):
+        # A node with a nodes row and fresh hypervisor metrics but no
+        # object_states row at all. The scheduler cannot see it --
+        # Nodes([], prefilter='active') resolves through
+        # get_objects_by_state, which only returns objects that have a
+        # state row -- so it must not get a capacity row either.
+        # Stateless zombies are a real condition (the orphan reconciler
+        # exists for them), and a subtractive inactive-set filter let
+        # them through: absent from the inactive set is not the same as
+        # present in the active one.
+        result, _ = self._run_roles(
+            previous_rows=[],
+            metrics_rows=[
+                _metrics_row(NODE1, cpu_schedulable=10, memory_max=1024,
+                             memory_reserved_mb=0,
+                             disk_free_instances=100 * GiB,
+                             disk_reservation_gb=0),
+                _metrics_row(NODE2, cpu_schedulable=64, memory_max=65536,
+                             memory_reserved_mb=0,
+                             disk_free_instances=500 * GiB,
+                             disk_reservation_gb=0)],
+            non_hypervisor_rows=[],
+            node_rows=[SimpleNamespace(uuid=NODE1),
+                       SimpleNamespace(uuid=NODE2)],
+            active_rows=[SimpleNamespace(object_uuid=str(NODE1))])
+
+        self.assertEqual([str(NODE1)],
+                         [n['node_uuid'] for n in result['nodes']])
         self.assertEqual(30, result['cluster']['total_cpus'])
 
     def test_node_entering_error_loses_its_row(self):
@@ -787,7 +838,7 @@ class ReconcileNodeStateFilterTestCase(
             metrics_rows=[],
             non_hypervisor_rows=[],
             node_rows=[SimpleNamespace(uuid=NODE2)],
-            inactive_rows=[SimpleNamespace(object_uuid=str(NODE2))])
+            active_rows=[])
 
         self.assertEqual([], result['nodes'])
         self.assertEqual(1, result['nodes_removed'])

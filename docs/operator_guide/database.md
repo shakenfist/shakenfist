@@ -554,20 +554,29 @@ has stopped publishing even though the node itself still looks alive.
 Each of those mirrors a filter the scheduler already applies before
 considering a node as a placement candidate.
 
-Severe clock skew is a fifth way to lose the row. `node_metrics.
-timestamp` is written by each node's resources daemon from that node's
-clock, and the staleness check runs on the database daemon's, so a node
-running more than fifteen minutes slow looks permanently stale. Any
-working NTP setup is far inside that, but it is worth knowing if a node
-drops out of the capacity tables while otherwise looking healthy.
+Severe clock skew is a fifth way to lose the row. The
+`node_metrics.timestamp` column is written by each node's resources
+daemon from that node's clock, and the staleness check runs on the
+database daemon's, so a node running more than fifteen minutes slow
+looks permanently stale. Any working NTP setup is far inside that, but
+it is worth knowing if a node drops out of the capacity tables while
+otherwise looking healthy.
 
-Two things to know when reading those numbers. The `used_*` counters are
-allocation ledgers: they sum what every placed, non-deleted instance was
-allocated, so an instance that is powered off but not deleted still
+Three things to know when reading those numbers. The `used_*` counters
+are allocation ledgers: they sum what every placed, non-deleted instance
+was allocated, so an instance that is powered off but not deleted still
 counts, and the numbers will not match the resources daemon's
 `cpu_total_instance_vcpus` and `memory_total_instance_actual` (which
 count only running libvirt domains) on a cluster with powered-off
-instances. And the gauges are published only by the elected cluster node,
+instances. The `cluster_capacity` singleton is a closed accounting over
+the nodes that hold capacity rows: an instance stranded on a node that
+has lost its row (errored, demoted, stale metrics, deleted) contributes
+to neither the total nor the unclaimed-used side, so a drained
+hypervisor makes both numbers shrink together rather than showing usage
+exceeding capacity. A namespace claim's `used_*` counters are the
+deliberate exception — they stay namespace-wide, because a quota covers
+the namespace's instances wherever they are stranded.
+And the gauges are published only by the elected cluster node,
 which drops them when it loses the lock, so during a leadership handoff
 there is a window with no capacity gauges at all until the new leader's
 first pass. Alert on the reconciler falling behind rather than on a

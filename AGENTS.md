@@ -400,20 +400,36 @@ placed, non-deleted instance, whereas the resources daemon's
 only active libvirt domains. A powered-off instance holds its
 reservation in the ledger and is absent from the measurement, so the
 two legitimately disagree and phase 3 has to choose between them
-explicitly rather than assume parity. The reconciler maintains the
+explicitly rather than assume parity. The ledger also reads only
+`INSTANCE_LOCATION` rows in `object_references`: during the one
+transition release where `Node.instances` still unions in the legacy
+`node_attributes.instances` JSON column, a placement written by a
+pre-cutover node exists only in that column and is invisible to the
+ledger, so mid-rolling-upgrade the `used_*` counters under-count — the
+non-conservative direction for an admission guard. Phase 3 must not
+enable the counter guard until the legacy column and its union are
+removed. The reconciler maintains the
 `scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
 tables from the elected cluster node every five minutes. Rows exist
 per *schedulable hypervisor*, not per node, because a row that
 describes capacity the scheduler would never use is worse than no row
-at all: it inflates the cluster totals. Three filters enforce that,
-and all three mirror something `scheduler.py` already does — the
+at all: it inflates the cluster totals. Four filters enforce that,
+each mirroring something `scheduler.py` already does — the
 `is_hypervisor` column projected into `node_metrics` (sf-resources
 publishes metrics from every node whatever its roles), node state
 against `constants.NODE_ACTIVE_STATES` (the scheduler builds its
-candidates from `Nodes([], prefilter='active')`), and metrics
-freshness against `RECONCILE_METRICS_MAX_AGE_SECONDS` (the scheduler
-discards metrics older than 120s; the reconciler's window is much
-wider because its cadence is). If you add a capacity consumer, it
+candidates from `Nodes([], prefilter='active')`; the filter is
+expressed positively, as membership in the active set, so a node with
+no state row at all is excluded exactly as `get_objects_by_state`
+would exclude it), metrics freshness against
+`RECONCILE_METRICS_MAX_AGE_SECONDS` (the scheduler discards metrics
+older than 120s; the reconciler's window is much wider because its
+cadence is), and existence in the `nodes` table. The
+`cluster_capacity` singleton is a closed accounting over the nodes
+that pass those filters: usage on a node without a capacity row counts
+toward neither the total nor the unclaimed-used side (a claim's
+`used_*` stays namespace-wide — a quota covers a namespace's instances
+wherever they are stranded). If you add a capacity consumer, it
 inherits these filters by reading the tables — do not re-derive
 capacity from `node_metrics` directly. In this release nothing
 consumes the tables for admission

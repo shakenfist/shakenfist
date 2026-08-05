@@ -19,7 +19,7 @@ cannot exercise the parts most likely to break:
   directly silently never matches, so a broken join returns zero rows
   rather than an error),
 * is_hypervisor and the node-state filter against real NULL-able
-  columns and a real NOT IN,
+  columns and a real IN-the-active-set membership test,
 * both ON DUPLICATE KEY UPDATE upserts.
 
 The fixture mirrors the one used for the plan's step 4 validation, so
@@ -363,15 +363,48 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(48 + 96, cluster['total_cpus'])
         # Only the live claim's limits.
         self.assertEqual(16, cluster['claimed_cpus'])
-        # The manual namespace has no claim: i3 (8) and i5 (2). i5 is on
-        # the deleted node, whose placement row still exists.
-        self.assertEqual(10, cluster['unclaimed_used_cpus'])
+        # The manual namespace has no claim. i3 (8 cpus) counts; i5
+        # (2 cpus) does not, because its placement row points at the
+        # deleted node_d, which holds no capacity row. That exclusion is
+        # a decision, not an accident: the singleton is a closed
+        # accounting over the schedulable cluster, so an instance
+        # stranded on a node whose limits are not in total_* may not
+        # inflate unclaimed_used_* either. (The per-claim counters are
+        # the deliberate exception -- see
+        # test_claim_usage_is_namespace_wide.)
+        self.assertEqual(8, cluster['unclaimed_used_cpus'])
 
         cluster_t = mariadb._get_cluster_capacity_table()
         with self.engine.connect() as conn:
             row = conn.execute(sa.select(cluster_t)).fetchone()
         self.assertEqual(1, row.id)
         self.assertEqual(cluster['total_cpus'], row.total_cpus)
+
+    def test_claim_usage_is_namespace_wide(self):
+        # The mirror image of the closed-accounting rule asserted in
+        # test_cluster_singleton_sums: a claim's used_* counters are
+        # namespace-wide, so i5 -- stranded on the deleted node_d and
+        # invisible to the cluster singleton -- still counts against a
+        # claim on its namespace. A quota covers the namespace's
+        # instances wherever they are stranded.
+        claims_t = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            self._insert(conn, claims_t, uuid=uuid4(), namespace='manual',
+                         limit_cpus=32, limit_memory_mb=32768,
+                         limit_disk_gb=200, state='active',
+                         expires_at=sa.text('NOW() + INTERVAL 4 HOUR'),
+                         updated_at=sa.func.now())
+            conn.commit()
+
+        result = self._reconcile()
+        with self.engine.connect() as conn:
+            rows = {r.namespace: r for r in
+                    conn.execute(sa.select(claims_t)).fetchall()}
+        # i3 (8, on schedulable node_b) plus i5 (2, stranded on the
+        # deleted node_d).
+        self.assertEqual(10, rows['manual'].used_cpus)
+        # With every namespace claimed, nothing is left unclaimed.
+        self.assertEqual(0, result['cluster']['unclaimed_used_cpus'])
 
     def test_rows_are_written_and_upserted(self):
         self._reconcile()
@@ -434,6 +467,46 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         with self.engine.connect() as conn:
             rows = conn.execute(sa.select(capacity_t)).fetchall()
         self.assertNotIn(orphan, [r.node_uuid for r in rows])
+
+    def test_stateless_node_never_gets_a_row(self):
+        # The orphaned-state sibling of the orphaned-metrics case above:
+        # a node with a nodes row and fresh hypervisor metrics but no
+        # object_states row at all. The scheduler cannot see it --
+        # Nodes([], prefilter='active') resolves through
+        # get_objects_by_state, which only returns objects that have a
+        # state row -- and stateless zombies are a real condition (the
+        # orphan reconciler exists for them). A subtractive
+        # NOT-IN-the-active-set filter put this node in neither the
+        # active nor the inactive set, so it slipped through and its
+        # limits were summed into the cluster totals.
+        stateless = uuid4()
+        nodes_t = mariadb._get_nodes_table()
+        metrics_t = mariadb._get_node_metrics_table()
+        with self.engine.connect() as conn:
+            self._insert(conn, nodes_t, uuid=stateless,
+                         fqdn=f'node-{str(stateless)[:8]}')
+            self._insert(conn, metrics_t, node_uuid=stateless,
+                         cpu_schedulable=128, memory_max=65536,
+                         memory_reserved_mb=2048,
+                         disk_free_instances=500 * GiB,
+                         disk_reservation_gb=20, metrics_json={},
+                         is_hypervisor=True, timestamp=self.now)
+            conn.commit()
+
+        first = self._reconcile()
+        self.assertNotIn(str(stateless),
+                         [n['node_uuid'] for n in first['nodes']])
+        self.assertEqual(48 + 96, first['cluster']['total_cpus'])
+
+        # And it does not creep in on a later pass either.
+        second = self._reconcile()
+        self.assertNotIn(str(stateless),
+                         [n['node_uuid'] for n in second['nodes']])
+
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            rows = conn.execute(sa.select(capacity_t)).fetchall()
+        self.assertNotIn(stateless, [r.node_uuid for r in rows])
 
     def test_capacity_rows_are_removed_when_a_node_stops_qualifying(self):
         self._reconcile()

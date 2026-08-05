@@ -70,8 +70,10 @@ so expiry guards compare against server-side `NOW()`.
 `scheduler_node_capacity` — one row per hypervisor:
 `node_uuid` (PK), `limit_cpus`, `limit_memory_mb`,
 `limit_disk_gb`, `used_cpus`, `used_memory_mb`,
-`used_disk_gb` (all INTEGER), `expected_demand` (DOUBLE),
-`updated_at`.
+`used_disk_gb` (all BIGINT, matching the int64 proto fields;
+the cluster sums could overflow INT around 700 TB of
+overcommitted RAM, and widening costs nothing while the
+tables are new), `expected_demand` (DOUBLE), `updated_at`.
 
 `namespace_claims` — one row per claim: `uuid` (PK),
 `namespace` (type matching `namespaces.name`, indexed —
@@ -150,9 +152,21 @@ in place rather than zeroing them.
 Capacity rows exist per **schedulable hypervisor**, not per
 node. A row describing capacity the scheduler would never use
 is worse than no row at all, because it inflates the cluster
-totals that a phase 3 D14 guard reads. Three filters enforce
-this, each mirroring something `scheduler.py` already does
-before it will consider a node:
+totals that a phase 3 D14 guard reads. The invariant, learned
+the hard way across four review rounds that each found the
+same defect in a new dimension, is: **a capacity row exists
+only where the scheduler could place, and any node-level
+scheduler-side filter is automatically a reconciler-side
+filter too.** By that rule one node-level filter remains
+deliberately unmirrored: `_has_reasonable_queue_state()` (the
+scheduler's `queue_state` stage, which drops a node whose
+queue depth suggests it is wedged). It is excluded because
+queue depth is a fast-moving liveness signal, not capacity —
+mirroring it at a five-minute cadence would make rows flap on
+transient queue spikes — but if phase 3's guard needs it, it
+is a *decision* to take, not a gap to discover. Four filters
+enforce the invariant today, each mirroring something
+`scheduler.py` already does before it will consider a node:
 
 * **Role.** The resources daemon runs on every cluster node
   and upserts `node_metrics` unconditionally, so a
@@ -172,12 +186,26 @@ before it will consider a node:
   candidate. A hypervisor that the node-health cascade has
   taken out of service must stop contributing its limits, not
   sit there advertising capacity nothing can be placed on. The
-  filter is expressed as `state_value NOT IN` the active set
-  (`constants.NODE_ACTIVE_STATES`, which `Node.ACTIVE_STATES`
-  is now defined from so the two cannot drift) rather than
-  `IN` an inactive set, so a state added to the state machine
-  later is excluded by default — an unrecognised state is not
-  evidence that a node can be scheduled onto.
+  filter is expressed positively — `state_value IN` the active
+  set (`constants.NODE_ACTIVE_STATES`, which
+  `Node.ACTIVE_STATES` is now defined from so the two cannot
+  drift), with candidates intersected against the result — so
+  everything outside the set is excluded by default: a state
+  added to the state machine later, and a node with *no* state
+  row at all. `prefilter='active'` resolves through
+  `get_objects_by_state`, which only returns objects that have
+  a state row, so the scheduler sees neither; and stateless
+  zombies are a real condition here (the orphan reconciler
+  exists for them). An earlier draft subtracted a
+  `NOT IN`-derived inactive set instead, and a stateless node
+  appeared in neither set and slipped through — the fifth
+  instance of the recurring defect (fourth review, item 1).
+* **Existence.** A node must have a row in the `nodes` table,
+  gating creation as well as removal. Gating only removal
+  leaves a permanent phantom: a `node_metrics` row that
+  outlives its node's static and state rows reads as a fresh
+  hypervisor, gets a row, and then no removal condition ever
+  fires for it.
 * **Freshness.** `node_metrics` rows are only deleted when the
   node is, so a node whose resources daemon has died would
   otherwise contribute its last-known limits forever. Rows
@@ -238,7 +266,16 @@ One pass, in order:
 5. **Recompute the singleton**: `total_*` as sums of node
    limits, `claimed_*` as sums of active claim limits (zero
    for now), `unclaimed_used_*` as usage by instances in
-   namespaces without an active claim (all usage, for now).
+   namespaces without an active claim, restricted to nodes
+   that hold a capacity row. The singleton is a *closed
+   accounting over the schedulable cluster*: an instance
+   stranded on an errored, demoted, stale-metrics or deleted
+   node contributes to neither the total nor the used side,
+   so a drained hypervisor shrinks both together instead of
+   showing usage exceeding capacity on the soak dashboards.
+   Per-claim `used_*` is the deliberate exception — it stays
+   namespace-wide, because a quota covers a namespace's
+   instances wherever they are stranded.
 
 Two claim-accounting decisions this leaves for phase 4, both
 inert while `namespace_claims` is empty but both fixed by the
@@ -322,6 +359,7 @@ surface yet: the admin capacity view migrates in phase 5.
 | 8 | Address automated review of PR #3614 | medium | management session | none | Complete — see Review response |
 | 9 | Address second automated review of PR #3614 | medium | management session | none | Complete — see Second review response |
 | 10 | Address third automated review of PR #3614 | medium | management session | none | Complete — see Third review response |
+| 11 | Address fourth automated review of PR #3614 | medium | management session | none | Complete — see Fourth review response |
 
 ## Validation
 
@@ -632,6 +670,89 @@ obviously right once `namespace_claims` holds real rows, so when the
 claims API lands, `Namespace.hard_delete()` should clean up its
 claims — a namespace's claim outliving the namespace is a leak, not a
 staleness window. Do not read the current omission as an oversight.
+
+### Step 11: response to the fourth automated review (2026-08-05)
+
+Three action items and three optional suggestions. From this round on,
+suggestions are explicitly *triaged* — accepted, deferred with an
+owner, or declined with a reason recorded here — rather than
+implicitly all-adopted, so a suggestion that resurfaces in a later
+round can be answered by pointing at the record instead of by
+re-litigating it.
+
+**Fixed — a stateless node got a capacity row (item 1), the fifth
+instance of the recurring defect.** The state filter was expressed
+negatively (subtract nodes whose state is `NOT IN` the active set), so
+a node with a `nodes` row but *no* `object_states` row appeared in
+neither set and slipped through, while `prefilter='active'` makes it
+invisible to the scheduler. The previous round predicted the fifth
+instance would be `_has_reasonable_queue_state`; it was instead the
+existing state filter's polarity — the defect class is about filter
+*semantics*, not just filter *inventory*. The filter is now positive
+(`state_value IN` the active set, candidates intersected against the
+result), which excludes unknown states and missing state rows by the
+same mechanism the scheduler does. The design section's State bullet
+records the polarity rule; mock and live tests cover the stateless
+case, and reverting the intersection fails the live test.
+
+**Fixed — markdown code span split across a newline (item 4)** in
+`database.md`'s clock-skew paragraph.
+
+**Documented — the usage ledger cannot see legacy placements
+(item 3).** During the one-release `node_attributes.instances`
+dual-write transition, a placement written by a pre-cutover node
+exists only in the legacy JSON column, which the reconciler does not
+read, so mid-rolling-upgrade `used_*` under-counts. Recorded in the
+`_RECONCILE_USAGE_SQL` comment block and AGENTS.md: phase 3 must not
+enable the counter guard until the legacy column and its union are
+removed.
+
+**Suggestions triaged — all three accepted, because each was cheapest
+now:**
+
+* **Cluster singleton accounting (item 2): implemented, not just
+  documented.** `unclaimed_used_*` was folded from the unfiltered
+  usage query, so an instance stranded on an errored, demoted, stale
+  or deleted node inflated the used side of a total its node
+  contributed nothing to — the soak dashboards could show usage
+  exceeding capacity, and phase 3 would have inherited the open
+  semantics silently. The fold is now restricted to nodes holding a
+  capacity row (see the recompute step 5 above); per-claim `used_*`
+  deliberately stays namespace-wide, and
+  `test_claim_usage_is_namespace_wide` pins the asymmetry as a
+  decision. The related stale-placement edge (a lost node's
+  `instance_location` row surviving `place_instance()`'s
+  best-effort removal, double-counting the instance at node scope)
+  is out of the reconciler's scope and now benign at cluster scope;
+  it belongs to phase 3's placement work.
+* **BIGINT counters (item 5): adopted.** The proto fields are int64
+  and the tables are new in this release, so widening is free now and
+  a migration later; `cluster_capacity.total_memory_mb` as INT would
+  overflow around 700 TB of overcommitted RAM with an
+  every-pass-fails-at-WARNING failure mode.
+* **CancelJob (item 6): honoured.** `_run_due_scheduled_jobs()` now
+  mirrors `Scheduler._run_job()`'s cancel handling, making its
+  "semantics are unchanged" docstring true rather than amending the
+  docstring to document a divergence. The raising-job behaviour
+  (propagate, skip the rest of the batch, stay due) is pinned by a
+  test as well.
+
+**Test-coverage suggestions triaged:**
+
+* Stateless-node live test: added (required by item 1).
+* Cluster-asymmetry and namespace-wide-claim tests: added (item 2).
+* Raising-job behaviour test: added (item 6).
+* Registration-happens-once test: **declined.** Registration is
+  inline at the top of `_run_inner()`, which never returns; asserting
+  on it would require extracting a registration helper purely for the
+  test's benefit, and `_run_inner` is only called once per process by
+  construction (`Daemon.run`). The behaviour is documented in the
+  registration comment instead.
+* Namespace-over-claim-limit live test: **deferred to phase 4.** The
+  overage gap is already recorded as a phase 4 obligation in the
+  claim-accounting decisions above; a test asserting today's
+  incomplete accounting would have to be rewritten by the same change
+  that closes the gap, and nothing consumes the numbers until then.
 
 ## Administration and logistics
 

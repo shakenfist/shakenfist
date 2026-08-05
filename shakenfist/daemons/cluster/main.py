@@ -516,14 +516,21 @@ class Monitor(daemon.Daemon):
         unresponsiveness. A pet between jobs bounds the exposure to one
         job rather than nine.
 
-        Sorting and the should_run check mirror run_pending() itself, so
-        job ordering and semantics are unchanged.
+        Sorting, the should_run check and the CancelJob handling mirror
+        run_pending() and _run_job() themselves, so job ordering and
+        semantics are unchanged. A job that raises propagates to the
+        caller's ignore_exception, skipping the rest of this batch; the
+        raising job never reached _schedule_next_run() so it stays due
+        and retries on the next 60 second cycle, exactly as it would
+        under run_pending().
         """
         for job in sorted(schedule.jobs):
             if not job.should_run:
                 continue
             self.pet_watchdog()
-            job.run()
+            ret = job.run()
+            if isinstance(ret, schedule.CancelJob) or ret is schedule.CancelJob:
+                schedule.cancel_job(job)
         self.pet_watchdog()
 
     def _run_inner(self):

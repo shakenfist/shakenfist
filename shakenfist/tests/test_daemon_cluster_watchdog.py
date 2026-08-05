@@ -120,3 +120,43 @@ class ScheduledJobWatchdogTestCase(base.ShakenFistTestCase):
         with mock.patch.object(cluster_main.schedule, 'jobs', []):
             m._run_due_scheduled_jobs()
         self.assertEqual(1, m.pet_watchdog.call_count)
+
+    def test_cancel_job_is_honoured(self):
+        # The loop mirrors Scheduler._run_job(), which cancels a job
+        # whose run() returns schedule.CancelJob. No registered task
+        # returns it today, but a future self-cancelling task must not
+        # silently keep running forever.
+        ran = []
+        cancels = self._fake_job(True, ran)
+        cancels.run.side_effect = None
+        cancels.run.return_value = cluster_main.schedule.CancelJob
+        keeps = self._fake_job(True, ran)
+
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs',
+                               [cancels, keeps]), \
+                mock.patch.object(cluster_main.schedule,
+                                  'cancel_job') as mock_cancel:
+            m._run_due_scheduled_jobs()
+
+        mock_cancel.assert_called_once_with(cancels)
+        keeps.run.assert_called_once()
+
+    def test_raising_job_propagates_and_skips_the_rest(self):
+        # A job that raises propagates to the elected loop's
+        # ignore_exception, skipping the remainder of the batch; the
+        # raising job never reached _schedule_next_run(), so it stays
+        # due and retries on the next 60 second cycle -- the same
+        # behaviour run_pending() would give. Pinned so a refactor that
+        # swallows the exception per-job is a deliberate change rather
+        # than an accident.
+        ran = []
+        raises = self._fake_job(True, ran)
+        raises.run.side_effect = RuntimeError('task exploded')
+        after = self._fake_job(True, ran)
+
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs',
+                               [raises, after]):
+            self.assertRaises(RuntimeError, m._run_due_scheduled_jobs)
+        after.run.assert_not_called()

@@ -3395,14 +3395,20 @@ def _get_scheduler_node_capacity_table() -> sa.Table:
                 'scheduler_node_capacity',
                 metadata,
                 sa.Column('node_uuid', sa.Uuid(), primary_key=True),
-                sa.Column('limit_cpus', sa.Integer(), nullable=False),
-                sa.Column('limit_memory_mb', sa.Integer(), nullable=False),
-                sa.Column('limit_disk_gb', sa.Integer(), nullable=False),
-                sa.Column('used_cpus', sa.Integer(), nullable=False,
+                # BIGINT to match the int64 proto fields. Per-node
+                # counters can not realistically overflow INT, but the
+                # cluster singleton sums them and the tables are new in
+                # this release, so widening everything now is free where
+                # it would be a migration later.
+                sa.Column('limit_cpus', sa.BigInteger(), nullable=False),
+                sa.Column('limit_memory_mb', sa.BigInteger(),
+                          nullable=False),
+                sa.Column('limit_disk_gb', sa.BigInteger(), nullable=False),
+                sa.Column('used_cpus', sa.BigInteger(), nullable=False,
                           server_default='0'),
-                sa.Column('used_memory_mb', sa.Integer(), nullable=False,
+                sa.Column('used_memory_mb', sa.BigInteger(), nullable=False,
                           server_default='0'),
-                sa.Column('used_disk_gb', sa.Integer(), nullable=False,
+                sa.Column('used_disk_gb', sa.BigInteger(), nullable=False,
                           server_default='0'),
                 sa.Column('expected_demand', sa.Double(), nullable=False,
                           server_default='0'),
@@ -3442,14 +3448,17 @@ def _get_namespace_claims_table() -> sa.Table:
                 metadata,
                 sa.Column('uuid', sa.Uuid(), primary_key=True),
                 sa.Column('namespace', sa.String(255), nullable=False),
-                sa.Column('limit_cpus', sa.Integer(), nullable=False),
-                sa.Column('limit_memory_mb', sa.Integer(), nullable=False),
-                sa.Column('limit_disk_gb', sa.Integer(), nullable=False),
-                sa.Column('used_cpus', sa.Integer(), nullable=False,
+                # BIGINT to match the int64 proto fields; see the
+                # scheduler_node_capacity definition.
+                sa.Column('limit_cpus', sa.BigInteger(), nullable=False),
+                sa.Column('limit_memory_mb', sa.BigInteger(),
+                          nullable=False),
+                sa.Column('limit_disk_gb', sa.BigInteger(), nullable=False),
+                sa.Column('used_cpus', sa.BigInteger(), nullable=False,
                           server_default='0'),
-                sa.Column('used_memory_mb', sa.Integer(), nullable=False,
+                sa.Column('used_memory_mb', sa.BigInteger(), nullable=False,
                           server_default='0'),
-                sa.Column('used_disk_gb', sa.Integer(), nullable=False,
+                sa.Column('used_disk_gb', sa.BigInteger(), nullable=False,
                           server_default='0'),
                 sa.Column('state', sa.String(32), nullable=False),
                 sa.Column('expires_at', sa.DateTime(), nullable=False),
@@ -3488,20 +3497,29 @@ def _get_cluster_capacity_table() -> sa.Table:
                 metadata,
                 sa.Column('id', sa.Integer(), primary_key=True,
                           autoincrement=False),
-                sa.Column('total_cpus', sa.Integer(), nullable=False),
-                sa.Column('total_memory_mb', sa.Integer(), nullable=False),
-                sa.Column('total_disk_gb', sa.Integer(), nullable=False),
-                sa.Column('claimed_cpus', sa.Integer(), nullable=False,
+                # BIGINT because these are cluster-wide sums and the
+                # proto fields are int64. total_memory_mb as INT would
+                # overflow around 700 TB of overcommitted RAM, and the
+                # failure mode is an upsert that raises under strict
+                # mode, failing every pass with only a WARNING to show
+                # for it. The tables are new in this release, so
+                # widening now is free where it would be a migration
+                # later.
+                sa.Column('total_cpus', sa.BigInteger(), nullable=False),
+                sa.Column('total_memory_mb', sa.BigInteger(),
+                          nullable=False),
+                sa.Column('total_disk_gb', sa.BigInteger(), nullable=False),
+                sa.Column('claimed_cpus', sa.BigInteger(), nullable=False,
                           server_default='0'),
-                sa.Column('claimed_memory_mb', sa.Integer(), nullable=False,
-                          server_default='0'),
-                sa.Column('claimed_disk_gb', sa.Integer(), nullable=False,
-                          server_default='0'),
-                sa.Column('unclaimed_used_cpus', sa.Integer(), nullable=False,
-                          server_default='0'),
-                sa.Column('unclaimed_used_memory_mb', sa.Integer(),
+                sa.Column('claimed_memory_mb', sa.BigInteger(),
                           nullable=False, server_default='0'),
-                sa.Column('unclaimed_used_disk_gb', sa.Integer(),
+                sa.Column('claimed_disk_gb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('unclaimed_used_cpus', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('unclaimed_used_memory_mb', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('unclaimed_used_disk_gb', sa.BigInteger(),
                           nullable=False, server_default='0'),
                 sa.Column('updated_at', sa.DateTime(), nullable=False),
             )
@@ -23433,6 +23451,15 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # it means phase 3 must decide explicitly which number its guard uses
 # rather than assuming the two agree.
 #
+# The ledger reads only these INSTANCE_LOCATION rows. During the one
+# transition release where Node.instances still unions in the legacy
+# node_attributes.instances JSON column, a placement written by a
+# pre-cutover node exists only in that column and is invisible here, so
+# mid-rolling-upgrade the used_* counters under-count -- the
+# non-conservative direction for an admission guard. Phase 3 must not
+# enable the counter guard until the legacy column and its union are
+# gone.
+#
 # Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
 # (available since MariaDB 10.6, below the MIN_MARIADB_VERSION floor).
 # The derived table aggregates per instance first so the JSON_TABLE only
@@ -23677,28 +23704,31 @@ def _direct_reconcile_scheduler_capacity(
 
             # Node existence and schedulability ground truth. The
             # scheduler builds its candidate set from
-            # Nodes([], prefilter='active'), so a node in any state
-            # outside NODE_ACTIVE_STATES -- errored, missing, stopping,
-            # stopped, deleted -- is not a scheduling candidate and its
-            # resources are not capacity. A node taken out of service by
-            # the node-health cascade must stop contributing to the
-            # cluster totals, not sit there advertising capacity nothing
-            # can be placed on. The query is expressed as NOT IN the
-            # active set rather than IN an inactive set so a new state
-            # added to the state machine is excluded by default: an
-            # unrecognised state is not evidence that a node can be
-            # scheduled onto.
+            # Nodes([], prefilter='active'), which resolves through
+            # get_objects_by_state and so only ever sees nodes that have
+            # an object_states row in NODE_ACTIVE_STATES. The query here
+            # is expressed the same way round -- IN the active set, with
+            # candidates intersected against it -- so that everything
+            # outside that set is excluded by default: an errored,
+            # missing, stopping, stopped or deleted node, a state added
+            # to the state machine later, and a node with no state row
+            # at all (stateless zombies are a real condition here, which
+            # is why the orphan reconciler exists). None of those is
+            # evidence that a node can be scheduled onto. An earlier
+            # draft subtracted a NOT IN inactive set instead, and a
+            # stateless node appeared in neither set and slipped
+            # through.
             known_nodes = {
                 row.uuid for row in
                 conn.execute(sa.select(nodes.c.uuid)).fetchall()}
-            inactive_nodes = set()
+            active_nodes = set()
             for row in conn.execute(sa.select(states.c.object_uuid).where(
                     sa.and_(
                         states.c.object_type == ObjectType.NODE,
-                        states.c.state_value.notin_(
+                        states.c.state_value.in_(
                             sorted(NODE_ACTIVE_STATES))))).fetchall():
                 try:
-                    inactive_nodes.add(UUID(str(row.object_uuid)))
+                    active_nodes.add(UUID(str(row.object_uuid)))
                 except ValueError:
                     pass
 
@@ -23738,17 +23768,18 @@ def _direct_reconcile_scheduler_capacity(
             # cluster totals forever.
             removals = [
                 node_uuid for node_uuid in previous
-                if node_uuid in inactive_nodes
+                if node_uuid not in active_nodes
                 or node_uuid in non_hypervisors
                 or node_uuid in stale_metrics_nodes
                 or node_uuid not in known_nodes]
             candidates = (
-                (set(previous) | set(metrics_rows)) & known_nodes
-            ) - inactive_nodes - set(removals)
+                (set(previous) | set(metrics_rows))
+                & known_nodes & active_nodes) - set(removals)
 
             nodes_added = 0
             reply_nodes = []
             total_limits = [0, 0, 0]
+            capacity_nodes = set()
             for node_uuid in sorted(candidates, key=lambda u: u.hex):
                 prev_row = previous.get(node_uuid)
                 metrics_row = metrics_rows.get(node_uuid)
@@ -23805,6 +23836,7 @@ def _direct_reconcile_scheduler_capacity(
                 total_limits[0] += limit_cpus
                 total_limits[1] += limit_memory_mb
                 total_limits[2] += limit_disk_gb
+                capacity_nodes.add(node_uuid)
                 reply_nodes.append({
                     'node_uuid': str(node_uuid),
                     'limit_cpus': limit_cpus,
@@ -23855,13 +23887,28 @@ def _direct_reconcile_scheduler_capacity(
             # (5) Rebuild the cluster_capacity singleton: node limit
             # sums, active claim limit sums, and usage by instances in
             # namespaces without an active claim.
+            #
+            # The unclaimed fold is restricted to nodes that hold a
+            # capacity row after this pass, so the singleton is a closed
+            # accounting over the schedulable cluster: an instance
+            # stranded on an errored, demoted, stale-metrics or deleted
+            # node contributes to neither side, rather than inflating
+            # the used side of a total its node contributes nothing to.
+            # Without the restriction a drained hypervisor makes the
+            # soak dashboards show unclaimed usage exceeding total
+            # capacity, which reads as a bug rather than as accounting.
+            # Per-claim used_* above is deliberately different: it stays
+            # namespace-wide, because a namespace quota covers the
+            # namespace's instances wherever they are stranded.
             unclaimed_used = [0, 0, 0]
-            for namespace, ns_used in usage_by_namespace.items():
+            for (node_uuid, namespace), used_row in usage.items():
                 if namespace in claimed_namespaces:
                     continue
-                unclaimed_used[0] += ns_used[0]
-                unclaimed_used[1] += ns_used[1]
-                unclaimed_used[2] += ns_used[2]
+                if node_uuid not in capacity_nodes:
+                    continue
+                unclaimed_used[0] += used_row[0]
+                unclaimed_used[1] += used_row[1]
+                unclaimed_used[2] += used_row[2]
 
             cluster_values = {
                 'total_cpus': total_limits[0],
