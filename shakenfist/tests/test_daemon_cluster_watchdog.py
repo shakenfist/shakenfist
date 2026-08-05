@@ -65,3 +65,58 @@ class ClusterWatchdogTestCase(base.ShakenFistTestCase):
 
         # One pet per IPAM iterated.
         self.assertGreaterEqual(m.pet_watchdog.call_count, 2)
+
+
+class ScheduledJobWatchdogTestCase(base.ShakenFistTestCase):
+    """The maintenance batch pets between jobs, not just around it.
+
+    Job timers run continuously while a node is idle but only fire while
+    it is elected, so a node up for hours and then elected finds every
+    job overdue at once -- including the heaviest three. Petting only
+    around the batch, with WatchdogSec at 60s, makes that first elected
+    pass the likeliest place to be killed for unresponsiveness.
+    """
+
+    def _make_monitor(self):
+        m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+        return m
+
+    def _fake_job(self, should_run, ran):
+        job = mock.MagicMock()
+        job.should_run = should_run
+        job.run.side_effect = lambda: ran.append(job)
+        # sorted() over the job list needs an ordering.
+        job.__lt__ = lambda self, other: False
+        return job
+
+    def test_pets_between_each_due_job(self):
+        ran = []
+        jobs = [self._fake_job(True, ran) for _ in range(9)]
+
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs', jobs):
+            m._run_due_scheduled_jobs()
+
+        self.assertEqual(9, len(ran))
+        # One pet before each job, plus one after the batch.
+        self.assertEqual(10, m.pet_watchdog.call_count)
+
+    def test_skips_jobs_which_are_not_due(self):
+        ran = []
+        due = self._fake_job(True, ran)
+        not_due = self._fake_job(False, ran)
+
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs',
+                               [due, not_due]):
+            m._run_due_scheduled_jobs()
+
+        self.assertEqual([due], ran)
+        not_due.run.assert_not_called()
+
+    def test_pets_even_when_nothing_is_due(self):
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs', []):
+            m._run_due_scheduled_jobs()
+        self.assertEqual(1, m.pet_watchdog.call_count)

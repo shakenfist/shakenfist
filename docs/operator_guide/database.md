@@ -547,11 +547,19 @@ A node only has a capacity row while it could actually be scheduled
 onto, so expect rows to appear and disappear as nodes change state. A
 node loses its row when it stops being a hypervisor, when it leaves the
 active states (so anything the node-health cascade takes out of service
-stops contributing to the cluster totals), or when its `node_metrics`
-row goes stale — more than fifteen minutes without an update, which
-means the resources daemon has stopped publishing even though the node
-itself still looks alive. Each of those mirrors a filter the scheduler
-already applies before considering a node as a placement candidate.
+stops contributing to the cluster totals), when it has no row in the
+`nodes` table at all, or when its `node_metrics` row goes stale — more
+than fifteen minutes without an update, which means the resources daemon
+has stopped publishing even though the node itself still looks alive.
+Each of those mirrors a filter the scheduler already applies before
+considering a node as a placement candidate.
+
+Severe clock skew is a fifth way to lose the row. `node_metrics.
+timestamp` is written by each node's resources daemon from that node's
+clock, and the staleness check runs on the database daemon's, so a node
+running more than fifteen minutes slow looks permanently stale. Any
+working NTP setup is far inside that, but it is worth knowing if a node
+drops out of the capacity tables while otherwise looking healthy.
 
 Two things to know when reading those numbers. The `used_*` counters are
 allocation ledgers: they sum what every placed, non-deleted instance was
@@ -562,9 +570,20 @@ count only running libvirt domains) on a cluster with powered-off
 instances. And the gauges are published only by the elected cluster node,
 which drops them when it loses the lock, so during a leadership handoff
 there is a window with no capacity gauges at all until the new leader's
-first pass — alert on
-`scheduler_capacity_reconcile_last_success_timestamp` going stale rather
-than on a gauge disappearing.
+first pass. Alert on the reconciler falling behind rather than on a
+gauge disappearing, and make the alert cluster-scoped:
+
+```
+time() - max(scheduler_capacity_reconcile_last_success_timestamp) > 900
+```
+
+The `max()` matters. Unlike the capacity gauges, the last-success
+timestamp is not cleared on demotion — it records when *that node* last
+reconciled successfully, which is useful for debugging — so every node
+that has ever held and lost the maintenance lock keeps publishing its
+own frozen value. A per-instance staleness alert would fire permanently
+on all of them. Aggregating asks the question you actually want
+answered: has *anybody* reconciled recently.
 
 Cluster operation headers (`cluster_operations`) and work queue rows
 (`work_queue`) live in MariaDB so the create-and-enqueue step can run in a

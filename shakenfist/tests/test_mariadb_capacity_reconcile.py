@@ -25,6 +25,7 @@ from sqlalchemy.exc import OperationalError
 
 from shakenfist.constants import GiB
 from shakenfist.daemons.database import main as database_main
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.protos import database_pb2
 from shakenfist.tests import base
@@ -376,6 +377,20 @@ def _is_stale_metrics_query(text):
     return 'node_metrics.timestamp <=' in text
 
 
+def _deleted_row_count(stmt):
+    """How many node uuids does a capacity DELETE actually name?
+
+    The IN list binds as one expanding parameter, so this is the length
+    of that list -- what a real database would report as the rowcount
+    given the fixture's rows all exist.
+    """
+    params = stmt.compile(dialect=MYSQL_DIALECT).params
+    for value in params.values():
+        if isinstance(value, (list, tuple)):
+            return len(value)
+    return len(params)
+
+
 def _capacity_row(node_uuid, limit_cpus, limit_memory_mb, limit_disk_gb,
                   used_cpus=0, used_memory_mb=0, used_disk_gb=0):
     return SimpleNamespace(
@@ -408,7 +423,10 @@ class _ReconcileRouterMixin:
         if 'UPDATE namespace_claims' in text and 'expires_at' in text:
             return self._fake_result(rowcount=3)
         if 'DELETE FROM scheduler_node_capacity' in text:
-            return self._fake_result(rowcount=2)
+            # Report the number of uuids the statement actually names, so
+            # nodes_removed assertions test the reconciler's removal set
+            # rather than a hardcoded number the fixture cannot produce.
+            return self._fake_result(rowcount=_deleted_row_count(stmt))
         if 'FROM scheduler_node_capacity' in text:
             return self._fake_result(rows=self.previous_rows)
         if 'FROM node_metrics' in text:
@@ -671,7 +689,7 @@ class ReconcileHypervisorFilterTestCase(
             node_rows=[SimpleNamespace(uuid=NODE2)])
 
         self.assertEqual([], result['nodes'])
-        self.assertEqual(2, result['nodes_removed'])
+        self.assertEqual(1, result['nodes_removed'])
         deletes = [str(call.args[0].compile(dialect=MYSQL_DIALECT))
                    for call in conn.execute.call_args_list
                    if isinstance(call.args[0], sa.sql.expression.Delete)]
@@ -772,7 +790,7 @@ class ReconcileNodeStateFilterTestCase(
             inactive_rows=[SimpleNamespace(object_uuid=str(NODE2))])
 
         self.assertEqual([], result['nodes'])
-        self.assertEqual(2, result['nodes_removed'])
+        self.assertEqual(1, result['nodes_removed'])
         deletes = [str(call.args[0].compile(dialect=MYSQL_DIALECT))
                    for call in conn.execute.call_args_list
                    if isinstance(call.args[0], sa.sql.expression.Delete)]
@@ -791,7 +809,7 @@ class ReconcileNodeStateFilterTestCase(
             stale_metrics_rows=[SimpleNamespace(node_uuid=NODE2)])
 
         self.assertEqual([], result['nodes'])
-        self.assertEqual(2, result['nodes_removed'])
+        self.assertEqual(1, result['nodes_removed'])
         self.assertEqual(0, result['cluster']['total_cpus'])
 
     def test_staleness_window_is_above_the_reconcile_cadence(self):
@@ -875,6 +893,27 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
         self.assertEqual(mariadb.BOUNDED_QUERY_TIMEOUT,
                          mock_call.call_args.kwargs['timeout'])
         self.assertEqual(1, mock_call.call_args.kwargs['max_slow_failures'])
+
+    def test_database_unavailable_is_a_quiet_skip(self):
+        # The bounded budget makes an exhausted-retries DatabaseUnavailable
+        # the expected result of a loaded or restarting database tier. It
+        # must be converted to None here rather than escaping to the
+        # scheduled task's ignore_exception(), which logs at ERROR with a
+        # traceback and writes a recorded-exception file -- every five
+        # minutes, for a condition the design calls harmless, and against
+        # cluster CI's log-error checks.
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=exceptions.DatabaseUnavailable(
+                               'no gateways')), \
+                mock.patch.object(mariadb, 'LOG') as mock_log:
+            self.assertIsNone(
+                mariadb._grpc_reconcile_scheduler_capacity(2.5, 600))
+
+        mock_log.warning.assert_called_once()
+        mock_log.error.assert_not_called()
 
     def test_direct_failure_becomes_an_unsuccessful_reply(self):
         reply = self._servicer_reply(None)

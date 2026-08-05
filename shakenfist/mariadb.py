@@ -513,6 +513,14 @@ BOUNDED_QUERY_TIMEOUT = 10
 # within the quarter hour. Deliberately not the scheduler's 120 second
 # window: that is tuned for a cache refreshed on demand, and copying it
 # here would put the threshold below the reconcile period.
+#
+# Note this comparison spans hosts, unlike everything else in the
+# capacity work: node_metrics.timestamp is a float written by each
+# node's resources daemon from that node's clock, while the comparison
+# runs on the database daemon's. That is forced by the data model (the
+# column is not a server-side TIMESTAMP the way claim expiry is), so a
+# node whose clock runs more than this window slow loses its capacity
+# row. Fifteen minutes absorbs any skew a working NTP setup produces.
 RECONCILE_METRICS_MAX_AGE_SECONDS = 900
 
 
@@ -1640,6 +1648,12 @@ def _node_metric_to_bool(value: Any) -> bool:
     the string and integer forms so a publisher change cannot silently
     turn every node into a hypervisor -- bool('false') is True, which is
     exactly the trap this avoids.
+
+    An empty string is not False. It carries no more information than a
+    missing key, and the reconciler is careful to treat an unknown
+    is_hypervisor as evidence of nothing rather than as a confirmed
+    non-hypervisor -- the latter deletes the node's capacity row. So
+    refuse it, and let the caller store NULL.
     """
     if isinstance(value, bool):
         return value
@@ -1649,7 +1663,7 @@ def _node_metric_to_bool(value: Any) -> bool:
         lowered = value.strip().lower()
         if lowered in ('true', 't', 'yes', 'y', '1'):
             return True
-        if lowered in ('false', 'f', 'no', 'n', '0', ''):
+        if lowered in ('false', 'f', 'no', 'n', '0'):
             return False
     raise ValueError(f'Cannot coerce {value!r} to a boolean')
 
@@ -23293,7 +23307,15 @@ def _derive_cpu_memory_limits(
 
     A dimension whose inputs are NULL (a metrics row written by an old
     resources daemon mid-upgrade) derives as None so the caller keeps
-    the previous limit rather than zeroing it.
+    the previous limit rather than zeroing it. Note that the mirroring
+    of scheduler.py covers the arithmetic but deliberately not the
+    inputs: Scheduler._schedulable_threads() and
+    Scheduler._memory_reserved_mb() substitute per-node fallbacks for a
+    pre-phase-1 metrics row, where this returns None and the caller
+    prefers no capacity row to a guessed one. So mid-upgrade the
+    scheduler may place on a node that has no capacity row yet. That is
+    the conservative direction, but it means the two are not
+    interchangeable while an upgrade is in flight.
     """
     limit_cpus = None
     if cpu_schedulable is not None:
@@ -23699,22 +23721,29 @@ def _direct_reconcile_scheduler_capacity(
                     totals[2] += used_row[2]
 
             # (2) Refresh node rows. A node has a capacity row while it
-            # is an active hypervisor with a node_metrics row; an
-            # existing row also survives a missing metrics row while the
-            # node itself still exists, and NULL metrics columns keep the
-            # previous limits rather than zeroing them. A node that stops
-            # being a hypervisor, or leaves the active states, loses its
-            # row -- which is also how rows written before these filters
-            # existed get cleaned up on upgrade.
+            # is an active hypervisor with fresh metrics and a row in the
+            # nodes table; NULL metrics columns keep the previous limits
+            # rather than zeroing them. A node that stops qualifying on
+            # any of those loses its row -- which is also how rows
+            # written before these filters existed get cleaned up on
+            # upgrade.
+            #
+            # Existence in the nodes table gates creation as well as
+            # removal. Gating only removal leaves a permanent phantom: a
+            # node_metrics row that outlived its node's static and state
+            # rows has nothing to mark it inactive, so it reads as a
+            # fresh hypervisor, gets a row created, and then appears in
+            # both previous and metrics_rows on every later pass, so no
+            # removal condition ever fires and its limits sit in the
+            # cluster totals forever.
             removals = [
                 node_uuid for node_uuid in previous
                 if node_uuid in inactive_nodes
                 or node_uuid in non_hypervisors
                 or node_uuid in stale_metrics_nodes
-                or (node_uuid not in metrics_rows and
-                    node_uuid not in known_nodes)]
+                or node_uuid not in known_nodes]
             candidates = (
-                set(previous) | set(metrics_rows)
+                (set(previous) | set(metrics_rows)) & known_nodes
             ) - inactive_nodes - set(removals)
 
             nodes_added = 0
@@ -23926,6 +23955,18 @@ def _grpc_reconcile_scheduler_capacity(
                     reply.cluster.unclaimed_used_disk_gb),
             },
         }
+    except exceptions.DatabaseUnavailable as e:
+        # The bounded budget above makes this the *expected* outcome of a
+        # loaded or restarting database tier, not an anomaly, so it must
+        # not reach the caller's ignore_exception() path -- that logs at
+        # ERROR with a traceback and writes a recorded-exception file
+        # every five minutes for a condition this design calls harmless,
+        # and cluster CI's log-error checks are the functional gate for
+        # this phase. The failure counter and the un-advanced
+        # last-success timestamp are the signal operators need.
+        LOG.warning(
+            f'Scheduler capacity reconcile skipped, database unavailable: {e}')
+        return None
     except grpc.RpcError as e:
         LOG.error(f'gRPC ReconcileSchedulerCapacity failed: {e}')
         return None

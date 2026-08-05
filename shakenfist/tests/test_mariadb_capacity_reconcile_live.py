@@ -400,6 +400,41 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(2, len(rows_again))
         self.assertEqual(1, len(cluster_rows), 'singleton was duplicated')
 
+    def test_orphaned_metrics_row_never_gets_a_row(self):
+        # A node_metrics row that has outlived its node's static and
+        # state rows looks like a fresh hypervisor with good capacity
+        # columns: there is nothing left to mark it inactive. If
+        # existence in the nodes table gated only removal and not
+        # creation, this would get a row on the first pass and then be
+        # in both previous and metrics_rows forever, so no removal
+        # condition would ever fire and its limits would sit in the
+        # cluster totals permanently.
+        orphan = uuid4()
+        metrics_t = mariadb._get_node_metrics_table()
+        with self.engine.connect() as conn:
+            self._insert(conn, metrics_t, node_uuid=orphan,
+                         cpu_schedulable=128, memory_max=65536,
+                         memory_reserved_mb=2048,
+                         disk_free_instances=500 * GiB,
+                         disk_reservation_gb=20, metrics_json={},
+                         is_hypervisor=True, timestamp=self.now)
+            conn.commit()
+
+        first = self._reconcile()
+        self.assertNotIn(str(orphan),
+                         [n['node_uuid'] for n in first['nodes']])
+        self.assertEqual(48 + 96, first['cluster']['total_cpus'])
+
+        # And it does not creep in on a later pass either.
+        second = self._reconcile()
+        self.assertNotIn(str(orphan),
+                         [n['node_uuid'] for n in second['nodes']])
+
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            rows = conn.execute(sa.select(capacity_t)).fetchall()
+        self.assertNotIn(orphan, [r.node_uuid for r in rows])
+
     def test_capacity_rows_are_removed_when_a_node_stops_qualifying(self):
         self._reconcile()
         capacity_t = mariadb._get_scheduler_node_capacity_table()

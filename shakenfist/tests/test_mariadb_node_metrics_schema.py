@@ -109,6 +109,26 @@ class NodeMetricsExtractionTestCase(base.ShakenFistTestCase):
         self.assertIsNone(extracted['cpu_max'])
         mock_log.warning.assert_not_called()
 
+    def test_boolean_string_forms_coerce(self):
+        for value in (True, 1, 'true', 'True', ' yes ', '1'):
+            self.assertIs(True, mariadb._node_metric_to_bool(value),
+                          f'{value!r} should be True')
+        for value in (False, 0, 'false', 'False', 'no', '0'):
+            self.assertIs(False, mariadb._node_metric_to_bool(value),
+                          f'{value!r} should be False')
+
+    def test_empty_string_is_not_a_confirmed_false(self):
+        # An empty string carries no more information than a missing
+        # key, and the reconciler treats an unknown is_hypervisor as
+        # evidence of nothing -- whereas a confirmed False deletes the
+        # node's capacity row. So it must extract as NULL, not False.
+        self.assertRaises(ValueError, mariadb._node_metric_to_bool, '')
+
+        metrics = dict(REALISTIC_METRICS)
+        metrics['is_hypervisor'] = ''
+        extracted = mariadb._extract_node_metrics_columns(uuid4(), metrics)
+        self.assertIsNone(extracted['is_hypervisor'])
+
     def test_garbage_extracts_as_none_and_warns(self):
         node_uuid = uuid4()
         metrics = dict(REALISTIC_METRICS)

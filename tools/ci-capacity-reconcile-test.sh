@@ -57,6 +57,18 @@ export SF_MARIADB_TEST_DSN="mariadb+mysqldb://shakenfist:${DB_PASSWORD}@127.0.0.
 # Serial because every test in the module shares one database and drops
 # its tables during cleanup.
 echo "Running live capacity reconciler tests..."
-stestr run --serial test_mariadb_capacity_reconcile_live
+stestr run --serial test_mariadb_capacity_reconcile_live | tee /tmp/capacity-reconcile-output
+
+# Every test in the module is @unittest.skipUnless(SF_MARIADB_TEST_DSN),
+# so a broken export -- a typo, a rename of the environment variable, a
+# shell change that drops it -- turns this job into a clean run of zero
+# tests and a green tick. The whole argument for this job is that the
+# failures it catches are silently wrong numbers rather than errors, so
+# it must not be able to fail silently itself.
+if ! grep -qE '^ - Passed: [1-9]' /tmp/capacity-reconcile-output; then
+    echo "ERROR: no live capacity reconciler tests actually ran." >&2
+    echo "Is SF_MARIADB_TEST_DSN reaching the test process?" >&2
+    exit 1
+fi
 
 echo "Live capacity reconciler tests passed."

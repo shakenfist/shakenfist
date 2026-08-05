@@ -386,7 +386,14 @@ capacity reconciler's limit-derivation helpers in
 `_derive_disk_limit_gb()`) deliberately reproduce `scheduler.py`'s
 admission *limits*, so the phase 3 counter guard bounds capacity the
 same way today's Python filter does — a change to one must change
-both. The *usage* side is deliberately not a mirror: the reconciler's
+both. The mirroring covers the arithmetic but not the inputs:
+`_schedulable_threads()` and `_memory_reserved_mb()` substitute
+per-node fallbacks for a metrics row that predates the phase 1
+columns, where the reconciler derives None and prefers to write no
+capacity row at all rather than a guessed one. So mid-upgrade a node
+can be schedulable while having no capacity row — the conservative
+direction, but the two are not interchangeable while an upgrade is in
+flight. The *usage* side is deliberately not a mirror: the reconciler's
 `used_cpus` and `used_memory_mb` are allocation ledgers over every
 placed, non-deleted instance, whereas the resources daemon's
 `cpu_total_instance_vcpus` and `memory_total_instance_actual` count

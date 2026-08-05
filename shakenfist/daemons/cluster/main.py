@@ -502,6 +502,30 @@ class Monitor(daemon.Daemon):
             b.remove_location(n.fqdn)
             b.request_replication()
 
+    def _run_due_scheduled_jobs(self):
+        """Run every due maintenance job, petting between each one.
+
+        This is schedule.run_pending() with a watchdog pet before each
+        job. The batch matters because job timers run continuously while
+        a node is idle but only fire while it is elected, so a node that
+        has been up for hours and is then elected finds every job
+        overdue at once -- including the three heaviest (prune_events,
+        reconcile_orphaned_objects, per_blob_checks). Petting only
+        around the batch, with WatchdogSec at 60s, makes that first
+        elected pass the most likely place to be killed for
+        unresponsiveness. A pet between jobs bounds the exposure to one
+        job rather than nine.
+
+        Sorting and the should_run check mirror run_pending() itself, so
+        job ordering and semantics are unchanged.
+        """
+        for job in sorted(schedule.jobs):
+            if not job.should_run:
+                continue
+            self.pet_watchdog()
+            job.run()
+        self.pet_watchdog()
+
     def _run_inner(self):
         last_defer_message = 0
         last_loop_run = 0
@@ -569,7 +593,7 @@ class Monitor(daemon.Daemon):
                         with util_general.RecordedOperation(
                                 'scheduled cluster operations',
                                 None, threshold=10):
-                            schedule.run_pending()
+                            self._run_due_scheduled_jobs()
                     except Exception as e:
                         util_exceptions.ignore_exception('cluster', e)
 

@@ -691,6 +691,15 @@ def clear_scheduler_capacity_metrics() -> None:
     problem -- they are monotonic and aggregate correctly across nodes --
     but these are gauges, so the demoted node has to stop answering. The
     newly elected node repopulates all of them on its first pass.
+
+    The last-success and last-duration gauges are deliberately left
+    alone. They describe this node's own last pass, not cluster state,
+    and are worth keeping for debugging ("when did this node last
+    reconcile successfully?"). They are also unlabelled, so they cannot
+    be removed the way a label set can -- only overwritten. That means a
+    freshness alert on them must aggregate across instances or it will
+    fire forever on every node that has ever held the lock; see
+    docs/operator_guide/database.md for the query.
     """
     for node_uuid in _CAPACITY_EXPORTED_NODES:
         for gauge in (SCHEDULER_CAPACITY_NODE_LIMIT,

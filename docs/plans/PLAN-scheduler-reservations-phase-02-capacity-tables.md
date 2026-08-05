@@ -321,6 +321,7 @@ surface yet: the admin capacity view migrates in phase 5.
 | 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | In progress — PR #3614 open |
 | 8 | Address automated review of PR #3614 | medium | management session | none | Complete — see Review response |
 | 9 | Address second automated review of PR #3614 | medium | management session | none | Complete — see Second review response |
+| 10 | Address third automated review of PR #3614 | medium | management session | none | Complete — see Third review response |
 
 ## Validation
 
@@ -543,6 +544,94 @@ capacity reconciler" job gated by `can_merge`, following the
 existing `schema_enum_widening` pattern. Verified as a real
 guard rather than a passing formality: removing the
 `REPLACE()` transform from the usage join fails 8 of the 11.
+
+### Step 10: response to the third automated review (2026-08-04)
+
+Ten items, all adopted.
+
+**Fixed — the phantom capacity row (item 4), which is the fourth
+instance of one pattern.** Existence in the `nodes` table gated
+removal but not creation, so a `node_metrics` row that outlived its
+node's static and state rows read as a fresh hypervisor: it got a
+capacity row, then appeared in both `previous` and `metrics_rows` on
+every later pass, so no removal condition ever fired and its limits sat
+in the cluster totals permanently. `candidates` is now intersected
+with `known_nodes` and the removal condition is unconditional.
+
+That is now four rounds of the same defect — role, state, freshness,
+existence — each one a filter the scheduler applies that the
+reconciler did not. **The generalisation for phase 3 is that the rule
+is "a capacity row exists only where the scheduler could place", and
+any new scheduler-side filter is automatically a reconciler-side
+filter too.** A live test seeds an orphaned metrics row and asserts no
+row is created on the first pass or any later one; reverting the fix
+fails it.
+
+**Fixed — the alerting advice was self-defeating (item 1).**
+`docs/operator_guide/database.md` told operators to alert on
+`scheduler_capacity_reconcile_last_success_timestamp` going stale, but
+that gauge is deliberately *not* cleared on demotion (it records this
+node's own last pass, which is useful for debugging, and being
+unlabelled it cannot be removed the way a label set can). A
+per-instance staleness alert would therefore fire forever on every
+node that has ever held the lock. The docs now give the cluster-scoped
+expression, `time() - max(...) > 900`, and explain why the
+aggregation is load-bearing rather than stylistic.
+
+**Adopted:**
+
+* Watchdog pets between scheduled jobs, not just around the batch
+  (item 2). Hoisting registration in step 9 fixed the timer reset but
+  guaranteed that a node elected after hours of idling finds all nine
+  jobs due at once, including the three heaviest, inside a single
+  un-petted `run_pending()` with `WatchdogSec` at 60s.
+  `_run_due_scheduled_jobs()` mirrors `run_pending()`'s ordering and
+  due-check while petting before each job, bounding the exposure to
+  one job instead of nine.
+* `DatabaseUnavailable` is caught in
+  `_grpc_reconcile_scheduler_capacity` and logged at WARNING (item 3).
+  The bounded budget adopted in step 8 makes exhausted retries the
+  *expected* outcome of a loaded or restarting database tier, but it
+  escaped the `except grpc.RpcError` and landed in the scheduled
+  task's `ignore_exception()` — an ERROR with a traceback and a
+  recorded-exception file every five minutes, for a condition the
+  design calls harmless, against a phase whose stated functional gate
+  is cluster CI's log-error checks.
+* `_node_metric_to_bool('')` now raises rather than returning False
+  (item 10), so an empty string extracts as NULL and routes into the
+  same no-evidence handling as a missing key. Unreachable today, but
+  the falsey list had quietly made "no value" mean "confirmed
+  non-hypervisor", which deletes a capacity row.
+* The mock router now reports the number of uuids the DELETE actually
+  names rather than a hardcoded 2 (item 7), so three
+  `nodes_removed` assertions test the reconciler rather than the
+  fixture. They now assert 1, which is what their single-row fixtures
+  can actually produce.
+* Both live-test CI scripts assert that tests actually ran (item 8).
+  Every test in those modules is `@unittest.skipUnless(DSN)`, so a
+  broken export turned the job into a green tick over zero tests —
+  the guard silently not guarding, which is precisely the failure mode
+  these jobs exist to prevent. Fixed in
+  `ci-enum-widening-test.sh` as well as the new script, since it has
+  the identical shape and the same hole. Verified by running with the
+  DSN unset: 12 skipped, and the guard fails the script.
+* Documented: that the scheduler mirroring covers the arithmetic but
+  not `_schedulable_threads()`/`_memory_reserved_mb()`'s pre-upgrade
+  fallbacks, so mid-upgrade a node can be schedulable with no capacity
+  row (item 5); and that the metrics-freshness comparison spans hosts,
+  making severe clock skew a fifth way to lose a capacity row (item
+  6), which is forced by `node_metrics.timestamp` being a
+  client-written float rather than a server `TIMESTAMP`.
+
+**Recorded for phase 4 (item 9).** Node capacity rows are
+intentionally reaped by the reconciler rather than by
+`Node.hard_delete()`: this phase's invariant is that the reconciler is
+the sole writer of these tables, and a second writer would contradict
+it for at most five minutes of staleness. That trade stops being
+obviously right once `namespace_claims` holds real rows, so when the
+claims API lands, `Namespace.hard_delete()` should clean up its
+claims — a namespace's claim outliving the namespace is a leak, not a
+staleness window. Do not read the current omission as an oversight.
 
 ## Administration and logistics
 
