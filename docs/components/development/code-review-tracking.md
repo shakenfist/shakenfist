@@ -48,12 +48,17 @@ this repository and passes through to the script.
   fnmatch patterns matched against repo-relative paths (`*` matches
   across directory separators; an empty or absent `include` means
   all tracked files). The tracking machinery (`.vscode/*`,
-  `REVIEWS.md`) is always excluded. Scope should cover both the
+  `REVIEWS.md`) is always excluded. Scope should cover the
   executable artifacts (source code in every language the repo
-  uses, plus shell scripts) and the prose that documents them
-  (READMEs, `ARCHITECTURE`/`AGENTS`, and `docs/` guides): prose
-  drifts out of sync just as quietly as code and benefits from the
-  same periodic re-reading. Generated and vendored code should be
+  uses, plus shell scripts), the declarative configuration that is
+  executable in practice (CI workflows, container and deployment
+  manifests, Ansible playbooks, tool and packaging config -- the
+  YAML that decides what runs, with which permissions, against
+  which secrets, and which is where a supply-chain change is most
+  likely to hide), and the prose that documents them (READMEs,
+  `ARCHITECTURE`/`AGENTS`, and `docs/` guides): prose drifts out of
+  sync just as quietly as code and benefits from the same periodic
+  re-reading. Generated and vendored code should be
   excluded, as should ephemeral working documents like a
   `docs/plans/` archive -- point-in-time records of intended work,
   not living artifacts, and numerous enough to swamp the queue.
@@ -98,15 +103,16 @@ this repository and passes through to the script.
    superset -- PRs, merge queue, status checks -- and also
    satisfies this.)
 
-4. Write `.vscode/review-scope.toml`. Cover code and docs across
-   the languages the repo uses, and exclude generated, vendored, and
-   ephemeral files. For example (ryll's config; adjust the language
-   patterns to the repo):
+4. Write `.vscode/review-scope.toml`. Cover code, YAML
+   configuration, and docs across the languages the repo uses, and
+   exclude generated, vendored, and ephemeral files. For example
+   (ryll's config; adjust the language patterns to the repo):
 
    ```toml
-   # Source in every language the repo uses, plus shell scripts and
-   # the Markdown documentation.
-   include = ['*.rs', '*.sh', '*.py', '*.md']
+   # Source in every language the repo uses, plus shell scripts,
+   # the YAML that configures CI and deployment, and the Markdown
+   # documentation.
+   include = ['*.rs', '*.sh', '*.py', '*.md', '*.yml', '*.yaml']
    # docs/plans/ is a point-in-time archive, not living artifacts.
    exclude = ['docs/plans/*']
    ```
@@ -115,6 +121,13 @@ this repository and passes through to the script.
    starting point for a small repo -- but then lean on `exclude` to
    keep generated code (`*_pb2.py`), vendored trees (`vendor/*`), and
    ephemeral archives out of the queue.
+
+   Widening scope in a repo that has already been adopted needs no
+   migration -- the newly in-scope files simply have no review mark,
+   so they enter the `next` queue like any other unreviewed file.
+   Expect the `review-coverage` audit to open an issue until the
+   backlog has been worked off, since a repo's worth of workflow
+   files arrives at once.
 
 5. Add a thin wrapper (e.g. `tools/review-tracking.sh`, copied
    from ryll) that locates a local clone of this repository --
