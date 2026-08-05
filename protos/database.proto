@@ -1894,6 +1894,15 @@ message GetTrustedIssuerAttributesReply {
 
 message UpdateTrustedIssuerAttributesRequest {
   TrustedIssuerAttributesProto data = 1;
+
+  // Field mask: the TrustedIssuerAttributesData field names to write.
+  // An empty list means write every column. See the equivalent comment
+  // on UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents. An issuer's three values are edited as one
+  // coherent configuration, so today's only caller names all three --
+  // the mask is here so a later writer of one of them cannot silently
+  // revert the others.
+  repeated string fields = 2;
 }
 
 message DeleteTrustedIssuerAttributesRequest {
@@ -1975,6 +1984,15 @@ message GetMappingRuleAttributesReply {
 
 message UpdateMappingRuleAttributesRequest {
   MappingRuleAttributesProto data = 1;
+
+  // Field mask: the MappingRuleAttributesData field names to write. An
+  // empty list means write every column. See the equivalent comment on
+  // UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents. A rule's policy is edited as one unit, so
+  // today's only caller names every field -- the mask is here so a
+  // later writer of one of them cannot silently revert the rest, which
+  // for a rule would mean reverting the scopes it grants.
+  repeated string fields = 2;
 }
 
 message DeleteMappingRuleAttributesRequest {

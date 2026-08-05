@@ -3543,7 +3543,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['update_trusted_issuer_attributes'].inc()
             ok = mariadb._direct_update_trusted_issuer_attributes(
-                mariadb._trusted_issuer_attrs_from_proto(request.data))
+                mariadb._trusted_issuer_attrs_from_proto(request.data),
+                fields=list(request.fields))
             return database_pb2.StatusReply(success=ok)
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -3725,7 +3726,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['update_mapping_rule_attributes'].inc()
             ok = mariadb._direct_update_mapping_rule_attributes(
-                mariadb._mapping_rule_attrs_from_proto(request.data))
+                mariadb._mapping_rule_attrs_from_proto(request.data),
+                fields=list(request.fields))
             return database_pb2.StatusReply(success=ok)
         except Exception as e:
             util_exceptions.ignore_exception(

@@ -200,14 +200,18 @@ class TrustedIssuer(dbo):
 
         All three move together because they are one coherent
         configuration: a new issuer_url with a stale jwks_uri is a
-        broken issuer rather than a partially updated one.
+        broken issuer rather than a partially updated one. That is why
+        the field mask names all three rather than passing None: the
+        caller really is writing every column, and saying so keeps the
+        "None is for creation and upgrades only" rule intact.
         """
         mariadb.update_trusted_issuer_attributes(
             TrustedIssuerAttributesData(
                 uuid=_as_uuid(self.uuid),
                 issuer_url=issuer_url,
                 jwks_uri=jwks_uri,
-                audience=audience))
+                audience=audience),
+            fields=['issuer_url', 'jwks_uri', 'audience'])
         self.add_event(
             EVENT_TYPE_MUTATE, 'updated trusted issuer configuration',
             extra={'issuer_url': issuer_url, 'jwks_uri': jwks_uri,

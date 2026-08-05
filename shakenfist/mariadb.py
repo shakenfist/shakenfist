@@ -13152,14 +13152,47 @@ def _direct_get_trusted_issuer_attributes(
         return None
 
 
+def _trusted_issuer_attributes_column_values(
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map TrustedIssuerAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so a concurrent writer of another attribute on the
+    same row cannot lose its committed column to this writer's
+    read-modify-write.
+
+    The only caller today names all three, because an issuer's
+    issuer_url, jwks_uri and audience are one coherent configuration
+    and editing them apart is how a cluster ends up pointing at a new
+    provider while trusting the old one's keys. The mask exists so that
+    a later single-field writer cannot silently revert the other two.
+    """
+    all_values: Dict[str, Any] = {
+        'issuer_url': data.issuer_url,
+        'jwks_uri': data.jwks_uri,
+        'audience': data.audience,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown trusted issuer attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_trusted_issuer_attributes(
-        data: TrustedIssuerAttributesData) -> bool:
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Replace a TrustedIssuer's mutable attributes.
 
-    The whole attribute set is written together because these three
-    values are one coherent configuration: pointing at a different
-    issuer_url while leaving a stale jwks_uri would be a broken state
-    rather than a partial update.
+    fields is the list of model field names to write; None or empty
+    writes every column. See
+    _trusted_issuer_attributes_column_values for why a writer of one
+    attribute must pass its field name.
     """
     engine = _get_engine()
     table = _get_trusted_issuer_attributes_table()
@@ -13169,9 +13202,7 @@ def _direct_update_trusted_issuer_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                issuer_url=data.issuer_url,
-                jwks_uri=data.jwks_uri,
-                audience=data.audience)
+                **_trusted_issuer_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -13348,11 +13379,20 @@ def _grpc_get_trusted_issuer_attributes(
 
 
 def _grpc_update_trusted_issuer_attributes(
-        data: TrustedIssuerAttributesData) -> bool:
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update a TrustedIssuer's attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See
+    _trusted_issuer_attributes_column_values for why a writer of one
+    attribute must pass its field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateTrustedIssuerAttributesRequest(
-            data=_trusted_issuer_attrs_to_proto(data))
+            data=_trusted_issuer_attrs_to_proto(data),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateTrustedIssuerAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -13430,11 +13470,30 @@ def get_trusted_issuer_attributes(
 
 
 def update_trusted_issuer_attributes(
-        data: TrustedIssuerAttributesData) -> bool:
-    """Replace a TrustedIssuer's mutable attributes."""
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]]) -> bool:
+    """Replace a TrustedIssuer's mutable attributes.
+
+    Args:
+        data: The TrustedIssuerAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so a concurrent writer of another
+            attribute on the same row cannot lose its committed column
+            to this writer's read-modify-write. Passing None writes
+            every column and is reserved for row creation and upgrade
+            persistence.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _trusted_issuer_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_trusted_issuer_attributes(data)
-    return _direct_update_trusted_issuer_attributes(data)
+        return _grpc_update_trusted_issuer_attributes(data, fields=fields)
+    return _direct_update_trusted_issuer_attributes(data, fields=fields)
 
 
 def delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
@@ -13768,13 +13827,48 @@ def _direct_get_mapping_rule_attributes(
         return None
 
 
+def _mapping_rule_attributes_column_values(
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map MappingRuleAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so a concurrent writer of another attribute on the
+    same row cannot lose its committed column to this writer's
+    read-modify-write.
+
+    The only caller today names every field, because a rule's issuer,
+    claims and the scopes it grants are one policy and applying half an
+    edit would leave a grant nobody wrote. The mask exists so that a
+    later single-field writer cannot silently revert the rest -- which
+    for a rule means reverting the scopes it hands out.
+    """
+    all_values: Dict[str, Any] = {
+        'issuer': data.issuer,
+        'bound_claims': _json_dumps(data.bound_claims),
+        'scopes': _json_dumps(data.scopes),
+        'key_ttl': data.key_ttl,
+        'key_name_prefix': data.key_name_prefix,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown mapping rule attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_mapping_rule_attributes(
-        data: MappingRuleAttributesData) -> bool:
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Replace a MappingRule's mutable attributes.
 
-    The whole attribute set moves together: a rule's issuer, claims and
-    the scopes it grants are one policy, and applying half of an edit
-    would leave a grant nobody wrote.
+    fields is the list of model field names to write; None or empty
+    writes every column. See _mapping_rule_attributes_column_values for
+    why a writer of one attribute must pass its field name.
     """
     engine = _get_engine()
     table = _get_mapping_rule_attributes_table()
@@ -13784,11 +13878,7 @@ def _direct_update_mapping_rule_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                issuer=data.issuer,
-                bound_claims=_json_dumps(data.bound_claims),
-                scopes=_json_dumps(data.scopes),
-                key_ttl=data.key_ttl,
-                key_name_prefix=data.key_name_prefix)
+                **_mapping_rule_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -13991,11 +14081,19 @@ def _grpc_get_mapping_rule_attributes(
 
 
 def _grpc_update_mapping_rule_attributes(
-        data: MappingRuleAttributesData) -> bool:
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update a MappingRule's attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _mapping_rule_attributes_column_values for
+    why a writer of one attribute must pass its field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateMappingRuleAttributesRequest(
-            data=_mapping_rule_attrs_to_proto(data))
+            data=_mapping_rule_attrs_to_proto(data),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateMappingRuleAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -14079,11 +14177,31 @@ def get_mapping_rule_attributes(
     return _direct_get_mapping_rule_attributes(rule_uuid)
 
 
-def update_mapping_rule_attributes(data: MappingRuleAttributesData) -> bool:
-    """Replace a MappingRule's mutable attributes."""
+def update_mapping_rule_attributes(
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]]) -> bool:
+    """Replace a MappingRule's mutable attributes.
+
+    Args:
+        data: The MappingRuleAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so a concurrent writer of another
+            attribute on the same row cannot lose its committed column
+            to this writer's read-modify-write. Passing None writes
+            every column and is reserved for row creation and upgrade
+            persistence.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _mapping_rule_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_mapping_rule_attributes(data)
-    return _direct_update_mapping_rule_attributes(data)
+        return _grpc_update_mapping_rule_attributes(data, fields=fields)
+    return _direct_update_mapping_rule_attributes(data, fields=fields)
 
 
 def delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:

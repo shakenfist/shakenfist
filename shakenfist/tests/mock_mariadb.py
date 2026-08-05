@@ -3453,10 +3453,22 @@ class MockMariaDB():
     def _mariadb_get_trusted_issuer_attributes(self, issuer_uuid):
         return self.trusted_issuer_attributes.get(str(issuer_uuid))
 
-    def _mariadb_update_trusted_issuer_attributes(self, data):
+    def _mariadb_update_trusted_issuer_attributes(self, data, fields=None):
+        """Mock of mariadb.update_trusted_issuer_attributes().
+
+        Honours the fields mask the way the real implementation does,
+        rather than always replacing the row. A mock which ignored the
+        mask would let a caller name the wrong fields and still see the
+        write it expected.
+        """
         if str(data.uuid) not in self.trusted_issuer_attributes:
             return False
-        self.trusted_issuer_attributes[str(data.uuid)] = data
+        if fields:
+            stored = self.trusted_issuer_attributes[str(data.uuid)]
+            for field in fields:
+                setattr(stored, field, getattr(data, field))
+        else:
+            self.trusted_issuer_attributes[str(data.uuid)] = data
         return True
 
     def _mariadb_delete_trusted_issuer_attributes(self, issuer_uuid):
@@ -3501,10 +3513,20 @@ class MockMariaDB():
     def _mariadb_get_mapping_rule_attributes(self, rule_uuid):
         return self.mapping_rule_attributes.get(str(rule_uuid))
 
-    def _mariadb_update_mapping_rule_attributes(self, data):
+    def _mariadb_update_mapping_rule_attributes(self, data, fields=None):
+        """Mock of mariadb.update_mapping_rule_attributes().
+
+        Honours the fields mask, for the reason given on the trusted
+        issuer equivalent above.
+        """
         if str(data.uuid) not in self.mapping_rule_attributes:
             return False
-        self.mapping_rule_attributes[str(data.uuid)] = data
+        if fields:
+            stored = self.mapping_rule_attributes[str(data.uuid)]
+            for field in fields:
+                setattr(stored, field, getattr(data, field))
+        else:
+            self.mapping_rule_attributes[str(data.uuid)] = data
         return True
 
     def _mariadb_delete_mapping_rule_attributes(self, rule_uuid):

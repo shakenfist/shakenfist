@@ -7,6 +7,7 @@
 # operation enqueue) could interleave so the second write reverted the
 # first writer's committed column to the stale value it had read.
 
+import json
 import uuid
 from unittest import mock
 
@@ -16,9 +17,13 @@ from shakenfist import mariadb
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.mapping_rule_attributes import (
+    MappingRuleAttributesData)
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.network_attributes import NetworkAttributesData
 from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.trusted_issuer_attributes import (
+    TrustedIssuerAttributesData)
 from shakenfist.tests import base
 
 
@@ -243,3 +248,73 @@ class BlobColumnValuesTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             ValueError, mariadb._blob_attributes_column_values,
             self.data, ['expires_at', 'not_a_column'])
+
+
+class TrustedIssuerColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = TrustedIssuerAttributesData(
+            uuid=uuid.uuid4(),
+            issuer_url='https://token.actions.githubusercontent.com',
+            jwks_uri='https://token.actions.githubusercontent.com/jwks',
+            audience='https://sf.example.com')
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._trusted_issuer_attributes_column_values(self.data)
+        self.assertEqual({'issuer_url', 'jwks_uri', 'audience'}, set(values))
+
+    def test_mask_limits_columns(self):
+        # issuer_url and jwks_uri travel together -- a new URL with the
+        # old key source is a cluster verifying against the wrong
+        # provider -- so a writer of one must not carry a stale other.
+        values = mariadb._trusted_issuer_attributes_column_values(
+            self.data, ['audience'])
+        self.assertEqual({'audience'}, set(values))
+        self.assertEqual('https://sf.example.com', values['audience'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._trusted_issuer_attributes_column_values,
+            self.data, ['audience', 'not_a_column'])
+
+
+class MappingRuleColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = MappingRuleAttributesData(
+            uuid=uuid.uuid4(),
+            issuer='github',
+            bound_claims={'repository': 'shakenfist/ryll'},
+            scopes=['instance.read'],
+            key_ttl=900,
+            key_name_prefix='ryll-ci')
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._mapping_rule_attributes_column_values(self.data)
+        self.assertEqual(
+            {'issuer', 'bound_claims', 'scopes', 'key_ttl',
+             'key_name_prefix'}, set(values))
+
+    def test_mask_limits_columns(self):
+        # The scopes a rule grants are the column worth protecting: a
+        # writer touching anything else must not carry a stale copy of
+        # them, or narrowing a rule could be silently reverted.
+        values = mariadb._mapping_rule_attributes_column_values(
+            self.data, ['key_ttl'])
+        self.assertEqual({'key_ttl'}, set(values))
+        self.assertNotIn('scopes', values)
+
+    def test_json_columns_are_encoded(self):
+        # bound_claims and scopes are JSON columns, so a masked write
+        # has to encode them rather than hand SQLAlchemy the objects.
+        values = mariadb._mapping_rule_attributes_column_values(
+            self.data, ['bound_claims', 'scopes'])
+        self.assertEqual(
+            {'repository': 'shakenfist/ryll'},
+            json.loads(values['bound_claims']))
+        self.assertEqual(['instance.read'], json.loads(values['scopes']))
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._mapping_rule_attributes_column_values,
+            self.data, ['scopes', 'not_a_column'])

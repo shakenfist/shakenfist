@@ -481,6 +481,10 @@ class MappingRule(dbo):
         key_ttl = validate_key_ttl(key_ttl)
         key_name_prefix = validate_key_name_prefix(key_name_prefix)
 
+        # The mask names every field rather than passing None. A rule's
+        # policy is edited as one unit -- a PUT carries the whole of it
+        # -- so this genuinely does write every column, and naming them
+        # keeps None reserved for creation and upgrade persistence.
         mariadb.update_mapping_rule_attributes(
             MappingRuleAttributesData(
                 uuid=_as_uuid(self.uuid),
@@ -488,7 +492,9 @@ class MappingRule(dbo):
                 bound_claims=bound_claims,
                 scopes=scopes,
                 key_ttl=key_ttl,
-                key_name_prefix=key_name_prefix))
+                key_name_prefix=key_name_prefix),
+            fields=['issuer', 'bound_claims', 'scopes', 'key_ttl',
+                    'key_name_prefix'])
         self.add_event(
             EVENT_TYPE_MUTATE, 'updated mapping rule',
             extra={'issuer': issuer, 'bound_claims': bound_claims,

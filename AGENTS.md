@@ -120,6 +120,19 @@ belongs in a table with per-row inserts and deletes — see the
 `instance_location` rows in `object_references` — never in a JSON list
 on an attributes row.
 
+"The caller writes every column anyway" is not a reason to pass `None`.
+`TrustedIssuer.update` and `MappingRule.update` both replace their whole
+attribute set, because an issuer's URL and key source are one
+configuration and a rule's policy is one unit — and both still name
+every field. Naming them keeps `None` meaning only "creation or
+upgrade", so a reader can tell the two cases apart, and it means the
+day somebody adds a single-field writer they inherit a masked function
+rather than having to retrofit one. The mask travels over gRPC as
+`repeated string fields` on the request message, and the mock in
+`shakenfist/tests/mock_mariadb.py` honours it too — a mock that
+replaced the whole row would let a caller name the wrong fields and
+still see the write it expected.
+
 ### Native ENUM columns and Python enums
 
 A handful of columns are native MariaDB `ENUM` types built with

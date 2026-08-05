@@ -6338,16 +6338,29 @@ class UpdateTrustedIssuerAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___TrustedIssuerAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the TrustedIssuerAttributesData field names to write.
+        An empty list means write every column. See the equivalent comment
+        on UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents. An issuer's three values are edited as one
+        coherent configuration, so today's only caller names all three --
+        the mask is here so a later writer of one of them cannot silently
+        revert the others.
+        """
+
     def __init__(
         self,
         *,
         data: Global___TrustedIssuerAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -6682,16 +6695,29 @@ class UpdateMappingRuleAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___MappingRuleAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the MappingRuleAttributesData field names to write. An
+        empty list means write every column. See the equivalent comment on
+        UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents. A rule's policy is edited as one unit, so
+        today's only caller names every field -- the mask is here so a
+        later writer of one of them cannot silently revert the rest, which
+        for a rule would mean reverting the scopes it grants.
+        """
+
     def __init__(
         self,
         *,
         data: Global___MappingRuleAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
