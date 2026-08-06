@@ -58,6 +58,9 @@ from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.mapping_rule_attributes import (
+    MappingRuleAttributesData)
+from shakenfist.schema.mapping_rule_data import MappingRuleData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
@@ -271,6 +274,8 @@ _namespace_keys_table: Optional[sa.Table] = None
 _namespace_key_attributes_table: Optional[sa.Table] = None
 _trusted_issuers_table: Optional[sa.Table] = None
 _trusted_issuer_attributes_table: Optional[sa.Table] = None
+_mapping_rules_table: Optional[sa.Table] = None
+_mapping_rule_attributes_table: Optional[sa.Table] = None
 _agent_operations_table: Optional[sa.Table] = None
 _agent_operation_attributes_table: Optional[sa.Table] = None
 _instances_table: Optional[sa.Table] = None
@@ -281,6 +286,8 @@ _node_metrics_table: Optional[sa.Table] = None
 _node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
 _cluster_operation_errors_table: Optional[sa.Table] = None
+_federation_replay_table: Optional[sa.Table] = None
+_federation_rate_limits_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
 _events_table: Optional[sa.Table] = None
 _event_objects_table: Optional[sa.Table] = None
@@ -312,6 +319,8 @@ NAMESPACE_KEYS_VERSION = 2
 NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
 TRUSTED_ISSUERS_VERSION = 1
 TRUSTED_ISSUER_ATTRIBUTES_VERSION = 1
+MAPPING_RULES_VERSION = 1
+MAPPING_RULE_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
@@ -345,6 +354,8 @@ NODE_METRICS_VERSION = 3
 NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 CLUSTER_OPERATION_ERRORS_VERSION = 1
+FEDERATION_REPLAY_VERSION = 1
+FEDERATION_RATE_LIMITS_VERSION = 1
 WORK_QUEUE_VERSION = 2
 # v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
 # and introduces a refresh path so live holders can extend their lease.
@@ -394,6 +405,8 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'namespace_key_attributes': NAMESPACE_KEY_ATTRIBUTES_VERSION,
     'trusted_issuers': TRUSTED_ISSUERS_VERSION,
     'trusted_issuer_attributes': TRUSTED_ISSUER_ATTRIBUTES_VERSION,
+    'mapping_rules': MAPPING_RULES_VERSION,
+    'mapping_rule_attributes': MAPPING_RULE_ATTRIBUTES_VERSION,
     'artifacts': ARTIFACTS_VERSION,
     'artifact_attributes': ARTIFACT_ATTRIBUTES_VERSION,
     'artifact_indexes': ARTIFACT_INDEXES_VERSION,
@@ -412,6 +425,8 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'node_daemon_states': NODE_DAEMON_STATES_VERSION,
     'cluster_operations': CLUSTER_OPERATIONS_VERSION,
     'cluster_operation_errors': CLUSTER_OPERATION_ERRORS_VERSION,
+    'federation_replay': FEDERATION_REPLAY_VERSION,
+    'federation_rate_limits': FEDERATION_RATE_LIMITS_VERSION,
     'work_queue': WORK_QUEUE_VERSION,
     'cluster_locks': CLUSTER_LOCKS_VERSION,
     'cluster_config': CLUSTER_CONFIG_VERSION,
@@ -1860,6 +1875,167 @@ def _ensure_cluster_operation_errors_schema(
     }
 
 
+def _get_federation_replay_table() -> sa.Table:
+    """Get or create the federation_replay table definition.
+
+    One row per identity token already exchanged through one mapping
+    rule. The composite primary key on (token_id, rule_uuid) is the
+    whole mechanism: the exchange inserts unconditionally and a
+    duplicate key error *is* the replay detection, so there is no
+    read-then-write window for two concurrent replays to slip through.
+
+    Refusal is per (token, rule) rather than per token because
+    exchanging one identity against two rules to reach two namespaces
+    is a legitimate pattern, while re-exchanging it against the same
+    rule is not.
+
+    ``token_id`` is the token's ``jti`` claim where it has a usable
+    one, and a hash of its signature otherwise -- see
+    ``federation.token_identity``. 128 characters is generous for a
+    jti (they are typically a UUID) and keeps the composite key
+    comfortably inside InnoDB's index length limit under any row
+    format.
+
+    It is declared ``utf8mb4_nopad_bin`` because the column is an
+    opaque identifier and the server's default collation treats it as
+    text. Under ``utf8mb4_general_ci`` (or ``utf8mb4_uca1400_ai_ci``,
+    the default from MariaDB 11.4) key comparison is case insensitive,
+    and every PAD SPACE collation ignores trailing spaces, so two
+    distinct tokens would collide on the primary key and the second,
+    entirely legitimate, exchange would be refused as a replay. That
+    fails safe rather than open, and the sha256 fallback is lowercase
+    hex of a fixed length so it never bites, but a false refusal on
+    somebody else's choice of jti alphabet is not a behaviour to ship.
+
+    Plain ``utf8mb4_bin`` is not enough: it compares case sensitively
+    but is still PAD SPACE, so ``'x'`` and ``'x '`` remain one key.
+    ``utf8mb4_nopad_bin`` is the binary, NO PAD pairing, and it has
+    existed since MariaDB 10.2 -- comfortably below MIN_MARIADB_VERSION
+    of 10.6. Comparing bytes is also what "is this the same token"
+    actually means.
+
+    ``expires_at`` is the inbound token's own ``exp``. The row only
+    has to outlive the token: once the token is expired, step five of
+    the exchange refuses it before the replay check is ever reached.
+    The cluster daemon reaps on this column.
+    """
+    global _federation_replay_table
+    if _federation_replay_table is None:
+        with TABLE_CREATION_LOCK:
+            if _federation_replay_table is not None:
+                return _federation_replay_table
+            metadata = _get_metadata()
+            _federation_replay_table = sa.Table(
+                'federation_replay',
+                metadata,
+                sa.Column('token_id',
+                          sa.String(128, collation='utf8mb4_nopad_bin'),
+                          primary_key=True),
+                sa.Column('rule_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('expires_at', sa.Double(), nullable=False),
+                sa.Index('idx_federation_replay_expires', 'expires_at'),
+            )
+    return _federation_replay_table
+
+
+def _ensure_federation_replay_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the federation_replay table schema is up to date."""
+    table_name = 'federation_replay'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_federation_replay_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': FEDERATION_REPLAY_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_federation_rate_limits_table() -> sa.Table:
+    """Get or create the federation_rate_limits table definition.
+
+    One row per source address per one minute window, holding a count
+    of federated exchange attempts. The counter lives in MariaDB
+    rather than in the worker so the limit is cluster wide: a per
+    process counter would let an attacker multiply their allowance by
+    the number of gunicorn workers behind the load balancer, which is
+    the opposite of a limit.
+
+    Volume is low by nature -- a real caller exchanges once per CI job
+    -- so a row per source per window is affordable, and the reaper
+    keeps the table to roughly the number of distinct sources seen in
+    the last few minutes.
+
+    ``source`` is 64 characters, which fits an IPv6 address (45 at
+    most) with room to spare.
+    """
+    global _federation_rate_limits_table
+    if _federation_rate_limits_table is None:
+        with TABLE_CREATION_LOCK:
+            if _federation_rate_limits_table is not None:
+                return _federation_rate_limits_table
+            metadata = _get_metadata()
+            _federation_rate_limits_table = sa.Table(
+                'federation_rate_limits',
+                metadata,
+                sa.Column('source', sa.String(64), primary_key=True),
+                sa.Column('window_start', sa.BigInteger(), primary_key=True),
+                sa.Column('attempts', sa.Integer(), nullable=False),
+                sa.Index('idx_federation_rate_limits_window', 'window_start'),
+            )
+    return _federation_rate_limits_table
+
+
+def _ensure_federation_rate_limits_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the federation_rate_limits table schema is up to date."""
+    table_name = 'federation_rate_limits'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_federation_rate_limits_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': FEDERATION_RATE_LIMITS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def _get_work_queue_table() -> sa.Table:
     """Get or create the work_queue table definition.
 
@@ -3129,6 +3305,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_namespace_keys_schema(engine))
     results.append(_ensure_trusted_issuer_attributes_schema(engine))
     results.append(_ensure_trusted_issuers_schema(engine))
+    results.append(_ensure_mapping_rule_attributes_schema(engine))
+    results.append(_ensure_mapping_rules_schema(engine))
     results.append(_ensure_artifacts_schema(engine))
     results.append(_ensure_artifact_attributes_schema(engine))
     results.append(_ensure_artifact_indexes_schema(engine))
@@ -3147,6 +3325,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_daemon_states_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
     results.append(_ensure_cluster_operation_errors_schema(engine))
+    results.append(_ensure_federation_replay_schema(engine))
+    results.append(_ensure_federation_rate_limits_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
@@ -3204,6 +3384,8 @@ def register_all_tables() -> None:
     _get_namespace_keys_table()
     _get_trusted_issuers_table()
     _get_trusted_issuer_attributes_table()
+    _get_mapping_rules_table()
+    _get_mapping_rule_attributes_table()
     _get_namespace_key_attributes_table()
     _get_artifacts_table()
     _get_artifact_attributes_table()
@@ -3223,6 +3405,8 @@ def register_all_tables() -> None:
     _get_node_daemon_states_table()
     _get_cluster_operations_table()
     _get_cluster_operation_errors_table()
+    _get_federation_replay_table()
+    _get_federation_rate_limits_table()
     _get_work_queue_table()
     _get_cluster_locks_table()
     _get_cluster_config_table()
@@ -12988,14 +13172,47 @@ def _direct_get_trusted_issuer_attributes(
         return None
 
 
+def _trusted_issuer_attributes_column_values(
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map TrustedIssuerAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so a concurrent writer of another attribute on the
+    same row cannot lose its committed column to this writer's
+    read-modify-write.
+
+    The only caller today names all three, because an issuer's
+    issuer_url, jwks_uri and audience are one coherent configuration
+    and editing them apart is how a cluster ends up pointing at a new
+    provider while trusting the old one's keys. The mask exists so that
+    a later single-field writer cannot silently revert the other two.
+    """
+    all_values: Dict[str, Any] = {
+        'issuer_url': data.issuer_url,
+        'jwks_uri': data.jwks_uri,
+        'audience': data.audience,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown trusted issuer attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_trusted_issuer_attributes(
-        data: TrustedIssuerAttributesData) -> bool:
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Replace a TrustedIssuer's mutable attributes.
 
-    The whole attribute set is written together because these three
-    values are one coherent configuration: pointing at a different
-    issuer_url while leaving a stale jwks_uri would be a broken state
-    rather than a partial update.
+    fields is the list of model field names to write; None or empty
+    writes every column. See
+    _trusted_issuer_attributes_column_values for why a writer of one
+    attribute must pass its field name.
     """
     engine = _get_engine()
     table = _get_trusted_issuer_attributes_table()
@@ -13005,9 +13222,7 @@ def _direct_update_trusted_issuer_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                issuer_url=data.issuer_url,
-                jwks_uri=data.jwks_uri,
-                audience=data.audience)
+                **_trusted_issuer_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -13184,11 +13399,20 @@ def _grpc_get_trusted_issuer_attributes(
 
 
 def _grpc_update_trusted_issuer_attributes(
-        data: TrustedIssuerAttributesData) -> bool:
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update a TrustedIssuer's attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See
+    _trusted_issuer_attributes_column_values for why a writer of one
+    attribute must pass its field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateTrustedIssuerAttributesRequest(
-            data=_trusted_issuer_attrs_to_proto(data))
+            data=_trusted_issuer_attrs_to_proto(data),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateTrustedIssuerAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -13266,11 +13490,30 @@ def get_trusted_issuer_attributes(
 
 
 def update_trusted_issuer_attributes(
-        data: TrustedIssuerAttributesData) -> bool:
-    """Replace a TrustedIssuer's mutable attributes."""
+        data: TrustedIssuerAttributesData,
+        fields: Optional[List[str]]) -> bool:
+    """Replace a TrustedIssuer's mutable attributes.
+
+    Args:
+        data: The TrustedIssuerAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so a concurrent writer of another
+            attribute on the same row cannot lose its committed column
+            to this writer's read-modify-write. Passing None writes
+            every column and is reserved for row creation and upgrade
+            persistence.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _trusted_issuer_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_trusted_issuer_attributes(data)
-    return _direct_update_trusted_issuer_attributes(data)
+        return _grpc_update_trusted_issuer_attributes(data, fields=fields)
+    return _direct_update_trusted_issuer_attributes(data, fields=fields)
 
 
 def delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
@@ -13278,6 +13521,730 @@ def delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_trusted_issuer_attributes(issuer_uuid)
     return _direct_delete_trusted_issuer_attributes(issuer_uuid)
+
+
+# =============================================================================
+# MappingRule Table Definitions
+# =============================================================================
+
+# The (namespace, name) UNIQUE index the Pydantic model cannot express:
+# the SQLUniqueIndex marker is single-column, and the compound-index
+# configuration path is multi-column but non-unique. Created by hand
+# here for the same reason namespace_keys does it.
+MAPPING_RULES_UNIQUE_INDEX_SQL = (
+    'CREATE UNIQUE INDEX IF NOT EXISTS uidx_mapping_rules_namespace_name '
+    'ON mapping_rules (namespace, name)')
+
+
+def _get_mapping_rules_table() -> sa.Table:
+    """Get or create the mapping_rules table definition.
+
+    A MappingRule says which external identities a namespace will mint
+    keys for. The table is generated from the MappingRuleData Pydantic
+    model, with uuid as the primary key and a hand-built UNIQUE index
+    on (namespace, name).
+    """
+    global _mapping_rules_table
+    if _mapping_rules_table is None:
+        with TABLE_CREATION_LOCK:
+            if _mapping_rules_table is not None:
+                return _mapping_rules_table
+            metadata = _get_metadata()
+            _mapping_rules_table = pydantic_to_sqlalchemy_table(
+                MappingRuleData,
+                'mapping_rules',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _mapping_rules_table
+
+
+def _get_mapping_rule_attributes_table() -> sa.Table:
+    """Get or create the mapping_rule_attributes table definition."""
+    global _mapping_rule_attributes_table
+    if _mapping_rule_attributes_table is None:
+        with TABLE_CREATION_LOCK:
+            if _mapping_rule_attributes_table is not None:
+                return _mapping_rule_attributes_table
+            metadata = _get_metadata()
+            _mapping_rule_attributes_table = pydantic_to_sqlalchemy_table(
+                MappingRuleAttributesData,
+                'mapping_rule_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _mapping_rule_attributes_table
+
+
+def _ensure_mapping_rules_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the mapping_rules table schema is up to date."""
+    table_name = 'mapping_rules'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_mapping_rules_table()
+
+    # This table has no pre-object history to import, so version 1 is
+    # simply "the table exists".
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+            # The composite UNIQUE index the model cannot express. See
+            # the comment on MAPPING_RULES_UNIQUE_INDEX_SQL above.
+            conn.execute(sa.text(MAPPING_RULES_UNIQUE_INDEX_SQL))
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': MAPPING_RULES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_mapping_rule_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the mapping_rule_attributes table schema is up to date."""
+    table_name = 'mapping_rule_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_mapping_rule_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': MAPPING_RULE_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# MappingRule Direct Access Functions
+# =============================================================================
+
+def _mapping_rule_row_to_data(row: Any) -> MappingRuleData:
+    return MappingRuleData(
+        uuid=row.uuid, namespace=row.namespace, name=row.name,
+        version=row.version)
+
+
+def _require_bound_claims(value: Any, rule_uuid: Any) -> dict[str, Any]:
+    """Decode a rule's bound_claims, refusing to invent a default.
+
+    The column is NOT NULL and is written only by us, so None here is
+    a damaged row rather than an absent policy. Defaulting to {} would
+    turn it into a matcher set that matches every token.
+    """
+    decoded = _decode_optional_json_dict(value)
+    if decoded is None:
+        raise exceptions.CorruptMappingRule(
+            f'mapping rule {rule_uuid} has undecodable bound_claims')
+    return decoded
+
+
+def _require_scopes(value: Any, rule_uuid: Any) -> list[str]:
+    """Decode a rule's scopes, refusing to invent a default."""
+    decoded = _decode_optional_json_list(value)
+    if decoded is None:
+        raise exceptions.CorruptMappingRule(
+            f'mapping rule {rule_uuid} has undecodable scopes')
+    return decoded
+
+
+def _direct_create_mapping_rule(data: MappingRuleData) -> bool:
+    """Create a mapping_rules record in MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid, namespace=data.namespace, name=data.name,
+                version=data.version)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # The (namespace, name) unique index rejected this. A duplicate
+        # rule name within a namespace is a caller error, not a failure.
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for mapping_rule '
+            f'{data.namespace}/{data.name}: {e}')
+        return False
+
+
+def _direct_get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
+    """Get a mapping_rules record from MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == rule_uuid)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return _mapping_rule_row_to_data(row)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for mapping_rule {rule_uuid}: {e}')
+        return None
+
+
+def _direct_get_mapping_rule_by_name(
+        namespace: str, name: str) -> Optional[MappingRuleData]:
+    """Look a rule up by its (namespace, name) pair.
+
+    This is the exchange's path: a federated request names a namespace
+    and a rule, and this resolves the pair. Served by the composite
+    unique index.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(table.c.namespace == namespace,
+                        table.c.name == name))
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return _mapping_rule_row_to_data(row)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for mapping_rule {namespace}/{name}: {e}')
+        return None
+
+
+def _direct_get_mapping_rules_in_namespace(
+        namespace: str) -> list[MappingRuleData]:
+    """Every rule owned by one namespace.
+
+    Served by the leading column of the (namespace, name) unique index.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.namespace == namespace)
+            rows = conn.execute(stmt).fetchall()
+            return [_mapping_rule_row_to_data(row) for row in rows]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB list failed for mapping_rules in {namespace}: {e}')
+        return []
+
+
+def _direct_get_all_mapping_rules() -> list[MappingRuleData]:
+    """Every rule on the cluster, for cluster-wide iteration."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(sa.select(table)).fetchall()
+            return [_mapping_rule_row_to_data(row) for row in rows]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB list failed for mapping_rules: {e}')
+        return []
+
+
+def _direct_delete_mapping_rule(rule_uuid: UUID) -> bool:
+    """Delete a mapping_rules record from MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == rule_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for mapping_rule {rule_uuid}: {e}')
+        return False
+
+
+def _direct_create_mapping_rule_attributes(
+        data: MappingRuleAttributesData) -> bool:
+    """Create a mapping_rule_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                issuer=data.issuer,
+                bound_claims=_json_dumps(data.bound_claims),
+                scopes=_json_dumps(data.scopes),
+                key_ttl=data.key_ttl,
+                key_name_prefix=data.key_name_prefix)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for mapping_rule_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_get_mapping_rule_attributes(
+        rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
+    """Get MappingRule attributes from MariaDB.
+
+    Both JSON columns are NOT NULL, so a None decode means the row is
+    corrupt rather than absent. That is deliberately left to raise
+    through Pydantic: an empty bound_claims dict would be a matcher set
+    that matches every token, so failing loudly beats defaulting.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == rule_uuid)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return MappingRuleAttributesData(
+                uuid=row.uuid,
+                issuer=row.issuer,
+                bound_claims=_require_bound_claims(
+                    row.bound_claims, rule_uuid),
+                scopes=_require_scopes(row.scopes, rule_uuid),
+                key_ttl=row.key_ttl,
+                key_name_prefix=row.key_name_prefix)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for mapping_rule_attributes {rule_uuid}: {e}')
+        return None
+
+
+def _mapping_rule_attributes_column_values(
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map MappingRuleAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so a concurrent writer of another attribute on the
+    same row cannot lose its committed column to this writer's
+    read-modify-write.
+
+    The only caller today names every field, because a rule's issuer,
+    claims and the scopes it grants are one policy and applying half an
+    edit would leave a grant nobody wrote. The mask exists so that a
+    later single-field writer cannot silently revert the rest -- which
+    for a rule means reverting the scopes it hands out.
+    """
+    all_values: Dict[str, Any] = {
+        'issuer': data.issuer,
+        'bound_claims': _json_dumps(data.bound_claims),
+        'scopes': _json_dumps(data.scopes),
+        'key_ttl': data.key_ttl,
+        'key_name_prefix': data.key_name_prefix,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown mapping rule attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
+def _direct_update_mapping_rule_attributes(
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Replace a MappingRule's mutable attributes.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _mapping_rule_attributes_column_values for
+    why a writer of one attribute must pass its field name.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                **_mapping_rule_attributes_column_values(data, fields))
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB update failed for mapping_rule_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:
+    """Delete MappingRule attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_mapping_rule_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == rule_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for mapping_rule_attributes '
+            f'{rule_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# MappingRule Proto Conversion and gRPC Access Functions
+# =============================================================================
+
+def _mapping_rule_to_proto(
+        data: MappingRuleData) -> 'database_pb2.MappingRuleStaticData':
+    return database_pb2.MappingRuleStaticData(
+        uuid=str(data.uuid), namespace=data.namespace, name=data.name,
+        version=data.version)
+
+
+def _mapping_rule_from_proto(
+        proto: 'database_pb2.MappingRuleStaticData') -> MappingRuleData:
+    return MappingRuleData(
+        uuid=UUID(proto.uuid), namespace=proto.namespace, name=proto.name,
+        version=proto.version)
+
+
+def _mapping_rule_attrs_to_proto(
+        data: MappingRuleAttributesData
+) -> 'database_pb2.MappingRuleAttributesProto':
+    # bound_claims and scopes cross the wire as JSON strings rather than
+    # as proto maps: a matcher is "string or list of strings", which a
+    # protobuf map<string, string> cannot express without inventing an
+    # encoding, and inventing one here is how the two sides drift.
+    return database_pb2.MappingRuleAttributesProto(
+        uuid=str(data.uuid),
+        issuer=data.issuer,
+        bound_claims=_json_dumps(data.bound_claims),
+        scopes=_json_dumps(data.scopes),
+        key_ttl=data.key_ttl,
+        key_name_prefix=data.key_name_prefix)
+
+
+def _mapping_rule_attrs_from_proto(
+        proto: 'database_pb2.MappingRuleAttributesProto'
+) -> MappingRuleAttributesData:
+    return MappingRuleAttributesData(
+        uuid=UUID(proto.uuid),
+        issuer=proto.issuer,
+        bound_claims=_require_bound_claims(proto.bound_claims, proto.uuid),
+        scopes=_require_scopes(proto.scopes, proto.uuid),
+        key_ttl=proto.key_ttl,
+        key_name_prefix=proto.key_name_prefix)
+
+
+def _grpc_create_mapping_rule(data: MappingRuleData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateMappingRuleRequest(
+            data=_mapping_rule_to_proto(data))
+        reply = _grpc_call(stub.CreateMappingRule, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC CreateMappingRule failed for '
+            f'{data.namespace}/{data.name}: {e}')
+        return False
+
+
+def _grpc_get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRuleRequest(uuid=str(rule_uuid))
+        reply = _grpc_call(stub.GetMappingRule, request)
+        if not reply.found:
+            return None
+        return _mapping_rule_from_proto(reply.data)
+    except grpc.RpcError as e:
+        # None from these reads means "no such rule", and the exchange
+        # treats that as authoritative -- a refusal to mint. A transport
+        # or server failure must therefore raise rather than masquerade
+        # as a deliberate absence. Issue 3522 established this for the
+        # analogous namespace key read on the same authentication path.
+        LOG.error(f'gRPC GetMappingRule failed for {rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {rule_uuid} could not be read: {e}') from e
+
+
+def _grpc_get_mapping_rule_by_name(
+        namespace: str, name: str) -> Optional[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRuleByNameRequest(
+            namespace=namespace, name=name)
+        reply = _grpc_call(stub.GetMappingRuleByName, request)
+        if not reply.found:
+            return None
+        return _mapping_rule_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetMappingRuleByName failed for {namespace}/{name}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {namespace}/{name} could not be read: {e}') from e
+
+
+def _grpc_get_mapping_rules_in_namespace(
+        namespace: str) -> list[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRulesInNamespaceRequest(
+            namespace=namespace)
+        reply = _grpc_call(stub.GetMappingRulesInNamespace, request)
+        return [_mapping_rule_from_proto(r) for r in reply.rules]
+    except grpc.RpcError as e:
+        # An empty list would read as "this namespace federates with
+        # nobody", which is a valid looking answer and therefore the
+        # worst possible thing to invent during an outage.
+        LOG.error(f'gRPC GetMappingRulesInNamespace failed for '
+                  f'{namespace}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules in {namespace} could not be listed: {e}') from e
+
+
+def _grpc_get_all_mapping_rules() -> list[MappingRuleData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllMappingRulesRequest()
+        reply = _grpc_call(stub.GetAllMappingRules, request)
+        return [_mapping_rule_from_proto(r) for r in reply.rules]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetAllMappingRules failed: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules could not be listed: {e}') from e
+
+
+def _grpc_delete_mapping_rule(rule_uuid: UUID) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteMappingRuleRequest(uuid=str(rule_uuid))
+        reply = _grpc_call(stub.DeleteMappingRule, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC DeleteMappingRule failed for {rule_uuid}: {e}')
+        return False
+
+
+def _grpc_create_mapping_rule_attributes(
+        data: MappingRuleAttributesData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateMappingRuleAttributesRequest(
+            data=_mapping_rule_attrs_to_proto(data))
+        reply = _grpc_call(stub.CreateMappingRuleAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC CreateMappingRuleAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_mapping_rule_attributes(
+        rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetMappingRuleAttributesRequest(
+            uuid=str(rule_uuid))
+        reply = _grpc_call(stub.GetMappingRuleAttributes, request)
+        if reply.corrupt:
+            # The servicer tried to decode the row and could not. Raise
+            # what the direct path raises, so a damaged rule behaves
+            # the same whether or not the database service is in use:
+            # the exchange refuses with a generic 401 and
+            # external_view() marks the rule unusable. Without this the
+            # servicer's catch-all makes it INTERNAL, this function
+            # cannot distinguish that from an outage, and the API
+            # answers 503 instead.
+            #
+            # Deliberately not folded into the RpcError handler below.
+            # This is an answer, not a transport failure, and it is not
+            # worth retrying -- the next attempt decodes the same bad
+            # row.
+            raise exceptions.CorruptMappingRule(
+                f'mapping rule {rule_uuid} has undecodable attributes')
+        if not reply.found:
+            return None
+        return _mapping_rule_attrs_from_proto(reply.data)
+    except grpc.RpcError as e:
+        # The attributes are the policy itself. Returning None here
+        # would present a rule whose issuer, claims and scopes all read
+        # as absent, which is the same confidently wrong answer as a
+        # missing rule.
+        LOG.error(
+            f'gRPC GetMappingRuleAttributes failed for {rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {rule_uuid} attributes could not be read: '
+            f'{e}') from e
+
+
+def _grpc_update_mapping_rule_attributes(
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update a MappingRule's attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _mapping_rule_attributes_column_values for
+    why a writer of one attribute must pass its field name.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateMappingRuleAttributesRequest(
+            data=_mapping_rule_attrs_to_proto(data),
+            fields=fields or [])
+        reply = _grpc_call(stub.UpdateMappingRuleAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC UpdateMappingRuleAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteMappingRuleAttributesRequest(
+            uuid=str(rule_uuid))
+        reply = _grpc_call(stub.DeleteMappingRuleAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteMappingRuleAttributes failed for {rule_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# MappingRule Public Access Functions
+# =============================================================================
+
+def create_mapping_rule(data: MappingRuleData) -> bool:
+    """Create a MappingRule's static values."""
+    if _use_database_service():
+        return _grpc_create_mapping_rule(data)
+    return _direct_create_mapping_rule(data)
+
+
+def get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
+    """Get a MappingRule's static values."""
+    if _use_database_service():
+        return _grpc_get_mapping_rule(rule_uuid)
+    return _direct_get_mapping_rule(rule_uuid)
+
+
+def get_mapping_rule_by_name(
+        namespace: str, name: str) -> Optional[MappingRuleData]:
+    """Look a MappingRule up by its (namespace, name) pair."""
+    if _use_database_service():
+        return _grpc_get_mapping_rule_by_name(namespace, name)
+    return _direct_get_mapping_rule_by_name(namespace, name)
+
+
+def get_mapping_rules_in_namespace(namespace: str) -> list[MappingRuleData]:
+    """Every MappingRule owned by one namespace."""
+    if _use_database_service():
+        return _grpc_get_mapping_rules_in_namespace(namespace)
+    return _direct_get_mapping_rules_in_namespace(namespace)
+
+
+def get_all_mapping_rules() -> list[MappingRuleData]:
+    """Every MappingRule on the cluster."""
+    if _use_database_service():
+        return _grpc_get_all_mapping_rules()
+    return _direct_get_all_mapping_rules()
+
+
+def delete_mapping_rule(rule_uuid: UUID) -> bool:
+    """Delete a MappingRule's static values."""
+    if _use_database_service():
+        return _grpc_delete_mapping_rule(rule_uuid)
+    return _direct_delete_mapping_rule(rule_uuid)
+
+
+def create_mapping_rule_attributes(data: MappingRuleAttributesData) -> bool:
+    """Create a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_create_mapping_rule_attributes(data)
+    return _direct_create_mapping_rule_attributes(data)
+
+
+def get_mapping_rule_attributes(
+        rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
+    """Get a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_get_mapping_rule_attributes(rule_uuid)
+    return _direct_get_mapping_rule_attributes(rule_uuid)
+
+
+def update_mapping_rule_attributes(
+        data: MappingRuleAttributesData,
+        fields: Optional[List[str]]) -> bool:
+    """Replace a MappingRule's mutable attributes.
+
+    Args:
+        data: The MappingRuleAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so a concurrent writer of another
+            attribute on the same row cannot lose its committed column
+            to this writer's read-modify-write. Passing None writes
+            every column and is reserved for row creation and upgrade
+            persistence.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _mapping_rule_attributes_column_values(data, fields)
+    if _use_database_service():
+        return _grpc_update_mapping_rule_attributes(data, fields=fields)
+    return _direct_update_mapping_rule_attributes(data, fields=fields)
+
+
+def delete_mapping_rule_attributes(rule_uuid: UUID) -> bool:
+    """Delete a MappingRule's mutable attributes."""
+    if _use_database_service():
+        return _grpc_delete_mapping_rule_attributes(rule_uuid)
+    return _direct_delete_mapping_rule_attributes(rule_uuid)
 
 
 # =============================================================================
@@ -19212,6 +20179,116 @@ def _direct_delete_cluster_operation_error(op_uuid: UUID) -> bool:
 
 
 # =============================================================================
+# Federation Abuse Resistance Direct Access Functions
+# =============================================================================
+
+def _direct_record_federated_exchange(
+        token_id: str, rule_uuid: UUID, expires_at: float) -> bool:
+    """Claim a (token, rule) pair, returning False if already claimed.
+
+    The insert is the check. A duplicate key error means some other
+    request -- possibly on another API node, possibly microseconds ago
+    -- already exchanged this token through this rule, and there is no
+    window between deciding and recording for a second attempt to slip
+    through.
+
+    A database failure raises rather than returning either answer. On
+    this path False means "replayed" and True means "go ahead and mint
+    a credential"; inventing either one during an outage is a security
+    decision made by accident, so the caller is told the truth instead
+    and refuses.
+    """
+    engine = _get_engine()
+    table = _get_federation_replay_table()
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(sa.insert(table).values(
+                token_id=token_id,
+                rule_uuid=rule_uuid,
+                expires_at=expires_at))
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.error(f'MariaDB write failed for federation_replay '
+                  f'{token_id}/{rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange replay check failed: {e}') from e
+
+
+def _direct_count_federated_attempt(source: str, window_start: int) -> int:
+    """Count one exchange attempt from a source, returning the new total.
+
+    The increment is atomic in the database, so no attempt is lost
+    under concurrency. The read that follows it is not part of the
+    same atomic step: two concurrent attempts can both increment and
+    then both see the higher total. That errs towards refusing
+    slightly early during a burst, which is the correct direction for
+    a rate limiter to be wrong in, and the alternative idioms for
+    reading back an exact per-caller value are MariaDB specific and
+    considerably harder to read.
+    """
+    engine = _get_engine()
+    table = _get_federation_rate_limits_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                source=source, window_start=window_start, attempts=1)
+            stmt = stmt.on_duplicate_key_update(
+                attempts=table.c.attempts + 1)
+            conn.execute(stmt)
+            result = conn.execute(
+                sa.select(table.c.attempts).where(sa.and_(
+                    table.c.source == source,
+                    table.c.window_start == window_start))).fetchone()
+            conn.commit()
+            # The row was just written, so a missing one means something
+            # is badly wrong. Report the attempt we know we made rather
+            # than zero, which would read as "no attempts yet".
+            return int(result.attempts) if result else 1
+    except (IntegrityError, OperationalError) as e:
+        LOG.error(f'MariaDB write failed for federation_rate_limits '
+                  f'{source}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange rate limit check failed: {e}') from e
+
+
+def _direct_reap_federation_replay(cutoff: float) -> int:
+    """Delete replay rows for tokens which expired before cutoff."""
+    engine = _get_engine()
+    table = _get_federation_replay_table()
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                sa.delete(table).where(table.c.expires_at < cutoff))
+            conn.commit()
+            return int(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for federation_replay: {e}')
+        return 0
+
+
+def _direct_reap_federation_rate_limits(cutoff: int) -> int:
+    """Delete rate limit rows for windows which closed before cutoff."""
+    engine = _get_engine()
+    table = _get_federation_rate_limits_table()
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                sa.delete(table).where(table.c.window_start < cutoff))
+            conn.commit()
+            return int(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for federation_rate_limits: {e}')
+        return 0
+
+
+# =============================================================================
 # Cluster Operations gRPC Client Functions
 # =============================================================================
 
@@ -19421,6 +20498,87 @@ def _grpc_delete_cluster_operation_error(op_uuid: UUID) -> bool:
             f'gRPC DeleteClusterOperationError failed for '
             f'{op_uuid}: {e}')
         return False
+
+
+# =============================================================================
+# Federation Abuse Resistance gRPC Client Functions
+# =============================================================================
+
+def _grpc_record_federated_exchange(
+        token_id: str, rule_uuid: UUID, expires_at: float) -> bool:
+    """Claim a (token, rule) pair via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RecordFederatedExchangeRequest(
+            token_id=token_id, rule_uuid=str(rule_uuid),
+            expires_at=expires_at)
+        reply = _grpc_call(stub.RecordFederatedExchange, request)
+        if not reply.ok:
+            # The daemon distinguishes "already claimed" (recorded
+            # False, ok True) from a failure to find out, and only the
+            # former is a replay.
+            #
+            # Decided on ok rather than on error being non-empty: an
+            # exception with an empty str() would otherwise arrive
+            # looking like a successful answer. See the field comment on
+            # CountFederatedAttemptReply.ok, where that misreading was
+            # the permissive direction rather than this one.
+            raise exceptions.DatabaseUnavailable(
+                f'federated exchange replay check failed: '
+                f'{reply.error or "no detail reported"}')
+        return bool(reply.recorded)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC RecordFederatedExchange failed for '
+                  f'{token_id}/{rule_uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange replay check failed: {e}') from e
+
+
+def _grpc_count_federated_attempt(source: str, window_start: int) -> int:
+    """Count one exchange attempt via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CountFederatedAttemptRequest(
+            source=source, window_start=window_start)
+        reply = _grpc_call(stub.CountFederatedAttempt, request)
+        if not reply.ok:
+            # Never `if reply.error`. attempts=0 with an empty error is
+            # what an exception raised with no args produces, and read as
+            # a count it says "nobody has tried this minute, allow" --
+            # which turns a database failure into an open door on the one
+            # unauthenticated endpoint in the API.
+            raise exceptions.DatabaseUnavailable(
+                f'federated exchange rate limit check failed: '
+                f'{reply.error or "no detail reported"}')
+        return int(reply.attempts)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC CountFederatedAttempt failed for {source}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'federated exchange rate limit check failed: {e}') from e
+
+
+def _grpc_reap_federation_replay(cutoff: float) -> int:
+    """Reap expired replay rows via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReapFederationReplayRequest(cutoff=cutoff)
+        reply = _grpc_call(stub.ReapFederationReplay, request)
+        return int(reply.removed)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC ReapFederationReplay failed: {e}')
+        return 0
+
+
+def _grpc_reap_federation_rate_limits(cutoff: int) -> int:
+    """Reap closed rate limit windows via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReapFederationRateLimitsRequest(cutoff=cutoff)
+        reply = _grpc_call(stub.ReapFederationRateLimits, request)
+        return int(reply.removed)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC ReapFederationRateLimits failed: {e}')
+        return 0
 
 
 # =============================================================================
@@ -19872,6 +21030,71 @@ def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
     if _use_database_service():
         return _grpc_delete_cluster_operation_error(u)
     return _direct_delete_cluster_operation_error(u)
+
+
+def record_federated_exchange(
+        token_id: str, rule_uuid: 'str | UUID', expires_at: float) -> bool:
+    """Claim a (token, rule) pair for a federated exchange.
+
+    Args:
+        token_id: The token's identity, from
+            ``federation.token_identity``.
+        rule_uuid: The mapping rule being exchanged through.
+        expires_at: The inbound token's ``exp``, which is when this
+            row stops being needed.
+
+    Returns:
+        True if the pair was recorded, meaning this is the first
+        exchange of this token through this rule. False if it was
+        already present, meaning a replay.
+
+    Raises:
+        DatabaseUnavailable: if we could not find out. Never guessed,
+        because both answers authorise something.
+    """
+    u = _ensure_uuid(rule_uuid)
+    if _use_database_service():
+        return _grpc_record_federated_exchange(token_id, u, expires_at)
+    return _direct_record_federated_exchange(token_id, u, expires_at)
+
+
+def count_federated_attempt(source: str, window_start: int) -> int:
+    """Count one federated exchange attempt and return the window total.
+
+    Args:
+        source: The source address the attempt came from.
+        window_start: Unix timestamp of the start of the one minute
+            window the attempt falls in.
+
+    Returns:
+        The number of attempts recorded from this source in this
+        window, including this one.
+
+    Raises:
+        DatabaseUnavailable: if the counter could not be written.
+    """
+    if _use_database_service():
+        return _grpc_count_federated_attempt(source, window_start)
+    return _direct_count_federated_attempt(source, window_start)
+
+
+def reap_federation_replay(cutoff: float) -> int:
+    """Delete replay rows for tokens which expired before cutoff.
+
+    Returns the number of rows removed, or 0 on a database error --
+    this is housekeeping, and a failed sweep is retried in fifteen
+    minutes rather than being worth raising over.
+    """
+    if _use_database_service():
+        return _grpc_reap_federation_replay(cutoff)
+    return _direct_reap_federation_replay(cutoff)
+
+
+def reap_federation_rate_limits(cutoff: int) -> int:
+    """Delete rate limit rows for windows which closed before cutoff."""
+    if _use_database_service():
+        return _grpc_reap_federation_rate_limits(cutoff)
+    return _direct_reap_federation_rate_limits(cutoff)
 
 
 # =============================================================================

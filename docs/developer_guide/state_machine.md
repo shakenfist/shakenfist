@@ -196,6 +196,28 @@ stateDiagram-v2
   deleted --> [*]
 ```
 
+## Mapping Rules
+
+A mapping rule binds claims from a trusted issuer to a set of scopes in one
+namespace. Writing a rule is atomic, so there is no error state.
+
+* `initial`: the first state for a mapping rule. A UUID has been allocated and
+  a database entry exists, but the rule's attributes have not been written yet.
+* `created`: the rule is complete and may be used to exchange identity tokens.
+* `deleted`: the rule has been deleted. It matches nothing from this point on,
+  but keys it has already minted keep working until they expire.
+
+The following transitions are possible:
+
+``` mermaid
+stateDiagram-v2
+  [*] --> initial
+  initial --> created
+  initial --> deleted
+  created --> deleted
+  deleted --> [*]
+```
+
 ## Namespaces
 
 * `created`: the namespace exists.
@@ -341,6 +363,29 @@ stateDiagram-v2
   missing --> degraded
 
   deleted --> created
+```
+
+## Trusted Issuers
+
+A trusted issuer is an external identity provider whose tokens the cluster is
+willing to validate. Configuring one is atomic, so there is no error state.
+
+* `initial`: the first state for a trusted issuer. A UUID has been allocated
+  and a database entry exists, but the issuer's attributes have not been
+  written yet.
+* `created`: the issuer is complete, and mapping rules may name it.
+* `deleted`: the issuer has been deleted. Tokens from it are refused
+  immediately, which is the fastest way to disown a compromised provider.
+
+The following transitions are possible:
+
+``` mermaid
+stateDiagram-v2
+  [*] --> initial
+  initial --> created
+  initial --> deleted
+  created --> deleted
+  deleted --> [*]
 ```
 
 ## Upload

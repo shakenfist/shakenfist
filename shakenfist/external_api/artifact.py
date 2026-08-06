@@ -48,7 +48,10 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-def arg_is_artifact_ref(func):
+def _resolve_artifact_ref(func, widen):
+    # Shared body of the two ref decorators below. `widen` says
+    # whether a *name* may resolve outside the caller's own namespace;
+    # see those two for which routes get which, and why.
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.pop('namespace', None)
 
@@ -72,8 +75,16 @@ def arg_is_artifact_ref(func):
                 kwargs['artifact_uuid'])
         else:
             try:
-                kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
-                    kwargs.get('artifact_ref'), lookup_namespace)
+                # Naming a namespace turns the widening off whatever
+                # the route asked for: that caller asked about one
+                # namespace and must be answered from it or not at all.
+                if widen and not body_namespace:
+                    kwargs['artifact_from_db'] = \
+                        Artifact.from_db_by_ref_visible_to(
+                            kwargs.get('artifact_ref'), lookup_namespace)
+                else:
+                    kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
+                        kwargs.get('artifact_ref'), lookup_namespace)
             except exceptions.MultipleObjects as e:
                 return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -97,14 +108,78 @@ def arg_is_artifact_ref(func):
     return wrapper
 
 
+def arg_is_artifact_ref(func):
+    """Resolve a ref, with names scoped to the caller's namespace.
+
+    Pair this with `requires_artifact_ownership`, which is to say use
+    it on everything that changes an artifact.
+
+    A name here means "mine". `requires_artifact_ownership` is the
+    gate that actually refuses somebody else's artifact, and it does so
+    whichever way the artifact was named -- trust no longer reaches
+    past reading, so a uuid gets the same refusal a name does. This
+    decorator is defence in depth on top of that: *resolving* a name
+    into another namespace and then destroying what it landed on is a
+    different proposition from being handed a uuid. `sf-client artifact
+    delete build-cache` run in a namespace that has no `build-cache` of
+    its own should say so, not quietly find the one belonging to a
+    namespace which happens to trust it and then refuse with a 404 that
+    looks like the name was wrong. Destructive actions get the narrow,
+    boring reading of an ambiguous name.
+    """
+    return _resolve_artifact_ref(func, widen=False)
+
+
+def arg_is_visible_artifact_ref(func):
+    """Resolve a ref, with names spanning everything the caller sees.
+
+    Pair this with `requires_artifact_access`, which is to say use it
+    on read only routes.
+
+    Reading is where the narrow reading is the surprising one: a
+    tenant sees a shared image in `GET /artifacts`, asks for it by the
+    name the listing just showed them, and gets a 404. Widening costs
+    nothing here because the worst case is that the caller reads
+    something they were already entitled to read, and
+    `requires_artifact_access` still has to agree.
+    """
+    return _resolve_artifact_ref(func, widen=True)
+
+
 def requires_artifact_ownership(func):
-    # Requires that @arg_is_artifact_ref has already run
+    # Requires that @arg_is_artifact_ref has already run -- that one
+    # specifically, not the widening variant, so that a name never
+    # resolves into another namespace on a route which then changes
+    # what it found.
+    #
+    # The stricter of the two tests, for anything which changes the
+    # artifact: the caller's own namespace, or system.
+    #
+    # Deliberately does *not* consult the shared flag -- sharing an
+    # artifact publishes it for reading, it does not hand the world a
+    # delete button -- and deliberately does not consult trust either.
+    # Trust is a visibility mechanism. The operator guide introduces it
+    # as a way to get the system namespace's cross-namespace *sight* on
+    # a smaller scale, and letting somebody delete your artifacts is
+    # not a smaller scale version of being able to see them. It is also
+    # what the rest of the codebase already does:
+    # requires_instance_ownership and requires_network_ownership both
+    # test `request_namespace() not in [obj.namespace, 'system']`, and
+    # artifacts were the only object type where trust reached past
+    # reading. Now they match.
+    #
+    # Creating an artifact *in* a namespace which trusts you is a
+    # different question and still allowed -- see the namespace checks
+    # on the cache and upload routes. That is the "gifting" pattern the
+    # operator guide's ci-images example is built on, and it is
+    # additive: the receiving namespace opted in by trusting you, and
+    # nothing it already had is lost.
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if not namespace_is_trusted(a.namespace, request_namespace()):
+        if request_namespace() not in [a.namespace, 'system']:
             LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
             return sf_api.error(404, 'artifact not found')
@@ -114,15 +189,42 @@ def requires_artifact_ownership(func):
 
 
 def requires_artifact_access(func):
-    # Requires that @arg_is_artifact_ref has already run
+    # Requires that @arg_is_visible_artifact_ref has already run.
+    #
+    # The wider test, for read only routes: ownership as above, plus
+    # any artifact explicitly marked shared, plus anything owned by a
+    # namespace which trusts the caller. That last one is the whole of
+    # what trust now buys -- sight, on the read routes, and nothing on
+    # the routes which change things. This is exactly the
+    # predicate the artifact listing filters on, and it reuses that
+    # function rather than restating it -- "appears in the list" and
+    # "is readable by uuid" have to be one rule, because two copies of
+    # a visibility rule is two chances to get it wrong.
+    #
+    # It was previously two copies, and they did disagree. The test
+    # here read `if a.shared and requestor not in [a.namespace,
+    # 'system']`, which is inverted in both directions: it hid shared
+    # artifacts from the namespaces they were shared with, and, far
+    # worse, let any caller who knew a uuid read an *unshared*
+    # artifact belonging to any namespace. `arg_is_artifact_ref`
+    # short-circuits a uuid straight to `Artifact.from_db`, applying no
+    # namespace filter of its own, so this decorator was the only thing
+    # standing between a guessed or leaked uuid and another tenant's
+    # artifact metadata.
+    #
+    # The refusal also logged through LOG.with_object, which
+    # shakenfist_utilities no longer provides, so the one case the old
+    # test did refuse raised AttributeError and answered 500 rather
+    # than 404. That nobody noticed is itself the evidence for how
+    # rarely the branch ran.
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if (a.shared and request_namespace() not in [a.namespace, 'system']):
-            LOG.with_object(a).info(
-                'Artifact not found, ownership test in decorator')
+        if not namespace_or_shared_filter(request_namespace(), a):
+            LOG.with_fields({'artifact': a}).info(
+                'Artifact not found, access test in decorator')
             return sf_api.error(404, 'artifact not found')
 
         return func(*args, **kwargs)
@@ -229,7 +331,7 @@ class ArtifactEndpoint(api_base.Resource):
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact not found.', None)]))
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
     def get(self, artifact_ref=None, artifact_from_db=None):
@@ -349,8 +451,20 @@ class ArtifactsEndpoint(api_base.Resource):
         if not namespace_is_trusted(namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
 
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
-                              create_if_new=True)
+        # As on the upload route, resolve by ownership. The trust check
+        # above only establishes that we may act on the named namespace;
+        # from_url would additionally have matched an artifact belonging
+        # to a third namespace which shares with, or is trusted by, that
+        # one, and the image_fetch queued below adds a version to
+        # whatever it lands on.
+        a = Artifact.owned_from_url(Artifact.TYPE_IMAGE, url,
+                                    namespace=namespace)
+        if a:
+            if request_namespace() not in [a.namespace, 'system']:
+                return sf_api.error(404, 'namespace not found')
+        else:
+            a = Artifact.new(Artifact.TYPE_IMAGE, url, namespace=namespace)
+
         a.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
         # Only admin can create shared artifacts
@@ -490,12 +604,33 @@ class ArtifactUploadEndpoint(api_base.Resource):
         else:
             return sf_api.error(403, 'invalid artifact type specified')
 
-        a = Artifact.from_url(artifact_type_value, source_url, name=artifact_name,
-                              namespace=namespace, create_if_new=True)
-        a.add_event(EVENT_TYPE_AUDIT, 'convert upload to artifact from REST API')
+        # Resolve by ownership rather than visibility, then authorise the
+        # two cases apart. from_url would have matched an artifact owned
+        # by anyone who merely shares with us or trusts us, and the write
+        # below is add_index, which ends in delete_old_versions -- so a
+        # trusted namespace could replace what somebody else's artifact
+        # resolves to and destroy the versions underneath it.
+        #
+        # Creating is additive and a trust is enough for it, which is what
+        # the operator guide promises. Pushing a version into an artifact
+        # a namespace already owns is not additive, so that takes the
+        # owning namespace or system, exactly as requires_artifact_
+        # ownership demands everywhere else.
+        a = Artifact.owned_from_url(artifact_type_value, source_url,
+                                    namespace=namespace)
+        if a:
+            if request_namespace() not in [a.namespace, 'system']:
+                return sf_api.error(404, 'namespace not found')
+        else:
+            if not namespace_is_trusted(namespace, request_namespace()):
+                return sf_api.error(404, 'namespace not found')
+            a = Artifact.new(artifact_type_value, source_url,
+                             name=artifact_name, namespace=namespace)
 
-        if not namespace_is_trusted(a.namespace, request_namespace()):
-            return sf_api.error(404, 'namespace not found')
+        # The audit event is written after the authorisation check, not
+        # before it, so a refused caller cannot append to the event log of
+        # a namespace it has just been told does not exist.
+        a.add_event(EVENT_TYPE_AUDIT, 'convert upload to artifact from REST API')
 
         # Only admin can create shared artifacts
         if shared:
@@ -568,7 +703,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
          (404, 'Artifact not found.', None)]))
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
     def get(self, artifact_ref=None, event_type=None, limit=100, artifact_from_db=None):
@@ -620,7 +755,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [(200, 'A list of the blobs which form the artifact versions.',
           artifact_versions_example),
          (404, 'Artifact not found.', None)]))
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, artifact_from_db=None):
         retval = []
@@ -857,7 +992,7 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
             artifact_outstanding_operations_example),
          (404, 'Artifact not found.', None)]))
     @use_kwargs(get_args, location='query')
-    @arg_is_artifact_ref
+    @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, all=False, artifact_from_db=None):
         retval = []

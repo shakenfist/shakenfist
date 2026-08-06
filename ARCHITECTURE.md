@@ -877,7 +877,70 @@ There is no error state, because key operations are atomic. Expiry is not a
 state: it is enforced when the key is used, and the cluster daemon separately
 soft-deletes long-expired keys so that the standard reaper hard-deletes them.
 
+### Trusted Issuer and Mapping Rule States
+- `initial` -> `created`
+- `created` -> `deleted` (soft delete)
+
+Both follow the `NamespaceKey` recipe. A `TrustedIssuer`
+(`shakenfist/trusted_issuer.py`) is a cluster-level record of an external
+identity provider whose tokens this cluster will accept, managed through
+`/auth/issuers` by the `system` namespace only. A `MappingRule`
+(`shakenfist/mapping_rule.py`) is owned by the namespace it targets, managed
+under `/auth/namespaces/{namespace}/rules` by that namespace's owner, and hard
+deleted with its namespace.
+
 See `docs/developer_guide/state_machine.md` for complete documentation.
+
+## Federated Identity Exchange
+
+`POST /auth/federated` (`shakenfist/external_api/auth.py`) trades an
+externally issued identity token for a scoped, expiring `NamespaceKey`. It is
+one of the handful of `@api_base.public` routes, because the caller by
+definition has no Shaken Fist credential yet.
+
+Token validation lives in `shakenfist/federation.py`, which is deliberately
+Flask-free: issuer resolution from an unverified `iss`, signature checking
+against a `PyJWKClient` cache (one client and one lock per issuer, so a key
+rotation does not stampede the provider), audience and lifetime checks, and
+claim matching against a rule. The endpoint composes these in a fixed order —
+cheap local rejections before anything that costs a network round trip — and
+that order is a security property rather than a style, asserted by tests.
+
+The rate limit is the dividing line in that order, and only the argument
+checks sit above it. Issuer resolution in particular sits *below* it: it scans
+the configured issuers and reads state and attributes per row, so although a
+cluster only ever has a handful of issuers, leaving that above the meter gave
+an anonymous caller a way to multiply one request into database work with
+nothing counting it. The rule for anything added to this endpoint is that the
+meter goes above whatever touches the database or the network, not merely
+above whatever is slow.
+
+Two plain (non-DBO) tables back the abuse resistance, both reaped by the
+cluster daemon's `reap_federation_records`:
+
+- `federation_replay`, keyed `(token_id, rule_uuid)`, makes an identity token
+  single-use per rule. The composite primary key does the arbitration, so a
+  failing insert *is* the replay detection.
+- `federation_rate_limits`, keyed `(source, window_start)`, counts exchange
+  attempts per source per minute in the database rather than in the worker, so
+  the limit is cluster-wide.
+
+Both fail closed: a database error refuses the exchange rather than being read
+as "not seen before" or "under the limit".
+
+The replay record is keyed on the token's `jti` when the issuer supplies one,
+and otherwise on a hash of the token's *signed material* — header and payload.
+Not the signature: base64url leaves four don't-care bits in the final
+character of an RS256 signature and the padding is optional, so one signature
+has dozens of spellings which all verify, and keying on the text would have
+given an attacker one replay slot per spelling. The signature commits to the
+signed material, so an attacker cannot vary it without invalidating the token.
+
+Because the endpoint is unauthenticated, its input bound is enforced in an
+`@app.before_request` hook (`limit_federated_body_size`) rather than in the
+method. By the time a `flask_restful` method runs, `log_request` has already
+parsed the body, so a check there cannot prevent the work it exists to
+prevent.
 
 ## Configuration
 
@@ -1005,10 +1068,114 @@ The develop branch uses:
 - Namespace keys are database-backed objects with optional expiry, enforced
   when the key is used rather than by a sweep
 - Credentials never enter events, which are shipped to syslog and Loki;
-  events record the key name, and request tracing does not log bodies for
-  routes under `/auth`
+  events record the key name, and neither of the two request loggers records
+  a body for routes under `/auth`. Both consult one predicate,
+  `api_base.handles_credentials()`, and drop the body wholesale rather than
+  redacting named fields — a name-based rule leaks the day a route arrives
+  whose credential field it has not heard of
 - RBAC with admin/user roles
 - Network isolation via VXLAN
+
+### Object visibility and the two artifact guards
+
+Namespace isolation is enforced at two different granularities, and the
+artifact endpoints are where both are visible.
+
+Listing endpoints filter in the query or in a filter callable —
+`namespace_or_shared_filter(namespace, obj)` for artifacts, which admits the
+caller's own namespace, any namespace whose trust list names the caller,
+`system`, and anything flagged `shared`.
+
+Single-object endpoints cannot filter, because they resolve the object before
+they know who is asking. `arg_is_artifact_ref` short-circuits a UUID straight
+to `Artifact.from_db` with no namespace filter at all — deliberately, since
+system callers legitimately reach across namespaces — so the whole of the
+authorization decision rests on the decorator that runs next. There are two:
+
+- `requires_artifact_access` guards the read-only routes (the artifact, its
+  events, versions and cluster operations) and calls
+  `namespace_or_shared_filter`, the same predicate the listing uses. That
+  reuse is deliberate: "appears in the list" and "is readable by UUID" have to
+  be one rule, and for as long as they were two copies of a rule they
+  disagreed.
+- `requires_artifact_ownership` guards everything that mutates, and tests
+  `request_namespace() not in [a.namespace, 'system']` — the caller's own
+  namespace, or the cluster admin. It consults neither the `shared` flag nor
+  the trust list. Sharing publishes an artifact for reading rather than
+  transferring it, and a trust is a visibility grant: the operator guide
+  introduces it as the system namespace's cross-namespace *sight* on a
+  smaller scale, and being able to delete somebody's artifacts is not a
+  smaller-scale version of being able to see them. This matches
+  `requires_instance_ownership` and `requires_network_ownership`, which have
+  always read exactly this way; artifacts were the one object type where
+  trust reached past reading.
+
+Creating an object *in* a namespace which trusts you is a different question
+and remains allowed — see the `namespace_is_trusted` checks on the artifact
+cache and upload routes, and on instance creation. That is the "gifting"
+pattern the operator guide's `ci-images` example is built on. It is additive,
+the receiving namespace opted in by extending the trust, and nothing it
+already had is lost.
+
+Both refuse with `404` rather than `403`, so a refusal does not confirm that
+the object exists. Scope enforcement is a separate and earlier gate — a caller
+who fails the scope check gets `403` without either decorator running.
+
+#### Resolving a name
+
+Guarding a lookup is a separate problem from performing one, and for a name
+the two have to agree. `{artifact_ref}` accepts a UUID or a name; a UUID
+identifies one artifact, but names are unique only within a namespace, so
+resolution needs a scope and the obvious scope — the caller's own namespace —
+is narrower than what the caller can see. That gap is visible from outside: a
+tenant reads a shared image's name out of `GET /artifacts` and then gets a
+`404` asking for it by that name.
+
+`Artifact.from_db_by_ref_visible_to(ref, requestor)` closes it in two phases,
+and the ordering carries more weight than the widening:
+
+1. `from_db_by_ref(ref, requestor)`, unchanged, including raising
+   `MultipleObjects` when the name is ambiguous inside the caller's own
+   namespace. Whatever your own namespace resolves to wins. Without this,
+   sharing an artifact called `debian-11` would silently retarget every
+   tenant who already had one of their own by that name.
+2. Only on a miss, an unscoped query by name filtered through
+   `namespace_or_shared_filter` — the same predicate the listing and the read
+   guard use. More than one survivor raises `MultipleObjects`, because a
+   tenant cannot disambiguate with the `namespace` body field (they may only
+   name their own) and picking one would be a guess. The error points at the
+   UUID, which is never ambiguous.
+
+Phase one is the fast path and stays free of phase two's per-candidate trust
+lookups.
+
+Widening applies to reading only, and the split is expressed as two decorators
+over one shared body (`_resolve_artifact_ref`) so the pairing is visible at
+each route:
+
+| Decorator | Pairs with | A name resolves to |
+|-----------|------------|--------------------|
+| `arg_is_visible_artifact_ref` | `requires_artifact_access` | anything you can see, own namespace first |
+| `arg_is_artifact_ref` | `requires_artifact_ownership` | your own namespace only |
+
+The split follows the authorization guard, not the HTTP verb — `GET
+/artifacts/{ref}/metadata` is ownership-guarded and therefore resolves
+narrowly. Either decorator also drops back to the narrow behaviour when the
+caller named a namespace in the request body, since that caller asked about
+one namespace specifically.
+
+Since `requires_artifact_ownership` no longer honours trust, narrow resolution
+mostly agrees with the guard that follows it, and the split is defence in
+depth rather than the only thing standing between a name and somebody else's
+artifact. It still earns its place twice over. It keeps resolution from
+silently following if the guard is ever widened again, and it is observable:
+faced with a name matching two artifacts the caller can see but does not own,
+the read route must answer `400` and ask which one, while a write route
+answers a flat `404` rather than confirming that two exist.
+
+Instances and networks have the same shape in `arg_is_instance_ref` and
+`arg_is_network_ref` and have not been widened. Sharing is an artifact-only
+concept by design, so only the trust half would apply to them.
 
 ### VDI console token trust model
 

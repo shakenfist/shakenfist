@@ -261,6 +261,22 @@ service DatabaseService {
   rpc UpdateTrustedIssuerAttributes (UpdateTrustedIssuerAttributesRequest) returns (StatusReply) {}
   rpc DeleteTrustedIssuerAttributes (DeleteTrustedIssuerAttributesRequest) returns (StatusReply) {}
 
+  // MappingRule Operations (MariaDB)
+  // A MappingRule says which external identities a namespace will mint
+  // keys for. Owned by that namespace; unique on (namespace, name).
+  rpc CreateMappingRule (CreateMappingRuleRequest) returns (StatusReply) {}
+  rpc GetMappingRule (GetMappingRuleRequest) returns (GetMappingRuleReply) {}
+  rpc GetMappingRuleByName (GetMappingRuleByNameRequest) returns (GetMappingRuleReply) {}
+  rpc GetMappingRulesInNamespace (GetMappingRulesInNamespaceRequest) returns (GetMappingRulesReply) {}
+  rpc GetAllMappingRules (GetAllMappingRulesRequest) returns (GetMappingRulesReply) {}
+  rpc DeleteMappingRule (DeleteMappingRuleRequest) returns (StatusReply) {}
+
+  // MappingRule Attributes Operations (MariaDB)
+  rpc CreateMappingRuleAttributes (CreateMappingRuleAttributesRequest) returns (StatusReply) {}
+  rpc GetMappingRuleAttributes (GetMappingRuleAttributesRequest) returns (GetMappingRuleAttributesReply) {}
+  rpc UpdateMappingRuleAttributes (UpdateMappingRuleAttributesRequest) returns (StatusReply) {}
+  rpc DeleteMappingRuleAttributes (DeleteMappingRuleAttributesRequest) returns (StatusReply) {}
+
   // AgentOperation Operations (MariaDB)
   // These manage AgentOperation static values in MariaDB. AgentOperations
   // represent in-guest agent tasks (execute, get-file, put-blob, chmod).
@@ -345,6 +361,16 @@ service DatabaseService {
   rpc SetClusterOperationError (SetClusterOperationErrorRequest) returns (StatusReply) {}
   rpc GetClusterOperationError (GetClusterOperationErrorRequest) returns (GetClusterOperationErrorReply) {}
   rpc DeleteClusterOperationError (DeleteClusterOperationErrorRequest) returns (StatusReply) {}
+
+  // Federation Abuse Resistance (MariaDB)
+  // Replay refusal and rate limiting for /auth/federated. Both counters
+  // live in the database rather than in the API worker so the
+  // protection is cluster wide -- a per process counter would let a
+  // caller multiply their allowance by the number of workers.
+  rpc RecordFederatedExchange (RecordFederatedExchangeRequest) returns (RecordFederatedExchangeReply) {}
+  rpc CountFederatedAttempt (CountFederatedAttemptRequest) returns (CountFederatedAttemptReply) {}
+  rpc ReapFederationReplay (ReapFederationReplayRequest) returns (ReapFederationReply) {}
+  rpc ReapFederationRateLimits (ReapFederationRateLimitsRequest) returns (ReapFederationReply) {}
 }
 
 // Generic status reply
@@ -1868,9 +1894,128 @@ message GetTrustedIssuerAttributesReply {
 
 message UpdateTrustedIssuerAttributesRequest {
   TrustedIssuerAttributesProto data = 1;
+
+  // Field mask: the TrustedIssuerAttributesData field names to write.
+  // An empty list means write every column. See the equivalent comment
+  // on UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents. An issuer's three values are edited as one
+  // coherent configuration, so today's only caller names all three --
+  // the mask is here so a later writer of one of them cannot silently
+  // revert the others.
+  repeated string fields = 2;
 }
 
 message DeleteTrustedIssuerAttributesRequest {
+  string uuid = 1;
+}
+
+// MappingRule Operations (MariaDB)
+// A MappingRule says which external identities a namespace will mint
+// keys for, and what those keys may do. Owned by the namespace it
+// targets; the (namespace, name) pair is unique.
+
+message MappingRuleStaticData {
+  string uuid = 1;            // MappingRule UUID
+  string namespace = 2;       // Owning namespace
+  string name = 3;            // Unique within the owning namespace
+  int32 version = 4;          // Schema version
+}
+
+// The policy the rule expresses. bound_claims and scopes travel as JSON
+// strings rather than as proto maps or repeated fields: a claim matcher
+// is "an exact string or a list of acceptable strings", which a
+// map<string, string> cannot carry without inventing an encoding, and
+// an invented encoding is how the two sides of a wire drift apart. The
+// same reasoning is why AgentOperationStaticData carries commands_json.
+message MappingRuleAttributesProto {
+  string uuid = 1;             // References mapping_rules.uuid
+  string issuer = 2;           // Name of the TrustedIssuer accepted
+  string bound_claims = 3;     // JSON object: claim name -> matcher
+  string scopes = 4;           // JSON array of scope strings
+  int64 key_ttl = 5;           // Seconds of life for minted keys
+  string key_name_prefix = 6;  // Prefix for minted key names
+}
+
+message CreateMappingRuleRequest {
+  MappingRuleStaticData data = 1;
+}
+
+message GetMappingRuleRequest {
+  string uuid = 1;
+}
+
+message GetMappingRuleByNameRequest {
+  string namespace = 1;
+  string name = 2;
+}
+
+message GetMappingRuleReply {
+  bool found = 1;
+  MappingRuleStaticData data = 2;
+}
+
+message GetMappingRulesInNamespaceRequest {
+  string namespace = 1;
+}
+
+message GetAllMappingRulesRequest {
+}
+
+message GetMappingRulesReply {
+  repeated MappingRuleStaticData rules = 1;
+}
+
+message DeleteMappingRuleRequest {
+  string uuid = 1;
+}
+
+message CreateMappingRuleAttributesRequest {
+  MappingRuleAttributesProto data = 1;
+}
+
+message GetMappingRuleAttributesRequest {
+  string uuid = 1;
+}
+
+message GetMappingRuleAttributesReply {
+  bool found = 1;
+  MappingRuleAttributesProto data = 2;
+
+  // The row exists but its bound_claims or scopes will not decode.
+  //
+  // This is a data fault, not a transport fault, and the difference is
+  // the whole point of the field. A damaged rule has two documented
+  // behaviours -- the exchange refuses it with a generic 401, and
+  // external_view() marks it unusable so one bad row does not take a
+  // namespace's rule listing down -- and both are driven by catching
+  // CorruptMappingRule in the API process. Without this flag the
+  // exception is raised inside sf-database, the servicer's catch-all
+  // turns it into INTERNAL, and _grpc_get_mapping_rule_attributes
+  // cannot tell that from a database outage, so the API answers 503
+  // and neither behaviour ever happens on a deployed cluster.
+  //
+  // Sent with found=true and no data: the caller is being told the
+  // rule is there and cannot be read, which is a different answer to
+  // found=false. The message deliberately carries no detail, because
+  // the exception text names the rule uuid and this reply is produced
+  // on behalf of an unauthenticated caller.
+  bool corrupt = 3;
+}
+
+message UpdateMappingRuleAttributesRequest {
+  MappingRuleAttributesProto data = 1;
+
+  // Field mask: the MappingRuleAttributesData field names to write. An
+  // empty list means write every column. See the equivalent comment on
+  // UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents. A rule's policy is edited as one unit, so
+  // today's only caller names every field -- the mask is here so a
+  // later writer of one of them cannot silently revert the rest, which
+  // for a rule would mean reverting the scopes it grants.
+  repeated string fields = 2;
+}
+
+message DeleteMappingRuleAttributesRequest {
   string uuid = 1;
 }
 
@@ -2299,4 +2444,64 @@ message GetClusterOperationErrorReply {
 
 message DeleteClusterOperationErrorRequest {
   string op_uuid = 1;             // Operation UUID as string
+}
+
+// Federation Abuse Resistance (MariaDB)
+
+message RecordFederatedExchangeRequest {
+  string token_id = 1;      // jti, or a hash of the signature
+  string rule_uuid = 2;     // MappingRule UUID as string
+  double expires_at = 3;    // The inbound token's exp
+}
+
+message RecordFederatedExchangeReply {
+  // True if this (token, rule) pair was recorded for the first time,
+  // false if it was already present and this is therefore a replay.
+  bool recorded = 1;
+  // Set only when we could not find out. "Already claimed" is not an
+  // error, and the distinction matters: recorded=false means refuse
+  // the exchange as a replay, whereas error set means refuse it
+  // because we do not know. Both refuse, but only one is worth paging
+  // an operator about.
+  string error = 2;
+  // Whether the claim was actually evaluated. Carried here for symmetry
+  // with CountFederatedAttemptReply rather than because this message
+  // needs it: recorded=false with an empty error degrades to "treat as
+  // a replay", which refuses, so this one already failed closed. Having
+  // both replies answer the same way keeps the next reader from having
+  // to work out which of the two was the safe one.
+  bool ok = 3;
+}
+
+message CountFederatedAttemptRequest {
+  string source = 1;        // Source address of the attempt
+  int64 window_start = 2;   // Unix timestamp of the one minute window
+}
+
+message CountFederatedAttemptReply {
+  int32 attempts = 1;       // Attempts in this window, including this one
+  string error = 2;         // Diagnostics only. Never test this to decide.
+  // Whether attempts means anything. Set true only on the success path.
+  //
+  // The client used to infer this from error being non-empty, which put
+  // the fail closed property in the hands of message formatting: an
+  // exception whose str() is empty -- KeyError(), a bare
+  // AttributeError(), anything raised with no args -- arrived as
+  // attempts=0, error='' and read as "nobody has tried this minute",
+  // which is the one answer this reply must never be able to give by
+  // accident. A field that has to be set deliberately cannot be
+  // produced by a formatting accident.
+  bool ok = 3;
+}
+
+message ReapFederationReplayRequest {
+  double cutoff = 1;        // Delete rows whose token expired before this
+}
+
+message ReapFederationRateLimitsRequest {
+  int64 cutoff = 1;         // Delete windows which started before this
+}
+
+message ReapFederationReply {
+  int32 removed = 1;
 }

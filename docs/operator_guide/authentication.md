@@ -105,6 +105,113 @@ predates this change loses them. Keys that existed before the upgrade are
 unaffected either way. The exposure is one upgrade cycle, and it matches the
 precedent set by the `node_daemon_states` migration.
 
+## Federated identity
+
+Workloads with an identity elsewhere -- a GitHub Actions job, a service
+account in an Authentik instance -- can trade that identity for a
+scoped, expiring namespace key rather than holding a long-lived Shaken
+Fist secret. The mechanics are in the
+[developer guide](/developer_guide/authentication/#federated-identity);
+this covers what an operator has to decide and configure.
+
+### Trusting an issuer is an administrative act
+
+A **trusted issuer** is cluster-wide, and creating one is a `system`
+namespace operation. It says the cluster will believe tokens this
+provider signs, so the decision belongs with whoever is responsible
+for the cluster rather than with an individual namespace owner.
+
+Four fields, all mandatory:
+
+| Field | Notes |
+|-------|-------|
+| `name` | How rules refer to this issuer. Treat it as durable |
+| `issuer_url` | Compared to a token's `iss` claim **exactly**: no normalisation, no trailing-slash tolerance |
+| `jwks_uri` | Where the signing keys are published. Always taken from here, never from the token |
+| `audience` | Tokens must be minted for this. Usually your cluster's API URL |
+
+The exact `issuer_url` comparison is deliberate. A loose comparison
+here is a way to accept tokens from somewhere else entirely, so if
+your tokens are refused with an untrusted-issuer message, check for a
+trailing slash before checking anything else.
+
+???+ warning "Rules reference issuers by name"
+
+    Deleting an issuer does not delete the mapping rules that name it;
+    those rules simply stop working. Recreating an issuer under the
+    same name silently rebinds every rule that named it, potentially
+    to a different identity provider than the rules' authors intended.
+    Renaming rather than recreating avoids this.
+
+### Delegating to namespace owners
+
+A **mapping rule** is owned by the namespace it mints into, and
+creating one requires ownership of that namespace -- the same gate as
+adding a key, because a rule is the same privilege granted in advance
+and conditioned on claims. Once you have configured an issuer,
+namespace owners can write their own rules without coming back to you.
+
+Two things to watch:
+
+* **Rules targeting `system`.** A rule that mints into the `system`
+  namespace is a standing offer of administrative credentials to
+  whoever satisfies its claims. This is permitted, because there are
+  legitimate uses, but the cluster logs a warning and writes an audit
+  event when such a rule is created. Those events are worth alerting
+  on.
+* **Scope breadth.** A rule grants exactly the scopes it lists.
+  `artifact.*` is a whole family; `["cluster-admin", "node.read"]` is
+  a genuinely least-privilege monitoring credential. Listing a rule's
+  scopes is how you audit what a federated workload can do.
+
+Listing a namespace's rules answers "who can get into this namespace",
+which is the inbound counterpart to listing its trusts.
+
+### Abuse resistance
+
+`/auth/federated` is unauthenticated by nature, so it carries its own
+protections.
+
+**Replay.** An identity token is single-use per rule. The same token
+may still be exchanged through a *different* rule, so a workflow can
+reach two namespaces with one identity. Seen pairs live in the
+`federation_replay` table until the token they describe expires, and
+are reaped by the cluster daemon.
+
+**Rate limiting.** Attempts are counted per source address per minute
+in the database, so the limit is cluster-wide rather than per API
+worker. Note that behind a reverse proxy which does not rewrite the
+source address, every request appears to come from the proxy and the
+limit becomes a single global one -- size it accordingly, or disable
+it and rate limit at the proxy instead.
+
+Every attempt is counted, including ones refused for naming an issuer
+this cluster does not trust. Only the checks that read nothing but the
+request itself -- a missing field, an oversized body -- happen before
+the counter. So a misconfigured workflow pointed at the wrong issuer
+consumes its source's budget in the same way a wrong key does, which
+is worth knowing when a CI fleet sharing one NAT address starts
+seeing 429s.
+
+Both checks fail closed: if the database cannot be reached the
+exchange answers 503 rather than assuming the request is fine.
+
+### Settings
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `FEDERATION_JWKS_CACHE_SECONDS` | 300 | How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id always triggers an immediate refetch, so raising this does not delay recognising a rotated key |
+| `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
+| `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
+| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Exchange attempts allowed per source address per minute. `0` disables rate limiting entirely |
+
+### If nobody uses it
+
+Federation is inert until an issuer exists. A cluster which never
+creates one behaves exactly as it did before: the two tables stay
+empty, the reaper does nothing, and `/auth/federated` refuses
+everything with an untrusted-issuer message.
+
 ## Trusts
 
 ???+ info
@@ -142,3 +249,50 @@ What we implemented was:
   them to the `ci-images` namespace via a label.
 * jobs which need to boot a test image can now see the images from the `ci-images`
   namespace by virtue of this trust relationship.
+
+### What a trust does and does not grant
+
+A trust grants **visibility** over your *resources* — instances, networks,
+artifacts and the like. It is the system namespace's ability to see across
+namespaces, scaled down. A namespace you trust can list and read those
+objects. It cannot delete them, rename them, share them, or change their
+metadata — those all require the object's own namespace, or `system`.
+
+Giving is a separate question from taking, and it is still allowed: a
+namespace you trust may *create* an object in your namespace, which is exactly
+the "gift" step in the `ci-images` example above. Creation is additive, you
+opted into it by extending the trust, and nothing you already had is lost by
+it. Deletion is none of those things.
+
+Giving the same thing twice is not creation, though, and it is worth being
+precise about where the line falls. A trusted namespace may upload an artifact
+into yours when nothing of that `source_url` is there yet. It may not upload
+again over the artifact that first upload produced: adding a version ends in
+`delete_old_versions`, the caller supplies the blob, and the practical result
+is that an instance of yours booting that artifact afterwards gets somebody
+else's image. So the second upload is refused, and a CI job which pushes a
+nightly image into a shared namespace needs a key in that namespace rather
+than a trust. Labels are not affected — a label URL names its own namespace,
+so a trusted caller cannot reach yours through one.
+
+**Namespace administration is the exception, and it is a large one.**
+Adding a key to your namespace, and writing a mapping rule in it, are both
+gated on this same trust relationship rather than on ownership. A namespace
+you trust can therefore mint credentials in yours — directly with
+`add-key`, or by writing a mapping rule, which is a standing offer to mint
+a key for anyone holding a matching identity token. It can also delete the
+rules you wrote.
+
+So a trust is not only a window onto your resources; it is administrative
+access to your namespace's credentials. Extend one to a namespace you would
+be willing to hand a key to, and read
+[Federated identity](#federated-identity) before extending one to a
+namespace that has mapping rules configured.
+
+!!! note
+
+    Artifacts behaved differently until recently: a trusted namespace could
+    delete another namespace's artifacts. Instances and networks never
+    permitted this, and artifacts now match them. If you have tooling which
+    relied on deleting artifacts across a trust, it needs a key in the owning
+    namespace, or the `system` namespace, instead.

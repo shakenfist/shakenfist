@@ -52,6 +52,31 @@ daemon.set_log_level(LOG, 'api')
 # circular import while letting both modules share the single tuple.
 HEALTH_PROBE_PATHS = ('/', '/livez', '/readyz', '/healthz')
 
+REDACTED_BODY = '...body not logged as this route handles credentials...'
+
+
+# Request and response bodies are logged verbatim by app.py, and the
+# parsed body is logged again as kwargs by log_request below. That is
+# useful for debugging and unacceptable for the routes which carry
+# credentials: POST /auth is sent a plaintext namespace key and answers
+# with a JWT, the key management routes are sent key secrets, and
+# POST /auth/federated is sent a third party identity token which is a
+# bearer credential until it expires. Every such route lives under
+# /auth, so bodies there are not logged at all. Redacting by field name
+# instead was rejected because "key" means a metadata key name on most
+# endpoints and a secret on only a few, so the check would have to know
+# which route it was on anyway -- and would silently start leaking the
+# day somebody adds a route it had not heard of, which is exactly how
+# the federated exchange came to log its tokens.
+#
+# The URL is still logged, so an audit reader keeps the namespace and
+# the key name. Only the credential itself is lost. Kept here alongside
+# HEALTH_PROBE_PATHS so app.py and base.py cannot disagree about which
+# routes are sensitive.
+def handles_credentials():
+    path = flask.request.path
+    return path == '/auth' or path.startswith('/auth/')
+
 
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
@@ -600,14 +625,21 @@ def log_request(func):
         for header in flask.request.headers:
             formatted_headers.append(str(header))
 
-        # Ensure key does not appear in logs
-        kwargs_log = kwargs.copy()
-        if 'key' in kwargs_log:
-            kwargs_log['key'] = '*****'
+        # The body has just been merged into kwargs, so on a credential
+        # carrying route kwargs now holds the credential. Drop the lot
+        # rather than naming fields, for the reasons on
+        # handles_credentials.
+        if handles_credentials():
+            kwargs_log = {'body': REDACTED_BODY}
+        else:
+            # Ensure key does not appear in logs
+            kwargs_log = kwargs.copy()
+            if 'key' in kwargs_log:
+                kwargs_log['key'] = '*****'
 
-        # Redact a password if any
-        if 'password' in kwargs_log:
-            kwargs_log['password'] = '*****'
+            # Redact a password if any
+            if 'password' in kwargs_log:
+                kwargs_log['password'] = '*****'
 
         # Redact the JWT auth token in headers as well
         headers_log = dict(flask.request.headers)

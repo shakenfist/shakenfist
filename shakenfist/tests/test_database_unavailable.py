@@ -8,6 +8,7 @@ found", and the hot paths that intentionally shrug off an unreachable
 database must catch it explicitly.
 """
 
+import json
 import uuid
 from unittest import mock
 
@@ -18,7 +19,9 @@ from shakenfist import exceptions
 from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.daemons import daemon
+from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist.daemons.queues import main as queues_main
+from shakenfist.protos import database_pb2
 from shakenfist.tests import base
 
 
@@ -421,3 +424,168 @@ class BlockUntilHealthyTestCase(base.ShakenFistTestCase):
         # then terminates the loop.
         queues_main._block_until_healthy(abort_path='/run/sf/queues.abort')
         mock_checks.assert_called_once()
+
+
+class FederationRepliesFailClosedTestCase(base.ShakenFistTestCase):
+    """A reply nobody could produce must not read as a permissive one.
+
+    Both federation replies used to signal failure by carrying a
+    non-empty `error`, which left the fail closed property resting on
+    string formatting. An exception raised with no args -- `KeyError()`,
+    a bare `AttributeError()` -- has an empty `str()`, so the reply
+    arrived as `attempts=0, error=''`. Read as a count, that says
+    "nobody has tried this minute", which is an allow on the one
+    unauthenticated endpoint in the API.
+
+    `ok` has to be set deliberately on the success path, so no
+    formatting accident can produce one. Each refusal below is paired
+    with the corresponding success, because a client which raised
+    unconditionally would satisfy the refusals on its own.
+    """
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_counter_failure_with_no_message_still_refuses(self, mock_stub):
+        mock_stub.return_value.CountFederatedAttempt.return_value = \
+            database_pb2.CountFederatedAttemptReply(
+                attempts=0, error='', ok=False)
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_count_federated_attempt, '10.0.0.1', 1234)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_counted_attempt_is_returned(self, mock_stub):
+        mock_stub.return_value.CountFederatedAttempt.return_value = \
+            database_pb2.CountFederatedAttemptReply(
+                attempts=7, error='', ok=True)
+
+        self.assertEqual(
+            7, mariadb._grpc_count_federated_attempt('10.0.0.1', 1234))
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_claim_failure_with_no_message_still_refuses(self, mock_stub):
+        mock_stub.return_value.RecordFederatedExchange.return_value = \
+            database_pb2.RecordFederatedExchangeReply(
+                recorded=False, error='', ok=False)
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_record_federated_exchange,
+            'token-1', uuid.uuid4(), 1.0)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_first_claim_is_recorded(self, mock_stub):
+        mock_stub.return_value.RecordFederatedExchange.return_value = \
+            database_pb2.RecordFederatedExchangeReply(
+                recorded=True, error='', ok=True)
+
+        self.assertTrue(mariadb._grpc_record_federated_exchange(
+            'token-1', uuid.uuid4(), 1.0))
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_an_already_claimed_pair_is_a_replay_not_a_failure(self, mock_stub):
+        # recorded False with ok True is the replay answer. It has to stay
+        # distinguishable from "we could not find out": both refuse the
+        # exchange, but only one of them should wake anybody up.
+        mock_stub.return_value.RecordFederatedExchange.return_value = \
+            database_pb2.RecordFederatedExchangeReply(
+                recorded=False, error='', ok=True)
+
+        self.assertFalse(mariadb._grpc_record_federated_exchange(
+            'token-1', uuid.uuid4(), 1.0))
+
+
+class CorruptMappingRuleOverGrpcTestCase(base.ShakenFistTestCase):
+    """A damaged rule must stay a damaged rule across the RPC.
+
+    The exchange refuses a rule it cannot decode with a generic 401,
+    and external_view() marks it unusable so one bad row does not take
+    a namespace's listing down. Both are driven by catching
+    CorruptMappingRule in the API process, and the decode happens in
+    sf-database, so neither works unless the fault survives the trip.
+
+    These drive the real servicer method and the real client wrapper.
+    Patching MappingRule._attributes -- which is how the behavioural
+    tests in test_federated_exchange.py and test_rules.py raise this --
+    exercises only the single-process path and would pass just as
+    happily with the RPC flattening the fault into INTERNAL.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.rule_uuid = uuid.uuid4()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+
+    @mock.patch('shakenfist.mariadb._direct_get_mapping_rule_attributes')
+    def test_the_servicer_reports_corruption_as_a_field(self, mock_get):
+        mock_get.side_effect = exceptions.CorruptMappingRule(
+            f'mapping rule {self.rule_uuid} has undecodable scopes')
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetMappingRuleAttributes(
+            database_pb2.GetMappingRuleAttributesRequest(
+                uuid=str(self.rule_uuid)),
+            context)
+
+        self.assertTrue(reply.corrupt)
+        # found stays True: the row is there and cannot be read, which
+        # is not the same answer as no such row.
+        self.assertTrue(reply.found)
+        # Not an error status. INTERNAL is what made this invisible.
+        context.set_code.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_mapping_rule_attributes')
+    def test_the_servicer_does_not_return_the_rule_uuid(self, mock_get):
+        # The exception text names the rule, and the exchange is
+        # unauthenticated, so the uuid must not ride back in the reply.
+        mock_get.side_effect = exceptions.CorruptMappingRule(
+            f'mapping rule {self.rule_uuid} has undecodable scopes')
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetMappingRuleAttributes(
+            database_pb2.GetMappingRuleAttributesRequest(
+                uuid=str(self.rule_uuid)),
+            context)
+
+        context.set_details.assert_not_called()
+        self.assertNotIn(str(self.rule_uuid), str(reply))
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_the_client_re_raises_corruption(self, mock_stub):
+        mock_stub.return_value.GetMappingRuleAttributes.return_value = \
+            database_pb2.GetMappingRuleAttributesReply(
+                found=True, corrupt=True)
+
+        # CorruptMappingRule, not DatabaseUnavailable. The API tells
+        # them apart: one refuses the exchange, the other is a 503.
+        self.assertRaises(
+            exceptions.CorruptMappingRule,
+            mariadb._grpc_get_mapping_rule_attributes, self.rule_uuid)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_missing_row_is_still_not_corruption(self, mock_stub):
+        mock_stub.return_value.GetMappingRuleAttributes.return_value = \
+            database_pb2.GetMappingRuleAttributesReply(found=False)
+
+        self.assertIsNone(
+            mariadb._grpc_get_mapping_rule_attributes(self.rule_uuid))
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_healthy_row_is_still_returned(self, mock_stub):
+        # Without this an implementation which raised unconditionally
+        # would pass everything above.
+        mock_stub.return_value.GetMappingRuleAttributes.return_value = \
+            database_pb2.GetMappingRuleAttributesReply(
+                found=True,
+                data=database_pb2.MappingRuleAttributesProto(
+                    uuid=str(self.rule_uuid),
+                    issuer='an-issuer',
+                    bound_claims=json.dumps({'repo': 'shakenfist/shakenfist'}),
+                    scopes=json.dumps(['namespace']),
+                    key_ttl=3600,
+                    key_name_prefix='ci'))
+
+        attrs = mariadb._grpc_get_mapping_rule_attributes(self.rule_uuid)
+        self.assertEqual('an-issuer', attrs.issuer)
+        self.assertEqual(['namespace'], attrs.scopes)

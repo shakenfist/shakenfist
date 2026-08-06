@@ -120,6 +120,19 @@ belongs in a table with per-row inserts and deletes — see the
 `instance_location` rows in `object_references` — never in a JSON list
 on an attributes row.
 
+"The caller writes every column anyway" is not a reason to pass `None`.
+`TrustedIssuer.update` and `MappingRule.update` both replace their whole
+attribute set, because an issuer's URL and key source are one
+configuration and a rule's policy is one unit — and both still name
+every field. Naming them keeps `None` meaning only "creation or
+upgrade", so a reader can tell the two cases apart, and it means the
+day somebody adds a single-field writer they inherit a masked function
+rather than having to retrofit one. The mask travels over gRPC as
+`repeated string fields` on the request message, and the mock in
+`shakenfist/tests/mock_mariadb.py` honours it too — a mock that
+replaced the whole row would let a caller name the wrong fields and
+still see the write it expected.
+
 ### Native ENUM columns and Python enums
 
 A handful of columns are native MariaDB `ENUM` types built with
@@ -356,6 +369,222 @@ row, `KERBSIDE_JWT_SIGNING_KEY` (two-key rotation window). The `sf-ctl`
 `ensure-kerbside-signing-key` / `rotate-kerbside-signing-key` subcommands
 bootstrap and rotate it. Operator runbook:
 `docs/operator_guide/vdi_console_tokens.md`.
+
+### Never restate a visibility predicate
+
+A listing endpoint filters; a single-object endpoint cannot, because it has
+already resolved the object by the time it knows who is asking. The two must
+still agree, so the single-object guard calls *the same function* the listing
+filters with rather than open-coding the equivalent test.
+
+For artifacts that function is `namespace_or_shared_filter(namespace, obj)`:
+own namespace, a namespace whose trust list names the caller, `system`, or
+`shared`. `requires_artifact_access` calls it.
+
+`requires_artifact_ownership` is the deliberately stricter mutation guard and
+tests `request_namespace() not in [obj.namespace, 'system']` — the same test
+`requires_instance_ownership` and `requires_network_ownership` use. It
+consults neither the `shared` flag nor the trust list: sharing publishes an
+object for reading, and a trust is a visibility grant, so neither one hands
+out a delete button. Creating an object *in* a namespace that trusts you is a
+separate question and is still allowed.
+
+This is not a style preference. `requires_artifact_access` used to restate the
+rule as `if a.shared and requestor not in [a.namespace, 'system']`, which is
+inverted in both directions, and because `arg_is_artifact_ref` resolves a UUID
+straight to `Artifact.from_db` with no namespace filter, that decorator was the
+only guard on the path. Any caller who knew a UUID could read any namespace's
+unshared artifacts. Refuse with `404` rather than `403` so the refusal does not
+confirm the object exists, and pair every new refusal test with a control that
+shows the same request succeeding when the one thing under test changes.
+
+The same predicate governs how a *name* resolves on the read routes, not just
+whether a resolved object is allowed through. `arg_is_visible_artifact_ref`
+(paired with `requires_artifact_access`) resolves through
+`Artifact.from_db_by_ref_visible_to`, which searches the caller's own
+namespace first and only then widens to what `namespace_or_shared_filter`
+admits. Two rules to preserve if you touch this:
+
+- The caller's own namespace must win, or sharing an object silently
+  retargets every tenant who already used that name.
+- Routes which change an object use plain `arg_is_artifact_ref` and resolve
+  names narrowly. The ownership guard already refuses the write whichever way
+  the object was named, so this is defence in depth rather than the only
+  gate — but a name must never resolve into someone else's namespace on a
+  route that then deletes what it found. New route, ownership guard, narrow
+  ref decorator — the pairing goes together.
+
+The same split applies to *url* resolution, and this is where it was missed.
+`Artifact.from_url` filters by `namespace_or_shared_filter`, so it can return
+an artifact belonging to whoever shares with or trusts the caller. That is the
+right answer for a caller which will read the result and the wrong one for a
+caller which will write to it: the upload and cache routes used it to pick a
+write target, so a trusted namespace could name the owner's `source_url` and
+have its own blob added as the newest version — and because `add_index` ends in
+`delete_old_versions`, the owner's older versions went with it. Write paths use
+`Artifact.owned_from_url()`, which resolves by ownership and does not create.
+
+Two rules fell out of fixing it, and both generalise past artifacts:
+
+- **A predicate is part of a function's contract, not an implementation
+  detail.** If one lookup serves both intents, say which it is in the name and
+  make the other one a separate function. A default that silently suits readers
+  is how a write path inherits a read's authorisation.
+- **Creating and modifying are different grants.** A trust may let a namespace
+  *give* you an object it did not have — additive, and the operator guide
+  promises it. It must not let that namespace replace what an object you
+  already own resolves to. When a route can do either, authorise the two cases
+  separately rather than once at the top, and put the audit event *after* the
+  check so a refused caller cannot write to the event log of a namespace it is
+  about to be told does not exist.
+
+Three call sites that end in `add_index` still resolve with `from_url`, and the
+sweep was not exhaustive. They are listed here so the next reader does not
+assume otherwise:
+
+- `external_api/instance.py` (instance create) resolves a caller-supplied
+  `disk.base` with `create_if_new=True`. Namespace B naming A's `source_url`
+  lands on A's artifact, but the fetch pulls from the owner's own URL rather
+  than from bytes B supplied, so an unchanged URL adds no version. Lower
+  severity than the upload hole, not zero.
+- `external_api/label.py` (`LabelEndpoint.post`) builds
+  `sf://label/<namespace>/<name>` from the request, so the URL is
+  namespace-scoped and a caller cannot steer it into somebody else's namespace.
+  Note that the `requires_admin=True` in its `swag_from` is documentation and
+  enforces nothing — see the swagger note elsewhere in this file.
+- `operations/artifact_fetch_op.py` runs behind the instance path above and
+  inherits its namespace.
+
+Issue #3640 tracks narrowing them. Until then, treat "write paths use
+`owned_from_url`" as the rule being converged on rather than one the tree
+already satisfies, and do not add a fourth exception.
+
+### Credential-carrying routes are not logged, not redacted
+
+Two independent loggers see a request body: `app.py`'s `before_request` audit
+event, and `log_request` in `base.py`, which merges the parsed body into the
+decorated method's kwargs and logs those. Both ask
+`api_base.handles_credentials()` — one predicate, in one place — and drop the
+whole body when it answers yes.
+
+Redacting by field name was tried and is wrong. `key` means a metadata key
+name on most endpoints and a secret on a few, so a name-based rule has to know
+which route it is on anyway, and it silently starts leaking the day somebody
+adds a route it has not heard of. That is exactly what happened: the federated
+exchange's credential field is `token`, which was on neither redaction list,
+so identity tokens were logged verbatim at INFO and shipped to the log
+aggregator.
+
+Every route which takes a credential lives under `/auth/`. Keep it that way,
+or extend the predicate — never the redaction lists.
+
+### A check that runs after the parse is not a check
+
+The endpoint-method decorators are not the outermost thing in a request.
+`log_request` calls `get_json(force=True)` before any method body runs, so a
+size or shape check written inside a `post()` cannot prevent work that has
+already happened. Anything protecting an *unauthenticated* endpoint from
+attacker-controlled input has to be an `@app.before_request` hook registered
+ahead of `log_request_info` — see `limit_federated_body_size`.
+
+While you are there: `flask.request.content_length` is `None` for chunked
+transfer encoding. Treating unknown as small enough lets any caller opt out of
+a size limit by choosing a header, so refuse with 411 rather than measuring.
+
+### Two records must not claim one lookup key
+
+`federation.issuer_for_token` resolves a trusted issuer by scanning for a
+matching `issuer_url`. Uniqueness on that column is therefore a correctness
+property, not tidiness: two live records claiming one URL make which
+provider's signing keys are trusted depend on listing order, so an
+administrator repointing an issuer would believe they had while some requests
+kept verifying against the old JWKS. The create and update endpoints refuse a
+duplicate by calling `federation.issuer_claiming_url`, the same function the
+resolution path uses.
+
+A check-then-write is not an invariant on its own. `issuer_url` lives in the
+attributes row and has no unique index -- and cannot easily get one, because a
+soft-deleted issuer keeps its row and its URL is deliberately reusable -- so
+both endpoints hold `_issuer_url_lock()` across the check *and* the write it
+guards. Without that, two administrators configuring one provider at the same
+moment both read "free" and both write. This is the `vsock_cids` pattern from
+`instance.py`: where a unique index cannot be the arbiter, a cluster lock
+around the check-then-act has to be.
+
+### Put the meter above the expensive thing, not below it
+
+`/auth/federated` is unauthenticated, so every step above the rate limit is a
+step an anonymous caller gets for free, as often as they can send. Ordering
+there is a security property, and the question to ask of each step is not "is
+this cheap?" but "does this touch the database or the network?". Issuer
+resolution reads once per configured issuer, so it belongs *below* the meter
+even though there are only ever a handful of issuers; only the argument
+checks, which touch nothing but the request, belong above it. The original
+ordering had this backwards on its own stated logic -- it placed the meter
+below the lookup to avoid writing a counter row, when the lookup it was
+skipping cost more than the row did. If you add a step to that endpoint, place
+it relative to `enforce_rate_limit` on that basis, and say why in a comment.
+
+### A guard has to sit where the exception is raised
+
+`CorruptMappingRule` comes from decoding `bound_claims` or `scopes`, which
+only happens on the *attributes* read. `MappingRule.from_db_by_name` reads the
+static row and the object state, so wrapping the lookup in a `try` looks like
+protection and is none. Before writing a guard, find the raise site; before
+believing a regression test, check that the thing it patches is on the path
+that can actually fail. Use `MappingRule.policy()` to read the whole policy in
+one go when you need more than one field -- it is also the single place to
+catch this.
+
+The same guard has to answer differently in different places, and that is not
+inconsistency. The exchange endpoint *refuses* a damaged rule, because bound
+claims it cannot read are bound claims it cannot check and minting anyway would
+be authorising on a guess. `MappingRule.external_view()` *describes* one, with
+an explicit `unusable` marker, because the CRUD routes exist to tell an owner
+which rule is broken -- raising there turned one bad row into a 500 that hid
+every healthy rule in the namespace, and made a successful delete report
+failure on the one call that would have cleaned it up. Ask what the caller will
+do with the answer before choosing.
+
+### Fail closed on a field, not on a formatting accident
+
+A reply that says "this went wrong" must say so in a field set only on the
+success path. `CountFederatedAttemptReply` used to signal failure by carrying a
+non-empty `error`, and the client read anything else as an answer -- so an
+exception raised with no args, whose `str()` is empty, arrived as
+`attempts=0, error=''` and was read as "nobody has tried this minute, allow".
+That is the one direction a rate limiter must never fail, on the one endpoint
+anybody may call.
+
+Both federation replies now carry `bool ok`, set only where the work actually
+succeeded, and the client tests that. `error` is diagnostics. When you add an
+RPC whose reply has a permissive-looking default -- a zero count, an empty
+list, a `False` that means "go ahead" -- carry an explicit success field rather
+than inferring one, and write the test that returns the empty-error reply and
+asserts the refusal. The invariant is not that today's code produces a message;
+it is that no reply can be mistaken for a permissive one.
+
+### Cluster CI tests only run in the merge queue
+
+The `(collection)` matrix in `Functional tests` -- everything under
+`deploy/shakenfist_ci/cluster_ci_tests/` -- is skipped on `pull_request` and
+runs on `merge_group`. A green PR therefore says nothing about whether those
+tests pass, or whether they can even reach their first assertion.
+
+`cluster_ci_tests/test_federation.py` sat through four commits registering a
+trusted issuer with an `http://` `jwks_uri` while the API had refused
+non-HTTPS `jwks_uri` since the object was added. Every test in the class died
+in `setUp` on a 400, and nothing said so until the branch entered the queue.
+
+Two habits follow. When you add or change a cluster CI test, run it, or at
+minimum drive the validator it depends on directly -- these tests import
+cleanly given `pip install shakenfist-client testtools oslo.concurrency
+prettytable` in a scratch venv, so "the client is not installed" is not a
+reason to skip verification. And when a test needs input that a validator
+rejects, the validator is usually right: change the test, never carve a
+loopback or test-only exemption into a security check. If that makes the test
+unrunnable, make it skip loudly and file the issue -- see #3639 for the JWKS
+certificate case.
 
 ### Key Directories
 

@@ -6,12 +6,12 @@ inside Shaken Fist, or against the vocabulary of an external tool -- the entry
 names the sibling meaning so that a reader who arrived by search is not misled.
 Other documents should link here rather than redefining these terms.
 
-Definitions describe what the code does *today*. A few entries describe concepts
-that are planned but not yet implemented (the workload identity federation
-work): these carry a
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
-marker, and will lose it as the features land. An entry without the marker
-describes something that exists in the current release.
+Definitions describe what the code does *today*. Entries which once carried a
+*(planned)* marker for the workload identity federation work have lost it: as
+of phase 3 of [PLAN-auth-federation](plans/PLAN-auth-federation.md), trusted
+issuers, mapping rules, identity tokens and scopes all exist and are described
+here as they behave. Should a future entry describe something not yet built, it
+will say so explicitly.
 
 Entries are alphabetical. Each carries a short definition, a "Defined in"
 pointer to the authoritative code or documentation, and, where the term is
@@ -84,12 +84,19 @@ event" strictly means an event of type `audit`; documentation sometimes uses the
 phrase loosely to mean "the event that serves as the audit record", which may be
 of another type.
 
-**identity token**{#identity-token}
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
--- An externally-issued JWT proving workload or user identity, for example a
-GitHub Actions OIDC token or an Authentik-issued token. It is presented to
-Shaken Fist to be exchanged for a scoped [namespace key](#namespace-key).
-Defined in `docs/plans/PLAN-auth-federation.md` ("Authentication terms to pin").
+**identity token**{#identity-token} -- An externally-issued JWT proving
+workload or user identity, for example a GitHub Actions OIDC token or an
+Authentik-issued token. It is presented to `POST /auth/federated`, along with a
+namespace and a [mapping rule](#mapping-rule) name, and exchanged for a scoped
+[namespace key](#namespace-key). The token is verified against the
+[trusted issuer](#trusted-issuer) named by its `iss` claim: signature against
+that issuer's published keys, using asymmetric algorithms only, then audience,
+issuer and lifetime, then the rule's bound claims. An identity token is
+single-use *per rule*: once exchanged through a given
+[mapping rule](#mapping-rule) it cannot be exchanged through that rule again,
+though the same token may still be exchanged through a *different* rule to
+reach a second namespace. Validation is defined in `shakenfist/federation.py`
+and the exchange in `shakenfist/external_api/auth.py`.
 
 **instance**{#instance} -- The virtual machine object: a running (or startable)
 VM with disks, network interfaces, and a lifecycle. Defined in
@@ -116,12 +123,20 @@ Prometheus/Loki metric and log labels (`docs/operator_guide/events.md`,
 `docs/operator_guide/logging.md`) or GitHub issue labels such as `ci-failure`
 (`docs/developer_guide/workflow.md`).
 
-**mapping rule**{#mapping-rule}
-*(planned -- see [PLAN-auth-federation](plans/PLAN-auth-federation.md))*
--- A first-class object, owned by the namespace it targets, that is a standing
-claim-gated authorization to mint keys there: a [trusted issuer](#trusted-issuer)
-reference, bound claims, [scopes](#scope), and an expiry. Defined in
-`docs/plans/PLAN-auth-federation.md` ("Authentication terms to pin").
+**mapping rule**{#mapping-rule} -- A first-class object, owned by the namespace
+it targets, that is a standing claim-gated authorization to mint keys there: a
+[trusted issuer](#trusted-issuer) reference, bound claims, the [scopes](#scope)
+minted keys receive, a TTL for those keys, and a prefix for their names.
+Managed under `/auth/namespaces/{namespace}/rules` by the namespace owner,
+unique on (namespace, name), and deleted with the namespace. Bound claims match
+exactly -- an exact string, or a list of acceptable strings -- with no globbing,
+regular expressions or prefix matching, and a rule must bind at least one claim
+and grant at least one scope, so it can neither accept every identity an issuer
+vouches for nor inherit the wildcard an unscoped [namespace key](#namespace-key)
+would. Rules are consumed by `POST /auth/federated`, which is where an
+[identity token](#identity-token) becomes a key. Defined in
+`shakenfist/mapping_rule.py` and
+`docs/developer_guide/api_reference/authentication.md`.
 
 **namespace**{#namespace} -- The tenancy and authorization unit: objects belong
 to a namespace, and a caller acts within one. Visibility extends to a caller's
@@ -135,8 +150,9 @@ with Linux network namespaces, which the networking documentation uses heavily
 and an optional expiry. [Scopes](#scope) are recorded on the object and
 enforced on every request made with a token minted from it; a key with no
 scopes recorded mints wildcard tokens, which is every key predating the
-federation work. Provenance is reserved but not yet populated -- it arrives
-with the federation exchange. `/auth` bcrypt-compares a presented secret
+federation work. Provenance records where a key came from: keys minted by the
+[federated exchange](#identity-token) carry the rule, the issuer and the
+claims that were satisfied. `/auth` bcrypt-compares a presented secret
 against the namespace's
 unexpired keys and mints a token bound to the matching key's nonce. A key is a
 first-class object owned by its namespace, with its own lifecycle, events and
@@ -177,7 +193,11 @@ object, usually referred to by a version-4 UUID string; the exceptions named by
 name are nodes, namespaces, and keys. Referring to an object *by reference* means
 passing either its name or its UUID, and a by-name lookup searches every object
 visible to the caller -- those in the caller's own namespace, and those in
-namespaces that trust it (plus shared artifacts for artifact commands). Defined
+namespaces that trust it (plus shared artifacts for artifact commands). The
+caller's own namespace always wins, so nothing another namespace does can
+change what a name already means to you. Operations which *modify* an object
+resolve a name in the caller's own namespace only, so that a name can never
+resolve into another namespace and then destroy what it found there. Defined
 authoritatively in `docs/user_guide/objects.md`.
 
 **Release pipeline vocabulary**{#release-pipeline} -- The release process signs
@@ -236,12 +256,14 @@ as an administrator. Defined in `shakenfist/external_api/base.py`.
 **token**{#token} -- Primary sense: an [access token](#access-token). Not to be
 confused with the release pipeline's GitHub Actions / Sigstore OIDC token
 (`docs/developer_guide/release_process.md`), which is unrelated to runtime
-authentication and is closest in nature to the planned
+authentication and is closest in nature to an
 [identity token](#identity-token).
 
 **trust**{#trust} -- The existing namespace-to-namespace visibility grant: if
 namespace A trusts namespace B, then callers in B can see A's objects by
-reference. Defined in `shakenfist/namespace.py` (the `trust` member and
+reference. Visibility only -- B may read A's objects and may create new ones
+in A (the "gifting" pattern), but may not delete or modify what A already has.
+Defined in `shakenfist/namespace.py` (the `trust` member and
 `add_trust`/`remove_trust`) and `docs/operator_guide/authentication.md`. Not to
 be confused with: a [trusted issuer](#trusted-issuer), which is about
 accepting external token issuers rather than sharing objects between namespaces;

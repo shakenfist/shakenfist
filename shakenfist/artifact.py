@@ -249,6 +249,78 @@ class Artifact(dbowo):
         return cls(matches[0])
 
     @classmethod
+    def from_db_by_ref_visible_to(
+            cls, object_ref: Union[str, uuid_mod.UUID],
+            requestor: Optional[str] = None) -> 'Artifact | None':
+        """Resolve a ref across everything ``requestor`` may see.
+
+        ``from_db_by_ref`` scopes a name lookup to exactly one
+        namespace, which is right when the caller named one and wrong
+        when they did not. A tenant can see a shared image in
+        ``GET /artifacts`` and then fail to look up the very name the
+        listing just showed them, because the name search never leaves
+        their own namespace. Use this when the caller did *not* name a
+        namespace and the answer should match what they can see.
+
+        Resolution is two phase, and the first phase is exactly
+        ``from_db_by_ref``. Whatever the caller's own namespace
+        resolves to wins unchanged, including raising
+        ``MultipleObjects`` when the name is ambiguous within it: an
+        artifact you own must never start resolving to somebody else's
+        just because they happen to have picked the same name. Only
+        when your own namespace has no answer at all do we widen, and
+        then only to artifacts ``namespace_or_shared_filter`` would
+        have put in your listing.
+
+        Phase one is also the fast path, and stays free of the
+        per-candidate trust lookups phase two needs.
+
+        Phase two's cost scales with how many namespaces have picked
+        the same name: the query is unscoped, and
+        ``namespace_or_shared_filter`` then does a trust lookup per
+        candidate. On a cluster where everybody has a `debian-11`,
+        that is a trust read per tenant. Accepted rather than
+        overlooked, because it only runs when the caller's own
+        namespace came up empty. If it ever shows up in a profile the
+        fix is to push the filter into SQL -- both halves of it, the
+        shared flag and the set of namespaces which trust the
+        requestor, are known before the scan starts.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        own = cls.from_db_by_ref(object_ref, requestor)
+        if own:
+            return own
+
+        # from_db_by_ref reads 'system' and None as "every namespace",
+        # so for those callers phase one has already searched the whole
+        # cluster and phase two would just run the query again.
+        if not requestor or requestor == 'system':
+            return None
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            name=object_ref,
+        )
+        visible = [
+            a for a in map(cls, mariadb.find_artifacts(criteria))
+            if namespace_or_shared_filter(requestor, a)
+        ]
+
+        if not visible:
+            return None
+        if len(visible) > 1:
+            # A tenant cannot disambiguate this with the `namespace`
+            # body field, because resolve_lookup_namespace only lets
+            # them name their own, so point them at the ref which is
+            # never ambiguous.
+            raise exceptions.MultipleObjects(
+                f'multiple artifacts visible to "{requestor}" have the '
+                f'name "{object_ref}", use a UUID to choose one')
+        return visible[0]
+
+    @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,
             namespace=None):
         if namespace is None:
@@ -289,11 +361,57 @@ class Artifact(dbowo):
     @staticmethod
     def from_url(artifact_type, url, name=None, max_versions=0, namespace=None,
                  create_if_new=False):
+        """Resolve a URL to an artifact this namespace can see.
+
+        Resolution is by *visibility*, so the artifact returned may
+        belong to somebody else -- a shared one, or one whose owner
+        trusts us. That is the right answer for a caller which wants to
+        read the result or boot from it.
+
+        It is the wrong answer for a caller which wants to write to it.
+        Adding a version is a mutation, and it takes ownership rather
+        than visibility, because add_index ends in delete_old_versions
+        and so destroys the owner's older versions once the count passes
+        max_versions. A write path wants owned_from_url().
+        """
+        return Artifact._resolve_url(
+            artifact_type, url, namespace_or_shared_filter, name=name,
+            max_versions=max_versions, namespace=namespace,
+            create_if_new=create_if_new)
+
+    @staticmethod
+    def owned_from_url(artifact_type, url, namespace=None):
+        """Resolve a URL to an artifact this namespace owns, or None.
+
+        The write side counterpart to from_url(). ``namespace`` here is
+        the namespace the artifact should live in, so the predicate is a
+        plain ownership test and neither sharing nor a trust appears in
+        it. Both of those grant visibility, and the invariant this PR
+        states is that changing an object takes its owning namespace or
+        system.
+
+        Note that there is no system escape in the predicate itself,
+        because the argument is the target namespace rather than the
+        requestor. System naming a namespace explicitly still lands on
+        that namespace's artifact; what the caller may then do with it
+        is the caller's own ownership check to make.
+
+        Deliberately does not create. The caller has to authorise the
+        existing and the brand new cases differently: a trust is enough
+        to gift a namespace an artifact it did not have, and not enough
+        to replace what one it already owns resolves to.
+        """
+        return Artifact._resolve_url(
+            artifact_type, url, namespace_exact_filter, namespace=namespace)
+
+    @staticmethod
+    def _resolve_url(artifact_type, url, visibility, name=None, max_versions=0,
+                     namespace=None, create_if_new=False):
         artifacts = list(Artifacts([
             partial(url_filter, url),
             partial(type_filter, artifact_type),
             not_dead_states_filter,
-            partial(namespace_or_shared_filter, namespace)]))
+            partial(visibility, namespace)]))
 
         if len(artifacts) == 0:
             if create_if_new:

@@ -623,6 +623,8 @@ values (immutable data set at creation time):
 | `nodes` | Node | uuid, fqdn (unique index), ip, version |
 | `namespaces` | Namespace | name (VARCHAR PK), version |
 | `namespace_keys` | NamespaceKey | uuid, namespace, name, version. UNIQUE index on (namespace, name), which also serves the per-namespace listing |
+| `trusted_issuers` | TrustedIssuer | uuid, name, version |
+| `mapping_rules` | MappingRule | uuid, namespace, name, version |
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
 | `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
@@ -644,6 +646,8 @@ dedicated attribute tables:
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; for one transition release the legacy `instances` JSON column is dual-written and unioned into reads so rolling upgrade and rollback both see fresh placements |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
 | `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
+| `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri, audience |
+| `mapping_rule_attributes` | MappingRule | uuid, issuer, bound_claims (JSON dict), scopes (JSON list), key_ttl, key_name_prefix |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
@@ -689,6 +693,25 @@ revives the JSON column**, which still holds every key that existed
 before the migration, but keys created or rotated after the migration
 exist only in the new tables and will be invisible to the rolled-back
 code.
+
+#### Federation Abuse Resistance Tables
+
+Two tables in the federated exchange path hold no objects at all. They
+exist to make an unauthenticated endpoint safe to expose, so they are
+plain tables with no UUID, no state and no attribute row:
+
+| Table | Purpose | Fields |
+|-------|---------|--------|
+| `federation_replay` | One row per identity token exchanged through one rule, so a token cannot be exchanged twice | token_id + rule_uuid (composite PK), expires_at (indexed) |
+| `federation_rate_limits` | Attempts per source address per minute | source + window_start (composite PK), attempts, window_start (indexed) |
+
+Both grow with traffic rather than with the size of the cluster, and
+both are swept by the cluster daemon: `reap_federation_replay` removes
+rows whose `expires_at` has passed (a token that can no longer be
+validated cannot be replayed, so the record has no further use), and
+`reap_federation_rate_limits` removes closed counting windows. Neither
+needs operator attention; the reaper counters are visible on the
+database daemon's metrics port.
 
 #### Node Identity and UUID Persistence
 

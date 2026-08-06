@@ -21,6 +21,7 @@ import flask_restful
 from flask import got_request_exception
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
+from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
@@ -147,25 +148,37 @@ def _is_health_probe():
     return flask.request.path in api_base.HEALTH_PROBE_PATHS
 
 
-# Request and response bodies are logged verbatim below, which is
-# useful for debugging and unacceptable for the routes which carry
-# credentials: POST /auth is sent a plaintext namespace key and
-# answers with a JWT, and the key management routes are sent key
-# secrets. Every such route lives under /auth, so bodies there are
-# not logged at all. Redacting by field name instead was rejected
-# because "key" means a metadata key name on most endpoints and a
-# secret on only a few, so the check would have to know which route
-# it was on anyway -- and would silently start leaking the day
-# somebody adds a route it had not heard of.
+# Which routes carry credentials, and why their bodies are dropped
+# instead of redacted, is documented on api_base.handles_credentials.
+# It lives in base.py because base.py's log_request needs the same
+# answer, and two copies of this predicate would eventually disagree.
+_handles_credentials = api_base.handles_credentials
+REDACTED_BODY = api_base.REDACTED_BODY
+
+
+# Registered before log_request_info on purpose. /auth/federated is the
+# only unauthenticated route which takes a body, and the endpoint's own
+# size check cannot protect it: by the time a flask_restful method runs,
+# log_request has already called get_json(force=True) and parsed the
+# whole thing. The refusal has to happen here, ahead of every reader of
+# the body, or it is not a refusal at all.
 #
-# The URL is still logged, so an audit reader keeps the namespace and
-# the key name. Only the credential itself is lost.
-def _handles_credentials():
-    path = flask.request.path
-    return path == '/auth' or path.startswith('/auth/')
+# A body with no declared length is refused rather than measured.
+# content_length is None for chunked transfer encoding, so treating
+# "unknown" as "small enough" would let anyone opt out of the limit by
+# setting a header. 411 is the honest answer: send a Content-Length.
+@app.before_request
+def limit_federated_body_size():
+    if flask.request.path != '/auth/federated':
+        return
 
+    if flask.request.content_length is None:
+        if flask.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return
+        return sf_api.error(411, 'a content-length is required')
 
-REDACTED_BODY = '...body not logged as this route handles credentials...'
+    if flask.request.content_length > config.FEDERATION_MAX_TOKEN_BYTES:
+        return sf_api.error(413, 'request body too large')
 
 
 @app.before_request
@@ -247,8 +260,11 @@ class Root(api_base.Resource):
              # scope-enforcement lets a client tell whether a 403 means
              # "your token is not scoped for this" on this cluster, or
              # something else entirely.
+             # mapping-rules and federated-exchange are advertised
+             # separately: a client can be told which rules exist
+             # without the cluster necessarily accepting exchanges yet.
              '<li>auth: trusted-issuers, generated-key-secrets, '
-             'scope-enforcement</li>'
+             'scope-enforcement, mapping-rules, federated-exchange</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
@@ -344,6 +360,11 @@ api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,
                  '/auth/namespaces/<namespace>/keys/<key_name>')
+api.add_resource(api_auth.AuthFederatedEndpoint, '/auth/federated')
+api.add_resource(api_auth.AuthNamespaceRulesEndpoint,
+                 '/auth/namespaces/<namespace>/rules')
+api.add_resource(api_auth.AuthNamespaceRuleEndpoint,
+                 '/auth/namespaces/<namespace>/rules/<rule_name>')
 api.add_resource(api_auth.AuthMetadatasEndpoint,
                  '/auth/namespaces/<namespace>/metadata')
 api.add_resource(api_auth.AuthMetadataEndpoint,

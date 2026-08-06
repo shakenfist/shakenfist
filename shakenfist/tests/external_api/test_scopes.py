@@ -184,7 +184,7 @@ class RealEndpointDerivationTestCase(base.ShakenFistTestCase):
     EXPECTED_FAMILIES = {
         'admin', 'agentoperation', 'artifact', 'auth', 'blob',
         'clusteroperation', 'instance', 'interface', 'issuer', 'label',
-        'network', 'node', 'upload',
+        'network', 'node', 'rule', 'upload',
         # Public endpoints. Their family is never consulted because
         # @public short-circuits before enforcement, but they are
         # listed so the assertion below is exhaustive.

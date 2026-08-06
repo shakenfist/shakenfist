@@ -401,6 +401,176 @@ grants cluster-wide visibility to a monitoring workload that provably
 cannot delete a node. If administration were a single all-or-nothing
 flag, that credential could not be expressed.
 
+## Federated identity
+
+A workload that already has an identity somewhere else -- a GitHub
+Actions job, a service account in an Authentik instance -- can trade
+that identity for a scoped, expiring namespace key without anyone
+having stored a long-lived Shaken Fist secret alongside it. The
+long-lived CI secret is the thing this exists to delete.
+
+Three objects make up the chain, and each is a real database-backed
+object with its own events:
+
+* A **trusted issuer** is an identity provider the cluster will
+  believe. It is cluster-wide and administrative, because deciding who
+  may vouch for identities here is not a per-namespace decision.
+* A **mapping rule** is a namespace's standing offer: an identity from
+  this issuer, carrying these claims, may mint a key here with these
+  scopes. It is owned by the namespace it mints into.
+* The **minted key** is an ordinary namespace key. Nothing downstream
+  knows or cares that it was federated; it authenticates, carries
+  scopes, expires and is reaped exactly as any other key is. Its
+  provenance records the rule, the issuer, and the claims that were
+  actually satisfied.
+
+### The exchange
+
+`POST /auth/federated` takes `{token, namespace, rule}` and returns a
+key. The order it works in is a security property rather than an
+implementation detail, because the endpoint is reachable by anyone:
+
+1. Refuse if the body is larger than `FEDERATION_MAX_TOKEN_BYTES`,
+   before anything parses it.
+2. Count the attempt against the source address's rate limit.
+3. Read the `iss` claim **without verifying anything** and refuse if no
+   trusted issuer matches. No network yet.
+4. Verify the signature against the issuer's JWKS.
+5. Check `aud`, `exp` and `nbf`.
+6. Load the named rule and check its bound claims.
+7. Claim this `(token, rule)` pair, refusing a replay.
+8. Mint the key.
+
+Steps 1 to 3 preceding step 4 matter more than they look. The JWKS
+fetch is a synchronous outbound HTTP request made inside a request
+worker, so an unfiltered path would let anyone with a made-up `iss`
+tie up workers on connections to a host of their choosing.
+
+The meter is step 2 rather than step 3, and that is the ordering most
+likely to be undone by accident. Only the argument checks sit above it.
+Resolving the issuer is a scan of every configured issuer, reading
+state and URL per row, so it is itself work worth metering -- with the
+meter below it the cheapest request to send would be among the more
+expensive ones to answer. A new step belongs below step 2 unless it
+touches neither the database nor the network.
+
+Signature verification is pinned to asymmetric algorithms. If `HS256`
+were accepted, an attacker could sign a token using the issuer's
+*public* key as the HMAC secret -- the public key being, by
+definition, public.
+
+### Claim matching
+
+`bound_claims` values are exact strings, or lists of exact strings
+meaning "any of these". There is no globbing, no regular expressions,
+no prefix matching and no type coercion: a claim of `1` does not match
+a matcher of `"1"`.
+
+This is deliberate and is the most likely thing to feel restrictive.
+Prefix matching on `repository` reads naturally right up until someone
+registers `shakenfist-evil`, and the anchored patterns needed to make
+it safe are exactly what reviewers get wrong. Enumerating the branches
+and repositories you mean covers the realistic cases; if practice
+proves otherwise, patterns can be added later with anchoring enforced
+at rule creation. Shipping them as the default is the part that would
+be hard to undo.
+
+### Single use
+
+An identity token is single-use *per rule*. Once exchanged through a
+given rule it cannot be exchanged through that rule again -- but it
+can still be exchanged through a *different* rule, which is how a
+workflow that needs two namespaces gets into both.
+
+The pair is claimed by inserting it into a table with a composite
+primary key, so the failing insert *is* the detection and there is no
+window in which two simultaneous presentations both succeed. The claim
+is the last thing that happens before minting, so a refusal for any
+other reason -- claims that do not match, a rule that has been deleted
+-- leaves the token still usable.
+
+### A worked GitHub Actions example
+
+GitHub can mint an OIDC token for a workflow job, describing the
+repository, the branch and the workflow that asked for it. Configure
+the issuer once, as an administrator:
+
+The `sf-client` command line does not wrap these routes yet, so the
+examples below call the REST API directly.
+
+```bash
+curl -X POST https://sf.example.com/auth/issuers \
+  -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "github",
+        "issuer_url": "https://token.actions.githubusercontent.com",
+        "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+        "audience": "https://sf.example.com"
+      }'
+```
+
+Then, as the owner of the namespace the workflow should reach, write a
+rule saying which jobs qualify and what they get:
+
+```bash
+curl -X POST https://sf.example.com/auth/namespaces/ci/rules \
+  -H "Authorization: Bearer ${SF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "ryll",
+        "issuer": "github",
+        "bound_claims": {
+          "repository": "shakenfist/ryll",
+          "ref": ["refs/heads/develop", "refs/heads/main"]
+        },
+        "scopes": ["blob.read", "artifact.*"],
+        "key_ttl": 3600,
+        "key_name_prefix": "ryll-ci"
+      }'
+```
+
+The workflow needs `id-token: write` permission to ask GitHub for a
+token, and nothing else:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get a Shaken Fist key
+        run: |
+          IDENTITY=$(curl -sS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://sf.example.com" \
+            | jq -r .value)
+
+          RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \
+            -H "Content-Type: application/json" \
+            -d "{\"token\": \"${IDENTITY}\",
+                 \"namespace\": \"ci\",
+                 \"rule\": \"ryll\"}")
+
+          echo "::add-mask::$(echo "${RESPONSE}" | jq -r .key)"
+          echo "SHAKENFIST_KEY=$(echo "${RESPONSE}" | jq -r .key)" >> "${GITHUB_ENV}"
+          echo "SHAKENFIST_NAMESPACE=ci" >> "${GITHUB_ENV}"
+```
+
+The `audience` in the token request must match the issuer's
+configured `audience` exactly, and the `add-mask` line matters: the
+minted secret is a credential, and the response body is the only place
+it will ever appear.
+
+There is no repository secret anywhere in this. The credential the job
+ends up holding is scoped to `blob.read` and `artifact.*`, expires an
+hour after it was minted, and its provenance records which rule minted
+it and which claims were satisfied -- so an audit of "what did that
+workflow have access to" is a query rather than an investigation.
+
 ## Secrets and the event log
 
 Credentials never appear in events. This matters more than it might sound,

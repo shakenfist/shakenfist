@@ -13,6 +13,7 @@ from shakenfist.schema.cluster_operation_target import ClusterOperationTargetDat
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 BLOB_UUID_1 = '11111111-1111-4111-8111-111111111111'
@@ -766,3 +767,78 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
         st.reconcile_orphaned_objects()
         st.reconcile_orphaned_objects()
         mock_set_state.assert_not_called()
+
+
+class ReapFederationRecordsTestCase(base.ShakenFistTestCase):
+    """Housekeeping for the two federated exchange abuse tables.
+
+    Neither row is read once it has gone stale, so without this sweep
+    both tables grow for the life of the cluster.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+    def test_an_expired_replay_record_is_removed(self):
+        st.mariadb.record_federated_exchange(
+            'jti-old', KEY_UUID_1, time.time() - st.REPLAY_REAP_GRACE - 60)
+
+        st.reap_federation_records()
+        self.assertEqual({}, self.mock_mariadb.federation_replay)
+
+    def test_a_live_replay_record_is_kept(self):
+        st.mariadb.record_federated_exchange(
+            'jti-live', KEY_UUID_1, time.time() + 300)
+
+        st.reap_federation_records()
+        self.assertEqual(1, len(self.mock_mariadb.federation_replay))
+
+    def test_a_just_expired_record_survives_the_grace_period(self):
+        # The grace covers clock skew between the node running this
+        # sweep and whichever node verifies a token. A node running
+        # behind would otherwise still accept a token whose replay
+        # record a node running ahead had already deleted -- which is
+        # precisely the replay the table exists to refuse.
+        st.mariadb.record_federated_exchange(
+            'jti-recent', KEY_UUID_1, time.time() - 60)
+
+        st.reap_federation_records()
+        self.assertEqual(1, len(self.mock_mariadb.federation_replay))
+
+    def test_a_closed_rate_limit_window_is_removed(self):
+        st.mariadb.count_federated_attempt(
+            '10.0.0.1', int(time.time()) - st.RATE_LIMIT_REAP_GRACE - 60)
+
+        st.reap_federation_records()
+        self.assertEqual({}, self.mock_mariadb.federation_rate_limits)
+
+    def test_the_current_rate_limit_window_is_kept(self):
+        # Reaping the window a request is currently being counted
+        # against would reset that caller's allowance mid-minute.
+        st.mariadb.count_federated_attempt('10.0.0.1', int(time.time()))
+
+        st.reap_federation_records()
+        self.assertEqual(1, len(self.mock_mariadb.federation_rate_limits))
+
+    def test_the_sweep_reports_what_it_removed(self):
+        st.mariadb.record_federated_exchange(
+            'jti-old', KEY_UUID_1, time.time() - st.REPLAY_REAP_GRACE - 60)
+        st.mariadb.count_federated_attempt(
+            '10.0.0.1', int(time.time()) - st.RATE_LIMIT_REAP_GRACE - 60)
+
+        with mock.patch.object(st.LOG, 'info') as log_info:
+            st.reap_federation_records()
+
+        messages = ' '.join(str(c[0][0]) for c in log_info.call_args_list)
+        self.assertIn('replay', messages)
+        self.assertIn('rate limit', messages)
+
+    def test_an_empty_sweep_says_nothing(self):
+        # Quiet when there is nothing to do, so the log stays readable
+        # at four sweeps an hour forever.
+        with mock.patch.object(st.LOG, 'info') as log_info:
+            st.reap_federation_records()
+
+        self.assertEqual([], log_info.call_args_list)

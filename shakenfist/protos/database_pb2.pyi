@@ -6338,16 +6338,29 @@ class UpdateTrustedIssuerAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___TrustedIssuerAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the TrustedIssuerAttributesData field names to write.
+        An empty list means write every column. See the equivalent comment
+        on UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents. An issuer's three values are edited as one
+        coherent configuration, so today's only caller names all three --
+        the mask is here so a later writer of one of them cannot silently
+        revert the others.
+        """
+
     def __init__(
         self,
         *,
         data: Global___TrustedIssuerAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -6371,6 +6384,385 @@ class DeleteTrustedIssuerAttributesRequest(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DeleteTrustedIssuerAttributesRequest: _TypeAlias = DeleteTrustedIssuerAttributesRequest  # noqa: Y015
+
+@_typing.final
+class MappingRuleStaticData(_message.Message):
+    """MappingRule Operations (MariaDB)
+    A MappingRule says which external identities a namespace will mint
+    keys for, and what those keys may do. Owned by the namespace it
+    targets; the (namespace, name) pair is unique.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    VERSION_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """MappingRule UUID"""
+    namespace: _builtins.str
+    """Owning namespace"""
+    name: _builtins.str
+    """Unique within the owning namespace"""
+    version: _builtins.int
+    """Schema version"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+        version: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___MappingRuleStaticData: _TypeAlias = MappingRuleStaticData  # noqa: Y015
+
+@_typing.final
+class MappingRuleAttributesProto(_message.Message):
+    """The policy the rule expresses. bound_claims and scopes travel as JSON
+    strings rather than as proto maps or repeated fields: a claim matcher
+    is "an exact string or a list of acceptable strings", which a
+    map<string, string> cannot carry without inventing an encoding, and
+    an invented encoding is how the two sides of a wire drift apart. The
+    same reasoning is why AgentOperationStaticData carries commands_json.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    ISSUER_FIELD_NUMBER: _builtins.int
+    BOUND_CLAIMS_FIELD_NUMBER: _builtins.int
+    SCOPES_FIELD_NUMBER: _builtins.int
+    KEY_TTL_FIELD_NUMBER: _builtins.int
+    KEY_NAME_PREFIX_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """References mapping_rules.uuid"""
+    issuer: _builtins.str
+    """Name of the TrustedIssuer accepted"""
+    bound_claims: _builtins.str
+    """JSON object: claim name -> matcher"""
+    scopes: _builtins.str
+    """JSON array of scope strings"""
+    key_ttl: _builtins.int
+    """Seconds of life for minted keys"""
+    key_name_prefix: _builtins.str
+    """Prefix for minted key names"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        issuer: _builtins.str = ...,
+        bound_claims: _builtins.str = ...,
+        scopes: _builtins.str = ...,
+        key_ttl: _builtins.int = ...,
+        key_name_prefix: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["bound_claims", b"bound_claims", "issuer", b"issuer", "key_name_prefix", b"key_name_prefix", "key_ttl", b"key_ttl", "scopes", b"scopes", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___MappingRuleAttributesProto: _TypeAlias = MappingRuleAttributesProto  # noqa: Y015
+
+@_typing.final
+class CreateMappingRuleRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___MappingRuleStaticData: ...
+    def __init__(
+        self,
+        *,
+        data: Global___MappingRuleStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateMappingRuleRequest: _TypeAlias = CreateMappingRuleRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleRequest: _TypeAlias = GetMappingRuleRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleByNameRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    name: _builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleByNameRequest: _TypeAlias = GetMappingRuleByNameRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___MappingRuleStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___MappingRuleStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleReply: _TypeAlias = GetMappingRuleReply  # noqa: Y015
+
+@_typing.final
+class GetMappingRulesInNamespaceRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRulesInNamespaceRequest: _TypeAlias = GetMappingRulesInNamespaceRequest  # noqa: Y015
+
+@_typing.final
+class GetAllMappingRulesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetAllMappingRulesRequest: _TypeAlias = GetAllMappingRulesRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRulesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    RULES_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def rules(self) -> _containers.RepeatedCompositeFieldContainer[Global___MappingRuleStaticData]: ...
+    def __init__(
+        self,
+        *,
+        rules: _abc.Iterable[Global___MappingRuleStaticData] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["rules", b"rules"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRulesReply: _TypeAlias = GetMappingRulesReply  # noqa: Y015
+
+@_typing.final
+class DeleteMappingRuleRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteMappingRuleRequest: _TypeAlias = DeleteMappingRuleRequest  # noqa: Y015
+
+@_typing.final
+class CreateMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___MappingRuleAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___MappingRuleAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateMappingRuleAttributesRequest: _TypeAlias = CreateMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleAttributesRequest: _TypeAlias = GetMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetMappingRuleAttributesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    CORRUPT_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    corrupt: _builtins.bool
+    """The row exists but its bound_claims or scopes will not decode.
+
+    This is a data fault, not a transport fault, and the difference is
+    the whole point of the field. A damaged rule has two documented
+    behaviours -- the exchange refuses it with a generic 401, and
+    external_view() marks it unusable so one bad row does not take a
+    namespace's rule listing down -- and both are driven by catching
+    CorruptMappingRule in the API process. Without this flag the
+    exception is raised inside sf-database, the servicer's catch-all
+    turns it into INTERNAL, and _grpc_get_mapping_rule_attributes
+    cannot tell that from a database outage, so the API answers 503
+    and neither behaviour ever happens on a deployed cluster.
+
+    Sent with found=true and no data: the caller is being told the
+    rule is there and cannot be read, which is a different answer to
+    found=false. The message deliberately carries no detail, because
+    the exception text names the rule uuid and this reply is produced
+    on behalf of an unauthenticated caller.
+    """
+    @_builtins.property
+    def data(self) -> Global___MappingRuleAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___MappingRuleAttributesProto | None = ...,
+        corrupt: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["corrupt", b"corrupt", "data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetMappingRuleAttributesReply: _TypeAlias = GetMappingRuleAttributesReply  # noqa: Y015
+
+@_typing.final
+class UpdateMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___MappingRuleAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the MappingRuleAttributesData field names to write. An
+        empty list means write every column. See the equivalent comment on
+        UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents. A rule's policy is edited as one unit, so
+        today's only caller names every field -- the mask is here so a
+        later writer of one of them cannot silently revert the rest, which
+        for a rule would mean reverting the scopes it grants.
+        """
+
+    def __init__(
+        self,
+        *,
+        data: Global___MappingRuleAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___UpdateMappingRuleAttributesRequest: _TypeAlias = UpdateMappingRuleAttributesRequest  # noqa: Y015
+
+@_typing.final
+class DeleteMappingRuleAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteMappingRuleAttributesRequest: _TypeAlias = DeleteMappingRuleAttributesRequest  # noqa: Y015
 
 @_typing.final
 class AgentOperationStaticData(_message.Message):
@@ -8132,3 +8524,195 @@ class DeleteClusterOperationErrorRequest(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DeleteClusterOperationErrorRequest: _TypeAlias = DeleteClusterOperationErrorRequest  # noqa: Y015
+
+@_typing.final
+class RecordFederatedExchangeRequest(_message.Message):
+    """Federation Abuse Resistance (MariaDB)"""
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    TOKEN_ID_FIELD_NUMBER: _builtins.int
+    RULE_UUID_FIELD_NUMBER: _builtins.int
+    EXPIRES_AT_FIELD_NUMBER: _builtins.int
+    token_id: _builtins.str
+    """jti, or a hash of the signature"""
+    rule_uuid: _builtins.str
+    """MappingRule UUID as string"""
+    expires_at: _builtins.float
+    """The inbound token's exp"""
+    def __init__(
+        self,
+        *,
+        token_id: _builtins.str = ...,
+        rule_uuid: _builtins.str = ...,
+        expires_at: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_at", b"expires_at", "rule_uuid", b"rule_uuid", "token_id", b"token_id"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___RecordFederatedExchangeRequest: _TypeAlias = RecordFederatedExchangeRequest  # noqa: Y015
+
+@_typing.final
+class RecordFederatedExchangeReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    RECORDED_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    OK_FIELD_NUMBER: _builtins.int
+    recorded: _builtins.bool
+    """True if this (token, rule) pair was recorded for the first time,
+    false if it was already present and this is therefore a replay.
+    """
+    error: _builtins.str
+    """Set only when we could not find out. "Already claimed" is not an
+    error, and the distinction matters: recorded=false means refuse
+    the exchange as a replay, whereas error set means refuse it
+    because we do not know. Both refuse, but only one is worth paging
+    an operator about.
+    """
+    ok: _builtins.bool
+    """Whether the claim was actually evaluated. Carried here for symmetry
+    with CountFederatedAttemptReply rather than because this message
+    needs it: recorded=false with an empty error degrades to "treat as
+    a replay", which refuses, so this one already failed closed. Having
+    both replies answer the same way keeps the next reader from having
+    to work out which of the two was the safe one.
+    """
+    def __init__(
+        self,
+        *,
+        recorded: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        ok: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "ok", b"ok", "recorded", b"recorded"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___RecordFederatedExchangeReply: _TypeAlias = RecordFederatedExchangeReply  # noqa: Y015
+
+@_typing.final
+class CountFederatedAttemptRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SOURCE_FIELD_NUMBER: _builtins.int
+    WINDOW_START_FIELD_NUMBER: _builtins.int
+    source: _builtins.str
+    """Source address of the attempt"""
+    window_start: _builtins.int
+    """Unix timestamp of the one minute window"""
+    def __init__(
+        self,
+        *,
+        source: _builtins.str = ...,
+        window_start: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["source", b"source", "window_start", b"window_start"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CountFederatedAttemptRequest: _TypeAlias = CountFederatedAttemptRequest  # noqa: Y015
+
+@_typing.final
+class CountFederatedAttemptReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ATTEMPTS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    OK_FIELD_NUMBER: _builtins.int
+    attempts: _builtins.int
+    """Attempts in this window, including this one"""
+    error: _builtins.str
+    """Diagnostics only. Never test this to decide."""
+    ok: _builtins.bool
+    """Whether attempts means anything. Set true only on the success path.
+
+    The client used to infer this from error being non-empty, which put
+    the fail closed property in the hands of message formatting: an
+    exception whose str() is empty -- KeyError(), a bare
+    AttributeError(), anything raised with no args -- arrived as
+    attempts=0, error='' and read as "nobody has tried this minute",
+    which is the one answer this reply must never be able to give by
+    accident. A field that has to be set deliberately cannot be
+    produced by a formatting accident.
+    """
+    def __init__(
+        self,
+        *,
+        attempts: _builtins.int = ...,
+        error: _builtins.str = ...,
+        ok: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempts", b"attempts", "error", b"error", "ok", b"ok"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CountFederatedAttemptReply: _TypeAlias = CountFederatedAttemptReply  # noqa: Y015
+
+@_typing.final
+class ReapFederationReplayRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CUTOFF_FIELD_NUMBER: _builtins.int
+    cutoff: _builtins.float
+    """Delete rows whose token expired before this"""
+    def __init__(
+        self,
+        *,
+        cutoff: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cutoff", b"cutoff"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReapFederationReplayRequest: _TypeAlias = ReapFederationReplayRequest  # noqa: Y015
+
+@_typing.final
+class ReapFederationRateLimitsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CUTOFF_FIELD_NUMBER: _builtins.int
+    cutoff: _builtins.int
+    """Delete windows which started before this"""
+    def __init__(
+        self,
+        *,
+        cutoff: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cutoff", b"cutoff"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReapFederationRateLimitsRequest: _TypeAlias = ReapFederationRateLimitsRequest  # noqa: Y015
+
+@_typing.final
+class ReapFederationReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    REMOVED_FIELD_NUMBER: _builtins.int
+    removed: _builtins.int
+    def __init__(
+        self,
+        *,
+        removed: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["removed", b"removed"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReapFederationReply: _TypeAlias = ReapFederationReply  # noqa: Y015

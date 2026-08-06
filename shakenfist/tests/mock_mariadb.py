@@ -98,6 +98,13 @@ class MockMariaDB():
         self.namespace_key_attributes = {}  # Mock MariaDB namespace key attrs
         self.trusted_issuers = {}  # Mock MariaDB trusted issuer storage
         self.trusted_issuer_attributes = {}  # ... and their attributes
+        self.mapping_rules = {}  # Mock MariaDB mapping rule storage
+        self.mapping_rule_attributes = {}  # ... and their attributes
+        # Federated exchange abuse resistance. Keyed the same way the
+        # real tables are: (token_id, rule_uuid) -> expires_at, and
+        # (source, window_start) -> attempts.
+        self.federation_replay = {}
+        self.federation_rate_limits = {}
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
         self.object_references = {}  # Mock MariaDB object references
@@ -412,7 +419,19 @@ class MockMariaDB():
                      'create_trusted_issuer_attributes',
                      'get_trusted_issuer_attributes',
                      'update_trusted_issuer_attributes',
-                     'delete_trusted_issuer_attributes'):
+                     'delete_trusted_issuer_attributes',
+                     'create_mapping_rule', 'get_mapping_rule',
+                     'get_mapping_rule_by_name',
+                     'get_mapping_rules_in_namespace',
+                     'get_all_mapping_rules', 'delete_mapping_rule',
+                     'create_mapping_rule_attributes',
+                     'get_mapping_rule_attributes',
+                     'update_mapping_rule_attributes',
+                     'delete_mapping_rule_attributes',
+                     'record_federated_exchange',
+                     'count_federated_attempt',
+                     'reap_federation_replay',
+                     'reap_federation_rate_limits'):
             patcher = mock.patch(
                 f'shakenfist.mariadb.{name}',
                 side_effect=getattr(self, f'_mariadb_{name}'))
@@ -3434,12 +3453,109 @@ class MockMariaDB():
     def _mariadb_get_trusted_issuer_attributes(self, issuer_uuid):
         return self.trusted_issuer_attributes.get(str(issuer_uuid))
 
-    def _mariadb_update_trusted_issuer_attributes(self, data):
+    def _mariadb_update_trusted_issuer_attributes(self, data, fields=None):
+        """Mock of mariadb.update_trusted_issuer_attributes().
+
+        Honours the fields mask the way the real implementation does,
+        rather than always replacing the row. A mock which ignored the
+        mask would let a caller name the wrong fields and still see the
+        write it expected.
+        """
         if str(data.uuid) not in self.trusted_issuer_attributes:
             return False
-        self.trusted_issuer_attributes[str(data.uuid)] = data
+        if fields:
+            stored = self.trusted_issuer_attributes[str(data.uuid)]
+            for field in fields:
+                setattr(stored, field, getattr(data, field))
+        else:
+            self.trusted_issuer_attributes[str(data.uuid)] = data
         return True
 
     def _mariadb_delete_trusted_issuer_attributes(self, issuer_uuid):
         return self.trusted_issuer_attributes.pop(
             str(issuer_uuid), None) is not None
+
+    # ------------------------------------------------------------------
+    # MappingRule
+    # ------------------------------------------------------------------
+
+    def _mariadb_create_mapping_rule(self, data):
+        if any(d.namespace == data.namespace and d.name == data.name
+               for d in self.mapping_rules.values()):
+            # The unique index on (namespace, name).
+            return False
+        self.mapping_rules[str(data.uuid)] = data
+        return True
+
+    def _mariadb_get_mapping_rule(self, rule_uuid):
+        return self.mapping_rules.get(str(rule_uuid))
+
+    def _mariadb_get_mapping_rule_by_name(self, namespace, name):
+        for data in self.mapping_rules.values():
+            if data.namespace == namespace and data.name == name:
+                return data
+        return None
+
+    def _mariadb_get_mapping_rules_in_namespace(self, namespace):
+        return [d for d in self.mapping_rules.values()
+                if d.namespace == namespace]
+
+    def _mariadb_get_all_mapping_rules(self):
+        return list(self.mapping_rules.values())
+
+    def _mariadb_delete_mapping_rule(self, rule_uuid):
+        return self.mapping_rules.pop(str(rule_uuid), None) is not None
+
+    def _mariadb_create_mapping_rule_attributes(self, data):
+        self.mapping_rule_attributes[str(data.uuid)] = data
+        return True
+
+    def _mariadb_get_mapping_rule_attributes(self, rule_uuid):
+        return self.mapping_rule_attributes.get(str(rule_uuid))
+
+    def _mariadb_update_mapping_rule_attributes(self, data, fields=None):
+        """Mock of mariadb.update_mapping_rule_attributes().
+
+        Honours the fields mask, for the reason given on the trusted
+        issuer equivalent above.
+        """
+        if str(data.uuid) not in self.mapping_rule_attributes:
+            return False
+        if fields:
+            stored = self.mapping_rule_attributes[str(data.uuid)]
+            for field in fields:
+                setattr(stored, field, getattr(data, field))
+        else:
+            self.mapping_rule_attributes[str(data.uuid)] = data
+        return True
+
+    def _mariadb_delete_mapping_rule_attributes(self, rule_uuid):
+        return self.mapping_rule_attributes.pop(
+            str(rule_uuid), None) is not None
+
+    def _mariadb_record_federated_exchange(
+            self, token_id, rule_uuid, expires_at):
+        key = (token_id, str(rule_uuid))
+        if key in self.federation_replay:
+            return False
+        self.federation_replay[key] = expires_at
+        return True
+
+    def _mariadb_count_federated_attempt(self, source, window_start):
+        key = (source, window_start)
+        self.federation_rate_limits[key] = \
+            self.federation_rate_limits.get(key, 0) + 1
+        return self.federation_rate_limits[key]
+
+    def _mariadb_reap_federation_replay(self, cutoff):
+        stale = [k for k, expires_at in self.federation_replay.items()
+                 if expires_at < cutoff]
+        for k in stale:
+            del self.federation_replay[k]
+        return len(stale)
+
+    def _mariadb_reap_federation_rate_limits(self, cutoff):
+        stale = [k for k in self.federation_rate_limits if k[1] < cutoff]
+        for k in stale:
+            del self.federation_rate_limits[k]
+        return len(stale)

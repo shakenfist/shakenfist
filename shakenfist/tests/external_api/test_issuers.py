@@ -12,9 +12,11 @@ import sys
 from unittest import mock
 
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.trusted_issuer import TrustedIssuer
 
 
 GITHUB = 'https://token.actions.githubusercontent.com'
@@ -88,6 +90,98 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, self._create().status_code)
         resp = self._create()
         self.assertEqual(409, resp.status_code)
+
+    def test_a_second_issuer_for_one_url_is_refused(self):
+        # Token validation resolves an issuer by its URL, so two live
+        # records claiming the same URL would make which provider's
+        # keys we trust depend on listing order.
+        self.assertEqual(200, self._create().status_code)
+        resp = self._create(
+            name='github-again', jwks_uri='https://evil.example.com/jwks')
+
+        self.assertEqual(409, resp.status_code)
+        self.assertIn('github', resp.get_json()['error'])
+
+    def test_the_url_check_and_the_write_happen_under_one_lock(self):
+        # issuer_url has no unique index behind it -- it lives in the
+        # attributes row, and a soft-deleted issuer keeps its URL so
+        # that the URL can be reused. Uniqueness is therefore a read
+        # followed by a write, and only the lock makes that a decision
+        # rather than a race: without it, two administrators
+        # configuring the same provider at once both read "free" and
+        # both write.
+        events = []
+
+        real_acquire = mariadb.acquire_cluster_lock
+        real_release = mariadb.release_cluster_lock
+
+        def acquire(objecttype, subtype, name, lock_data):
+            events.append(('acquire', objecttype))
+            return real_acquire(objecttype, subtype, name, lock_data)
+
+        def release(objecttype, subtype, name, lock_data):
+            events.append(('release', objecttype))
+            return real_release(objecttype, subtype, name, lock_data)
+
+        original_new = TrustedIssuer.new
+
+        def new(*args, **kwargs):
+            events.append(('create', None))
+            return original_new(*args, **kwargs)
+
+        with mock.patch('shakenfist.mariadb.acquire_cluster_lock', acquire), \
+                mock.patch(
+                    'shakenfist.mariadb.release_cluster_lock', release), \
+                mock.patch.object(TrustedIssuer, 'new', new):
+            self.assertEqual(200, self._create().status_code)
+
+        # The create has to sit strictly between an acquire and the
+        # matching release of the issuer URL lock.
+        relevant = [e for e in events
+                    if e[1] == 'trusted_issuer_urls' or e[0] == 'create']
+        self.assertEqual(
+            [('acquire', 'trusted_issuer_urls'),
+             ('create', None),
+             ('release', 'trusted_issuer_urls')], relevant)
+
+    def test_a_deleted_issuers_url_can_be_reused(self):
+        # The conflict is with live issuers only, or disowning a
+        # compromised provider would make its URL unusable forever.
+        self._create()
+        self.assertEqual(200, self.client.delete(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin}).status_code)
+
+        self.assertEqual(200, self._create(name='github2').status_code)
+
+    def test_update_cannot_steal_another_issuers_url(self):
+        self._create()
+        self._create(name='authentik', issuer_url='https://auth.example.com',
+                     jwks_uri='https://auth.example.com/jwks')
+
+        resp = self.client.put(
+            '/auth/issuers/authentik',
+            headers={'Authorization': self.admin},
+            data=json.dumps({
+                'issuer_url': GITHUB,
+                'jwks_uri': 'https://evil.example.com/jwks',
+                'audience': 'https://sf.example.com'}))
+        self.assertEqual(409, resp.status_code)
+
+    def test_update_can_leave_the_url_alone(self):
+        # The conflict check must not trip over the issuer being
+        # updated, or no issuer could ever change its audience.
+        self._create()
+        resp = self.client.put(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin},
+            data=json.dumps({
+                'issuer_url': GITHUB, 'jwks_uri': GITHUB_JWKS,
+                'audience': 'https://sf3.example.com'}))
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('https://sf3.example.com',
+                         resp.get_json()['audience'])
 
     def test_required_fields_are_required(self):
         for field in ('name', 'issuer_url', 'jwks_uri', 'audience'):
@@ -204,7 +298,8 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
 
     def test_listing(self):
         self._create()
-        self._create(name='authentik')
+        self._create(name='authentik', issuer_url='https://auth.example.com',
+                     jwks_uri='https://auth.example.com/jwks')
         resp = self.client.get(
             '/auth/issuers', headers={'Authorization': self.admin})
         self.assertEqual(200, resp.status_code)

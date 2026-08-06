@@ -15,18 +15,28 @@ import flask
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import artifact
 from shakenfist import baseobject
+from shakenfist import exceptions
+from shakenfist import federation
 from shakenfist import instance
+from shakenfist import locks
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import scopes as api_scopes
+from shakenfist.mapping_rule import MappingRule
+from shakenfist.mapping_rule import MappingRules
+from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
+from shakenfist.namespace_key import NamespaceKey
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
@@ -87,8 +97,13 @@ def _validate_key_name(key_name):
     Both patterns are now rejected on both paths (phase 2 Decision 2
     of the auth federation plan). Returns an error response, or None
     if the name is acceptable.
+
+    The patterns themselves live in util.credentials, because a mapping
+    rule's key_name_prefix has to be held to the same standard and
+    mapping_rule.py cannot import a module that returns Flask
+    responses.
     """
-    if key_name == 'service_key' or key_name.startswith('_service_key'):
+    if credentials.is_reserved_key_name(key_name):
         return sf_api.error(403, 'illegal key name')
     return None
 
@@ -741,6 +756,45 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience):
     return None
 
 
+def _issuer_url_lock():
+    """Serialise the check-then-write on issuer_url.
+
+    issuer_url lives in trusted_issuer_attributes and has no unique
+    index to enforce it -- and could not easily have one, because a
+    soft-deleted issuer keeps its row and its URL is deliberately
+    available for reuse. So uniqueness here is a read followed by a
+    write, and without a lock two administrators configuring the same
+    provider at the same moment can both read "free" and both write.
+
+    That is the same shape as the vsock CID allocator in instance.py,
+    and it takes the same remedy: one cluster wide lock held across
+    both halves. Cheap, because these are admin-only endpoints that
+    run about as often as a cluster gains an identity provider.
+    """
+    return locks.ClusterLock(
+        'trusted_issuer_urls', None, 'global',
+        op='Claim trusted issuer URL', timeout=30)
+
+
+def _issuer_url_taken(issuer_url, by_someone_other_than=None):
+    """Refuse a second issuer record for one iss value.
+
+    Token validation resolves an issuer by its URL, so two live records
+    claiming the same URL make which provider's keys we trust depend on
+    listing order. An operator repointing an issuer would believe they
+    had, while some requests kept verifying against the old JWKS.
+
+    Callers must hold _issuer_url_lock() across this check and the
+    write it guards, or the check is advisory only.
+    """
+    existing = federation.issuer_claiming_url(issuer_url)
+    if not existing or existing.name == by_someone_other_than:
+        return None
+    return sf_api.error(
+        409, f'issuer {existing.name} is already configured for '
+             f'{issuer_url}')
+
+
 class AuthIssuersEndpoint(api_base.Resource):
     scope_family = 'issuer'
 
@@ -787,7 +841,15 @@ class AuthIssuersEndpoint(api_base.Resource):
         if err:
             return err
 
-        issuer = TrustedIssuer.new(name, issuer_url, jwks_uri, audience)
+        # The URL check and the create are one decision, so they are
+        # taken together. See _issuer_url_lock.
+        with _issuer_url_lock():
+            err = _issuer_url_taken(issuer_url)
+            if err:
+                return err
+
+            issuer = TrustedIssuer.new(name, issuer_url, jwks_uri, audience)
+
         if not issuer:
             return sf_api.error(409, 'issuer already exists')
         return issuer.external_view()
@@ -837,7 +899,19 @@ class AuthIssuerEndpoint(api_base.Resource):
         if err:
             return err
 
-        issuer.update(issuer_url, jwks_uri, audience)
+        # Excluding this issuer, or repointing anything else about an
+        # issuer while leaving its URL alone would conflict with itself.
+        # Held under the same lock as the create path, for the same
+        # reason: two concurrent repoints onto one URL would otherwise
+        # both see it free.
+        with _issuer_url_lock():
+            err = _issuer_url_taken(
+                issuer_url, by_someone_other_than=issuer_name)
+            if err:
+                return err
+
+            issuer.update(issuer_url, jwks_uri, audience)
+
         return issuer.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -857,3 +931,526 @@ class AuthIssuerEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'delete issuer request from REST API')
         issuer.delete()
         return issuer.external_view()
+
+
+mapping_rule_example = """{
+    "namespace": "ci",
+    "name": "ryll-develop",
+    "issuer": "github",
+    "bound_claims": {
+        "repository": "shakenfist/ryll",
+        "ref": ["refs/heads/develop", "refs/heads/main"]
+    },
+    "scopes": ["blob.read", "artifact.*"],
+    "key_ttl": 3600,
+    "key_name_prefix": "ryll-ci"
+}
+"""
+
+
+def _rule_arguments(issuer, bound_claims, scopes, key_ttl, key_name_prefix):
+    """Normalise the rule body, or return an error response.
+
+    Returns (kwargs, error_response), exactly one of which is None.
+    Only presence is checked here; the meaning of each value is the
+    MappingRule's business, so that a rule created through the API and
+    a rule created any other way cannot diverge on what is safe.
+    """
+    missing = [
+        field for field, value in [
+            ('issuer', issuer), ('bound_claims', bound_claims),
+            ('scopes', scopes), ('key_ttl', key_ttl),
+            ('key_name_prefix', key_name_prefix)]
+        if value is None
+    ]
+    if missing:
+        return None, sf_api.error(
+            400, 'missing required field(s): %s' % ', '.join(missing))
+
+    # A rule may not grant scopes its author does not itself hold.
+    #
+    # This is the cap `_namespace_keys_putpost` applies when minting a
+    # key directly, and it belongs here for the same reason with one
+    # extra hop in between. A rule is a standing instruction to mint a
+    # key, so without this a token scoped `rule.write` could write a
+    # rule granting `*`, satisfy that rule's own bound claims with an
+    # identity token from a trusted issuer, and exchange it for a
+    # wildcard key. In the system namespace the wildcard reaches
+    # cluster-admin, routing straight around Decision 3. The exchange
+    # endpoint cannot catch it either, because by that point the rule
+    # is indistinguishable from a legitimately authored one.
+    #
+    # None from caller_scopes() means unrestricted, which is every
+    # operator holding a legacy key, so their rules are unaffected.
+    held = api_base.caller_scopes()
+    if held is not None and isinstance(scopes, list):
+        ungranted = sorted({
+            s for s in scopes
+            if isinstance(s, str) and not api_scopes.satisfies(held, s)
+        })
+        if ungranted:
+            return None, sf_api.error(
+                403, 'a rule cannot grant scopes you do not hold: %s'
+                     % ', '.join(ungranted))
+
+    return {
+        'issuer': issuer,
+        'bound_claims': bound_claims,
+        'scopes': scopes,
+        'key_ttl': key_ttl,
+        'key_name_prefix': key_name_prefix
+    }, None
+
+
+class AuthNamespaceRulesEndpoint(api_base.Resource):
+    scope_family = 'rule'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List the identity mapping rules for a namespace.',
+        [('namespace', 'path', 'string', 'The namespace.', True)],
+        [(200, 'The namespace\'s mapping rules.', None),
+         (404, 'Namespace not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, namespace_from_db=None):
+        # Soft-deleted rules are gone as far as an operator is
+        # concerned: they no longer resolve by name and no longer mint
+        # anything, so listing them would misrepresent who this
+        # namespace federates with.
+        return [
+            r.external_view() for r in MappingRules(
+                [partial(baseobject.state_filter, MappingRule.ACTIVE_STATES)],
+                namespace=namespace)
+        ]
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Create an identity mapping rule for a namespace.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('name', 'body', 'string',
+             'A name for this rule, unique within the namespace.', True),
+            ('issuer', 'body', 'string',
+             'The name of the trusted issuer whose tokens this rule '
+             'accepts.', True),
+            ('bound_claims', 'body', 'dict',
+             'Claim name to matcher. A matcher is an exact string, or a '
+             'list of acceptable strings. Matching is exact: no globbing, '
+             'no regular expressions, no prefix matching. At least one '
+             'claim must be bound.', True),
+            ('scopes', 'body', 'arrayofstring',
+             'The scopes granted to keys minted through this rule. Must be '
+             'non-empty.', True),
+            ('key_ttl', 'body', 'integer',
+             'Seconds of life for keys minted through this rule.', True),
+            ('key_name_prefix', 'body', 'string',
+             'Prefix for minted key names. The cluster appends a random '
+             'discriminator, so minted names never collide.', True)
+        ],
+        [(200, 'The rule as created.', mapping_rule_example),
+         (400, 'A required field is missing or malformed.', None),
+         (404, 'Namespace not found.', None),
+         (409, 'A rule of that name already exists in this namespace.',
+          None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def post(self, namespace=None, name=None, issuer=None, bound_claims=None,
+             scopes=None, key_ttl=None, key_name_prefix=None,
+             namespace_from_db=None):
+        if not name:
+            return sf_api.error(400, 'no name specified')
+        if not isinstance(name, str) or len(name) > 255:
+            return sf_api.error(400, 'name is not a valid string')
+
+        kwargs, err = _rule_arguments(
+            issuer, bound_claims, scopes, key_ttl, key_name_prefix)
+        if err:
+            return err
+
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'create mapping rule request from REST API',
+            extra={'rule': name})
+
+        try:
+            rule = MappingRule.new(namespace, name, **kwargs)
+        except RuleValidationError as e:
+            return sf_api.error(400, str(e))
+
+        if not rule:
+            return sf_api.error(409, 'rule already exists')
+        return rule.external_view()
+
+
+class AuthNamespaceRuleEndpoint(api_base.Resource):
+    scope_family = 'rule'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Fetch an identity mapping rule.',
+        [('namespace', 'path', 'string', 'The namespace.', True),
+         ('rule_name', 'path', 'string', 'The rule name.', True)],
+        [(200, 'The rule.', mapping_rule_example),
+         (404, 'Namespace or rule not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, rule_name=None, namespace_from_db=None):
+        rule = MappingRule.from_db_by_name(namespace, rule_name)
+        if not rule:
+            return sf_api.error(404, 'rule not found')
+        return rule.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Update an identity mapping rule.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('rule_name', 'path', 'string', 'The rule name.', True),
+            ('issuer', 'body', 'string',
+             'The name of the trusted issuer whose tokens this rule '
+             'accepts.', True),
+            ('bound_claims', 'body', 'dict',
+             'Claim name to matcher, as for creation.', True),
+            ('scopes', 'body', 'arrayofstring',
+             'The scopes granted to keys minted through this rule.', True),
+            ('key_ttl', 'body', 'integer',
+             'Seconds of life for keys minted through this rule.', True),
+            ('key_name_prefix', 'body', 'string',
+             'Prefix for minted key names.', True)
+        ],
+        [(200, 'The updated rule.', mapping_rule_example),
+         (400, 'A required field is missing or malformed.', None),
+         (404, 'Namespace or rule not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def put(self, namespace=None, rule_name=None, issuer=None,
+            bound_claims=None, scopes=None, key_ttl=None,
+            key_name_prefix=None, namespace_from_db=None):
+        rule = MappingRule.from_db_by_name(namespace, rule_name)
+        if not rule:
+            return sf_api.error(404, 'rule not found')
+
+        kwargs, err = _rule_arguments(
+            issuer, bound_claims, scopes, key_ttl, key_name_prefix)
+        if err:
+            return err
+
+        # Updating a rule does not touch keys already minted from it.
+        # A minted key stands alone and its provenance records the
+        # claims it actually satisfied, so narrowing a rule does not
+        # retroactively narrow a live key -- delete the key for that.
+        try:
+            rule.update(**kwargs)
+        except RuleValidationError as e:
+            return sf_api.error(400, str(e))
+
+        return rule.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Delete an identity mapping rule.',
+        [('namespace', 'path', 'string', 'The namespace.', True),
+         ('rule_name', 'path', 'string', 'The rule name.', True)],
+        [(200, 'The rule was deleted.', None),
+         (404, 'Namespace or rule not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def delete(self, namespace=None, rule_name=None, namespace_from_db=None):
+        rule = MappingRule.from_db_by_name(namespace, rule_name)
+        if not rule:
+            return sf_api.error(404, 'rule not found')
+
+        rule.add_event(
+            EVENT_TYPE_AUDIT, 'delete mapping rule request from REST API')
+        rule.delete()
+        return rule.external_view()
+
+
+federated_example = """{
+    "namespace": "ci",
+    "key_name": "ryll-ci-8fJ2mQ",
+    "key": "sfk_..."
+}
+"""
+
+
+def _federated_refusal(rule, reason, detail, namespace=None):
+    """Refuse an exchange, auditing it to the rule's owner if we can.
+
+    A stream of near-miss claim failures is what probing looks like,
+    and the namespace owner is the person who needs to see it. So a
+    failure against a rule we resolved is evented against that rule.
+
+    A failure where no owner can be identified -- an unknown namespace,
+    an unknown rule, a token from nobody we trust -- is logged and not
+    evented. /auth/federated is unauthenticated, so eventing those
+    would hand an anonymous caller a way to write unbounded rows into
+    a namespace's audit log, or into no namespace at all.
+
+    That restraint is about the *namespace* audit log, and it should
+    not be read as a claim that an anonymous request writes nothing.
+    app.py's log_request_info hook events every request to
+    API_REQUESTS before routing, this endpoint included, and it runs
+    ahead of the rate limit inside the method. So a flood does still
+    write a row per request, just against the API's own log rather
+    than a tenant's. That is pre-existing and shared with POST /auth,
+    which is the other public route -- worth knowing, and not
+    something this function fixes.
+
+    The caller is told less than the log records. "federated exchange
+    refused" plus a category is enough for an operator debugging their
+    own workflow, and withholding which claim missed avoids turning
+    the endpoint into an oracle for guessing a rule's contents.
+    """
+    if rule:
+        rule.add_event(
+            EVENT_TYPE_AUDIT, 'federated exchange refused',
+            extra={'reason': reason, 'detail': detail})
+    else:
+        LOG.with_fields({
+            'namespace': namespace, 'reason': reason
+        }).info(f'Federated exchange refused: {detail}')
+
+    return sf_api.error(401, f'federated exchange refused: {reason}')
+
+
+class AuthFederatedEndpoint(api_base.Resource):
+    # Unauthenticated by nature: the whole point is that the caller has
+    # no Shaken Fist credential yet, only an identity from somewhere we
+    # have been told to believe.
+    @api_base.public
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Exchange an identity token for a namespace key.',
+        [
+            ('token', 'body', 'string',
+             'A signed identity token from a trusted issuer.', True),
+            ('namespace', 'body', 'string',
+             'The namespace to mint a key in.', True),
+            ('rule', 'body', 'string',
+             'The name of the mapping rule to exchange through.', True)
+        ],
+        [(200, 'The minted key. The secret is returned once and never '
+               'again.', federated_example),
+         (400, 'A required field is missing.', None),
+         (401, 'The exchange was refused.', None),
+         (413, 'The request body is too large.', None),
+         (429, 'Too many exchange attempts from this source.', None),
+         (503, 'The database is unavailable, so the exchange could not '
+               'be checked for replay.', None)],
+        requires_auth=False))
+    def post(self, token=None, namespace=None, rule=None):
+        # The order below is the one in the phase 3 design section, and
+        # it is a security property rather than a style. Each step is
+        # cheaper than the one after it, and the expensive ones -- a
+        # JWKS fetch, a bcrypt hash -- sit behind checks that an
+        # anonymous caller cannot pass by guessing.
+
+        # 1. Size. The refusal that actually protects us is
+        #    app.py's limit_federated_body_size hook, because by the
+        #    time this method runs log_request has already parsed the
+        #    body -- a check here cannot stop work that has happened.
+        #    This copy stays as a backstop for callers that reach the
+        #    method without going through the app's request hooks, and
+        #    it is deliberately the same limit.
+        if (flask.request.content_length or 0) > \
+                config.FEDERATION_MAX_TOKEN_BYTES:
+            return sf_api.error(413, 'request body too large')
+
+        if not token or not isinstance(token, str):
+            return sf_api.error(400, 'no token specified')
+        if not namespace or not isinstance(namespace, str):
+            return sf_api.error(400, 'no namespace specified')
+        if not rule or not isinstance(rule, str):
+            return sf_api.error(400, 'no rule specified')
+
+        # 2. Rate limit per source address. Here, rather than earlier,
+        #    because the argument checks above touch nothing but the
+        #    request; and here, rather than after the issuer lookup,
+        #    because that lookup is not free.
+        #
+        #    The design section had this the other way around, on the
+        #    grounds that resolving an issuer was free and writing a
+        #    counter row was not. That was wrong about the first half:
+        #    issuer_claiming_url scans every configured issuer and
+        #    reads state and attributes per row, so an anonymous caller
+        #    who can produce a syntactically valid JWT with any iss at
+        #    all could drive that scan as fast as they could send. It
+        #    was the one unmetered database amplification path in the
+        #    exchange, and it sat above the meter.
+        #
+        #    Counting the request costs one row per source per window,
+        #    which is the same row that source would get by naming a
+        #    real issuer, so nothing about the table's growth changes.
+        source = flask.request.remote_addr or 'unknown'
+        try:
+            federation.enforce_rate_limit(source)
+        except exceptions.RateLimited as e:
+            LOG.with_fields({
+                'namespace': namespace, 'source': source
+            }).info(f'Federated exchange rate limited: {e}')
+            return sf_api.error(429, 'too many federated exchange attempts')
+
+        # 3. Resolve the issuer from the unverified iss. No network yet:
+        #    a made-up issuer must not be able to make us dial out.
+        try:
+            issuer = federation.issuer_for_token(token)
+        except exceptions.UntrustedIssuer as e:
+            return _federated_refusal(
+                None, 'untrusted issuer', str(e), namespace=namespace)
+
+        # 4 and 5. Signature, then audience, issuer and lifetime.
+        try:
+            claims = federation.validate_token(token, issuer)
+        except exceptions.TokenValidationFailed as e:
+            return _federated_refusal(
+                None, 'token rejected', str(e), namespace=namespace)
+
+        # 6. Only now look up the rule. Doing it after verification
+        #    means an anonymous caller holding no valid token cannot
+        #    use this endpoint to discover which rules exist.
+        rule_from_db = MappingRule.from_db_by_name(namespace, rule)
+        if not rule_from_db:
+            return _federated_refusal(
+                None, 'no such rule', f'no rule {namespace}/{rule}',
+                namespace=namespace)
+
+        #    Read the whole policy in one go, and refuse a damaged row
+        #    rather than let it escape as an exception. The generic 500
+        #    handler answers with repr(e), and CorruptMappingRule names
+        #    the rule's UUID -- which on the one endpoint anybody may
+        #    call would hand a stranger an identifier they should not
+        #    have.
+        #
+        #    The guard belongs here and not around the lookup above.
+        #    from_db_by_name reads the static row and the object state,
+        #    neither of which decodes bound_claims or scopes, so it
+        #    cannot raise this. Wrapping it looked like protection and
+        #    was none: the first read that can actually fail was the
+        #    issuer comparison below.
+        #
+        #    The refusal is evented against the rule, as the "rule has
+        #    no scopes" one below is. The owner has been identified by
+        #    this point, and a damaged rule is precisely the thing they
+        #    need told. What the *caller* gets back is still the bare
+        #    category, which is what keeps the UUID out of the answer.
+        try:
+            policy = rule_from_db.policy()
+        except exceptions.CorruptMappingRule as e:
+            LOG.with_fields({
+                'namespace': namespace, 'rule': rule
+            }).error(f'Federated exchange hit a damaged rule: {e}')
+            return _federated_refusal(
+                rule_from_db, 'rule is unusable', 'rule could not be read')
+
+        if not policy:
+            # The static row outlived its attributes row. Same refusal
+            # as a rule that cannot be decoded: there is no policy to
+            # apply, so there is nothing to mint against.
+            LOG.with_fields({
+                'namespace': namespace, 'rule': rule
+            }).error('Federated exchange found a rule with no attributes')
+            return _federated_refusal(
+                rule_from_db, 'rule is unusable', 'rule has no attributes')
+
+        if policy.issuer != issuer.name:
+            return _federated_refusal(
+                rule_from_db, 'wrong issuer',
+                f'rule accepts {policy.issuer}, token is from '
+                f'{issuer.name}')
+
+        try:
+            satisfied = federation.match_claims(
+                claims, policy.bound_claims or {})
+        except exceptions.ClaimMismatch as e:
+            return _federated_refusal(
+                rule_from_db, 'claims do not match', str(e))
+
+        namespace_from_db = Namespace.from_db(
+            namespace, suppress_failure_audit=True)
+        if not namespace_from_db or \
+                namespace_from_db.state.value == dbo.STATE_DELETED:
+            # The rule outlived its namespace, which Namespace
+            # hard delete is supposed to prevent. Refuse rather than
+            # mint into a namespace that is on its way out.
+            return _federated_refusal(
+                rule_from_db, 'no such namespace',
+                f'rule {namespace}/{rule} names a namespace which is gone')
+
+        scopes = policy.scopes
+        key_ttl = policy.key_ttl
+        if not scopes or not key_ttl:
+            return _federated_refusal(
+                rule_from_db, 'rule is unusable',
+                'rule has no scopes or no key_ttl')
+
+        # 7. Refuse a replay of this token through this rule.
+        #
+        # An early draft of the design section numbered this ahead of the
+        # rule lookup, which is not implementable: the pair being claimed
+        # is (token, rule uuid), and there is no rule uuid until the rule
+        # has been read. It sits after claim matching rather than
+        # immediately after the lookup so that
+        # a refusal for any *other* reason -- claims that do not match, a
+        # namespace that has gone, a rule with no scopes -- does not
+        # consume the token's single use. A caller who fixes their rule
+        # and retries with the same still-valid token should succeed.
+        #
+        # It is the last gate before minting, which is what makes it
+        # effective: two concurrent presentations of the same token
+        # cannot both get past this line, because the second one's
+        # insert collides with the first one's.
+        #
+        # If minting then fails, the token's use is spent with no key to
+        # show for it. That is the right way round to be wrong -- the
+        # caller asks their identity provider for another token, which
+        # costs them a second, whereas the alternative is a window in
+        # which a token mints twice.
+        try:
+            federation.refuse_replay(token, claims, rule_from_db)
+        except exceptions.TokenReplayed as e:
+            return _federated_refusal(
+                rule_from_db, 'token already used', str(e))
+        except exceptions.TokenValidationFailed as e:
+            return _federated_refusal(
+                rule_from_db, 'token rejected', str(e))
+
+        # 8. Mint. The name carries a random discriminator so a
+        #    workflow re-run gets its own key rather than silently
+        #    rotating the secret out from under a still-running job.
+        key_name = '%s-%s' % (
+            policy.key_name_prefix, sf_random.random_id()[:8])
+        secret = credentials.generate()
+
+        minted = NamespaceKey.new(
+            namespace, key_name, secret,
+            expiry=time.time() + key_ttl,
+            scopes=list(scopes),
+            provenance={
+                'source': 'federated',
+                'rule': str(rule_from_db.uuid),
+                'rule_name': rule_from_db.name,
+                'issuer': issuer.name,
+                # The claims that were actually satisfied, not the
+                # rule's matchers. An audit should describe the grant
+                # as it was made, not as the rule reads today.
+                'claims': satisfied,
+                'jti': claims.get('jti'),
+                'sub': claims.get('sub')
+            })
+
+        minted.add_event(
+            EVENT_TYPE_AUDIT, 'key minted by federated exchange',
+            extra={'rule': str(rule_from_db.uuid), 'issuer': issuer.name,
+                   'claims': satisfied, 'scopes': list(scopes)})
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'federated exchange minted a key',
+            extra={'key_name': key_name, 'rule': rule_from_db.name,
+                   'issuer': issuer.name, 'claims': satisfied})
+
+        # The secret is returned here and never again: nothing stores
+        # it, only its bcrypt hash.
+        return {
+            'namespace': namespace,
+            'key_name': key_name,
+            'key': secret
+        }

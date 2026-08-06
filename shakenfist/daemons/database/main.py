@@ -3543,7 +3543,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['update_trusted_issuer_attributes'].inc()
             ok = mariadb._direct_update_trusted_issuer_attributes(
-                mariadb._trusted_issuer_attrs_from_proto(request.data))
+                mariadb._trusted_issuer_attrs_from_proto(request.data),
+                fields=list(request.fields))
             return database_pb2.StatusReply(success=ok)
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -3565,6 +3566,206 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteTrustedIssuerAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    # ------------------------------------------------------------------
+    # MappingRule operations
+    # ------------------------------------------------------------------
+
+    def CreateMappingRule(
+        self,
+        request: database_pb2.CreateMappingRuleRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['create_mapping_rule'].inc()
+            ok = mariadb._direct_create_mapping_rule(
+                mariadb._mapping_rule_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateMappingRule failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def GetMappingRule(
+        self,
+        request: database_pb2.GetMappingRuleRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRuleReply:
+        try:
+            self.monitor.counters['get_mapping_rule'].inc()
+            data = mariadb._direct_get_mapping_rule(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetMappingRuleReply(found=False)
+            return database_pb2.GetMappingRuleReply(
+                found=True, data=mariadb._mapping_rule_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRule failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRuleReply(found=False)
+
+    def GetMappingRuleByName(
+        self,
+        request: database_pb2.GetMappingRuleByNameRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRuleReply:
+        try:
+            self.monitor.counters['get_mapping_rule_by_name'].inc()
+            data = mariadb._direct_get_mapping_rule_by_name(
+                request.namespace, request.name)
+            if data is None:
+                return database_pb2.GetMappingRuleReply(found=False)
+            return database_pb2.GetMappingRuleReply(
+                found=True, data=mariadb._mapping_rule_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRuleByName failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRuleReply(found=False)
+
+    def GetMappingRulesInNamespace(
+        self,
+        request: database_pb2.GetMappingRulesInNamespaceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRulesReply:
+        try:
+            self.monitor.counters['get_mapping_rules_in_namespace'].inc()
+            rules = mariadb._direct_get_mapping_rules_in_namespace(
+                request.namespace)
+            return database_pb2.GetMappingRulesReply(
+                rules=[mariadb._mapping_rule_to_proto(r) for r in rules])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRulesInNamespace failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRulesReply(rules=[])
+
+    def GetAllMappingRules(
+        self,
+        request: database_pb2.GetAllMappingRulesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRulesReply:
+        try:
+            self.monitor.counters['get_all_mapping_rules'].inc()
+            rules = mariadb._direct_get_all_mapping_rules()
+            return database_pb2.GetMappingRulesReply(
+                rules=[mariadb._mapping_rule_to_proto(r) for r in rules])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllMappingRules failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRulesReply(rules=[])
+
+    def DeleteMappingRule(
+        self,
+        request: database_pb2.DeleteMappingRuleRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['delete_mapping_rule'].inc()
+            ok = mariadb._direct_delete_mapping_rule(UUID(request.uuid))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteMappingRule failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def CreateMappingRuleAttributes(
+        self,
+        request: database_pb2.CreateMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['create_mapping_rule_attributes'].inc()
+            ok = mariadb._direct_create_mapping_rule_attributes(
+                mariadb._mapping_rule_attrs_from_proto(request.data))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def GetMappingRuleAttributes(
+        self,
+        request: database_pb2.GetMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetMappingRuleAttributesReply:
+        try:
+            self.monitor.counters['get_mapping_rule_attributes'].inc()
+            data = mariadb._direct_get_mapping_rule_attributes(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetMappingRuleAttributesReply(found=False)
+            return database_pb2.GetMappingRuleAttributesReply(
+                found=True, data=mariadb._mapping_rule_attrs_to_proto(data))
+        except exceptions.CorruptMappingRule as e:
+            # A rule whose bound_claims or scopes will not decode is a
+            # data fault, and the catch-all below would flatten it into
+            # INTERNAL, which the client can only read as a database
+            # outage. Carry it in a field instead, so the API can still
+            # refuse the exchange and still mark the rule unusable. See
+            # the comment on GetMappingRuleAttributesReply.corrupt.
+            #
+            # str(e) is logged rather than passed to set_details(),
+            # because the message names the rule uuid, and on the
+            # exchange path this reply is produced for a caller who has
+            # not authenticated.
+            LOG.with_fields({'rule': request.uuid}).error(
+                'database GetMappingRuleAttributes found a damaged '
+                f'rule: {e}')
+            return database_pb2.GetMappingRuleAttributesReply(
+                found=True, corrupt=True)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetMappingRuleAttributesReply(found=False)
+
+    def UpdateMappingRuleAttributes(
+        self,
+        request: database_pb2.UpdateMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['update_mapping_rule_attributes'].inc()
+            ok = mariadb._direct_update_mapping_rule_attributes(
+                mariadb._mapping_rule_attrs_from_proto(request.data),
+                fields=list(request.fields))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateMappingRuleAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False)
+
+    def DeleteMappingRuleAttributes(
+        self,
+        request: database_pb2.DeleteMappingRuleAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        try:
+            self.monitor.counters['delete_mapping_rule_attributes'].inc()
+            ok = mariadb._direct_delete_mapping_rule_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=ok)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteMappingRuleAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return database_pb2.StatusReply(success=False)
@@ -5321,6 +5522,87 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def RecordFederatedExchange(
+        self,
+        request: database_pb2.RecordFederatedExchangeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.RecordFederatedExchangeReply:
+        """Claim a (token, rule) pair for a federated exchange."""
+        try:
+            self.monitor.counters['record_federated_exchange'].inc()
+            recorded = mariadb._direct_record_federated_exchange(
+                request.token_id,
+                UUID(request.rule_uuid),
+                request.expires_at)
+            return database_pb2.RecordFederatedExchangeReply(
+                recorded=recorded, error='', ok=True)
+        except Exception as e:
+            # Reported in the reply body rather than as an RPC error so
+            # the client can tell "we could not find out" apart from
+            # "already claimed". Both refuse the exchange, but only one
+            # of them means the database is in trouble.
+            #
+            # ok is set on the success path only, so it stays false here
+            # whatever str(e) turns out to be.
+            util_exceptions.ignore_exception(
+                'database RecordFederatedExchange failed', e)
+            return database_pb2.RecordFederatedExchangeReply(
+                recorded=False, error=str(e), ok=False)
+
+    def CountFederatedAttempt(
+        self,
+        request: database_pb2.CountFederatedAttemptRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.CountFederatedAttemptReply:
+        """Count one federated exchange attempt from a source address."""
+        try:
+            self.monitor.counters['count_federated_attempt'].inc()
+            attempts = mariadb._direct_count_federated_attempt(
+                request.source, request.window_start)
+            return database_pb2.CountFederatedAttemptReply(
+                attempts=attempts, error='', ok=True)
+        except Exception as e:
+            # attempts=0 is not a safe default here -- read as a real
+            # count it means "under the limit, allow" -- so the client
+            # decides on ok rather than on this reply having managed to
+            # produce a non-empty error string.
+            util_exceptions.ignore_exception(
+                'database CountFederatedAttempt failed', e)
+            return database_pb2.CountFederatedAttemptReply(
+                attempts=0, error=str(e), ok=False)
+
+    def ReapFederationReplay(
+        self,
+        request: database_pb2.ReapFederationReplayRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReapFederationReply:
+        """Delete replay rows for tokens which have expired."""
+        try:
+            self.monitor.counters['reap_federation_replay'].inc()
+            return database_pb2.ReapFederationReply(
+                removed=mariadb._direct_reap_federation_replay(
+                    request.cutoff))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReapFederationReplay failed', e)
+            return database_pb2.ReapFederationReply(removed=0)
+
+    def ReapFederationRateLimits(
+        self,
+        request: database_pb2.ReapFederationRateLimitsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReapFederationReply:
+        """Delete rate limit rows for windows which have closed."""
+        try:
+            self.monitor.counters['reap_federation_rate_limits'].inc()
+            return database_pb2.ReapFederationReply(
+                removed=mariadb._direct_reap_federation_rate_limits(
+                    request.cutoff))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReapFederationRateLimits failed', e)
+            return database_pb2.ReapFederationReply(removed=0)
+
     def _cluster_operation_to_proto(
             self,
             data: dict[str, Any]
@@ -5539,6 +5821,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_trusted_issuer_attributes',
             'update_trusted_issuer_attributes',
             'delete_trusted_issuer_attributes',
+            'create_mapping_rule', 'get_mapping_rule',
+            'get_mapping_rule_by_name', 'get_mapping_rules_in_namespace',
+            'get_all_mapping_rules', 'delete_mapping_rule',
+            'create_mapping_rule_attributes',
+            'get_mapping_rule_attributes',
+            'update_mapping_rule_attributes',
+            'delete_mapping_rule_attributes',
             'find_namespace_keys', 'delete_namespace_key',
             'delete_expired_namespace_keys',
             # MariaDB namespace key attributes operations
@@ -5620,6 +5909,11 @@ class Monitor(daemon.WorkerPoolDaemon):
             'set_cluster_operation_error',
             'get_cluster_operation_error',
             'delete_cluster_operation_error',
+            # MariaDB federation abuse resistance operations
+            'record_federated_exchange',
+            'count_federated_attempt',
+            'reap_federation_replay',
+            'reap_federation_rate_limits',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
             'find_network_interfaces',

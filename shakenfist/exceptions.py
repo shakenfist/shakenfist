@@ -133,6 +133,53 @@ class BadObjectVersion(DatabaseException):
     ...
 
 
+class FederationException(Exception):
+    """An identity token could not be turned into a grant.
+
+    Subclassed rather than flattened so the exchange endpoint can
+    decide what to tell an unauthenticated caller and what to keep to
+    the audit log: which claim failed is useful to a namespace owner
+    reading their events, and an oracle to somebody probing.
+    """
+
+
+class UntrustedIssuer(FederationException):
+    """No configured trusted issuer matches the token's iss claim."""
+
+
+class TokenValidationFailed(FederationException):
+    """Signature, audience, issuer, or lifetime verification failed."""
+
+
+class ClaimMismatch(FederationException):
+    """The token is genuine, but does not satisfy the rule's claims."""
+
+
+class TokenReplayed(FederationException):
+    """This token has already been exchanged through this rule.
+
+    Per (token, rule) rather than per token: exchanging one identity
+    against two rules to reach two namespaces is a legitimate pattern
+    the CI conductor design depends on, while re-exchanging the same
+    identity against the same rule is not.
+    """
+
+
+class RateLimited(FederationException):
+    """Too many federated exchange attempts from one source address."""
+
+
+class CorruptMappingRule(DatabaseException):
+    """A mapping rule's policy columns could not be decoded.
+
+    Raised rather than defaulted because the columns are NOT NULL and
+    are written only by us, so an absent value means the row is
+    damaged. An empty bound_claims dict would be a matcher set that
+    matches every token, which is the one thing a rule must never
+    silently become.
+    """
+
+
 class PreExistingReadOnlyCache(DatabaseException):
     ...
 

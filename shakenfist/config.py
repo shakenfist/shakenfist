@@ -153,6 +153,51 @@ class SFConfig(BaseSettings):
         15,
         description='How long in minutes an API token is valid for.'
     )
+    FEDERATION_MAX_TOKEN_BYTES: int = Field(
+        16384,
+        description=(
+            'The largest federated exchange request body accepted, in '
+            'bytes. Refused before any parsing, because /auth/federated is '
+            'unauthenticated and parsing an attacker-sized JWT is work '
+            'done on their behalf. Comfortably above a real identity '
+            'token, which is typically one to two kilobytes.'
+        )
+    )
+    FEDERATION_JWKS_CACHE_SECONDS: int = Field(
+        300,
+        description=(
+            'How long in seconds a trusted issuer\'s JWKS is cached before '
+            'being refetched. Lower values shorten the window in which a '
+            'key the issuer has revoked is still accepted; higher values '
+            'reduce load on the issuer. An unknown key id always triggers '
+            'an immediate refetch regardless of this setting, so raising '
+            'it does not delay recognising a newly rotated key.'
+        )
+    )
+    FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS: int = Field(
+        5,
+        description=(
+            'How long in seconds to wait for a trusted issuer\'s JWKS '
+            'endpoint before giving up. The fetch happens while holding '
+            'that issuer\'s refetch lock, so this is also the longest one '
+            'unreachable identity provider can pin an API worker. PyJWT '
+            'defaults to 30 seconds, which is long enough that a provider '
+            'blackholing traffic exhausts the worker pool.'
+        )
+    )
+    FEDERATION_RATE_LIMIT_PER_MINUTE: int = Field(
+        60,
+        description=(
+            'How many federated exchange attempts one source address may '
+            'make per minute before being refused with a 429. Counted in '
+            'MariaDB rather than in the worker, so the limit is cluster '
+            'wide rather than per gunicorn worker. Set to 0 to disable '
+            'rate limiting entirely. Note that behind a reverse proxy '
+            'which does not rewrite the source address every request '
+            'appears to come from the proxy, which makes this a single '
+            'global limit -- size it accordingly.'
+        )
+    )
     API_ADVERTISED_HOST: str = Field(
         'localhost',
         description='The DNS name of the REST API host as advertised to users.'
