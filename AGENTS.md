@@ -513,26 +513,42 @@ Two rules fell out of fixing it, and both generalise past artifacts:
   check so a refused caller cannot write to the event log of a namespace it is
   about to be told does not exist.
 
-Three call sites that end in `add_index` still resolve with `from_url`, and the
-sweep was not exhaustive. They are listed here so the next reader does not
-assume otherwise:
+The remaining three call sites were narrowed in #3640, and one of them was
+worse than the sweep recorded. `LabelEndpoint.post` had been read as safe
+because it builds its URL from the request — but `_label_url` accepts
+`<namespace>/<label>` and hands back the namespace it was given, so any
+authenticated caller could push a version into any namespace's label. The
+`requires_admin=True` in its `swag_from` is documentation and enforces
+nothing, and the route carried no ownership decorator, so nothing stopped it.
+Two lessons worth carrying:
 
-- `external_api/instance.py` (instance create) resolves a caller-supplied
-  `disk.base` with `create_if_new=True`. Namespace B naming A's `source_url`
-  lands on A's artifact, but the fetch pulls from the owner's own URL rather
-  than from bytes B supplied, so an unchanged URL adds no version. Lower
-  severity than the upload hole, not zero.
-- `external_api/label.py` (`LabelEndpoint.post`) builds
-  `sf://label/<namespace>/<name>` from the request, so the URL is
-  namespace-scoped and a caller cannot steer it into somebody else's namespace.
-  Note that the `requires_admin=True` in its `swag_from` is documentation and
-  enforces nothing — see the swagger note elsewhere in this file.
-- `operations/artifact_fetch_op.py` runs behind the instance path above and
-  inherits its namespace.
+- **"Built from the request" is not the same as "not caller-controlled."**
+  The URL was assembled by our code out of a value the caller chose. Follow
+  the value, not the construction.
+- **A read path can be broken in a way that hides the write path's bug.**
+  `LabelEndpoint.get` and `delete` had answered 500 to every request since
+  2024 (a pair handed to a filter expecting a string, and a 404 that was
+  computed but never returned), so nobody exercised the endpoint hard enough
+  to notice what `post` would accept.
 
-Issue #3640 tracks narrowing them. Until then, treat "write paths use
-`owned_from_url`" as the rule being converged on rather than one the tree
-already satisfies, and do not add a fourth exception.
+The instance path is the case where the obvious narrowing was the wrong fix,
+and it is worth knowing why before someone "simplifies" it:
+
+- **Resolving `disk.base` by ownership alone would have broken sharing.**
+  Reuse is the entire point of a shared image, and `transfer_image` treats an
+  artifact with no versions as "cluster does not have a copy", so giving every
+  namespace its own artifact would have meant its own download and its own
+  stored copy of every shared image.
+- The split is therefore per verb, not per artifact. A visible foreign
+  artifact is resolved to a blob and booted from — the same move the label and
+  snapshot branches already made — and never fetched into. `owned_from_url()`
+  picks the write target; `from_url()` still picks what you may read.
+
+`Artifact.owned_from_url_or_new()` exists for the write paths whose target
+namespace is fixed as the caller's own, or already authorised: they have no
+two cases to tell apart, so they get the create for free. Routes which accept
+a caller-nominated namespace must still authorise creating and modifying by
+hand, which is why `owned_from_url()` itself does not create.
 
 ### Credential-carrying routes are not logged, not redacted
 

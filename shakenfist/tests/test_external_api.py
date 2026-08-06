@@ -725,10 +725,19 @@ class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
 class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     """Tests for the disk-loop artifact-fetch logic in InstancesEndpoint.post.
 
-    Phase 3b refactored the disk loop to call Artifact.from_url eagerly
-    (with create_if_new=True) and pass artifact_uuid into afo_create_and_enqueue,
-    and to build instance_start_dependencies passed as depends_on to
+    Phase 3b refactored the disk loop to resolve the artifact eagerly and
+    pass artifact_uuid into afo_create_and_enqueue, and to build
+    instance_start_dependencies passed as depends_on to
     nino_create_and_enqueue.  These tests verify that contract.
+
+    Resolution is by ownership rather than visibility (#3640), so the
+    mocks below stand in for owned_from_url_or_new rather than from_url.
+    Which resolver runs is the substance of that change rather than an
+    incidental detail: from_url could land the fetch -- and so add_index,
+    and so delete_old_versions -- on an artifact belonging to another
+    namespace. What a caller may boot from is a wider question than what
+    it may write to, and it gets answered separately, in the disk_base
+    loop rather than here.
     """
 
     # Valid UUID4 values (version nibble = 4).
@@ -748,13 +757,13 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     @mock.patch(
         'shakenfist.external_api.instance.afo_create_and_enqueue')
     @mock.patch(
-        'shakenfist.external_api.instance.Artifact.from_url')
+        'shakenfist.external_api.instance.Artifact.owned_from_url_or_new')
     def test_post_instance_disk_loop_enqueues_artifact_fetch(
-            self, mock_from_url, mock_afo, mock_nino):
+            self, mock_resolve, mock_afo, mock_nino):
         """A disk with a plain URL triggers afo_create_and_enqueue with
         the artifact UUID and nino_create_and_enqueue with a depends_on list."""
         fake_artifact = self._fake_artifact()
-        mock_from_url.return_value = fake_artifact
+        mock_resolve.return_value = fake_artifact
 
         fetch_op_uuid = self.FETCH_OP_UUID_1
         from shakenfist.schema.object_types import ObjectType as _OT
@@ -774,18 +783,16 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
             }))
         self.assertEqual(200, resp.status_code, resp.get_json())
 
-        # Artifact.from_url must have been called at least once with
-        # create_if_new=True for the given URL.
+        # The fetch loop must have resolved the URL by ownership.
         url_arg = 'https://example.com/img.qcow2'
-        from_url_calls = mock_from_url.call_args_list
-        create_if_new_calls = [
-            c for c in from_url_calls
-            if c.kwargs.get('create_if_new') is True
-            or (len(c.args) > 1 and url_arg in c.args)
+        resolved_urls = [
+            c.args[1] if len(c.args) > 1 else c.kwargs.get('url', '')
+            for c in mock_resolve.call_args_list
         ]
-        self.assertTrue(
-            len(create_if_new_calls) > 0,
-            'Artifact.from_url was not called with create_if_new=True')
+        self.assertIn(
+            url_arg, resolved_urls,
+            f'Expected {url_arg!r} in owned_from_url_or_new calls, '
+            f'got {resolved_urls!r}')
 
         # afo_create_and_enqueue must have been called with artifact_uuid
         # matching the resolved artifact's UUID.
@@ -812,13 +819,13 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     @mock.patch(
         'shakenfist.external_api.instance.afo_create_and_enqueue')
     @mock.patch(
-        'shakenfist.external_api.instance.Artifact.from_url')
+        'shakenfist.external_api.instance.Artifact.owned_from_url_or_new')
     def test_post_instance_disk_loop_blob_uuid_branch(
-            self, mock_from_url, mock_afo, mock_nino):
-        """A disk with blob_uuid triggers Artifact.from_url with the BLOB_URL
-        prefix in the artifact-fetch loop."""
+            self, mock_resolve, mock_afo, mock_nino):
+        """A disk with blob_uuid resolves the BLOB_URL prefixed URL in the
+        artifact-fetch loop."""
         fake_artifact = self._fake_artifact()
-        mock_from_url.return_value = fake_artifact
+        mock_resolve.return_value = fake_artifact
 
         from shakenfist.schema.object_types import ObjectType as _OT
         mock_afo.return_value = (
@@ -838,17 +845,18 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
             }))
         self.assertEqual(200, resp.status_code, resp.get_json())
 
-        # Artifact.from_url must be called with a URL that includes BLOB_URL
+        # The resolution must be against a URL that includes the BLOB_URL
         # prefix followed by the blob UUID.
         from shakenfist.artifact import BLOB_URL
         expected_url = f'{BLOB_URL}{self.BLOB_UUID}'
-        from_url_urls = [
+        resolved_urls = [
             c.args[1] if len(c.args) > 1 else c.kwargs.get('url', '')
-            for c in mock_from_url.call_args_list
+            for c in mock_resolve.call_args_list
         ]
         self.assertIn(
-            expected_url, from_url_urls,
-            f'Expected {expected_url!r} in from_url calls, got {from_url_urls!r}')
+            expected_url, resolved_urls,
+            f'Expected {expected_url!r} in owned_from_url_or_new calls, '
+            f'got {resolved_urls!r}')
 
     @mock.patch(
         'shakenfist.external_api.instance.nino_create_and_enqueue')
@@ -884,3 +892,151 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
         self.assertIsNone(
             nino_kwargs.get('depends_on'),
             'depends_on must be None when there are no fetch dependencies')
+
+
+class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
+    """Which artifact `disk.base` as a plain URL is allowed to land on.
+
+    Booting from a URL somebody else has already fetched used to resolve
+    to *their* artifact, and then enqueue a fetch against it. That fetch
+    ends in add_index, which ends in delete_old_versions, so any tenant
+    who knew the URL of a shared image could roll the system namespace's
+    artifact forward and drop the versions underneath it at a moment of
+    their choosing. The operator guide says the opposite: a shared
+    artifact is one "non-system namespaces should not be able to
+    update".
+
+    The obvious narrowing -- resolve by ownership, full stop -- would
+    have broken the feature instead of fixing it. Reuse is the entire
+    point of sharing an official image, and an artifact with no versions
+    yet is treated by transfer_image as "cluster does not have a copy",
+    so every namespace would have downloaded and stored its own copy of
+    every shared image.
+
+    So the split is per verb rather than per artifact: a visible foreign
+    artifact is something to boot from, by resolving it to a blob the
+    way the label and snapshot branches already do, and never something
+    to fetch into. Both halves are asserted, because a change which only
+    stopped the write would look identical here to one which also
+    stopped the reuse.
+    """
+
+    FOREIGN_BLOB = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
+    URL = 'https://example.com/shared-image.qcow2'
+
+    def setUp(self):
+        super().setUp()
+
+        from shakenfist.artifact import Artifact
+        self.foreign = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='shared-image',
+            namespace='system')
+        self.foreign.state = Artifact.STATE_CREATED
+
+        # The blob machinery is well beyond what this harness has, and
+        # irrelevant to the question: all these tests need is for the
+        # foreign artifact to have something bootable in it.
+        patcher = mock.patch.object(
+            Artifact, 'resolve_to_blob', return_value=self.FOREIGN_BLOB)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _create(self, token, namespace, mock_afo, mock_nino):
+        from shakenfist.schema.object_types import ObjectType as _OT
+        mock_afo.return_value = (_OT.ARTIFACT_FETCH_OP, str(uuid4()))
+        mock_nino.return_value = (_OT.NODE_INST_NETDESC_OP, str(uuid4()))
+
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': token},
+            data=json.dumps({
+                'name': 'test-disk-base',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [],
+                'disk': [{'size': 8, 'base': self.URL}],
+                'namespace': namespace,
+            }))
+        self.assertEqual(200, resp.status_code, resp.get_json())
+
+        # afo_create_and_enqueue(namespace, url, instance_uuid, ...) -- the
+        # url it is handed, and the artifact_uuid alongside it, are the
+        # observable answer to "what did this resolve to".
+        mock_afo.assert_called()
+        return (mock_afo.call_args.args[1],
+                str(mock_afo.call_args.kwargs.get('artifact_uuid')))
+
+    def _owned_by(self, namespace):
+        from shakenfist.artifact import Artifact
+        return Artifact.owned_from_url(
+            Artifact.TYPE_IMAGE, self.URL, namespace=namespace)
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_a_shared_artifact_is_booted_from_and_not_fetched_into(
+            self, mock_afo, mock_nino):
+        # The fix. The fetch is enqueued against the blob rather than
+        # against the URL, so it can neither re-download nor re-index.
+        from shakenfist.artifact import BLOB_URL
+        self.foreign.shared = True
+
+        url, _ = self._create(
+            self.auth_token_two, 'two', mock_afo, mock_nino)
+        self.assertEqual(f'{BLOB_URL}{self.FOREIGN_BLOB}', url)
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_the_fetch_does_not_name_the_foreign_artifact(
+            self, mock_afo, mock_nino):
+        # The same fix stated on the other argument. artifact_uuid is
+        # what the fetch operation records as its target, and it used to
+        # be the shared artifact's -- which is how the write reached it.
+        self.foreign.shared = True
+
+        _, artifact_uuid = self._create(
+            self.auth_token_two, 'two', mock_afo, mock_nino)
+        self.assertNotEqual(str(self.foreign.uuid), artifact_uuid)
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_booting_from_a_shared_artifact_creates_nothing(
+            self, mock_afo, mock_nino):
+        # A property rather than a regression -- it held before the
+        # change too, for a different reason. A caller who boots from
+        # somebody else's blob should not also acquire an artifact of
+        # its own for that URL, or the next boot would fetch it after
+        # all and the reuse would last exactly one instance.
+        self.foreign.shared = True
+        self._create(self.auth_token_two, 'two', mock_afo, mock_nino)
+
+        self.assertIsNone(self._owned_by('two'))
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_an_invisible_artifact_is_not_reused(self, mock_afo, mock_nino):
+        # The control which proves the tests above are the sharing
+        # rather than the URL. Unshared, so `two` cannot see it, so
+        # `two` gets an artifact of its own and a fetch against the URL.
+        url, _ = self._create(
+            self.auth_token_two, 'two', mock_afo, mock_nino)
+        self.assertEqual(self.URL, url)
+
+        mine = self._owned_by('two')
+        self.assertIsNotNone(mine)
+        self.assertNotEqual(str(self.foreign.uuid), str(mine.uuid))
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_your_own_artifact_is_still_fetched_into(
+            self, mock_afo, mock_nino):
+        # The control for the whole class. An owner booting from their
+        # own URL must still get a real fetch, which is what keeps a
+        # cached image up to date -- narrowing this to the blob would
+        # freeze every artifact at its first version.
+        url, artifact_uuid = self._create(
+            self.auth_token, 'system', mock_afo, mock_nino)
+
+        self.assertEqual(self.URL, url)
+        self.assertEqual(str(self.foreign.uuid), artifact_uuid)
+        self.assertEqual(str(self.foreign.uuid),
+                         str(self._owned_by('system').uuid))

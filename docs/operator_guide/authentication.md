@@ -272,8 +272,16 @@ again over the artifact that first upload produced: adding a version ends in
 is that an instance of yours booting that artifact afterwards gets somebody
 else's image. So the second upload is refused, and a CI job which pushes a
 nightly image into a shared namespace needs a key in that namespace rather
-than a trust. Labels are not affected — a label URL names its own namespace,
-so a trusted caller cannot reach yours through one.
+than a trust.
+
+Labels fall on the same side of that line, which they did not until v0.8.
+A label may be named `<namespace>/<label>`, so a caller *can* reach into
+your namespace through one, and nothing used to stop it — updating a label
+in your namespace did not even require a trust. A trusted namespace may now
+create a label in yours and may not update one that already exists, matching
+artifacts exactly. This does affect the `ci-images` pattern above: the first
+gift of a given label works, and a job which republishes under the same label
+name every night needs a key in the receiving namespace.
 
 **Namespace administration is the exception, and it is a large one.**
 Adding a key to your namespace, and writing a mapping rule in it, are both

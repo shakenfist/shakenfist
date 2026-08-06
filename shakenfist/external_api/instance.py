@@ -652,11 +652,44 @@ class InstancesEndpoint(api_base.Resource):
                 d['blob_uuid'] = disk_base[len(BLOB_URL):]
 
             else:
-                # We ensure that the image exists in the database in an initial state
-                # here so that it will show up in image list requests. The image is
+                # A plain URL, to be fetched from the internet. We ensure that
+                # the image exists in the database in an initial state here so
+                # that it will show up in image list requests. The image is
                 # fetched by the queued job later.
-                Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
-                                  namespace=namespace, create_if_new=True)
+                #
+                # Resolution is by ownership, because that queued job ends in
+                # add_index and add_index ends in delete_old_versions.
+                # Resolving by visibility is how booting from the URL of a
+                # shared image rolled the system namespace's artifact forward
+                # and dropped the versions underneath it -- the operator guide
+                # says outright that a non-system namespace should not be able
+                # to update a shared artifact.
+                #
+                # Reuse is the whole point of sharing one, though, so a
+                # visible artifact somebody else already fetched is still
+                # worth having: we boot from its blob, which costs no download
+                # and writes nothing. Reading theirs and writing only our own
+                # is the distinction, not ours-or-nothing.
+                if not Artifact.owned_from_url(Artifact.TYPE_IMAGE, disk_base,
+                                               namespace=namespace):
+                    theirs = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
+                                               namespace=namespace)
+
+                    # The safety check is a usability test here rather than an
+                    # authorisation one, so a failure falls through to our own
+                    # fetch instead of refusing the request. Somebody else's
+                    # half-built artifact is a reason to fetch our own copy,
+                    # not a reason the instance cannot boot.
+                    blob_uuid = None
+                    if theirs and not _artifact_safety_checks(
+                            theirs, instance_uuid=instance_uuid):
+                        blob_uuid = theirs.resolve_to_blob()
+
+                    if blob_uuid:
+                        d['blob_uuid'] = blob_uuid
+                    else:
+                        Artifact.new(Artifact.TYPE_IMAGE, disk_base,
+                                     namespace=namespace)
 
             transformed_disk.append(d)
 
@@ -826,8 +859,12 @@ class InstancesEndpoint(api_base.Resource):
                 # Empty disk with no base image, no artifact fetch needed
                 continue
 
-            a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
-                                  create_if_new=True)
+            # By ownership, for the same reason as the disk_base resolution
+            # above: the fetch this enqueues ends in add_index. By the time we
+            # get here url is either a blob we already resolved, or a URL we
+            # were entitled to fetch into our own namespace.
+            a = Artifact.owned_from_url_or_new(
+                Artifact.TYPE_IMAGE, url, namespace=namespace)
             a.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
             # TODO(mikal): I would really like the target_node not to be set

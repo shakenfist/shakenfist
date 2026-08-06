@@ -405,6 +405,29 @@ class Artifact(dbowo):
             artifact_type, url, namespace_exact_filter, namespace=namespace)
 
     @staticmethod
+    def owned_from_url_or_new(artifact_type, url, namespace=None):
+        """Resolve a URL to an artifact this namespace owns, creating one.
+
+        For a write path whose target namespace is fixed as the
+        caller's own, or which has already authorised the caller
+        against a namespace it named. Those callers have no two cases
+        to tell apart -- whoever may add a version to the artifact may
+        equally bring it into existence -- so they get the create for
+        free, while still never landing on somebody else's artifact.
+
+        This is the reason owned_from_url() itself does not create. The
+        routes which accept a caller-nominated namespace *do* have two
+        cases: a trust is enough to gift a namespace an artifact it did
+        not have, and not enough to replace what one it already owns
+        resolves to. They authorise the two apart by hand rather than
+        calling this.
+        """
+        a = Artifact.owned_from_url(artifact_type, url, namespace=namespace)
+        if a:
+            return a
+        return Artifact.new(artifact_type, url, namespace=namespace)
+
+    @staticmethod
     def _resolve_url(artifact_type, url, visibility, name=None, max_versions=0,
                      namespace=None, create_if_new=False):
         artifacts = list(Artifacts([
