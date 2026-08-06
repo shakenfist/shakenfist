@@ -6,8 +6,6 @@ tenant/auth headers, and the failure-handling branches (push
 failure, backoff, row retention). Mirrors
 ``test_eventlog_drainer.py``.
 """
-import shutil
-import tempfile
 from unittest import mock
 
 import requests
@@ -17,19 +15,9 @@ from shakenfist import logship_spool
 from shakenfist.tests import base
 
 
-class _SpoolRootMixin:
-    def setUp(self):
-        super().setUp()
-        self.tmp = tempfile.mkdtemp(prefix='sf-logship-drainer-test-')
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self._original_root = logship_spool.SPOOL_ROOT
-        logship_spool.SPOOL_ROOT = self.tmp
-        logship_spool.reset_for_tests()
-        self.addCleanup(logship_spool.reset_for_tests)
-        self.addCleanup(self._restore_root)
-
-    def _restore_root(self):
-        logship_spool.SPOOL_ROOT = self._original_root
+class _SpoolRootMixin(base.SpoolRootMixin):
+    spool_module = logship_spool
+    spool_prefix = 'sf-logship-drainer-test-'
 
 
 class PushBodyTestCase(_SpoolRootMixin, base.ShakenFistTestCase):

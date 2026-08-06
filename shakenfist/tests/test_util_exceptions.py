@@ -2,6 +2,7 @@ import contextlib
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -20,14 +21,9 @@ class RecordExceptionTestCase(base.ShakenFistTestCase):
 
         # Create a temporary directory for exception files
         self.temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_dir, ignore_errors=True)
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
         os.makedirs(self.exceptions_path, exist_ok=True)
-
-    def tearDown(self):
-        super().tearDown()
-        # Clean up temp directory
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _get_exception_info(self):
         """Helper to generate exception info for testing."""
@@ -170,13 +166,9 @@ class RecordExceptionLoggingTestCase(base.ShakenFistTestCase):
         self.mock_record_exception_patcher.stop()
 
         self.temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_dir, ignore_errors=True)
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
         os.makedirs(self.exceptions_path, exist_ok=True)
-
-    def tearDown(self):
-        super().tearDown()
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _redirect_open(self):
         """Send record_exception's writes into the temp directory."""
@@ -423,6 +415,7 @@ class IgnoreExceptionEndToEndTestCase(base.ShakenFistTestCase):
         self.mock_record_exception_patcher.stop()
 
         self.temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_dir, ignore_errors=True)
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
         os.makedirs(self.exceptions_path, exist_ok=True)
 
@@ -437,11 +430,6 @@ class IgnoreExceptionEndToEndTestCase(base.ShakenFistTestCase):
         original_level = logger.level
         logger.setLevel(logging.DEBUG)
         self.addCleanup(logger.setLevel, original_level)
-
-    def tearDown(self):
-        super().tearDown()
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_exactly_one_shipped_record_carrying_the_hash(self):
         real_os_open = os.open
@@ -551,13 +539,9 @@ class IntegrationTestCase(base.ShakenFistTestCase):
         self.mock_record_exception_patcher.stop()
 
         self.temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_dir, ignore_errors=True)
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
         os.makedirs(self.exceptions_path, exist_ok=True)
-
-    def tearDown(self):
-        super().tearDown()
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_record_exception_full_flow(self):
         """Test recording an exception with a real temp file."""

@@ -1,3 +1,5 @@
+import shutil
+import tempfile
 from unittest import mock
 
 import testtools
@@ -26,3 +28,36 @@ class ShakenFistTestCase(testtools.TestCase):
             return_value=None)
         self.mock_record_exception = self.mock_record_exception_patcher.start()
         self.addCleanup(self.mock_record_exception_patcher.stop)
+
+
+class SpoolRootMixin:
+    """Redirect a spool module's ``SPOOL_ROOT`` to a per-test tempdir.
+
+    Subclasses set ``spool_module`` (a module exposing ``SPOOL_ROOT``
+    and ``reset_for_tests()``) and ``spool_prefix`` (the tempdir name
+    prefix). Modules with additional singletons to reset between tests
+    (for example ``shakenfist.logship``) list the reset callables in
+    ``extra_resets``.
+    """
+
+    spool_module = None
+    spool_prefix = None
+    extra_resets = ()
+
+    def setUp(self):
+        super().setUp()
+        self.tmp = tempfile.mkdtemp(prefix=self.spool_prefix)
+        # Registered first so LIFO cleanup ordering runs it last, after
+        # reset_for_tests() has closed the spool's sqlite connection.
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self._original_root = self.spool_module.SPOOL_ROOT
+        self.spool_module.SPOOL_ROOT = self.tmp
+        self.spool_module.reset_for_tests()
+        self.addCleanup(self.spool_module.reset_for_tests)
+        for reset in self.extra_resets:
+            reset()
+            self.addCleanup(reset)
+        self.addCleanup(self._restore_root)
+
+    def _restore_root(self):
+        self.spool_module.SPOOL_ROOT = self._original_root

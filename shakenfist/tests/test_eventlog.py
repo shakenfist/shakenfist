@@ -1,6 +1,4 @@
 import json
-import shutil
-import tempfile
 import uuid
 from unittest import mock
 
@@ -14,21 +12,11 @@ from shakenfist.tests import base
 LOG, _ = logs.setup(__name__)
 
 
-class _SpoolRootMixin:
+class _SpoolRootMixin(base.SpoolRootMixin):
     """Redirect ``SPOOL_ROOT`` to a tempdir and initialise a fresh spool."""
 
-    def setUp(self):
-        super().setUp()
-        self.tmp = tempfile.mkdtemp(prefix='sf-eventlog-test-')
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self._original_root = eventlog_spool.SPOOL_ROOT
-        eventlog_spool.SPOOL_ROOT = self.tmp
-        eventlog_spool.reset_for_tests()
-        self.addCleanup(eventlog_spool.reset_for_tests)
-        self.addCleanup(self._restore_root)
-
-    def _restore_root(self):
-        eventlog_spool.SPOOL_ROOT = self._original_root
+    spool_module = eventlog_spool
+    spool_prefix = 'sf-eventlog-test-'
 
 
 class AddEventMultiSpoolPayloadTestCase(
