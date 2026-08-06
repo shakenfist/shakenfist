@@ -6673,7 +6673,28 @@ class GetMappingRuleAttributesReply(_message.Message):
 
     FOUND_FIELD_NUMBER: _builtins.int
     DATA_FIELD_NUMBER: _builtins.int
+    CORRUPT_FIELD_NUMBER: _builtins.int
     found: _builtins.bool
+    corrupt: _builtins.bool
+    """The row exists but its bound_claims or scopes will not decode.
+
+    This is a data fault, not a transport fault, and the difference is
+    the whole point of the field. A damaged rule has two documented
+    behaviours -- the exchange refuses it with a generic 401, and
+    external_view() marks it unusable so one bad row does not take a
+    namespace's rule listing down -- and both are driven by catching
+    CorruptMappingRule in the API process. Without this flag the
+    exception is raised inside sf-database, the servicer's catch-all
+    turns it into INTERNAL, and _grpc_get_mapping_rule_attributes
+    cannot tell that from a database outage, so the API answers 503
+    and neither behaviour ever happens on a deployed cluster.
+
+    Sent with found=true and no data: the caller is being told the
+    rule is there and cannot be read, which is a different answer to
+    found=false. The message deliberately carries no detail, because
+    the exception text names the rule uuid and this reply is produced
+    on behalf of an unauthenticated caller.
+    """
     @_builtins.property
     def data(self) -> Global___MappingRuleAttributesProto: ...
     def __init__(
@@ -6681,10 +6702,11 @@ class GetMappingRuleAttributesReply(_message.Message):
         *,
         found: _builtins.bool = ...,
         data: Global___MappingRuleAttributesProto | None = ...,
+        corrupt: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["corrupt", b"corrupt", "data", b"data", "found", b"found"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

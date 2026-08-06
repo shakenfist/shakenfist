@@ -558,8 +558,9 @@ class MappingRule(dbo):
             'scopes': attrs.scopes if attrs else None,
             'key_ttl': attrs.key_ttl if attrs else None,
             'key_name_prefix': attrs.key_name_prefix if attrs else None,
-            # Only ever True. A missing attributes row also yields nulls
-            # above, and that is a different fault with a different fix,
+            # Set only by the decode failure above; False for every
+            # healthy rule. A missing attributes row also yields nulls
+            # above, but that is a different fault with a different fix,
             # so the two are not collapsed into one flag.
             'unusable': unusable
         })

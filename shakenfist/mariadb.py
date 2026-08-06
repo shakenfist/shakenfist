@@ -1896,6 +1896,24 @@ def _get_federation_replay_table() -> sa.Table:
     comfortably inside InnoDB's index length limit under any row
     format.
 
+    It is declared ``utf8mb4_nopad_bin`` because the column is an
+    opaque identifier and the server's default collation treats it as
+    text. Under ``utf8mb4_general_ci`` (or ``utf8mb4_uca1400_ai_ci``,
+    the default from MariaDB 11.4) key comparison is case insensitive,
+    and every PAD SPACE collation ignores trailing spaces, so two
+    distinct tokens would collide on the primary key and the second,
+    entirely legitimate, exchange would be refused as a replay. That
+    fails safe rather than open, and the sha256 fallback is lowercase
+    hex of a fixed length so it never bites, but a false refusal on
+    somebody else's choice of jti alphabet is not a behaviour to ship.
+
+    Plain ``utf8mb4_bin`` is not enough: it compares case sensitively
+    but is still PAD SPACE, so ``'x'`` and ``'x '`` remain one key.
+    ``utf8mb4_nopad_bin`` is the binary, NO PAD pairing, and it has
+    existed since MariaDB 10.2 -- comfortably below MIN_MARIADB_VERSION
+    of 10.6. Comparing bytes is also what "is this the same token"
+    actually means.
+
     ``expires_at`` is the inbound token's own ``exp``. The row only
     has to outlive the token: once the token is expired, step five of
     the exchange refuses it before the replay check is ever reached.
@@ -1910,7 +1928,9 @@ def _get_federation_replay_table() -> sa.Table:
             _federation_replay_table = sa.Table(
                 'federation_replay',
                 metadata,
-                sa.Column('token_id', sa.String(128), primary_key=True),
+                sa.Column('token_id',
+                          sa.String(128, collation='utf8mb4_nopad_bin'),
+                          primary_key=True),
                 sa.Column('rule_uuid', sa.Uuid(), primary_key=True),
                 sa.Column('expires_at', sa.Double(), nullable=False),
                 sa.Index('idx_federation_replay_expires', 'expires_at'),
@@ -14065,6 +14085,22 @@ def _grpc_get_mapping_rule_attributes(
         request = database_pb2.GetMappingRuleAttributesRequest(
             uuid=str(rule_uuid))
         reply = _grpc_call(stub.GetMappingRuleAttributes, request)
+        if reply.corrupt:
+            # The servicer tried to decode the row and could not. Raise
+            # what the direct path raises, so a damaged rule behaves
+            # the same whether or not the database service is in use:
+            # the exchange refuses with a generic 401 and
+            # external_view() marks the rule unusable. Without this the
+            # servicer's catch-all makes it INTERNAL, this function
+            # cannot distinguish that from an outage, and the API
+            # answers 503 instead.
+            #
+            # Deliberately not folded into the RpcError handler below.
+            # This is an answer, not a transport failure, and it is not
+            # worth retrying -- the next attempt decodes the same bad
+            # row.
+            raise exceptions.CorruptMappingRule(
+                f'mapping rule {rule_uuid} has undecodable attributes')
         if not reply.found:
             return None
         return _mapping_rule_attrs_from_proto(reply.data)

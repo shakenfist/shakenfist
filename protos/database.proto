@@ -1980,6 +1980,26 @@ message GetMappingRuleAttributesRequest {
 message GetMappingRuleAttributesReply {
   bool found = 1;
   MappingRuleAttributesProto data = 2;
+
+  // The row exists but its bound_claims or scopes will not decode.
+  //
+  // This is a data fault, not a transport fault, and the difference is
+  // the whole point of the field. A damaged rule has two documented
+  // behaviours -- the exchange refuses it with a generic 401, and
+  // external_view() marks it unusable so one bad row does not take a
+  // namespace's rule listing down -- and both are driven by catching
+  // CorruptMappingRule in the API process. Without this flag the
+  // exception is raised inside sf-database, the servicer's catch-all
+  // turns it into INTERNAL, and _grpc_get_mapping_rule_attributes
+  // cannot tell that from a database outage, so the API answers 503
+  // and neither behaviour ever happens on a deployed cluster.
+  //
+  // Sent with found=true and no data: the caller is being told the
+  // rule is there and cannot be read, which is a different answer to
+  // found=false. The message deliberately carries no detail, because
+  // the exception text names the rule uuid and this reply is produced
+  // on behalf of an unauthenticated caller.
+  bool corrupt = 3;
 }
 
 message UpdateMappingRuleAttributesRequest {

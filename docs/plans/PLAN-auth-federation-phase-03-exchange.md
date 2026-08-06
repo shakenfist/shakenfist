@@ -845,6 +845,83 @@ installs from PyPI into a scratch venv without difficulty, and doing
 so reproduces the failure in seconds. The lesson is recorded in
 `AGENTS.md` under "Cluster CI tests only run in the merge queue".
 
+## Third pull request review (#3625)
+
+Eight items. Two fixed as defects, two as documentation, two as
+smaller corrections, one deferred to an issue, one needing nothing.
+
+**The damaged-rule handling did not work on a real cluster.** This
+phase put considerable effort into a rule whose `bound_claims` or
+`scopes` will not decode: the exchange refuses it with a generic 401,
+and `external_view()` marks it `unusable` so one bad row does not take
+a namespace's listing down. Neither happened on a deployed cluster.
+The decode runs inside `sf-database`, the servicer's catch-all turned
+`CorruptMappingRule` into `INTERNAL`, and
+`_grpc_get_mapping_rule_attributes` converts any `RpcError` into
+`DatabaseUnavailable` — so the API answered 503 and both behaviours
+were unreachable. Every test for them patched `MappingRule._attributes`
+in-process, which is the only path where they worked.
+
+This is the mistake this plan already named under "A guard has to sit
+where the exception is raised", committed one layer down: the guard
+was in the right place, and the fault could not reach it. The reply
+now carries `bool corrupt`, the servicer sets it instead of falling
+into the catch-all, and the client re-raises `CorruptMappingRule`.
+`str(e)` is logged rather than passed to `set_details()`, because the
+message names the rule uuid and the exchange is unauthenticated. The
+new tests drive the real servicer method and the real client wrapper
+rather than a patched attribute; reverting either half fails exactly
+the three that should.
+
+**The replay key compared tokens as text.** `token_id` was
+`sa.String(128)`, so it inherited the server's default collation —
+`utf8mb4_general_ci` on 10.6, `utf8mb4_uca1400_ai_ci` from 11.4 — under
+which two jti values differing only in case are one primary key, and
+the second, legitimate, exchange is refused as a replay. It fails safe
+rather than open, and the sha256 fallback is lowercase hex so it never
+bites, but an issuer minting mixed-case base64 jti values is ordinary.
+
+The obvious fix was wrong and testing caught it. `utf8mb4_bin` compares
+case sensitively but is still PAD SPACE, so `'x'` and `'x '` remained
+one key; the column is now `utf8mb4_nopad_bin`, which has existed since
+MariaDB 10.2, comfortably below `MIN_MARIADB_VERSION` of 10.6. Because
+no unit test can answer "does this server think these are the same
+key", the tests are live ones behind `SF_MARIADB_TEST_DSN`, verified
+against dockerised MariaDB 10.6 and 11.4. `tools/ci-enum-widening-test.sh`
+now runs every `test_mariadb_*_live` module rather than one by name —
+standing up MariaDB is the expensive part, and the script and its job
+keep their old names so the required status check does not move.
+
+**Two documentation gaps.** The release notes recorded that a trust no
+longer authorises delete, share, unshare, retag or metadata changes,
+but not that it no longer authorises adding a version to an artifact it
+previously gifted — so tooling that re-uploads the same `source_url`
+across a trust breaks with a 404 and nothing said so. The operator
+guide's "Giving is a separate question from taking" read as though
+re-gifting worked. Both now state where the line falls, and both note
+that labels are unaffected because a label URL names its own namespace.
+
+Also: the comment on `external_view()`'s `unusable` field opened with
+"Only ever True", which is wrong — the field is False for every healthy
+rule, as its own test asserts. Two documentation files were missing
+trailing newlines; there is no `end-of-file-fixer` in
+`.pre-commit-config.yaml`, which is why nothing caught them.
+
+**Deferred.** Three call sites ending in `add_index` still resolve
+URLs with the visibility-based `from_url` — instance create, the label
+endpoint, and the artifact fetch operation. None is exploitable the way
+the upload route was: the instance path fetches from the owner's own
+URL rather than caller-supplied bytes, and label URLs are
+namespace-scoped. But this phase writes the ownership rule down as
+universal, so leaving three unremarked counter-examples would mislead.
+`AGENTS.md` now names them and issue #3640 tracks narrowing them,
+rather than growing this pull request further.
+
+**No action.** The rate limiter keying on `remote_addr` without a
+`ProxyFix` was reviewed and agreed with as already analysed and
+documented. The absence of functional coverage for a successful
+exchange is the subject of #3639, above.
+
 ## Back brief
 
 Before executing any step of this phase, the implementing sub-agent

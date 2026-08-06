@@ -3711,6 +3711,23 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 return database_pb2.GetMappingRuleAttributesReply(found=False)
             return database_pb2.GetMappingRuleAttributesReply(
                 found=True, data=mariadb._mapping_rule_attrs_to_proto(data))
+        except exceptions.CorruptMappingRule as e:
+            # A rule whose bound_claims or scopes will not decode is a
+            # data fault, and the catch-all below would flatten it into
+            # INTERNAL, which the client can only read as a database
+            # outage. Carry it in a field instead, so the API can still
+            # refuse the exchange and still mark the rule unusable. See
+            # the comment on GetMappingRuleAttributesReply.corrupt.
+            #
+            # str(e) is logged rather than passed to set_details(),
+            # because the message names the rule uuid, and on the
+            # exchange path this reply is produced for a caller who has
+            # not authenticated.
+            LOG.with_fields({'rule': request.uuid}).error(
+                'database GetMappingRuleAttributes found a damaged '
+                f'rule: {e}')
+            return database_pb2.GetMappingRuleAttributesReply(
+                found=True, corrupt=True)
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetMappingRuleAttributes failed', e)

@@ -264,6 +264,17 @@ the "gift" step in the `ci-images` example above. Creation is additive, you
 opted into it by extending the trust, and nothing you already had is lost by
 it. Deletion is none of those things.
 
+Giving the same thing twice is not creation, though, and it is worth being
+precise about where the line falls. A trusted namespace may upload an artifact
+into yours when nothing of that `source_url` is there yet. It may not upload
+again over the artifact that first upload produced: adding a version ends in
+`delete_old_versions`, the caller supplies the blob, and the practical result
+is that an instance of yours booting that artifact afterwards gets somebody
+else's image. So the second upload is refused, and a CI job which pushes a
+nightly image into a shared namespace needs a key in that namespace rather
+than a trust. Labels are not affected — a label URL names its own namespace,
+so a trusted caller cannot reach yours through one.
+
 **Namespace administration is the exception, and it is a large one.**
 Adding a key to your namespace, and writing a mapping rule in it, are both
 gated on this same trust relationship rather than on ownership. A namespace

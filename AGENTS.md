@@ -438,6 +438,27 @@ Two rules fell out of fixing it, and both generalise past artifacts:
   check so a refused caller cannot write to the event log of a namespace it is
   about to be told does not exist.
 
+Three call sites that end in `add_index` still resolve with `from_url`, and the
+sweep was not exhaustive. They are listed here so the next reader does not
+assume otherwise:
+
+- `external_api/instance.py` (instance create) resolves a caller-supplied
+  `disk.base` with `create_if_new=True`. Namespace B naming A's `source_url`
+  lands on A's artifact, but the fetch pulls from the owner's own URL rather
+  than from bytes B supplied, so an unchanged URL adds no version. Lower
+  severity than the upload hole, not zero.
+- `external_api/label.py` (`LabelEndpoint.post`) builds
+  `sf://label/<namespace>/<name>` from the request, so the URL is
+  namespace-scoped and a caller cannot steer it into somebody else's namespace.
+  Note that the `requires_admin=True` in its `swag_from` is documentation and
+  enforces nothing — see the swagger note elsewhere in this file.
+- `operations/artifact_fetch_op.py` runs behind the instance path above and
+  inherits its namespace.
+
+Issue #3640 tracks narrowing them. Until then, treat "write paths use
+`owned_from_url`" as the rule being converged on rather than one the tree
+already satisfies, and do not add a fourth exception.
+
 ### Credential-carrying routes are not logged, not redacted
 
 Two independent loggers see a request body: `app.py`'s `before_request` audit
