@@ -91,7 +91,13 @@ class Declaration(NamedTuple):
 
 
 def _parse(path: str) -> ast.Module:
-    with open(path) as f:
+    # Explicit encoding, unlike the rest of the codebase: python source
+    # is UTF-8 by definition (PEP 3120), but open() defaults to the
+    # locale's encoding, and the pre-commit hook and mutation harness
+    # run in whatever environment the developer has. Three of the files
+    # this reads contain non-ASCII, so an ASCII locale crashed the
+    # whole audit here.
+    with open(path, encoding='utf-8') as f:
         return ast.parse(f.read())
 
 

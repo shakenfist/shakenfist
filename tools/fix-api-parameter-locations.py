@@ -48,7 +48,7 @@ def main(apply_edits, api_dir=declarations.API_DIR, app=None):
         by_file[declared.path].append((declared, want))
 
     for path, edits in sorted(by_file.items()):
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             lines = f.read().splitlines(keepends=True)
 
         # Bottom-up, so an edit cannot move the position of one not yet
@@ -58,25 +58,35 @@ def main(apply_edits, api_dir=declarations.API_DIR, app=None):
                                       e[0].location_node.col_offset),
                 reverse=True):
             node = declared.location_node
-            line = lines[node.lineno - 1]
+            # AST column offsets count UTF-8 bytes, not characters, so
+            # the line is spliced in its encoded form. The two models
+            # agree on ASCII, which is why indexing the str appeared to
+            # work -- and would have stopped at the first line with a
+            # non-ASCII character ahead of a location literal.
+            raw = lines[node.lineno - 1].encode('utf-8')
             # Guards, not asserts: python -O strips asserts, and this
             # splices bytes into source at an offset.
             if node.lineno != node.end_lineno:
                 raise SystemExit(
                     'multi-line location literal for %s' % declared.name)
-            if line[node.col_offset:node.end_col_offset] != repr(
-                    declared.location):
+            if raw[node.col_offset:node.end_col_offset] != repr(
+                    declared.location).encode('utf-8'):
                 raise SystemExit(
                     '%s:%d does not hold %r'
                     % (path, node.lineno, declared.location))
 
-            lines[node.lineno - 1] = (line[:node.col_offset] + repr(want)
-                                      + line[node.end_col_offset:])
+            lines[node.lineno - 1] = (
+                raw[:node.col_offset] + repr(want).encode('utf-8')
+                + raw[node.end_col_offset:]).decode('utf-8')
             print('  %-38s %-18s %-6s -> %s'
                   % (declared.cls, declared.name, declared.location, want))
 
         if apply_edits:
-            with open(path, 'w') as f:
+            # Explicit encoding on the write as well as the read: this
+            # open() truncates the file before a UnicodeEncodeError
+            # could be raised, so an ASCII locale would leave source
+            # cut off at its first non-ASCII character.
+            with open(path, 'w', encoding='utf-8') as f:
                 f.write(''.join(lines))
 
     for declared, _ in underivable:

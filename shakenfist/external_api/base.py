@@ -167,9 +167,14 @@ def swagger_helper(section, description, parameters, responses,
         'produces': [
             'application/json'
         ],
-        'security': {
+        # A list, not a bare object: OpenAPI 2.0 defines security as an
+        # array of requirement objects (alternatives, any one of which
+        # satisfies the operation). The object form was the largest
+        # single class of specification-validity errors -- one per
+        # operation.
+        'security': [{
             'bearerAuth': []
-        },
+        }],
         'deprecated': False,
         'description': description,
         'responses': {}

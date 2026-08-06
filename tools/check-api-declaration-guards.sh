@@ -33,8 +33,9 @@
 # restores from a copy rather than with git, so uncommitted work
 # survives a failure part-way through.
 #
-# Requires GNU sed: the mutations use `sed -i` without a backup suffix,
-# which BSD/macOS sed parses differently.
+# Requires GNU sed (the mutations use `sed -i` without a backup
+# suffix, which BSD/macOS sed parses differently) and rsync (the
+# restore path deletes files a mutation created).
 set -u
 
 # Run from the repository root whatever the caller's directory. Every
@@ -56,6 +57,13 @@ fi
 # NO-OP comparison report a difference that is not a mutation.
 export PYTHONDONTWRITEBYTECODE=1
 
+# tox also sets LC_ALL for its environments, and this script does not
+# get that either. The API sources contain non-ASCII, so under an
+# ASCII locale every file read in the audit used to die with
+# UnicodeDecodeError. The reads now pass encoding='utf-8' explicitly,
+# but the interpreter itself still consults the locale for stdio.
+export PYTHONUTF8=1
+
 BACKUP=$(mktemp -d)
 cp -a shakenfist/external_api/. "${BACKUP}"/
 if [ -z "$(ls -A "${BACKUP}")" ]; then
@@ -64,14 +72,18 @@ if [ -z "$(ls -A "${BACKUP}")" ]; then
     rm -rf "${BACKUP}"
     exit 2
 fi
-trap 'cp -a "${BACKUP}"/. shakenfist/external_api/; rm -rf "${BACKUP}"' EXIT
+# rsync --delete rather than cp: a copy restores modified files but
+# leaves behind any file a mutation *created*, in a directory the
+# audit globs. No current mutation adds a file, but this script exists
+# to be extended.
+trap 'rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; rm -rf "${BACKUP}"' EXIT
 
 total=0
 failures=0
 
 run() { "${PYTHON}" -m stestr run test_parameter_declarations 2>&1; }
 
-restore() { cp -a "${BACKUP}"/. shakenfist/external_api/; }
+restore() { rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; }
 
 # Anything but a catch counts against the exit status, including the
 # two verdicts which indict this script rather than a guard.
@@ -229,8 +241,11 @@ check 'underivable location declared'
 # redundant early warning. A *registered* collision still breaks
 # import, so the mutation defines the duplicate without registering
 # it; the class is otherwise fully compliant (declared, empty
-# parameter list, no kwargs) so the collision report is the only guard
-# it can trip. DerivationTestCase.test_colliding_class_names_are_reported
+# parameter list, no kwargs) so the collision report is the only
+# guard it can trip. Note the endpoint/route symmetry test cannot see
+# it: that check compares class *names*, and this name is mounted --
+# which is exactly the blindness the by-name collision report exists
+# to cover. DerivationTestCase.test_colliding_class_names_are_reported
 # covers the message shape on constructed sources.
 python3 - <<'PY'
 p = 'shakenfist/external_api/blob.py'

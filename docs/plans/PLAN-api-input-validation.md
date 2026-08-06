@@ -287,25 +287,29 @@ declarations are good enough to compile.
 ### Carried into phase 2 from phase 1
 
 Phase 1 corrected which location each parameter declares. It did
-not change how `swagger_helper()` renders them, which leaves three
+not change how `swagger_helper()` renders them, which leaves two
 specification-validity problems for phase 2 to pick up. Measured
 with `openapi_spec_validator` over the flasgger output (raised by
 the ninth review round and re-measured independently): develop
-produces 363 validation errors, this branch 241, with the entire
-"path template variable has no corresponding path parameter"
-class eliminated by the location audit. The 241 that remain
-decompose exactly into the three items below: 126, 114 and 1.
+produced 363 validation errors and this branch 241 at that
+measurement, with the entire "path template variable has no
+corresponding path parameter" class eliminated by the location
+audit. The `security` fix below then landed in phase 1 after all,
+and a rebase brought in the eleven federated-authentication
+handlers, so the branch now measures **129**: 128 from the body
+class, 1 from `schemes`.
 
 * **Multiple body parameters per operation.** Swagger 2.0 permits
   at most one `in: body` parameter, and it must carry a `schema`
   rather than `type`/`format`; `swagger_helper()` emits
-  `type`/`format` for everything. 29 operations declare more than
-  one body parameter (23 before phase 1 — correcting `key` from
-  query to body on the metadata endpoints added most of the
-  rest). Every individual declaration is now right and the
-  specification is still invalid, so the generated-client problem
-  this plan opens with is only partly closed. The fix is to
-  collapse an operation's body parameters into a single `body`
+  `type`/`format` for everything. 32 of 132 operations declare
+  more than one body parameter (23 before phase 1 — correcting
+  `key` from query to body on the metadata endpoints added most
+  of the rest, and the federated-authentication endpoints arrived
+  with several more). Every individual declaration is now right
+  and the specification is still invalid, so the generated-client
+  problem this plan opens with is only partly closed. The fix is
+  to collapse an operation's body parameters into a single `body`
   parameter with a generated `schema` object, which is a change to
   the renderer rather than to any declaration.
 * **`schemes` renders as a string, not an array.**
@@ -320,16 +324,17 @@ decompose exactly into the three items below: 126, 114 and 1.
   *first* thing a validator trips over, ahead of the body
   parameters above, so #3626 has to fix or explicitly waive it to
   reach anything else.
-* **`security` renders as an object, not an array.**
-  `swagger_helper()` emits `'security': {'bearerAuth': []}`, but
-  OpenAPI 2.0 requires `security` to be an *array* of requirement
-  objects. At 126 of the 241 remaining validator errors this is
-  the largest single class left — more than the body-parameter
-  one (114) and `schemes` (1) combined — and unlike `schemes` it
-  is emitted by `swagger_helper()` itself. The fix is one line
-  (`'security': [{'bearerAuth': []}]`) and belongs with the
-  renderer work here rather than in phase 1, whose scope was the
-  declarations, not what they render to.
+* **`security` renders as an object, not an array — fixed in
+  phase 1 after all.** `swagger_helper()` emitted
+  `'security': {'bearerAuth': []}`, but OpenAPI 2.0 requires
+  `security` to be an *array* of requirement objects. This was
+  deferred here twice on scoping grounds, and the eleventh review
+  round questioned deferring a one-line change inside a function
+  the phase was already editing (the `format`/duplicated-key
+  fixes were the same class of renderer tweak). It shipped:
+  `'security': [{'bearerAuth': []}]` eliminated the entire
+  126-error class, the largest remaining. Kept in this list as a
+  record of the scoping call rather than as work to do.
 * **Nothing validates the generated specification.** Phase 1's
   path-implies-required rule exists to satisfy linters and client
   generators, and was checked by hand. A unit test running

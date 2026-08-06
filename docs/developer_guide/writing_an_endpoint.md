@@ -151,10 +151,11 @@ Two known gaps:
 * Swagger 2.0 allows at most one `in: body` parameter per operation,
   carrying a `schema` rather than a `type`. `swagger_helper()` emits
   one parameter per declaration, so operations with several body
-  parameters render an invalid specification — **29 of 126 operations
+  parameters render an invalid specification — **32 of 132 operations
   today, up from 23 of 124 before the declaration audit**, because
   correcting a parameter to `body` is individually right and moves this
-  count the wrong way. The published specification is not yet
+  count the wrong way (the federated-authentication endpoints then
+  added several more). The published specification is not yet
   linter-clean. Phase 2 collapses the parameters into a generated
   `schema`;
   [issue #3626](https://github.com/shakenfist/shakenfist/issues/3626)

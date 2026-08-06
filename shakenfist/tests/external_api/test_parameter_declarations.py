@@ -97,6 +97,15 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         ever preferred the installed copy, the audit would confidently
         pass against stale sources and the mutation harness would
         mutate files nothing reads.
+
+        Two assertions because either alone holds for the wrong
+        reason. The relative check catches *divergence* (test from the
+        checkout, module from the wheel) but passes when both resolve
+        to the installed copy -- REPO_ROOT is then just site-packages,
+        and the module is under it. So the second assertion requires a
+        marker which the wheel does not ship: tools/ is not in the
+        package, so its presence under REPO_ROOT proves REPO_ROOT is a
+        checkout and not an install.
         """
         self.assertTrue(
             os.path.abspath(declarations.API_DIR).startswith(
@@ -104,6 +113,12 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             'declarations was imported from %s, which is not under this '
             'checkout (%s): the audit is running against an installed '
             'copy, not the working tree' % (declarations.API_DIR, REPO_ROOT))
+        self.assertTrue(
+            os.path.exists(os.path.join(
+                REPO_ROOT, 'tools', 'fix-api-parameter-locations.py')),
+            '%s does not contain tools/fix-api-parameter-locations.py, so '
+            'it is an installed copy rather than a checkout, and the audit '
+            'is not reading the working tree' % REPO_ROOT)
 
     def test_declared_locations_are_derivable(self):
         """The declared location must be where the value really arrives.
@@ -169,7 +184,8 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             'underivable declaration; remove them')
 
     def test_route_parameters_are_declared(self):
-        """Every route segment is declared as a path parameter.
+        """Every route segment is declared as a path parameter, by
+        every handler of the mounted class.
 
         The drift assertion checks each *declared* parameter against
         its derived location, so a route segment that is never declared
@@ -179,24 +195,60 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         property holds transitively (flask_restful passes segments as
         kwargs, and accepted kwargs must be declared), but that chain
         has exemption lists in it; this states the property directly.
+
+        Per handler rather than per class: an earlier version pooled
+        every handler's path declarations into one set per class, so a
+        class whose post declared the segment covered for a get which
+        neither declared nor accepted it -- and flask_restful passes
+        the segment to every method on the class regardless.
         """
         declared_path: dict = {}
-        for cls, _, fn in _endpoints():
-            for parameter in declarations.declarations(fn):
-                if parameter.location == 'path':
-                    declared_path.setdefault(cls, set()).add(parameter.name)
+        for cls, method, fn in _endpoints():
+            declared_path[(cls, method)] = {
+                parameter.name
+                for parameter in declarations.declarations(fn)
+                if parameter.location == 'path'}
 
         problems: list = []
-        for cls, names in declarations.route_parameters(
-                problems=problems).items():
-            for name in names:
+        routes = declarations.route_parameters(problems=problems)
+        for (cls, method), declared in declared_path.items():
+            for name in routes.get(cls, set()):
                 self.assertIn(
-                    name, declared_path.get(cls, set()),
-                    '%s is mounted on a route carrying %r, but no handler '
-                    'on it declares that path parameter; the published '
-                    'path template would reference an undefined variable'
-                    % (cls, name))
+                    name, declared,
+                    '%s is mounted on a route carrying %r, but %s.%s does '
+                    'not declare that path parameter; the published path '
+                    'template would reference an undefined variable, and '
+                    'flask_restful passes the segment to every method on '
+                    'the class' % (cls, name, cls, method))
         self.assertEqual([], problems)
+
+    def test_every_mounted_class_is_an_endpoint_and_vice_versa(self):
+        """route_parameters() and handlers() must agree on what an
+        endpoint is.
+
+        handlers() recognises an endpoint by a base name ending in
+        'Resource' -- a heuristic, because AST cannot resolve what a
+        base actually is. A Resource subclass reached through an
+        intermediate base named anything else would be skipped with an
+        empty problems list, exempting it from every assertion in this
+        module. This symmetry check is what makes that silent skip
+        loud: a class mounted by add_resource() but not recognised as
+        an endpoint fails one direction, and a recognised endpoint
+        never mounted (dead code, or a typo in app.py) fails the
+        other.
+        """
+        problems: list = []
+        mounted = set(declarations.route_parameters(problems=problems))
+        recognised = {cls for cls, _, _ in _endpoints()}
+        self.assertEqual([], problems)
+
+        self.assertEqual(
+            set(), mounted - recognised,
+            'mounted by add_resource() but not recognised as an endpoint, '
+            'so exempt from every assertion in this module')
+        self.assertEqual(
+            set(), recognised - mounted,
+            'recognised as an endpoint but never mounted in app.py')
 
     def test_declared_names_are_real_parameters(self):
         """A declared name must be something the handler can receive.
@@ -999,7 +1051,10 @@ class FixerTestCase(base.ShakenFistTestCase):
         spec.loader.exec_module(self.fixer)
 
     def _write(self, name, source):
-        with open(os.path.join(self.tempdir, name), 'w') as f:
+        # Explicit encoding because the byte-offset test writes real
+        # non-ASCII, and this must not depend on the caller's locale.
+        with open(os.path.join(self.tempdir, name), 'w',
+                  encoding='utf-8') as f:
             f.write(source)
 
     def test_rewrites_a_wrong_location(self):
@@ -1030,6 +1085,42 @@ class FakeEndpoint(api_base.Resource):
             rewritten)
 
         # Idempotent, and the only thing that changed is the two tokens.
+        self.assertEqual(0, self.fixer.main(False, self.tempdir))
+
+    def test_splices_at_byte_offsets_not_character_offsets(self):
+        """AST column offsets count UTF-8 bytes, not characters.
+
+        The two models agree on ASCII, so the character model works
+        until a non-ASCII character lands ahead of a location literal
+        on the same physical line -- the em dash in the first tuple's
+        description shifts the second tuple's byte offsets past its
+        character offsets. The old character-based splice failed the
+        slice guard there: closed, but refusing a rewrite it should
+        have made.
+        """
+        self._write('app.py', '''
+api.add_resource(FakeEndpoint, '/fakes/<fake_ref>/parts/<part_ref>')
+''')
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('fake_ref', 'query', 'uuid', 'A ref — truly.', True), ('part_ref', 'body', 'uuid', 'A part.', True)],
+        []))
+    def get(self, fake_ref=None, part_ref=None):
+        pass
+''')
+
+        self.assertEqual(1, self.fixer.main(False, self.tempdir))
+        self.assertEqual(0, self.fixer.main(True, self.tempdir))
+
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
+            rewritten = f.read()
+        self.assertIn(
+            "[('fake_ref', 'path', 'uuid', 'A ref — truly.', True), "
+            "('part_ref', 'path', 'uuid', 'A part.', True)]",
+            rewritten)
         self.assertEqual(0, self.fixer.main(False, self.tempdir))
 
     def test_refuses_to_rewrite_from_unreadable_input(self):

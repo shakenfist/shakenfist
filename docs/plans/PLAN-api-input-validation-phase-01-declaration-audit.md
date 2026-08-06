@@ -608,15 +608,53 @@ grep is consulted only when there are no counts at all, so an
 import-time abort is recognised by what it prevents (a test run)
 rather than by a substring a completed run can also emit.
 
+An eleventh round found two genuinely new defects rather than
+holes in the previous round's machinery. Every `open()` in the
+derivation and the fixer trusted the locale's encoding, and three
+of the API sources contain non-ASCII — so under an ASCII locale
+(which the pre-commit hook and the mutation harness actually run
+in, unlike tox's `LC_ALL`-pinned testenv) the whole audit died
+with `UnicodeDecodeError`. Worse, the fixer's write-side `open()`
+truncates before an encode error can raise, so only the read
+crash happening first stood between an ASCII locale and a source
+file cut off at its first em dash. Everything now passes
+`encoding='utf-8'` explicitly (python source is UTF-8 by
+definition, PEP 3120) and the harness exports `PYTHONUTF8=1`.
+The second: `test_the_audit_reads_this_checkout` could not detect
+the very case its docstring names, because when both the test and
+the module resolve to the installed wheel, `REPO_ROOT` *is*
+site-packages and the relative check passes. It now also requires
+a marker the wheel does not ship (`tools/`), so "this is a
+checkout" is asserted rather than inferred.
+
+The same round's considers, all taken: the fixer now splices at
+byte offsets (`ast` column offsets count UTF-8 bytes, and the
+character model failed the slice guard — closed, but refusing a
+rewrite it should have made — on any line with non-ASCII ahead of
+a location literal); an endpoint/route symmetry test makes
+`handlers()`'s name-suffix heuristic loud when it misses (a
+mounted class the audit does not recognise, or a recognised class
+never mounted); the route-coverage test asserts per handler
+rather than per class, so one method's path declaration no longer
+covers for a sibling that neither declares nor accepts the
+segment; the mutation harness restores with `rsync --delete` so a
+future file-creating mutation cannot leak into a directory the
+audit globs; and the `security`-as-object fix — deferred to phase
+2 twice — shipped as the one-line array form, eliminating the
+largest remaining specification-error class (126 of 241). The
+remaining errors measure 129: 128 multi-body, 1 `schemes`.
+
 ### Known remaining gap: multiple body parameters
 
 Swagger 2.0 permits at most one `in: body` parameter per
 operation, and it must carry a `schema` rather than
 `type`/`format`. `swagger_helper()` emits `type`/`format` for
 every parameter regardless of location, and operations declaring
-more than one body parameter go from **23 on develop to 29 on
-this branch** — the metadata POST endpoints in particular move
-`key` from query to body, joining `value`.
+more than one body parameter go from **23 before the audit to 32
+on this branch** — the metadata POST endpoints in particular move
+`key` from query to body, joining `value`, and the rebase brought
+in the federated-authentication endpoints which declare several
+body parameters of their own.
 
 Each individual move is correct (the client does send `key` in
 the body) and the defect predates this phase, but it means the
