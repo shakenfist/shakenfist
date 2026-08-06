@@ -22,6 +22,7 @@
 # because enum growth changes no table version and so cannot be caught by
 # the version gate.
 
+import decimal
 from ipaddress import IPv4Address
 import json
 import math
@@ -23334,6 +23335,13 @@ def _derive_cpu_memory_limits(
     scheduler may place on a node that has no capacity row yet. That is
     the conservative direction, but it means the two are not
     interchangeable while an upgrade is in flight.
+
+    ``limit_memory_mb`` is clamped at zero, matching the headroom clamp
+    in _derive_disk_limit_gb: a reservation exceeding the overcommit
+    ceiling (RAM_OVERCOMMIT_RATIO at or below 1.0 with a large
+    NODE_MEMORY_RESERVATION_MB) means the node admits nothing, and zero
+    says that without silently dragging the cluster total below the sum
+    of the other nodes the way a negative limit would.
     """
     limit_cpus = None
     if cpu_schedulable is not None:
@@ -23341,8 +23349,10 @@ def _derive_cpu_memory_limits(
 
     limit_memory_mb = None
     if memory_max is not None and memory_reserved_mb is not None:
-        limit_memory_mb = (
-            math.floor(memory_max * ram_overcommit_ratio) - memory_reserved_mb)
+        limit_memory_mb = max(
+            0,
+            math.floor(memory_max * ram_overcommit_ratio) -
+            memory_reserved_mb)
 
     return limit_cpus, limit_memory_mb
 
@@ -23400,10 +23410,19 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
     _RECONCILE_USAGE_SQL: elements without a numeric ``size`` (missing,
     null, or garbage) contribute 0, and a disk_spec that is not a list
     contributes 0 with a warning. Production reads the SQL, not this --
-    validation settled that question in JSON_TABLE's favour -- but
-    ``tools/ci-capacity-reconcile-test.sh`` asserts the two agree on the
-    same payloads against a real MariaDB, so this stays an oracle rather
-    than becoming stale prose.
+    validation settled that question in JSON_TABLE's favour -- but the
+    live-MariaDB CI job asserts the two agree on the same payloads
+    against a real server, so this stays an oracle rather than becoming
+    stale prose.
+
+    Fractional sizes follow MariaDB's JSON-number-to-BIGINT cast, which
+    rounds half away from zero (10.5 -> 11, -2.5 -> -3, and a numeric
+    string "8.7" -> 9) -- probed against a real server rather than
+    assumed, because Python's round() would give banker's rounding and
+    int() would truncate, and either divergence is exactly the silent
+    wrong number this oracle exists to expose. Booleans cast to 0/1 as
+    they do in SQL. No current write path produces fractional sizes, so
+    this is soundness of the oracle rather than a live behaviour.
     """
     if not isinstance(disk_spec, list):
         LOG.warning(f'Malformed disk_spec (not a list): {disk_spec!r}')
@@ -23414,10 +23433,16 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
             LOG.warning(f'Malformed disk_spec element: {disk!r}')
             continue
         size = disk.get('size')
+        if size is None:
+            # JSON null casts to SQL NULL, which SUM() ignores.
+            continue
+        if isinstance(size, bool):
+            total += int(size)
+            continue
         try:
-            if size is not None:
-                total += int(size)
-        except (TypeError, ValueError):
+            total += int(decimal.Decimal(str(size)).quantize(
+                decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP))
+        except (decimal.InvalidOperation, TypeError, ValueError):
             LOG.warning(f'Malformed disk_spec size: {size!r}')
     return total
 
@@ -23479,9 +23504,21 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # The JSON_TYPE guard skips a disk_spec that is somehow not an array, and
 # the DEFAULT ... ON EMPTY / ON ERROR clauses make elements without a
 # numeric size contribute 0 -- one malformed disk_spec can not abort the
-# pass (see _disk_spec_virtual_gb for the reference semantics). The
-# enum-valued columns (object_type, relationship) are bound as parameters
-# because SQLAlchemy persists enum member names, not values.
+# pass (see _disk_spec_virtual_gb for the reference semantics).
+#
+# The enum-typed predicates span two storage conventions, and the bound
+# parameters must match each column's convention exactly.
+# object_states.object_type is a native sa.Enum(ObjectType), which
+# SQLAlchemy persists as the member *name* ('INSTANCE'); the
+# object_references type and relationship columns are plain String(64)
+# written by _direct_record_relationship() as str(member), which for
+# these str-subclass enums is the *value* ('instance',
+# 'instance_location'). The two spellings differ only in case, so a
+# mismatched binding still matches under MariaDB's default
+# case-insensitive utf8mb4 collations -- and silently returns zero rows
+# under utf8mb4_bin or any _cs collation, all of which
+# verify_mariadb_compat() accepts. The live test suite runs against
+# utf8mb4_bin precisely so a wrong binding here fails loudly.
 #
 # The reference row's endpoint types are constrained as well as its
 # relationship. Nothing writes an INSTANCE_LOCATION row with other
@@ -23514,7 +23551,7 @@ _RECONCILE_USAGE_SQL = sa.text('''
        AND s.object_type = :instance_object_type
      WHERE r.relationship = :instance_location
        AND r.source_object_type = :node_object_type
-       AND r.target_object_type = :instance_object_type
+       AND r.target_object_type = :instance_ref_type
        AND (s.state_value IS NULL OR s.state_value != 'deleted')
      GROUP BY r.source_uuid, i.namespace
 ''')
@@ -23530,9 +23567,17 @@ def _reconcile_fetch_usage(
     """
     usage: dict[tuple[UUID, str], tuple[int, int, int]] = {}
     rows = conn.execute(_RECONCILE_USAGE_SQL, {
+        # object_states.object_type is a native sa.Enum, which persists
+        # member names.
         'instance_object_type': ObjectType.INSTANCE.name,
-        'node_object_type': ObjectType.NODE.name,
-        'instance_location': RelationshipType.INSTANCE_LOCATION.name,
+        # The object_references type and relationship columns are plain
+        # String(64) written by _direct_record_relationship() as
+        # str(member), i.e. the enum *value*. Do not rely on a
+        # case-insensitive collation to bridge the two conventions --
+        # see the comment block above _RECONCILE_USAGE_SQL.
+        'instance_ref_type': ObjectType.INSTANCE.value,
+        'node_object_type': ObjectType.NODE.value,
+        'instance_location': RelationshipType.INSTANCE_LOCATION.value,
     }).fetchall()
     for row in rows:
         try:
@@ -23670,7 +23715,14 @@ def _direct_reconcile_scheduler_capacity(
             # has died would otherwise keep contributing its last-known
             # limits forever. The node-state filter below catches a node
             # that has gone missing outright; this catches the narrower
-            # case of a live node that has stopped publishing.
+            # case of a live node that has stopped publishing. Like the
+            # state filter, it is expressed positively -- membership in
+            # a fresh set, with absence removing the row -- because a
+            # node can also have *no* metrics row at all: sf-resources
+            # deletes its own node's rows at daemon startup before the
+            # first upsert, so a resources daemon that dies in that
+            # window leaves a live, active node with no row, which a
+            # stale-set subtraction would retain forever.
             #
             # A NULL is_hypervisor (a metrics row written by a
             # pre-upgrade resources daemon, before the first upsert
@@ -23697,10 +23749,14 @@ def _direct_reconcile_scheduler_capacity(
                     sa.select(metrics.c.node_uuid).where(
                         metrics.c.is_hypervisor.is_(False))).fetchall()}
 
-            stale_metrics_nodes = {
+            # Derived without the is_hypervisor predicate, so a fresh
+            # row whose is_hypervisor is still NULL (mid-upgrade) keeps
+            # qualifying and the no-evidence retention below still
+            # applies to it.
+            fresh_metrics_nodes = {
                 row.node_uuid for row in conn.execute(
                     sa.select(metrics.c.node_uuid).where(
-                        metrics.c.timestamp <= fresh_after)).fetchall()}
+                        metrics.c.timestamp > fresh_after)).fetchall()}
 
             # Node existence and schedulability ground truth. The
             # scheduler builds its candidate set from
@@ -23770,7 +23826,7 @@ def _direct_reconcile_scheduler_capacity(
                 node_uuid for node_uuid in previous
                 if node_uuid not in active_nodes
                 or node_uuid in non_hypervisors
-                or node_uuid in stale_metrics_nodes
+                or node_uuid not in fresh_metrics_nodes
                 or node_uuid not in known_nodes]
             candidates = (
                 (set(previous) | set(metrics_rows))
@@ -23865,6 +23921,12 @@ def _direct_reconcile_scheduler_capacity(
             # Per-claim usage recompute over the same instance set,
             # grouped by namespace. Empty in production this phase (the
             # claims API is phase 4), but the machinery must be proven.
+            #
+            # phase 4: this loop is one UPDATE per active claim, inside
+            # the pass's transaction. Fine at zero claims; N round trips
+            # holding write locks once claims are real. Fold it into a
+            # single set-based UPDATE ... JOIN over the namespace usage
+            # aggregation rather than inheriting the loop.
             claimed_limits = [0, 0, 0]
             claimed_namespaces = set()
             active_claims = conn.execute(sa.select(claims).where(

@@ -9,7 +9,7 @@ from google.protobuf import message as _message
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 import builtins as _builtins
-from shakenfist.protos from shakenfist.protos import common_pb2 as _common_pb2
+from shakenfist.protos import common_pb2 as _common_pb2
 import sys
 import typing as _typing
 

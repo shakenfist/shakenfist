@@ -382,7 +382,6 @@ service DatabaseService {
   // no copy of the caller's scheduler configuration. See
   // docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
   rpc ReconcileSchedulerCapacity (ReconcileSchedulerCapacityRequest) returns (ReconcileSchedulerCapacityReply) {}
->>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
 }
 
 // Generic status reply

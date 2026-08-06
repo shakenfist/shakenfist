@@ -28,6 +28,8 @@ from shakenfist.daemons.database import main as database_main
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.protos import database_pb2
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.tests import base
 
 
@@ -82,6 +84,17 @@ class LimitDerivationTestCase(base.ShakenFistTestCase):
         _, limit_memory_mb = mariadb._derive_cpu_memory_limits(
             None, 3, 1, 3.0, 1.5)
         self.assertEqual(3, limit_memory_mb)
+
+    def test_memory_limit_clamps_at_zero(self):
+        # A published reservation exceeding the overcommit ceiling
+        # (RAM_OVERCOMMIT_RATIO at or below 1.0 with a large
+        # NODE_MEMORY_RESERVATION_MB) means the node admits nothing.
+        # Zero says that without silently dragging
+        # cluster_capacity.total_memory_mb below the sum of the other
+        # nodes the way a negative limit would.
+        _, limit_memory_mb = mariadb._derive_cpu_memory_limits(
+            None, 1024, 4096, 3.0, 1.0)
+        self.assertEqual(0, limit_memory_mb)
 
     def test_null_cpu_input_derives_none(self):
         limit_cpus, limit_memory_mb = mariadb._derive_cpu_memory_limits(
@@ -187,6 +200,29 @@ class DiskSpecReferenceTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             8, mariadb._disk_spec_virtual_gb([{'size': '8'}]))
 
+    def test_fractional_sizes_round_half_away_from_zero(self):
+        # MariaDB's JSON-number-to-BIGINT cast rounds half away from
+        # zero, probed on a real server rather than assumed: 10.5 -> 11,
+        # 10.4 -> 10, -2.5 -> -3, and numeric strings round too
+        # ('8.7' -> 9). Python's round() would give banker's rounding
+        # (10.5 -> 10) and int() would truncate; either silently
+        # diverges from the SQL this helper is the oracle for.
+        self.assertEqual(
+            11, mariadb._disk_spec_virtual_gb([{'size': 10.5}]))
+        self.assertEqual(
+            10, mariadb._disk_spec_virtual_gb([{'size': 10.4}]))
+        self.assertEqual(
+            -3, mariadb._disk_spec_virtual_gb([{'size': -2.5}]))
+        self.assertEqual(
+            9, mariadb._disk_spec_virtual_gb([{'size': '8.7'}]))
+
+    def test_boolean_size_casts_like_sql(self):
+        # JSON true/false cast to 1/0 in the BIGINT column.
+        self.assertEqual(
+            1, mariadb._disk_spec_virtual_gb([{'size': True}]))
+        self.assertEqual(
+            0, mariadb._disk_spec_virtual_gb([{'size': False}]))
+
     def test_garbage_size_contributes_zero(self):
         self.assertEqual(
             10, mariadb._disk_spec_virtual_gb(
@@ -219,9 +255,34 @@ class FetchUsageTestCase(base.ShakenFistTestCase):
         # Only 'deleted' is excluded; stateless rows count.
         self.assertIn('s.state_value IS NULL', text)
         self.assertIn("s.state_value != 'deleted'", text)
-        # SQLAlchemy persists enum member names.
+        # Two storage conventions, and each binding must match its
+        # column's exactly rather than leaning on a case-insensitive
+        # collation: object_states.object_type is a native sa.Enum,
+        # which persists member *names*; the object_references type and
+        # relationship columns are plain strings written by
+        # _direct_record_relationship() as str(member), which for these
+        # str-subclass enums is the member *value*. Binding the name
+        # against object_references matches under utf8mb4_general_ci
+        # and silently returns zero rows under utf8mb4_bin (the live
+        # suite runs under utf8mb4_bin to catch exactly that).
         self.assertEqual('INSTANCE', params['instance_object_type'])
-        self.assertEqual('INSTANCE_LOCATION', params['instance_location'])
+        self.assertEqual('instance', params['instance_ref_type'])
+        self.assertEqual('node', params['node_object_type'])
+        self.assertEqual('instance_location', params['instance_location'])
+
+    def test_bindings_match_what_the_write_path_stores(self):
+        # _direct_record_relationship() writes str(member) into the
+        # object_references columns. These str-subclass enums override
+        # __str__ to return the member value, so the value is what the
+        # columns contain -- pin that here, because if the enums ever
+        # stopped overriding __str__ (Python's default str() for a
+        # str-mixin enum is 'ObjectType.NODE') the write path and the
+        # reconcile bindings would both change character silently.
+        self.assertEqual(ObjectType.NODE.value, str(ObjectType.NODE))
+        self.assertEqual(ObjectType.INSTANCE.value,
+                         str(ObjectType.INSTANCE))
+        self.assertEqual(RelationshipType.INSTANCE_LOCATION.value,
+                         str(RelationshipType.INSTANCE_LOCATION))
 
     def test_folds_rows_and_skips_malformed_node_uuid(self):
         conn = mock.MagicMock()
@@ -365,16 +426,22 @@ def _is_non_hypervisor_query(text):
 
     The reconciler issues three node_metrics selects: the capacity
     columns for hypervisors with fresh metrics, the uuids of nodes known
-    not to be hypervisors, and the uuids of nodes whose metrics have gone
-    stale. The first two are told apart by the polarity of the
+    not to be hypervisors, and the uuids of nodes with any fresh row at
+    all. The first two are told apart by the polarity of the
     is_hypervisor predicate.
     """
     return 'is_hypervisor IS false' in text
 
 
-def _is_stale_metrics_query(text):
-    """Is this the node_metrics query for stale rows?"""
-    return 'node_metrics.timestamp <=' in text
+def _is_fresh_metrics_query(text):
+    """Is this the node_metrics query for the fresh-row set?
+
+    Distinguished from the capacity-columns query (which also filters
+    on freshness) by having no is_hypervisor predicate: the fresh set
+    deliberately includes rows whose is_hypervisor is still NULL so the
+    mid-upgrade retention behaviour is preserved.
+    """
+    return 'node_metrics.timestamp >' in text and 'is_hypervisor' not in text
 
 
 def _deleted_row_count(stmt):
@@ -432,8 +499,8 @@ class _ReconcileRouterMixin:
         if 'FROM node_metrics' in text:
             if _is_non_hypervisor_query(text):
                 return self._fake_result(rows=self.non_hypervisor_rows)
-            if _is_stale_metrics_query(text):
-                return self._fake_result(rows=self.stale_metrics_rows)
+            if _is_fresh_metrics_query(text):
+                return self._fake_result(rows=self.fresh_metrics_rows)
             return self._fake_result(rows=self.metrics_rows)
         if 'FROM nodes' in text:
             return self._fake_result(rows=self.node_rows)
@@ -486,7 +553,15 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
                             limit_memory_mb=8192, limit_disk_gb=100,
                             state='active')]
         self.non_hypervisor_rows = []
-        self.stale_metrics_rows = []
+        # Every node that has a metrics row in this scenario has a
+        # fresh one; NODE3 has no metrics row at all, so it is absent
+        # here and the freshness rule removes its previous row (as does
+        # its absence from nodes).
+        self.fresh_metrics_rows = [
+            SimpleNamespace(node_uuid=NODE1),
+            SimpleNamespace(node_uuid=NODE2),
+            SimpleNamespace(node_uuid=NODE4),
+            SimpleNamespace(node_uuid=NODE5)]
         self.executed = []
 
         usage = {
@@ -613,11 +688,13 @@ class ReconcileHypervisorFilterTestCase(
     """
 
     def _run_roles(self, previous_rows, metrics_rows, non_hypervisor_rows,
-                   node_rows, active_rows=None, stale_metrics_rows=None):
-        # Nodes named in node_rows default to active: these tests are
-        # about the role, freshness and existence filters, and the state
-        # filter would otherwise mask them all (a node with no active
-        # state row never qualifies).
+                   node_rows, active_rows=None, fresh_metrics_rows=None):
+        # Nodes named in node_rows default to active, and nodes with a
+        # metrics row default to fresh: these tests are each about one
+        # filter, and the state and freshness filters would otherwise
+        # mask the one under test (a node with no active state row or
+        # no fresh metrics row never qualifies). Tests about the
+        # freshness rule itself pass fresh_metrics_rows explicitly.
         self.previous_rows = previous_rows
         self.metrics_rows = metrics_rows
         self.non_hypervisor_rows = non_hypervisor_rows
@@ -626,7 +703,10 @@ class ReconcileHypervisorFilterTestCase(
             active_rows = [SimpleNamespace(object_uuid=str(row.uuid))
                            for row in node_rows]
         self.active_rows = active_rows
-        self.stale_metrics_rows = stale_metrics_rows or []
+        if fresh_metrics_rows is None:
+            fresh_metrics_rows = [SimpleNamespace(node_uuid=row.node_uuid)
+                                  for row in metrics_rows]
+        self.fresh_metrics_rows = fresh_metrics_rows
         self.claim_rows = []
         self.executed = []
 
@@ -663,13 +743,20 @@ class ReconcileHypervisorFilterTestCase(
         self.assertEqual(3, len(metrics_queries))
         hypervisor = [t for t in metrics_queries
                       if not _is_non_hypervisor_query(t)
-                      and not _is_stale_metrics_query(t)]
+                      and not _is_fresh_metrics_query(t)]
         self.assertEqual(1, len(hypervisor))
         self.assertIn('is_hypervisor IS true', hypervisor[0])
         self.assertIn('cpu_schedulable', hypervisor[0])
         # The capacity columns are also gated on metrics freshness, so a
         # node whose resources daemon died stops contributing.
         self.assertIn('node_metrics.timestamp >', hypervisor[0])
+        # The fresh set is expressed positively (membership, not a
+        # stale-set subtraction, so a node with no metrics row at all
+        # is excluded) and deliberately has no is_hypervisor predicate,
+        # so a fresh row whose is_hypervisor is still NULL mid-upgrade
+        # keeps qualifying for the no-evidence retention.
+        fresh = [t for t in metrics_queries if _is_fresh_metrics_query(t)]
+        self.assertEqual(1, len(fresh))
 
     def test_non_hypervisor_gets_no_capacity_row(self):
         # NODE1 is a hypervisor, NODE2 is a network-only node: it has a
@@ -703,7 +790,8 @@ class ReconcileHypervisorFilterTestCase(
             previous_rows=[_capacity_row(NODE2, 10, 1000, 50)],
             metrics_rows=[],
             non_hypervisor_rows=[SimpleNamespace(node_uuid=NODE2)],
-            node_rows=[SimpleNamespace(uuid=NODE2)])
+            node_rows=[SimpleNamespace(uuid=NODE2)],
+            fresh_metrics_rows=[SimpleNamespace(node_uuid=NODE2)])
 
         self.assertEqual([], result['nodes'])
         self.assertEqual(1, result['nodes_removed'])
@@ -716,15 +804,17 @@ class ReconcileHypervisorFilterTestCase(
 
     def test_null_is_hypervisor_keeps_an_existing_row(self):
         # A metrics row written by a pre-upgrade resources daemon has
-        # is_hypervisor NULL, so the node appears in neither query. That
-        # is not evidence of anything, so an existing row keeps its
-        # limits rather than being deleted on the strength of a value
-        # that has simply not been written yet.
+        # is_hypervisor NULL, so the node appears in neither polarity of
+        # the role query -- but its row is fresh, so it is in the fresh
+        # set. That is not evidence of anything, so an existing row
+        # keeps its limits rather than being deleted on the strength of
+        # a value that has simply not been written yet.
         result, _ = self._run_roles(
             previous_rows=[_capacity_row(NODE2, 10, 1000, 50)],
             metrics_rows=[],
             non_hypervisor_rows=[],
-            node_rows=[SimpleNamespace(uuid=NODE2)])
+            node_rows=[SimpleNamespace(uuid=NODE2)],
+            fresh_metrics_rows=[SimpleNamespace(node_uuid=NODE2)])
 
         self.assertEqual(1, len(result['nodes']))
         self.assertEqual(str(NODE2), result['nodes'][0]['node_uuid'])
@@ -838,7 +928,8 @@ class ReconcileNodeStateFilterTestCase(
             metrics_rows=[],
             non_hypervisor_rows=[],
             node_rows=[SimpleNamespace(uuid=NODE2)],
-            active_rows=[])
+            active_rows=[],
+            fresh_metrics_rows=[SimpleNamespace(node_uuid=NODE2)])
 
         self.assertEqual([], result['nodes'])
         self.assertEqual(1, result['nodes_removed'])
@@ -851,13 +942,34 @@ class ReconcileNodeStateFilterTestCase(
     def test_stale_metrics_node_loses_its_row(self):
         # node_metrics rows are only deleted when the node is, so a live
         # node whose resources daemon has died would otherwise contribute
-        # its last known limits forever.
+        # its last known limits forever. A stale row means absence from
+        # the fresh set.
         result, _ = self._run_roles(
             previous_rows=[_capacity_row(NODE2, 192, 196608, 500)],
             metrics_rows=[],
             non_hypervisor_rows=[],
             node_rows=[SimpleNamespace(uuid=NODE2)],
-            stale_metrics_rows=[SimpleNamespace(node_uuid=NODE2)])
+            fresh_metrics_rows=[])
+
+        self.assertEqual([], result['nodes'])
+        self.assertEqual(1, result['nodes_removed'])
+        self.assertEqual(0, result['cluster']['total_cpus'])
+
+    def test_no_metrics_row_at_all_loses_its_row(self):
+        # sf-resources deletes its own node's metrics rows at daemon
+        # startup before the first upsert, so a resources daemon that
+        # dies in that window leaves a live, active node with no
+        # node_metrics row at all. To the positive fresh set that is
+        # indistinguishable from a stale row and the capacity row is
+        # removed; a stale-set subtraction would have found the node in
+        # neither set and rewritten its last-known limits forever --
+        # the freshness twin of the state filter's polarity bug.
+        result, _ = self._run_roles(
+            previous_rows=[_capacity_row(NODE2, 192, 196608, 500)],
+            metrics_rows=[],
+            non_hypervisor_rows=[],
+            node_rows=[SimpleNamespace(uuid=NODE2)],
+            fresh_metrics_rows=[])
 
         self.assertEqual([], result['nodes'])
         self.assertEqual(1, result['nodes_removed'])

@@ -153,11 +153,15 @@ Capacity rows exist per **schedulable hypervisor**, not per
 node. A row describing capacity the scheduler would never use
 is worse than no row at all, because it inflates the cluster
 totals that a phase 3 D14 guard reads. The invariant, learned
-the hard way across four review rounds that each found the
-same defect in a new dimension, is: **a capacity row exists
-only where the scheduler could place, and any node-level
+the hard way across five review rounds that each found the
+same defect in a new guise (role, state, freshness, existence,
+and — twice — filter polarity: a subtractive filter admits
+whatever is in neither set), is: **a capacity row exists
+only where the scheduler could place, every node-level
 scheduler-side filter is automatically a reconciler-side
-filter too.** By that rule one node-level filter remains
+filter too, and each filter is expressed as membership in a
+positive qualifying set, never as absence from a
+disqualifying one.** By that rule one node-level filter remains
 deliberately unmirrored: `_has_reasonable_queue_state()` (the
 scheduler's `queue_state` stage, which drops a node whose
 queue depth suggests it is wedged). It is excluded because
@@ -215,7 +219,18 @@ enforce the invariant today, each mirroring something
   window, which is tuned for an on-demand cache and would sit
   below this pass's five-minute period, making rows flap in
   and out between passes and rendering the reply's
-  `nodes_added`/`nodes_removed` counts meaningless.
+  `nodes_added`/`nodes_removed` counts meaningless. Like the
+  state filter, this is expressed positively — membership in a
+  fresh set, and absence removes the row — because a node can
+  also have *no* metrics row at all: sf-resources deletes its
+  own node's rows at daemon startup before the first upsert,
+  so a resources daemon dying in that window leaves a live,
+  active node with no row, which a stale-set subtraction
+  retained forever (fifth review, item 2 — the freshness twin
+  of the state filter's polarity bug). The fresh set carries
+  no `is_hypervisor` predicate, so a fresh row whose flag is
+  still NULL mid-upgrade keeps qualifying for the no-evidence
+  retention.
 
 A node failing any of these loses its capacity row, which is
 also how rows written by a release before the filters existed
@@ -360,6 +375,7 @@ surface yet: the admin capacity view migrates in phase 5.
 | 9 | Address second automated review of PR #3614 | medium | management session | none | Complete — see Second review response |
 | 10 | Address third automated review of PR #3614 | medium | management session | none | Complete — see Third review response |
 | 11 | Address fourth automated review of PR #3614 | medium | management session | none | Complete — see Fourth review response |
+| 12 | Rebase onto develop; address fifth automated review of PR #3614 | medium | management session | none | Complete — see Fifth review response |
 
 ## Validation
 
@@ -754,7 +770,89 @@ now:**
   incomplete accounting would have to be rewritten by the same change
   that closes the gap, and nothing consumes the numbers until then.
 
-## Administration and logistics
+### Step 12: rebase and the fifth automated review (2026-08-07)
+
+The branch was rebased onto develop (which had gained the federation
+abuse-resistance work and a generalised live-MariaDB CI job). Two
+rebase reconciliations worth recording:
+
+* develop added `reap_federation_records` to the old in-election-loop
+  schedule registration; it now registers in the hoisted
+  once-per-daemon block with the others.
+* develop generalised `tools/ci-enum-widening-test.sh` to run *every*
+  `test_mariadb_*_live` module behind one MariaDB install, precisely
+  so a later live module needs no new job. That made this branch's
+  dedicated "Scheduler capacity reconciler" job an exact duplicate
+  (same runner class, same MariaDB install, same tests twice per
+  merge), so the job and `tools/ci-capacity-reconcile-test.sh` are
+  removed; `test_mariadb_capacity_reconcile_live.py` runs in the
+  generalised job, which also carries the no-tests-actually-ran
+  guard this branch added in round 3.
+
+The review itself: two fix items (both genuinely latent bugs — the
+round-over-round trend is 3 → 2 and nothing this round was fallout
+from earlier fixes), three considers (all accepted, each cheapest
+now), two informational.
+
+**Fixed — enum bindings leaned on a case-insensitive collation
+(item 1).** `_reconcile_fetch_usage()` bound enum member *names* for
+all four predicates, but only `object_states.object_type` (a native
+`sa.Enum`) stores names; the `object_references` type and relationship
+columns are plain strings written by `_direct_record_relationship()`
+as `str(member)`, which for these str-subclass enums is the *value*.
+The two spellings differ only in case, so the query matched under the
+default utf8mb4 collations and would silently produce zero usage under
+`utf8mb4_bin` or any `_cs` collation — all of which
+`verify_mariadb_compat()` accepts, and the same pass's demand query
+already bound values, so usage and demand would have diverged
+silently. The bindings now name each column's convention explicitly
+(with a fourth parameter, since the object_states join and the
+object_references predicate can no longer share one), and the live
+suite now runs its tables under `utf8mb4_bin` so this whole class
+fails loudly: mutating one binding back to `.name` fails 9 of the 15
+live tests. A unit test also pins `str(member) == member.value`, the
+property the write path and the bindings both depend on.
+
+**Fixed — a node with no `node_metrics` row at all kept its capacity
+row forever (item 2).** The sixth instance of the recurring class and
+the freshness twin of round four's state-filter bug: the filter
+subtracted a stale set, and a node with *no* metrics row was in
+neither the fresh nor the stale set. Reachable because sf-resources
+deletes its own node's rows at daemon startup before the first
+upsert. The filter is now membership in a fresh set (derived without
+the `is_hypervisor` predicate, so the NULL-flag mid-upgrade retention
+is preserved), and the design invariant gains a third clause: filters
+are expressed as membership in a positive qualifying set, never as
+absence from a disqualifying one. Mock and live tests cover the
+no-row case; disabling the freshness removal fails the live test.
+
+**Suggestions triaged — all three accepted:**
+
+* Per-claim recompute loop (item 3): a `# phase 4:` comment now marks
+  the one-UPDATE-per-claim loop as a shape to replace with a set-based
+  `UPDATE ... JOIN` when claims become real, not to inherit.
+* Disk-size oracle rounding (item 4): probed MariaDB's
+  JSON-number-to-BIGINT cast on a real server — it rounds half away
+  from zero (10.5 → 11, -2.5 → -3), including numeric strings
+  ('8.7' → 9), where the helper truncated integers and zeroed
+  fractional strings. `_disk_spec_virtual_gb()` now matches via
+  `decimal.ROUND_HALF_UP` (Python's `round()` is banker's and would
+  itself diverge at .5), the messy fixture gained fractional sizes so
+  the live oracle assertion exercises the divergence, and unit tests
+  pin the probed values. Booleans (JSON true → 1) and JSON null
+  (→ SQL NULL, ignored by SUM) were probed too and already agreed.
+* Negative `limit_memory_mb` (item 5): clamped at zero, matching
+  `_derive_disk_limit_gb()`'s headroom clamp, with the docstring
+  explaining why zero is the right encoding of "admits nothing".
+
+**Also repaired in passing:** a rebase-conflict resolution error left
+a stray conflict marker in `protos/database.proto` in the rebased
+history, which made `grpc_tools.protoc` fail — and `_make_stubs.sh`
+has no `set -e`, so its sed import-fixing loops ran anyway and
+stacked `from shakenfist.protos` prefixes onto the stale generated
+files. The proto is fixed and the stubs regenerated at the head;
+intermediate rebased commits retain the broken generated files, which
+matters to `git bisect` but not to the PR diff or CI.
 
 ### Success criteria
 

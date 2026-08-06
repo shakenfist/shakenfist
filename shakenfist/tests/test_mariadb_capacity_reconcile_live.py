@@ -6,18 +6,25 @@
 """Live-MariaDB test for the scheduler capacity reconciler.
 
 These tests run only when SF_MARIADB_TEST_DSN points at a disposable
-MariaDB database (CI provides one via
-tools/ci-capacity-reconcile-test.sh; developers can point at a local
-instance). They exist because the reconciler's unit tests all run
-against a mocked connection and assert on compiled statement text, which
-cannot exercise the parts most likely to break:
+MariaDB database (CI provides one via tools/ci-enum-widening-test.sh,
+which runs every test_mariadb_*_live module behind one MariaDB install;
+developers can point at a local instance). They exist because the
+reconciler's unit tests all run against a mocked connection and assert
+on compiled statement text, which cannot exercise the parts most likely
+to break:
 
 * the JSON_TABLE derived table, including its DEFAULT ... ON EMPTY /
-  ON ERROR clauses against genuinely malformed disk_spec payloads,
+  ON ERROR clauses against genuinely malformed disk_spec payloads and
+  its half-away-from-zero rounding of fractional sizes,
 * the REPLACE(dashed, '-', '') joins landing on the instances CHAR(32)
   primary key (CLAUDE.md pitfall 6: comparing the two uuid forms
   directly silently never matches, so a broken join returns zero rows
   rather than an error),
+* the enum storage conventions -- object_states persists member names
+  while object_references stores member values, so this suite runs
+  under utf8mb4_bin, where a binding naming the wrong convention
+  returns zero rows instead of being papered over by a
+  case-insensitive collation,
 * is_hypervisor and the node-state filter against real NULL-able
   columns and a real IN-the-active-set membership test,
 * both ON DUPLICATE KEY UPDATE upserts.
@@ -62,10 +69,15 @@ TEST_TABLES = [
 
 # Deliberately messy disk specs. The first is the ordinary case with a
 # string size (the resources daemon and the API have both produced
-# those); the second has a null size and a sizeless CD-ROM style disk;
-# the third is not a list at all.
+# those); the second has a null size, a sizeless CD-ROM style disk, and
+# two fractional sizes (no current write path produces those, but the
+# JSON-number-to-BIGINT cast rounds half away from zero -- 2.5 -> 3,
+# '1.5' -> 2 -- and _disk_spec_virtual_gb must agree with the SQL on
+# them or the oracle assertion below is not an oracle); the third is
+# not a list at all.
 DISK_SPEC_NORMAL = [{'size': 20}, {'size': '8'}]
-DISK_SPEC_MESSY = [{'size': None}, {'base': 'x'}]
+DISK_SPEC_MESSY = [{'size': None}, {'base': 'x'}, {'size': 2.5},
+                   {'size': '1.5'}]
 DISK_SPEC_NOT_A_LIST = {'oops': 'not-a-list'}
 
 
@@ -81,6 +93,30 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.engine.dispose)
         self.addCleanup(self._drop_tables)
         self._drop_tables()
+
+        # Run this suite against a case-sensitive collation.
+        # verify_mariadb_compat() accepts any utf8mb4_* collation, and
+        # the reconcile SQL spans two enum storage conventions --
+        # object_states persists member names ('INSTANCE') while
+        # object_references stores member values ('instance') -- so a
+        # binding that names the wrong convention still matches under
+        # the default case-insensitive collations and silently returns
+        # zero rows under a _bin or _cs one. Creating this suite's
+        # tables under utf8mb4_bin makes that class of mistake fail
+        # loudly here instead of on the one deployment that pinned a
+        # case-sensitive server. The database default is restored in
+        # cleanup because the CI database is shared with the other live
+        # test modules in the same stestr run.
+        with self.engine.connect() as conn:
+            database = conn.execute(sa.text('SELECT DATABASE()')).scalar()
+            previous_collation = conn.execute(sa.text(
+                'SELECT @@collation_database')).scalar()
+            conn.execute(sa.text(
+                f'ALTER DATABASE `{database}` CHARACTER SET utf8mb4 '
+                f'COLLATE utf8mb4_bin'))
+            conn.commit()
+        self.addCleanup(self._restore_collation, database,
+                        previous_collation)
 
         mariadb._ensure_schema_versions_table(self.engine)
         for ensure in (mariadb._ensure_object_states_schema,
@@ -112,6 +148,12 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         with self.engine.connect() as conn:
             for table in TEST_TABLES:
                 conn.execute(sa.text(f'DROP TABLE IF EXISTS {table}'))
+            conn.commit()
+
+    def _restore_collation(self, database, collation):
+        with self.engine.connect() as conn:
+            conn.execute(sa.text(
+                f'ALTER DATABASE `{database}` COLLATE {collation}'))
             conn.commit()
 
     def _fill_required(self, table, known):
@@ -293,9 +335,9 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(48, node_a['limit_cpus'])
         self.assertEqual(65536 * 3 - 2048, node_a['limit_memory_mb'])
-        # 28 GB currently drawn down, plus 500 GiB free less the 20 GB
+        # 33 GB currently drawn down, plus 500 GiB free less the 20 GB
         # reservation.
-        self.assertEqual(28 + 480, node_a['limit_disk_gb'])
+        self.assertEqual(33 + 480, node_a['limit_disk_gb'])
 
     def test_usage_joins_across_both_uuid_forms(self):
         # If the REPLACE() transform were dropped, the dashed
@@ -310,10 +352,11 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
     def test_json_table_handles_malformed_disk_specs(self):
         by_node = self._by_node(self._reconcile())
 
-        # 20 + '8' from i1, and nothing from i2's null and sizeless
-        # entries -- without the ON EMPTY / ON ERROR defaults this would
-        # be NULL rather than 28.
-        self.assertEqual(28, by_node[str(self.node_a)]['used_disk_gb'])
+        # 20 + '8' from i1; from i2, nothing for the null and sizeless
+        # entries (without the ON EMPTY / ON ERROR defaults the sum
+        # would be NULL) plus the rounded fractional sizes: 2.5 -> 3
+        # and '1.5' -> 2, half away from zero.
+        self.assertEqual(33, by_node[str(self.node_a)]['used_disk_gb'])
         # i3's disk_spec is not an array at all, so the JSON_TYPE guard
         # drops it; i4 is deleted and does not count despite its 100 GB.
         self.assertEqual(0, by_node[str(self.node_b)]['used_disk_gb'])
@@ -354,7 +397,7 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual('expired', rows['stale-ns'].state)
         # The live claim's usage is recomputed from its namespace.
         self.assertEqual(6, rows['ci-1'].used_cpus)
-        self.assertEqual(28, rows['ci-1'].used_disk_gb)
+        self.assertEqual(33, rows['ci-1'].used_disk_gb)
 
     def test_cluster_singleton_sums(self):
         result = self._reconcile()
@@ -507,6 +550,37 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         with self.engine.connect() as conn:
             rows = conn.execute(sa.select(capacity_t)).fetchall()
         self.assertNotIn(stateless, [r.node_uuid for r in rows])
+
+    def test_missing_metrics_row_loses_the_capacity_row(self):
+        # sf-resources deletes its own node's node_metrics rows at
+        # daemon startup, before the first upsert, so a resources
+        # daemon that dies in that window leaves a live, active,
+        # sentinel-reporting node with no metrics row at all. The
+        # freshness filter must treat "no row" like "stale row": the
+        # capacity row is removed rather than being rewritten with its
+        # last-known limits forever. (An earlier draft subtracted a
+        # stale set instead of intersecting with a fresh set, and a
+        # node with no row was in neither.)
+        first = self._reconcile()
+        self.assertIn(str(self.node_a),
+                      [n['node_uuid'] for n in first['nodes']])
+
+        metrics_t = mariadb._get_node_metrics_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.delete(metrics_t).where(
+                metrics_t.c.node_uuid == self.node_a))
+            conn.commit()
+
+        second = self._reconcile()
+        self.assertNotIn(str(self.node_a),
+                         [n['node_uuid'] for n in second['nodes']])
+        self.assertEqual(1, second['nodes_removed'])
+        self.assertEqual(96, second['cluster']['total_cpus'])
+
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            rows = conn.execute(sa.select(capacity_t)).fetchall()
+        self.assertNotIn(self.node_a, [r.node_uuid for r in rows])
 
     def test_capacity_rows_are_removed_when_a_node_stops_qualifying(self):
         self._reconcile()

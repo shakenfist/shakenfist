@@ -436,9 +436,16 @@ consumes the tables for admission
 (`docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md`).
 The SQL itself is covered by
 `shakenfist/tests/test_mariadb_capacity_reconcile_live.py`, which runs
-against a real MariaDB in the "Scheduler capacity reconciler" CI job;
-the mocked unit tests cannot catch a broken uuid join or a JSON_TABLE
-change, because both fail as silently wrong numbers rather than errors.
+against a real MariaDB in the "Schema ENUM widening" CI job (whose
+script runs every `test_mariadb_*_live` module behind one MariaDB
+install); the mocked unit tests cannot catch a broken uuid join, a
+JSON_TABLE change, or an enum binding that names the wrong storage
+convention, because all of those fail as silently wrong numbers rather
+than errors. The live suite runs under `utf8mb4_bin` for that last
+reason: `object_states.object_type` is a native `sa.Enum` persisting
+member *names* while the `object_references` type and relationship
+columns store member *values* (written as `str(member)`), and only a
+case-sensitive collation makes a binding that confuses the two fail.
 Operator-facing documentation is
 [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).
 

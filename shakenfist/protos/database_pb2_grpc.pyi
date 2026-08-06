@@ -377,7 +377,6 @@ class DatabaseServiceStub:
     """
     GetClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationErrorRequest, _database_pb2.GetClusterOperationErrorReply]
     DeleteClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationErrorRequest, _database_pb2.StatusReply]
-<<<<<<< HEAD
     RecordFederatedExchange: _grpc.UnaryUnaryMultiCallable[_database_pb2.RecordFederatedExchangeRequest, _database_pb2.RecordFederatedExchangeReply]
     """Federation Abuse Resistance (MariaDB)
     Replay refusal and rate limiting for /auth/federated. Both counters
@@ -388,7 +387,6 @@ class DatabaseServiceStub:
     CountFederatedAttempt: _grpc.UnaryUnaryMultiCallable[_database_pb2.CountFederatedAttemptRequest, _database_pb2.CountFederatedAttemptReply]
     ReapFederationReplay: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationReplayRequest, _database_pb2.ReapFederationReply]
     ReapFederationRateLimits: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]
-=======
     ReconcileSchedulerCapacity: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReconcileSchedulerCapacityRequest, _database_pb2.ReconcileSchedulerCapacityReply]
     """Scheduler Capacity Operations (MariaDB)
     Scheduler-reservations phase 2: the reconciler's single RPC. One
@@ -399,7 +397,6 @@ class DatabaseServiceStub:
     no copy of the caller's scheduler configuration. See
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
     """
->>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
 
 @_typing.type_check_only
 class DatabaseServiceAsyncStub(DatabaseServiceStub):
@@ -750,7 +747,6 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     """
     GetClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationErrorRequest, _database_pb2.GetClusterOperationErrorReply]  # type: ignore[assignment]
     DeleteClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationErrorRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
-<<<<<<< HEAD
     RecordFederatedExchange: _aio.UnaryUnaryMultiCallable[_database_pb2.RecordFederatedExchangeRequest, _database_pb2.RecordFederatedExchangeReply]  # type: ignore[assignment]
     """Federation Abuse Resistance (MariaDB)
     Replay refusal and rate limiting for /auth/federated. Both counters
@@ -761,7 +757,6 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     CountFederatedAttempt: _aio.UnaryUnaryMultiCallable[_database_pb2.CountFederatedAttemptRequest, _database_pb2.CountFederatedAttemptReply]  # type: ignore[assignment]
     ReapFederationReplay: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationReplayRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
     ReapFederationRateLimits: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
-=======
     ReconcileSchedulerCapacity: _aio.UnaryUnaryMultiCallable[_database_pb2.ReconcileSchedulerCapacityRequest, _database_pb2.ReconcileSchedulerCapacityReply]  # type: ignore[assignment]
     """Scheduler Capacity Operations (MariaDB)
     Scheduler-reservations phase 2: the reconciler's single RPC. One
@@ -772,7 +767,6 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     no copy of the caller's scheduler configuration. See
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
     """
->>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
 
 class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -2424,7 +2418,6 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
     @_abc_1.abstractmethod
-<<<<<<< HEAD
     def RecordFederatedExchange(
         self,
         request: _database_pb2.RecordFederatedExchangeRequest,
@@ -2458,7 +2451,7 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.ReapFederationReply, _abc.Awaitable[_database_pb2.ReapFederationReply]]: ...
 
-=======
+    @_abc_1.abstractmethod
     def ReconcileSchedulerCapacity(
         self,
         request: _database_pb2.ReconcileSchedulerCapacityRequest,
@@ -2474,5 +2467,4 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
         """
 
->>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

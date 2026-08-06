@@ -8,7 +8,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf.internal import containers as _containers
 import builtins as _builtins
-from shakenfist.protos from shakenfist.protos import shakenfist_enums_pb2 as _shakenfist_enums_pb2
+from shakenfist.protos import shakenfist_enums_pb2 as _shakenfist_enums_pb2
 import sys
 import typing as _typing
 
@@ -8598,7 +8598,6 @@ class DeleteClusterOperationErrorRequest(_message.Message):
 Global___DeleteClusterOperationErrorRequest: _TypeAlias = DeleteClusterOperationErrorRequest  # noqa: Y015
 
 @_typing.final
-<<<<<<< HEAD
 class RecordFederatedExchangeRequest(_message.Message):
     """Federation Abuse Resistance (MariaDB)"""
 
@@ -8789,7 +8788,8 @@ class ReapFederationReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ReapFederationReply: _TypeAlias = ReapFederationReply  # noqa: Y015
-=======
+
+@_typing.final
 class ReconcileSchedulerCapacityRequest(_message.Message):
     """Scheduler Capacity Operations (MariaDB)
     Scheduler-reservations phase 2 (see docs/plans/
@@ -8958,4 +8958,3 @@ class ReconcileSchedulerCapacityReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ReconcileSchedulerCapacityReply: _TypeAlias = ReconcileSchedulerCapacityReply  # noqa: Y015
->>>>>>> f32063959 (Add scheduler capacity tables and reconciler.)
