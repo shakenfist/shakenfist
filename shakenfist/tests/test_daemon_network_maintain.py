@@ -58,6 +58,8 @@ def _patch_maintain_module(network_node=True, queue_depth_per_queue=0,
             'shakenfist.daemons.network.maintain.net_ip_create_and_enqueue'),
         'instance': mock.patch(
             'shakenfist.daemons.network.maintain.instance'),
+        'util_exceptions': mock.patch(
+            'shakenfist.daemons.network.maintain.util_exceptions'),
         'log': mock.patch('shakenfist.daemons.network.maintain.LOG'),
     }
     return patches
@@ -80,6 +82,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         def _clear():
             maintain.EXTRA_VLANS_HISTORY.clear()
             maintain.EXTRA_VLANS_WARNED.clear()
+            maintain.STRAY_VXLAN_HANDLING_FAILING = False
 
         _clear()
         self.addCleanup(_clear)
@@ -1125,7 +1128,10 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
     def test_unreadable_bridge_membership_protects_a_stray(self):
         """"Could not ask the host" is not "the host says nobody is
-        using it"."""
+        using it". A failing query also protects the stray, so it
+        persists and is re-queried on every pass -- the failure must be
+        reported once per episode, not once per pass, or it becomes the
+        log storm this reaper exists to end."""
         from shakenfist.daemons.network import maintain
 
         maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
@@ -1137,6 +1143,21 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         )
 
         active['util_concurrency'].execute.assert_not_called()
+        self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
+
+        # A second pass over the same still-failing stray, with a
+        # different exception text: nothing further is logged. The
+        # first pass emitted both the query failure warning and the
+        # protection warning; keying on the bridge name (not the
+        # exception text) is what keeps a varying error message from
+        # defeating the suppression.
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[],
+            bridge_members_error=Exception('ip is having a worse day'),
+        )
+        active['log'].with_fields.return_value.warning.assert_not_called()
         self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
 
     def test_stray_with_no_bridge_at_all_is_reaped(self):
@@ -1296,6 +1317,46 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['mariadb'].find_network_vxids.assert_called_once()
         active['util_concurrency'].execute.assert_not_called()
         self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
+        active['util_exceptions'].ignore_exception.assert_called_once()
+
+    def test_stray_handling_failure_is_recorded_on_transition_only(self):
+        """The guard fires on every 30 second pass for the length of a
+        mixed version window or database outage. Recording the
+        exception each time -- an ERROR with a traceback and a spooled
+        exception file -- would be a louder version of the log storm
+        this reaper exists to end, so it is recorded only on the
+        transition into failure, and re-armed by a successful pass."""
+        from shakenfist.daemons.network import maintain
+
+        for i in range(2):
+            maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+            active = self._run_one_iteration(
+                network_node=True,
+                vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+                find_network_vxids_error=Exception('UNIMPLEMENTED'),
+            )
+            if i == 0:
+                active['util_exceptions'].ignore_exception.assert_called_once()
+            else:
+                active['util_exceptions'].ignore_exception.assert_not_called()
+
+        # A successful pass re-arms the report...
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[],
+        )
+        self.assertFalse(maintain.STRAY_VXLAN_HANDLING_FAILING)
+
+        # ... so a fresh failure episode is recorded again.
+        maintain.EXTRA_VLANS_HISTORY[0x456] = 10_000.0 - 400
+        active = self._run_one_iteration(
+            network_node=True,
+            vxid_to_mac={0x456: '02:00:00:aa:bb:cc'},
+            find_network_vxids_error=Exception('UNIMPLEMENTED'),
+        )
+        active['util_exceptions'].ignore_exception.assert_called_once()
 
 
 class MaintainBridgeVetoTest(base.ShakenFistTestCase):

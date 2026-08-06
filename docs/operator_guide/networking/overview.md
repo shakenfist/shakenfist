@@ -473,9 +473,12 @@ the residue this reaping exists to remove.
 All three audit events are worth watching for. None is an error on its
 own -- the maintainer is doing the job it exists to do -- but a node
 producing them repeatedly is a node where network teardown is failing
-somewhere upstream, and that is worth investigating. A repeated
-`partially reaped stray vxlan` in particular means a device on that
-host will not go away, which usually needs manual attention.
+somewhere upstream, and that is worth investigating. Note that a
+`partially reaped stray vxlan` event fires once per stray episode, not
+once per retry: later attempts on the surviving devices are silent
+until one succeeds. A `partially reaped stray vxlan` with no follow-up
+`reaped stray vxlan` therefore means a device on that host will not go
+away, which usually needs manual attention.
 
 **A reap on the network node implies manual cleanup.** The devices
 listed above are all named from the VXLAN id, so the maintainer can

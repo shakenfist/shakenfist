@@ -46,6 +46,7 @@ LOG, _ = logs.setup(__name__)
 # for a vxid when the stray leaves the host or is reaped.
 EXTRA_VLANS_HISTORY: dict[int, float] = {}
 EXTRA_VLANS_WARNED: dict[int, set[str]] = {}
+STRAY_VXLAN_HANDLING_FAILING: bool = False
 
 
 # Instance states in which a domain on this node may still be attached
@@ -198,8 +199,14 @@ class Job(util_concurrency.Job):
         try:
             members = util_network.get_bridge_members(bridge)
         except Exception as e:
-            LOG.with_fields({'vxid': vxid, 'bridge': bridge}).warning(
-                'Failed to list stray vxlan bridge members: %s' % e)
+            # A failing bridge query protects the stray, so the stray --
+            # and this failure -- persist across passes. Report it once
+            # per stray episode like every other message on this path,
+            # keyed on the bridge name so a varying exception text does
+            # not defeat the suppression.
+            if self._first_report(vxid, 'bridge query failure: %s' % bridge):
+                LOG.with_fields({'vxid': vxid, 'bridge': bridge}).warning(
+                    'Failed to list stray vxlan bridge members: %s' % e)
             return None
 
         ours = {'vxlan-%06x' % vxid, 'veth-%06x-o' % vxid,
@@ -718,8 +725,10 @@ class Job(util_concurrency.Job):
                 if (time.time() - EXTRA_VLANS_HISTORY[vxid]
                     > config.MAINTAIN_STRAY_VXLAN_GRACE_SECONDS)]
             if overdue:
+                global STRAY_VXLAN_HANDLING_FAILING
                 try:
                     self._handle_stray_vxlans(overdue)
+                    STRAY_VXLAN_HANDLING_FAILING = False
                 except Exception as e:
                     # This is the last thing the pass does, and the
                     # only part of it which depends on an RPC added
@@ -733,5 +742,14 @@ class Job(util_concurrency.Job):
                     # rest of the pass with it. Stray vxlans are the
                     # least urgent thing maintain does; nothing else
                     # here should be lost because of them.
-                    util_exceptions.ignore_exception(
-                        'network maintain stray vxlan handling', e)
+                    #
+                    # Both the mixed version window and a database
+                    # outage make this fire on every 30 second pass for
+                    # as long as they last, so only record the
+                    # exception on the transition into failure --
+                    # otherwise the guard becomes a louder version of
+                    # the log storm this reaper exists to fix.
+                    if not STRAY_VXLAN_HANDLING_FAILING:
+                        STRAY_VXLAN_HANDLING_FAILING = True
+                        util_exceptions.ignore_exception(
+                            'network maintain stray vxlan handling', e)

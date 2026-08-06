@@ -260,10 +260,11 @@ is discovery-only: it never blocks on `raise_for_error()`. Each maintain
 pass applies a five-guard pipeline before enqueueing any reconciliation op
 at `PRIORITY.background` — (1) queue-depth safety, (2) per-network gating
 via `has_pending_cluster_operation`, (3) cooldown on recent errors,
-(4) circuit-breaker on repeated errors, (5) enqueue. Three config knobs
-control the guards: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50),
+(4) circuit-breaker on repeated errors, (5) enqueue. The config knobs
+controlling maintain are `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50),
 `MAINTAIN_RECONCILE_COOLDOWN_SECONDS` (default 60),
-`MAINTAIN_RECONCILE_CIRCUIT_K` (default 5).
+`MAINTAIN_RECONCILE_CIRCUIT_K` (default 5) and
+`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS` (default 300, see below).
 
 **The one exception: reaping stray vxlans.** Maintain deletes orphaned
 vxlan devices (`_handle_stray_vxlans()`) directly, on the maintain thread,
