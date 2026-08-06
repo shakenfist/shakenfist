@@ -993,6 +993,64 @@ tenant booting from a shared image's URL now pins to the blob that
 image currently has rather than causing a refetch, which is the
 intended reading of "should not be able to update".
 
+## Follow-up: the CI JWKS certificate (#3639)
+
+The issue offered three options and said the choice needed making
+before anyone wrote code. None of the three was taken as written.
+
+**What the issue got wrong about the shape of the problem.** It
+assumed a CA installed into the node trust stores by the deploy
+playbooks. Two facts undercut that. The tests run over SSH *on the
+primary node* (`smoke-cluster.yml` scps the repo there and runs stestr
+under `/etc/sf/sfrc`), while `internal_ca` bootstraps on the ansible
+control node — so the CA key and the test process are on different
+machines, and closing the gap means shipping a signing key to a
+hypervisor. And `internal_ca` is a production role: widening it so
+every deployment's SPICE CA also anchors outbound TLS is a real change
+to production posture in service of a test.
+
+**What was done instead.** `FEDERATION_JWKS_CA_BUNDLE`, an extra set
+of trust anchors used only for JWKS fetches. This is a feature in its
+own right rather than a test affordance — a self hosted Authentik or
+Keycloak is normally behind a private CA, and an operator needs some
+way to say so — and CI is simply its first user. It relaxes nothing:
+`jwks_uri` must still be https, hostname and expiry are still checked,
+and there is no skip-verification escape.
+
+The anchors are *added* to the system set rather than replacing it,
+and that is the part which is easy to get wrong.
+`ssl.create_default_context(cafile=...)` loads the named file
+**instead of** the system store, so the short spelling would mean that
+configuring a private Authentik silently stopped GitHub tokens from
+verifying — weeks later, when somebody added the second issuer. The
+unit test asserts the union by count, and fails on the short spelling.
+
+CI gets a throwaway CA from `tools/ci-jwks-ca.sh`, minted per run,
+trusted for nothing but JWKS, with its key left on the primary for the
+test to issue a leaf with; `smoke-cluster.yml` calls it before the
+cluster suite. Putting a CA key on a node is only acceptable because
+that cluster is destroyed within the hour, and the script says so
+loudly. The deployment CA is untouched.
+
+**Verified locally rather than assumed, and it mattered.** A harness
+borrowed the real `_tls_context`, `_ci_ca` and `_start_jwks_server`
+off the shipped test class, minted a CA with the script's exact
+openssl invocation, and fetched through a real `PyJWKClient` built by
+the real `jwks_ssl_context`. The first run failed: *Missing Authority
+Key Identifier*. Python 3.13 turns on `ssl.VERIFY_X509_STRICT` by
+default, and a leaf without an AKI is refused by it. The symptom is
+indistinguishable from a cluster that does not trust the CA, so this
+would have shipped as five tests still skipping, for a reason the skip
+message does not mention. The leaf now carries AKI, SKI, basic
+constraints and an extended key usage; with them the harness fetches,
+and without the CA it is still refused with zero fetches — which is
+the skip path working as intended.
+
+**Not closed by this.** The five tests will only actually run once the
+`shakenfist/actions` change merges; until then the fallback keeps them
+skipping honestly. That change is a branch in the actions repo for the
+operator to raise.
+
 ## Back brief
 
 Before executing any step of this phase, the implementing sub-agent

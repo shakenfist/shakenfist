@@ -70,3 +70,10 @@ SHAKENFIST_LOKI_TENANT="{{ loki_tenant }}"
 {% if loki_auth_header %}
 SHAKENFIST_LOKI_AUTH_HEADER="{{ loki_auth_header }}"
 {% endif %}
+
+{# Extra trust anchors for fetching a federated identity provider's JWKS.
+   Rendered on every node, because any node may serve /auth/federated. Not a
+   secret -- it is a path to a file of public certificates. #}
+{% if federation_jwks_ca_bundle %}
+SHAKENFIST_FEDERATION_JWKS_CA_BUNDLE="{{ federation_jwks_ca_bundle }}"
+{% endif %}

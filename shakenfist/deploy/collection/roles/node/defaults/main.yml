@@ -57,6 +57,13 @@ loki_base_url: ""
 loki_tenant: ""
 loki_auth_header: ""
 
+# Extra certificate authorities to trust when fetching a federated identity
+# provider's JWKS. Empty means the system trust store alone. Set this to a
+# path on the nodes when the provider is behind a private CA, which a self
+# hosted Authentik or Keycloak usually is. Getting the file onto the nodes is
+# the operator's job; this only tells sf-api where to look for it.
+federation_jwks_ca_bundle: ""
+
 # Shaken Fist server/client package references installed into /srv/shakenfist's
 # virtualenv. The defaults install the released packages from PyPI. For
 # local/CI installs these may be overridden to local wheel paths (for example

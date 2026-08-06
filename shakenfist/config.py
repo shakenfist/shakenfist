@@ -185,6 +185,20 @@ class SFConfig(BaseSettings):
             'blackholing traffic exhausts the worker pool.'
         )
     )
+    FEDERATION_JWKS_CA_BUNDLE: str = Field(
+        '',
+        description=(
+            'Path to a PEM file of extra certificate authorities to trust '
+            'when fetching a trusted issuer\'s JWKS. Empty, the default, '
+            'means the system trust store alone. Set this when the identity '
+            'provider is behind a private CA -- a self hosted Authentik or '
+            'Keycloak usually is. The anchors are added to the system ones '
+            'rather than replacing them, so configuring this does not stop '
+            'a public issuer like GitHub from verifying. It also does not '
+            'relax anything else: jwks_uri must still be https, and a '
+            'certificate which chains to neither set is still refused.'
+        )
+    )
     FEDERATION_RATE_LIMIT_PER_MINUTE: int = Field(
         60,
         description=(

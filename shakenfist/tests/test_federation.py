@@ -7,11 +7,15 @@ dependency on a real identity provider being reachable or unchanged.
 """
 
 import base64
+import datetime
 import hashlib
 import hmac
 import io
 import json
+import os
+import ssl
 import string
+import tempfile
 import threading
 import time
 from unittest import mock
@@ -628,3 +632,113 @@ class ReplayRefusalTestCase(FederationTestCase):
                 exceptions.DatabaseUnavailable, federation.refuse_replay,
                 self._token(), {'jti': 'a', 'exp': time.time() + 300},
                 self.rule)
+
+
+class JWKSTrustAnchorTestCase(base.ShakenFistTestCase):
+    """Which certificate authorities may vouch for a JWKS endpoint.
+
+    An identity provider run inside an organisation is usually behind
+    that organisation's own CA, so there has to be a way to tell the
+    cluster about it. The hazard is in how: the short spelling,
+    ssl.create_default_context(cafile=...), loads the named file
+    *instead of* the system store rather than as well as it, so
+    configuring a private Authentik would silently stop GitHub tokens
+    from verifying -- and it would do so at the moment somebody adds a
+    second issuer, weeks after the change that caused it.
+
+    So the union is the property under test, and both halves of it are
+    asserted separately. It is also worth pinning that widening who may
+    vouch did not weaken what is checked: hostname verification and
+    expiry are still on.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # A CA nobody has heard of, which is the point: if it turns up
+        # in a context's anchors it can only have come from the bundle.
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.x509.oid import NameOID
+
+        key = _keypair()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        name = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, 'sf-test-private-ca')])
+        self.certificate = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(minutes=5))
+            .not_valid_after(now + datetime.timedelta(days=1))
+            .add_extension(
+                x509.BasicConstraints(ca=True, path_length=None),
+                critical=True)
+            .sign(key, hashes.SHA256()))
+
+        handle, self.bundle = tempfile.mkstemp(suffix='.pem')
+        with open(handle, 'wb') as f:
+            f.write(self.certificate.public_bytes(serialization.Encoding.PEM))
+        self.addCleanup(os.unlink, self.bundle)
+
+    def _subjects(self, context):
+        return [
+            dict(pair for part in cert['subject'] for pair in part).get(
+                'commonName')
+            for cert in context.get_ca_certs()
+        ]
+
+    def test_no_bundle_configured_means_no_context(self):
+        # The ordinary case. None leaves PyJWKClient to build its own
+        # default context, which is exactly what a public issuer needs.
+        with mock.patch.object(
+                federation.config, 'FEDERATION_JWKS_CA_BUNDLE', ''):
+            self.assertIsNone(federation.jwks_ssl_context())
+
+    def test_a_configured_bundle_is_trusted(self):
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE', self.bundle):
+            context = federation.jwks_ssl_context()
+
+        self.assertIsNotNone(context)
+        self.assertIn('sf-test-private-ca', self._subjects(context))
+
+    def test_the_bundle_is_added_to_the_system_anchors(self):
+        # The regression for the cafile= spelling. Asserted by count
+        # rather than by naming a well known root, because which roots
+        # a distribution ships is not ours to depend on: one more than
+        # the default context has is the union, and exactly one is the
+        # substitution.
+        default = len(ssl.create_default_context().get_ca_certs())
+        self.assertGreater(
+            default, 1, 'no system trust store, so this proves nothing')
+
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE', self.bundle):
+            context = federation.jwks_ssl_context()
+
+        self.assertEqual(default + 1, len(context.get_ca_certs()))
+
+    def test_widening_the_anchors_does_not_relax_verification(self):
+        # A bundle says who may vouch for a certificate. It must not
+        # become a way to stop checking that the certificate is for the
+        # host we asked for, or that it is still valid.
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE', self.bundle):
+            context = federation.jwks_ssl_context()
+
+        self.assertTrue(context.check_hostname)
+        self.assertEqual(ssl.CERT_REQUIRED, context.verify_mode)
+
+    def test_the_client_is_built_with_the_context(self):
+        # The wiring. jwks_ssl_context can be perfect and still never
+        # reach the fetch.
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE', self.bundle):
+            cache = federation.JWKSCache()
+            client, _ = cache._client_and_lock('an-issuer', 'https://x/jwks')
+
+        self.assertIsNotNone(client.ssl_context)
+        self.assertIn('sf-test-private-ca', self._subjects(client.ssl_context))

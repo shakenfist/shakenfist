@@ -192,6 +192,19 @@ argument_specs:
           - Loki auth header (a secret). Rendered into
             SHAKENFIST_LOKI_AUTH_HEADER on every node when set, because every
             daemon ships its own logs.
+      federation_jwks_ca_bundle:
+        type: str
+        default: ""
+        description:
+          - >-
+            Path on the node to a PEM bundle of extra certificate authorities
+            to trust when fetching a federated identity provider's JWKS.
+            Empty, the default, means the system trust store alone. Set this
+            when the provider is behind a private CA, which a self hosted
+            Authentik or Keycloak usually is. The anchors are added to the
+            system ones rather than replacing them, so a private provider and
+            a public one such as GitHub can both be configured at once.
+            Rendered into SHAKENFIST_FEDERATION_JWKS_CA_BUNDLE.
       server_package:
         type: str
         default: "shakenfist"

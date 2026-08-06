@@ -16,6 +16,7 @@
 # unauthenticated caller with a made-up issuer can tie up workers.
 
 import hashlib
+import ssl
 import threading
 import time
 from typing import Any
@@ -67,6 +68,35 @@ ALLOWED_ALGORITHMS = [
 LEEWAY_SECONDS = 0
 
 
+def jwks_ssl_context() -> Optional[ssl.SSLContext]:
+    """How to verify the TLS certificate of a JWKS endpoint.
+
+    None when FEDERATION_JWKS_CA_BUNDLE is unset, which leaves
+    PyJWKClient to build its own default context -- the ordinary case,
+    and the one every public issuer needs.
+
+    When it is set, the anchors in it are *added* to the system ones.
+    That distinction is the whole point and is easy to get backwards:
+    ssl.create_default_context(cafile=...) loads that file *instead of*
+    the system store, so writing it the short way would mean that
+    configuring a private Authentik silently stopped GitHub tokens from
+    verifying. Building the default context first and calling
+    load_verify_locations on it is what makes the two sets union.
+
+    Nothing else is relaxed. The bundle only says which authorities may
+    vouch for a certificate; hostname checking and expiry are still on,
+    jwks_uri must still be https, and a certificate chaining to neither
+    set is still refused.
+    """
+    bundle = config.FEDERATION_JWKS_CA_BUNDLE
+    if not bundle:
+        return None
+
+    context = ssl.create_default_context()
+    context.load_verify_locations(cafile=bundle)
+    return context
+
+
 class JWKSCache:
     """One PyJWKClient per trusted issuer, plus a lock per issuer.
 
@@ -109,11 +139,16 @@ class JWKSCache:
                 # A changed jwks_uri means the operator repointed the
                 # issuer, so the old client's cached keys are no longer
                 # the right answer and the client is replaced.
+                # The context is built per client rather than once at
+                # import, so an operator who fixes a wrong bundle path
+                # gets it picked up by an sf-api restart rather than
+                # needing the file to have been right at install time.
                 client = PyJWKClient(
                     jwks_uri,
                     cache_jwk_set=True,
                     lifespan=config.FEDERATION_JWKS_CACHE_SECONDS,
-                    timeout=config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS)
+                    timeout=config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS,
+                    ssl_context=jwks_ssl_context())
                 self._clients[issuer_uuid] = client
                 self._locks[issuer_uuid] = threading.Lock()
             return client, self._locks[issuer_uuid]

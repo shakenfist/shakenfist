@@ -677,6 +677,27 @@ loopback or test-only exemption into a security check. If that makes the test
 unrunnable, make it skip loudly and file the issue -- see #3639 for the JWKS
 certificate case.
 
+That issue is a worked example of how the second habit tends to resolve. The
+test needed the cluster to trust a certificate it had minted, and the tempting
+fix was a test-only exemption in the deploy. What it became instead was
+`FEDERATION_JWKS_CA_BUNDLE` -- extra trust anchors for JWKS fetches, which a
+self hosted Authentik or Keycloak needs anyway -- with CI as its first user.
+When a test cannot run because a security check is doing its job, the useful
+question is usually "what would a real operator need here", not "how do we get
+around this in CI".
+
+Two traps it also left behind, both of which cost a debugging round:
+
+- **`ssl.create_default_context(cafile=...)` replaces the system trust store
+  rather than adding to it.** Build the default context and then call
+  `load_verify_locations` on it. The wrong spelling passes every test that
+  only checks the new anchor is present.
+- **Python 3.13 enables `ssl.VERIFY_X509_STRICT` by default**, so a leaf
+  certificate with no Authority Key Identifier is refused with "Missing
+  Authority Key Identifier". If you generate certificates in a test, give
+  them AKI, SKI and basic constraints -- and be aware the symptom is
+  indistinguishable from the CA not being trusted at all.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

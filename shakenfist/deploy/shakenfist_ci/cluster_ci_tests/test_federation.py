@@ -9,14 +9,18 @@ a test which mocks the database away.
 Most of this needs no external identity provider. The successful
 exchange does -- the cluster has to fetch a JWKS -- so this stands up
 a throwaway JWKS server in the test process and hands the issuer its
-address. That server speaks TLS behind a certificate it signs itself,
-because the API refuses a plaintext jwks_uri and should keep doing so.
-The cluster refuses the certificate in turn, so that half detects
-whether the JWKS was actually served and skips rather than failing, in
-the same spirit as the Kerbside VDI token test. Issue #3639 tracks
-giving CI a certificate the cluster trusts, which is what this file
-needs before the exchange can be tested for real. The parts that need
-no callback always run.
+address. That server speaks TLS, because the API refuses a plaintext
+jwks_uri and should keep doing so.
+
+Whether the cluster will accept its certificate depends on
+tools/ci-jwks-ca.sh having run first (issue #3639). That script mints
+a throwaway CA, points FEDERATION_JWKS_CA_BUNDLE at it on every node,
+and leaves the signing key here, so the server can present a leaf the
+cluster trusts and the exchange is tested for real. Without it the
+server falls back to signing its own, the cluster refuses it, and the
+five tests which need a callback skip rather than fail -- in the same
+spirit as the Kerbside VDI token test. The parts that need no callback
+always run.
 
 The requests library is used directly for anything where the exact
 status code is the assertion, because the client library maps
@@ -43,6 +47,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import ExtendedKeyUsageOID
 from cryptography.x509.oid import NameOID
 from testtools import content
 
@@ -133,36 +138,95 @@ class TestFederation(base.BaseNamespacedTestCase):
         finally:
             probe.close()
 
+    def _ci_ca(self):
+        """The CA tools/ci-jwks-ca.sh left for us, if it ran.
+
+        Returns (certificate, key) or None. The directory is the one
+        that script writes; change the two together.
+        """
+        directory = os.environ.get(
+            'SF_CI_JWKS_CA_DIR',
+            os.path.join(os.path.expanduser('~'), '.sf-ci-jwks-ca'))
+        cert_path = os.path.join(directory, 'ca-cert.pem')
+        key_path = os.path.join(directory, 'ca-key.pem')
+        if not (os.path.exists(cert_path) and os.path.exists(key_path)):
+            return None
+
+        with open(cert_path, 'rb') as f:
+            certificate = x509.load_pem_x509_certificate(f.read())
+        with open(key_path, 'rb') as f:
+            key = serialization.load_pem_private_key(f.read(), password=None)
+        return certificate, key
+
+    @staticmethod
+    def _authority_key_identifier(ca_certificate):
+        """Point the leaf at the exact CA key that signed it.
+
+        Derived from the CA's own Subject Key Identifier when it has
+        one, because that is the identifier a verifier matches against.
+        Falling back to hashing the public key produces the same bytes
+        for a conventionally generated CA, but not necessarily for one
+        somebody made another way.
+        """
+        try:
+            ski = ca_certificate.extensions.get_extension_for_class(
+                x509.SubjectKeyIdentifier)
+        except x509.ExtensionNotFound:
+            return x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                ca_certificate.public_key())
+        return x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+            ski.value)
+
     def _tls_context(self, local_ip):
-        """Serve the JWKS over TLS, behind a self signed certificate.
+        """Serve the JWKS over TLS, behind a certificate for local_ip.
 
         The API refuses a jwks_uri that is not https, and it is right
         to: a JWKS fetched over plaintext can be substituted by anyone
         on the path, which turns signature verification into theatre.
-        So the test server has to speak TLS, and the only certificate a
-        test can conjure for an ephemeral address is one it signs
-        itself.
+        So the test server has to speak TLS.
 
-        The cluster fetches through PyJWKClient, which verifies against
-        the system trust store, so it will refuse this certificate and
-        the handler will never run. That is a known limitation rather
-        than an accident: _require_reachable_jwks sees the JWKS was
-        never served and skips, so the exchange stays honestly
-        uncovered here instead of the validation being weakened to suit
-        the test. Issue #3639 tracks giving CI a certificate the
-        cluster trusts.
+        Which certificate depends on whether tools/ci-jwks-ca.sh ran.
+        If it did, it minted a throwaway CA, told the cluster to trust
+        it for JWKS fetches via FEDERATION_JWKS_CA_BUNDLE, and left the
+        signing key here -- so we issue a leaf the cluster will accept
+        and the exchange is tested for real.
+
+        If it did not, we fall back to signing our own, which the
+        cluster refuses. That is a working configuration rather than a
+        broken one: _require_reachable_jwks sees the JWKS was never
+        served and skips, so the exchange stays honestly uncovered
+        rather than the validation being weakened to suit the test.
+        That fallback is what running this file against a hand-built
+        cluster gets you.
         """
         now = datetime.datetime.now(datetime.timezone.utc)
-        name = x509.Name(
+        subject = x509.Name(
             [x509.NameAttribute(NameOID.COMMON_NAME, local_ip)])
 
-        # The JWKS signing key doubles as the transport key. A second
-        # 2048 bit key per test buys nothing when the certificate is
-        # untrusted by design.
+        ca = self._ci_ca()
+        if ca:
+            ca_certificate, signing_key = ca
+            issuer = ca_certificate.subject
+            authority_key = self._authority_key_identifier(ca_certificate)
+        else:
+            # The JWKS signing key doubles as the transport key. A
+            # second 2048 bit key per test buys nothing when the
+            # certificate is untrusted by design.
+            signing_key = self.key
+            issuer = subject
+            authority_key = x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                self.key.public_key())
+
+        # The key identifier extensions are not decoration. Python 3.13
+        # turned on ssl.VERIFY_X509_STRICT by default, and a leaf with no
+        # Authority Key Identifier fails that check with "Missing
+        # Authority Key Identifier" -- which looks exactly like a cluster
+        # that does not trust the CA, and would have left these tests
+        # skipping for a reason nothing in the skip message mentions.
         certificate = (
             x509.CertificateBuilder()
-            .subject_name(name)
-            .issuer_name(name)
+            .subject_name(subject)
+            .issuer_name(issuer)
             .public_key(self.key.public_key())
             .serial_number(x509.random_serial_number())
             .not_valid_before(now - datetime.timedelta(minutes=5))
@@ -171,7 +235,18 @@ class TestFederation(base.BaseNamespacedTestCase):
                 x509.SubjectAlternativeName(
                     [x509.IPAddress(ipaddress.ip_address(local_ip))]),
                 critical=False)
-            .sign(self.key, hashes.SHA256()))
+            .add_extension(
+                x509.BasicConstraints(ca=False, path_length=None),
+                critical=True)
+            .add_extension(
+                x509.SubjectKeyIdentifier.from_public_key(
+                    self.key.public_key()),
+                critical=False)
+            .add_extension(authority_key, critical=False)
+            .add_extension(
+                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+                critical=False)
+            .sign(signing_key, hashes.SHA256()))
 
         # load_cert_chain has no in-memory equivalent, so these have to
         # touch disk.
@@ -253,13 +328,16 @@ class TestFederation(base.BaseNamespacedTestCase):
         if not self.jwks_server.fetches:
             self.skipTest(
                 'The cluster never fetched %s, so the signature could not '
-                'be verified. Expected until issue #3639 gives CI a '
-                'certificate the cluster trusts: the test server can only '
-                'sign its own, and the cluster verifies against the system '
-                'trust store. The other possibility is that the cluster '
-                'cannot route back to the test runner at all. Either way '
-                'the exchange logic is covered by the unit tests, and the '
-                'parts of this file which need no callback still ran.'
+                'be verified. The likely cause is that tools/ci-jwks-ca.sh '
+                'did not run before this suite, so the JWKS server is '
+                'behind a certificate it signed itself and the cluster '
+                'refuses it -- the state issue #3639 described, and the '
+                'expected one outside the CI pipeline. The alternatives '
+                'are that the script ran but FEDERATION_JWKS_CA_BUNDLE did '
+                'not reach this sf-api, or that the cluster cannot route '
+                'back to the test runner at all. Either way the exchange '
+                'logic is covered by the unit tests, and the parts of this '
+                'file which need no callback still ran.'
                 % self.jwks_uri)
 
         self.addDetail('exchange_response',
