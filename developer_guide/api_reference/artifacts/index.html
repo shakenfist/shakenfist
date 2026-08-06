@@ -10910,6 +10910,28 @@ fetched and if that fetch is complete.</p>
 artifacts in a namespace, or a specific artifact for more detailed information.
 Artifacts also track "events" (see the <a href="/user_guide/events/">user guide</a> for
 a general introduction to the Shaken Fist event system).</p>
+<p><code>{artifact_ref}</code> is either a UUID or a name. A UUID identifies exactly one
+artifact. A name does not, because names are only unique within a namespace,
+so on the read-only routes a name is resolved against every artifact you can
+see — your own namespace first, and then the artifacts of namespaces which
+trust you and any artifact marked shared. Your own namespace always wins: if
+you have an artifact called <code>debian-11</code> and somebody shares a different one by
+that name, yours is still the one you get.</p>
+<p>If a name matches more than one artifact you can see and none of them is
+yours, the request fails with <code>400</code> rather than picking one, and you should
+use the UUID instead. Supplying a <code>namespace</code> in the request body turns the
+widening off and resolves the name in that namespace alone; a <code>400</code> in your
+own namespace means you have two artifacts of that name, which the <code>namespace</code>
+field cannot disambiguate either.</p>
+<p>Routes which <strong>change</strong> an artifact — delete, share, unshare, set max
+versions, delete a version, and all of the metadata routes — require the
+artifact to be in your own namespace, or you to be <code>system</code>. A trust does not
+grant them, whether you use a name or a UUID; see
+<a href="/operator_guide/authentication/">trusts</a> for why. Those routes also resolve
+names in your own namespace and nowhere else, so a name you do not own is a
+<code>404</code>. Note that this follows the route's authorization, not its HTTP verb:
+<code>GET /artifacts/{artifact_ref}/metadata</code> is ownership-guarded and therefore
+both narrow and owner-only.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
@@ -11214,6 +11236,17 @@ from. This allows recommencing failed downloads.</p>
 <p>As described in the <a href="/operator_guide/artifacts/">operator guide</a>, artifacts in
 the system namespace can be shared with all other namespaces. This is desirable
 for commonly used "official" images which many users will want to use.</p>
+<p>Sharing grants reading, and only reading. A shared artifact appears in every
+namespace's <code>GET /artifacts</code> listing and can be fetched by UUID, along with its
+events, versions and cluster operations. It cannot be deleted, unshared,
+retagged or otherwise modified by anyone but its owning namespace or <code>system</code> —
+the write paths consult neither the shared flag nor the trust list.</p>
+<p>Read access is otherwise exactly the set the artifact listing shows you: your
+own namespace's artifacts, those of any namespace which
+<a href="/operator_guide/authentication/">trusts</a> yours, and everything if you are
+<code>system</code>. A UUID is not a capability, so requesting an artifact you may not see
+returns <code>404</code> rather than <code>403</code> — the refusal does not confirm that the
+artifact exists.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>

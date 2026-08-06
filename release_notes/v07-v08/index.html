@@ -11149,6 +11149,13 @@
 <li>Disk utilization is now a factor in scheduling decisions. This might produce
   unexpected results if you have many very active filesystems mounted on a single
   hypervisor.</li>
+<li>Shaken Fist can now accept identity tokens from external OIDC issuers and
+  exchange them for short lived, scoped namespace keys, so a CI job no longer
+  needs a long lived Shaken Fist credential. An administrator registers a
+  trusted issuer, a namespace owner writes a mapping rule binding claims from
+  that issuer to a set of scopes, and the job posts its token to
+  <code>POST /auth/federated</code>. See the
+  <a href="/operator_guide/authentication/">federated identity section of the operator guide</a>.</li>
 </ul>
 <h2 id="rest-api">REST API<a class="headerlink" href="#rest-api" title="Permanent link">&para;</a></h2>
 <ul>
@@ -11163,6 +11170,21 @@
   are published to admins at <code>GET /admin/vditokenpubkey</code>. This integration is
   disabled until the operator sets <code>KERBSIDE_URL</code>; see the
   <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
+<li>There are now API calls for managing trusted issuers
+  (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).
+  These are administrative: only the system namespace may register or remove an
+  issuer, because trusting an issuer is a cluster wide decision. Two issuers
+  may not claim the same issuer URL, since that would make which provider's
+  keys are trusted depend on listing order.</li>
+<li>Namespace owners can manage mapping rules for their own namespace at
+  <code>GET</code>/<code>POST /auth/namespaces/...namespace.../rules</code> and
+  <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/namespaces/...namespace.../rules/...ruleref...</code>. A
+  rule may not grant scopes its author does not itself hold, and may not mint
+  keys under the names Shaken Fist reserves for its own service credentials.</li>
+<li><code>POST /auth/federated</code> exchanges an external identity token for a scoped
+  namespace key. It is deliberately unauthenticated -- the identity token is
+  the credential -- and is rate limited per source address. An identity token
+  may be exchanged only once per mapping rule.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
@@ -11229,6 +11251,49 @@
 <li>When you refer to an artifact by name, and there is more than one match then
   the match in your local namespace (if any) is now preferred instead of returning
   an error.</li>
+<li>Fetching an artifact by UUID from another namespace is now correctly refused.
+  The read guard on <code>GET /artifacts/...artifactref...</code> and on the events,
+  versions and cluster operations routes hanging off it had its test inverted,
+  which meant an artifact that was <em>not</em> shared could be read by any caller who
+  knew its UUID, while an artifact that <em>was</em> shared was refused to the
+  namespaces it had been shared with. Both directions are fixed: read access is
+  now exactly what the artifact listing shows you -- your own namespace,
+  namespaces which trust you, anything shared, and everything if you are
+  <code>system</code>.</li>
+<li>Looking an artifact up by name now searches everything you can see, not just
+  your own namespace, so a shared or trusted artifact can be fetched by the name
+  the listing showed you. Your own namespace still wins if you have an artifact
+  of that name, which is the same rule artifact-by-URL resolution has used since
+  v0.8 development began.</li>
+<li>
+<p><strong>Trusts no longer authorise changing another namespace's artifacts.</strong>
+  Previously a namespace which had been trusted could delete, share, unshare,
+  retag and rewrite the metadata of the trusting namespace's artifacts.
+  Instances and networks never permitted this and artifacts now match them: a
+  trust grants visibility, and modifying an object requires its own namespace or
+  <code>system</code>. Creating an object <em>in</em> a namespace which trusts you is unaffected,
+  so the "gift an image to a shared namespace" pattern described in the operator
+  guide continues to work.</p>
+<p>If you have tooling which deleted artifacts across a trust, it now needs a
+key in the owning namespace, or the system namespace.</p>
+</li>
+<li>
+<p><strong>A trust creates an artifact in another namespace, but no longer adds a
+  version to one.</strong> Uploading to a namespace which trusts you works the first
+  time, when there is nothing of that <code>source_url</code> there to overwrite. A second
+  upload of the same <code>source_url</code> now resolves the artifact that already exists
+  and is refused with a 404, where previously the trust authorised it.</p>
+<p>This follows from the rule above rather than sitting beside it. Adding a
+version ends in <code>delete_old_versions</code>, so it is not the additive act that a
+trust is meant to permit: the caller supplies the blob, and the namespace
+that owned the artifact would find the image its instances boot replaced by
+somebody else's. Creating is a gift; overwriting is a substitution.</p>
+<p>If you have tooling which re-uploads the same <code>source_url</code> across a trust --
+a CI job pushing a nightly image into a shared namespace is the usual shape
+-- it now needs a key in the owning namespace, or the system namespace.
+Labels are unaffected, because <code>LabelEndpoint</code> resolves a namespace-scoped
+<code>sf://label/&lt;namespace&gt;/&lt;name&gt;</code> URL rather than a caller-supplied one.</p>
+</li>
 </ul>
 <h3 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h3>
 <ul>
@@ -11294,6 +11359,12 @@
   instead of the invalid string "floating". Existing deployments must run
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
   This change enables proper UUID4 type validation in the IPAM schema.</li>
+<li>Federated identity adds four tables: <code>trusted_issuers</code> and <code>mapping_rules</code>
+  (with their attribute tables) for the configuration, and <code>federation_replay</code>
+  and <code>federation_rate_limits</code> for abuse resistance. All are created by the
+  normal schema migration path, so <code>sf-ctl ensure-mariadb-schema</code> or a routine
+  upgrade will add them; there is no manual step. The two abuse resistance
+  tables are swept by the cluster daemon and need no operator attention.</li>
 </ul>
 <h2 id="bring-your-own-mariadb">Bring your own MariaDB<a class="headerlink" href="#bring-your-own-mariadb" title="Permanent link">&para;</a></h2>
 <p>Earlier in the v0.8 cycle the Shaken Fist deployer installed and
@@ -11556,6 +11627,14 @@ changed:</p>
 </ul>
 <p>There is no migration step. Callers that pass <code>namespace</code> matching
 the object's actual namespace are unaffected.</p>
+<p>Artifacts additionally split this decorator in two, because how a <em>name</em>
+should resolve depends on what the route is going to do with the answer.
+Read only artifact routes use <code>arg_is_visible_artifact_ref</code> and resolve a
+name across everything the caller can see; routes which change an artifact
+use <code>arg_is_artifact_ref</code> and resolve only within the caller's own
+namespace, so that a name can never resolve into somebody else's namespace
+on a route which then deletes what it found. Passing an explicit
+<code>namespace</code> disables the wider search on both.</p>
 <p>One specific consequence is worth calling out for operator tooling:
 the floating network has <code>namespace=NULL</code> in the database and
 therefore no longer matches any non-empty <code>namespace=&lt;x&gt;</code> filter.

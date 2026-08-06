@@ -10501,6 +10501,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#federation-abuse-resistance-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federation Abuse Resistance Tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#node-identity-and-uuid-persistence" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11529,6 +11540,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#federation-abuse-resistance-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federation Abuse Resistance Tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#node-identity-and-uuid-persistence" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12546,6 +12568,16 @@ values (immutable data set at creation time):</p>
 <td>uuid, namespace, name, version. UNIQUE index on (namespace, name), which also serves the per-namespace listing</td>
 </tr>
 <tr>
+<td><code>trusted_issuers</code></td>
+<td>TrustedIssuer</td>
+<td>uuid, name, version</td>
+</tr>
+<tr>
+<td><code>mapping_rules</code></td>
+<td>MappingRule</td>
+<td>uuid, namespace, name, version</td>
+</tr>
+<tr>
 <td><code>artifacts</code></td>
 <td>Artifact</td>
 <td>uuid, artifact_type, source_url, name, namespace, version</td>
@@ -12612,6 +12644,16 @@ dedicated attribute tables:</p>
 <td>uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict)</td>
 </tr>
 <tr>
+<td><code>trusted_issuer_attributes</code></td>
+<td>TrustedIssuer</td>
+<td>uuid, issuer_url, jwks_uri, audience</td>
+</tr>
+<tr>
+<td><code>mapping_rule_attributes</code></td>
+<td>MappingRule</td>
+<td>uuid, issuer, bound_claims (JSON dict), scopes (JSON list), key_ttl, key_name_prefix</td>
+</tr>
+<tr>
 <td><code>artifact_attributes</code></td>
 <td>Artifact</td>
 <td>uuid, max_versions, shared, highest_index</td>
@@ -12676,6 +12718,38 @@ revives the JSON column</strong>, which still holds every key that existed
 before the migration, but keys created or rotated after the migration
 exist only in the new tables and will be invisible to the rolled-back
 code.</p>
+<h4 id="federation-abuse-resistance-tables">Federation Abuse Resistance Tables<a class="headerlink" href="#federation-abuse-resistance-tables" title="Permanent link">&para;</a></h4>
+<p>Two tables in the federated exchange path hold no objects at all. They
+exist to make an unauthenticated endpoint safe to expose, so they are
+plain tables with no UUID, no state and no attribute row:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+<th>Fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>federation_replay</code></td>
+<td>One row per identity token exchanged through one rule, so a token cannot be exchanged twice</td>
+<td>token_id + rule_uuid (composite PK), expires_at (indexed)</td>
+</tr>
+<tr>
+<td><code>federation_rate_limits</code></td>
+<td>Attempts per source address per minute</td>
+<td>source + window_start (composite PK), attempts, window_start (indexed)</td>
+</tr>
+</tbody>
+</table>
+<p>Both grow with traffic rather than with the size of the cluster, and
+both are swept by the cluster daemon: <code>reap_federation_replay</code> removes
+rows whose <code>expires_at</code> has passed (a token that can no longer be
+validated cannot be replayed, so the record has no further use), and
+<code>reap_federation_rate_limits</code> removes closed counting windows. Neither
+needs operator attention; the reaper counters are visible on the
+database daemon's metrics port.</p>
 <h4 id="node-identity-and-uuid-persistence">Node Identity and UUID Persistence<a class="headerlink" href="#node-identity-and-uuid-persistence" title="Permanent link">&para;</a></h4>
 <p>Each node in the cluster is assigned a real UUID (UUID version 4) when it
 first registers with the cluster. Previously, nodes used their FQDN as a

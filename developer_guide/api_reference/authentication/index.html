@@ -9402,6 +9402,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#trusted-issuers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted issuers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mapping-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#federated-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated exchange
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#metadata" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10668,6 +10701,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#trusted-issuers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted issuers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mapping-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#federated-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated exchange
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#metadata" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10954,6 +11020,244 @@ the REST API or the Python client directly for now.</p>
 <a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">update_namespace_key</span><span class="p">(</span><span class="s1">&#39;ci&#39;</span><span class="p">,</span> <span class="s1">&#39;newkey&#39;</span><span class="p">,</span> <span class="s1">&#39;newsecret&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
+<h2 id="trusted-issuers">Trusted issuers<a class="headerlink" href="#trusted-issuers" title="Permanent link">&para;</a></h2>
+<p>A <strong>trusted issuer</strong> is an external identity provider this cluster will
+believe: GitHub Actions, an Authentik instance, or anything else that
+signs OIDC-style JWTs. Issuers are cluster-wide and administrative --
+deciding who may vouch for identities here is not a per-namespace
+decision -- so every call below requires the <code>system</code> namespace.</p>
+<p>An issuer records four things: a <code>name</code> used to refer to it, the
+<code>issuer_url</code> that must match a token's <code>iss</code> claim exactly, the
+<code>jwks_uri</code> its signing keys are published at, and the <code>audience</code> its
+tokens must be minted for. The <code>jwks_uri</code> always comes from this
+record and never from the token, because a token naming its own key
+source is a token vouching for itself.</p>
+<p>Both the <code>name</code> and the <code>issuer_url</code> must be unique among live issuers,
+and a second issuer claiming either is refused with a 409. Uniqueness
+on the URL matters because token validation resolves an issuer by it:
+two records claiming one URL would make which provider's keys are
+trusted depend on listing order, so an administrator repointing an
+issuer would believe they had while some requests kept verifying
+against the old JWKS. Deleting an issuer frees both its name and its
+URL for reuse.</p>
+<p>The two are enforced by different mechanisms. <code>name</code> has a unique
+index behind it, so the database is the arbiter. <code>issuer_url</code> cannot
+easily have one -- a soft-deleted issuer keeps its row precisely so
+that its URL stays reusable -- so the create and update endpoints
+instead hold a cluster-wide lock across the duplicate check and the
+write it guards. The invariant holds either way, including when two
+administrators configure the same provider at the same moment.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/auth/get_auth_issuers">GET /auth/issuers</a>: List all trusted issuers.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/post_auth_issuers">POST /auth/issuers</a>: Configure a new trusted issuer.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/get_auth_issuers__issuer_name_">GET /auth/issuers/{issuer_name}</a>: Fetch one trusted issuer.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/put_auth_issuers__issuer_name_">PUT /auth/issuers/{issuer_name}</a>: Update a trusted issuer.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/delete_auth_issuers__issuer_name_">DELETE /auth/issuers/{issuer_name}</a>: Remove a trusted issuer.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Configuring GitHub Actions as a trusted issuer</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="s1">        &quot;name&quot;: &quot;github&quot;,</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="s1">        &quot;issuer_url&quot;: &quot;https://token.actions.githubusercontent.com&quot;,</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="s1">        &quot;jwks_uri&quot;: &quot;https://token.actions.githubusercontent.com/.well-known/jwks&quot;,</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="s1">        &quot;audience&quot;: &quot;https://sf.example.com&quot;</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="s1">      }&#39;</span>
+</code></pre></div>
+</details>
+<details class="warning" open="open">
+<summary>Deleting an issuer</summary>
+<p>Mapping rules reference their issuer by name. Deleting an issuer
+does not delete the rules that name it -- those rules simply stop
+working, because the exchange can no longer resolve the issuer.
+Recreating an issuer under the same name rebinds every rule that
+named it, so treat the name as the durable identifier it is.</p>
+</details>
+<h2 id="mapping-rules">Mapping rules<a class="headerlink" href="#mapping-rules" title="Permanent link">&para;</a></h2>
+<p>A <strong>mapping rule</strong> is a namespace's standing offer: "an identity from
+this issuer, carrying these claims, may mint a key here with these
+scopes". Rules are owned by the namespace they mint into and are gated
+by namespace ownership, exactly as key creation is -- a rule is the
+same class of privilege as <code>add-key</code>, granted in advance and gated on
+claims.</p>
+<p>Rules are deleted with their namespace, so "who can get into this
+namespace" is answered by listing its rules. That listing is the
+inbound sibling of the trust list.</p>
+<p>A rule carries:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Unique within the namespace, and named by the exchange request</td>
+</tr>
+<tr>
+<td><code>issuer</code></td>
+<td>The trusted issuer whose tokens this rule accepts</td>
+</tr>
+<tr>
+<td><code>bound_claims</code></td>
+<td>Claims a token must carry, and the values they must have</td>
+</tr>
+<tr>
+<td><code>scopes</code></td>
+<td>The scopes minted keys receive</td>
+</tr>
+<tr>
+<td><code>key_ttl</code></td>
+<td>How long a minted key lives, in seconds. At most 86400</td>
+</tr>
+<tr>
+<td><code>key_name_prefix</code></td>
+<td>Prefix for minted key names; the cluster appends a random discriminator</td>
+</tr>
+</tbody>
+</table>
+<p><code>bound_claims</code> values are exact strings, or lists of exact strings
+meaning "any of these". There is no globbing and no pattern matching:
+<code>shakenfist/*</code> looks reasonable until somebody registers
+<code>shakenfist-evil</code>, and the anchored patterns needed to make that safe
+are exactly what reviewers get wrong. A rule must bind at least one
+claim and grant at least one scope, both enforced at creation, because
+a rule that binds nothing matches every identity the issuer will ever
+sign.</p>
+<p>Three further limits are enforced at creation and on update, so that a
+rule which exists is one that was safe to write:</p>
+<ul>
+<li>A rule may not grant a scope its author does not itself hold.
+  Otherwise a token scoped <code>rule.write</code> could write a rule granting
+  <code>*</code>, satisfy that rule's own claims, and exchange it for a wildcard
+  key. Holders of legacy unscoped keys are unrestricted, as they are
+  everywhere else.</li>
+<li><code>key_ttl</code> is capped at one day. A federated key stands in for an
+  identity token that is typically valid for minutes, so a key
+  outliving its own justification by more than a working day is not a
+  policy anyone chose on purpose. Create a namespace key directly if a
+  long lived credential is what you want.</li>
+<li><code>key_name_prefix</code> may not be a name Shaken Fist reserves for the
+  credentials it mints for itself (<code>service_key</code>, or anything starting
+  <code>_service_key</code>), the same reservation the key endpoints enforce.</li>
+</ul>
+<p>Every field is length bounded. Exceeding a bound is a 400 naming the
+field, rather than a 500 from the database.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__rules">GET /auth/namespaces/{namespace}/rules</a>: List the mapping rules for a namespace.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/post_auth_namespaces__namespace__rules">POST /auth/namespaces/{namespace}/rules</a>: Create a mapping rule.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__rules__rule_name_">GET /auth/namespaces/{namespace}/rules/{rule_name}</a>: Fetch one mapping rule.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/put_auth_namespaces__namespace__rules__rule_name_">PUT /auth/namespaces/{namespace}/rules/{rule_name}</a>: Replace a mapping rule's policy.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace__rules__rule_name_">DELETE /auth/namespaces/{namespace}/rules/{rule_name}</a>: Delete a mapping rule.</li>
+</ul>
+</details>
+<details class="example">
+<summary>A rule for one repository and two branches</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="s1">        &quot;name&quot;: &quot;ryll&quot;,</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="s1">        &quot;issuer&quot;: &quot;github&quot;,</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="s1">        &quot;bound_claims&quot;: {</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="s1">          &quot;repository&quot;: &quot;shakenfist/ryll&quot;,</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="s1">          &quot;ref&quot;: [&quot;refs/heads/develop&quot;, &quot;refs/heads/main&quot;]</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="s1">        },</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="s1">        &quot;scopes&quot;: [&quot;blob.read&quot;, &quot;artifact.*&quot;],</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="s1">        &quot;key_ttl&quot;: 3600,</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="s1">        &quot;key_name_prefix&quot;: &quot;ryll-ci&quot;</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="s1">      }&#39;</span>
+</code></pre></div>
+</details>
+<details class="info" open="open">
+<summary>Updating a rule does not touch keys already minted</summary>
+<p>A minted key stands alone. Its provenance records the claims that
+were actually satisfied, so the audit trail describes the grant as
+it was made rather than as the rule reads today. Narrowing a
+rule's scopes therefore does not retroactively narrow keys it
+minted earlier -- delete those keys if that is what you need.</p>
+</details>
+<h2 id="federated-exchange">Federated exchange<a class="headerlink" href="#federated-exchange" title="Permanent link">&para;</a></h2>
+<p><code>POST /auth/federated</code> trades an <a href="/glossary/#identity-token">identity token</a>
+from a trusted issuer for a namespace key. It is unauthenticated by
+nature: the caller has no Shaken Fist credential yet, which is the
+entire point. What stands in place of authentication is the token's
+signature, checked against the issuer's published keys, plus a
+mapping rule the namespace owner wrote in advance.</p>
+<p>The request names three things, and the response returns the minted
+secret exactly once:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span><span class="nt">&quot;token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;eyJ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ci&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;rule&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ryll&quot;</span><span class="p">}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p">{</span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ci&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;key_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ryll-ci-8fJ2mQ&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sfk_...&quot;</span><span class="p">}</span>
+</code></pre></div>
+<p>The secret is never returned again and is never written to an event or
+a log -- only its bcrypt hash is stored. Use it immediately to call
+<code>POST /auth</code> for an access token, exactly as you would any other
+namespace key.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/auth/post_auth_federated">POST /auth/federated</a>: Exchange an identity token for a namespace key.</li>
+</ul>
+</details>
+<details class="info" open="open">
+<summary>What a refusal tells you</summary>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td>A required field is missing</td>
+</tr>
+<tr>
+<td>401</td>
+<td>The exchange was refused, with a category but no detail</td>
+</tr>
+<tr>
+<td>413</td>
+<td>The request body exceeds <code>FEDERATION_MAX_TOKEN_BYTES</code></td>
+</tr>
+<tr>
+<td>429</td>
+<td>Too many attempts from this source address</td>
+</tr>
+<tr>
+<td>503</td>
+<td>The database was unavailable, so the exchange could not be checked</td>
+</tr>
+</tbody>
+</table>
+<p>A 401 deliberately says less than the audit log records. Telling
+an anonymous caller <em>which</em> claim missed would turn the endpoint
+into an oracle for guessing a rule's contents, one request at a
+time. The namespace that owns the rule sees the detail in its
+events, which is where a stream of near-miss claim failures --
+what probing looks like -- belongs.</p>
+</details>
+<details class="warning" open="open">
+<summary>An identity token is single-use per rule</summary>
+<p>Once a token has been exchanged through a given rule it cannot be
+exchanged through that rule again. The same token <em>can</em> still be
+exchanged through a different rule to reach a second namespace,
+which is a legitimate pattern: a workflow needing two namespaces
+exchanges its token twice against two rules.</p>
+<p>A refusal for any other reason does not consume the token, so
+fixing a rule and retrying with a still-valid token works.</p>
+</details>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <p>All objects exposed by the REST API may have metadata associated with them. This
 metadata is for storing values that are of interest to the owner of the resources,
@@ -10972,29 +11276,29 @@ is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
 </details>
 <details class="example">
 <summary>Python API client: set metadata on a namespace</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">set_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">set_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Python API client: get metadata for a namespace</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact_metadata</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact_metadata</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Python API client: delete metadata for a namespace</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">delete_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">delete_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
 

@@ -9849,6 +9849,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#federated-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated identity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Federated identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The exchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claim-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claim matching
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-worked-github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A worked GitHub Actions example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#secrets-and-the-event-log" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10932,6 +10993,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#federated-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated identity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Federated identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The exchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claim-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claim matching
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-worked-github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A worked GitHub Actions example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#secrets-and-the-event-log" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11323,6 +11445,151 @@ possible:</p>
 <p>grants cluster-wide visibility to a monitoring workload that provably
 cannot delete a node. If administration were a single all-or-nothing
 flag, that credential could not be expressed.</p>
+<h2 id="federated-identity">Federated identity<a class="headerlink" href="#federated-identity" title="Permanent link">&para;</a></h2>
+<p>A workload that already has an identity somewhere else -- a GitHub
+Actions job, a service account in an Authentik instance -- can trade
+that identity for a scoped, expiring namespace key without anyone
+having stored a long-lived Shaken Fist secret alongside it. The
+long-lived CI secret is the thing this exists to delete.</p>
+<p>Three objects make up the chain, and each is a real database-backed
+object with its own events:</p>
+<ul>
+<li>A <strong>trusted issuer</strong> is an identity provider the cluster will
+  believe. It is cluster-wide and administrative, because deciding who
+  may vouch for identities here is not a per-namespace decision.</li>
+<li>A <strong>mapping rule</strong> is a namespace's standing offer: an identity from
+  this issuer, carrying these claims, may mint a key here with these
+  scopes. It is owned by the namespace it mints into.</li>
+<li>The <strong>minted key</strong> is an ordinary namespace key. Nothing downstream
+  knows or cares that it was federated; it authenticates, carries
+  scopes, expires and is reaped exactly as any other key is. Its
+  provenance records the rule, the issuer, and the claims that were
+  actually satisfied.</li>
+</ul>
+<h3 id="the-exchange">The exchange<a class="headerlink" href="#the-exchange" title="Permanent link">&para;</a></h3>
+<p><code>POST /auth/federated</code> takes <code>{token, namespace, rule}</code> and returns a
+key. The order it works in is a security property rather than an
+implementation detail, because the endpoint is reachable by anyone:</p>
+<ol>
+<li>Refuse if the body is larger than <code>FEDERATION_MAX_TOKEN_BYTES</code>,
+   before anything parses it.</li>
+<li>Count the attempt against the source address's rate limit.</li>
+<li>Read the <code>iss</code> claim <strong>without verifying anything</strong> and refuse if no
+   trusted issuer matches. No network yet.</li>
+<li>Verify the signature against the issuer's JWKS.</li>
+<li>Check <code>aud</code>, <code>exp</code> and <code>nbf</code>.</li>
+<li>Load the named rule and check its bound claims.</li>
+<li>Claim this <code>(token, rule)</code> pair, refusing a replay.</li>
+<li>Mint the key.</li>
+</ol>
+<p>Steps 1 to 3 preceding step 4 matter more than they look. The JWKS
+fetch is a synchronous outbound HTTP request made inside a request
+worker, so an unfiltered path would let anyone with a made-up <code>iss</code>
+tie up workers on connections to a host of their choosing.</p>
+<p>The meter is step 2 rather than step 3, and that is the ordering most
+likely to be undone by accident. Only the argument checks sit above it.
+Resolving the issuer is a scan of every configured issuer, reading
+state and URL per row, so it is itself work worth metering -- with the
+meter below it the cheapest request to send would be among the more
+expensive ones to answer. A new step belongs below step 2 unless it
+touches neither the database nor the network.</p>
+<p>Signature verification is pinned to asymmetric algorithms. If <code>HS256</code>
+were accepted, an attacker could sign a token using the issuer's
+<em>public</em> key as the HMAC secret -- the public key being, by
+definition, public.</p>
+<h3 id="claim-matching">Claim matching<a class="headerlink" href="#claim-matching" title="Permanent link">&para;</a></h3>
+<p><code>bound_claims</code> values are exact strings, or lists of exact strings
+meaning "any of these". There is no globbing, no regular expressions,
+no prefix matching and no type coercion: a claim of <code>1</code> does not match
+a matcher of <code>"1"</code>.</p>
+<p>This is deliberate and is the most likely thing to feel restrictive.
+Prefix matching on <code>repository</code> reads naturally right up until someone
+registers <code>shakenfist-evil</code>, and the anchored patterns needed to make
+it safe are exactly what reviewers get wrong. Enumerating the branches
+and repositories you mean covers the realistic cases; if practice
+proves otherwise, patterns can be added later with anchoring enforced
+at rule creation. Shipping them as the default is the part that would
+be hard to undo.</p>
+<h3 id="single-use">Single use<a class="headerlink" href="#single-use" title="Permanent link">&para;</a></h3>
+<p>An identity token is single-use <em>per rule</em>. Once exchanged through a
+given rule it cannot be exchanged through that rule again -- but it
+can still be exchanged through a <em>different</em> rule, which is how a
+workflow that needs two namespaces gets into both.</p>
+<p>The pair is claimed by inserting it into a table with a composite
+primary key, so the failing insert <em>is</em> the detection and there is no
+window in which two simultaneous presentations both succeed. The claim
+is the last thing that happens before minting, so a refusal for any
+other reason -- claims that do not match, a rule that has been deleted
+-- leaves the token still usable.</p>
+<h3 id="a-worked-github-actions-example">A worked GitHub Actions example<a class="headerlink" href="#a-worked-github-actions-example" title="Permanent link">&para;</a></h3>
+<p>GitHub can mint an OIDC token for a workflow job, describing the
+repository, the branch and the workflow that asked for it. Configure
+the issuer once, as an administrator:</p>
+<p>The <code>sf-client</code> command line does not wrap these routes yet, so the
+examples below call the REST API directly.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="s1">        &quot;name&quot;: &quot;github&quot;,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="s1">        &quot;issuer_url&quot;: &quot;https://token.actions.githubusercontent.com&quot;,</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="s1">        &quot;jwks_uri&quot;: &quot;https://token.actions.githubusercontent.com/.well-known/jwks&quot;,</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="s1">        &quot;audience&quot;: &quot;https://sf.example.com&quot;</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="s1">      }&#39;</span>
+</code></pre></div>
+<p>Then, as the owner of the namespace the workflow should reach, write a
+rule saying which jobs qualify and what they get:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="s1">        &quot;name&quot;: &quot;ryll&quot;,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s1">        &quot;issuer&quot;: &quot;github&quot;,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="s1">        &quot;bound_claims&quot;: {</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="s1">          &quot;repository&quot;: &quot;shakenfist/ryll&quot;,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="s1">          &quot;ref&quot;: [&quot;refs/heads/develop&quot;, &quot;refs/heads/main&quot;]</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="s1">        },</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="s1">        &quot;scopes&quot;: [&quot;blob.read&quot;, &quot;artifact.*&quot;],</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="s1">        &quot;key_ttl&quot;: 3600,</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="s1">        &quot;key_name_prefix&quot;: &quot;ryll-ci&quot;</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="s1">      }&#39;</span>
+</code></pre></div>
+<p>The workflow needs <code>id-token: write</code> permission to ask GitHub for a
+token, and nothing else:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">permissions</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Get a Shaken Fist key</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">          </span><span class="no">IDENTITY=$(curl -sS \</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">            </span><span class="no">-H &quot;Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}&quot; \</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">            </span><span class="no">&quot;${ACTIONS_ID_TOKEN_REQUEST_URL}&amp;audience=https://sf.example.com&quot; \</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">            </span><span class="no">| jq -r .value)</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">          </span><span class="no">RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">            </span><span class="no">-H &quot;Content-Type: application/json&quot; \</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">            </span><span class="no">-d &quot;{\&quot;token\&quot;: \&quot;${IDENTITY}\&quot;,</span>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="w">                 </span><span class="no">\&quot;namespace\&quot;: \&quot;ci\&quot;,</span>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="w">                 </span><span class="no">\&quot;rule\&quot;: \&quot;ryll\&quot;}&quot;)</span>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="w">          </span><span class="no">echo &quot;::add-mask::$(echo &quot;${RESPONSE}&quot; | jq -r .key)&quot;</span>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a><span class="w">          </span><span class="no">echo &quot;SHAKENFIST_KEY=$(echo &quot;${RESPONSE}&quot; | jq -r .key)&quot; &gt;&gt; &quot;${GITHUB_ENV}&quot;</span>
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a><span class="w">          </span><span class="no">echo &quot;SHAKENFIST_NAMESPACE=ci&quot; &gt;&gt; &quot;${GITHUB_ENV}&quot;</span>
+</code></pre></div>
+<p>The <code>audience</code> in the token request must match the issuer's
+configured <code>audience</code> exactly, and the <code>add-mask</code> line matters: the
+minted secret is a credential, and the response body is the only place
+it will ever appear.</p>
+<p>There is no repository secret anywhere in this. The credential the job
+ends up holding is scoped to <code>blob.read</code> and <code>artifact.*</code>, expires an
+hour after it was minted, and its provenance records which rule minted
+it and which claims were satisfied -- so an audit of "what did that
+workflow have access to" is a query rather than an investigation.</p>
 <h2 id="secrets-and-the-event-log">Secrets and the event log<a class="headerlink" href="#secrets-and-the-event-log" title="Permanent link">&para;</a></h2>
 <p>Credentials never appear in events. This matters more than it might sound,
 because events are written to syslog and shipped to Loki, so a credential in an

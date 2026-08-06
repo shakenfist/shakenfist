@@ -10244,6 +10244,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#federated-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated identity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Federated identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trusting-an-issuer-is-an-administrative-act" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusting an issuer is an administrative act
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delegating-to-namespace-owners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delegating to namespace owners
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#abuse-resistance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Abuse resistance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-nobody-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If nobody uses it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trusts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10251,6 +10323,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Trusts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-trust-does-and-does-not-grant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a trust does and does not grant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -10722,6 +10811,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#federated-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated identity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Federated identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trusting-an-issuer-is-an-administrative-act" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusting an issuer is an administrative act
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delegating-to-namespace-owners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delegating to namespace owners
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#abuse-resistance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Abuse resistance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-nobody-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If nobody uses it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trusts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10729,6 +10890,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Trusts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-trust-does-and-does-not-grant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a trust does and does not grant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -10850,6 +11028,138 @@ are not written back to the old JSON column, so downgrading to a release that
 predates this change loses them. Keys that existed before the upgrade are
 unaffected either way. The exposure is one upgrade cycle, and it matches the
 precedent set by the <code>node_daemon_states</code> migration.</p>
+<h2 id="federated-identity">Federated identity<a class="headerlink" href="#federated-identity" title="Permanent link">&para;</a></h2>
+<p>Workloads with an identity elsewhere -- a GitHub Actions job, a service
+account in an Authentik instance -- can trade that identity for a
+scoped, expiring namespace key rather than holding a long-lived Shaken
+Fist secret. The mechanics are in the
+<a href="/developer_guide/authentication/#federated-identity">developer guide</a>;
+this covers what an operator has to decide and configure.</p>
+<h3 id="trusting-an-issuer-is-an-administrative-act">Trusting an issuer is an administrative act<a class="headerlink" href="#trusting-an-issuer-is-an-administrative-act" title="Permanent link">&para;</a></h3>
+<p>A <strong>trusted issuer</strong> is cluster-wide, and creating one is a <code>system</code>
+namespace operation. It says the cluster will believe tokens this
+provider signs, so the decision belongs with whoever is responsible
+for the cluster rather than with an individual namespace owner.</p>
+<p>Four fields, all mandatory:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>How rules refer to this issuer. Treat it as durable</td>
+</tr>
+<tr>
+<td><code>issuer_url</code></td>
+<td>Compared to a token's <code>iss</code> claim <strong>exactly</strong>: no normalisation, no trailing-slash tolerance</td>
+</tr>
+<tr>
+<td><code>jwks_uri</code></td>
+<td>Where the signing keys are published. Always taken from here, never from the token</td>
+</tr>
+<tr>
+<td><code>audience</code></td>
+<td>Tokens must be minted for this. Usually your cluster's API URL</td>
+</tr>
+</tbody>
+</table>
+<p>The exact <code>issuer_url</code> comparison is deliberate. A loose comparison
+here is a way to accept tokens from somewhere else entirely, so if
+your tokens are refused with an untrusted-issuer message, check for a
+trailing slash before checking anything else.</p>
+<details class="warning" open="open">
+<summary>Rules reference issuers by name</summary>
+<p>Deleting an issuer does not delete the mapping rules that name it;
+those rules simply stop working. Recreating an issuer under the
+same name silently rebinds every rule that named it, potentially
+to a different identity provider than the rules' authors intended.
+Renaming rather than recreating avoids this.</p>
+</details>
+<h3 id="delegating-to-namespace-owners">Delegating to namespace owners<a class="headerlink" href="#delegating-to-namespace-owners" title="Permanent link">&para;</a></h3>
+<p>A <strong>mapping rule</strong> is owned by the namespace it mints into, and
+creating one requires ownership of that namespace -- the same gate as
+adding a key, because a rule is the same privilege granted in advance
+and conditioned on claims. Once you have configured an issuer,
+namespace owners can write their own rules without coming back to you.</p>
+<p>Two things to watch:</p>
+<ul>
+<li><strong>Rules targeting <code>system</code>.</strong> A rule that mints into the <code>system</code>
+  namespace is a standing offer of administrative credentials to
+  whoever satisfies its claims. This is permitted, because there are
+  legitimate uses, but the cluster logs a warning and writes an audit
+  event when such a rule is created. Those events are worth alerting
+  on.</li>
+<li><strong>Scope breadth.</strong> A rule grants exactly the scopes it lists.
+  <code>artifact.*</code> is a whole family; <code>["cluster-admin", "node.read"]</code> is
+  a genuinely least-privilege monitoring credential. Listing a rule's
+  scopes is how you audit what a federated workload can do.</li>
+</ul>
+<p>Listing a namespace's rules answers "who can get into this namespace",
+which is the inbound counterpart to listing its trusts.</p>
+<h3 id="abuse-resistance">Abuse resistance<a class="headerlink" href="#abuse-resistance" title="Permanent link">&para;</a></h3>
+<p><code>/auth/federated</code> is unauthenticated by nature, so it carries its own
+protections.</p>
+<p><strong>Replay.</strong> An identity token is single-use per rule. The same token
+may still be exchanged through a <em>different</em> rule, so a workflow can
+reach two namespaces with one identity. Seen pairs live in the
+<code>federation_replay</code> table until the token they describe expires, and
+are reaped by the cluster daemon.</p>
+<p><strong>Rate limiting.</strong> Attempts are counted per source address per minute
+in the database, so the limit is cluster-wide rather than per API
+worker. Note that behind a reverse proxy which does not rewrite the
+source address, every request appears to come from the proxy and the
+limit becomes a single global one -- size it accordingly, or disable
+it and rate limit at the proxy instead.</p>
+<p>Every attempt is counted, including ones refused for naming an issuer
+this cluster does not trust. Only the checks that read nothing but the
+request itself -- a missing field, an oversized body -- happen before
+the counter. So a misconfigured workflow pointed at the wrong issuer
+consumes its source's budget in the same way a wrong key does, which
+is worth knowing when a CI fleet sharing one NAT address starts
+seeing 429s.</p>
+<p>Both checks fail closed: if the database cannot be reached the
+exchange answers 503 rather than assuming the request is fine.</p>
+<h3 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FEDERATION_JWKS_CACHE_SECONDS</code></td>
+<td>300</td>
+<td>How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id always triggers an immediate refetch, so raising this does not delay recognising a rotated key</td>
+</tr>
+<tr>
+<td><code>FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS</code></td>
+<td>5</td>
+<td>How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker</td>
+</tr>
+<tr>
+<td><code>FEDERATION_MAX_TOKEN_BYTES</code></td>
+<td>16384</td>
+<td>Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no <code>Content-Length</code> is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit</td>
+</tr>
+<tr>
+<td><code>FEDERATION_RATE_LIMIT_PER_MINUTE</code></td>
+<td>60</td>
+<td>Exchange attempts allowed per source address per minute. <code>0</code> disables rate limiting entirely</td>
+</tr>
+</tbody>
+</table>
+<h3 id="if-nobody-uses-it">If nobody uses it<a class="headerlink" href="#if-nobody-uses-it" title="Permanent link">&para;</a></h3>
+<p>Federation is inert until an issuer exists. A cluster which never
+creates one behaves exactly as it did before: the two tables stay
+empty, the reaper does nothing, and <code>/auth/federated</code> refuses
+everything with an untrusted-issuer message.</p>
 <h2 id="trusts">Trusts<a class="headerlink" href="#trusts" title="Permanent link">&para;</a></h2>
 <details class="info" open="open">
 <summary>Info</summary>
@@ -10884,6 +11194,47 @@ be able to see them.</p>
 <li>jobs which need to boot a test image can now see the images from the <code>ci-images</code>
   namespace by virtue of this trust relationship.</li>
 </ul>
+<h3 id="what-a-trust-does-and-does-not-grant">What a trust does and does not grant<a class="headerlink" href="#what-a-trust-does-and-does-not-grant" title="Permanent link">&para;</a></h3>
+<p>A trust grants <strong>visibility</strong> over your <em>resources</em> — instances, networks,
+artifacts and the like. It is the system namespace's ability to see across
+namespaces, scaled down. A namespace you trust can list and read those
+objects. It cannot delete them, rename them, share them, or change their
+metadata — those all require the object's own namespace, or <code>system</code>.</p>
+<p>Giving is a separate question from taking, and it is still allowed: a
+namespace you trust may <em>create</em> an object in your namespace, which is exactly
+the "gift" step in the <code>ci-images</code> example above. Creation is additive, you
+opted into it by extending the trust, and nothing you already had is lost by
+it. Deletion is none of those things.</p>
+<p>Giving the same thing twice is not creation, though, and it is worth being
+precise about where the line falls. A trusted namespace may upload an artifact
+into yours when nothing of that <code>source_url</code> is there yet. It may not upload
+again over the artifact that first upload produced: adding a version ends in
+<code>delete_old_versions</code>, the caller supplies the blob, and the practical result
+is that an instance of yours booting that artifact afterwards gets somebody
+else's image. So the second upload is refused, and a CI job which pushes a
+nightly image into a shared namespace needs a key in that namespace rather
+than a trust. Labels are not affected — a label URL names its own namespace,
+so a trusted caller cannot reach yours through one.</p>
+<p><strong>Namespace administration is the exception, and it is a large one.</strong>
+Adding a key to your namespace, and writing a mapping rule in it, are both
+gated on this same trust relationship rather than on ownership. A namespace
+you trust can therefore mint credentials in yours — directly with
+<code>add-key</code>, or by writing a mapping rule, which is a standing offer to mint
+a key for anyone holding a matching identity token. It can also delete the
+rules you wrote.</p>
+<p>So a trust is not only a window onto your resources; it is administrative
+access to your namespace's credentials. Extend one to a namespace you would
+be willing to hand a key to, and read
+<a href="#federated-identity">Federated identity</a> before extending one to a
+namespace that has mapping rules configured.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Artifacts behaved differently until recently: a trusted namespace could
+delete another namespace's artifacts. Instances and networks never
+permitted this, and artifacts now match them. If you have tooling which
+relied on deleting artifacts across a trust, it needs a key in the owning
+namespace, or the <code>system</code> namespace, instead.</p>
+</div>
 
 
 

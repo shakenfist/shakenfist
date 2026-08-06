@@ -10729,6 +10729,61 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pre-push-security-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-push security review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pull-request-review-3625" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull request review (#3625)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#second-pull-request-review-3625" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Second pull request review (#3625)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#merge-queue-failure-3625" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge queue failure (#3625)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#third-pull-request-review-3625" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Third pull request review (#3625)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11022,36 +11077,69 @@ the cheapest rejections happen first:</p>
 <ol>
 <li>Reject if the body exceeds <code>FEDERATION_MAX_TOKEN_BYTES</code>. No
    parsing.</li>
+<li>Rate limit per source address.</li>
 <li>Parse the JWT header and claims <strong>without verifying</strong> to read
    <code>iss</code>. Reject if no <code>TrustedIssuer</code> matches. No network yet.</li>
-<li>Rate limit per source address.</li>
 <li>Verify the signature against cached JWKS.</li>
 <li>Check <code>aud</code>, <code>exp</code>, <code>nbf</code>.</li>
-<li>Refuse if this <code>(jti, rule)</code> pair has been seen.</li>
 <li>Load the named rule in the named namespace; check bound claims.</li>
+<li>Refuse if this <code>(token, rule)</code> pair has been seen.</li>
 <li>Mint the key.</li>
 </ol>
-<p>Steps 1 and 2 preceding step 4 matter more than they look.
+<p>Steps 1 to 3 preceding step 4 matter more than they look.
 <code>PyJWKClient</code> fetches synchronously inside the request, so an
 unfiltered path would let anyone with a made-up <code>iss</code> tie up a
 gunicorn worker on an outbound HTTP call.</p>
+<p>Steps 2 and 3 were also the other way around when this section was
+first written, on the reasoning that refusing an unknown issuer first
+kept the rate limit table from growing a row per made-up <code>iss</code>. That
+reasoning does not survive being stated: resolving the issuer is a scan
+of every configured issuer with two reads per row, so the ordering
+avoided one cheap insert by permitting an unbounded number of reads
+above the meter. The review that caught it is recorded below; the meter
+is now second, and only the argument checks sit above it.</p>
+<p>Steps 6 and 7 were the other way around when this section was first
+written, which is not implementable: the pair being claimed is
+<code>(token, rule_uuid)</code>, and there is no rule uuid until the rule has
+been read. Ordering the replay claim <em>last</em>, after claim matching and
+after the namespace check, is also the behaviour worth having — a
+refusal for any other reason must not consume the token's single use,
+or an operator who fixes a rule cannot retry with a token that is
+still perfectly valid. Being the last gate before minting is what
+makes it effective against concurrency: two simultaneous
+presentations of one token cannot both get past it, because the
+second one's insert collides with the first one's.</p>
 <p><strong>JWKS caching</strong> uses <code>PyJWKClient</code> (PyJWT 2.13.0 is already a
 dependency — no new package), with <code>cache_jwk_set</code> and an explicit
 <code>lifespan</code>. An unknown <code>kid</code> triggers at most one refetch, guarded so
 concurrent requests for the same issuer collapse into a single fetch
 rather than a thundering herd against the IdP.</p>
-<p><strong>Replay</strong> is refused per <code>(jti, rule)</code>, not per <code>jti</code>: exchanging one
+<p><strong>Replay</strong> is refused per <code>(token, rule)</code>, not per token: exchanging one
 token against two rules to reach two namespaces is a legitimate
 pattern the CI conductor design depends on, while re-exchanging the
 same token against the same rule is not. Seen pairs are stored in a
 small table with the inbound token's <code>exp</code> as their own expiry, and a
-unique index on <code>(jti, rule_uuid)</code> does the arbitration — the insert
-failing <em>is</em> the replay detection, with no read-then-write race. They
-are reaped like any other expiring row.</p>
+composite primary key on <code>(token_id, rule_uuid)</code> does the arbitration
+— the insert failing <em>is</em> the replay detection, with no
+read-then-write race. They are reaped like any other expiring row.</p>
+<p><code>token_id</code> is the token's <code>jti</code> where the issuer provides a usable
+one, and a SHA-256 of its signature otherwise. Not every identity
+provider stamps a <code>jti</code> — the claim is optional in the spec — and
+refusing those outright would rule out conforming issuers, while
+letting them through unprotected would leave open exactly the hole
+this table exists to close. The signature is unique per token by
+construction, so it identifies the token just as well; it is hashed
+rather than stored because it is the secret half of the credential.</p>
 <p><strong>Rate limiting</strong> is per source address, backed by MariaDB so the
 limit is cluster-wide rather than per gunicorn worker. Request volume
 on this endpoint is low by nature (once per CI job), so a row per
-source per window is affordable.</p>
+source per window is affordable. Windows are fixed rather than
+sliding: the boundary lets a determined caller send two allowances
+back to back, which at this volume is not worth what a sliding window
+costs in rows. Both this counter and the replay claim fail <em>closed</em> —
+a database error refuses the exchange with a 503 rather than being
+read as "under the limit" or "not seen before", since both of those
+readings authorise something.</p>
 <p><strong>Auditing.</strong> A successful exchange writes an audit event against the
 minted key and its namespace, carrying the satisfied claims and the
 rule, never the secret. A <em>failed</em> exchange writes an event against
@@ -11296,46 +11384,431 @@ the security boundary of this whole plan. After 3i:
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every registered route either authenticates or is one of a
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every registered route either authenticates or is one of a
       small, individually justified <code>@public</code> set, asserted by a test
       over <code>app.url_map</code> and backstopped by a pre-commit check.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Scopes derive automatically for all endpoints; overrides are
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Scopes derive automatically for all endpoints; overrides are
       explicit, greppable and documented; legacy unscoped keys carry
       the wildcard and behave exactly as before.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Admin endpoints require both the <code>system</code> namespace and the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Admin endpoints require both the <code>system</code> namespace and the
       <code>cluster-admin</code> scope, and a <code>["cluster-admin", "node.read"]</code>
       credential can read a node but not delete one.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>TrustedIssuer</code> and <code>MappingRule</code> are database-backed objects
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>TrustedIssuer</code> and <code>MappingRule</code> are database-backed objects
       with events, CRUD APIs, and the correct ownership gates; rules
       die with their namespace.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A GitHub Actions OIDC token can be exchanged for a scoped,
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A GitHub Actions OIDC token can be exchanged for a scoped,
       expiring key that works with an unmodified <code>sf-client</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The same machinery exchanges an Authentik-style token with
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The same machinery exchanges an Authentik-style token with
       configuration only, proven by test.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Replay of one token against one rule is refused; the same token
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Replay of one token against one rule is refused; the same token
       against a different rule still works.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Scopes survive the trust boundary: readable across, not
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Scopes survive the trust boundary: readable across, not
       writable across, asserted by test.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No secret appears in any event; the failed-exchange event
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No secret appears in any event; the failed-exchange event
       reaches the rule owner.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every cluster-minted secret carries the <code>sfk_</code> prefix and a
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every cluster-minted secret carries the <code>sfk_</code> prefix and a
       verifiable checksum; the prefix is reserved against
       operator-supplied secrets; a bad checksum is rejected before any
       bcrypt comparison; and the rotation caveat for a pre-existing
       <code>sfk_</code>-prefixed secret is in the operator guide.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> clean; <code>tox -e genprotos</code> no-op;
-      unit tests green; functional CI green on the branch <strong>before</strong>
-      the PR merges.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10 and 11
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> clean; <code>tox -e genprotos</code> no-op;
+      unit tests green. Re-confirmed by the pre-push audit after the
+      rebase onto develop.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Functional CI green on the branch <strong>before</strong> the PR merges.
+      Deliberately left unticked: it cannot be established from a
+      local tree and is the operator's gate at pull request time.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10 and 11
       marked resolved; phase status updated in the Execution table
       and <code>docs/plans/index.md</code>; glossary and guides updated.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Pre-push security review findings triaged: every high fixed,
+      every medium and low either fixed or recorded below with the
+      reason it was accepted.</li>
 </ul>
+<h2 id="pre-push-security-review">Pre-push security review<a class="headerlink" href="#pre-push-security-review" title="Permanent link">&para;</a></h2>
+<p>The pre-push audit's security agent read the whole phase 3 diff. What
+it found and what was done, kept here because the reasoning for an
+accepted finding is worth more later than the finding itself.</p>
+<p>Fixed, each with a regression test that was verified to fail when the
+fix is reverted:</p>
+<ul>
+<li><strong>A rule could grant scopes its author did not hold.</strong> A token scoped
+  <code>rule.write</code> could write a rule granting <code>*</code>, satisfy that rule's own
+  bound claims, and exchange it for a wildcard key — which in the
+  system namespace reaches cluster-admin. <code>_rule_arguments</code> now applies
+  the same ceiling <code>_namespace_keys_putpost</code> applies when minting a key
+  directly.</li>
+<li><strong>Replay refusal was keyed on the token's signature text.</strong> base64url
+  leaves four don't-care bits in the final character of a 256 byte
+  signature and the padding is optional, so one signature has many
+  spellings that all verify — measured at 48 for an RS256 token. Each
+  spelling was a separate replay slot. The identity is now derived from
+  the signed material (header and payload), which the signature commits
+  to and an attacker cannot vary.</li>
+<li><strong>The identity token was written to the API log.</strong> <code>log_request</code>
+  merges the request body into the decorated method's kwargs and logs
+  them, redacting by field name — and the federated endpoint's
+  credential field is <code>token</code>, which was not on the list. The body is
+  now dropped entirely for any route under <code>/auth/</code>, matching what
+  <code>app.py</code> already did for the audit event stream, with the predicate
+  shared so the two cannot disagree.</li>
+<li><strong>The JWKS fetch used PyJWT's 30 second default timeout</strong> while
+  holding the issuer's refetch lock, so an unreachable provider could
+  pin an API worker for 30 seconds per queued request. Now
+  <code>FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS</code>, default 5.</li>
+<li><strong>The exchange's body size check could not do its job.</strong> It ran in
+  the endpoint method, by which point <code>log_request</code> had already called
+  <code>get_json(force=True)</code> and parsed the whole body; and it read
+  <code>content_length</code>, which is <code>None</code> for chunked encoding, so a header
+  choice opted out of the limit entirely. The refusal moved to a
+  request hook ahead of every reader of the body, and a body with no
+  declared length is now refused with 411 rather than measured.</li>
+<li><strong>Two trusted issuers could claim the same issuer URL</strong>, making which
+  provider's keys are trusted depend on listing order — an operator
+  repointing an issuer would believe they had while some requests kept
+  verifying against the old JWKS. Refused on create and update, using
+  the same lookup token validation uses.</li>
+<li><strong>A mapping rule's <code>key_name_prefix</code> bypassed the reserved key name
+  check.</strong> A rule with the prefix <code>_service_key</code> minted keys colliding
+  with the cluster's own service credentials, which is precisely what
+  the key endpoints refuse. The reserved-name patterns moved to
+  <code>util.credentials</code> so both paths ask the same question.</li>
+<li><strong>Rule fields had no upper bounds</strong>, so an oversized value reached
+  the database and returned a 500 instead of a message the operator
+  could act on. <code>key_ttl</code> additionally had no ceiling, so a rule could
+  mint a key outliving by a year the identity token that justified it.</li>
+<li><strong>A damaged rule row leaked its UUID to an anonymous caller.</strong> The
+  generic 500 handler answers with <code>repr(e)</code> and <code>CorruptMappingRule</code>
+  names the rule; on the one endpoint anybody may call, that hands a
+  stranger an identifier. Caught and turned into a generic refusal.
+  The first attempt guarded the wrong call and protected nothing; see
+  the pull request review below.</li>
+</ul>
+<p>Assessed and accepted:</p>
+<ul>
+<li><strong>The rate limiter keys on <code>remote_addr</code> with no <code>ProxyFix</code>.</strong> Behind
+  a reverse proxy that does not rewrite the source address this is one
+  global limit rather than a per-caller one. Trusting
+  <code>X-Forwarded-For</code> unconditionally would be worse — it would let any
+  caller choose their own rate limit bucket — and whether the header
+  can be trusted is a property of a deployment we cannot see from here.
+  Documented in both the config description and the operator guide
+  instead.</li>
+<li><strong>The refusal reasons are coarse categories.</strong> A caller learns
+  "untrusted issuer" versus "token rejected" versus "no such rule".
+  This is deliberate: the rule lookup happens after token validation,
+  so an anonymous caller holding no valid token cannot use it to
+  enumerate rules, and an operator debugging their own workflow needs
+  to know which stage refused them. Which claim missed is still
+  withheld.</li>
+<li><strong><code>PyJWKClient</code> follows redirects when fetching a JWKS.</strong> Reaching
+  this requires the ability to register a trusted issuer, which is
+  cluster-admin — an actor who already has total control. The <code>https://</code>
+  requirement on <code>jwks_uri</code> stands.</li>
+<li><strong>The <code>federation_replay</code> and <code>federation_rate_limits</code> tables grow
+  with traffic.</strong> Both are already swept by the cluster daemon's
+  reapers, so this was addressed before the review ran.</li>
+</ul>
+<h2 id="pull-request-review-3625">Pull request review (#3625)<a class="headerlink" href="#pull-request-review-3625" title="Permanent link">&para;</a></h2>
+<p>The automated reviewer on the pull request raised eight items. Three
+were marked for fixing, five as things to consider. All eight were
+addressed; the two that turned out to matter most are the first two,
+because between them they show a mitigation and its own regression
+test agreeing with each other and both being wrong.</p>
+<p>Fixed:</p>
+<ul>
+<li><strong>The <code>CorruptMappingRule</code> guard was wrapped around a call that
+  cannot raise it.</strong> The exception comes from decoding <code>bound_claims</code>
+  or <code>scopes</code>, which happens on the <em>attributes</em> read;
+  <code>MappingRule.from_db_by_name</code> reads the static row and the object
+  state and touches neither. The first read that could actually fail
+  was the <code>issuer</code> comparison, outside the <code>try</code>, so the UUID leak the
+  guard was written to prevent was still open. The endpoint now reads
+  the whole policy once, inside a <code>try</code> that covers it, via the new
+  <code>MappingRule.policy()</code>.</li>
+<li><strong>The regression test mocked the one function that cannot raise.</strong>
+  It patched <code>from_db_by_name</code>, so it passed against the broken guard
+  — which is why the guard shipped in the wrong place. It now patches
+  the attribute read, asserts the lookup really did succeed first, and
+  was verified to fail (<code>401 != 500</code>) against the unguarded endpoint.</li>
+<li><strong><code>arg_is_artifact_ref</code>'s docstring described the trust behaviour
+  this branch removes</strong>, telling the reader that ownership still lets a
+  trusted namespace delete by UUID. It does not, as every other
+  document in the branch says. Rewritten, and the trust case added to
+  the <code>requires_artifact_access</code> comment, which had omitted it.</li>
+</ul>
+<p>Considered, and changed:</p>
+<ul>
+<li><strong>Issuer resolution ran above the rate limit</strong>, and the comment
+  justified that ordering by calling the preceding steps free.
+  <code>issuer_claiming_url</code> scans every configured issuer and reads state
+  and attributes per row, so it was the one unauthenticated, unmetered
+  database amplification path in the new code — and the ordering was
+  backwards on its own logic, since the counter row it was avoiding
+  costs less than the scan it was permitting. The meter moved above
+  the lookup. Counting is one row per source per window, the same row
+  a caller naming a real issuer already earned, so the table grows no
+  faster. The test that asserted the old contract now asserts the new
+  one.</li>
+<li><strong><code>issuer_url</code> uniqueness was a check-then-write with nothing
+  serialising it</strong>, while three documents described it as an
+  invariant. It cannot have a unique index, because a soft-deleted
+  issuer keeps its row so its URL stays reusable, so both endpoints
+  now hold a cluster lock across the check and the write — the
+  <code>vsock_cids</code> pattern from <code>instance.py</code>. Tested by asserting the
+  create happens between the acquire and the release.</li>
+<li><strong>Every attribute access re-read the row.</strong> One exchange made five
+  round trips for one rule. <code>policy()</code> reads once; the exchange and
+  <code>external_view()</code> both use it. This fell out of the first fix.</li>
+</ul>
+<p>Considered, and documented rather than changed:</p>
+<ul>
+<li><strong>Anonymous requests write an audit row before the rate limit
+  applies.</strong> <code>log_request_info</code> events every request to <code>API_REQUESTS</code>
+  ahead of routing, so <code>_federated_refusal</code>'s care not to let an
+  anonymous caller write unbounded rows into a <em>namespace's</em> log does
+  not extend to the API's own. This is pre-existing and shared with
+  <code>POST /auth</code>, the other public route, so it is out of scope for this
+  branch — but the docstring no longer reads as though the exposure is
+  closed.</li>
+<li><strong>Widened artifact name resolution does a trust lookup per
+  candidate.</strong> A popular name across many namespaces fans out to one
+  trust read each. It only runs when the caller's own namespace has no
+  match, so the common case is untouched. Recorded in the docstring as
+  a deliberate choice, with the SQL pushdown that would fix it if it
+  ever shows up in a profile.</li>
+</ul>
+<h2 id="second-pull-request-review-3625">Second pull request review (#3625)<a class="headerlink" href="#second-pull-request-review-3625" title="Permanent link">&para;</a></h2>
+<p>A re-review after the first round raised seven further items: two to
+fix, one documentation correction, four to consider. All seven were
+addressed. None of them contradicted a fix from the first round, and
+the severity fell — the first round found a security hole with a
+regression test that agreed with it, this one found one live
+authorisation gap and otherwise inconsistencies between what the code
+does and what this branch's own documents claim it does.</p>
+<p>Fixed:</p>
+<ul>
+<li><strong>A trust still authorised destructive mutation of another
+  namespace's artifact.</strong> <code>ArtifactUploadEndpoint.post</code> and the cache
+  route resolved a caller-supplied url with <code>Artifact.from_url</code>, whose
+  predicate is <em>visibility</em> — so a trusted namespace could name the
+  owner's <code>source_url</code>, land on the owner's artifact, and have its own
+  blob added as the newest version. <code>add_index</code> ends in
+  <code>delete_old_versions</code>, so the owner's older versions went with it.
+  The root cause was one function serving both a read and a write
+  intent, which is the same defect this phase already fixed for <em>name</em>
+  resolution when it split <code>arg_is_artifact_ref</code> from
+  <code>arg_is_visible_artifact_ref</code>. <code>from_url</code> now documents that it
+  resolves by visibility, and the new <code>Artifact.owned_from_url()</code> is
+  what a write path uses. Both routes then authorise the existing and
+  the brand new cases apart: a trust is enough to gift a namespace an
+  artifact it did not have, and not enough to replace what one it
+  already owns resolves to. The audit event also moved below the check,
+  so a refused caller can no longer append to the event log of a
+  namespace it is about to be told does not exist.</li>
+<li><strong>Two documents still described the pre-reorder exchange sequence.</strong>
+  The developer guide and this plan both listed issuer resolution above
+  the rate limit, and this plan contradicted itself within one file.
+  Both lists now match the code, and the inline step comments in
+  <code>AuthFederatedEndpoint.post</code> — which read 2, 3, 4-5, 7, 6, 8 — are
+  renumbered, since an ordering argument that cannot be audited against
+  the code is not much of an argument.</li>
+<li><strong>The operator guide overstated what a trust withholds.</strong> It claimed
+  a trusted namespace cannot change your objects' metadata, but
+  <code>requires_namespace_ownership</code> <em>is</em> <code>namespace_is_trusted</code>, so a
+  trusted namespace can add keys and write mapping rules in yours — the
+  most privilege-bearing objects this phase adds. The behaviour matches
+  the documented <code>add-key</code> precedent and is deliberate; the blanket
+  claim was what needed narrowing. The section now says plainly that a
+  trust is administrative access to a namespace's credentials, not only
+  a window onto its resources.</li>
+</ul>
+<p>Considered, and changed:</p>
+<ul>
+<li><strong>The rate limiter could fail open.</strong> Both federation replies
+  signalled failure by carrying a non-empty <code>error</code>, which left the
+  fail-closed property resting on string formatting: an exception
+  raised with no args has an empty <code>str()</code>, so the reply arrived as
+  <code>attempts=0, error=''</code> and read as "nobody has tried this minute".
+  Not reachable through any current path, because
+  <code>_direct_count_federated_attempt</code> converts the plausible failures
+  into <code>DatabaseUnavailable</code> with text — but an invariant carried by a
+  string being non-empty is not one a future contributor will know to
+  preserve. Both replies now carry an explicit <code>bool ok</code>, set only on
+  the success path, and the client decides on that.</li>
+<li><strong>A damaged rule took the whole CRUD listing down.</strong>
+  <code>external_view()</code> called <code>policy()</code>, so one undecodable column turned
+  a namespace's entire rule listing into a 500 and hid every healthy
+  rule. Worse, <code>delete()</code> does the work and <em>then</em> builds the
+  response, so a damaged rule was soft-deleted successfully and the
+  caller still got a 500 — on the one operation that would have cleaned
+  it up. <code>external_view()</code> now describes such a rule with an explicit
+  <code>unusable</code> marker instead of raising. Note this is the opposite
+  choice from the exchange, deliberately: the exchange must refuse,
+  because bound claims it cannot read are bound claims it cannot check,
+  while the CRUD routes exist to tell an owner which rule is broken.</li>
+<li><strong><code>TrustedIssuer</code> was left with the read-per-property shape
+  <code>MappingRule.policy()</code> was written to fix.</strong> <code>validate_token</code> went
+  back to the same row three times — <code>jwks_uri</code>, then <code>audience</code> and
+  <code>issuer_url</code>. The new <code>TrustedIssuer.configuration()</code> reads once, and
+  <code>JWKS_CACHE.signing_key()</code> takes the <code>jwks_uri</code> its caller is already
+  holding rather than reading it again. Pinned by a test asserting the
+  read count, because nothing else would notice a third read coming
+  back. The <code>issuer_claiming_url</code> SQL pushdown the reviewer also
+  suggested was <em>not</em> done: the scan is now below the meter, which was
+  the security half, and pushing the match into SQL is a larger change
+  than this branch should carry.</li>
+<li><strong>Reclaiming a rule name destroyed the superseded rule's events.</strong>
+  <code>hard_delete()</code> deletes object events, and on a rule those events are
+  the refusal trail — a stream of near-miss claim failures is what
+  probing looks like. The natural response to spotting it is to delete
+  the rule and write a tighter one under the same name, which is this
+  exact path, so acting on the evidence erased it. Both <code>MappingRule</code>
+  and <code>TrustedIssuer</code> now record the supersession, with the superseded
+  uuid, on the replacement object. Recorded there rather than on the
+  namespace because <code>namespace.py</code> imports <code>mapping_rule</code>, and because
+  the replacement is where somebody asking what happened to a rule will
+  look. This preserves the fact and the identifier, not the trail
+  itself; a fuller fix would copy the events, and the unique index
+  means the old row still has to go.</li>
+</ul>
+<p>Not done, and why:</p>
+<ul>
+<li><strong>A CI assertion for the artifact upload gap.</strong> The reviewer
+  suggested one in <code>test_trusts</code> alongside the delete assertions. The
+  <code>shakenfist_client</code> package is not installed in the development
+  environment, so <code>cache_artifact</code>'s signature could not be verified,
+  and a functional test written against a guessed client API is worse
+  than none. The unit coverage pins both halves of the fix instead, and
+  each half was confirmed by reverting it and watching the specific
+  tests fail.</li>
+<li><strong>A test that <code>reap_federation_records</code> is registered on the cluster
+  daemon schedule.</strong> True gap, but a uniform one: no test in the tree
+  asserts schedule registration for any of the ten cluster tasks, and
+  the block sits inside the elected loop where reaching it means
+  refactoring <code>daemons/cluster/main.py</code>. Covering one task and not the
+  nine beside it would read as assurance that is not there.</li>
+<li><strong>A test that a <code>key_name_prefix</code> collision does not rotate an
+  existing key.</strong> Investigated rather than accepted: the minted name
+  carries an eight character random discriminator, so a collision is
+  not reachable, and a test of that would be a test of probability.
+  What <em>was</em> missing is the property the discriminator exists to
+  protect — that the bare prefix is never used as a key name — so there
+  is now a test that an operator's key named for the prefix still
+  authenticates after a mint.</li>
+</ul>
+<h2 id="merge-queue-failure-3625">Merge queue failure (#3625)<a class="headerlink" href="#merge-queue-failure-3625" title="Permanent link">&para;</a></h2>
+<p>The first attempt to merge failed for two unrelated reasons. Three
+matrix jobs died because the home lab pip mirror and proxy were
+unreachable for about two minutes, which is infrastructure and not
+this branch. The fourth found a real defect.</p>
+<p>Every one of the sixteen tests in
+<code>cluster_ci_tests/test_federation.py</code> failed in <code>setUp</code> with
+<code>400 jwks_uri must be https</code>. <code>_start_jwks_server()</code> handed the issuer
+an <code>http://</code> address, and <code>_validate_issuer_arguments</code> has refused
+non-HTTPS <code>jwks_uri</code> since the <code>TrustedIssuer</code> object was added in
+<code>6d9092944</code>. The test, written later in <code>0a6f5d651</code>, contradicted a
+constraint that already existed. It went unnoticed because the
+<code>(collection)</code> matrix is skipped on <code>pull_request</code> and only runs on
+<code>merge_group</code>, so these tests had never executed.</p>
+<p>The API is right and the test was wrong, so the test changed: the
+throwaway JWKS server now speaks TLS behind a certificate it signs
+itself, and the issuer is registered with an <code>https://</code> address. No
+loopback or private-address exemption was added to the validator. A
+JWKS fetched over plaintext can be substituted by anyone on the path,
+and a rule with a hole in it for the convenience of tests is a rule
+that will eventually be exercised in production.</p>
+<p>The cost is stated rather than hidden. The cluster verifies against
+the system trust store, so it refuses a self-signed certificate and
+never reaches the handler; <code>_require_reachable_jwks</code> sees the JWKS was
+never served and skips. Eleven tests — issuer and rule CRUD, ownership
+gates, validation, malformed and oversized bodies, the unauthenticated
+route — now run for real. The five that need a live callback skip with
+a message naming the reason. Issue #3639 tracks giving CI a
+certificate the cluster trusts, and records that reachability is
+almost certainly not the obstacle, since the tests run on the primary
+node alongside the API they call.</p>
+<p>This is also the item the second review round raised and this plan
+declined, on the grounds that <code>shakenfist_client</code> was not installed
+locally so the call could not be verified. That was wrong: the client
+installs from PyPI into a scratch venv without difficulty, and doing
+so reproduces the failure in seconds. The lesson is recorded in
+<code>AGENTS.md</code> under "Cluster CI tests only run in the merge queue".</p>
+<h2 id="third-pull-request-review-3625">Third pull request review (#3625)<a class="headerlink" href="#third-pull-request-review-3625" title="Permanent link">&para;</a></h2>
+<p>Eight items. Two fixed as defects, two as documentation, two as
+smaller corrections, one deferred to an issue, one needing nothing.</p>
+<p><strong>The damaged-rule handling did not work on a real cluster.</strong> This
+phase put considerable effort into a rule whose <code>bound_claims</code> or
+<code>scopes</code> will not decode: the exchange refuses it with a generic 401,
+and <code>external_view()</code> marks it <code>unusable</code> so one bad row does not take
+a namespace's listing down. Neither happened on a deployed cluster.
+The decode runs inside <code>sf-database</code>, the servicer's catch-all turned
+<code>CorruptMappingRule</code> into <code>INTERNAL</code>, and
+<code>_grpc_get_mapping_rule_attributes</code> converts any <code>RpcError</code> into
+<code>DatabaseUnavailable</code> — so the API answered 503 and both behaviours
+were unreachable. Every test for them patched <code>MappingRule._attributes</code>
+in-process, which is the only path where they worked.</p>
+<p>This is the mistake this plan already named under "A guard has to sit
+where the exception is raised", committed one layer down: the guard
+was in the right place, and the fault could not reach it. The reply
+now carries <code>bool corrupt</code>, the servicer sets it instead of falling
+into the catch-all, and the client re-raises <code>CorruptMappingRule</code>.
+<code>str(e)</code> is logged rather than passed to <code>set_details()</code>, because the
+message names the rule uuid and the exchange is unauthenticated. The
+new tests drive the real servicer method and the real client wrapper
+rather than a patched attribute; reverting either half fails exactly
+the three that should.</p>
+<p><strong>The replay key compared tokens as text.</strong> <code>token_id</code> was
+<code>sa.String(128)</code>, so it inherited the server's default collation —
+<code>utf8mb4_general_ci</code> on 10.6, <code>utf8mb4_uca1400_ai_ci</code> from 11.4 — under
+which two jti values differing only in case are one primary key, and
+the second, legitimate, exchange is refused as a replay. It fails safe
+rather than open, and the sha256 fallback is lowercase hex so it never
+bites, but an issuer minting mixed-case base64 jti values is ordinary.</p>
+<p>The obvious fix was wrong and testing caught it. <code>utf8mb4_bin</code> compares
+case sensitively but is still PAD SPACE, so <code>'x'</code> and <code>'x '</code> remained
+one key; the column is now <code>utf8mb4_nopad_bin</code>, which has existed since
+MariaDB 10.2, comfortably below <code>MIN_MARIADB_VERSION</code> of 10.6. Because
+no unit test can answer "does this server think these are the same
+key", the tests are live ones behind <code>SF_MARIADB_TEST_DSN</code>, verified
+against dockerised MariaDB 10.6 and 11.4. <code>tools/ci-enum-widening-test.sh</code>
+now runs every <code>test_mariadb_*_live</code> module rather than one by name —
+standing up MariaDB is the expensive part, and the script and its job
+keep their old names so the required status check does not move.</p>
+<p><strong>Two documentation gaps.</strong> The release notes recorded that a trust no
+longer authorises delete, share, unshare, retag or metadata changes,
+but not that it no longer authorises adding a version to an artifact it
+previously gifted — so tooling that re-uploads the same <code>source_url</code>
+across a trust breaks with a 404 and nothing said so. The operator
+guide's "Giving is a separate question from taking" read as though
+re-gifting worked. Both now state where the line falls, and both note
+that labels are unaffected because a label URL names its own namespace.</p>
+<p>Also: the comment on <code>external_view()</code>'s <code>unusable</code> field opened with
+"Only ever True", which is wrong — the field is False for every healthy
+rule, as its own test asserts. Two documentation files were missing
+trailing newlines; there is no <code>end-of-file-fixer</code> in
+<code>.pre-commit-config.yaml</code>, which is why nothing caught them.</p>
+<p><strong>Deferred.</strong> Three call sites ending in <code>add_index</code> still resolve
+URLs with the visibility-based <code>from_url</code> — instance create, the label
+endpoint, and the artifact fetch operation. None is exploitable the way
+the upload route was: the instance path fetches from the owner's own
+URL rather than caller-supplied bytes, and label URLs are
+namespace-scoped. But this phase writes the ownership rule down as
+universal, so leaving three unremarked counter-examples would mislead.
+<code>AGENTS.md</code> now names them and issue #3640 tracks narrowing them,
+rather than growing this pull request further.</p>
+<p><strong>No action.</strong> The rate limiter keying on <code>remote_addr</code> without a
+<code>ProxyFix</code> was reviewed and agreed with as already analysed and
+documented. The absence of functional coverage for a successful
+exchange is the subject of #3639, above.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this phase, the implementing sub-agent
 must back-brief the management session on its understanding of the
 brief and surrounding context. The management session must present
 the 3g and 3h diffs for operator review before commit — the exchange
 endpoint is the security boundary this entire plan exists to create.</p>
+<p>The 3g and 3h diffs were both presented. The operator elected to
+review the phase as a whole at the pull request rather than
+step by step, which is why both were committed before review.</p>
 
 
 

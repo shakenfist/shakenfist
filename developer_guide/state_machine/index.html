@@ -9895,6 +9895,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mapping-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#namespaces" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9932,6 +9943,17 @@
     <span class="md-ellipsis">
       
         Nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trusted-issuers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted Issuers
       
     </span>
   </a>
@@ -10732,6 +10754,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mapping-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#namespaces" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10769,6 +10802,17 @@
     <span class="md-ellipsis">
       
         Nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trusted-issuers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted Issuers
       
     </span>
   </a>
@@ -10983,6 +11027,23 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   delete_wait --&gt; delete_wait_error
 
   deleted --&gt; [*]</code></pre>
+<h2 id="mapping-rules">Mapping Rules<a class="headerlink" href="#mapping-rules" title="Permanent link">&para;</a></h2>
+<p>A mapping rule binds claims from a trusted issuer to a set of scopes in one
+namespace. Writing a rule is atomic, so there is no error state.</p>
+<ul>
+<li><code>initial</code>: the first state for a mapping rule. A UUID has been allocated and
+  a database entry exists, but the rule's attributes have not been written yet.</li>
+<li><code>created</code>: the rule is complete and may be used to exchange identity tokens.</li>
+<li><code>deleted</code>: the rule has been deleted. It matches nothing from this point on,
+  but keys it has already minted keep working until they expire.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+  initial --&gt; created
+  initial --&gt; deleted
+  created --&gt; deleted
+  deleted --&gt; [*]</code></pre>
 <h2 id="namespaces">Namespaces<a class="headerlink" href="#namespaces" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>created</code>: the namespace exists.</li>
@@ -11113,6 +11174,24 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   missing --&gt; degraded
 
   deleted --&gt; created</code></pre>
+<h2 id="trusted-issuers">Trusted Issuers<a class="headerlink" href="#trusted-issuers" title="Permanent link">&para;</a></h2>
+<p>A trusted issuer is an external identity provider whose tokens the cluster is
+willing to validate. Configuring one is atomic, so there is no error state.</p>
+<ul>
+<li><code>initial</code>: the first state for a trusted issuer. A UUID has been allocated
+  and a database entry exists, but the issuer's attributes have not been
+  written yet.</li>
+<li><code>created</code>: the issuer is complete, and mapping rules may name it.</li>
+<li><code>deleted</code>: the issuer has been deleted. Tokens from it are refused
+  immediately, which is the fastest way to disown a compromised provider.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+  initial --&gt; created
+  initial --&gt; deleted
+  created --&gt; deleted
+  deleted --&gt; [*]</code></pre>
 <h2 id="upload">Upload<a class="headerlink" href="#upload" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>created</code>: the upload has data associated with it.</li>

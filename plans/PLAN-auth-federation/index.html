@@ -11074,17 +11074,42 @@ groundwork exists, and lives mostly outside this repository.</p>
    survey): the noun is <strong>scope</strong>, not "capability" —
    <code>check_capability</code> already names the client's
    feature-probe mechanism, and reusing the word would put
-   two meanings in the same CLI surface. The vocabulary
-   <em>shape</em> (hybrid derivation) remains open.</li>
-<li><strong>Endpoint tagging coverage.</strong> Phase 3 tags at minimum
+   two meanings in the same CLI surface.</li>
+</ol>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> The hybrid was
+   chosen and shipped in step 3b. Verbs derive from the HTTP
+   method (<code>read</code>/<code>write</code>/<code>delete</code>) and families from the
+   resource class, with <code>scope_family</code> and
+   <code>@api_base.scope(...)</code> as the greppable overrides. Two
+   further verbs exist only as overrides, because there the
+   HTTP method describes the mechanism rather than the
+   privilege: <code>console</code> (the VDI helpers are GET, but they
+   return interactive control of a guest) and <code>execute</code>
+   (in-guest command execution is not the same privilege as
+   creating an instance). Adding a verb is a vocabulary
+   decision, and the test applied is whether anyone would
+   sensibly write a mapping rule granting it alone. The
+   vocabulary and derivation rule are published in
+   <code>docs/developer_guide/authentication.md</code>, and the full
+   family and verb sets are pinned by a test over the real
+   routing table.
+2. <strong>Endpoint tagging coverage.</strong> Phase 3 tags at minimum
    the blob and artifact endpoints (the CI cache needs).
    Untagged endpoints are default-deny for scoped tokens.
    Do we accept a long tail of untagged endpoints, or drive
    to full coverage within the phase? Note this question
    only exists in its hard form under hand-tagging; the
    hybrid derivation in open question 1 makes coverage
-   automatic, reducing this to auditing the override list.</li>
-<li><strong>Ownership model for mapping rules.</strong> Current lean
+   automatic, reducing this to auditing the override list.</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> Dissolved, as
+   anticipated. Coverage is total by construction: every
+   endpoint derives a scope from its class and method, and
+   an endpoint whose scope <em>cannot</em> be derived is
+   default-deny for scoped tokens rather than being quietly
+   ungoverned. There is no long tail to accept. The override
+   list is one grep and is published in the developer
+   guide.
+3. <strong>Ownership model for mapping rules.</strong> Current lean
    (from design discussion): split the concept in two.
    <em>Trusted issuers</em> (issuer URL, JWKS, audience) are
    cluster-level, system-owned objects — "who may vouch
@@ -11114,41 +11139,106 @@ groundwork exists, and lives mostly outside this repository.</p>
    multiple rules per namespace may bind the same issuer,
    and what rule mutation means for keys already minted
    from it (lean: nothing — keys stand alone once minted,
-   with provenance recording the rule as it was).</li>
-<li><strong>Exchange endpoint abuse resistance.</strong> The exchange is
+   with provenance recording the rule as it was).</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> The split shipped
+   as described: issuers are system-owned and managed under
+   <code>/auth/issuers</code>, rules are namespace-owned and managed
+   under <code>/auth/namespaces/{namespace}/rules</code>, gated by
+   <code>requires_namespace_ownership</code>, unique on
+   <code>(namespace, name)</code>, and hard deleted with their
+   namespace.</p>
+<p>Multiple rules per namespace <strong>may</strong> bind the same
+   issuer. Uniqueness is on the rule's name, not on its
+   issuer, and there is no reason to stop a namespace
+   offering two different claim-gated grants to two
+   different workloads from one provider.</p>
+<p>Rule mutation does <strong>nothing</strong> to keys already minted, as
+   leaned. A minted key stands alone and its provenance
+   records the claims that were actually satisfied, so the
+   audit trail describes the grant as it was made rather
+   than as the rule reads today. Narrowing a rule's scopes
+   therefore does not retroactively narrow its keys; delete
+   the keys if that is what is wanted. This is documented in
+   the API reference rather than left to be discovered.</p>
+<p>One consequence was not anticipated and is worth naming:
+   rules reference their issuer <strong>by name</strong>, so deleting and
+   recreating an issuer under the same name silently rebinds
+   every rule that named it. Storing the uuid would fail
+   loudly instead. This was left as-is — the name is what an
+   operator writes and reads — and is called out in the
+   operator guide.
+4. <strong>Exchange endpoint abuse resistance.</strong> The exchange is
    necessarily reachable without an SF credential (its
    authentication <em>is</em> the external JWT). It must be cheap
    to reject garbage: issuer allowlist check before JWKS
    fetch, JWKS cached with sane TTL and single-flight
    refetch on unknown <code>kid</code>, per-source rate limiting, and
-   strict maximum token size. How much of this is v1?</li>
-<li><strong>Key visibility and naming.</strong> With phase 2, keys are
+   strict maximum token size. How much of this is v1?</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> All of it is v1.
+   The ordering is enforced and tested as a property rather
+   than left to reading order: size
+   (<code>FEDERATION_MAX_TOKEN_BYTES</code>, refused before parsing),
+   then the issuer allowlist check against the unverified
+   <code>iss</code> (no network yet), then the rate limit, and only
+   then the JWKS fetch. JWKS caching uses <code>PyJWKClient</code> with
+   a configured <code>lifespan</code>
+   (<code>FEDERATION_JWKS_CACHE_SECONDS</code>) plus a per-issuer lock,
+   so concurrent misses on a rotated key collapse into one
+   fetch rather than a stampede against the provider.</p>
+<p>Two protections were added beyond the question's list.
+   Replay is refused per <code>(token, rule)</code> via a composite
+   primary key, so the failing insert <em>is</em> the detection.
+   And both the replay claim and the rate limit counter fail
+   <strong>closed</strong>: a database error answers 503 rather than
+   being read as "not seen before" or "under the limit",
+   because both of those readings authorise something.
+5. <strong>Key visibility and naming.</strong> With phase 2, keys are
    first-class objects owned by their namespace, so
    provenance, expiry, and scopes are queryable attributes
    — a federated key is distinguished by its rule
    reference, not by smuggling metadata into its name, and
    "show me every key rule X minted" is an ordinary
-   filtered listing. What actually remains open:</li>
-<li>Collision handling for rule-minted names: the rule's
+   filtered listing. What actually remains open:
+   * Collision handling for rule-minted names: the rule's
      key-name template (e.g. incorporating the workflow
      run id) can collide on re-runs of the same run — does
-     the exchange refuse, replace, or suffix?</li>
-<li>How much the legacy <code>key_names</code> API shape exposes:
+     the exchange refuse, replace, or suffix?
+   * How much the legacy <code>key_names</code> API shape exposes:
      it must keep returning names for existing clients,
      but does it include federated keys (lean: yes — they
      are real keys, and hiding them from the legacy view
      makes audits lie), with richer detail reserved for
-     the new object listing?</li>
-<li>Whether a light naming convention is still worth
+     the new object listing?
+   * Whether a light naming convention is still worth
      having purely for human scanning of mixed listings
      (lean: let the rule's template decide; no enforced
-     prefix).</li>
-<li><strong>JWT lifetime vs key lifetime.</strong> The nonce check
+     prefix).</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> Collisions are
+   avoided rather than arbitrated: <code>key_name_prefix</code> is a
+   prefix, not a template, and the exchange appends a random
+   discriminator. So a workflow re-run gets its own key
+   rather than silently rotating the secret out from under a
+   still-running job — which is what "replace" would have
+   done, and is the failure mode the question was circling.
+   Refusing was rejected for the same reason.</p>
+<p>The legacy <code>key_names</code> shape includes federated keys, as
+   leaned: they are real keys, and hiding them would make
+   audits lie. No naming convention is enforced beyond the
+   operator's chosen prefix.
+6. <strong>JWT lifetime vs key lifetime.</strong> The nonce check
    already invalidates derived tokens the moment the key
    expires, so capping <code>expires_delta</code> at the key's
    remaining lifetime is cosmetic. Do it anyway for
-   clarity, or leave mint-time duration alone?</li>
-<li><strong>Migration mechanics for key storage.</strong> The decision
+   clarity, or leave mint-time duration alone?</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> Mint-time duration
+   is left alone. The capping really is cosmetic — an
+   expired key stops validating immediately, so a token
+   outliving its key on paper cannot be used — and adding a
+   second place where a lifetime is decided is a second
+   place for the two to disagree. A federated key's own
+   <code>key_ttl</code> is what bounds the grant, and that is the
+   number an operator sets and reads.
+7. <strong>Migration mechanics for key storage.</strong> The decision
    to make keys first-class namespace-owned objects (with
    rule references, provenance, per-key events, cleaner
    reaping, and filtered listings) effectively forecloses
@@ -11157,25 +11247,24 @@ groundwork exists, and lives mostly outside this repository.</p>
    relationships and SQL-level filtering want a real table
    with a Pydantic schema, per the codebase's standard
    object shape and the BYO-MariaDB direction. What
-   remains open is the transition:</li>
-<li>Migration path for existing <code>nonced_keys</code> entries
+   remains open is the transition:
+   * Migration path for existing <code>nonced_keys</code> entries
      (bcrypt hashes and nonces copy verbatim; no expiry,
      wildcard scope): one-shot migration at upgrade, or a
      dual-read window where <code>/auth</code> and <code>verify_token</code>
-     consult the table first and fall back to the column?</li>
-<li>Rollback story if the migration must be reversed
-     after new-style keys (with expiry/scopes) exist.</li>
-<li>When the legacy column is retired: immediately after
+     consult the table first and fall back to the column?
+   * Rollback story if the migration must be reversed
+     after new-style keys (with expiry/scopes) exist.
+   * When the legacy column is retired: immediately after
      migration, or kept read-only for a deprecation
-     window?</li>
-<li>Hot-path cost: <code>verify_token</code> re-verifies the nonce
+     window?
+   * Hot-path cost: <code>verify_token</code> re-verifies the nonce
      on every request, so the key lookup moves from an
      attribute-blob read to an indexed table read —
      confirm this is neutral-or-better, and decide whether
      any caching is warranted (with care: a stale cache
      would delay nonce-based revocation, which is the
-     mechanism's whole point).</li>
-</ol>
+     mechanism's whole point).</p>
 <p><strong>Resolved by phase 2 (2026-07-27).</strong> One-shot migration,
    no dual-read window. Schema migrations here are
    operator-driven via <code>sf-ctl ensure-mariadb-schema</code>, and
@@ -11212,7 +11301,26 @@ groundwork exists, and lives mostly outside this repository.</p>
    checks the namespace name). Phase 3 must decide whether
    admin endpoints also require a scope (e.g.
    <code>admin.*</code>) so a scoped system-namespace key cannot
-   escalate. Related to the sibling plan's open question 5.
+   escalate. Related to the sibling plan's open question 5.</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> Yes. Endpoints
+   guarded by <code>caller_is_admin</code> now require <strong>both</strong> the
+   <code>system</code> namespace and a <code>cluster-admin</code> scope, on top of
+   the derived scope for the operation itself. Unscoped keys
+   carry the wildcard and satisfy all of it, so existing
+   administrative automation is untouched.</p>
+<p>The marker is <code>cluster-admin</code>, hyphenated rather than
+   dotted, because it names no family and so no family
+   wildcard can synthesise it. Of the twenty methods
+   <code>caller_is_admin</code> guards, only two derive an <code>admin.*</code>
+   scope; the rest derive <code>node.*</code>, <code>issuer.*</code>, <code>auth.*</code> and
+   <code>blob.read</code>, which is exactly why a dotted <code>admin.*</code>
+   would not have worked.</p>
+<p>Requiring both axes is what makes a least-privilege
+   administrative credential expressible:
+   <code>["cluster-admin", "node.read"]</code> grants cluster-wide
+   visibility to a monitoring workload that provably cannot
+   delete a node. A single all-or-nothing flag could not say
+   that.
 10. <strong>Opt-out rather than opt-in enforcement.</strong> The
     "must remember to decorate" problem predates this plan:
     <code>verify_token</code> itself is applied by hand per method,
@@ -11235,8 +11343,45 @@ groundwork exists, and lives mostly outside this repository.</p>
     (<code>caller_is_admin</code>, <code>requires_namespace_ownership</code>)
     remain opt-in — they are per-endpoint policy, not
     defaults. Phase 3 should decide whether this inversion
-    is in scope or a fast-follow refactor.
-11. <strong>Scopes must compose with trust.</strong> Namespace trust
+    is in scope or a fast-follow refactor.</p>
+<div class="highlight"><pre><span></span><code>**Resolved by phase 3 (2026-08-03).** In scope, and done
+first, as step 3a — before scopes existed, so that scope
+enforcement could be added to an already-universal path
+rather than being another thing to remember.
+Authentication moved onto
+`api_base.Resource.method_decorators`, the 120
+per-method `@api_base.verify_token` decorators were
+removed, and `@api_base.public` became the only way out.
+
+The measurement that justified the shape: 120 of the 124
+authenticated methods carried the decorator and the four
+that did not were the correct four. A good record, but
+the failure mode was wrong — forgetting it on a new
+endpoint left that endpoint silently open, and nothing
+would have caught it.
+
+`log_token_use` was deliberately **not** moved. Three of
+the 120 methods omit it on purpose and
+`AuthNamespacesEndpoint.post` writes its own richer
+events, so moving it would have double-logged there and
+made 3a something other than the pure refactor it needed
+to be.
+
+Backstopped two ways: a structural test enumerating
+`app.url_map` and asserting every method either
+authenticates or is explicitly `@public`, with the
+public set written down and individually justified; and
+`tools/check-endpoint-authentication.sh` as a pre-commit
+hook, modelled on the `from_db_by_ref` guard. The
+decorator ordering assumption — class-level decorators
+running outermost, so authentication precedes the
+ownership checks that assume an authenticated caller —
+is asserted by its own test rather than left as a
+comment.
+</code></pre></div>
+<ol>
+<li>
+<p><strong>Scopes must compose with trust.</strong> Namespace trust
     grants cross-namespace visibility, and the deferred CI
     conductor design leans on it (a PR-scratch namespace
     with read-trust on the per-repo cache namespace). A
@@ -11247,6 +11392,31 @@ groundwork exists, and lives mostly outside this repository.</p>
     because the object it touches lives in a trusting
     namespace. Phase 3 needs a test asserting exactly
     this, or trust becomes a scope-escape hatch.</p>
+<p><strong>Resolved by phase 3 (2026-08-03).</strong> Scopes compose
+with trust, and the test exists:
+<code>shakenfist/tests/external_api/test_scope_trust_composition.py</code>.</p>
+<p>A key scoped <code>artifact.read</code> in a namespace that a cache
+namespace trusts can list the cache's artifacts and read
+them by UUID, and cannot delete them; a key scoped
+<code>instance.read</code> is refused outright rather than being
+handed an empty list; and a key granted nothing gains
+nothing from trust. Reading by UUID is asserted
+separately from listing because the two are separately
+guarded — and were separately wrong, see the artifact
+read bug below. Each
+refusal is paired with a control — a wildcard key
+reaching the same object across the same trust succeeds
+— so a 403 arriving for some unrelated reason cannot
+read as the property holding. Trust remains necessary as
+well as insufficient: the right scope without the trust
+grant sees nothing.</p>
+<p>The same suite drives a key the exchange actually
+minted, through the whole chain (issuer, rule, identity
+token, exchange, key, token), because "a federated key
+is just a namespace key" is the claim the design rests
+on and it is cheap to stop assuming it.</p>
+</li>
+</ol>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -11270,7 +11440,7 @@ groundwork exists, and lives mostly outside this repository.</p>
 <tr>
 <td>3. Federated exchange and scope enforcement</td>
 <td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
-<td>Planning</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4. Authentication documentation</td>
@@ -11460,6 +11630,14 @@ and cross-link the glossary:</p>
 <p>The GitHub example must stand alone for any reader running
 their own runners; nothing in <code>docs/</code> should describe or
 depend on the private CI conductor implementation.</p>
+<p>Phase 3 shipped most of the developer and operator guide
+halves of this as it went, because a security decision is
+cheapest to write down while it is being made. What remains
+is the user guide page, which does not exist at all:
+<code>docs/user_guide/authentication.md</code> needs writing from
+scratch. Phase 4 should also re-read the two existing guides
+end to end, rather than assuming a series of incremental
+additions composes into a coherent page.</p>
 <h3 id="phase-5-oidc-plan-refresh">Phase 5: OIDC plan refresh<a class="headerlink" href="#phase-5-oidc-plan-refresh" title="Permanent link">&para;</a></h3>
 <p>Rewrite <code>PLAN-oidc-authentication.md</code> (the human-login
 sibling, currently a stub) against the as-built reality of
@@ -11717,6 +11895,18 @@ implemented because the following statements will be true:</p>
   so the REST API or the Python client must be used
   directly. A client-python change, hence not a phase of
   this plan.</li>
+<li><strong><code>sf-client federation ...</code></strong>: phase 3 added three route
+  families the client library does not wrap —
+  <code>/auth/issuers</code>, <code>/auth/namespaces/{namespace}/rules</code> and
+  <code>/auth/federated</code> — so operators and namespace owners
+  configure federation with <code>curl</code> today, and the
+  documentation is written that way. A client-python
+  change, hence not a phase of this plan. The exchange
+  itself is the least urgent of the three: a CI job wants a
+  plain HTTP call it can make before it has installed
+  anything, which is what it already has. Issuer and rule
+  management is where a command line would actually earn
+  its keep.</li>
 <li><strong>Token introspection / jti denylist</strong> if bounded-delay
   revocation of <em>scoped keys themselves</em> (as opposed to
   their derived tokens) ever proves insufficient.</li>
@@ -11725,6 +11915,82 @@ implemented because the following statements will be true:</p>
   real.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>Phase 3:</p>
+<ul>
+<li><strong>Cross-namespace artifact reads by UUID</strong>, found while
+  writing phase 3's trust composition test. Unrelated to
+  federation and older than this plan, but fixed on this
+  branch rather than filed, because an issue would have
+  advertised the hole before a fix existed.</li>
+</ul>
+<p><code>arg_is_artifact_ref</code> short-circuits a UUID straight to
+  <code>Artifact.from_db</code>, applying no namespace filter — that is
+  deliberate, because the same decorator serves system
+  callers who legitimately reach across namespaces. It makes
+  <code>requires_artifact_access</code> the only guard on the path, and
+  that guard read <code>if a.shared and requestor not in
+  [a.namespace, 'system']: 404</code>, which is inverted in both
+  directions. Unshared artifacts belonging to any namespace
+  were readable by anyone who knew the UUID, and shared
+  artifacts were refused to precisely the namespaces they
+  had been shared with. The refusal branch then called
+  <code>LOG.with_object</code>, which <code>shakenfist_utilities</code> no longer
+  provides, so the one case it did refuse got a 500 rather
+  than a 404 — evidence that the branch had not executed in
+  a long time.</p>
+<p>The fix replaces the restated predicate with the one the
+  artifact listing already filters on,
+  <code>namespace_or_shared_filter</code>: owner, a namespace which
+  trusts the caller, system, or shared. "Appears in the
+  list" and "is readable by UUID" are now one rule rather
+  than two copies of a rule. Four routes were affected: the
+  artifact itself, its events, its versions and its cluster
+  operations.</p>
+<ul>
+<li><strong>Artifact names would not resolve to shared or trusted
+  artifacts.</strong> <code>docs/user_guide/objects.md</code> has long said a
+  by-name lookup searches everything visible to the caller,
+  including shared artifacts. It did not:
+  <code>arg_is_artifact_ref</code> handed <code>from_db_by_ref</code> the caller's
+  own namespace, so a tenant could read a shared image's
+  name out of <code>GET /artifacts</code> and then get a 404 asking for
+  it by that name.</li>
+</ul>
+<p><code>Artifact.from_db_by_ref_visible_to</code> resolves in two
+  phases. The first is exactly <code>from_db_by_ref</code> against the
+  caller's own namespace, so whatever that resolves to still
+  wins; only on a miss does it widen to what
+  <code>namespace_or_shared_filter</code> admits. The ordering is the
+  part that matters — without it, sharing an artifact named
+  <code>debian-11</code> would silently retarget every tenant who
+  already had one. This mirrors <code>Artifact.from_url</code>, which
+  has resolved URLs by the same "everything visible, prefer
+  local" rule since <code>9faa90c71</code>, so the two resolution paths
+  now agree.</p>
+<p>Widening applies to reading only. The ref decorator split
+  into <code>arg_is_visible_artifact_ref</code> (paired with
+  <code>requires_artifact_access</code>) and <code>arg_is_artifact_ref</code>
+  (paired with <code>requires_artifact_ownership</code>), so a name
+  cannot resolve into another namespace on a route which
+  then changes what it found.</p>
+<ul>
+<li><strong>A namespace trust authorised artifact mutation.</strong>
+  <code>requires_artifact_ownership</code> tested
+  <code>namespace_is_trusted</code>, so a trusted namespace could
+  delete, share, unshare, retag and rewrite the metadata of
+  the trusting namespace's artifacts. It now tests
+  <code>request_namespace() not in [a.namespace, 'system']</code>,
+  which is what <code>requires_instance_ownership</code> and
+  <code>requires_network_ownership</code> have always used; artifacts
+  were the one object type where trust reached past reading.
+  Creating an object <em>in</em> a namespace which trusts you is
+  untouched, so the operator guide's <code>ci-images</code> "gifting"
+  pattern still works.</li>
+</ul>
+<p>This is a behaviour change for anyone whose tooling
+  deleted artifacts across a trust; they need a key in the
+  owning namespace, or system. Recorded in the v0.7 to v0.8
+  release notes.</p>
 <p>Phase 2:</p>
 <ul>
 <li><strong>Credentials in audit events</strong>, five sites (step 2g).
