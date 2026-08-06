@@ -7,7 +7,6 @@ are the things that have to work right -- everything else in
 """
 import fcntl
 import os
-import tempfile
 import threading
 import time
 from unittest import mock
@@ -16,22 +15,11 @@ from shakenfist import eventlog_spool
 from shakenfist.tests import base
 
 
-class _SpoolRootMixin:
+class _SpoolRootMixin(base.SpoolRootMixin):
     """Redirect ``SPOOL_ROOT`` to a tempdir for every test."""
 
-    def setUp(self):
-        super().setUp()
-        self.tmp = tempfile.mkdtemp(prefix='sf-spool-test-')
-        self._original_root = eventlog_spool.SPOOL_ROOT
-        eventlog_spool.SPOOL_ROOT = self.tmp
-        # Reset module-level singletons between tests so each test
-        # starts from a clean slate.
-        eventlog_spool.reset_for_tests()
-        self.addCleanup(eventlog_spool.reset_for_tests)
-        self.addCleanup(self._restore_root)
-
-    def _restore_root(self):
-        eventlog_spool.SPOOL_ROOT = self._original_root
+    spool_module = eventlog_spool
+    spool_prefix = 'sf-spool-test-'
 
 
 class SpoolBasicsTestCase(_SpoolRootMixin, base.ShakenFistTestCase):

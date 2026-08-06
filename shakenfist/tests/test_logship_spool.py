@@ -8,27 +8,17 @@ suite mirrors ``test_eventlog_spool.py``.
 """
 import fcntl
 import os
-import tempfile
 from unittest import mock
 
 from shakenfist import logship_spool
 from shakenfist.tests import base
 
 
-class _SpoolRootMixin:
+class _SpoolRootMixin(base.SpoolRootMixin):
     """Redirect ``SPOOL_ROOT`` to a tempdir for every test."""
 
-    def setUp(self):
-        super().setUp()
-        self.tmp = tempfile.mkdtemp(prefix='sf-logship-spool-test-')
-        self._original_root = logship_spool.SPOOL_ROOT
-        logship_spool.SPOOL_ROOT = self.tmp
-        logship_spool.reset_for_tests()
-        self.addCleanup(logship_spool.reset_for_tests)
-        self.addCleanup(self._restore_root)
-
-    def _restore_root(self):
-        logship_spool.SPOOL_ROOT = self._original_root
+    spool_module = logship_spool
+    spool_prefix = 'sf-logship-spool-test-'
 
 
 class SpoolBasicsTestCase(_SpoolRootMixin, base.ShakenFistTestCase):

@@ -7,7 +7,6 @@ batch-building (translates spool payload dicts into
 (``mariadb.record_event_batch`` failure, backoff, poison-row
 drop).
 """
-import tempfile
 from unittest import mock
 
 from shakenfist import eventlog_drainer
@@ -16,18 +15,9 @@ from shakenfist.schema.event import EventRecord
 from shakenfist.tests import base
 
 
-class _SpoolRootMixin:
-    def setUp(self):
-        super().setUp()
-        self.tmp = tempfile.mkdtemp(prefix='sf-drainer-test-')
-        self._original_root = eventlog_spool.SPOOL_ROOT
-        eventlog_spool.SPOOL_ROOT = self.tmp
-        eventlog_spool.reset_for_tests()
-        self.addCleanup(eventlog_spool.reset_for_tests)
-        self.addCleanup(self._restore_root)
-
-    def _restore_root(self):
-        eventlog_spool.SPOOL_ROOT = self._original_root
+class _SpoolRootMixin(base.SpoolRootMixin):
+    spool_module = eventlog_spool
+    spool_prefix = 'sf-drainer-test-'
 
 
 class BuildRecordsTestCase(

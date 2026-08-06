@@ -10,7 +10,6 @@ under v0.9.0 it is the library's instance. We assert *type*
 """
 import json
 import logging
-import tempfile
 import uuid
 from logging.handlers import SysLogHandler
 from unittest import mock
@@ -22,20 +21,10 @@ from shakenfist import logship_spool
 from shakenfist.tests import base
 
 
-class _SpoolRootMixin:
-    def setUp(self):
-        super().setUp()
-        self.tmp = tempfile.mkdtemp(prefix='sf-logship-test-')
-        self._original_root = logship_spool.SPOOL_ROOT
-        logship_spool.SPOOL_ROOT = self.tmp
-        logship_spool.reset_for_tests()
-        logship.reset_for_tests()
-        self.addCleanup(logship_spool.reset_for_tests)
-        self.addCleanup(logship.reset_for_tests)
-        self.addCleanup(self._restore_root)
-
-    def _restore_root(self):
-        logship_spool.SPOOL_ROOT = self._original_root
+class _SpoolRootMixin(base.SpoolRootMixin):
+    spool_module = logship_spool
+    spool_prefix = 'sf-logship-test-'
+    extra_resets = (logship.reset_for_tests,)
 
 
 class HandlerEmitTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
