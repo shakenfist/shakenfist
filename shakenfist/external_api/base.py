@@ -167,14 +167,6 @@ def swagger_helper(section, description, parameters, responses,
         'produces': [
             'application/json'
         ],
-        # A list, not a bare object: OpenAPI 2.0 defines security as an
-        # array of requirement objects (alternatives, any one of which
-        # satisfies the operation). The object form was the largest
-        # single class of specification-validity errors -- one per
-        # operation.
-        'security': [{
-            'bearerAuth': []
-        }],
         'deprecated': False,
         'description': description,
         'responses': {}
@@ -213,6 +205,19 @@ def swagger_helper(section, description, parameters, responses,
             'description': 'JWT authorization header'
         })
         out['parameters'][-1].update(argtypes['bearer'])
+        # The security requirement and the Authorization parameter
+        # travel together: an operation which does not demand the
+        # header must not publish the requirement either. This used to
+        # be emitted unconditionally, which described /auth/federated
+        # -- the one deliberately unauthenticated endpoint, where the
+        # identity token is the credential -- as requiring a bearer
+        # token. A list, not a bare object: OpenAPI 2.0 defines
+        # security as an array of requirement objects, and the object
+        # form was the largest single class of specification-validity
+        # errors.
+        out['security'] = [{
+            'bearerAuth': []
+        }]
 
     declarable = set(argtypes) - {'bearer'}
 

@@ -1258,6 +1258,35 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual('body', declared[0]['in'])
         self.assertFalse(declared[0]['required'])
 
+    def test_security_and_authorization_travel_together(self):
+        """An unauthenticated operation publishes neither the security
+        requirement nor the Authorization parameter; an authenticated
+        one publishes both.
+
+        The requirement used to be emitted unconditionally, which
+        described /auth/federated -- deliberately unauthenticated,
+        the identity token is the credential -- as demanding a bearer
+        token, and a client generated from the specification would
+        have insisted on a credential for the one endpoint that must
+        not take one. Making the requirement a spec-valid array made
+        that misstatement invisible to a linter, so only a test like
+        this can keep the two coupled.
+        """
+        authed = api_base.swagger_helper(
+            'test', 'A test endpoint.', [], [(200, 'No return value', '')])
+        self.assertEqual([{'bearerAuth': []}], authed['security'])
+        self.assertEqual(
+            1, len([p for p in authed['parameters']
+                    if p['name'] == 'Authorization']))
+
+        public = api_base.swagger_helper(
+            'test', 'A test endpoint.', [], [(200, 'No return value', '')],
+            requires_auth=False)
+        self.assertNotIn('security', public)
+        self.assertEqual(
+            [], [p for p in public['parameters']
+                 if p['name'] == 'Authorization'])
+
     def test_unknown_location_is_rejected(self):
         for location in ('qeury', 'post', 'BODY', ''):
             self.assertRaises(

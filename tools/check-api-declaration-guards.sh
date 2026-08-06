@@ -64,7 +64,11 @@ export PYTHONDONTWRITEBYTECODE=1
 # but the interpreter itself still consults the locale for stdio.
 export PYTHONUTF8=1
 
-BACKUP=$(mktemp -d)
+# Guarded like every other failure path here: an unchecked mktemp
+# failure would leave BACKUP empty, and `cp -a shakenfist/external_api/.
+# ""/` resolves to copying the API sources into the filesystem root.
+BACKUP=$(mktemp -d) || exit 2
+[ -n "${BACKUP}" ] || exit 2
 cp -a shakenfist/external_api/. "${BACKUP}"/
 if [ -z "$(ls -A "${BACKUP}")" ]; then
     echo 'The backup of shakenfist/external_api is empty, so a mutation' >&2
