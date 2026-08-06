@@ -1051,6 +1051,81 @@ the skip path working as intended.
 skipping honestly. That change is a branch in the actions repo for the
 operator to raise.
 
+## Pull request review (#3641)
+
+Eleven items from the automated reviewer. Ten were acted on; one was
+declined with reasons.
+
+**The findings worth remembering.**
+
+- **A fourth write path.** `Instance.snapshot()` resolved by visibility
+  and fed the result to `add_index`. The original #3640 sweep listed
+  three sites because it was run over `external_api/` and
+  `operations/`, and this one is in the core object. Not exploitable
+  — the URL carries the instance UUID and the type filter pins it —
+  but that is an argument for the guard being cheap. The lesson, now
+  in AGENTS.md: grep for the *sink* (`add_index`), not for callers of
+  the resolver you happen to be changing.
+- **A discarded error response is not free.** The disk.base
+  fall-through called `_artifact_safety_checks` for its truthiness.
+  That helper builds a Flask 404 and `sf_api.error` logs `Returning
+  API error: 404` with a traceback as it does, so the ordinary case —
+  a foreign artifact which exists and is not usable — wrote a refusal
+  into the log of a request which returned 200. Split into
+  `_artifact_unusable_reason`, a predicate returning a (log message,
+  API message) pair, with the response building left where refusals
+  actually happen.
+- **The one setting that names a file.** A wrong
+  `FEDERATION_JWKS_CA_BUNDLE` path raised `FileNotFoundError` from
+  `PyJWKClient` construction on the request path of the
+  unauthenticated exchange endpoint, escaping as `server error:
+  FileNotFoundError(2, ...)` with no mention of the setting, forever
+  (the client is never cached on that path). Now
+  `JWKSTrustAnchorUnusable`, deliberately not a
+  `TokenValidationFailed`: the token was never examined, so 401 would
+  send the caller to their identity provider for a fault in our config
+  file. The exchange answers 503, each gunicorn worker complains at
+  startup, and the log names the setting and the path while the
+  response does not.
+- **The pushdown has a landmine.** Pushing the ownership namespace to
+  SQL is correct and worth doing on the instance create path, but the
+  object iterator drops a namespace criterion of `system` so that
+  listing as system sees the whole cluster. A pushdown *replacing* the
+  Python predicate would silently turn an ownership test into no test.
+  Both are kept, and there is a test for exactly that sabotage.
+
+**Declined: item 10**, replacing the artifact fetch route's
+resolve-then-fall-back block with `owned_from_url_or_new`. The review
+read the `request_namespace() not in [a.namespace, 'system']` guard as
+a redundant restatement of the trust check above it. It is not — it is
+strictly stronger, and it is the entire authorisation for the existing
+artifact case. The trust is enough to gift a namespace an artifact it
+lacked; replacing what one it already owns resolves to takes the owner
+or system. That is the two-case split `owned_from_url_or_new` documents
+itself as *not* being for. Comment added at the site so the resemblance
+is not mistaken for duplication again.
+
+**Also done.** `set -u` and explicit `${nodes:?}` / `${primary:?}`
+guards in `tools/ci-jwks-ca.sh` (an unsourced environment previously
+exited 0 having installed nothing, producing exactly the silent skip
+the script exists to remove); the CA key scp'd straight into the 0700
+directory rather than via world-readable `/tmp`; a post-restart check
+that the setting actually landed, since readiness only proves sf-api
+came back; `LabelHierarchyTooDeep` caught and answered 400 rather than
+500 on all three verbs; release note for the disk.base pinning change;
+function-level imports hoisted.
+
+**Coverage added**: 24 tests across five files — the three resolvers
+directly, `Instance.snapshot`, `artifact_fetch_op._image_fetch`, the
+disk.base fall-throughs including the state-refused case and the
+system-creates-elsewhere asymmetry, the malformed label name on all
+three verbs, label creation by system into a namespace it does not
+own, the two bad-bundle cases, and a functional
+(`cluster_ci_tests/test_artifacts.py`) test of the whole label
+authorisation split against a real cluster. Every fix was
+sabotage-verified: revert, confirm the specific expected tests fail and
+the controls hold, restore.
+
 ## Back brief
 
 Before executing any step of this phase, the implementing sub-agent

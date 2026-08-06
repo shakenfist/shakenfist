@@ -259,28 +259,51 @@ class InstanceEndpoint(api_base.Resource):
         return instance_from_db.external_view()
 
 
+def _artifact_unusable_reason(a):
+    """Why this request may not use this artifact, or None if it may.
+
+    Split out of _artifact_safety_checks so there is a way to ask the
+    question without answering it. Most callers here are refusing the
+    request when the answer is no, and want the error response and the
+    log line that go with a refusal. The disk.base fall-through is not:
+    a foreign artifact it cannot use is a reason to fetch its own copy,
+    so building a 404 nobody will ever be sent -- and emitting
+    'Returning API error' for a request about to succeed -- would put a
+    refusal in the log of a request that created an instance.
+
+    Returns a (log message, API message) pair rather than one string,
+    because those deliberately differ: an artifact somebody may not see
+    is logged as not visible and reported as not found, so the refusal
+    is diagnosable by an operator without being an oracle to a caller.
+    """
+    if not a:
+        return ('Artifact not found', 'artifact not found')
+    if a.state.value != Artifact.STATE_CREATED:
+        return ('Artifact not in ready state',
+                'artifact not ready (state=%s)' % a.state.value)
+
+    if namespace_is_trusted(a.namespace, request_namespace()):
+        return None
+    if a.shared:
+        return None
+
+    return ('Artifact not owned or trusted by requestor and not shared',
+            'artifact not found')
+
+
 def _artifact_safety_checks(a, instance_uuid=None):
+    reason = _artifact_unusable_reason(a)
+    if not reason:
+        return
+
     log = LOG
     if a:
         log = log.with_fields({'artifact': a})
     if instance_uuid:
         log = log.with_fields({'instance': instance_uuid})
 
-    if not a:
-        log.info('Artifact not found')
-        return sf_api.error(404, 'artifact not found')
-    if a.state.value != Artifact.STATE_CREATED:
-        log.info('Artifact not in ready state')
-        return sf_api.error(
-            404, 'artifact not ready (state=%s)' % a.state.value)
-
-    if namespace_is_trusted(a.namespace, request_namespace()):
-        return
-    if a.shared:
-        return
-
-    log.info('Artifact not owned or trusted by requestor and not shared')
-    return sf_api.error(404, 'artifact not found')
+    log.info(reason[0])
+    return sf_api.error(404, reason[1])
 
 
 def _netdesc_safety_checks(netdesc, namespace):
@@ -679,10 +702,11 @@ class InstancesEndpoint(api_base.Resource):
                     # authorisation one, so a failure falls through to our own
                     # fetch instead of refusing the request. Somebody else's
                     # half-built artifact is a reason to fetch our own copy,
-                    # not a reason the instance cannot boot.
+                    # not a reason the instance cannot boot. Hence the
+                    # predicate rather than _artifact_safety_checks: there is
+                    # no refusal here to log or to return.
                     blob_uuid = None
-                    if theirs and not _artifact_safety_checks(
-                            theirs, instance_uuid=instance_uuid):
+                    if theirs and not _artifact_unusable_reason(theirs):
                         blob_uuid = theirs.resolve_to_blob()
 
                     if blob_uuid:

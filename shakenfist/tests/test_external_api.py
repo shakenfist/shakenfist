@@ -6,7 +6,10 @@ from unittest import mock
 from uuid import uuid4
 
 import bcrypt
+from shakenfist_utilities import api as sf_api
 
+from shakenfist.artifact import Artifact
+from shakenfist.artifact import BLOB_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import NoopLock
 from shakenfist.baseobject import State
@@ -847,7 +850,6 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
 
         # The resolution must be against a URL that includes the BLOB_URL
         # prefix followed by the blob UUID.
-        from shakenfist.artifact import BLOB_URL
         expected_url = f'{BLOB_URL}{self.BLOB_UUID}'
         resolved_urls = [
             c.args[1] if len(c.args) > 1 else c.kwargs.get('url', '')
@@ -927,7 +929,6 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
     def setUp(self):
         super().setUp()
 
-        from shakenfist.artifact import Artifact
         self.foreign = Artifact.new(
             Artifact.TYPE_IMAGE, self.URL, name='shared-image',
             namespace='system')
@@ -942,9 +943,9 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.addCleanup(patcher.stop)
 
     def _create(self, token, namespace, mock_afo, mock_nino):
-        from shakenfist.schema.object_types import ObjectType as _OT
-        mock_afo.return_value = (_OT.ARTIFACT_FETCH_OP, str(uuid4()))
-        mock_nino.return_value = (_OT.NODE_INST_NETDESC_OP, str(uuid4()))
+        mock_afo.return_value = (ObjectType.ARTIFACT_FETCH_OP, str(uuid4()))
+        mock_nino.return_value = (
+            ObjectType.NODE_INST_NETDESC_OP, str(uuid4()))
 
         resp = self.client.post(
             '/instances',
@@ -967,7 +968,6 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
                 str(mock_afo.call_args.kwargs.get('artifact_uuid')))
 
     def _owned_by(self, namespace):
-        from shakenfist.artifact import Artifact
         return Artifact.owned_from_url(
             Artifact.TYPE_IMAGE, self.URL, namespace=namespace)
 
@@ -977,7 +977,6 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
             self, mock_afo, mock_nino):
         # The fix. The fetch is enqueued against the blob rather than
         # against the URL, so it can neither re-download nor re-index.
-        from shakenfist.artifact import BLOB_URL
         self.foreign.shared = True
 
         url, _ = self._create(
@@ -1040,3 +1039,93 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertEqual(str(self.foreign.uuid), artifact_uuid)
         self.assertEqual(str(self.foreign.uuid),
                          str(self._owned_by('system').uuid))
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_a_shared_artifact_with_no_blob_falls_through_to_our_own_fetch(
+            self, mock_afo, mock_nino):
+        # The branch the comment claims and nothing exercised. A visible
+        # artifact which passes the safety checks and still resolves to
+        # no blob is a half-built one, and that is a reason to fetch our
+        # own copy rather than a reason the instance cannot boot -- so
+        # this must be a 200 with a URL fetch, not a refusal.
+        self.foreign.shared = True
+        with mock.patch.object(Artifact, 'resolve_to_blob', return_value=None):
+            url, artifact_uuid = self._create(
+                self.auth_token_two, 'two', mock_afo, mock_nino)
+
+        self.assertEqual(self.URL, url)
+        self.assertNotEqual(str(self.foreign.uuid), artifact_uuid)
+        self.assertIsNotNone(self._owned_by('two'))
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_a_not_yet_created_artifact_is_not_booted_from(
+            self, mock_afo, mock_nino):
+        # The usability half of the same fall-through, one step earlier:
+        # an artifact still in STATE_INITIAL fails the safety check, and
+        # that too has to fetch rather than refuse. A second URL rather
+        # than the fixture's, because an artifact cannot go backwards
+        # from created and Artifact.new leaves this one exactly where it
+        # needs to be.
+        self.URL = 'https://example.com/half-built.qcow2'
+        half_built = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='half-built',
+            namespace='system')
+        half_built.shared = True
+
+        url, _ = self._create(
+            self.auth_token_two, 'two', mock_afo, mock_nino)
+
+        # resolve_to_blob is stubbed to answer for the whole class, so a
+        # URL fetch here can only mean the state check refused to use it.
+        self.assertEqual(self.URL, url)
+        self.assertIsNotNone(self._owned_by('two'))
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_resolution_follows_the_target_namespace_not_the_requestor(
+            self, mock_afo, mock_nino):
+        # system creating an instance in `two`. Resolution uses the
+        # target namespace and the safety check uses request_namespace,
+        # which is an asymmetry worth pinning: the artifact this lands
+        # on must be `two`'s, because `two` is who will own the instance
+        # and the fetch, not system's just because system asked.
+        self._create(self.auth_token, 'two', mock_afo, mock_nino)
+
+        mine = self._owned_by('two')
+        self.assertIsNotNone(mine)
+        self.assertNotEqual(str(self.foreign.uuid), str(mine.uuid))
+
+    @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_a_successful_create_builds_no_refusal(self, mock_afo, mock_nino):
+        # The disk.base fall-through asks whether a foreign artifact is
+        # usable and carries on either way, so it must ask with the
+        # predicate rather than with _artifact_safety_checks. That
+        # helper does not return a bare boolean: it builds a Flask 404
+        # and sf_api.error logs 'Returning API error: 404' with a
+        # traceback as it does. Called for its truthiness, it wrote a
+        # refusal into the log of a request which returns 200 and
+        # creates an instance -- and 'not visible to us' is the ordinary
+        # case here, not an unusual one.
+        #
+        # Shared and still in STATE_INITIAL, which is the case where
+        # the two diverge: `two` can see it, so `theirs` is truthy and
+        # the check actually runs, and the state refuses it. An unshared
+        # artifact would prove nothing, because from_url returns None
+        # and the check is short-circuited before it is reached.
+        self.URL = 'https://example.com/half-built-quietly.qcow2'
+        half_built = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='half-built-quietly',
+            namespace='system')
+        half_built.shared = True
+
+        with mock.patch(
+                'shakenfist.external_api.instance.sf_api.error',
+                side_effect=sf_api.error) as error:
+            url, _ = self._create(
+                self.auth_token_two, 'two', mock_afo, mock_nino)
+
+        self.assertEqual(self.URL, url)
+        error.assert_not_called()

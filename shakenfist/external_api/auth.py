@@ -1238,7 +1238,9 @@ class AuthFederatedEndpoint(api_base.Resource):
          (413, 'The request body is too large.', None),
          (429, 'Too many exchange attempts from this source.', None),
          (503, 'The database is unavailable, so the exchange could not '
-               'be checked for replay.', None)],
+               'be checked for replay, or the JWKS CA bundle this '
+               'deployment is configured with could not be loaded.',
+          None)],
         requires_auth=False))
     def post(self, token=None, namespace=None, rule=None):
         # The order below is the one in the phase 3 design section, and
@@ -1303,6 +1305,17 @@ class AuthFederatedEndpoint(api_base.Resource):
         # 4 and 5. Signature, then audience, issuer and lifetime.
         try:
             claims = federation.validate_token(token, issuer)
+        except exceptions.JWKSTrustAnchorUnusable as e:
+            # Ours, not theirs. This is FEDERATION_JWKS_CA_BUNDLE
+            # pointing at a file sf-api cannot load, so the token was
+            # never examined and calling it rejected would be a lie
+            # that sends the caller to their identity provider. The
+            # detail goes to our log and not to the response, for the
+            # same reason every other refusal here is terse.
+            LOG.with_fields({'namespace': namespace}).error(
+                f'Federated exchange misconfigured: {e}')
+            return sf_api.error(
+                503, 'federated exchange is unavailable, please retry')
         except exceptions.TokenValidationFailed as e:
             return _federated_refusal(
                 None, 'token rejected', str(e), namespace=namespace)

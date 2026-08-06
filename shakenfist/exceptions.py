@@ -169,6 +169,17 @@ class RateLimited(FederationException):
     """Too many federated exchange attempts from one source address."""
 
 
+class JWKSTrustAnchorUnusable(FederationException):
+    """FEDERATION_JWKS_CA_BUNDLE names a file which cannot be loaded.
+
+    Deliberately not a TokenValidationFailed. This is our
+    misconfiguration and not the caller's token, and answering 401
+    would tell somebody holding a perfectly good token that it had been
+    rejected, sending them to their identity provider to look for a
+    fault which is in our config file. The exchange answers 503.
+    """
+
+
 class CorruptMappingRule(DatabaseException):
     """A mapping rule's policy columns could not be decoded.
 

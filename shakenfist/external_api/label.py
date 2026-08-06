@@ -45,6 +45,28 @@ def _label_url(label_name):
     return (namespace, f'{LABEL_URL}{namespace}/{label}')
 
 
+def _label_url_or_error(label_name):
+    """_label_url, with a malformed name turned into a refusal.
+
+    Returns ``(namespace, url, None)``, or ``(None, None, response)``
+    when the name cannot be parsed.
+
+    The route is registered as ``/label/<path:label_name>``, so the
+    path converter happily matches embedded slashes and a caller can
+    reach here with ``a/b/c``. Nothing caught LabelHierarchyTooDeep, so
+    that answered ``server error: LabelHierarchyTooDeep()`` -- the
+    third way this endpoint had of returning 500, alongside the two
+    fixed in get() and delete(). It is the caller's mistake rather than
+    ours, so it is a 400, and it says which mistake.
+    """
+    try:
+        namespace, label_url = _label_url(label_name)
+    except LabelHierarchyTooDeep:
+        return (None, None, sf_api.error(
+            400, 'label names may contain at most one /'))
+    return (namespace, label_url, None)
+
+
 label_example = """{
     "artifact_type": "label",
     "blob_uuid": "ffdfce7f-728e-4b76-83c2-304e252f98b1",
@@ -81,11 +103,14 @@ class LabelEndpoint(api_base.Resource):
              'The maximum number of versions to retain, or zero for the '
              'configured default.', False)
         ],
-        [(200, 'The updated artifact.', label_example)],
+        [(200, 'The updated artifact.', label_example),
+         (400, 'The label name is malformed.', None)],
         requires_admin=True))
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
-        namespace, label_url = _label_url(label_name)
+        namespace, label_url, err = _label_url_or_error(label_name)
+        if err:
+            return err
 
         # Resolve by ownership and then authorise creating and modifying
         # apart, exactly as the artifact upload route does. The
@@ -122,6 +147,7 @@ class LabelEndpoint(api_base.Resource):
             ('label_name', 'path', 'string', 'The label name to search for.', True)
         ],
         [(200, 'The label artifact, if found.', label_example),
+         (400, 'The label name is malformed.', None),
          (404, 'Label not found.', None)],
         requires_admin=True))
     @api_base.log_token_use
@@ -136,7 +162,9 @@ class LabelEndpoint(api_base.Resource):
         # Reading resolves by visibility, so a label shared with us or
         # reached through a trust is legible here. Writing does not; see
         # post() and delete().
-        _, label_url = _label_url(label_name)
+        _, label_url, err = _label_url_or_error(label_name)
+        if err:
+            return err
         a = Artifact.from_url(Artifact.TYPE_LABEL, label_url,
                               namespace=request_namespace())
         if not a:
@@ -149,6 +177,7 @@ class LabelEndpoint(api_base.Resource):
             ('label_name', 'path', 'string', 'The label name to delete.', True)
         ],
         [(200, 'The label artifact, if found.', label_example),
+         (400, 'The label name is malformed.', None),
          (404, 'Label not found.', None)],
         requires_admin=True))
     @api_base.log_token_use
@@ -161,7 +190,9 @@ class LabelEndpoint(api_base.Resource):
         # a label through a share or a trust is not permission to remove
         # it, which is what requires_artifact_ownership says on the
         # routes that take a uuid.
-        namespace, label_url = _label_url(label_name)
+        namespace, label_url, err = _label_url_or_error(label_name)
+        if err:
+            return err
         a = Artifact.owned_from_url(Artifact.TYPE_LABEL, label_url,
                                     namespace=namespace)
         if not a or request_namespace() not in [a.namespace, 'system']:

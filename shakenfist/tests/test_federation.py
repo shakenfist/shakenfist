@@ -21,8 +21,11 @@ import time
 from unittest import mock
 
 import jwt
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 
 from shakenfist import exceptions
 from shakenfist import federation
@@ -657,10 +660,6 @@ class JWKSTrustAnchorTestCase(base.ShakenFistTestCase):
 
         # A CA nobody has heard of, which is the point: if it turns up
         # in a context's anchors it can only have come from the bundle.
-        from cryptography import x509
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.x509.oid import NameOID
-
         key = _keypair()
         now = datetime.datetime.now(datetime.timezone.utc)
         name = x509.Name([
@@ -742,3 +741,54 @@ class JWKSTrustAnchorTestCase(base.ShakenFistTestCase):
 
         self.assertIsNotNone(client.ssl_context)
         self.assertIn('sf-test-private-ca', self._subjects(client.ssl_context))
+
+    def test_a_bundle_path_that_does_not_exist_is_our_fault(self):
+        # Unhandled, load_verify_locations raises FileNotFoundError from
+        # PyJWKClient construction, which sits on the request path of an
+        # unauthenticated endpoint. Neither TokenValidationFailed nor
+        # anything else auth.py catches, so it escaped as `server error:
+        # FileNotFoundError(2, 'No such file or directory')` on every
+        # exchange from then on, naming no setting.
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE',
+                               '/no/such/jwks-ca.pem'):
+            self.assertRaises(exceptions.JWKSTrustAnchorUnusable,
+                              federation.jwks_ssl_context)
+
+    def test_a_bundle_that_is_not_a_certificate_is_our_fault(self):
+        # The other half: a file which exists and is not PEM raises
+        # ssl.SSLError, which is a subclass of OSError and so is caught
+        # by the same arm.
+        handle, path = tempfile.mkstemp(suffix='.pem')
+        with open(handle, 'wb') as f:
+            f.write(b'this is not a certificate\n')
+        self.addCleanup(os.unlink, path)
+
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE', path):
+            self.assertRaises(exceptions.JWKSTrustAnchorUnusable,
+                              federation.jwks_ssl_context)
+
+    def test_the_refusal_names_the_setting_and_the_path(self):
+        # An errno with no mention of which setting caused it is the
+        # part of the old behaviour that cost the debugging round, not
+        # the 500 itself.
+        with mock.patch.object(federation.config,
+                               'FEDERATION_JWKS_CA_BUNDLE',
+                               '/no/such/jwks-ca.pem'):
+            try:
+                federation.jwks_ssl_context()
+                self.fail('expected JWKSTrustAnchorUnusable')
+            except exceptions.JWKSTrustAnchorUnusable as e:
+                self.assertIn('FEDERATION_JWKS_CA_BUNDLE', str(e))
+                self.assertIn('/no/such/jwks-ca.pem', str(e))
+
+    def test_a_bad_bundle_is_not_reported_as_a_bad_token(self):
+        # The distinction the separate exception exists for.
+        # TokenValidationFailed becomes a 401, which would tell somebody
+        # holding a perfectly good token that it had been rejected and
+        # send them to their identity provider to look for a fault which
+        # is in our config file.
+        self.assertFalse(
+            issubclass(exceptions.JWKSTrustAnchorUnusable,
+                       exceptions.TokenValidationFailed))

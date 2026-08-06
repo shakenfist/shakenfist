@@ -1223,7 +1223,19 @@ a caller-nominated namespace has two cases to authorise apart: a trust is
 enough to gift a namespace an artifact it did not have, and not enough to
 replace what one it already owns resolves to. `owned_from_url_or_new()` exists
 for the callers which have no such split — their target namespace is their own
-or has already been checked — so they need not restate it.
+or has already been checked — so they need not restate it. The artifact fetch
+and upload routes are the ones which do have the split, and spell it out
+deliberately; the resemblance between them is the authorisation, not a
+duplication waiting to be factored out.
+
+`owned_from_url()` also passes the namespace to SQL as a query criterion, not
+only to the Python predicate. Ownership is a plain equality, and this runs on
+the instance create path. The predicate is still there, and has to be: the
+object iterator drops a namespace criterion of `system` so that listing as
+system sees the whole cluster, so a pushdown standing on its own would turn an
+ownership test into no test at all. Visibility cannot be pushed down the same
+way — it is a trust graph walk, and narrowing the query to one namespace would
+drop the shared and trusted rows `from_url()` exists to find.
 
 Instance creation from a plain URL is where the two verbs meet, and it is
 worth knowing why it is not simply the ownership call. Resolving `disk.base`
@@ -1234,6 +1246,14 @@ its own copy of every shared image, which is the opposite of what sharing one
 is for. A visible foreign artifact is therefore resolved to a blob and booted
 from, exactly as the label, snapshot and upload branches of the same loop
 already do, and never fetched into. Read theirs, write only your own.
+
+`Instance.snapshot()` is the fourth write path, and was missed by the original
+sweep because that only covered `external_api/` and `operations/`. It is not
+reachable across namespaces — the URL carries the instance UUID and the type
+filter pins it to `TYPE_SNAPSHOT` — but it resolves by ownership anyway, so
+the next artifact type minted against an instance URL does not have to
+rediscover the rule. When looking for write paths, grep for the sink
+(`add_index`) rather than for callers of the resolver.
 
 ### VDI console token trust model
 

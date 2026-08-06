@@ -32,8 +32,8 @@ import json
 from unittest import mock
 
 from shakenfist import mariadb
-from shakenfist.artifact import LABEL_URL
 from shakenfist.artifact import Artifact
+from shakenfist.artifact import LABEL_URL
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
@@ -209,6 +209,28 @@ class LabelWriteTargetTestCase(LabelAccessFixture):
         self.assertEqual(404, resp.status_code)
         self.assertIsNone(self._labels_owned_by('owner', 'brandnew'))
 
+    def test_system_may_create_a_label_in_a_namespace_it_does_not_own(self):
+        # Load bearing, and not obviously so. The create branch is
+        # authorised by namespace_is_trusted(namespace, requestor)
+        # rather than by a system escape of its own, so system reaching
+        # `owner` depends entirely on namespaces being created with
+        # trust=['system']. If that ever stops being the default, the
+        # system namespace quietly loses the ability to seed a label
+        # and this is the test which says so.
+        resp, _ = self._post('system', label_name='owner/brandnew')
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertIsNotNone(self._labels_owned_by('owner', 'brandnew'))
+
+    def test_a_label_name_with_two_slashes_is_400_and_not_500(self):
+        # The third way this endpoint returned 500, alongside the two
+        # in get and delete. The route is `/label/<path:label_name>`,
+        # so the converter matches embedded slashes and _label_url
+        # raises LabelHierarchyTooDeep, which nothing caught. A
+        # malformed name is the caller's mistake, so it is a 400.
+        resp, add_index = self._post('owner', label_name='a/b/c')
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        add_index.assert_not_called()
+
     def test_the_owners_label_gains_no_event_from_a_refusal(self):
         # Asserted on the object rather than the status code, because a
         # route which wrote and then refused would satisfy every status
@@ -258,6 +280,10 @@ class LabelReadTestCase(LabelAccessFixture):
         self.assertEqual(404, resp.status_code)
         self.assertIn('not found', resp.get_json()['error'])
 
+    def test_a_label_name_with_two_slashes_is_400_and_not_500(self):
+        resp = self._get('owner', label_name='a/b/c')
+        self.assertEqual(400, resp.status_code, resp.get_json())
+
 
 class LabelDeleteTestCase(LabelAccessFixture):
     """DELETE /label/<namespace>/<label>.
@@ -297,3 +323,7 @@ class LabelDeleteTestCase(LabelAccessFixture):
         resp = self._delete('owner', label_name='owner/nosuchthing')
         self.assertEqual(404, resp.status_code)
         self.assertIn('not found', resp.get_json()['error'])
+
+    def test_a_label_name_with_two_slashes_is_400_and_not_500(self):
+        resp = self._delete('owner', label_name='a/b/c')
+        self.assertEqual(400, resp.status_code, resp.get_json())

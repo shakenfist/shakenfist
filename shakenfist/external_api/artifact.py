@@ -457,6 +457,14 @@ class ArtifactsEndpoint(api_base.Resource):
         # to a third namespace which shares with, or is trusted by, that
         # one, and the image_fetch queued below adds a version to
         # whatever it lands on.
+        #
+        # Spelled out rather than deferred to owned_from_url_or_new,
+        # because the two cases below are authorised differently and
+        # that is not an accident of style. The trust check above is
+        # enough to gift this namespace an artifact it did not have;
+        # replacing what one it already owns resolves to takes the
+        # owning namespace or system, which is the stricter test below
+        # rather than a restatement of the trust.
         a = Artifact.owned_from_url(Artifact.TYPE_IMAGE, url,
                                     namespace=namespace)
         if a:

@@ -35,7 +35,14 @@
 # Arguments (positional):
 #   $1  ssh user for the test nodes (default: debian)
 
-set -e
+# set -u as well as set -e, because the failure this script exists to
+# prevent is a silent one. Without it, an unsourced ci-environment.sh
+# leaves ${nodes} empty, the install loop iterates zero times, and the
+# script exits 0 having done nothing -- after which the five federation
+# tests skip with a message blaming this script for not having run. The
+# explicit guards below say which variable is missing rather than
+# leaving it to scp's argument parsing to fail obscurely.
+set -eu
 
 SSH_USER="${1:-debian}"
 SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no"
@@ -47,6 +54,9 @@ SSH_OPTS="${SSH_OPTS} -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
 # change them together.
 BUNDLE_PATH="/etc/sf/jwks-ca.pem"
 TEST_CA_DIR=".sf-ci-jwks-ca"
+
+: "${nodes:?ci-environment.sh must be sourced before running this script}"
+: "${primary:?ci-environment.sh must be sourced before running this script}"
 
 workdir=$(mktemp -d /tmp/sf-ci-jwks-ca.XXXXXX)
 trap 'rm -rf "${workdir}"' EXIT
@@ -110,18 +120,30 @@ for node in ${nodes}; do
         fi
         sleep 5
     done
+    # Readiness proves sf-api came back, not that it came back with the
+    # bundle -- and an sf-api which restarted without the setting fails
+    # in exactly the way this script exists to prevent.
+    ssh ${SSH_OPTS} "${SSH_USER}@${address}" \
+        "grep -q '^SHAKENFIST_FEDERATION_JWKS_CA_BUNDLE=' /etc/sf/config \
+         && sudo test -r ${BUNDLE_PATH}"
+
     echo "sf-api on ${node} (${address}) is ready."
 done
 
 # The signing key, for the test process only. mode 0700/0600 rather
 # than something more relaxed: the cluster is disposable but there is
 # no reason for this to be readable by every process on the box.
+#
+# Copied straight into the 0700 directory rather than via /tmp. The
+# staged version left the CA signing key sitting world readable with
+# scp's default mode between the copy and the chmod, which is a window
+# this script's own header does not admit to and does not need to have.
 echo "Leaving the CA signing material on the primary for the tests"
-scp ${SSH_OPTS} "${workdir}/ca-cert.pem" "${workdir}/ca-key.pem" \
-    "${SSH_USER}@${primary}:/tmp/"
 ssh ${SSH_OPTS} "${SSH_USER}@${primary}" \
-    "mkdir -p ~/${TEST_CA_DIR} && chmod 0700 ~/${TEST_CA_DIR} \
-     && mv /tmp/ca-cert.pem /tmp/ca-key.pem ~/${TEST_CA_DIR}/ \
-     && chmod 0600 ~/${TEST_CA_DIR}/ca-key.pem"
+    "mkdir -p ~/${TEST_CA_DIR} && chmod 0700 ~/${TEST_CA_DIR}"
+scp ${SSH_OPTS} "${workdir}/ca-cert.pem" "${workdir}/ca-key.pem" \
+    "${SSH_USER}@${primary}:${TEST_CA_DIR}/"
+ssh ${SSH_OPTS} "${SSH_USER}@${primary}" \
+    "chmod 0600 ~/${TEST_CA_DIR}/ca-key.pem"
 
 echo "Done. cluster_ci_tests/test_federation.py will now issue a trusted leaf."

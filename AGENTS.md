@@ -513,7 +513,7 @@ Two rules fell out of fixing it, and both generalise past artifacts:
   check so a refused caller cannot write to the event log of a namespace it is
   about to be told does not exist.
 
-The remaining three call sites were narrowed in #3640, and one of them was
+The remaining call sites were narrowed in #3640, and one of them was
 worse than the sweep recorded. `LabelEndpoint.post` had been read as safe
 because it builds its URL from the request — but `_label_url` accepts
 `<namespace>/<label>` and hands back the namespace it was given, so any
@@ -548,7 +548,21 @@ and it is worth knowing why before someone "simplifies" it:
 namespace is fixed as the caller's own, or already authorised: they have no
 two cases to tell apart, so they get the create for free. Routes which accept
 a caller-nominated namespace must still authorise creating and modifying by
-hand, which is why `owned_from_url()` itself does not create.
+hand, which is why `owned_from_url()` itself does not create. The artifact
+fetch and upload routes both spell the two cases out for that reason, and the
+apparent duplication between them is the authorisation rather than a missing
+abstraction.
+
+One more lesson, from the review of that change:
+
+- **A sweep is only as wide as the directory it was run over.** The original
+  #3640 audit listed three sites because it looked at `external_api/` and
+  `operations/`. `Instance.snapshot()` is a fourth, in the core object, and
+  neither the issue nor the first draft of the fix saw it. It was not
+  exploitable — the URL carries the instance UUID and `type_filter` pins the
+  type — but "not reachable today" is an argument for the guard being cheap,
+  not for going without it. Grep for the *sink* (`add_index`), not for the
+  callers of the resolver you happen to be changing.
 
 ### Credential-carrying routes are not logged, not redacted
 

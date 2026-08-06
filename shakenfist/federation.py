@@ -87,13 +87,33 @@ def jwks_ssl_context() -> Optional[ssl.SSLContext]:
     vouch for a certificate; hostname checking and expiry are still on,
     jwks_uri must still be https, and a certificate chaining to neither
     set is still refused.
+
+    Raises JWKSTrustAnchorUnusable when the file cannot be loaded. This
+    is the one setting in the federation group which names a file on
+    disk, and the ansible template writes it to every node, so a path
+    that exists on the deploy host and not on the nodes is an ordinary
+    mistake. Unhandled, load_verify_locations raises FileNotFoundError
+    for a typo and ssl.SSLError for a file that is not PEM, neither of
+    which the exchange endpoint catches -- so the operator got `server
+    error: FileNotFoundError(2, 'No such file or directory')` off an
+    unauthenticated endpoint, with no mention of which setting caused
+    it, on every exchange attempt from then on.
     """
     bundle = config.FEDERATION_JWKS_CA_BUNDLE
     if not bundle:
         return None
 
     context = ssl.create_default_context()
-    context.load_verify_locations(cafile=bundle)
+    try:
+        # OSError alone covers both, because ssl.SSLError subclasses it.
+        context.load_verify_locations(cafile=bundle)
+    except OSError as e:
+        LOG.with_fields({
+            'setting': 'FEDERATION_JWKS_CA_BUNDLE', 'path': bundle
+        }).error(f'JWKS CA bundle could not be loaded: {e}')
+        raise exceptions.JWKSTrustAnchorUnusable(
+            f'FEDERATION_JWKS_CA_BUNDLE ({bundle}) could not be loaded: '
+            f'{e}') from e
     return context
 
 
@@ -264,8 +284,13 @@ def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
 
     Checks the signature against the issuer's published keys, then the
     audience, the issuer, and the lifetime. Raises
-    TokenValidationFailed for every failure, with a message intended
-    for the audit log rather than for the caller.
+    TokenValidationFailed for every failure of the token, with a
+    message intended for the audit log rather than for the caller.
+
+    The one exception it raises which is not about the token is
+    JWKSTrustAnchorUnusable, which says our JWKS CA bundle is
+    unloadable. It is separate precisely so the endpoint can avoid
+    reporting our misconfiguration as the caller's bad token.
     """
     # One read of the issuer's row for all three columns this needs.
     # Three separate property reads was three round trips on the one

@@ -228,6 +228,16 @@ deliberately no option to skip verification: a JWKS fetched over a
 connection nobody authenticated can be substituted by anyone on the
 path, which makes signature verification theatre.
 
+If the path is wrong, or the file is not a PEM bundle, `sf-api` says so
+twice. Each worker complains at startup, so a bad path is a line in the
+log at deploy time rather than a surprise at somebody's first federated
+login weeks later. If it is still wrong when a token arrives,
+`/auth/federated` answers **503** rather than 401 — the token was never
+examined, and calling it rejected would send the caller to their
+identity provider to look for a fault which is in your config file. The
+log line names `FEDERATION_JWKS_CA_BUNDLE` and the path; the response
+deliberately does not.
+
 ### If nobody uses it
 
 Federation is inert until an issuer exists. A cluster which never
