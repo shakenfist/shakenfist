@@ -84,6 +84,18 @@ repos:
         files: ^shakenfist/external_api/.*\.py$
         pass_filenames: false
 
+      - id: check-api-parameter-locations
+        name: Check API parameter locations are derivable
+        description: >-
+          Every declared parameter location must agree with where the value
+          really comes from: the mounted route, a webargs query schema, a
+          flask.request.args read, or the body merge. Reports what it would
+          change; re-run with --apply to fix.
+        entry: python3 tools/fix-api-parameter-locations.py
+        language: system
+        files: ^shakenfist/external_api/.*\.py$
+        pass_filenames: false
+
   # Type checking with mypy (incremental rollout via tox)
   # Requires: pip install tox mypy
   - repo: local
@@ -93,6 +105,6 @@ repos:
         description: Run mypy type checking on selected files (incremental rollout)
         entry: tox -e mypy
         language: system
-        files: ^shakenfist/(schema/|mariadb\.py|daemons/database/|operations/|resource_health\.py|node_health\.py)
+        files: ^shakenfist/(schema/|mariadb\.py|daemons/database/|operations/|resource_health\.py|node_health\.py|external_api/declarations\.py)
         pass_filenames: false
         types: [python]

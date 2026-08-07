@@ -497,3 +497,12 @@ class ProcessExecutionError(Exception):
         self.stderr = stderr
         self.stdout = stdout
         self.cmd = cmd
+
+
+class InvalidAPIDeclaration(Exception):
+    """An endpoint's swagger_helper() parameter declaration is malformed.
+
+    Raised at import time. These declarations describe the published
+    API and are the input to request validation, so a malformed one
+    must stop the process rather than produce a wrong specification.
+    """

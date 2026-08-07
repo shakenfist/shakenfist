@@ -221,10 +221,10 @@ instance_get_example_deleted = """{
 class InstanceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance information.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
          ('namespace', 'body', 'namespace',
-          'The namespace to contain the network.', False)],
+          'Scope the name lookup to this namespace.', False)],
         [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
@@ -235,7 +235,7 @@ class InstanceEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'instances', 'Delete an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
          ('namespace', 'body', 'namespace',
           'The namespace containing the instance', False)],
@@ -454,11 +454,11 @@ class InstancesEndpoint(api_base.Resource):
              'A list of diskspecs defining the disk devices for this instance. '
              'See https://shakenfist.com/developer_guide/api_reference/instances/#diskspec '
              'for more details on diskspecs.', True),
-            ('sshkey', 'body', 'string',
+            ('ssh_key', 'body', 'string',
              'A ssh public key to add to the default users authorized_keys file '
              'via cloud-init. Requires that both configdrive be enabled, and that '
              'cloud-init be installed on the instance before boot.', False),
-            ('userdata', 'body', 'string',
+            ('user_data', 'body', 'string',
              'Other user-data to be provided to cloud-init. Requires that both '
              'configdrive be enabled, and that cloud-init be installed on the '
              'instance before boot.', False),
@@ -937,7 +937,7 @@ instance_interface_create_example = """{
 class InstanceInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List network interfaces for an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(200, 'A list of network interfaces for an instance.',
           instance_interfaces_example),
@@ -951,7 +951,7 @@ class InstanceInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Create a new network interface on an instance',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('network', 'body', 'dict',
              'A networkspec defining the new interface. '
@@ -1081,7 +1081,7 @@ class InstanceEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance event information.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
@@ -1100,7 +1100,7 @@ class InstanceEventsEndpoint(api_base.Resource):
 class InstanceRebootSoftEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Soft (ACPI) reboot an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be rebooted.', None)]))
@@ -1123,7 +1123,7 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
 class InstanceRebootHardEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Hard (reset switch) reboot an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be rebooted.', None)]))
@@ -1146,7 +1146,7 @@ class InstanceRebootHardEndpoint(api_base.Resource):
 class InstancePowerOffEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Power off an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be powered off.', None)]))
@@ -1169,7 +1169,7 @@ class InstancePowerOffEndpoint(api_base.Resource):
 class InstancePowerOnEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Power on an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be powered on.', None)]))
@@ -1192,7 +1192,7 @@ class InstancePowerOnEndpoint(api_base.Resource):
 class InstancePauseEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Pause an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be paused.', None)]))
@@ -1215,7 +1215,7 @@ class InstancePauseEndpoint(api_base.Resource):
 class InstanceUnpauseEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Unpause an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be unpaused.', None)]))
@@ -1238,7 +1238,7 @@ class InstanceUnpauseEndpoint(api_base.Resource):
 class InstanceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch metadata for an instance.',
-        [('instance_ref', 'query', 'uuidorname',
+        [('instance_ref', 'path', 'uuidorname',
           'The instance to fetch metadata for.', True)],
         [(200, 'Instance metadata, if any.', None),
          (404, 'Instance not found.', None)],
@@ -1252,8 +1252,8 @@ class InstanceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Add metadata for an instance.',
         [
-            ('instance_ref', 'query', 'uuidorname', 'The instance to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('instance_ref', 'path', 'uuidorname', 'The instance to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1302,8 +1302,8 @@ class InstanceMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Update a metadata key for an instance.',
         [
-            ('instance_ref', 'query', 'uuidorname', 'The instance to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('instance_ref', 'path', 'uuidorname', 'The instance to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1325,8 +1325,8 @@ class InstanceMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Delete a metadata key for an instance.',
         [
-            ('instance_ref', 'query', 'uuidorname', 'The instance to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('instance_ref', 'path', 'uuidorname', 'The instance to remove a key from.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1348,7 +1348,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch console data from an instance.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True),
             ('length', 'body', 'integer',
              'The amount of data to fetch, defaults to 10240 bytes.', False)
@@ -1387,7 +1387,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Delete console data for an instance.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1434,7 +1434,7 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
         ('Fetch a virt-viewer .vv file describing how to connect to the VDI console '
          'for this instance.'),
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True)
         ],
         [(200, 'A .vv file to open in virt-viewer as a application/x-virt-viewer stream.',
@@ -1490,7 +1490,7 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
         ('Mint a short lived Kerbside VDI console token and return a '
          'proxy URL for the SPICE console of this instance.'),
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The instance to mint a VDI console proxy token for.', True)
         ],
         [(200, 'A Kerbside proxy URL and the token expiry time.',
@@ -1555,7 +1555,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Upload a file to an instance via the Shaken Fist agent.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('blob_uuid', 'body', 'uuid',
              'The UUID of the blob to put onto the instance.', True),
@@ -1623,7 +1623,7 @@ class InstanceAgentGetEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Download a file from an instance via the Shaken Fist agent.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True)
@@ -1667,7 +1667,7 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Execute a command within an instance via the Shaken Fist agent.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('command_line', 'body', 'string', 'The command to execute.', True)
         ],
@@ -1706,7 +1706,7 @@ class InstanceScreenshotEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Collect a screenshot of an instance.',
         [
-            ('instance_ref', 'query', 'uuidorname',
+            ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True)
         ],
         [(200, 'The UUID of a blob containing the screenshot.', None),
@@ -1770,8 +1770,11 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'instances', 'Get the outstanding cluster operations for an instance.',
-        [('instance_ref', 'query', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+        [('instance_ref', 'path', 'uuidorname',
+          'The UUID or name of the instance.', True),
+         ('all', 'query', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(
             200,
             'A list of the cluster operations not yet executed for this instance.',

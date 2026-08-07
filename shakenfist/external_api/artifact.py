@@ -327,7 +327,7 @@ artifact_delete_example = """{
 class ArtifactEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact information.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact not found.', None)]))
@@ -343,7 +343,7 @@ class ArtifactEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Delete an artifact.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True)],
         [(200, ('The artifact has been deleted. The final state of the '
                 'artifact is returned.'), artifact_delete_example),
@@ -530,7 +530,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Convert an upload into an artifact.',
         [
-            ('artifact_name', 'query', 'string',
+            ('artifact_name', 'path', 'string',
              'The name of the artifact. This is used to construct a source url if '
              'you do not specify one with source_url.', True),
             ('upload_uuid', 'body', 'uuid',
@@ -695,7 +695,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact event information.',
         [
-            ('artifact_ref', 'query', 'uuidorname',
+            ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
@@ -750,7 +750,7 @@ artifact_versions_example = """[
 class ArtifactVersionsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact version information.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True)],
         [(200, 'A list of the blobs which form the artifact versions.',
           artifact_versions_example),
@@ -771,9 +771,9 @@ class ArtifactVersionsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Set the maximum number of versions for an artifact.',
         [
-            ('artifact_ref', 'query', 'uuidorname',
+            ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('max_versions', 'post', 'integer',
+            ('max_versions', 'body', 'integer',
              'The maximum number of versions, or revert to the default it not set.',
              False)
         ],
@@ -801,9 +801,9 @@ class ArtifactVersionEndpoint(api_base.Resource):
          'remove the blob if its reference count reaches zero. If the artifact '
          'has no remaining versions, it will have its state set to deleted.'),
         [
-            ('artifact_ref', 'query', 'uuidorname',
+            ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('version_id', 'query', 'integer', 'The version number to remove.', False)
+            ('version_id', 'path', 'integer', 'The version number to remove.', True)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact index not found.', None)]))
@@ -833,7 +833,7 @@ class ArtifactVersionEndpoint(api_base.Resource):
 class ArtifactShareEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Share the specified artifact with all namespaces.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Only artifacts in the system namespace may be shared.', None),
@@ -854,7 +854,7 @@ class ArtifactShareEndpoint(api_base.Resource):
 class ArtifactUnshareEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Unshare the specified artifact with all namespaces.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Artifact not shared.', None),
@@ -874,7 +874,7 @@ class ArtifactUnshareEndpoint(api_base.Resource):
 class ArtifactMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Fetch metadata for an artifact.',
-        [('artifact_ref', 'qeury', 'uuidorname',
+        [('artifact_ref', 'path', 'uuidorname',
           'The artifact to fetch metadata for.', True)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
@@ -888,8 +888,8 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Add metadata for an artifact.',
         [
-            ('artifact_ref', 'query', 'uuidorname', 'The artifact to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('artifact_ref', 'path', 'uuidorname', 'The artifact to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -914,8 +914,8 @@ class ArtifactMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Update a metadata key for an artifact.',
         [
-            ('artifact_ref', 'query', 'uuidorname', 'The artifact to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('artifact_ref', 'path', 'uuidorname', 'The artifact to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -938,8 +938,8 @@ class ArtifactMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Delete a metadata key for an artifact.',
         [
-            ('artifact_ref', 'query', 'uuidorname', 'The artifact to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('artifact_ref', 'path', 'uuidorname', 'The artifact to remove a key from.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -984,8 +984,11 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get the outstanding cluster operations for an artifact.',
-        [('artifact_ref', 'query', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+        [('artifact_ref', 'path', 'uuidorname',
+          'The UUID or name of the artifact.', True),
+         ('all', 'query', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(
             200,
             'A list of the cluster operations not yet executed for this artifact.',

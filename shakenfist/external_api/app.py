@@ -479,5 +479,13 @@ api.add_resource(api_node.NodeMetadataEndpoint, '/nodes/<node>/metadata/<key>')
 
 api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
 api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')
+# The int converter makes the declared `integer` true at runtime:
+# Werkzeug rejects a non-numeric segment with a 404 before the handler
+# runs, where a bare <offset> arrived as a string and int() raised out
+# of the handler as a 500. The API's other path integer,
+# /artifacts/<artifact_ref>/versions/<version_id>, deliberately keeps
+# a bare segment: its handler already returns a clean 400 for a
+# non-numeric segment, so a converter there would swap one correct
+# response for a different one with nothing wrong to fix.
 api.add_resource(api_upload.UploadTruncateEndpoint,
-                 '/upload/<upload_uuid>/truncate/<offset>')
+                 '/upload/<upload_uuid>/truncate/<int:offset>')

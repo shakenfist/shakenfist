@@ -71,8 +71,11 @@ class LabelEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'label', 'Update a label artifact with a new blob.',
         [
-            ('label_name', 'body', 'string', 'The label artifact to update.', True),
-            ('blob_uuid', 'body', 'uuid', 'The blob to set as the new version.', True)
+            ('label_name', 'path', 'string', 'The label artifact to update.', True),
+            ('blob_uuid', 'body', 'uuid', 'The blob to set as the new version.', True),
+            ('max_versions', 'body', 'integer',
+             'The maximum number of versions to retain, or zero for the '
+             'configured default.', False)
         ],
         [(200, 'The updated artifact.', label_example)],
         requires_admin=True))
@@ -93,7 +96,7 @@ class LabelEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'label', 'Search for a label by name.',
         [
-            ('label_name', 'body', 'string', 'The label name to search for.', True)
+            ('label_name', 'path', 'string', 'The label name to search for.', True)
         ],
         [(200, 'The label artifact, if found.', label_example),
          (404, 'Label not found.', None)],
@@ -111,7 +114,7 @@ class LabelEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'label', 'Delete a label by name.',
         [
-            ('label_name', 'body', 'string', 'The label name to delete.', True)
+            ('label_name', 'path', 'string', 'The label name to delete.', True)
         ],
         [(200, 'The label artifact, if found.', label_example),
          (404, 'Label not found.', None)],

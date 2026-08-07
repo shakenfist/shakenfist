@@ -67,7 +67,7 @@ node_delete_example = """{
 class NodeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get information for a node.',
-        [('node_name', 'query', 'node', 'The name of a node.', True)],
+        [('node', 'path', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_get_example),
          (404, 'Node not found.', None)]))
     @api_base.caller_is_admin
@@ -80,7 +80,7 @@ class NodeEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'nodes', 'Delete a node.',
-        [('node_name', 'query', 'node', 'The name of a node.', True)],
+        [('node', 'path', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_delete_example),
          (404, 'Node not found.', None)]))
     @api_base.caller_is_admin
@@ -160,7 +160,7 @@ class NodeEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get nodes event information.',
         [
-            ('node', 'query', 'node', 'The name of a node.', True),
+            ('node', 'path', 'node', 'The name of a node.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
              'The number of events to return, defaults to 100.', False)
@@ -187,7 +187,7 @@ class NodeProcessMetricsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get process metrics for a given node.',
         [
-            ('node', 'query', 'node', 'The name of a node.', True)
+            ('node', 'path', 'node', 'The name of a node.', True)
         ],
         [(200, 'Process metrics for a single node.', node_process_metrics_example),
          (404, 'Node not found.', None)]))
@@ -203,7 +203,7 @@ class NodeProcessMetricsEndpoint(api_base.Resource):
 class NodeMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Fetch metadata for a node.',
-        [('node', 'query', 'node', 'The node to fetch metadata for.', True)],
+        [('node', 'path', 'node', 'The node to fetch metadata for.', True)],
         [(200, 'Node metadata, if any.', None),
          (404, 'Node not found.', None)],
         requires_admin=True))
@@ -218,8 +218,8 @@ class NodeMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Add metadata for a node.',
         [
-            ('node', 'query', 'node', 'The node to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('node', 'path', 'node', 'The node to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -246,8 +246,8 @@ class NodeMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Update a metadata key for a node.',
         [
-            ('node', 'query', 'node', 'The node to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('node', 'path', 'node', 'The node to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -272,8 +272,8 @@ class NodeMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Delete a metadata key for a node.',
         [
-            ('node', 'query', 'node', 'The node to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('node', 'path', 'node', 'The node to remove a key from.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

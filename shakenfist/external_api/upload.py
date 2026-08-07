@@ -45,8 +45,9 @@ class UploadCreateEndpoint(api_base.Resource):
 class UploadDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Append data to an upload.',
-        [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
-         ('binary data', 'body', 'binary', 'Binary data to append to the upload.', True)],
+        [('upload_uuid', 'path', 'uuid', 'The upload UUID.', True),
+         (api_base.RAW_BODY_PARAMETER, 'body', 'binary',
+          'Binary data to append to the upload.', True)],
         [(200, 'The new size of the uploaded object.', '1500')]))
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
@@ -69,8 +70,8 @@ class UploadDataEndpoint(api_base.Resource):
 class UploadTruncateEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Truncate an upload object to a specified size.',
-        [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
-         ('offset', 'query', 'integer', 'The new length of the object.', True)],
+        [('upload_uuid', 'path', 'uuid', 'The upload UUID.', True),
+         ('offset', 'path', 'integer', 'The new length of the object.', True)],
         [(200, 'No return value', '')]))
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request

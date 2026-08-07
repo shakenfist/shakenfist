@@ -78,6 +78,24 @@ def handles_credentials():
     return path == '/auth' or path.startswith('/auth/')
 
 
+# The parameter locations OpenAPI 2.0 defines. swagger_helper()
+# rejects anything else, so a mistyped location is an import-time
+# failure rather than a declaration silently ignored by the docs
+# generator and wrong in the published API.
+SWAGGER_PARAMETER_LOCATIONS = frozenset(
+    ['query', 'header', 'path', 'formData', 'body'])
+
+
+# The name an endpoint uses to declare that it consumes the raw
+# request body rather than a named parameter, as
+# ``(RAW_BODY_PARAMETER, 'body', 'binary', ...)``. It never appears
+# in a handler signature -- the handler reads flask.request directly
+# -- so schema compilation and the declaration audit both skip it.
+# OpenAPI 2.0 permits at most one body parameter and conventionally
+# names it 'body'.
+RAW_BODY_PARAMETER = 'body'
+
+
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
@@ -149,9 +167,6 @@ def swagger_helper(section, description, parameters, responses,
         'produces': [
             'application/json'
         ],
-        'security': {
-            'bearerAuth': []
-        },
         'deprecated': False,
         'description': description,
         'responses': {}
@@ -165,7 +180,10 @@ def swagger_helper(section, description, parameters, responses,
         'binary': {'type': 'string', 'format': 'Binary data'},
         'boolean': {'type': 'boolean', 'format': 'boolean'},
         'dict': {'type': 'string', 'format': 'a JSON dictionary'},
-        'integer': {'type': 'integer', 'type': 'integer'},
+        # The prose formats on the string types carry description-like
+        # information a generator passes through; integer has standard
+        # formats, and these are byte offsets and blob sizes, so int64.
+        'integer': {'type': 'integer', 'format': 'int64'},
         'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
         'namespace': {'type': 'string', 'format': 'the name of a namespace'},
         'node': {'type': 'string', 'format': 'the name of a node'},
@@ -187,8 +205,68 @@ def swagger_helper(section, description, parameters, responses,
             'description': 'JWT authorization header'
         })
         out['parameters'][-1].update(argtypes['bearer'])
+        # The security requirement and the Authorization parameter
+        # travel together: an operation which does not demand the
+        # header must not publish the requirement either. This used to
+        # be emitted unconditionally, which described /auth/federated
+        # -- the one deliberately unauthenticated endpoint, where the
+        # identity token is the credential -- as requiring a bearer
+        # token. A list, not a bare object: OpenAPI 2.0 defines
+        # security as an array of requirement objects, and the object
+        # form was the largest single class of specification-validity
+        # errors.
+        out['security'] = [{
+            'bearerAuth': []
+        }]
 
-    for (name, location, argtype, argdescription, argrequired) in parameters:
+    declarable = set(argtypes) - {'bearer'}
+
+    for parameter in parameters:
+        # Checked explicitly, and first, because every malformed
+        # declaration has to arrive as an InvalidAPIDeclaration for
+        # phase 3's compiler to catch one exception type. Destructuring
+        # five elements raises ValueError on a shorter tuple and len()
+        # raises TypeError on anything unsized, so neither is left to
+        # happen by itself.
+        if not isinstance(parameter, (tuple, list)) or len(parameter) != 5:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s declares a parameter which is not a 5-element (name, '
+                'location, type, description, required) tuple: %r'
+                % (section, parameter))
+        (name, location, argtype, argdescription, argrequired) = parameter
+
+        # The location was never validated, so 'post' and 'qeury' both
+        # survived in the tree until they were found by audit. Fail at
+        # import time instead: these declarations are the input to
+        # request validation, not just documentation.
+        if location not in SWAGGER_PARAMETER_LOCATIONS:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares location %r, which is not one of %s'
+                % (section, name, location,
+                   ', '.join(sorted(SWAGGER_PARAMETER_LOCATIONS))))
+
+        # OpenAPI 2.0 requires that a path parameter be required, because
+        # the route cannot match without it. A specification saying
+        # otherwise fails validation in linters and client generators,
+        # which are the readers this exists for.
+        if location == 'path' and argrequired is not True:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s is in the path, so it must be required'
+                % (section, name))
+
+        # An unknown type token used to surface as a bare KeyError from
+        # the argtypes lookup below, naming the token but neither the
+        # endpoint nor the parameter it came from. Report it the way a
+        # bad location is reported, so every malformed declaration
+        # raises one exception type that phase 3's compiler can catch
+        # uniformly. 'bearer' describes the Authorization header this
+        # function injects itself, so it is not a token an endpoint may
+        # declare.
+        if argtype not in declarable:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares type %r, which is not one of %s'
+                % (section, name, argtype, ', '.join(sorted(declarable))))
+
         out['parameters'].append({
             'name': name,
             'in': location,

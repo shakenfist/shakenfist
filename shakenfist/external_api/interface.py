@@ -54,7 +54,7 @@ interface_get_example = """{
 class InterfaceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Fetch details for an interface.',
-        [('interface_uuid', 'body', 'uuid', 'The interface to fetch details for.', True)],
+        [('interface_uuid', 'path', 'uuid', 'The interface to fetch details for.', True)],
         [(200, 'Interface details.', interface_get_example),
          (404, 'Interface not found.', None)],
         requires_admin=True))
@@ -69,7 +69,7 @@ class InterfaceEndpoint(api_base.Resource):
 class InterfaceFloatEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Float (make publicly available via a floating IP) an interface.',
-        [('interface_uuid', 'body', 'uuid', 'The interface to float.', True)],
+        [('interface_uuid', 'path', 'uuid', 'The interface to float.', True)],
         [(200, 'Interface float requested.', None),
          (404, 'Interface not found.', None),
          (507, 'Network congested and unable to allocate address.', None)],
@@ -97,7 +97,7 @@ class InterfaceFloatEndpoint(api_base.Resource):
 class InterfaceDefloatEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Defloat an interface.',
-        [('interface_uuid', 'body', 'uuid', 'The interface to defloat.', True)],
+        [('interface_uuid', 'path', 'uuid', 'The interface to defloat.', True)],
         [(200, 'Interface defloat requested.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
@@ -134,7 +134,7 @@ class InterfaceDefloatEndpoint(api_base.Resource):
 class InterfaceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Fetch metadata for an interface.',
-        [('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True)],
+        [('interface_uuid', 'path', 'uuid', 'The interface to add a key to.', True)],
         [(200, 'Interface metadata, if any.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
@@ -148,8 +148,8 @@ class InterfaceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Add metadata for an interface.',
         [
-            ('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('interface_uuid', 'path', 'uuid', 'The interface to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -175,8 +175,8 @@ class InterfaceMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Update a metadata key for an interface.',
         [
-            ('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('interface_uuid', 'path', 'uuid', 'The interface to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -200,8 +200,8 @@ class InterfaceMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Delete a metadata key for an interface.',
         [
-            ('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('interface_uuid', 'path', 'uuid', 'The interface to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

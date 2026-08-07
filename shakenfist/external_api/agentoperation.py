@@ -98,7 +98,7 @@ class AgentOperationEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'agentoperations', 'Get information for an agent operation.',
-        [('operation_uuid', 'query', 'uuid', 'The UUID of an agent operation.', True)],
+        [('operation_uuid', 'path', 'uuid', 'The UUID of an agent operation.', True)],
         [(200, 'Information about a single agent operation.', agentoperation_get_example),
          (404, 'Agent operation not found.', None)]))
     @arg_is_operation_uuid
@@ -109,7 +109,7 @@ class AgentOperationEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'agentoperations', 'Delete an agent operation.',
-        [('operation_uuid', 'query', 'uuid', 'The UUID of an agent operation.', True)],
+        [('operation_uuid', 'path', 'uuid', 'The UUID of an agent operation.', True)],
         [(200, 'Information about a single agentoperation.', None),
          (404, 'Agent operation not found.', None)]))
     @arg_is_operation_uuid
@@ -181,8 +181,11 @@ agentoperation_instance_example = """[
 class InstanceAgentOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List agent operations for an instance.',
-        [('instance_ref', 'query', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+        [('instance_ref', 'path', 'uuidorname',
+          'The UUID or name of the instance.', True),
+         ('all', 'body', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(200, 'Information about a agentoperations for an instance.',
           agentoperation_instance_example),
          (404, 'Instance not found.', None)]))

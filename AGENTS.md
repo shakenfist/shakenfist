@@ -170,6 +170,27 @@ static-table columns store undashed CHAR(32) — SQL joining the two must
 transform one side (see the orphan reconciliation queries in
 `mariadb.py`).
 
+### API parameter declarations are enforced at import time
+
+Every endpoint handler declares its parameters in
+`swag_from(api_base.swagger_helper(...))`, and `swagger_helper()`
+validates each declaration as the module is imported — so a malformed
+one raises `InvalidAPIDeclaration` and **sf-api will not start**. The
+rules: every handler carries a declaration (an empty parameter list is
+valid, no declaration at all is not); `location` is one of
+`SWAGGER_PARAMETER_LOCATIONS` *and* is where the parameter actually
+arrives (route segment → `path`, `use_kwargs(location='query')` key or
+`flask.request.args` read → `query`, otherwise `body`); a `path`
+parameter must be `required=True`; a raw body is declared as
+`api_base.RAW_BODY_PARAMETER`; and every accepted kwarg is declared,
+excluding the decorator-injected `*_from_db` objects.
+
+`shakenfist/external_api/declarations.py` derives the correct answer
+from the source and is shared by the fixer
+(`tools/fix-api-parameter-locations.py --apply`), the pre-commit hook
+and `test_parameter_declarations.py`. Full reference in
+`docs/developer_guide/writing_an_endpoint.md`.
+
 ### Events vs logs
 
 Shaken Fist has two structured-record streams; choose the right
@@ -216,7 +237,24 @@ Current hooks:
 - `actionlint` - Validates GitHub Actions workflow files
 - `ansible-lint` - Validates the `shakenfist.shakenfist` Ansible collection
   (`shakenfist/deploy/collection/`)
+- `flake8` - Style check via tox, on changed files
+- `py3` - Unit tests via tox
+- `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a
+  namespace, so an endpoint cannot fetch across tenants
+- `check-endpoint-authentication` - Endpoints inherit authentication from
+  `api_base.Resource.method_decorators` rather than each carrying a
+  decorator; this rejects resources that subclass `flask_restful.Resource`
+  directly, and `@api_base.public` markers that are not the outermost
+  decorator
+- `check-api-parameter-locations` - Every `swagger_helper()` parameter is
+  declared at the location it actually arrives at
 - `mypy` - Type checking via tox (incremental rollout)
+
+Note that no workflow runs pre-commit, so a hook only fires for
+contributors who have run `pre-commit install`. A check that must hold
+in CI needs a unit test as well — which is why the parameter-location
+derivation is shared between the hook and
+`test_parameter_declarations.py`.
 
 ### sf-net daemon topology
 

@@ -152,7 +152,7 @@ blob_get_example = """{
 class BlobEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob information.',
-        [('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True)],
+        [('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)],
         [(200, 'Information about a single blob.', blob_get_example),
          (404, 'Blob not found.', None)]))
     @api_base.log_token_use
@@ -175,7 +175,7 @@ class BlobDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob data.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
+            ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
             ('offset', 'query', 'integer',
              'The offset into the file to start reading from.', False),
             ('limit', 'query', 'integer',
@@ -267,7 +267,7 @@ class BlobEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob event information.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
+            ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
              'The number of events to return, defaults to 100.', False)
@@ -284,8 +284,8 @@ class BlobChecksumEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get a checksum for a blob.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
-            ('algorithm', 'query', 'string',
+            ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
+            ('algorithm', 'path', 'string',
              'The hash algorithm, one of sha1, sha512, or xxh128.', True)
         ],
         [
@@ -321,9 +321,9 @@ class BlobChecksumsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Search for a blob by sha512 hash.',
         [
-            ('algorithm', 'query', 'string',
+            ('algorithm', 'path', 'string',
              'The hash algorithm, one of sha1, sha512, or xxh128.', True),
-            ('hash', 'query', 'string', 'The hash to search for.', True)
+            ('hash', 'path', 'string', 'The hash to search for.', True)
         ],
         [
             (200, 'Information about a single blob.', blob_get_example),
@@ -357,7 +357,7 @@ class BlobMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Fetch metadata for a blob.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The blob to fetch metadata for.', True)
+            ('blob_uuid', 'path', 'uuid', 'The blob to fetch metadata for.', True)
         ],
         [(200, 'Blob metadata, if any.', None),
          (404, 'Blob not found.', None)],
@@ -370,8 +370,8 @@ class BlobMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Add metadata for a blob.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The blob to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('blob_uuid', 'path', 'uuid', 'The blob to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -395,8 +395,8 @@ class BlobMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Update a metadata key for an blob.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The blob to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('blob_uuid', 'path', 'uuid', 'The blob to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -418,8 +418,8 @@ class BlobMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Delete a metadata key for an blob.',
         [
-            ('blob_uuid', 'query', 'uuid', 'The blob to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('blob_uuid', 'path', 'uuid', 'The blob to remove a key from.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

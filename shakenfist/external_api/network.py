@@ -137,10 +137,10 @@ network_delete_example = """
 class NetworkEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network information.',
-        [('artifact_ref', 'query', 'uuidorname',
+        [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True),
          ('namespace', 'body', 'namespace',
-          'The namespace to contain the network.', False)],
+          'Scope the name lookup to this namespace.', False)],
         [(200, 'Information about a single network.', network_get_example),
          (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
@@ -151,8 +151,10 @@ class NetworkEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'networks', 'Delete a network.',
-        [('artifact_ref', 'query', 'uuidorname',
-          'The UUID or name of the network.', True)],
+        [('network_ref', 'path', 'uuidorname',
+          'The UUID or name of the network.', True),
+         ('namespace', 'body', 'namespace',
+          'Scope the name lookup to this namespace.', False)],
         [(202,
           'Deletion has been queued. The response body identifies the cluster '
           'operation that will perform the work; clients should poll the '
@@ -384,7 +386,7 @@ class NetworkEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network event information.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              'The UUID or name of the network.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
@@ -431,7 +433,7 @@ network_interfaces_example = """{
 class NetworkInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network interface information.',
-        [('network_ref', 'query', 'uuidorname',
+        [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True)],
         [(200, 'The network interfaces on a single network.',
           network_interfaces_example),
@@ -451,7 +453,7 @@ class NetworkInterfacesEndpoint(api_base.Resource):
 class NetworkMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Fetch metadata for a network.',
-        [('network_ref', 'query', 'uuidorname',
+        [('network_ref', 'path', 'uuidorname',
           'The network fetch metadata for.', True)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
@@ -465,7 +467,7 @@ class NetworkMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Add metadata for a network.',
         [
-            ('network_ref', 'query', 'uuidorname', 'The network to add a key to.', True),
+            ('network_ref', 'path', 'uuidorname', 'The network to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
@@ -491,8 +493,8 @@ class NetworkMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Update a metadata key for a network.',
         [
-            ('network_ref', 'query', 'uuidorname', 'The network to add a key to.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
+            ('network_ref', 'path', 'uuidorname', 'The network to add a key to.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -515,8 +517,8 @@ class NetworkMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Delete a metadata key for a network.',
         [
-            ('network_ref', 'query', 'uuidorname', 'The network to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True)
+            ('network_ref', 'path', 'uuidorname', 'The network to remove a key from.', True),
+            ('key', 'path', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -563,9 +565,9 @@ class NetworkPingEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Send ICMP ping traffic to an address on a network.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              'The network to send traffic on.', True),
-            ('address', 'query', 'string', 'The IPv4 address to ping.', True)
+            ('address', 'path', 'string', 'The IPv4 address to ping.', True)
         ],
         [(200, 'The stdout and stderr of the ping request.', None),
          (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
@@ -614,7 +616,7 @@ class NetworkAddressesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Return information about the address reservations in a network.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              'The network to return address allocation information about.', True)
         ],
         [(200, 'Address allocations', network_allocations_example),
@@ -635,7 +637,7 @@ class NetworkRouteAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Route a floating address to this network, with no DNAT.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              'The network route the address to.', True)
         ],
         [(200, 'The address that was routed', None),
@@ -666,9 +668,9 @@ class NetworkUnrouteAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove routing for a floating address to this network.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              'The network route the address to.', True),
-            ('address', 'query', 'string', 'The address to remove routing for', True)
+            ('address', 'path', 'string', 'The address to remove routing for', True)
         ],
         [(200, 'The address that was routed', None),
          (403, 'That address is not routed by this network.', None),
@@ -701,7 +703,7 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Add a custom DNS entry for this network.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              ('The network to add a DNS record for, which must have provide_dns '
               'enabled.'),
              True),
@@ -733,7 +735,7 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove a custom DNS entry for this network.',
         [
-            ('network_ref', 'query', 'uuidorname',
+            ('network_ref', 'path', 'uuidorname',
              'The network route the address to.', True),
             ('name', 'body', 'string', 'The DNS entry', True)
         ],
@@ -784,8 +786,11 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
 
     @swag_from(api_base.swagger_helper(
         'networks', 'Get the outstanding cluster operations for a network.',
-        [('network_ref', 'query', 'uuidorname',
-          'The UUID or name of the network.', True)],
+        [('network_ref', 'path', 'uuidorname',
+          'The UUID or name of the network.', True),
+         ('all', 'query', 'boolean',
+          'Include operations which have already completed, rather than '
+          'only those still in flight.', False)],
         [(
             200,
             'A list of the cluster operations not yet executed for this network.',
