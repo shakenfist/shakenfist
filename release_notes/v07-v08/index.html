@@ -10175,6 +10175,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/writing_an_endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing an API endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11185,6 +11213,13 @@
   namespace key. It is deliberately unauthenticated -- the identity token is
   the credential -- and is rate limited per source address. An identity token
   may be exchanged only once per mapping rule.</li>
+<li>The parameter declarations in the published OpenAPI specification have been
+  audited against the implementation and around 120 of them corrected --
+  including instance create's <code>sshkey</code> and <code>userdata</code>, which documented names
+  the handler has never accepted (they are <code>ssh_key</code> and <code>user_data</code>).</li>
+<li>A request to <code>/upload/...uuid.../truncate/...offset...</code> with a non-numeric
+  offset now returns a 404 (the route no longer matches) where it previously
+  returned a 500.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
