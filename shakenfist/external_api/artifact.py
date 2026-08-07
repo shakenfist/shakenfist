@@ -521,7 +521,10 @@ class ArtifactsEndpoint(api_base.Resource):
         for a in Artifacts(namespace=namespace):
             a.add_event(EVENT_TYPE_AUDIT, 'deletion request from REST API')
             a.delete()
-            deleted.append(a.uuid)
+            # The uuid is stringified here: this response does not pass
+            # through an external view, and flask_restful's JSON encoder
+            # cannot serialize a raw uuid.UUID (issue 3656).
+            deleted.append(str(a.uuid))
 
         return deleted
 
