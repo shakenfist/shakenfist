@@ -68,6 +68,24 @@ which CI checks out alongside this one:
 - `tools/ovirt-gather-artifacts.sh` — collects RPM lists and logs for
   CI artifacts
 
+## The oVirt end-to-end kerbside lane
+
+Since two-tier CI phase 1, the `ovirt_matrix` job in
+`.github/workflows/functional-tests.yml` does more than build and
+probe the oVirt environment: it also deploys the PR's own kerbside
+(package plus the manylinux Rust proxy wheel) on the CI runner,
+registers a live `type: ovirt` source against the engine it just
+built, and relays a real SPICE session from the oVirt hypervisor
+through the Rust proxy — asserting from the proxy log that the
+backend leg escalated to TLS with a non-empty certificate-subject
+pin on every escalation, then terminating the in-flight session via
+the REST API and asserting the proxy dropped it.
+
+The runner-side scripts live in `tools/ovirt-e2e/` and are
+documented in `tools/ovirt-e2e/README.md`; the architecture decision
+and bring-up history are in
+[plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/).
+
 ## Tempest tests against a Kolla-Ansible deployment
 
 The `tempest-plugin/` directory is a separate releasable that

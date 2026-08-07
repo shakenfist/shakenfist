@@ -508,6 +508,73 @@ implementation review:
   seconds, so the 180-second deadline allows three
   attempts.
 
+### Review follow-ups (PR #223)
+
+The automated PR review confirmed the lane closes the
+coverage hole, and surfaced two assertion gaps the bring-up
+notes had already half-admitted, both fixed in-branch:
+
+- `drive-console.py` now asserts from the proxy log that
+  the backend leg escalated to TLS and that subject pinning
+  did not reject, instead of only asserting the console row
+  carried `secure_port`/`host_subject`. The bring-up notes
+  had read this evidence out of the run-3 log by hand; the
+  driver now enforces it, which is what makes it a
+  regression gate rather than an observation.
+- The REST terminate now happens while ryll is still
+  connected, and the driver waits for the proxy's
+  `session terminated by control plane` line (the
+  `verify-terminate-live.sh` oracle). The previous
+  post-teardown `_session_present()` check was tautological:
+  terminate deletes the `ConsoleToken` row that
+  `get_sessions()` keys on, so it could not fail once the
+  API returned 200.
+
+Smaller review items also addressed: `kerbside.env` is now
+actually uploaded as an artifact (it is secret-free by
+design, and two comments claimed it was uploaded already);
+the `gen-sources.py` bootstrap-fetch docstring now calls
+itself trust-on-first-use instead of overclaiming MITM
+protection; the lane's artifact step moved to
+`upload-artifact@v7` to match the rest of the repo; the
+workdir is defined once as job-level `WORKDIR`; the
+no-teardown / plain `/etc/hosts` append is now documented
+as safe because the vm-labelled runners are single-use;
+and `tools/ovirt-e2e/` was added to ARCHITECTURE.md and
+`docs/testing.md`. Passing the engine password on argv was
+left as-is deliberately — it matches the sf-e2e convention
+and the credential is a public CI throwaway; tightening it
+should be done uniformly across both lanes or not at all.
+
+### Review follow-ups (PR #250)
+
+The review of the follow-up branch itself found that the
+new pinning check was the same class of never-can-fail
+oracle the branch had just removed from the terminate path:
+an empty `host_subject` maps to `None` in `build_config`,
+silently disabling verification while both the escalation
+line and the absent-rejection check still pass, and a real
+rejection would fail the smoke client before the log check
+ran. Fixed with a positive oracle: the escalation `info!` in
+`backend.rs` now logs the `host_subject` it is about to
+apply, and `drive-console.py` requires a non-empty pin on
+every escalation line. Both load-bearing `info!` sites
+(`backend.rs` escalation, `relay.rs` terminate) gained
+`CI-ORACLE` markers naming their consumers.
+
+Also from that review: the rejection needle was shortened to
+`pinned host_subject` (the message is produced by the ryll
+crate, not this repo, so the long form could drift silently;
+`verify-rust-proxy.sh` already matched the short fragment);
+the job-level workdir was renamed to `OVIRT_LANE_WORKDIR`
+and mapped to `WORKDIR` only on the deploy and drive steps,
+because a job-level `WORKDIR` leaks into steps running
+shakenfist/actions scripts; "secret-free by construction"
+wording was replaced with the precise invariant (nothing
+beyond the well-known loopback MariaDB credential); and the
+driver now fails distinctly when the daemon log is missing
+instead of reporting the oracle as absent.
+
 ## Back brief
 
 Before executing any step, back brief the operator on the
