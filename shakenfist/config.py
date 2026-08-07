@@ -366,6 +366,17 @@ class SFConfig(BaseSettings):
             'the circuit.'
         )
     )
+    MAINTAIN_STRAY_VXLAN_GRACE_SECONDS: int = Field(
+        300,
+        description=(
+            'How long an on-host vxlan device which matches no network '
+            'this node should be on must persist before maintain acts on '
+            'it. The grace period exists so devices seen mid-create or '
+            'mid-delete are not mistaken for strays. Lowering it makes '
+            'the functional test for stray reaping faster and is not '
+            'otherwise useful.'
+        )
+    )
 
     # Database Options
     CLEANER_DELAY: int = Field(

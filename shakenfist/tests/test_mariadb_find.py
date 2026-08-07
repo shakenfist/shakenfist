@@ -9,10 +9,16 @@
 # - _direct_find_instances() — same eight scenarios
 # - _direct_find_networks()  — same eight scenarios
 # - _grpc_find_* smoke tests — verify proto conversion without DB access
+# - find_network_vxids() — the stray vxlan reaper's claim lookup, whose
+#   error contract is the inverse of every other finder here: it must
+#   raise rather than return {}, because an unclaimed vxid authorises
+#   deletion of host network devices
 
+import collections
 from unittest import mock
 import uuid
 
+import grpc
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
@@ -1041,6 +1047,179 @@ class GrpcFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
         self.assertIn('created', list(request.criteria.states))
         self.assertEqual(request.criteria.namespace, 'tenant-a')
         self.assertEqual(request.criteria.name, 'eth0')
+
+
+# ---------------------------------------------------------------------------
+# find_network_vxids — the stray vxlan reaper's claim lookup
+# ---------------------------------------------------------------------------
+
+class DirectFindNetworkVxidsTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_find_network_vxids().
+
+    This finder is deliberately unlike every other one in this module:
+    its caller (the stray vxlan reaper in the network maintainer) reads
+    an absent vxid as permission to delete host network devices, so a
+    database failure must raise rather than present as "nothing claims
+    these vxids". The sibling finders above each have a
+    test_operational_error case asserting the *opposite* contract, so
+    this test is what stands between a well-meaning refactor which makes
+    them all consistent and a database outage deleting cluster
+    networking.
+    """
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_empty_input_does_not_touch_the_database(self, mock_get_engine):
+        """No candidates means no query."""
+        self.assertEqual({}, mariadb._direct_find_network_vxids([]))
+        mock_get_engine.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_claims_are_mapped_to_network_uuids(self, mock_get_engine):
+        """Claimed vxids map to the uuid of the claiming network, and
+        vxids nothing claims are simply absent."""
+        row = mock.MagicMock()
+        row.vxid = 42
+        row.uuid = NETWORK_UUID
+        mock_get_engine.return_value = _make_engine_mock([row])
+
+        result = mariadb._direct_find_network_vxids([42, 43])
+
+        self.assertEqual({42: str(NETWORK_UUID)}, result)
+        self.assertNotIn(43, result)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_no_claims_returns_empty(self, mock_get_engine):
+        """A vxid no network holds is genuinely unclaimed."""
+        mock_get_engine.return_value = _make_engine_mock([])
+        self.assertEqual({}, mariadb._direct_find_network_vxids([42]))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_propagates(self, mock_get_engine):
+        """A database failure must NOT be swallowed into an empty
+        result. An empty result here authorises device deletion."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = OperationalError(
+            'statement', {}, Exception('DB gone'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        self.assertRaises(
+            OperationalError, mariadb._direct_find_network_vxids, [1, 2])
+
+
+class FindNetworkVxidsPublicTestCase(base.ShakenFistTestCase):
+    """Tests for find_network_vxids() public wrapper routing."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._direct_find_network_vxids')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct(self, _mock_uds, mock_direct):
+        mock_direct.return_value = {}
+        self.assertEqual({}, mariadb.find_network_vxids([42]))
+        mock_direct.assert_called_once_with([42])
+
+    @mock.patch('shakenfist.mariadb._grpc_find_network_vxids')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc(self, _mock_uds, mock_grpc):
+        mock_grpc.return_value = {}
+        self.assertEqual({}, mariadb.find_network_vxids([42]))
+        mock_grpc.assert_called_once_with([42])
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    def test_empty_input_short_circuits(self, mock_uds):
+        self.assertEqual({}, mariadb.find_network_vxids([]))
+        mock_uds.assert_not_called()
+
+
+class GrpcFindNetworkVxidsTestCase(base.ShakenFistTestCase):
+    """Smoke tests for _grpc_find_network_vxids() proto conversion."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_claims_converted_from_proto(self, mock_stub, mock_grpc_call):
+        from shakenfist.protos import database_pb2
+
+        reply = database_pb2.FindNetworkVxidsReply(
+            claims=[database_pb2.NetworkVxidClaim(
+                vxid=42, uuid=str(NETWORK_UUID))])
+        mock_grpc_call.return_value = reply
+
+        result = mariadb._grpc_find_network_vxids([42, 43])
+
+        self.assertEqual({42: str(NETWORK_UUID)}, result)
+        request = mock_grpc_call.call_args[0][1]
+        self.assertIsInstance(request, database_pb2.FindNetworkVxidsRequest)
+        self.assertEqual([42, 43], list(request.vxids))
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_rpc_error_propagates(self, mock_stub, mock_grpc_call):
+        """As with the direct path, an error must not present as "these
+        vxids are unclaimed"."""
+        mock_grpc_call.side_effect = Exception('UNIMPLEMENTED')
+        self.assertRaises(
+            Exception, mariadb._grpc_find_network_vxids, [42])
+
+
+class ServicerFindNetworkVxidsTestCase(base.ShakenFistTestCase):
+    """Tests for the DatabaseService.FindNetworkVxids servicer method.
+
+    The reply proto has no way to say "the query failed" -- an empty
+    claims list is indistinguishable from a successful lookup which
+    found nothing -- so the failure path has to set a non-OK status,
+    otherwise the client reads the failure as an answer and deletes
+    devices on the strength of it.
+    """
+
+    def _servicer(self):
+        from shakenfist.daemons.database.main import DatabaseService
+        monitor = mock.MagicMock()
+        monitor.counters = collections.defaultdict(mock.MagicMock)
+        return DatabaseService(monitor)
+
+    @mock.patch('shakenfist.mariadb._direct_find_network_vxids')
+    def test_claims_returned(self, mock_direct):
+        mock_direct.return_value = {42: str(NETWORK_UUID)}
+        context = mock.MagicMock()
+
+        from shakenfist.protos import database_pb2
+        reply = self._servicer().FindNetworkVxids(
+            database_pb2.FindNetworkVxidsRequest(vxids=[42, 43]), context)
+
+        mock_direct.assert_called_once_with([42, 43])
+        self.assertEqual(1, len(reply.claims))
+        self.assertEqual(42, reply.claims[0].vxid)
+        self.assertEqual(str(NETWORK_UUID), reply.claims[0].uuid)
+        context.set_code.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_find_network_vxids')
+    def test_failure_sets_internal_status(self, mock_direct):
+        mock_direct.side_effect = OperationalError(
+            'statement', {}, Exception('DB gone'))
+        context = mock.MagicMock()
+
+        from shakenfist.protos import database_pb2
+        reply = self._servicer().FindNetworkVxids(
+            database_pb2.FindNetworkVxidsRequest(vxids=[42]), context)
+
+        self.assertEqual([], list(reply.claims))
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        context.set_details.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

@@ -124,6 +124,13 @@ argument_specs:
         description:
           - This node's disk reservation, in GB. Becomes
             SHAKENFIST_NODE_DISK_RESERVATION_GB.
+      maintain_stray_vxlan_grace_seconds:
+        type: int
+        default: 300
+        description:
+          - How long a vxlan device which matches no network this node should
+            be on must persist before the network maintainer reaps it. Becomes
+            SHAKENFIST_MAINTAIN_STRAY_VXLAN_GRACE_SECONDS.
       system_key:
         type: str
         default: "unknown"

@@ -5477,6 +5477,78 @@ class FindNetworksReply(_message.Message):
 Global___FindNetworksReply: _TypeAlias = FindNetworksReply  # noqa: Y015
 
 @_typing.final
+class FindNetworkVxidsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    VXIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def vxids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """Candidate VXLAN IDs to test"""
+
+    def __init__(
+        self,
+        *,
+        vxids: _abc.Iterable[_builtins.int] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["vxids", b"vxids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindNetworkVxidsRequest: _TypeAlias = FindNetworkVxidsRequest  # noqa: Y015
+
+@_typing.final
+class NetworkVxidClaim(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    VXID_FIELD_NUMBER: _builtins.int
+    UUID_FIELD_NUMBER: _builtins.int
+    vxid: _builtins.int
+    """A claimed VXLAN ID"""
+    uuid: _builtins.str
+    """The network which claims it"""
+    def __init__(
+        self,
+        *,
+        vxid: _builtins.int = ...,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid", "vxid", b"vxid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NetworkVxidClaim: _TypeAlias = NetworkVxidClaim  # noqa: Y015
+
+@_typing.final
+class FindNetworkVxidsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CLAIMS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def claims(self) -> _containers.RepeatedCompositeFieldContainer[Global___NetworkVxidClaim]:
+        """The subset of the requested vxids a networks row claims, paired
+        with the claiming network. The caller needs the uuid so it can
+        route cleanup for a still-existing network through a cluster
+        operation rather than mutating host state directly.
+        """
+
+    def __init__(
+        self,
+        *,
+        claims: _abc.Iterable[Global___NetworkVxidClaim] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claims", b"claims"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindNetworkVxidsReply: _TypeAlias = FindNetworkVxidsReply  # noqa: Y015
+
+@_typing.final
 class DeleteNetworkRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

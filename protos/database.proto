@@ -217,6 +217,7 @@ service DatabaseService {
   rpc GetNetwork (GetNetworkRequest) returns (GetNetworkReply) {}
   rpc GetAllNetworks (GetAllNetworksRequest) returns (GetAllNetworksReply) {}
   rpc FindNetworks (FindNetworksRequest) returns (FindNetworksReply) {}
+  rpc FindNetworkVxids (FindNetworkVxidsRequest) returns (FindNetworkVxidsReply) {}
   rpc DeleteNetwork (DeleteNetworkRequest) returns (StatusReply) {}
 
   // Network Attributes Operations (MariaDB)
@@ -1683,6 +1684,23 @@ message FindNetworksRequest {
 
 message FindNetworksReply {
   repeated NetworkStaticData networks = 1;
+}
+
+message FindNetworkVxidsRequest {
+  repeated int32 vxids = 1;   // Candidate VXLAN IDs to test
+}
+
+message NetworkVxidClaim {
+  int32 vxid = 1;   // A claimed VXLAN ID
+  string uuid = 2;  // The network which claims it
+}
+
+message FindNetworkVxidsReply {
+  // The subset of the requested vxids a networks row claims, paired
+  // with the claiming network. The caller needs the uuid so it can
+  // route cleanup for a still-existing network through a cluster
+  // operation rather than mutating host state directly.
+  repeated NetworkVxidClaim claims = 1;
 }
 
 message DeleteNetworkRequest {
