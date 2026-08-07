@@ -472,6 +472,143 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 os.unlink(cd_file)
 
 
+class FakeLibvirtError(Exception):
+    ...
+
+
+class FakeLibvirtModule:
+    libvirtError = FakeLibvirtError
+    VIR_DOMAIN_REBOOT_ACPI_POWER_BTN = 4
+
+
+class FakeDomain:
+    def __init__(self, active=True, error=None):
+        self._active = active
+        self._error = error
+        self.reboot_flags = None
+        self.reset_calls = 0
+
+    def isActive(self):
+        return 1 if self._active else 0
+
+    def reboot(self, flags=0):
+        if self._error:
+            raise self._error
+        self.reboot_flags = flags
+
+    def reset(self):
+        if self._error:
+            raise self._error
+        self.reset_calls += 1
+
+
+class FakeLibvirtConnection:
+    def __init__(self, domain):
+        self.libvirt = FakeLibvirtModule()
+        self._domain = domain
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def get_domain_from_sf_uuid(self, u):
+        return self._domain
+
+
+class InstanceRebootTestCase(base.ShakenFistTestCase):
+    """Reboot of a domain which is not running must raise
+    InvalidLifecycleState (which the API maps to the documented 409), not
+    leak a libvirtError to the generic 500 handler (issue 3630).
+
+    Shaken Fist domains are persistent, so a powered off instance is
+    normally a defined-but-inactive domain rather than an undefined one:
+    the original 'if not inst' guard never fired for it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+    def _mock_libvirt(self, domain):
+        lc = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=FakeLibvirtConnection(domain))
+        lc.start()
+        self.addCleanup(lc.stop)
+
+    def test_reboot_hard_no_domain(self):
+        self._mock_libvirt(None)
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.reboot(hard=True)
+
+    def test_reboot_hard_inactive_domain(self):
+        self._mock_libvirt(FakeDomain(active=False))
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.reboot(hard=True)
+
+    def test_reboot_soft_inactive_domain(self):
+        self._mock_libvirt(FakeDomain(active=False))
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.reboot(hard=False)
+
+    def test_reboot_hard_active_domain(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain)
+        self.inst.reboot(hard=True)
+        self.assertEqual(1, domain.reset_calls)
+
+    def test_reboot_soft_active_domain(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain)
+        self.inst.reboot(hard=False)
+        self.assertEqual(
+            FakeLibvirtModule.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN,
+            domain.reboot_flags)
+
+    def test_reboot_hard_domain_stops_after_check(self):
+        # The domain can shut off between the isActive() check and the
+        # reboot call. That libvirtError must also be translated.
+        self._mock_libvirt(FakeDomain(error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running')))
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.reboot(hard=True)
+
+    def test_reboot_soft_domain_stops_after_check(self):
+        self._mock_libvirt(FakeDomain(error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running')))
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.reboot(hard=False)
+
+    def test_reboot_hard_other_libvirt_error_passes_through(self):
+        self._mock_libvirt(FakeDomain(error=FakeLibvirtError(
+            'internal error: something else entirely')))
+        with testtools.ExpectedException(FakeLibvirtError):
+            self.inst.reboot(hard=True)
+
+
 class InstancesTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()

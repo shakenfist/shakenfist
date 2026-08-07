@@ -5,6 +5,7 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -122,6 +123,23 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                          'Instance %s failed hard reboot' % inst['uuid'])
         last_boot = this_boot
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+
+    def test_lifecycle_reboot_powered_off(self):
+        # A powered off instance normally has a defined but inactive libvirt
+        # domain. Rebooting it must return the documented 409, not a 500
+        # (issue 3630).
+        inst = self._start_target('rebootoff')
+
+        self.test_client.power_off_instance(inst['uuid'])
+        # Once the API returns the libvirt has powered off the instance or an
+        # error has occurred (which CI will catch).
+
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.reboot_instance, inst['uuid'])
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.reboot_instance, inst['uuid'], hard=True)
 
     def test_lifecycle_power_cycle(self):
         inst = self._start_target('powercycle')
