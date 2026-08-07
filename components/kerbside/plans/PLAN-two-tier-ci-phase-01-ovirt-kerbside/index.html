@@ -5909,6 +5909,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#review-follow-ups-pr-223" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review follow-ups (PR #223)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#review-follow-ups-pr-250" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review follow-ups (PR #250)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10952,6 +10974,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#review-follow-ups-pr-223" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review follow-ups (PR #223)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#review-follow-ups-pr-250" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review follow-ups (PR #250)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11507,6 +11551,68 @@ implementation review:</p>
   seconds, so the 180-second deadline allows three
   attempts.</li>
 </ul>
+<h3 id="review-follow-ups-pr-223">Review follow-ups (PR #223)<a class="headerlink" href="#review-follow-ups-pr-223" title="Permanent link">&para;</a></h3>
+<p>The automated PR review confirmed the lane closes the
+coverage hole, and surfaced two assertion gaps the bring-up
+notes had already half-admitted, both fixed in-branch:</p>
+<ul>
+<li><code>drive-console.py</code> now asserts from the proxy log that
+  the backend leg escalated to TLS and that subject pinning
+  did not reject, instead of only asserting the console row
+  carried <code>secure_port</code>/<code>host_subject</code>. The bring-up notes
+  had read this evidence out of the run-3 log by hand; the
+  driver now enforces it, which is what makes it a
+  regression gate rather than an observation.</li>
+<li>The REST terminate now happens while ryll is still
+  connected, and the driver waits for the proxy's
+  <code>session terminated by control plane</code> line (the
+  <code>verify-terminate-live.sh</code> oracle). The previous
+  post-teardown <code>_session_present()</code> check was tautological:
+  terminate deletes the <code>ConsoleToken</code> row that
+  <code>get_sessions()</code> keys on, so it could not fail once the
+  API returned 200.</li>
+</ul>
+<p>Smaller review items also addressed: <code>kerbside.env</code> is now
+actually uploaded as an artifact (it is secret-free by
+design, and two comments claimed it was uploaded already);
+the <code>gen-sources.py</code> bootstrap-fetch docstring now calls
+itself trust-on-first-use instead of overclaiming MITM
+protection; the lane's artifact step moved to
+<code>upload-artifact@v7</code> to match the rest of the repo; the
+workdir is defined once as job-level <code>WORKDIR</code>; the
+no-teardown / plain <code>/etc/hosts</code> append is now documented
+as safe because the vm-labelled runners are single-use;
+and <code>tools/ovirt-e2e/</code> was added to ARCHITECTURE.md and
+<code>docs/testing.md</code>. Passing the engine password on argv was
+left as-is deliberately — it matches the sf-e2e convention
+and the credential is a public CI throwaway; tightening it
+should be done uniformly across both lanes or not at all.</p>
+<h3 id="review-follow-ups-pr-250">Review follow-ups (PR #250)<a class="headerlink" href="#review-follow-ups-pr-250" title="Permanent link">&para;</a></h3>
+<p>The review of the follow-up branch itself found that the
+new pinning check was the same class of never-can-fail
+oracle the branch had just removed from the terminate path:
+an empty <code>host_subject</code> maps to <code>None</code> in <code>build_config</code>,
+silently disabling verification while both the escalation
+line and the absent-rejection check still pass, and a real
+rejection would fail the smoke client before the log check
+ran. Fixed with a positive oracle: the escalation <code>info!</code> in
+<code>backend.rs</code> now logs the <code>host_subject</code> it is about to
+apply, and <code>drive-console.py</code> requires a non-empty pin on
+every escalation line. Both load-bearing <code>info!</code> sites
+(<code>backend.rs</code> escalation, <code>relay.rs</code> terminate) gained
+<code>CI-ORACLE</code> markers naming their consumers.</p>
+<p>Also from that review: the rejection needle was shortened to
+<code>pinned host_subject</code> (the message is produced by the ryll
+crate, not this repo, so the long form could drift silently;
+<code>verify-rust-proxy.sh</code> already matched the short fragment);
+the job-level workdir was renamed to <code>OVIRT_LANE_WORKDIR</code>
+and mapped to <code>WORKDIR</code> only on the deploy and drive steps,
+because a job-level <code>WORKDIR</code> leaks into steps running
+shakenfist/actions scripts; "secret-free by construction"
+wording was replaced with the precise invariant (nothing
+beyond the well-known loopback MariaDB credential); and the
+driver now fails distinctly when the daemon log is missing
+instead of reporting the oracle as absent.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step, back brief the operator on the
 intended approach and on any deviation from this plan

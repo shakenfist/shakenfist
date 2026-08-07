@@ -4882,6 +4882,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-ovirt-end-to-end-kerbside-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The oVirt end-to-end kerbside lane
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tempest-tests-against-a-kolla-ansible-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10713,6 +10724,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-ovirt-end-to-end-kerbside-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The oVirt end-to-end kerbside lane
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tempest-tests-against-a-kolla-ansible-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10848,6 +10870,21 @@ which CI checks out alongside this one:</p>
 <li><code>tools/ovirt-gather-artifacts.sh</code> — collects RPM lists and logs for
   CI artifacts</li>
 </ul>
+<h2 id="the-ovirt-end-to-end-kerbside-lane">The oVirt end-to-end kerbside lane<a class="headerlink" href="#the-ovirt-end-to-end-kerbside-lane" title="Permanent link">&para;</a></h2>
+<p>Since two-tier CI phase 1, the <code>ovirt_matrix</code> job in
+<code>.github/workflows/functional-tests.yml</code> does more than build and
+probe the oVirt environment: it also deploys the PR's own kerbside
+(package plus the manylinux Rust proxy wheel) on the CI runner,
+registers a live <code>type: ovirt</code> source against the engine it just
+built, and relays a real SPICE session from the oVirt hypervisor
+through the Rust proxy — asserting from the proxy log that the
+backend leg escalated to TLS with a non-empty certificate-subject
+pin on every escalation, then terminating the in-flight session via
+the REST API and asserting the proxy dropped it.</p>
+<p>The runner-side scripts live in <code>tools/ovirt-e2e/</code> and are
+documented in <code>tools/ovirt-e2e/README.md</code>; the architecture decision
+and bring-up history are in
+<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</a>.</p>
 <h2 id="tempest-tests-against-a-kolla-ansible-deployment">Tempest tests against a Kolla-Ansible deployment<a class="headerlink" href="#tempest-tests-against-a-kolla-ansible-deployment" title="Permanent link">&para;</a></h2>
 <p>The <code>tempest-plugin/</code> directory is a separate releasable that
 contributes Kerbside-specific Tempest tests; see
