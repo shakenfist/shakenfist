@@ -644,7 +644,7 @@ def log_request(func):
         # Redact the JWT auth token in headers as well
         headers_log = dict(flask.request.headers)
         if 'Authorization' in headers_log:
-            headers_log = 'Bearer *****'
+            headers_log['Authorization'] = 'Bearer *****'
 
         # Attempt to lookup the identity from JWT token. This doesn't use
         # the usual get_jwt_identity() because that requires that the
