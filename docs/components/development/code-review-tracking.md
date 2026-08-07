@@ -194,6 +194,12 @@ this repository and passes through to the script.
    while no skipped workflow is a required status check -- a skipped
    required check sits "expected" forever and blocks the merge.
 
+   Which workflows count as "code-shaped" differs per project, so
+   verifying this step is judgment work rather than a deterministic
+   audit: the `review-tracking-adoption` Claude skill (in this
+   repository's `.claude/skills/`) carries the verification
+   procedure. Re-run it when new workflows land in an adopted repo.
+
 ## The review account
 
 Reviews are performed from a dedicated user account on the review

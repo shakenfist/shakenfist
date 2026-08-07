@@ -386,7 +386,6 @@ nav:
         - "State machine": developer_guide/state_machine.md
         - "Updating docs": developer_guide/updating_docs.md
         - "Workflow": developer_guide/workflow.md
-        - "Writing an API endpoint": developer_guide/writing_an_endpoint.md
     - Plans:
         - "Overview": plans/index.md
         - "API Query Batching": plans/api-query-batching-roadmap.md
