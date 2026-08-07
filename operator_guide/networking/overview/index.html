@@ -10456,6 +10456,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stray-vxlan-reaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stray vxlan reaping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dispatcher-diagnostic-events" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10747,6 +10758,17 @@
     <span class="md-ellipsis">
       
         Interface naming conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stray-vxlan-reaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stray vxlan reaping
       
     </span>
   </a>
@@ -11161,6 +11183,73 @@ address.</p>
 end by <code>TestFloatingIPLifecycle</code> in the cluster CI suite. If you change
 a name, change it in the add path, the remove path, the tests, this
 page and <code>docs/components/cloudgood/networking-shakenfist.md</code> together.</p>
+<h2 id="stray-vxlan-reaping">Stray vxlan reaping<a class="headerlink" href="#stray-vxlan-reaping" title="Permanent link">&para;</a></h2>
+<p>Every node's network maintainer compares the vxlan devices actually
+present on the host against the networks that node should be carrying.
+A device which matches nothing is a <em>stray</em> -- residue from a network
+teardown which did not finish, or from a network which has since been
+hard deleted entirely.</p>
+<p>Once a stray has been present for <code>MAINTAIN_STRAY_VXLAN_GRACE_SECONDS</code>
+(default 300) the maintainer acts on it:</p>
+<ul>
+<li>If no <code>networks</code> row claims the vxid at all, the maintainer deletes
+  <code>br-vxlan-&lt;vxid&gt;</code>, <code>veth-&lt;vxid&gt;-o</code>, <code>egr-&lt;vxid&gt;-o</code> and
+  <code>vxlan-&lt;vxid&gt;</code> itself, and records a <strong><code>reaped stray vxlan</code></strong> audit
+  event on the node. The <code>extra</code> field of that event names the devices
+  which were actually removed, and the message says why the vxid was
+  considered reapable. If some devices were removed but others could
+  not be deleted, the event is <strong><code>partially reaped stray vxlan</code></strong>
+  instead and <code>extra</code> carries a <code>failed</code> list alongside <code>devices</code>; the
+  remaining devices are retried after another grace period.</li>
+<li>If the network still exists but no instance on this hypervisor uses
+  it, the maintainer enqueues an ordinary network teardown operation
+  for that network on that node instead of touching the devices
+  itself, and records an <strong><code>enqueued teardown of stray vxlan</code></strong> audit
+  event.</li>
+<li>Otherwise the stray is left alone and logged once per episode. It is
+  <em>not</em> re-logged on every pass -- it used to be, which on a busy
+  cluster produced thousands of identical <code>Extra vxlan present!</code> lines
+  per day (github issue #3597).</li>
+</ul>
+<p>Before either of the first two outcomes touches anything, the
+maintainer also asks the host itself: if a device it did not create --
+a guest's tap interface -- is still enslaved to <code>br-vxlan-&lt;vxid&gt;</code>,
+then a virtual machine is attached to that bridge right now whatever
+the database says, and the stray is protected and logged instead. If
+that question cannot be answered at all, the stray is likewise
+protected.</p>
+<p>A bridge which does not exist is an answer to that question, not a
+failure to answer it -- nothing can be attached to a bridge which is
+not there. This matters because teardown deletes <code>br-vxlan-&lt;vxid&gt;</code>
+before <code>vxlan-&lt;vxid&gt;</code>, so a teardown which was interrupted leaves the
+vxlan interface behind with no bridge. That is the most common stray
+shape there is, and treating it as unanswerable would protect exactly
+the residue this reaping exists to remove.</p>
+<p>All three audit events are worth watching for. None is an error on its
+own -- the maintainer is doing the job it exists to do -- but a node
+producing them repeatedly is a node where network teardown is failing
+somewhere upstream, and that is worth investigating. Note that a
+<code>partially reaped stray vxlan</code> event fires once per stray episode, not
+once per retry: later attempts on the surviving devices are silent
+until one succeeds. A <code>partially reaped stray vxlan</code> with no follow-up
+<code>reaped stray vxlan</code> therefore means a device on that host will not go
+away, which usually needs manual attention.</p>
+<p><strong>A reap on the network node implies manual cleanup.</strong> The devices
+listed above are all named from the VXLAN id, so the maintainer can
+find them without the network object. The network namespace, and the
+NAT and DNAT rules inside it, are named from the network <em>uuid</em> --
+which is exactly what has been lost by the time a reap happens. They
+are therefore not cleaned up, and once the vxlan devices are gone
+nothing in Shaken Fist will report them again. Previously the
+never-ending <code>Extra vxlan present!</code> warning was, in effect, the
+standing notification that this residue existed; now the single audit
+event is the only record, so if you see a <code>reaped stray vxlan</code> event on
+your network node, check for a leftover namespace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span>list
+</code></pre></div>
+<p>Namespaces are named with the virtual network's UUID, so any name which
+does not correspond to a network in <code>sf-client network list</code> is residue
+and can be removed with <code>sudo ip netns delete &lt;uuid&gt;</code>.</p>
 <h2 id="dispatcher-diagnostic-events">Dispatcher diagnostic events<a class="headerlink" href="#dispatcher-diagnostic-events" title="Permanent link">&para;</a></h2>
 <p>Operators reading the event log for a cluster operation will see two
 events emitted directly by the queue dispatcher (in addition to the
