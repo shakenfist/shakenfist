@@ -1703,19 +1703,29 @@ class Instance(dbowo):
     def reboot(self, hard=False):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
-            if not inst:
-                # Not returning a libvirt domain here indicates that the instance
-                # is "powered off" (destroyed in libvirt speak). It doesn't make
-                # sense to reboot a powered off machine
+            if not inst or not inst.isActive():
+                # Our domains are persistent, so a powered off instance is
+                # normally a defined but inactive domain. No domain at all is
+                # also possible if the instance has never been started on this
+                # node. Either way it doesn't make sense to reboot a powered
+                # off machine.
                 raise exceptions.InvalidLifecycleState(
                     'you cannot reboot a powered off instance')
 
-            if not hard:
-                inst.reboot(flags=lc.libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
-                self.add_event(EVENT_TYPE_AUDIT, 'soft reboot')
-            else:
-                inst.reset()
-                self.add_event(EVENT_TYPE_AUDIT, 'hard reboot')
+            try:
+                if not hard:
+                    inst.reboot(flags=lc.libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
+                    self.add_event(EVENT_TYPE_AUDIT, 'soft reboot')
+                else:
+                    inst.reset()
+                    self.add_event(EVENT_TYPE_AUDIT, 'hard reboot')
+            except lc.libvirt.libvirtError as e:
+                # The domain can shut off between the isActive() check above
+                # and the reboot attempt.
+                if 'domain is not running' in str(e):
+                    raise exceptions.InvalidLifecycleState(
+                        'you cannot reboot a powered off instance') from e
+                raise
 
     def pause(self):
         with util_libvirt.LibvirtConnection() as lc:
