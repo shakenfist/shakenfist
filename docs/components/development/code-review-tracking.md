@@ -110,17 +110,26 @@ this repository and passes through to the script.
 
    ```toml
    # Source in every language the repo uses, plus shell scripts,
-   # the YAML that configures CI and deployment, and the Markdown
-   # documentation.
-   include = ['*.rs', '*.sh', '*.py', '*.md', '*.yml', '*.yaml']
-   # docs/plans/ is a point-in-time archive, not living artifacts.
-   exclude = ['docs/plans/*']
+   # protobuf definitions, the YAML that configures CI and
+   # deployment, and the Markdown documentation.
+   include = ['*.rs', '*.sh', '*.py', '*.pyi', '*.js', '*.proto', '*.md', '*.yml', '*.yaml']
+   # docs/plans/ is a point-in-time archive, not living artifacts;
+   # protoc output is generated, so reviewing it would attest to the
+   # generator rather than to anything a human wrote.
+   exclude = [
+       'docs/plans/*',
+       '*_pb2.py',
+       '*_pb2.pyi',
+       '*_pb2_grpc.py',
+       '*_pb2_grpc.pyi',
+   ]
    ```
 
    An empty `include` means all tracked files, which is a fine
    starting point for a small repo -- but then lean on `exclude` to
-   keep generated code (`*_pb2.py`), vendored trees (`vendor/*`), and
-   ephemeral archives out of the queue.
+   keep generated code (`*_pb2.py` and friends), vendored trees
+   (`vendor/*`, minified third-party JavaScript), and ephemeral
+   archives out of the queue.
 
    Widening scope in a repo that has already been adopted needs no
    migration -- the newly in-scope files simply have no review mark,
