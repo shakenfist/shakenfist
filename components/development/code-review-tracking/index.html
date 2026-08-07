@@ -9994,34 +9994,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../developer_guide/writing_an_endpoint/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing an API endpoint
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -10988,6 +10960,11 @@ this repository and passes through to the script.</p>
    place secrets or Unicode smuggling could land. This is only safe
    while no skipped workflow is a required status check -- a skipped
    required check sits "expected" forever and blocks the merge.</p>
+<p>Which workflows count as "code-shaped" differs per project, so
+   verifying this step is judgment work rather than a deterministic
+   audit: the <code>review-tracking-adoption</code> Claude skill (in this
+   repository's <code>.claude/skills/</code>) carries the verification
+   procedure. Re-run it when new workflows land in an adopted repo.</p>
 <h2 id="the-review-account">The review account<a class="headerlink" href="#the-review-account" title="Permanent link">&para;</a></h2>
 <p>Reviews are performed from a dedicated user account on the review
 machine, with its own clones of the repositories under review.
