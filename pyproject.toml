@@ -203,6 +203,10 @@ test = [
     "types-protobuf==7.34.1.20260518",    # apache2
     "types-PyYAML==6.0.12.20260724",      # apache2
     "types-requests==2.33.0.20260712",    # apache2
+    "openapi-spec-validator==0.9.0",      # apache2 -- test only: the API
+                                          #            daemon never
+                                          #            validates its own
+                                          #            spec at runtime
 ]
 
 # mypy configuration

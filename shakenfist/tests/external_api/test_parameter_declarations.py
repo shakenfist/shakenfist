@@ -350,7 +350,11 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         falsify the comment without failing a test.
         """
         exempt = {cls for cls, _ in UNDOCUMENTED_BY_DESIGN}
-        with open(os.path.join(declarations.API_DIR, 'app.py')) as f:
+        # Explicit encoding, like every other read in this module:
+        # Python source is UTF-8 by definition (PEP 3120), while a bare
+        # open() consults the caller's locale (issue 3643).
+        with open(os.path.join(declarations.API_DIR, 'app.py'),
+                  encoding='utf-8') as f:
             tree = ast.parse(f.read())
 
         routes = set()
@@ -1020,7 +1024,8 @@ class Thing(api_base.Resource):
         return ast.parse(source).body[0]
 
     def _write(self, name, source):
-        with open(os.path.join(self.tempdir, name), 'w') as f:
+        with open(os.path.join(self.tempdir, name), 'w',
+                  encoding='utf-8') as f:
             f.write(source)
 
 
@@ -1077,7 +1082,8 @@ class FakeEndpoint(api_base.Resource):
         self.assertEqual(1, self.fixer.main(False, self.tempdir))
         self.assertEqual(0, self.fixer.main(True, self.tempdir))
 
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             rewritten = f.read()
         self.assertIn(
             "[('fake_ref', 'path', 'uuid', 'A ref.', True), "
@@ -1145,13 +1151,15 @@ class FakeEndpoint(api_base.Resource):
     def get(self, fake_ref=None):
         pass
 ''')
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             before = f.read()
 
         self.assertRaises(
             SystemExit, self.fixer.main, True, self.tempdir)
 
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             self.assertEqual(before, f.read())
 
     def test_refuses_a_multiline_location_literal(self):
@@ -1176,14 +1184,16 @@ class FakeEndpoint(api_base.Resource):
     def get(self, fake_ref=None):
         pass
 ''')
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             before = f.read()
 
         self.assertRaisesRegex(
             SystemExit, 'multi-line location literal',
             self.fixer.main, True, self.tempdir)
 
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             self.assertEqual(before, f.read())
 
     def test_refuses_an_offset_that_does_not_hold_the_literal(self):
@@ -1206,14 +1216,16 @@ class FakeEndpoint(api_base.Resource):
     def get(self, fake_ref=None):
         pass
 ''')
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             before = f.read()
 
         self.assertRaisesRegex(
             SystemExit, 'does not hold',
             self.fixer.main, True, self.tempdir)
 
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             self.assertEqual(before, f.read())
 
     def test_leaves_a_correct_tree_alone(self):
@@ -1227,12 +1239,14 @@ class FakeEndpoint(api_base.Resource):
     def post(self, name=None):
         pass
 ''')
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             before = f.read()
 
         self.assertEqual(0, self.fixer.main(True, self.tempdir))
 
-        with open(os.path.join(self.tempdir, 'fake.py')) as f:
+        with open(os.path.join(self.tempdir, 'fake.py'),
+                  encoding='utf-8') as f:
             self.assertEqual(before, f.read())
 
 

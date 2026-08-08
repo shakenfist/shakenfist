@@ -74,7 +74,27 @@ swagger = flasgger.Swagger(app, template={
     },
     'host': config.API_ADVERTISED_HOST,
     'basePath': config.API_ADVERTISED_BASE_PATH,
-    'schemes': config.API_ADVERTISED_HTTP_SCHEMES
+    # The config field is a space separated list by its own documented
+    # contract, but OpenAPI 2.0 requires schemes to be an array of
+    # strings, so a default deployment used to publish the invalid
+    # schemes: 'http'. Split here rather than retyping the field:
+    # changing it to a list would change the environment variable
+    # format for every deployment to fix a rendering bug.
+    'schemes': config.API_ADVERTISED_HTTP_SCHEMES.split(),
+    # Swagger 2.0 has no first class bearer scheme (that arrived in
+    # OpenAPI 3); apiKey in the Authorization header is the standard
+    # 2.0 idiom for a JWT bearer token. Without this definition the
+    # security requirement swagger_helper() attaches to authenticated
+    # operations references a scheme the document never defines, so a
+    # generated client cannot learn how to authenticate.
+    'securityDefinitions': {
+        'bearerAuth': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'A JWT token, presented as "Bearer <token>".'
+        }
+    }
 })
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)

@@ -312,18 +312,17 @@ class, 1 from `schemes`.
   to collapse an operation's body parameters into a single `body`
   parameter with a generated `schema` object, which is a change to
   the renderer rather than to any declaration.
-* **`schemes` renders as a string, not an array.**
-  `API_ADVERTISED_HTTP_SCHEMES` is typed `str` in `config.py` while
-  its own description calls it a "space separated list", and
-  `app.py` feeds it straight into the specification's top-level
-  `schemes` key, which OpenAPI 2.0 requires to be an array of
-  strings. A default deployment therefore publishes
-  `schemes: 'http'`, and a two-scheme one publishes a single
-  nonsense string rather than two entries. Pre-existing —
-  introduced in `01ef8a563`, not by this plan — but it is the
-  *first* thing a validator trips over, ahead of the body
-  parameters above, so #3626 has to fix or explicitly waive it to
-  reach anything else.
+* **`schemes` renders as a string, not an array — fixed in
+  phase 2.** `API_ADVERTISED_HTTP_SCHEMES` is typed `str` in
+  `config.py` while its own description calls it a "space
+  separated list", and `app.py` fed it straight into the
+  specification's top-level `schemes` key, which OpenAPI 2.0
+  requires to be an array of strings. A default deployment
+  therefore published `schemes: 'http'`. Pre-existing —
+  introduced in `01ef8a563`, not by this plan. Phase 2's first PR
+  splits the documented space-separated contract at the consumer
+  in `app.py`, and added the `securityDefinitions` entry the
+  `security` requirements referenced without defining.
 * **`security` renders as an object, not an array — fixed in
   phase 1 after all.** `swagger_helper()` emitted
   `'security': {'bearerAuth': []}`, but OpenAPI 2.0 requires
@@ -335,16 +334,18 @@ class, 1 from `schemes`.
   `'security': [{'bearerAuth': []}]` eliminated the entire
   126-error class, the largest remaining. Kept in this list as a
   record of the scoping call rather than as work to do.
-* **Nothing validates the generated specification.** Phase 1's
-  path-implies-required rule exists to satisfy linters and client
-  generators, and was checked by hand. A unit test running
-  `openapi_spec_validator` over flasgger's output would catch the
-  next regression, including the body-parameter one above. The
-  only current functional coverage fetches `swagger-ui.css`.
-  Filed as [#3626](https://github.com/shakenfist/shakenfist/issues/3626)
-  so it is not gated on the renderer work — the test is worth
-  having before the fix, since it turns "invalid in N places"
-  into a number that moves.
+* **Nothing validates the generated specification — fixed in
+  phase 2.** Phase 1's path-implies-required rule exists to
+  satisfy linters and client generators, and was checked by hand.
+  Phase 2's first PR added
+  `shakenfist/tests/external_api/test_openapi_spec.py`, which
+  runs `openapi_spec_validator` over flasgger's output and holds
+  the remaining invalidity to an exact ratchet count (128, all in
+  the body-parameter class above), failing on any new error class
+  or any change in the count
+  ([#3626](https://github.com/shakenfist/shakenfist/issues/3626)).
+  The test landed before the renderer fix on purpose: it turns
+  "invalid in N places" into a number that moves.
 
 ### Carried into phase 3 from phase 1
 
