@@ -1265,12 +1265,98 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             [(200, 'No return value', '')])
 
     def test_valid_declaration_renders(self):
-        out = self._helper([('thing', 'body', 'string', 'A thing.', False)])
+        out = self._helper([('thing', 'query', 'string', 'A thing.', False)])
 
         declared = [p for p in out['parameters'] if p['name'] == 'thing']
         self.assertEqual(1, len(declared))
-        self.assertEqual('body', declared[0]['in'])
+        self.assertEqual('query', declared[0]['in'])
         self.assertFalse(declared[0]['required'])
+
+    def _body_parameters(self, out):
+        return [p for p in out['parameters'] if p['in'] == 'body']
+
+    def test_body_parameters_collapse_to_one_schema(self):
+        # Swagger 2.0 permits at most one body parameter per operation,
+        # carrying a schema. Declarations stay one tuple per parameter;
+        # the renderer collapses them.
+        out = self._helper([
+            ('first', 'body', 'string', 'The first thing.', True),
+            ('sneaky', 'query', 'string', 'Not a body thing.', False),
+            ('second', 'body', 'integer', 'The second thing.', False)])
+
+        bodies = self._body_parameters(out)
+        self.assertEqual(1, len(bodies))
+        body = bodies[0]
+        self.assertEqual('body', body['name'])
+        self.assertTrue(body['required'])
+        self.assertEqual(
+            {'first', 'second'}, set(body['schema']['properties']))
+        self.assertEqual(
+            'The first thing.',
+            body['schema']['properties']['first']['description'])
+        self.assertEqual(
+            'integer', body['schema']['properties']['second']['type'])
+        self.assertEqual(['first'], body['schema']['required'])
+
+        # The query parameter is untouched by the collapse.
+        self.assertEqual(
+            1, len([p for p in out['parameters'] if p['name'] == 'sneaky']))
+
+    def test_single_body_parameter_still_collapses(self):
+        # One body parameter carrying type/format instead of a schema
+        # is just as invalid as three of them.
+        out = self._helper([('thing', 'body', 'string', 'A thing.', False)])
+
+        bodies = self._body_parameters(out)
+        self.assertEqual(1, len(bodies))
+        self.assertIn('thing', bodies[0]['schema']['properties'])
+        self.assertNotIn('type', bodies[0])
+
+    def test_all_optional_body_omits_required_array(self):
+        # In a schema object 'required' is an array of property names,
+        # and an *empty* required array is itself invalid JSON Schema,
+        # so it must be absent rather than empty.
+        out = self._helper([
+            ('one', 'body', 'string', 'One.', False),
+            ('two', 'body', 'string', 'Two.', False)])
+
+        body = self._body_parameters(out)[0]
+        self.assertNotIn('required', body['schema'])
+        self.assertFalse(body['required'])
+
+    def test_no_body_declarations_no_body_parameter(self):
+        out = self._helper([('thing', 'query', 'string', 'A thing.', False)])
+        self.assertEqual([], self._body_parameters(out))
+
+    def test_raw_body_renders_as_schema(self):
+        out = self._helper([
+            (api_base.RAW_BODY_PARAMETER, 'body', 'binary',
+             'Binary data.', True)])
+
+        bodies = self._body_parameters(out)
+        self.assertEqual(1, len(bodies))
+        self.assertEqual('string', bodies[0]['schema']['type'])
+        self.assertNotIn('type', bodies[0])
+        self.assertNotIn('properties', bodies[0]['schema'])
+
+    def test_raw_and_named_body_rejected(self):
+        # Raw bytes and named JSON keys cannot share a request body, so
+        # declaring both is a contradiction caught at import time.
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, self._helper,
+            [(api_base.RAW_BODY_PARAMETER, 'body', 'binary', 'Bytes.', True),
+             ('thing', 'body', 'string', 'A thing.', False)])
+
+    def test_parameter_named_body_is_not_the_raw_marker(self):
+        # A named parameter which happens to be called 'body' with a
+        # non-binary type is an ordinary schema property. There is no
+        # collision with the generated wrapper: its name lives at
+        # parameter level, properties live inside the schema.
+        out = self._helper([('body', 'body', 'string', 'A thing.', False)])
+
+        bodies = self._body_parameters(out)
+        self.assertEqual(1, len(bodies))
+        self.assertIn('body', bodies[0]['schema']['properties'])
 
     def test_security_and_authorization_travel_together(self):
         """An unauthenticated operation publishes neither the security

@@ -88,7 +88,17 @@ specification invalid — client generators reject it outright.
 **4. A raw request body is declared as `api_base.RAW_BODY_PARAMETER`.**
 Upload endpoints read the body from `flask.request` rather than
 receiving it as a kwarg. Use the constant rather than inventing a name,
-so the "declared but not accepted" check knows to let it through.
+so the "declared but not accepted" check knows to let it through. An
+operation cannot declare both the raw body and named body parameters —
+raw bytes and JSON keys cannot share a request body, and
+`swagger_helper()` rejects the combination at import time.
+
+**A note on rendering:** declarations stay one tuple per parameter,
+but Swagger 2.0 permits at most one `in: body` parameter per
+operation, carrying a `schema`. `swagger_helper()` therefore collapses
+an operation's body declarations into a single generated body
+parameter whose schema has one property per declaration. You declare
+parameters individually; the collapse is the renderer's business.
 
 **A constraint on routing rather than on declarations:** a class
 mounted on more than one route must carry the same parameters on
@@ -134,6 +144,12 @@ per-endpoint request validation is phase 3 of the plan; until then a
 correct declaration does not stop a caller sending something else.
 Two known gaps:
 
+(The published specification itself *is* checked:
+`shakenfist/tests/external_api/test_openapi_spec.py` validates the
+generated OpenAPI with `openapi_spec_validator` on every CI run, so a
+change that renders an invalid specification fails rather than
+shipping — the fate of the 129 validation errors phase 2 removed.)
+
 * `header` and `formData` cannot be derived from the code, so they are
   reported rather than corrected. No endpoint uses either today, and
   using one requires an `UNDERIVABLE_BY_DESIGN` entry in
@@ -148,18 +164,3 @@ Two known gaps:
   know which parameters arrive in the query string, so an opt-out
   entry would have to restate the schema's keys by hand — exactly the
   second source of truth this machinery exists to remove.
-* Swagger 2.0 allows at most one `in: body` parameter per operation,
-  carrying a `schema` rather than a `type`. `swagger_helper()` emits
-  one parameter per declaration, so operations with several body
-  parameters render an invalid specification — **32 of 132 operations
-  today, up from 23 of 124 before the declaration audit**, because
-  correcting a parameter to `body` is individually right and moves this
-  count the wrong way (the federated-authentication endpoints then
-  added several more). The published specification is not yet
-  linter-clean. Phase 2 collapses the parameters into a generated
-  `schema`; until that lands,
-  `shakenfist/tests/external_api/test_openapi_spec.py` validates the
-  generated specification and holds this class to an exact count, so
-  a change that adds another invalid body parameter fails CI rather
-  than quietly raising the number
-  ([issue #3626](https://github.com/shakenfist/shakenfist/issues/3626)).

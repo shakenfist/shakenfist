@@ -7,26 +7,19 @@ from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 
 
-# The number of body parameters rendered with type/format where Swagger
-# 2.0 requires a schema. This is a ratchet with an exact count, not a
-# ceiling: an endpoint change that adds another one fails this test
-# instead of quietly raising the number, the same honesty rule the
-# declaration audit applies. Phase 2 of PLAN-api-input-validation
-# collapses each operation's body parameters into a single
-# schema-carrying parameter, at which point this reaches zero and the
-# ratchet machinery should be deleted, leaving only "the specification
-# is valid".
-KNOWN_UNSCHEMAD_BODY_PARAMETERS = 128
-
-
 class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
     """Validate the OpenAPI specification flasgger generates.
 
     The published specification is what client generators read, and it
     was invalid in three ways nothing measured (issue 3626): schemes
-    rendered as a string, security as a bare object, and body
-    parameters carrying type/format instead of a schema. This test is
-    the measurement.
+    rendered as a string, body parameters carrying type/format instead
+    of a schema, and security requirements referencing an undefined
+    scheme. All three are fixed; this test is what keeps them fixed.
+
+    This began life as a ratchet holding the body-parameter error
+    class to an exact count of 128 while the schemes fix landed ahead
+    of the renderer collapse. The collapse took it to zero, so the
+    classifier is gone and simple validity is the permanent assertion.
     """
 
     def setUp(self):
@@ -56,48 +49,16 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         return resp.get_json()
 
-    @staticmethod
-    def _node_at(spec, path):
-        node = spec
-        for key in path:
-            node = node[key]
-        return node
-
-    def _is_unschemad_body_parameter(self, spec, error):
-        # The known error class: a parameter declared in: body which
-        # carries type/format where Swagger 2.0 requires a schema.
-        # Classified structurally -- by looking at what the error
-        # points to -- rather than by matching message text, which is
-        # jsonschema's and changes between releases.
-        node = self._node_at(spec, error.absolute_path)
-        return (isinstance(node, dict) and node.get('in') == 'body'
-                and 'schema' not in node)
-
-    def test_specification_valid_apart_from_known_classes(self):
+    def test_specification_is_valid(self):
         spec = self._fetch_spec()
-        errors = list(OpenAPIV2SpecValidator(spec).iter_errors())
-
-        unknown = []
-        known = 0
-        for error in errors:
-            if self._is_unschemad_body_parameter(spec, error):
-                known += 1
-            else:
-                unknown.append('%s: %s' % (
-                    '/'.join(str(p) for p in error.absolute_path),
-                    error.message[:200]))
-
+        errors = [
+            '%s: %s' % ('/'.join(str(p) for p in error.absolute_path),
+                        error.message[:200])
+            for error in OpenAPIV2SpecValidator(spec).iter_errors()]
         self.assertEqual(
-            [], unknown,
-            'The generated specification has validation errors outside '
-            'the known unschemad-body-parameter class:\n' +
-            '\n'.join(unknown))
-        self.assertEqual(
-            KNOWN_UNSCHEMAD_BODY_PARAMETERS, known,
-            'The count of body parameters rendered without a schema '
-            'changed. If it went down, lower the ratchet constant; if '
-            'it went up, a change added an invalid body parameter the '
-            'phase 2 renderer work would have to unwind.')
+            [], errors,
+            'The generated specification is not valid OpenAPI 2.0:\n' +
+            '\n'.join(errors))
 
     def test_security_requirements_resolve(self):
         # openapi_spec_validator does not check that a security
@@ -121,3 +82,26 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                                 '%s %s references undefined security '
                                 'scheme %r' % (method, path, scheme))
         self.assertEqual([], unresolved, '\n'.join(unresolved))
+
+    def test_at_most_one_body_parameter_per_operation(self):
+        # The validator catches an unschemad body parameter, but "at
+        # most one body parameter" is checked here directly so a
+        # regression names the operation rather than surfacing as a
+        # oneOf mismatch deep in jsonschema output.
+        spec = self._fetch_spec()
+        offenders = []
+        for path, methods in spec['paths'].items():
+            for method, operation in methods.items():
+                if not isinstance(operation, dict):
+                    continue
+                bodies = [p for p in operation.get('parameters', [])
+                          if p.get('in') == 'body']
+                if len(bodies) > 1:
+                    offenders.append('%s %s has %d body parameters'
+                                     % (method, path, len(bodies)))
+                for body in bodies:
+                    if 'schema' not in body:
+                        offenders.append(
+                            '%s %s body parameter %r has no schema'
+                            % (method, path, body.get('name')))
+        self.assertEqual([], offenders, '\n'.join(offenders))
