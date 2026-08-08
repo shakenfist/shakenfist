@@ -500,87 +500,12 @@ is the last thing that happens before minting, so a refusal for any
 other reason -- claims that do not match, a rule that has been deleted
 -- leaves the token still usable.
 
-### A worked GitHub Actions example
+### Configuring it
 
-GitHub can mint an OIDC token for a workflow job, describing the
-repository, the branch and the workflow that asked for it. Configure
-the issuer once, as an administrator:
-
-The `sf-client` command line does not wrap these routes yet, so the
-examples below call the REST API directly.
-
-```bash
-curl -X POST https://sf.example.com/auth/issuers \
-  -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "name": "github",
-        "issuer_url": "https://token.actions.githubusercontent.com",
-        "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
-        "audience": "https://sf.example.com"
-      }'
-```
-
-Then, as the owner of the namespace the workflow should reach, write a
-rule saying which jobs qualify and what they get:
-
-```bash
-curl -X POST https://sf.example.com/auth/namespaces/ci/rules \
-  -H "Authorization: Bearer ${SF_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "name": "ryll",
-        "issuer": "github",
-        "bound_claims": {
-          "repository": "shakenfist/ryll",
-          "ref": ["refs/heads/develop", "refs/heads/main"]
-        },
-        "scopes": ["blob.read", "artifact.*"],
-        "key_ttl": 3600,
-        "key_name_prefix": "ryll-ci"
-      }'
-```
-
-The workflow needs `id-token: write` permission to ask GitHub for a
-token, and nothing else:
-
-```yaml
-permissions:
-  contents: read
-  id-token: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get a Shaken Fist key
-        run: |
-          IDENTITY=$(curl -sS \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://sf.example.com" \
-            | jq -r .value)
-
-          RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \
-            -H "Content-Type: application/json" \
-            -d "{\"token\": \"${IDENTITY}\",
-                 \"namespace\": \"ci\",
-                 \"rule\": \"ryll\"}")
-
-          echo "::add-mask::$(echo "${RESPONSE}" | jq -r .key)"
-          echo "SHAKENFIST_KEY=$(echo "${RESPONSE}" | jq -r .key)" >> "${GITHUB_ENV}"
-          echo "SHAKENFIST_NAMESPACE=ci" >> "${GITHUB_ENV}"
-```
-
-The `audience` in the token request must match the issuer's
-configured `audience` exactly, and the `add-mask` line matters: the
-minted secret is a credential, and the response body is the only place
-it will ever appear.
-
-There is no repository secret anywhere in this. The credential the job
-ends up holding is scoped to `blob.read` and `artifact.*`, expires an
-hour after it was minted, and its provenance records which rule minted
-it and which claims were satisfied -- so an audit of "what did that
-workflow have access to" is a query rather than an investigation.
+Configuring an issuer and writing a mapping rule are operator tasks, and
+the worked end to end example -- registering GitHub as an issuer, writing
+a rule, and the workflow YAML that exchanges a token -- lives with them in
+the [operator guide](/operator_guide/authentication/#a-worked-github-actions-example).
 
 ## Inter-node authentication
 

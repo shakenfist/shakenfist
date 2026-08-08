@@ -32,6 +32,19 @@ want a longer forensic window; set it to `0` if you would rather expired keys
 were never removed. Neither choice affects security, because enforcement does
 not depend on the sweep having run.
 
+!!! warning "You cannot currently read an expiry back"
+
+    A key's expiry is recorded on the key object, and no API returns it.
+    `GET /auth/namespaces/{namespace}/keys` answers with a list of key
+    *names* only, and the same is true of the scopes and the provenance of
+    a key minted by the federated exchange.
+
+    This makes the forensic window above more important than it should be:
+    when automation stops authenticating, the evidence that the key lapsed
+    is the key's disappearance and its events, not a field you can query.
+    Setting `NAMESPACE_KEY_REAP_GRACE` to `0` while investigating keeps
+    that evidence indefinitely.
+
 ## Cluster generated key secrets
 
 Secrets Shaken Fist generates itself — the short-lived service keys
@@ -52,6 +65,21 @@ of it.
 To have the cluster generate a key for you, create the key without
 supplying a secret. The generated secret is returned exactly once —
 only its bcrypt hash is stored, so it cannot be recovered afterwards.
+
+This is a REST API feature which the command line does not expose yet:
+`sf-client namespace add-key` takes the secret as a mandatory argument,
+so there is no way to omit it. Until that changes, generation means
+`curl`:
+
+```bash
+curl -X POST https://sf.example.com/auth/namespaces/myproject/keys \
+  -H "Authorization: Bearer ${SF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"key_name": "deploy"}'
+{"key_name": "deploy", "key": "sfk_..."}
+```
+
+The same applies to `expiry`, which is also body-only.
 
 ### The prefix is reserved
 
@@ -167,6 +195,94 @@ Two things to watch:
 Listing a namespace's rules answers "who can get into this namespace",
 which is the inbound counterpart to listing its trusts.
 
+### A worked GitHub Actions example
+
+GitHub can mint an OIDC token for a workflow job, describing the
+repository, the branch and the workflow that asked for it. This is the
+end to end shape of granting a repository's workflows scoped access to
+a namespace.
+
+The `sf-client` command line does not wrap these routes yet, so the
+examples below call the REST API directly.
+
+Configure the issuer once, as an administrator:
+
+```bash
+curl -X POST https://sf.example.com/auth/issuers \
+  -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "github",
+        "issuer_url": "https://token.actions.githubusercontent.com",
+        "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+        "audience": "https://sf.example.com"
+      }'
+```
+
+Then, as the owner of the namespace the workflow should reach, write a
+rule saying which jobs qualify and what they get:
+
+```bash
+curl -X POST https://sf.example.com/auth/namespaces/ci/rules \
+  -H "Authorization: Bearer ${SF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "ryll",
+        "issuer": "github",
+        "bound_claims": {
+          "repository": "shakenfist/ryll",
+          "ref": ["refs/heads/develop", "refs/heads/main"]
+        },
+        "scopes": ["blob.read", "artifact.*"],
+        "key_ttl": 3600,
+        "key_name_prefix": "ryll-ci"
+      }'
+```
+
+The workflow needs `id-token: write` permission to ask GitHub for a
+token, and nothing else:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get a Shaken Fist key
+        run: |
+          IDENTITY=$(curl -sS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://sf.example.com" \
+            | jq -r .value)
+
+          RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \
+            -H "Content-Type: application/json" \
+            -d "{\"token\": \"${IDENTITY}\",
+                 \"namespace\": \"ci\",
+                 \"rule\": \"ryll\"}")
+
+          echo "::add-mask::$(echo "${RESPONSE}" | jq -r .key)"
+          echo "SHAKENFIST_KEY=$(echo "${RESPONSE}" | jq -r .key)" >> "${GITHUB_ENV}"
+          echo "SHAKENFIST_NAMESPACE=ci" >> "${GITHUB_ENV}"
+```
+
+The `audience` in the token request must match the issuer's
+configured `audience` exactly, and the `add-mask` line matters: the
+minted secret is a credential, and the response body is the only place
+it will ever appear.
+
+There is no repository secret anywhere in this. The credential the job
+ends up holding is scoped to `blob.read` and `artifact.*`, expires an
+hour after it was minted, and its provenance records which rule minted
+it and which claims were satisfied -- so an audit of "what did that
+workflow have access to" is a query rather than an investigation.
+
+Nothing here is specific to GitHub's hosted runners; a self hosted
+runner asks for its token the same way.
+
 ### Abuse resistance
 
 `/auth/federated` is unauthenticated by nature, so it carries its own
@@ -276,7 +392,7 @@ be able to see them.
 What we implemented was:
 
 * a namespace to store the base images (we called it `ci-images`).
-* when our CI conductor creates a new CI runner and associated namespace, it
+* when our CI system creates a new CI runner and associated namespace, it
   creates a trust between that ephemeral namespace and the `ci-images` namespace.
 * jobs to create new images build them in their local namespace, and then "gift"
   them to the `ci-images` namespace via a label.
