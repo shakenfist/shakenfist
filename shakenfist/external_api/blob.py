@@ -176,9 +176,9 @@ class BlobDataEndpoint(api_base.Resource):
         'blobs', 'Get blob data.',
         [
             ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
-            ('offset', 'query', 'integer',
+            ('offset', 'query', 'unsignedinteger',
              'The offset into the file to start reading from.', False),
-            ('limit', 'query', 'integer',
+            ('limit', 'query', 'unsignedinteger',
              ('The maximum amount of data to return in one response. '
               '0 means no limit.'), False)
         ],
@@ -270,7 +270,8 @@ class BlobEventsEndpoint(api_base.Resource):
             ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single blob.', blob_events_example),
          (404, 'Blob not found.', None)]))

@@ -707,7 +707,8 @@ class ArtifactEventsEndpoint(api_base.Resource):
              'The UUID or name of the artifact.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
          (404, 'Artifact not found.', None)]))
@@ -781,7 +782,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('max_versions', 'body', 'integer',
+            ('max_versions', 'body', 'unsignedinteger',
              'The maximum number of versions, or revert to the default it not set.',
              False)
         ],

@@ -71,7 +71,7 @@ class UploadTruncateEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Truncate an upload object to a specified size.',
         [('upload_uuid', 'path', 'uuid', 'The upload UUID.', True),
-         ('offset', 'path', 'integer', 'The new length of the object.', True)],
+         ('offset', 'path', 'unsignedinteger', 'The new length of the object.', True)],
         [(200, 'No return value', '')]))
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request

@@ -168,9 +168,9 @@ p = 'shakenfist/external_api/blob.py'
 s = open(p).read()
 s = s.replace("""        [
             ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
-            ('offset', 'query', 'integer',
+            ('offset', 'query', 'unsignedinteger',
              'The offset into the file to start reading from.', False),
-            ('limit', 'query', 'integer',
+            ('limit', 'query', 'unsignedinteger',
              ('The maximum amount of data to return in one response. '
               '0 means no limit.'), False)
         ],""", '        [],', 1)
@@ -266,6 +266,30 @@ class NodeEndpoint(api_base.Resource):
 open(p, 'w').write(s)
 PY
 check 'two endpoint classes sharing a name'
+
+# 13. An unknown constraint key. The blob events limit carries the
+# tree's canonical constraints element, so the constraint mutations
+# all target it or its neighbours in blob.py.
+sed -i "s/{'minimum': 1, 'maximum': 1000})/{'minimom': 1, 'maximum': 1000})/" \
+    shakenfist/external_api/blob.py
+check 'unknown constraint key'
+
+# 14. A constraints element which is not a dictionary.
+sed -i "s/, {'minimum': 1, 'maximum': 1000})/, 'soon')/" \
+    shakenfist/external_api/blob.py
+check 'non-dict constraints element'
+
+# 15. A pattern which does not compile. uuid renders as a string
+# type, so this passes the pattern-on-a-string check and must be
+# caught by the compile check specifically.
+sed -i "s/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True, {'pattern': '('})/" \
+    shakenfist/external_api/blob.py
+check 'uncompilable pattern constraint'
+
+# 16. A numeric bound on a non-numeric type.
+sed -i "s/('event_type', 'body', 'string', 'The type of event to return.', False)/('event_type', 'body', 'string', 'The type of event to return.', False, {'minimum': 1})/" \
+    shakenfist/external_api/blob.py
+check 'minimum on a string type'
 
 echo
 if [ "${failures}" -ne 0 ]; then

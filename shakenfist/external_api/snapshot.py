@@ -35,7 +35,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
              'Snapshot every disk, rather than only the first.', False),
             ('device', 'body', 'string',
              'Snapshot only this device, for example "vdb".', False),
-            ('max_versions', 'body', 'integer',
+            ('max_versions', 'body', 'unsignedinteger',
              'The maximum number of versions to retain for the resulting '
              'snapshot artifacts, or zero for the configured default.', False),
             ('thin', 'body', 'boolean',

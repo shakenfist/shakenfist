@@ -404,8 +404,26 @@ def _is_request_args(node: ast.AST) -> bool:
             and ast.unparse(node.value).split('.')[-1] == 'request')
 
 
-def handler_kwargs(fn: ast.FunctionDef) -> list[str]:
-    """Every parameter a caller could populate, keyword-only included."""
+def handler_kwargs(fn: ast.FunctionDef,
+                   problems: Optional[list[str]] = None) -> list[str]:
+    """Every parameter a caller could populate, keyword-only included.
+
+    A variadic handler defeats the enumeration: log_request merges the
+    whole JSON body into the handler's kwargs, so ``**kwargs`` accepts
+    arbitrary undeclared names while this list stays near-empty and an
+    assertion iterating it passes vacuously (issue 3642). No handler in
+    the tree is variadic today; recorded as a problem so the first one
+    fails the audit rather than silently exempting itself.
+    """
+    if problems is not None:
+        if fn.args.vararg is not None:
+            problems.append(
+                '%s is variadic (*%s), so the parameters it accepts '
+                'cannot be enumerated' % (fn.name, fn.args.vararg.arg))
+        if fn.args.kwarg is not None:
+            problems.append(
+                '%s is variadic (**%s), so the parameters it accepts '
+                'cannot be enumerated' % (fn.name, fn.args.kwarg.arg))
     args = list(fn.args.args) + list(fn.args.kwonlyargs)
     return [a.arg for a in args
             if a.arg != 'self' and not a.arg.endswith(INJECTED_SUFFIX)]
@@ -480,10 +498,10 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
             out.append(Declaration(path, cls, fn.name, None, None, None, None))
             continue
         for item in call.args[2].elts:
-            # swagger_helper() destructures a fixed five elements, so a
-            # tuple of any other length is malformed however readable
-            # its parts are.
-            if not (isinstance(item, ast.Tuple) and len(item.elts) == 5):
+            # swagger_helper() destructures five fixed elements plus an
+            # optional constraints dictionary, so a tuple of any other
+            # length is malformed however readable its parts are.
+            if not (isinstance(item, ast.Tuple) and len(item.elts) in (5, 6)):
                 out.append(
                     Declaration(path, cls, fn.name, None, None, None, None))
                 continue

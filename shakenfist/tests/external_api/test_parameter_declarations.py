@@ -2,6 +2,7 @@
 import ast
 import importlib.util
 import os
+import re
 import shutil
 import tempfile
 
@@ -260,7 +261,12 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         here rather than kept for symmetry.
         """
         for cls, method, fn in _endpoints():
-            accepted = declarations.handler_kwargs(fn)
+            problems = []
+            accepted = declarations.handler_kwargs(fn, problems)
+            self.assertEqual(
+                [], problems,
+                '%s.%s: the accepted parameter list could not be '
+                'enumerated: %s' % (cls, method, '; '.join(problems)))
             for parameter in declarations.declarations(fn):
                 if parameter.name == api_base.RAW_BODY_PARAMETER:
                     # Documents the raw request body, read from
@@ -286,7 +292,18 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             if not declarations.documented(fn):
                 continue
             names = {d.name for d in declarations.declarations(fn)}
-            for kwarg in declarations.handler_kwargs(fn):
+            # A variadic handler would make this loop pass vacuously --
+            # **kwargs accepts arbitrary undeclared names while the
+            # enumeration below stays near-empty (issue 3642) -- so an
+            # unreadable parameter list is a failure, not an absence.
+            problems = []
+            kwargs = declarations.handler_kwargs(fn, problems)
+            self.assertEqual(
+                [], problems,
+                '%s.%s: the accepted parameter list could not be '
+                'enumerated, so this assertion cannot hold: %s'
+                % (cls, method, '; '.join(problems)))
+            for kwarg in kwargs:
                 if (cls, method, kwarg) in UNDECLARED_BY_DESIGN:
                     continue
                 self.assertIn(
@@ -758,6 +775,40 @@ class Thing:
         # And without a problems list, still no confident wrong answer
         # in the return value.
         self.assertEqual(set(), declarations.request_args_parameters(fn))
+
+    def test_variadic_handler_is_a_problem(self):
+        """A handler taking *args or **kwargs accepts names no
+        enumeration can produce -- log_request merges the whole JSON
+        body into kwargs -- so handler_kwargs() must report it rather
+        than return a near-empty list an assertion iterates vacuously
+        (issue 3642). By definition the shape is not in the tree, so it
+        is pinned on constructed source.
+        """
+        source = '''
+class Thing:
+    def post(self, thing_ref=None, **kwargs):
+        pass
+
+    def put(self, thing_ref=None, *extras):
+        pass
+'''
+        cls = self._parse_class(source)
+
+        problems = []
+        accepted = declarations.handler_kwargs(cls.body[0], problems)
+        self.assertEqual(['thing_ref'], accepted)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('**kwargs', problems[0])
+
+        problems = []
+        declarations.handler_kwargs(cls.body[1], problems)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('*extras', problems[0])
+
+        # And without the problems channel the answer is unchanged --
+        # the channel reports, it does not filter.
+        self.assertEqual(
+            ['thing_ref'], declarations.handler_kwargs(cls.body[0]))
 
     def test_underivable_request_args_read_is_a_problem(self):
         """The reviewer's demonstration case: a handler reading
@@ -1397,6 +1448,107 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             exceptions.InvalidAPIDeclaration, self._helper,
             [('thing', 'body', 'stringy', 'A thing.', False)])
+
+    def test_constraints_render_on_a_query_parameter(self):
+        # minimum, maximum and pattern are valid Swagger 2.0 parameter
+        # keywords, so a bound renders into the published OpenAPI
+        # rather than living only in code -- the property that kept the
+        # events limit cap invisible to callers for years.
+        out = self._helper([
+            ('limit', 'query', 'integer', 'A limit.', False,
+             {'minimum': 1, 'maximum': 1000})])
+
+        declared = [p for p in out['parameters'] if p['name'] == 'limit'][0]
+        self.assertEqual(1, declared['minimum'])
+        self.assertEqual(1000, declared['maximum'])
+
+    def test_constraints_render_into_body_properties(self):
+        out = self._helper([
+            ('limit', 'body', 'integer', 'A limit.', False,
+             {'minimum': 1, 'maximum': 1000})])
+
+        prop = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']['limit']
+        self.assertEqual(1, prop['minimum'])
+        self.assertEqual(1000, prop['maximum'])
+
+    def test_malformed_constraints_are_rejected(self):
+        # Every defect arrives as InvalidAPIDeclaration so phase 3's
+        # compiler catches one exception type, in the established
+        # import-time style: sf-api does not start with one of these
+        # in the tree.
+        for parameters in (
+                # A sixth element which is not a dictionary.
+                [('thing', 'body', 'integer', 'A thing.', False, 'nope')],
+                # An unknown constraint key.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'maximim': 3})],
+                # A bound which is not a number.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'minimum': True})],
+                # A bound on a non-numeric type.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'minimum': 1})],
+                # Contradictory bounds.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'minimum': 10, 'maximum': 1})],
+                # A constraint restating a key the token already
+                # renders: unsignedinteger defines its own minimum.
+                [('thing', 'body', 'unsignedinteger', 'A thing.', False,
+                  {'minimum': 3})],
+                # A pattern on a non-string type.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'pattern': '^a$'})],
+                # A pattern which is not a string.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': 7})],
+                # A pattern which does not compile.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '('})],
+                # Seven elements.
+                [('thing', 'body', 'string', 'A thing.', False, {}, 8)]):
+            self.assertRaises(
+                exceptions.InvalidAPIDeclaration, self._helper, parameters)
+
+    def test_new_tokens_render_their_bounds(self):
+        # The D9 vocabulary: bounds and formats phase 3 will compile,
+        # published in the specification in the meantime.
+        out = self._helper([
+            ('count', 'query', 'unsignedinteger', 'A count.', False),
+            ('mac', 'body', 'macaddr', 'A MAC.', False),
+            ('data', 'body', 'base64', 'Some data.', False),
+            ('block', 'body', 'netblock', 'A netblock.', False)])
+
+        count = [p for p in out['parameters'] if p['name'] == 'count'][0]
+        self.assertEqual(0, count['minimum'])
+
+        props = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']
+        # byte is Swagger 2.0's standard format for base64 content.
+        self.assertEqual('byte', props['data']['format'])
+        self.assertTrue(
+            re.match(props['mac']['pattern'], '02:00:00:73:18:66'))
+        self.assertFalse(
+            re.match(props['mac']['pattern'], '02:00:00:73:18:zz'))
+        self.assertTrue(
+            re.match(props['block']['pattern'], '192.168.20.0/24'))
+        self.assertFalse(
+            re.match(props['block']['pattern'], 'not-a-netblock'))
+
+    def test_arrays_render_as_arrays(self):
+        # These were prose-formatted strings before the D9 work; now
+        # that body parameters render through schema objects, a real
+        # array type is legal and generators produce list-typed
+        # bindings from it.
+        out = self._helper([
+            ('scopes', 'body', 'arrayofstring', 'Scopes.', False),
+            ('disk', 'body', 'arrayofdict', 'Disks.', False)])
+
+        props = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']
+        self.assertEqual('array', props['scopes']['type'])
+        self.assertEqual({'type': 'string'}, props['scopes']['items'])
+        self.assertEqual({'type': 'object'}, props['disk']['items'])
 
     def test_wrong_arity_is_rejected(self):
         """The one malformed declaration that used to arrive as a bare

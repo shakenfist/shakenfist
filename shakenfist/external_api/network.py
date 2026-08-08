@@ -227,7 +227,7 @@ class NetworksEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Create a network.',
         [
-            ('netblock', 'body', 'string',
+            ('netblock', 'body', 'netblock',
              'A CIDR netblock to use for address allocation on the network.', True),
             ('provide_dhcp', 'body', 'boolean',
              'Whether or not to provide DHCP services on the network. Defaults '
@@ -390,7 +390,8 @@ class NetworkEventsEndpoint(api_base.Resource):
              'The UUID or name of the network.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single network.', network_events_example),
          (404, 'Network not found.', None)]))

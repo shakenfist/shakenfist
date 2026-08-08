@@ -320,19 +320,50 @@ valid.
 
 ## Success criteria
 
-- [ ] CI fails when the generated specification acquires a new
+- [x] CI fails when the generated specification acquires a new
       validity error class (#3626 closed).
-- [ ] `openapi_spec_validator` reports zero errors on the
+- [x] `openapi_spec_validator` reports zero errors on the
       generated specification.
-- [ ] `securityDefinitions` published; `security` requirements
+- [x] `securityDefinitions` published; `security` requirements
       resolvable; `schemes` an array.
-- [ ] Every operation renders at most one body parameter, always
+- [x] Every operation renders at most one body parameter, always
       schema-carrying.
-- [ ] The four D9 tokens and the constraints element exist,
+- [x] The four D9 tokens and the constraints element exist,
       import-time validated, mutation-tested, documented.
-- [ ] The events `limit` bounds are visible in the published
+- [x] The events `limit` bounds are visible in the published
       OpenAPI.
-- [ ] #3642 and #3643 closed as riders.
-- [ ] Master plan phase table, `docs/plans/index.md`, and
+- [x] #3642 and #3643 closed as riders.
+- [x] Master plan phase table, `docs/plans/index.md`, and
       `writing_an_endpoint.md` updated; release note for the
       published-spec shape change.
+
+## Outcome
+
+Implemented 2026-08-08 as three commits on
+`api-input-validation-phase-02`, one per planned PR scope, so the
+work can land as one PR or be split back into three — that is a
+landing decision, not an implementation one. Measurements landed
+where the plan predicted: 129 errors before the work, 128 after the
+`schemes` fix (the ratchet's one recorded value), zero after the
+collapse, still zero with the vocabulary applied. The mutation
+harness grew from 12 to 16 (the four constraint-validation guards,
+all `caught-import`), and its NO-OP verdict earned its keep during
+the work: retyping the blob `offset`/`limit` declarations to
+`unsignedinteger` moved them out from under mutation 3's search
+text, which reported NO-OP instead of a false catch.
+
+Two deviations from the letter of the plan, both recorded rather
+than silent:
+
+* **`macaddr` is defined but unapplied.** No declaration site
+  exists for it: interface MACs arrive inside the `network`
+  arrayofdict specs on instance create, not as a standalone
+  parameter, so its first consumer is the structured value types
+  work (#936, phase 6). The token ships now because D9 committed
+  the vocabulary and the pattern is mutation-tested either way.
+* **The events `limit` minimum is 1, not 0.** The server replaces
+  `limit <= 0` with the default 100 (the mariadb limit-hardening
+  rules), so 0 is *accepted* but meaningless; the published bound
+  documents the values a caller can usefully send. Whether phase 4
+  enforcement should reject 0 or keep tolerating it is a warn-only
+  question for phase 3's sfcbr data.

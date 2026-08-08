@@ -99,7 +99,7 @@ class LabelEndpoint(api_base.Resource):
         [
             ('label_name', 'path', 'string', 'The label artifact to update.', True),
             ('blob_uuid', 'body', 'uuid', 'The blob to set as the new version.', True),
-            ('max_versions', 'body', 'integer',
+            ('max_versions', 'body', 'unsignedinteger',
              'The maximum number of versions to retain, or zero for the '
              'configured default.', False)
         ],

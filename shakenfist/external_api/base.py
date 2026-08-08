@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import traceback
 
@@ -181,6 +182,82 @@ def resolve_lookup_namespace(body_namespace, kind):
     return caller_ns, None
 
 
+# The keys a declaration's optional sixth element may carry. All three
+# are valid Swagger 2.0 parameter keywords and valid JSON Schema, so a
+# constraint renders into the published OpenAPI rather than living only
+# in code -- which is the property that made the events limit cap
+# invisible to callers for years.
+CONSTRAINT_KEYS = frozenset(['minimum', 'maximum', 'pattern'])
+
+
+def _validated_constraints(section, name, rendered, constraints):
+    """Check a declaration's constraints element, InvalidAPIDeclaration
+    on any defect, so phase 3's compiler catches one exception type."""
+    if not isinstance(constraints, dict):
+        raise exceptions.InvalidAPIDeclaration(
+            '%s parameter %s declares constraints which are not a '
+            'dictionary: %r' % (section, name, constraints))
+
+    unknown = set(constraints) - CONSTRAINT_KEYS
+    if unknown:
+        raise exceptions.InvalidAPIDeclaration(
+            '%s parameter %s declares unknown constraint keys %s; the '
+            'known keys are %s'
+            % (section, name, ', '.join(sorted(unknown)),
+               ', '.join(sorted(CONSTRAINT_KEYS))))
+
+    # A constraint restating a key the type token already renders (a
+    # second minimum on unsignedinteger) is a contradiction waiting for
+    # the two values to disagree, so it is rejected rather than merged
+    # silently.
+    overlap = set(constraints) & set(rendered)
+    if overlap:
+        raise exceptions.InvalidAPIDeclaration(
+            '%s parameter %s constrains %s, which its type already '
+            'defines' % (section, name, ', '.join(sorted(overlap))))
+
+    for key in ('minimum', 'maximum'):
+        if key not in constraints:
+            continue
+        value = constraints[key]
+        # bool is excluded explicitly because it subclasses int, and
+        # minimum=True is a typo rather than a bound.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares %s=%r, which is not a number'
+                % (section, name, key, value))
+        if rendered.get('type') not in ('integer', 'number'):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares %s on type %r, which is not '
+                'numeric' % (section, name, key, rendered.get('type')))
+
+    if ('minimum' in constraints and 'maximum' in constraints
+            and constraints['minimum'] > constraints['maximum']):
+        raise exceptions.InvalidAPIDeclaration(
+            '%s parameter %s declares minimum %r greater than maximum %r'
+            % (section, name, constraints['minimum'],
+               constraints['maximum']))
+
+    if 'pattern' in constraints:
+        pattern = constraints['pattern']
+        if rendered.get('type') != 'string':
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares a pattern on type %r, which '
+                'is not a string' % (section, name, rendered.get('type')))
+        if not isinstance(pattern, str):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares a pattern which is not a '
+                'string: %r' % (section, name, pattern))
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares a pattern which does not '
+                'compile: %r (%s)' % (section, name, pattern, e))
+
+    return constraints
+
+
 # https://swagger.io/specification/v2/ defines the schema for this dictionary
 def swagger_helper(section, description, parameters, responses,
                    requires_admin=False, requires_auth=True):
@@ -200,8 +277,17 @@ def swagger_helper(section, description, parameters, responses,
 
     # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
     argtypes = {
-        'arrayofdict': {'type': 'string', 'format': 'an array of JSON dictionaries'},
-        'arrayofstring': {'type': 'string', 'format': 'an array of strings'},
+        # Real array types rather than prose-formatted strings: body
+        # parameters render through schema objects, where array is
+        # legal JSON Schema. Every use in the tree is body-located; an
+        # arrayofdict on a query parameter would render an invalid
+        # specification (non-body items must be primitive), which
+        # test_openapi_spec.py catches naming the operation.
+        'arrayofdict': {'type': 'array', 'items': {'type': 'object'}},
+        'arrayofstring': {'type': 'array', 'items': {'type': 'string'}},
+        # byte is Swagger 2.0's standard format token for base64
+        # encoded content.
+        'base64': {'type': 'string', 'format': 'byte'},
         'bearer': {'type': 'string', 'format': 'Bearer ...JWT...'},
         'binary': {'type': 'string', 'format': 'Binary data'},
         'boolean': {'type': 'boolean', 'format': 'boolean'},
@@ -211,10 +297,22 @@ def swagger_helper(section, description, parameters, responses,
         # formats, and these are byte offsets and blob sizes, so int64.
         'integer': {'type': 'integer', 'format': 'int64'},
         'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
+        'macaddr': {
+            'type': 'string', 'format': 'a MAC address',
+            'pattern': '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'},
         'namespace': {'type': 'string', 'format': 'the name of a namespace'},
+        'netblock': {
+            'type': 'string', 'format': 'a CIDR netblock',
+            'pattern': '^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$'},
         'node': {'type': 'string', 'format': 'the name of a node'},
         'number': {'type': 'number', 'format': 'a floating point number'},
         'string': {'type': 'string', 'format': 'string'},
+        # Negative values here are at best meaningless and at worst
+        # silently destructive: a negative artifact max_versions
+        # deletes the oldest version on every index add, because
+        # delete_old_versions() slices [:-max].
+        'unsignedinteger': {
+            'type': 'integer', 'format': 'int64', 'minimum': 0},
         'url': {'type': 'string', 'format': 'url'},
         'uuid': {'type': 'string', 'format': 'uuid'},
         'uuidorname': {
@@ -262,15 +360,15 @@ def swagger_helper(section, description, parameters, responses,
         # Checked explicitly, and first, because every malformed
         # declaration has to arrive as an InvalidAPIDeclaration for
         # phase 3's compiler to catch one exception type. Destructuring
-        # five elements raises ValueError on a shorter tuple and len()
-        # raises TypeError on anything unsized, so neither is left to
-        # happen by itself.
-        if not isinstance(parameter, (tuple, list)) or len(parameter) != 5:
+        # raises ValueError on a wrong-arity tuple and len() raises
+        # TypeError on anything unsized, so neither is left to happen
+        # by itself.
+        if not isinstance(parameter, (tuple, list)) or len(parameter) not in (5, 6):
             raise exceptions.InvalidAPIDeclaration(
-                '%s declares a parameter which is not a 5-element (name, '
-                'location, type, description, required) tuple: %r'
-                % (section, parameter))
-        (name, location, argtype, argdescription, argrequired) = parameter
+                '%s declares a parameter which is not a (name, location, '
+                'type, description, required[, constraints]) tuple of five '
+                'or six elements: %r' % (section, parameter))
+        (name, location, argtype, argdescription, argrequired) = parameter[:5]
 
         # The location was never validated, so 'post' and 'qeury' both
         # survived in the tree until they were found by audit. Fail at
@@ -304,6 +402,16 @@ def swagger_helper(section, description, parameters, responses,
                 '%s parameter %s declares type %r, which is not one of %s'
                 % (section, name, argtype, ', '.join(sorted(declarable))))
 
+        # What this parameter renders as: the type token's keys, plus
+        # any constraints from the optional sixth tuple element.
+        # Validated whatever the location, and merged here rather than
+        # in each branch below, so a constraint cannot be silently
+        # dropped by the path it happens to render through.
+        rendered = dict(argtypes[argtype])
+        if len(parameter) == 6:
+            rendered.update(_validated_constraints(
+                section, name, rendered, parameter[5]))
+
         if location != 'body':
             out['parameters'].append({
                 'name': name,
@@ -311,7 +419,7 @@ def swagger_helper(section, description, parameters, responses,
                 'required': argrequired,
                 'description': argdescription
             })
-            out['parameters'][-1].update(argtypes[argtype])
+            out['parameters'][-1].update(rendered)
             continue
 
         # The raw request body marker: the handler reads bytes from
@@ -322,10 +430,10 @@ def swagger_helper(section, description, parameters, responses,
         # collision because the generated wrapper's name lives at
         # parameter level while properties live inside the schema.
         if name == RAW_BODY_PARAMETER and argtype == 'binary':
-            raw_body = (argdescription, argrequired)
+            raw_body = (argdescription, argrequired, rendered)
             continue
 
-        prop = dict(argtypes[argtype])
+        prop = dict(rendered)
         prop['description'] = argdescription
         body_properties[name] = prop
         if argrequired:
@@ -338,13 +446,13 @@ def swagger_helper(section, description, parameters, responses,
             'request body' % (section, ', '.join(sorted(body_properties))))
 
     if raw_body is not None:
-        (argdescription, argrequired) = raw_body
+        (argdescription, argrequired, rendered) = raw_body
         out['parameters'].append({
             'name': RAW_BODY_PARAMETER,
             'in': 'body',
             'required': argrequired,
             'description': argdescription,
-            'schema': dict(argtypes['binary'])
+            'schema': rendered
         })
     elif body_properties:
         schema = {

@@ -35,11 +35,44 @@ class InstanceEndpoint(api_base.Resource):
         return instance_from_db.external_view()
 ```
 
-Each parameter is a five-element tuple:
+Each parameter is a five-element tuple, with an optional sixth
+element for constraints:
 
 ```
-(name, location, type, description, required)
+(name, location, type, description, required[, constraints])
 ```
+
+The type is a token from the `argtypes` table in
+`api_base.swagger_helper()` — read the table for the current
+vocabulary; an unknown token is rejected at import time. Beyond the
+obvious primitives it includes `unsignedinteger` (an integer whose
+published `minimum` is 0 — use it for anything where a negative value
+is meaningless or destructive, like `max_versions`), `base64` (a
+string whose published format is Swagger 2.0's standard `byte` token),
+`macaddr` and `netblock` (strings carrying a published validation
+`pattern`), and real array types for `arrayofstring`/`arrayofdict`.
+
+The constraints element is a dict with keys drawn from `minimum`,
+`maximum` and `pattern`. All three are valid Swagger 2.0 keywords, so
+a bound renders into the published OpenAPI instead of living only in
+code — the events `limit` cap was invisible to callers for years for
+exactly that reason, and now reads:
+
+```python
+('limit', 'body', 'integer',
+ 'The number of events to return, defaults to 100 and is '
+ 'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
+```
+
+Constraints are validated at import time in the same style as
+everything else: unknown keys, non-numeric bounds, bounds on
+non-numeric types, contradictory bounds, patterns that do not
+compile, patterns on non-string types, and a constraint restating a
+key its type token already renders (a second `minimum` on
+`unsignedinteger`) all raise `InvalidAPIDeclaration`. Note that
+declared constraints are *published documentation* until phase 3 of
+[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
+compiles them — a constraint does not reject anything yet.
 
 **There is no per-handler authentication decorator.** Authentication is
 the default, applied to every handler by `_authenticate_unless_public`

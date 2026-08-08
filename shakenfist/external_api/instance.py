@@ -481,10 +481,10 @@ class InstancesEndpoint(api_base.Resource):
              'A ssh public key to add to the default users authorized_keys file '
              'via cloud-init. Requires that both configdrive be enabled, and that '
              'cloud-init be installed on the instance before boot.', False),
-            ('user_data', 'body', 'string',
-             'Other user-data to be provided to cloud-init. Requires that both '
-             'configdrive be enabled, and that cloud-init be installed on the '
-             'instance before boot.', False),
+            ('user_data', 'body', 'base64',
+             'Other user-data to be provided to cloud-init, base64 encoded. '
+             'Requires that both configdrive be enabled, and that cloud-init '
+             'be installed on the instance before boot.', False),
             ('placed_on', 'body', 'node',
              'The name of a Node to place this instance on.', False),
             ('namespace', 'body', 'namespace',
@@ -1146,7 +1146,8 @@ class InstanceEventsEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single instance.', instance_events_example),
          (404, 'Instance not found.', None)]))
