@@ -10543,6 +10543,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Configuration reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expected-demand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected demand
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -10718,6 +10735,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Configuration reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expected-demand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected demand
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -10891,9 +10925,10 @@ instances are untouched but new schedules to full nodes are
 refused until they drain.</p>
 <h2 id="configuration-reference">Configuration reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h2>
 <p>Except for <code>CPU_OVERCOMMIT_RATIO</code>, <code>RAM_OVERCOMMIT_RATIO</code>,
-<code>SCHEDULER_TARGET_LOAD</code> and <code>SCHEDULER_CACHE_TIMEOUT</code> (cluster-wide,
-set with <code>sf-ctl set-config</code>), the reservation variables below are
-<strong>per-node</strong> and set through each node's <code>/etc/sf/config</code>:</p>
+<code>SCHEDULER_TARGET_LOAD</code>, <code>SCHEDULER_CACHE_TIMEOUT</code> and the two
+<code>SCHEDULER_DEMAND_*</code> settings (cluster-wide, set with
+<code>sf-ctl set-config</code>), the reservation variables below are <strong>per-node</strong>
+and set through each node's <code>/etc/sf/config</code>:</p>
 <table>
 <thead>
 <tr>
@@ -10933,8 +10968,32 @@ set with <code>sf-ctl set-config</code>), the reservation variables below are
 <td>5</td>
 <td>Seconds an sf-api worker caches its metrics view</td>
 </tr>
+<tr>
+<td><code>SCHEDULER_DEMAND_PER_VCPU</code></td>
+<td>2.5</td>
+<td>Anticipated load per vCPU of a freshly placed instance (provisional)</td>
+</tr>
+<tr>
+<td><code>SCHEDULER_DEMAND_DECAY_SECONDS</code></td>
+<td>600</td>
+<td>Seconds over which that anticipated load decays to zero (provisional)</td>
+</tr>
 </tbody>
 </table>
+<h3 id="expected-demand">Expected demand<a class="headerlink" href="#expected-demand" title="Permanent link">&para;</a></h3>
+<p>The two <code>SCHEDULER_DEMAND_*</code> settings describe how much load a
+<em>just-placed</em> instance is assumed to be about to generate, before that
+load shows up in the node's measured <code>cpu_load_*</code> metrics. A placement
+starts at <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> of anticipated load and
+decays linearly to zero over <code>SCHEDULER_DEMAND_DECAY_SECONDS</code> of
+instance age. The purpose is to stop a burst of placements all choosing
+the same node because none of them have started doing any work yet.</p>
+<p>In this release they only shape the <code>expected_demand</code> column the
+capacity reconciler writes to <code>scheduler_node_capacity</code>, and the
+matching <code>scheduler_capacity_node_expected_demand</code> metric — <strong>they do
+not affect placement</strong>. The defaults are also provisional, pending an
+analysis of accumulated cluster data, so expect them to change. There is
+no reason to tune them yet.</p>
 <h2 id="diagnosing-a-placement-decision">Diagnosing a placement decision<a class="headerlink" href="#diagnosing-a-placement-decision" title="Permanent link">&para;</a></h2>
 <p>Every stage of the pipeline records an audit event on the
 instance (and the candidate nodes), so <code>sf-client instance events</code>

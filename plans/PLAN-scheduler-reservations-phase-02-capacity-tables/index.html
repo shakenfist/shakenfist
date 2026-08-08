@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-byo-mariadb-phase-01-statelessness/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-02-capacity-tables/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 1: Statelessness fixes and compatibility check - Shaken Fist</title>
+        <title>Scheduler reservations phase 2: capacity tables and reconciler - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-1-statelessness-fixes-and-compatibility-check" class="md-skip">
+        <a href="#scheduler-reservations-phase-2-capacity-tables-and-reconciler" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 1: Statelessness fixes and compatibility check
+              Scheduler reservations phase 2: capacity tables and reconciler
             
           </span>
         </div>
@@ -10547,10 +10547,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#context" class="md-nav__link">
+  <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Context
+        Situation
       
     </span>
   </a>
@@ -10558,10 +10558,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decisions-phase-local" class="md-nav__link">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Decisions (phase-local)
+        Mission and problem statement
       
     </span>
   </a>
@@ -10569,10 +10569,82 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steps" class="md-nav__link">
+  <a href="#design" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Steps
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tables-d2-verbatim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables (D2, verbatim)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limit-derivation-mirrors-todays-scheduler-arithmetic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limit derivation (mirrors today's scheduler arithmetic)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-reconciler-d5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The reconciler (D5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#observability-the-point-of-the-phase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability (the point of the phase)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explicitly-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicitly out of scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
       
     </span>
   </a>
@@ -10588,20 +10660,109 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risks" class="md-nav__link">
+    <nav class="md-nav" aria-label="Validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-4-docker-mariadb-reconcile-validation-2026-08-02" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Risks
+        Step 4: docker-MariaDB reconcile validation (2026-08-02)
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#step-8-response-to-the-automated-review-of-pr-3614-2026-08-03" class="md-nav__link">
+    <span class="md-ellipsis">
       
-        <li class="md-nav__item">
+        Step 8: response to the automated review of PR #3614 (2026-08-03)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-9-response-to-the-second-automated-review-2026-08-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 9: response to the second automated review (2026-08-04)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-10-response-to-the-third-automated-review-2026-08-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 10: response to the third automated review (2026-08-04)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-11-response-to-the-fourth-automated-review-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 11: response to the fourth automated review (2026-08-05)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-12-rebase-and-the-fifth-automated-review-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 12: rebase and the fifth automated review (2026-08-07)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-13-the-sixth-automated-review-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 13: the sixth automated review (2026-08-08)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#review-checklist-management-session-step-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review checklist (management session, step 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10609,6 +10770,11 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -10633,338 +10799,1022 @@
   
 
 
-<h1 id="phase-1-statelessness-fixes-and-compatibility-check">Phase 1: Statelessness fixes and compatibility check<a class="headerlink" href="#phase-1-statelessness-fixes-and-compatibility-check" title="Permanent link">&para;</a></h1>
-<p>Parent plan: <a href="../PLAN-byo-mariadb/">PLAN-byo-mariadb.md</a>.</p>
+<h1 id="scheduler-reservations-phase-2-capacity-tables-and-reconciler">Scheduler reservations phase 2: capacity tables and reconciler<a class="headerlink" href="#scheduler-reservations-phase-2-capacity-tables-and-reconciler" title="Permanent link">&para;</a></h1>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding, read these source files end-to-end —
-they are the substrate this phase mutates:</p>
+<p>Before implementing any step, read the phase 0 decisions
+(<code>PLAN-scheduler-reservations-phase-00-decisions.md</code>) — this
+phase implements D2 (three-table schema), D5 (reconciler) and
+the schema half of D13 (expected demand) exactly as decided
+there; do not reopen them. Read the code this phase extends:
+the schema-version machinery and tri-layer access pattern in
+<code>shakenfist/mariadb.py</code> (<code>EXPECTED_SCHEMA_VERSIONS</code>,
+<code>ensure_schema()</code>, and the <code>delete_stale_transfers</code> /
+<code>_grpc_</code> / <code>_direct_</code> triple as the RPC template); the orphan
+reconciliation queries in the same file (the index-friendly
+<code>REPLACE(dashed, '-', '') = LOWER(HEX(binary))</code> join is the
+required idiom for every dashed/undashed uuid join in this
+phase); the cluster daemon's elected-leader loop and
+<code>schedule</code>-based task registration
+(<code>shakenfist/daemons/cluster/main.py</code>,
+<code>daemons/cluster/scheduled_tasks.py</code>, including the
+module-level prometheus counters); the typed <code>node_metrics</code>
+columns phase 1 added (<code>NODE_METRICS_EXTRACTION_SPEC</code>); the
+scheduler's current capacity arithmetic
+(<code>shakenfist/scheduler.py</code> <code>_has_sufficient_cpu/_ram/_disk</code>)
+which the limit-derivation formulas below must mirror; and
+instance placement ground truth (<code>instance_location</code> rows in
+<code>object_references</code>, written by <code>Instance.place_instance()</code>).
+Ground the work in what the code does, not what this plan says
+it does.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>Phase 0 decided the admission design (guarded single-row
+UPDATEs over materialised counters, D1) and its schema (three
+tables, no per-decision reservation rows, D2). Phase 1
+promoted the capacity-relevant <code>node_metrics</code> fields to typed
+columns, so limit derivation can now be done in SQL. Nothing
+yet stores derived capacity, and nothing recomputes usage
+from ground truth.</p>
+<p>The master plan deliberately splits the storage-and-
+reconciliation layer (this phase) from admission (phase 3) so
+that the tables, the limit derivation and the reconciler can
+soak on sfcbr — observable via prometheus and logs, consulted
+by nothing — while phase 3 is built. Any bug found during
+soak costs an annoyed operator a dashboard glance, not a
+mis-placed instance.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Create <code>scheduler_node_capacity</code>, <code>namespace_claims</code> and
+<code>cluster_capacity</code> per D2; implement the reconciler as a
+periodic task in the cluster daemon's elected-leader loop per
+D5, recomputing every counter from ground truth server-side;
+carry the D13 <code>expected_demand</code> column and its decay
+recompute from day one. <strong>Nothing consumes any of it for
+admission</strong> — this phase is observable-but-inert.</p>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<h3 id="tables-d2-verbatim">Tables (D2, verbatim)<a class="headerlink" href="#tables-d2-verbatim" title="Permanent link">&para;</a></h3>
+<p>All uuid key columns are <code>sa.Uuid</code> (undashed CHAR(32) on
+MariaDB, matching the static tables); every join against the
+dashed-form tables (<code>object_states</code>, <code>object_references</code>)
+uses the orphan-reconciliation transform idiom (pitfall 6).
+Timestamp columns follow the <code>cluster_locks</code> TIMESTAMP idiom
+so expiry guards compare against server-side <code>NOW()</code>.</p>
+<p><code>scheduler_node_capacity</code> — one row per hypervisor:
+<code>node_uuid</code> (PK), <code>limit_cpus</code>, <code>limit_memory_mb</code>,
+<code>limit_disk_gb</code>, <code>used_cpus</code>, <code>used_memory_mb</code>,
+<code>used_disk_gb</code> (all BIGINT, matching the int64 proto fields;
+the cluster sums could overflow INT around 700 TB of
+overcommitted RAM, and widening costs nothing while the
+tables are new), <code>expected_demand</code> (DOUBLE), <code>updated_at</code>.</p>
+<p><code>namespace_claims</code> — one row per claim: <code>uuid</code> (PK),
+<code>namespace</code> (type matching <code>namespaces.name</code>, indexed —
+admission in phase 3 looks claims up by namespace),
+<code>limit_*</code> and <code>used_*</code> (same three dimensions), <code>state</code>
+(string), <code>expires_at</code>, <code>updated_at</code>. Created empty in this
+phase: the claims API is phase 4. The reconciler's per-claim
+recompute and expiry sweep are still implemented and
+unit-tested now, so phase 4 lands onto proven machinery.</p>
+<p><code>cluster_capacity</code> — a singleton (<code>id</code> PK, always 1):
+<code>total_*</code>, <code>claimed_*</code>, <code>unclaimed_used_*</code> for the three
+dimensions, <code>updated_at</code>. The D14 admission guards run
+against this row in phases 3/4; here it is only maintained.</p>
+<p>New version constants (all 1, the new-table convention):
+<code>SCHEDULER_NODE_CAPACITY_VERSION</code>, <code>NAMESPACE_CLAIMS_VERSION</code>,
+<code>CLUSTER_CAPACITY_VERSION</code>, wired into
+<code>EXPECTED_SCHEMA_VERSIONS</code>, <code>ensure_schema()</code> and the
+<code>EXPECTED_TABLE_NAMES</code> drift guard in
+<code>test_mariadb_schema_concurrency.py</code>. Fresh creation only —
+there is no prior shape to migrate. The standard machinery
+gives the rest: <code>sf-ctl ensure-mariadb-schema</code> creates the
+tables; <code>verify_schema_versions</code> makes <code>sf-database</code> refuse
+to start until it has run.</p>
+<p>No new indexes beyond the PKs and the <code>namespace</code> index:
+row counts are nodes, claims and one.</p>
+<h3 id="limit-derivation-mirrors-todays-scheduler-arithmetic">Limit derivation (mirrors today's scheduler arithmetic)<a class="headerlink" href="#limit-derivation-mirrors-todays-scheduler-arithmetic" title="Permanent link">&para;</a></h3>
+<p>Limits are recomputed each reconciler pass from the phase 1
+typed <code>node_metrics</code> columns. The formulas deliberately
+mirror <code>scheduler.py</code> so phase 3's guard admits exactly what
+today's Python filter admits:</p>
 <ul>
-<li><code>shakenfist/mariadb.py</code> lines 440-500 (engine factory,
-  metadata, schema_versions table getter), 2107-2178
-  (<code>ensure_schema()</code>), 2180-2350 (<code>ensure_data_migrations()</code>
-  and the surrounding DATA_MIGRATIONS framework), and a
-  representative chunk of <code>_ensure_*_schema()</code> functions
-  around 540-700 to understand the per-table version
-  pattern.</li>
-<li><code>shakenfist/daemons/database/main.py</code> lines 5070-5150
-  (the daemon startup sequence that calls <code>ensure_schema()</code>
-  and <code>ensure_data_migrations()</code>).</li>
-<li><code>shakenfist/client/ctl.py</code> lines 199-235
-  (the existing <code>sf-ctl ensure-mariadb-schema</code> command).</li>
-<li><code>shakenfist/config.py</code> lines 488-520 (the MariaDB config
-  block — read-only context; the <code>MARIADB_HOST=localhost</code>
-  bootstrap conditional is <strong>phase 2</strong>, not phase 1).</li>
+<li><code>limit_cpus = floor(cpu_schedulable ×
+  CPU_OVERCOMMIT_RATIO)</code> — the <code>_has_sufficient_cpu</code> bound.
+  <code>used_cpus</code> sums the allocated vCPUs of every placed,
+  non-deleted instance. <strong>This is not parity with
+  <code>cpu_total_instance_vcpus</code></strong>, which an earlier draft of this
+  plan claimed: the resources daemon counts only <em>active</em>
+  libvirt domains, so a powered-off instance (or one placed
+  but not yet defined in libvirt) is in the ledger and not in
+  the measurement, and <code>used_cpus</code> reads higher than today's
+  filter sees on a node with powered-off instances. The ledger
+  is the right semantics for a reservation — a stopped
+  instance still owns its resources — but it means phase 3
+  must decide explicitly which number its guard reads, and a
+  unit test asserting the two agree would be false comfort.</li>
+<li><code>limit_memory_mb = floor(memory_max ×
+  RAM_OVERCOMMIT_RATIO) - memory_reserved_mb</code> — the
+  <code>_has_sufficient_ram</code> overcommit bound. <code>used_memory_mb</code>
+  counts <em>allocated</em> MB (not the KSM-aware
+  <code>memory_total_instance_actual</code>): the counter is an
+  allocation ledger. The actual-free and actual-usage checks
+  remain phase 3 candidate <em>filters</em> over the typed
+  <code>node_metrics</code> columns per D7; the counter guard is the
+  allocation backstop.</li>
+<li><code>limit_disk_gb = used_disk_gb + max(0,
+  floor(disk_free_instances/GiB) - disk_reservation_gb)</code>,
+  recomputed together with <code>used_disk_gb</code>. There is no
+  total-disk metric, and free space is the only ground truth
+  that survives qcow2 growth, so the limit is expressed as
+  "current virtual drawdown plus what the filesystem says
+  still fits". The phase 3 guard <code>used + x &lt;= limit</code> is then
+  exactly today's <code>_has_sufficient_disk</code> free-space check,
+  while accounting virtual size per D2.</li>
 </ul>
-<p>This phase does <em>not</em> touch the <code>MARIADB_HOST</code> /
-<code>DATABASE_NODE_IP</code> config-bootstrap rewrite, the gRPC LB
-channel, or the deploy machinery. Those are phases 2-7.
-Phase 1 changes only: (a) the schema_versions table getter,
-(b) the daemon-startup verify-vs-run path, and (c)
-<code>sf-ctl ensure-mariadb-schema</code> to gain a compatibility
-gate before any schema work.</p>
-<p>Phase 0 (etcd machinery deletion) is assumed landed by
-the time this phase executes. If phase 0 has not yet
-landed, the brief for step 3 (replacing the daemon-
-startup calls) must account for the
-<code>ensure_data_migrations()</code> call still being present and
-must remove the call rather than just stop invoking it
-from the daemon — phase 0 will then delete the function
-body in its sweep.</p>
-<p>One commit per step at minimum. Each commit must build,
-pass <code>pre-commit run --all-files</code>, and have a clear
-message.</p>
-<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>The phase exists for two coupled reasons:</p>
+<p>Nodes gain a capacity row when they have a <code>node_metrics</code> row
+with non-NULL capacity columns; rows are deleted when the
+node is deleted. NULL-columned metrics rows (written by an
+old resources daemon mid-upgrade) leave the previous limits
+in place rather than zeroing them.</p>
+<p>Capacity rows exist per <strong>schedulable hypervisor</strong>, not per
+node. A row describing capacity the scheduler would never use
+is worse than no row at all, because it inflates the cluster
+totals that a phase 3 D14 guard reads. The invariant, learned
+the hard way across five review rounds that each found the
+same defect in a new guise (role, state, freshness, existence,
+and — twice — filter polarity: a subtractive filter admits
+whatever is in neither set), is: <strong>a capacity row exists
+only where the scheduler could place, every node-level
+scheduler-side filter is automatically a reconciler-side
+filter too, and each filter is expressed as membership in a
+positive qualifying set, never as absence from a
+disqualifying one.</strong> By that rule one node-level filter remains
+deliberately unmirrored: <code>_has_reasonable_queue_state()</code> (the
+scheduler's <code>queue_state</code> stage, which drops a node whose
+queue depth suggests it is wedged). It is excluded because
+queue depth is a fast-moving liveness signal, not capacity —
+mirroring it at a five-minute cadence would make rows flap on
+transient queue spikes — but if phase 3's guard needs it, it
+is a <em>decision</em> to take, not a gap to discover. Four filters
+enforce the invariant today, each mirroring something
+<code>scheduler.py</code> already does before it will consider a node:</p>
+<ul>
+<li><strong>Role.</strong> The resources daemon runs on every cluster node
+  and upserts <code>node_metrics</code> unconditionally, so a
+  network-only or database-only node has a metrics row with
+  perfectly good capacity columns. <code>scheduler.py</code> drops
+  non-hypervisor candidates before any capacity arithmetic, so
+  phase 2 adds <code>is_hypervisor</code> to
+  <code>NODE_METRICS_EXTRACTION_SPEC</code> (<code>node_metrics</code> v3 → v4) and
+  filters on the typed column in SQL. A NULL <code>is_hypervisor</code> —
+  a metrics row not yet rewritten after the upgrade — is
+  treated as no evidence either way: it neither creates nor
+  destroys a row, and an existing row keeps its limits until
+  the next 60-second upsert settles the question.</li>
+<li><strong>State.</strong> The scheduler builds its candidate set from
+  <code>Nodes([], prefilter='active')</code>, so an errored, missing,
+  stopping, stopped or deleted node is not a placement
+  candidate. A hypervisor that the node-health cascade has
+  taken out of service must stop contributing its limits, not
+  sit there advertising capacity nothing can be placed on. The
+  filter is expressed positively — <code>state_value IN</code> the active
+  set (<code>constants.NODE_ACTIVE_STATES</code>, which
+  <code>Node.ACTIVE_STATES</code> is now defined from so the two cannot
+  drift), with candidates intersected against the result — so
+  everything outside the set is excluded by default: a state
+  added to the state machine later, and a node with <em>no</em> state
+  row at all. <code>prefilter='active'</code> resolves through
+  <code>get_objects_by_state</code>, which only returns objects that have
+  a state row, so the scheduler sees neither; and stateless
+  zombies are a real condition here (the orphan reconciler
+  exists for them). An earlier draft subtracted a
+  <code>NOT IN</code>-derived inactive set instead, and a stateless node
+  appeared in neither set and slipped through — the fifth
+  instance of the recurring defect (fourth review, item 1).</li>
+<li><strong>Existence.</strong> A node must have a row in the <code>nodes</code> table,
+  gating creation as well as removal. Gating only removal
+  leaves a permanent phantom: a <code>node_metrics</code> row that
+  outlives its node's static and state rows reads as a fresh
+  hypervisor, gets a row, and then no removal condition ever
+  fires for it.</li>
+<li><strong>Freshness.</strong> <code>node_metrics</code> rows are only deleted when the
+  node is, so a node whose resources daemon has died would
+  otherwise contribute its last-known limits forever. Rows
+  older than <code>RECONCILE_METRICS_MAX_AGE_SECONDS</code> (15 minutes:
+  three reconcile cadences, fifteen publish intervals) are
+  ignored. Deliberately <em>not</em> the scheduler's 120-second
+  window, which is tuned for an on-demand cache and would sit
+  below this pass's five-minute period, making rows flap in
+  and out between passes and rendering the reply's
+  <code>nodes_added</code>/<code>nodes_removed</code> counts meaningless. Like the
+  state filter, this is expressed positively — membership in a
+  fresh set, and absence removes the row — because a node can
+  also have <em>no</em> metrics row at all: sf-resources deletes its
+  own node's rows at daemon startup before the first upsert,
+  so a resources daemon dying in that window leaves a live,
+  active node with no row, which a stale-set subtraction
+  retained forever (fifth review, item 2 — the freshness twin
+  of the state filter's polarity bug). The fresh set carries
+  no <code>is_hypervisor</code> predicate, so a fresh row whose flag is
+  still NULL mid-upgrade keeps qualifying for the no-evidence
+  retention.</li>
+</ul>
+<p>A node failing any of these loses its capacity row, which is
+also how rows written by a release before the filters existed
+get cleaned up on upgrade.</p>
+<h3 id="the-reconciler-d5">The reconciler (D5)<a class="headerlink" href="#the-reconciler-d5" title="Permanent link">&para;</a></h3>
+<p>A new <code>scheduled_tasks.reconcile_scheduler_capacity()</code>
+registered in the elected-leader loop at
+<code>schedule.every(5).minutes</code> (D5's provisional period, matching
+the hardcoded cadence of its sibling tasks; tune when step 3
+data lands). The task body is one public
+<code>mariadb.reconcile_scheduler_capacity()</code> call — tri-layer,
+modelled on <code>delete_stale_transfers</code>: a single new
+<code>ReconcileSchedulerCapacity</code> RPC in <code>database.proto</code>
+(regenerate with <code>tox -e genprotos</code>), a servicer method in
+<code>daemons/database/main.py</code> with the standard counter and
+error wrapper, and <code>_direct_reconcile_scheduler_capacity()</code>
+doing all the work server-side in set-based SQL.</p>
+<p>One pass, in order:</p>
 <ol>
-<li><strong>Two specific blockers make <code>sf-database</code> unsafe to run
-   as N&gt;1 instances today.</strong> Both are touched here:</li>
-<li>The schema_versions table getter
-     (<code>mariadb.py:476-492</code>) lacks the
-     <code>TABLE_CREATION_LOCK</code> + double-check pattern that
-     every other table getter (e.g.
-     <code>_get_object_states_table</code> at line 556) uses.
-     Concurrent <code>ensure_schema()</code> callers (either two
-     <code>sf-ctl ensure-mariadb-schema</code> invocations on
-     different operator control machines, or — pre-
-     phase-3 — two sf-database starts) can race in
-     SQLAlchemy's metadata registry.</li>
-<li>
-<p><code>ensure_data_migrations()</code> is documented as
-     non-concurrent (its own docstring at <code>mariadb.py:2230</code>
-     says so). This is dissolved not by adding a lock
-     but by removing migration execution from daemon
-     startup entirely: <code>sf-ctl ensure-mariadb-schema</code>
-     becomes the only path that runs migrations,
-     consistent with the master plan's "operator is
-     in charge" framing.</p>
-</li>
-<li>
-<p><strong>Operator-provided MariaDB needs an explicit
-   compatibility gate.</strong> Today the deployer always
-   provides a known MariaDB; once BYO becomes the
-   default, operators may bring versions, engines, or
-   character sets that SF cannot run against safely.
-   Catching the mismatch at <code>sf-ctl ensure-mariadb-schema</code>
-   time (and again at sf-database startup, in case the
-   server gets swapped underneath) is much friendlier
-   than the first JSON-column write failing at runtime.</p>
-</li>
+<li><strong>Expire claims</strong>: <code>UPDATE namespace_claims SET state =
+   'expired' WHERE state = 'active' AND expires_at &lt; NOW()</code>
+   (the D4 crash backstop; a no-op until phase 4 creates
+   claims).</li>
+<li><strong>Refresh node rows</strong>: upsert limits per the formulas
+   above from <code>node_metrics</code>; delete rows for deleted nodes.</li>
+<li><strong>Recompute usage</strong>: node <code>used_*</code> from placed non-dead
+   instances — <code>instance_location</code> rows in
+   <code>object_references</code> joined to <code>instances</code> (cpus, memory)
+   and to <code>object_states</code> excluding <code>deleted</code> (errored
+   instances keep their placement and their resources until
+   hard-delete, so they count). Disk sums virtual sizes from
+   the <code>disk_spec</code> JSON: prefer <code>JSON_TABLE</code> (available from
+   the MIN_MARIADB_VERSION floor of 10.6); if it proves
+   unworkable against real payloads, aggregate per-instance
+   in Python inside the <code>_direct_</code> function — still one RPC,
+   still server-side. Claim <code>used_*</code> recomputes per
+   namespace over the same instance set.</li>
+<li><strong>Recompute <code>expected_demand</code></strong> (D13): per node,
+   <code>SUM(cpus × SCHEDULER_DEMAND_PER_VCPU × (1 - age /
+   SCHEDULER_DEMAND_DECAY_SECONDS))</code> over placements younger
+   than the decay window, using the <code>instance_location</code>
+   reference row's <code>created</code> timestamp as placement time.
+   Phase 3's placement-time increment becomes the fast path
+   over this authoritative recompute.</li>
+<li><strong>Recompute the singleton</strong>: <code>total_*</code> as sums of node
+   limits, <code>claimed_*</code> as sums of active claim limits (zero
+   for now), <code>unclaimed_used_*</code> as usage by instances in
+   namespaces without an active claim, restricted to nodes
+   that hold a capacity row. The singleton is a <em>closed
+   accounting over the schedulable cluster</em>: an instance
+   stranded on an errored, demoted, stale-metrics or deleted
+   node contributes to neither the total nor the used side,
+   so a drained hypervisor shrinks both together instead of
+   showing usage exceeding capacity on the soak dashboards.
+   Per-claim <code>used_*</code> is the deliberate exception — it stays
+   namespace-wide, because a quota covers a namespace's
+   instances wherever they are stranded.</li>
 </ol>
-<p>After this phase lands, <code>sf-database</code> does no schema
-work at startup. It performs a <code>verify_mariadb_compat()</code>
-check (server version vs floor, default storage engine,
-default charset/collation) and a
-<code>verify_schema_versions()</code> check (every expected SF
-table is at the version this build expects), and
-refuses to start with an explicit error pointing the
-operator at <code>sf-ctl ensure-mariadb-schema</code> if either
-fails.</p>
-<h2 id="decisions-phase-local">Decisions (phase-local)<a class="headerlink" href="#decisions-phase-local" title="Permanent link">&para;</a></h2>
-<p>These resolve the master plan's open questions that
-land in phase 1.</p>
-<ol>
-<li><strong>MariaDB version floor: <code>10.6.0</code>.</strong> Inputs to the
-   choice:</li>
-<li>SF uses <code>sa.JSON()</code> columns (extensive) and the
-     <code>JSON_VALUE</code> / <code>JSON_CONTAINS</code> / <code>JSON_EXTRACT</code>
-     functions (<code>mariadb.py:17215-17282</code>). All four
-     are available from MariaDB <strong>10.2</strong>, so the JSON
-     features themselves are not the binding
-     constraint.</li>
-<li>Cluster CI's functional tests run against
-     <code>debian-12</code> which ships MariaDB <strong>10.11</strong>, so
-     10.11 is the version we actually exercise.</li>
-<li>Ubuntu 22.04 LTS (still supported through 2027)
-     ships MariaDB <strong>10.6</strong>; Ubuntu 24.04 LTS and
-     debian-12/13 ship <strong>10.11</strong>.</li>
-<li>Pinning to 10.11 ("support what we test") locks
-     out perfectly working 22.04 deployments without
-     a concrete reason. Pinning to 10.6 gives
-     comfortable headroom above the 10.2 features
-     floor, supports every LTS currently in vendor
-     support, and asks the operator on 10.5-or-older
-     to upgrade something that has been EOL since
-     2024-06-24.</li>
-<li>Adopting 10.6 commits us to keeping it working;
-     a single CI matrix entry exercising 10.6 against
-     unit-tests is the cheapest insurance and is
-     filed as future work below.</li>
-</ol>
-<p><em>Addendum (2026-08-02): superseded -- the floor is
-   now <code>10.11.0</code>. The <code>ipam_reservations.address</code>
-   INET4 column (which post-dates this decision)
-   requires MariaDB 10.10+, so the 10.6 floor had
-   silently stopped being achievable:
-   <code>verify_mariadb_compat</code> passed servers on which
-   <code>ensure-mariadb-schema</code> could not actually run.
-   Found by scheduler-reservations phase 2 validation;
-   10.11 chosen as the oldest in-support LTS above
-   10.10, and the version CI actually exercises.</em></p>
-<ol>
-<li>
-<p><strong>Compatibility check is a hard refuse, not a
-   warning.</strong> Per master plan decision 13. Implication:
-   the check raises a typed exception
-   (<code>MariaDBIncompatibleError</code> is a reasonable name)
-   that the callers convert to a <code>click.ClickException</code>
-   in <code>sf-ctl</code> and a <code>SystemExit(1)</code> in
-   <code>daemons/database/main.py</code>. No <code>--force</code> override.
-   An operator who genuinely wants to run an
-   unsupported server can patch the constant in their
-   fork; SF does not ship a way to ignore the gate.</p>
-</li>
-<li>
-<p><strong>Schema-version check uses an explicit expected-
-   versions map, not the live <code>_ensure_*_schema</code>
-   functions.</strong> Today each <code>_ensure_*_schema()</code>
-   function knows its own target version internally
-   (as a function-local constant or argument). Phase 1
-   extracts those into a single module-level dict
-   (<code>EXPECTED_SCHEMA_VERSIONS: dict[str, int]</code>) that
-   both <code>ensure_schema()</code> and the new
-   <code>verify_schema_versions()</code> helper consult. This
-   avoids <code>verify_schema_versions()</code> having to invoke
-   the <code>_ensure_*_schema()</code> functions just to read
-   their version constants, keeps the verification
-   path side-effect-free, and gives a single place to
-   bump versions on schema changes. The extraction is
-   mechanical but touches all 36 tables; the brief
-   for step 2 calls this out explicitly.</p>
-</li>
-<li>
-<p><strong>Check covers server version, default engine,
-   default charset, default collation. No feature-flag
-   introspection.</strong> Per master plan decision 13.
-   Specifically:</p>
-</li>
-<li><strong>Version</strong>: <code>SELECT VERSION()</code> returns a string
-     like <code>10.11.5-MariaDB-1:10.11.5+maria~ubu2204</code>.
-     Parse the leading <code>M.m.p</code> and compare against
-     <code>MIN_MARIADB_VERSION = (10, 6, 0)</code>. Refuse if
-     either older or — defensively — if the string
-     does not contain <code>MariaDB</code> (operator pointed us
-     at upstream MySQL, which we do not support).</li>
-<li><strong>Default storage engine</strong>: <code>SELECT
-     @@default_storage_engine</code> must be <code>InnoDB</code>.</li>
-<li><strong>Connection-default character set</strong>: <code>SELECT
-     @@character_set_database</code> must be <code>utf8mb4</code>.</li>
-<li>
-<p><strong>Connection-default collation</strong>: <code>SELECT
-     @@collation_database</code> must start with
-     <code>utf8mb4_</code>. The specific collation suffix is
-     not enforced; operators may prefer <code>unicode_ci</code>,
-     <code>unicode_520_ci</code>, or others.</p>
-</li>
-<li>
-<p><strong>The compat check runs from
-   <code>sf-ctl ensure-mariadb-schema</code> before any schema
-   work AND from <code>sf-database</code> startup before serving
-   any request.</strong> Both call the same
-   <code>verify_mariadb_compat()</code> helper. Cost is one
-   round-trip; not a concern.</p>
-</li>
-<li>
-<p><strong>Behaviour when <code>MARIADB_HOST</code> is unset is
-   unchanged in this phase.</strong> Both <code>ensure_schema()</code>
-   today and the new verify helpers raise
-   <code>RuntimeError</code> if <code>MARIADB_HOST</code> is unset; that
-   stays. Phase 2 owns the <code>MARIADB_HOST</code> plumbing
-   rework; phase 1 lives inside the existing
-   assumptions.</p>
-</li>
-</ol>
-<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
+<p>Two claim-accounting decisions this leaves for phase 4, both
+inert while <code>namespace_claims</code> is empty but both fixed by the
+semantics being built now:</p>
+<ul>
+<li><strong>Overage is currently invisible.</strong> <code>unclaimed_used_*</code>
+  skips any namespace with an active claim, and <code>claimed_*</code>
+  sums those claims' <em>limits</em>. A namespace using more than it
+  claimed contributes its overage to neither figure, so a
+  D14 guard shaped <code>claimed + unclaimed_used + request &lt;=
+  total</code> would over-admit by exactly that overage. Phase 4
+  must either prevent overage at admission, or have the
+  reconciler attribute usage above a claim's limit into
+  <code>unclaimed_used_*</code> so the cluster row stays a complete
+  accounting of the cluster.</li>
+<li><strong>Two active claims for one namespace would double-count.</strong>
+  Each active claim row is written the same full namespace
+  usage, and both limits sum into <code>claimed_*</code>. The claims API
+  should enforce one active claim per namespace; a unique
+  partial index would make that structural rather than
+  procedural.</li>
+<li><strong>Duplicate placements double-count into per-claim
+  <code>used_*</code>.</strong> The stale-placement edge (a lost node's
+  <code>instance_location</code> row surviving <code>place_instance()</code>'s
+  best-effort removal, so one instance appears on two nodes)
+  is benign <em>at cluster scope only</em>, because the unclaimed
+  fold is restricted to nodes holding a capacity row.
+  Per-claim <code>used_*</code> is deliberately namespace-wide (see
+  above), so a duplicated placement adds that instance's
+  resources to the claim twice, and a namespace could be
+  denied capacity it is not using once <code>used_*</code> is a quota.
+  Phase 4 must either de-duplicate by instance uuid in the
+  usage query (one placement row per <code>target_uuid</code>) or rely
+  on phase 3 having eliminated stale placement rows. The
+  <code>_RECONCILE_USAGE_SQL</code> comment block carries the same note.</li>
+</ul>
+<p>The reply carries a summary (per-node limits/used/demand, the
+cluster row, expired-claim and added/removed node counts, and
+per-counter deltas since the previous values) so the elected
+node can log and export it without a second RPC.</p>
+<p>Because nothing else writes these tables until phase 3, the
+per-statement writes need no enclosing transaction; the
+counter deltas the pass observes are ordinary between-pass
+churn, not drift. The drift-is-a-bug loud-warning path (D5)
+activates in phase 3, when guarded UPDATEs maintain the
+counters between passes and the recompute becomes a
+correction; the plumbing (deltas in the reply) is built now.</p>
+<p>New config: <code>SCHEDULER_DEMAND_PER_VCPU</code> (default 2.5, the
+00a-1 seed) and <code>SCHEDULER_DEMAND_DECAY_SECONDS</code> (default
+600), both marked <em>revisit when step 3 data lands</em>.</p>
+<h3 id="observability-the-point-of-the-phase">Observability (the point of the phase)<a class="headerlink" href="#observability-the-point-of-the-phase" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Prometheus, from the elected cluster daemon (module-level
+  metrics in <code>scheduled_tasks.py</code>, exported on the existing
+  <code>CLUSTER_METRICS_PORT</code> server): per-node gauges for limit,
+  used and expected demand (labelled by node and resource
+  dimension), cluster-row gauges, a reconcile-duration
+  summary, a pass counter and a last-success timestamp gauge.</li>
+<li>Logs: one structured <code>LOG.info</code> summary per pass (node
+  count, deltas, expired claims, duration); failures go
+  through the loop's existing <code>ignore_exception</code> path so a
+  bad pass never kills maintenance, and CI's log-error checks
+  surface any exception during cluster CI runs.</li>
+<li>The tables themselves, queryable on the database node.</li>
+</ul>
+<p>D9's events (drawdown, ceiling rejection) are admission
+events and land with admission (phases 3/7). No REST read
+surface yet: the admin capacity view migrates in phase 5.</p>
+<h3 id="explicitly-out-of-scope">Explicitly out of scope<a class="headerlink" href="#explicitly-out-of-scope" title="Permanent link">&para;</a></h3>
+<ul>
+<li>No admission or placement consumption (phase 3): the
+  scheduler, <code>place_instance()</code> and the queue worker are
+  untouched.</li>
+<li>No claims API, claim objects or claim events (phase 4).</li>
+<li>No guarded-UPDATE drawdown anywhere; the reconciler is the
+  only writer.</li>
+<li>No REST/API surface and no client changes.</li>
+<li>No new events; observability is prometheus + logs.</li>
+</ul>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Step</th>
+<th>Description</th>
 <th>Effort</th>
 <th>Model</th>
 <th>Isolation</th>
-<th>Brief for sub-agent</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
-<td>low</td>
-<td>sonnet</td>
-<td>none</td>
-<td>Wrap <code>_get_schema_versions_table()</code> (<code>shakenfist/mariadb.py:476-492</code>) in <code>with TABLE_CREATION_LOCK:</code> using the same double-check pattern as <code>_get_object_states_table()</code> at lines 556-589. Specifically: inside <code>if _schema_versions_table is None:</code>, acquire <code>TABLE_CREATION_LOCK</code>, re-check <code>if _schema_versions_table is not None: return _schema_versions_table</code>, then check <code>if 'schema_versions' in metadata.tables: _schema_versions_table = metadata.tables['schema_versions']; return _schema_versions_table</code>, then construct as today. Add a regression test in <code>shakenfist/tests/test_mariadb.py</code> (or a new file <code>test_mariadb_schema_concurrency.py</code>) that spawns two threads each calling <code>_get_schema_versions_table()</code> and asserts no exception and identical returned object. One commit.</td>
+<td>Schema: three tables, version constants, <code>ensure_schema()</code> and <code>EXPECTED_SCHEMA_VERSIONS</code> wiring, <code>EXPECTED_TABLE_NAMES</code> drift-guard update, unit tests (creation, versions, idempotent re-run)</td>
+<td>medium</td>
+<td>sub-agent</td>
+<td>worktree</td>
+<td>Complete — 10 unit tests, pre-commit green</td>
 </tr>
 <tr>
 <td>2</td>
-<td>medium</td>
-<td>opus</td>
-<td>none</td>
-<td>Extract per-table target versions into a single module-level dict <code>EXPECTED_SCHEMA_VERSIONS: dict[str, int]</code> in <code>shakenfist/mariadb.py</code> near the existing schema-version helpers (after <code>_set_table_version</code>, before <code>_ensure_schema_versions_table</code>). Survey every <code>_ensure_*_schema()</code> function (there are 36 of them, listed by <code>ensure_schema()</code> at lines 2133-2168) and lift each one's target-version constant out into the new dict, keyed by table name. Update each <code>_ensure_*_schema()</code> to read from <code>EXPECTED_SCHEMA_VERSIONS[&lt;table_name&gt;]</code> rather than carry its own constant. The constants today look like <code>OBJECT_STATES_VERSION = 3</code> (or similar) defined at module scope or function scope; sweep both. Verify with <code>pre-commit run --all-files</code> that nothing else imports those constants directly (if any do, update the import to read from the dict). One commit.</td>
+<td>Reconcile RPC: proto + genprotos, servicer, tri-layer functions, the five-part recompute (limit formulas and demand decay as pure, unit-testable helpers), summary reply; unit tests incl. scheduler-parity cases for the limit formulas, decay arithmetic, dashed/undashed join shapes, empty-cluster and empty-claims passes</td>
+<td>high</td>
+<td>sub-agent</td>
+<td>worktree</td>
+<td>Complete — JSON_TABLE used for the disk sum (validated against real MariaDB 10.6 with the exact query; Python reference kept as <code>_disk_spec_virtual_gb</code>), 38 unit tests</td>
 </tr>
 <tr>
 <td>3</td>
-<td>high</td>
-<td>opus</td>
+<td>Cluster daemon integration: scheduled task, prometheus metrics, structured pass logging; unit tests where practical</td>
+<td>medium</td>
+<td>sub-agent</td>
 <td>worktree</td>
-<td>Add two new helpers in <code>shakenfist/mariadb.py</code>: (a) <code>verify_mariadb_compat(engine: sa.Engine) -&gt; None</code> raises a new typed exception <code>MariaDBIncompatibleError</code> on mismatch, per phase 1 decision 4. Implement the four checks (version <code>&gt;= 10.6.0</code> and string contains <code>MariaDB</code>, <code>@@default_storage_engine == 'InnoDB'</code>, <code>@@character_set_database == 'utf8mb4'</code>, <code>@@collation_database</code> prefix <code>'utf8mb4_'</code>). Each failure adds a line to the exception message; raise once at end if any failed so the operator sees all mismatches in one error. Define <code>MIN_MARIADB_VERSION = (10, 6, 0)</code> at module top alongside the other constants. (b) <code>verify_schema_versions(engine: sa.Engine) -&gt; None</code> reads <code>schema_versions</code> and compares every entry against <code>EXPECTED_SCHEMA_VERSIONS</code>; raises <code>SchemaVersionMismatchError</code> listing every mismatched table with both expected and actual versions. Tables in <code>EXPECTED_SCHEMA_VERSIONS</code> with no row in <code>schema_versions</code> count as a mismatch (actual=0). Wire both into <code>sf-ctl ensure-mariadb-schema</code> in <code>shakenfist/client/ctl.py:206-234</code>: call <code>verify_mariadb_compat(engine)</code> immediately after acquiring the engine, before <code>mariadb.ensure_schema()</code>. Convert the typed exception to <code>click.ClickException</code>. (Do not call <code>verify_schema_versions()</code> from <code>sf-ctl ensure-mariadb-schema</code> — the <em>point</em> of that command is to bring the schema to the expected version, so checking-before-running would be circular. The version check belongs at daemon startup only.) Add <code>MariaDBIncompatibleError</code> and <code>SchemaVersionMismatchError</code> to <code>shakenfist/exceptions.py</code> if there is a natural section for typed mariadb errors, otherwise define them at the top of <code>mariadb.py</code>. Use worktree isolation: the brief touches three files in non-obvious ways and is worth being able to discard if the output is unsatisfactory. One commit.</td>
+<td>Complete — <code>scheduler_capacity_*</code> metrics, stale node label sets removed, failure path cannot raise; 4 unit tests</td>
 </tr>
 <tr>
 <td>4</td>
-<td>high</td>
-<td>opus</td>
-<td>worktree</td>
-<td>In <code>shakenfist/daemons/database/main.py</code> lines 5142-5146, replace <code>mariadb.ensure_schema()</code> and <code>mariadb.ensure_data_migrations()</code> calls with <code>mariadb.verify_mariadb_compat(mariadb._get_engine())</code> and <code>mariadb.verify_schema_versions(mariadb._get_engine())</code>. Both helpers raise on mismatch; let them propagate to the existing top-level exception handling in <code>main()</code> (the <code>if not config.MARIADB_HOST</code> block immediately above already uses <code>raise SystemExit(1)</code>, so the same exit pattern applies — wrap the verify calls in a try/except that logs the exception's message at error level and raises <code>SystemExit(1)</code>, so operators see the human-readable error rather than a traceback). The log message must explicitly tell the operator to run <code>sf-ctl ensure-mariadb-schema</code> to address a schema-version mismatch, and to fix the MariaDB server / config to address a compatibility mismatch. Worktree isolation: changing daemon startup is the highest-blast-radius change in this phase; getting it wrong means daemons stop starting. One commit.</td>
+<td>Local validation: run the reconciler against a docker MariaDB seeded with realistic rows (incl. a multi-disk <code>disk_spec</code> and both uuid forms); record results in the Validation section</td>
+<td>medium</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — 36/36 checks, 42 ms at 32 nodes / 1,205 instances; see Validation</td>
 </tr>
 <tr>
 <td>5</td>
-<td>medium</td>
-<td>sonnet</td>
-<td>none</td>
-<td>Unit tests in <code>shakenfist/tests/test_mariadb_compat.py</code> (new file). Cover: version-parse helper handles <code>10.6.0-MariaDB</code>, <code>10.11.5-MariaDB-1:10.11.5+maria~ubu2204</code>, <code>10.5.99-MariaDB</code>, <code>8.0.35</code> (MySQL), and a garbage string; the four compat checks each individually pass and individually fail; <code>verify_schema_versions()</code> reports every mismatched table in a single exception; <code>verify_schema_versions()</code> treats a table missing from <code>schema_versions</code> as actual=0. Mock the engine/connection using the existing <code>mock.patch</code> patterns from <code>shakenfist/tests/test_mariadb*.py</code>. One commit.</td>
+<td>Docs: <code>docs/operator_guide/database.md</code> (three tables), CLAUDE.md MariaDB-storage list, correct CLAUDE.md's stale <code>shakenfist/deploy/</code> collection paths, ARCHITECTURE/AGENTS if warranted, master plan phase row</td>
+<td>low</td>
+<td>sub-agent</td>
+<td>worktree</td>
+<td>Complete — all four docs updated; verification showed the collection and <code>shakenfist_ci</code> still live in-repo at <code>shakenfist/deploy/</code>, so only CLAUDE.md's directory tree (which drew <code>deploy/</code> at the repo root) needed correcting</td>
 </tr>
 <tr>
 <td>6</td>
+<td>Management-session code review against the checklist</td>
 <td>medium</td>
-<td>sonnet</td>
+<td>management session</td>
 <td>none</td>
-<td>Documentation. Update <code>docs/operator_guide/database.md</code> to add a "MariaDB compatibility requirements" section near the top of the BYO section (which doesn't exist as a coherent section yet — that's phase 7's job; just slot the new content in as a top-level subsection for now and let phase 7 reorganise). Cover: minimum version 10.6.0, MariaDB-not-MySQL, InnoDB engine, utf8mb4 charset, utf8mb4_* collation, the operator workflow "ensure-mariadb-schema runs the check before doing any schema work; sf-database runs the same check at startup." Update <code>docs/operator_guide/upgrades.md:45-57</code> which describes <code>ensure-mariadb-schema</code> today to mention the new compat check. No <code>README.md</code> / <code>ARCHITECTURE.md</code> / <code>AGENTS.md</code> updates in this phase — those are phase 7. One commit.</td>
+<td>Complete — checklist verified 2026-08-02</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak</td>
+<td>—</td>
+<td>operator</td>
+<td>—</td>
+<td>In progress — PR #3614 open</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Address automated review of PR #3614</td>
+<td>medium</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — see Review response</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Address second automated review of PR #3614</td>
+<td>medium</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — see Second review response</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Address third automated review of PR #3614</td>
+<td>medium</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — see Third review response</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Address fourth automated review of PR #3614</td>
+<td>medium</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — see Fourth review response</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Rebase onto develop; address fifth automated review of PR #3614</td>
+<td>medium</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — see Fifth review response</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Rebase again; record the sixth automated review's documentation batch</td>
+<td>low</td>
+<td>management session</td>
+<td>none</td>
+<td>Complete — see Sixth review response</td>
 </tr>
 </tbody>
 </table>
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<h3 id="step-4-docker-mariadb-reconcile-validation-2026-08-02">Step 4: docker-MariaDB reconcile validation (2026-08-02)<a class="headerlink" href="#step-4-docker-mariadb-reconcile-validation-2026-08-02" title="Permanent link">&para;</a></h3>
+<p>Run against MariaDB 11.8 with the schema created by
+<code>ensure_schema()</code>, seeded with four nodes (live, live,
+new-with-partial-metrics, deleted), five instances with
+deliberately messy <code>disk_spec</code> payloads (string sizes, null
+sizes, a non-list document), dashed-uuid placement references
+and states, and two claims (one live, one past expiry). All
+36 checks passed:</p>
 <ul>
-<li><code>pre-commit run --all-files</code> passes after each step.</li>
-<li>A locally-spun-up MariaDB 10.6 docker container
-  (<code>docker run --rm -d -e MARIADB_ROOT_PASSWORD=test
-  -p 3306:3306 mariadb:10.6</code>) accepts both
-  <code>sf-ctl ensure-mariadb-schema</code> and a subsequent
-  <code>sf-database</code> start. A 10.5 container is refused
-  by both with a clear error.</li>
-<li>A MySQL 8.0 container (operator pointed us at the
-  wrong server) is refused.</li>
-<li>Concurrent threads calling
-  <code>_get_schema_versions_table()</code> return the same
-  object and raise no exception (covered by the
-  regression test in step 1).</li>
-<li>A test deployment where the operator forgot to run
-  <code>sf-ctl ensure-mariadb-schema</code> after a SF version
-  bump produces a clear "schema_versions out of date,
-  run ensure-mariadb-schema" error from sf-database
-  startup, not a runtime SQL error somewhere later.</li>
+<li>Limits match the hand-computed scheduler-parity values for
+  both overcommit ratios; the partial-metrics node is skipped
+  without a row and the deleted node gets none.</li>
+<li>Usage counts the errored instance, excludes the deleted
+  one, and counts a stateless (zombie) instance; the
+  malformed <code>disk_spec</code> contributes 0 without aborting the
+  pass; <code>20 + '8'</code> sums to 28 GB.</li>
+<li>Expected demand matches the decay formula (4 vCPUs placed
+  100 s ago at defaults → 8.333).</li>
+<li>The stale claim flips to <code>expired</code> and stops counting
+  toward <code>claimed_*</code>; the live claim's <code>used_*</code> recomputes to
+  the namespace's actual footprint.</li>
+<li>The cluster singleton sums node limits, active claim limits
+  and unclaimed usage correctly; a second pass is idempotent
+  (zero added/expired, zero deltas).</li>
+<li>Duration: 14 ms for the small case, 42 ms at 32 nodes /
+  1,205 placed instances — far inside the watchdog budget.</li>
 </ul>
-<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
+<p>Two incidental findings worth recording:</p>
+<ol>
+<li><strong><code>ensure_schema()</code> cannot run on MariaDB 10.6</strong>: the
+   pre-existing <code>ipam_reservations.address INET4</code> column
+   requires 10.10+, so the documented
+   <code>MIN_MARIADB_VERSION = (10, 6, 0)</code> floor is already
+   unsatisfiable for fresh installs — not a phase 2 issue,
+   but the constant is stale. JSON_TABLE itself was
+   separately validated on a real 10.6 during step 2 with the
+   exact reconcile query text. <em>Fixed on this branch: the
+   floor is now <code>(10, 11, 0)</code> — the oldest in-support LTS
+   above INET4's 10.10 requirement, and the version cluster
+   CI actually exercises. sfcbr runs <code>mariadb:11.8</code> and is
+   unaffected.</em></li>
+<li><strong>Claim expiry must be written server-relative.</strong> The
+   first validation run seeded <code>expires_at</code> from the client's
+   local clock and the expiry sweep correctly did nothing —
+   the timestamp was hours in the future in the server's
+   timezone. Phase 4's claim create/update must always write
+   expiry as <code>NOW() + INTERVAL</code>, the <code>cluster_locks</code> idiom,
+   never a client-computed datetime.</li>
+</ol>
+<h3 id="step-8-response-to-the-automated-review-of-pr-3614-2026-08-03">Step 8: response to the automated review of PR #3614 (2026-08-03)<a class="headerlink" href="#step-8-response-to-the-automated-review-of-pr-3614-2026-08-03" title="Permanent link">&para;</a></h3>
+<p>Ten items were raised. One was a real bug, two were
+documentation corrections, five were adopted improvements, one
+was investigated and rejected on measurement, and one was
+informational.</p>
+<p><strong>Fixed — capacity rows were being created per node, not per
+hypervisor.</strong> The reconciler keyed candidate rows off the
+presence of a <code>node_metrics</code> row, but sf-resources runs on
+every node and upserts unconditionally, so network-only and
+database-only nodes were getting capacity rows and their
+unschedulable capacity was being summed into
+<code>cluster_capacity.total_*</code>. Inert this release, but it would
+have made the soak dashboards — the entire point of the phase
+— report wrong totals, and become an admission bug in phase 3.
+Fixed by projecting <code>is_hypervisor</code> into <code>node_metrics</code>
+(v3 → v4) and filtering in SQL; see the limit-derivation
+section above for the NULL-during-upgrade handling. Four unit
+tests plus a re-run of the step 4 validation with a
+non-hypervisor node carrying good capacity columns and a
+pre-existing capacity row (it is deleted, which is the upgrade
+path).</p>
+<p><strong>Rejected on measurement — restricting the disk <code>JSON_TABLE</code>
+derived table to the placement set.</strong> The review's premise was
+that the derived table expands every instance row, including
+the deleted-but-not-hard-deleted backlog, before the outer
+join discards them. MariaDB does not do that: <code>EXPLAIN</code> shows
+it already resolves the derived table as <code>LATERAL DERIVED</code>
+correlated on <code>i.uuid</code>, so it only expands the instances the
+outer query joins to. Measured with 73,640 instance rows of
+which 1,205 were placed, adding the suggested
+<code>i2.uuid IN (SELECT ... FROM object_references)</code> restriction
+turned the plan into a materialised <code>DERIVED</code> with a semi-join
+and made the query <em>slower</em> (10 ms → 13 ms) for identical
+results. A reconcile pass over that database took 44 ms, the
+same as with no backlog at all. The comment above the query now
+records the measurement so the change is not re-proposed.</p>
+<p><strong>Adopted:</strong></p>
 <ul>
-<li><strong>The schema-version map extraction (step 2) touches
-  every <code>_ensure_*_schema()</code> function in
-  <code>mariadb.py</code>.</strong> That is 36 functions across a
-  thousand-line span. The risk is a typo in one of the
-  table-name strings causing a silent
-  <code>EXPECTED_SCHEMA_VERSIONS</code> miss. Mitigation: the
-  step's brief tells the sub-agent to verify the dict
-  against the list of <code>_ensure_*_schema()</code> calls in
-  <code>ensure_schema()</code> (lines 2133-2168) and assert one-
-  to-one correspondence in a unit test.</li>
-<li><strong><code>verify_schema_versions()</code> on an empty database
-  (no <code>schema_versions</code> table) raises a different
-  error today</strong> — <code>_get_table_version()</code> returns -1
-  per its docstring. The brief for step 3 must
-  handle "schema_versions table does not exist" as
-  a distinct mismatch (every expected table is
-  effectively at version 0 / missing), with an error
-  message that says "MariaDB schema has not been
-  initialised; run <code>sf-ctl ensure-mariadb-schema</code>."</li>
-<li><strong>Removing <code>ensure_data_migrations()</code> calls
-  pre-emptively in step 4 (before phase 0 deletes
-  the function body) leaves the function in tree
-  with no callers.</strong> This is harmless: phase 0 will
-  delete it in its sweep. The brief for step 4
-  notes this.</li>
-<li><strong>Operators on Ubuntu 22.04 (MariaDB 10.6) are
-  inside the floor by a literal point release.</strong>
-  If we discover during validation that some
-  10.6.x patch level is needed for a specific JSON-
-  function behaviour, bumping the floor by a patch
-  version is cheap. The choice of 10.6.0 (not
-  10.6.5 or similar) is intentional: "the major.
-  minor we test against, no patch-level
-  superstition."</li>
+<li>The reconcile RPC now uses <code>BOUNDED_QUERY_TIMEOUT</code> with one
+  retry rather than the default 3 × 30 s budget. Its caller is
+  the elected loop that pets the systemd watchdog itself, and
+  its server side is one analytical query — the exact shape
+  that SIGABRTed non-database daemons in issue 3586. A skipped
+  pass is harmless because the next one recomputes everything.
+  That justification is release-scoped: once phase 3's guarded
+  UPDATEs make the recompute a drift correction, a reconciler
+  persistently exceeding its deadline means drift accumulates
+  indefinitely with only a counter and a frozen last-success
+  gauge as signal. Phase 3 must pair enabling the counter
+  guard with a persistent-failure decision — either raise the
+  reconciler's budget above <code>BOUNDED_QUERY_TIMEOUT</code> (it is not
+  on a watchdog-critical path, since <code>_run_due_scheduled_jobs</code>
+  pets before each job), or treat consecutive failures as a
+  condition that disables the guard rather than admitting
+  against stale counters.</li>
+<li><code>SCHEDULER_CAPACITY_LAST_DURATION</code> is now set before the
+  failure return, so a slow-then-failing pass reports its own
+  duration instead of the last successful one.</li>
+<li>The task is decorated with <code>@util_general.recorded_method</code>
+  like its five-minute siblings.</li>
+<li>The capacity gauges are cleared when the cluster daemon
+  leaves the elected loop. They describe singleton cluster
+  state, so a demoted node that kept publishing would
+  contradict its successor. <code>docs/operator_guide/database.md</code>
+  now tells operators to alert on the last-success timestamp
+  going stale rather than on a gauge disappearing.</li>
+<li>Round-trip test coverage of the servicer's reply
+  construction and the client's field-by-field unpacking, so a
+  proto/dict key rename fails in CI rather than on a live
+  cluster, plus the <code>result is None</code> and unexpected-exception
+  branches.</li>
 </ul>
-<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>Before executing this phase, please back brief the
-operator on:</p>
+<p><strong>Documentation corrections:</strong> the <code>used_cpus</code> parity claim
+(above) and the missing <code>SCHEDULER_DEMAND_*</code> entries in
+<code>docs/operator_guide/scheduler.md</code>.</p>
+<p><strong>Found while fixing the gauge staleness, outside the review's
+scope:</strong> the elected loop registered its <code>schedule.every()</code>
+jobs on every election without clearing them first, and
+<code>schedule</code> keeps a module-global job list — so a node elected
+twice ran every maintenance task twice per cadence, three
+times after a third election, and so on. Fixed with a
+<code>schedule.clear()</code> before registration. Pre-existing, not
+introduced by this phase, but it would have doubled up the
+reconcile pass this phase adds.</p>
+<h3 id="step-9-response-to-the-second-automated-review-2026-08-04">Step 9: response to the second automated review (2026-08-04)<a class="headerlink" href="#step-9-response-to-the-second-automated-review-2026-08-04" title="Permanent link">&para;</a></h3>
+<p>Nine items. One real bug of the same class as the first
+round's, one stale documentation reference, and seven
+improvements — all adopted this time.</p>
+<p><strong>Fixed — capacity rows for nodes the scheduler would never
+consider.</strong> The only node-state exclusion was <code>deleted</code>, but
+<code>scheduler.py</code> builds its candidates from
+<code>Nodes([], prefilter='active')</code>, so errored, missing, stopping
+and stopped nodes are not placement candidates either. A
+hypervisor taken out of service by the node-health cascade
+kept its row and its full limits stayed in
+<code>cluster_capacity.total_*</code>. Exactly the defect the first
+review found with <code>is_hypervisor</code>, in a second dimension — so
+the fix generalises rather than patches: the filter is now
+<code>NOT IN</code> the active set, and the active set moved to
+<code>constants.NODE_ACTIVE_STATES</code> with <code>Node.ACTIVE_STATES</code>
+defined from it, so the reconciler can read it in SQL without
+importing <code>shakenfist.node</code> and the two definitions cannot
+drift. See the limit-derivation section for all three filters.</p>
+<p><strong>Also fixed — the same class again, one dimension further
+out.</strong> Review item 3 noted <code>node_metrics</code> rows are only
+deleted when the node is, so a hypervisor whose resources
+daemon has died keeps contributing its last-known limits
+indefinitely while the node itself still looks healthy. The
+review judged this largely subsumed by the state filter, but
+it is not: a node whose resources daemon dies while its
+sentinels keep reporting stays in an active state. Metrics
+older than <code>RECONCILE_METRICS_MAX_AGE_SECONDS</code> (15 minutes)
+are now ignored, with the window chosen well above the
+five-minute cadence for the flapping reason the review itself
+gave.</p>
+<p><strong>Adopted:</strong></p>
 <ul>
-<li>The five concrete code changes (schema_versions
-  lock; EXPECTED_SCHEMA_VERSIONS dict; the two
-  verify helpers; the daemon-startup swap; the
-  ensure-mariadb-schema compat call) and which files
-  carry each change.</li>
-<li>The pinned version floor (<code>10.6.0</code>) and the
-  reasoning so it can be re-litigated if the
-  operator disagrees with the trade-off.</li>
-<li>The deliberate decision to <em>not</em> touch
-  <code>MARIADB_HOST</code> plumbing in this phase (that is
-  phase 2) and the fact that phase 0 is assumed to
-  have landed (or the step 4 brief needs an
-  adjustment).</li>
+<li>README and <code>docs/operator_guide/installation.md</code> both
+  advertised MariaDB 10.6.0+. The review found the README one;
+  the installation guide was a second stale reference it
+  missed.</li>
+<li>The <code>_derive_cpu_memory_limits</code> docstring claimed
+  <code>limit_memory_mb</code> mirrors <code>_has_sufficient_ram</code>. It does
+  not: it blends that check's overcommit ceiling with the
+  reservation term from the separate free-memory check.
+  Reworded here, in the docstring and in AGENTS.md.</li>
+<li>Both <code>object_references</code> queries now constrain
+  <code>source_object_type</code> and <code>target_object_type</code> as well as
+  <code>relationship</code>. Defensive only — nothing writes an
+  <code>INSTANCE_LOCATION</code> row with other endpoint types — but the
+  table's indexes lead with those columns so it is free.</li>
+<li>The servicer checks <code>context.is_active()</code> before starting a
+  pass, so a caller that has already hit its deadline does not
+  get work done on its behalf. The docstring records <em>why</em>
+  overlapping passes are benign today (sole writer, idempotent
+  recompute) and that phase 3 ends that property.</li>
+<li><code>_disk_spec_virtual_gb</code>'s docstring no longer describes the
+  JSON_TABLE fallback decision as open; it is now stated to be
+  the executable specification, and a live test asserts it
+  agrees with the SQL on the same payloads, making it an
+  oracle rather than prose.</li>
+<li>Schedule registration is hoisted out of the election loop
+  entirely, which was the review's preferred fix over the
+  <code>schedule.clear()</code> added in step 8. <code>schedule.every()</code>
+  computes each job's next run at registration, so
+  re-registering on every election restarted every period from
+  zero — on a cluster whose maintenance lock changes hands
+  more often than daily, <code>prune_events</code> might never have run.
+  Registering once at daemon start fixes the duplication and
+  the timer reset together, and <code>run_pending()</code> is still only
+  called while elected.</li>
 </ul>
+<p><strong>New CI coverage (review item 7).</strong> Every reconcile test ran
+against a mocked connection and asserted on compiled SQL text,
+which cannot catch the failure modes that matter: the
+JSON_TABLE aggregation, the dashed/undashed uuid joins, the
+nullable-BOOL and NOT-IN filters, and the two upserts. All of
+those fail as <em>silently wrong numbers</em> rather than errors —
+pitfall 6 in CLAUDE.md exists precisely because a mismatched
+uuid comparison matches nothing instead of raising. Step 4's
+docker validation covered them once, by hand, and would not
+catch a regression six months from now.
+<code>shakenfist/tests/test_mariadb_capacity_reconcile_live.py</code> now
+runs the real SQL against a real MariaDB with the step 4
+fixture (11 tests), driven by
+<code>tools/ci-capacity-reconcile-test.sh</code> from a new "Scheduler
+capacity reconciler" job gated by <code>can_merge</code>, following the
+existing <code>schema_enum_widening</code> pattern. Verified as a real
+guard rather than a passing formality: removing the
+<code>REPLACE()</code> transform from the usage join fails 8 of the 11.</p>
+<h3 id="step-10-response-to-the-third-automated-review-2026-08-04">Step 10: response to the third automated review (2026-08-04)<a class="headerlink" href="#step-10-response-to-the-third-automated-review-2026-08-04" title="Permanent link">&para;</a></h3>
+<p>Ten items, all adopted.</p>
+<p><strong>Fixed — the phantom capacity row (item 4), which is the fourth
+instance of one pattern.</strong> Existence in the <code>nodes</code> table gated
+removal but not creation, so a <code>node_metrics</code> row that outlived its
+node's static and state rows read as a fresh hypervisor: it got a
+capacity row, then appeared in both <code>previous</code> and <code>metrics_rows</code> on
+every later pass, so no removal condition ever fired and its limits sat
+in the cluster totals permanently. <code>candidates</code> is now intersected
+with <code>known_nodes</code> and the removal condition is unconditional.</p>
+<p>That is now four rounds of the same defect — role, state, freshness,
+existence — each one a filter the scheduler applies that the
+reconciler did not. <strong>The generalisation for phase 3 is that the rule
+is "a capacity row exists only where the scheduler could place", and
+any new scheduler-side filter is automatically a reconciler-side
+filter too.</strong> A live test seeds an orphaned metrics row and asserts no
+row is created on the first pass or any later one; reverting the fix
+fails it.</p>
+<p><strong>Fixed — the alerting advice was self-defeating (item 1).</strong>
+<code>docs/operator_guide/database.md</code> told operators to alert on
+<code>scheduler_capacity_reconcile_last_success_timestamp</code> going stale, but
+that gauge is deliberately <em>not</em> cleared on demotion (it records this
+node's own last pass, which is useful for debugging, and being
+unlabelled it cannot be removed the way a label set can). A
+per-instance staleness alert would therefore fire forever on every
+node that has ever held the lock. The docs now give the cluster-scoped
+expression, <code>time() - max(...) &gt; 900</code>, and explain why the
+aggregation is load-bearing rather than stylistic.</p>
+<p><strong>Adopted:</strong></p>
+<ul>
+<li>Watchdog pets between scheduled jobs, not just around the batch
+  (item 2). Hoisting registration in step 9 fixed the timer reset but
+  guaranteed that a node elected after hours of idling finds all nine
+  jobs due at once, including the three heaviest, inside a single
+  un-petted <code>run_pending()</code> with <code>WatchdogSec</code> at 60s.
+  <code>_run_due_scheduled_jobs()</code> mirrors <code>run_pending()</code>'s ordering and
+  due-check while petting before each job, bounding the exposure to
+  one job instead of nine.</li>
+<li><code>DatabaseUnavailable</code> is caught in
+  <code>_grpc_reconcile_scheduler_capacity</code> and logged at WARNING (item 3).
+  The bounded budget adopted in step 8 makes exhausted retries the
+  <em>expected</em> outcome of a loaded or restarting database tier, but it
+  escaped the <code>except grpc.RpcError</code> and landed in the scheduled
+  task's <code>ignore_exception()</code> — an ERROR with a traceback and a
+  recorded-exception file every five minutes, for a condition the
+  design calls harmless, against a phase whose stated functional gate
+  is cluster CI's log-error checks.</li>
+<li><code>_node_metric_to_bool('')</code> now raises rather than returning False
+  (item 10), so an empty string extracts as NULL and routes into the
+  same no-evidence handling as a missing key. Unreachable today, but
+  the falsey list had quietly made "no value" mean "confirmed
+  non-hypervisor", which deletes a capacity row.</li>
+<li>The mock router now reports the number of uuids the DELETE actually
+  names rather than a hardcoded 2 (item 7), so three
+  <code>nodes_removed</code> assertions test the reconciler rather than the
+  fixture. They now assert 1, which is what their single-row fixtures
+  can actually produce.</li>
+<li>Both live-test CI scripts assert that tests actually ran (item 8).
+  Every test in those modules is <code>@unittest.skipUnless(DSN)</code>, so a
+  broken export turned the job into a green tick over zero tests —
+  the guard silently not guarding, which is precisely the failure mode
+  these jobs exist to prevent. Fixed in
+  <code>ci-enum-widening-test.sh</code> as well as the new script, since it has
+  the identical shape and the same hole. Verified by running with the
+  DSN unset: 12 skipped, and the guard fails the script.</li>
+<li>Documented: that the scheduler mirroring covers the arithmetic but
+  not <code>_schedulable_threads()</code>/<code>_memory_reserved_mb()</code>'s pre-upgrade
+  fallbacks, so mid-upgrade a node can be schedulable with no capacity
+  row (item 5); and that the metrics-freshness comparison spans hosts,
+  making severe clock skew a fifth way to lose a capacity row (item
+  6), which is forced by <code>node_metrics.timestamp</code> being a
+  client-written float rather than a server <code>TIMESTAMP</code>.</li>
+</ul>
+<p><strong>Recorded for phase 4 (item 9).</strong> Node capacity rows are
+intentionally reaped by the reconciler rather than by
+<code>Node.hard_delete()</code>: this phase's invariant is that the reconciler is
+the sole writer of these tables, and a second writer would contradict
+it for at most five minutes of staleness. That trade stops being
+obviously right once <code>namespace_claims</code> holds real rows, so when the
+claims API lands, <code>Namespace.hard_delete()</code> should clean up its
+claims — a namespace's claim outliving the namespace is a leak, not a
+staleness window. Do not read the current omission as an oversight.</p>
+<h3 id="step-11-response-to-the-fourth-automated-review-2026-08-05">Step 11: response to the fourth automated review (2026-08-05)<a class="headerlink" href="#step-11-response-to-the-fourth-automated-review-2026-08-05" title="Permanent link">&para;</a></h3>
+<p>Three action items and three optional suggestions. From this round on,
+suggestions are explicitly <em>triaged</em> — accepted, deferred with an
+owner, or declined with a reason recorded here — rather than
+implicitly all-adopted, so a suggestion that resurfaces in a later
+round can be answered by pointing at the record instead of by
+re-litigating it.</p>
+<p><strong>Fixed — a stateless node got a capacity row (item 1), the fifth
+instance of the recurring defect.</strong> The state filter was expressed
+negatively (subtract nodes whose state is <code>NOT IN</code> the active set), so
+a node with a <code>nodes</code> row but <em>no</em> <code>object_states</code> row appeared in
+neither set and slipped through, while <code>prefilter='active'</code> makes it
+invisible to the scheduler. The previous round predicted the fifth
+instance would be <code>_has_reasonable_queue_state</code>; it was instead the
+existing state filter's polarity — the defect class is about filter
+<em>semantics</em>, not just filter <em>inventory</em>. The filter is now positive
+(<code>state_value IN</code> the active set, candidates intersected against the
+result), which excludes unknown states and missing state rows by the
+same mechanism the scheduler does. The design section's State bullet
+records the polarity rule; mock and live tests cover the stateless
+case, and reverting the intersection fails the live test.</p>
+<p><strong>Fixed — markdown code span split across a newline (item 4)</strong> in
+<code>database.md</code>'s clock-skew paragraph.</p>
+<p><strong>Documented — the usage ledger cannot see legacy placements
+(item 3).</strong> During the one-release <code>node_attributes.instances</code>
+dual-write transition, a placement written by a pre-cutover node
+exists only in the legacy JSON column, which the reconciler does not
+read, so mid-rolling-upgrade <code>used_*</code> under-counts. Recorded in the
+<code>_RECONCILE_USAGE_SQL</code> comment block and AGENTS.md: phase 3 must not
+enable the counter guard until the legacy column and its union are
+removed.</p>
+<p><strong>Suggestions triaged — all three accepted, because each was cheapest
+now:</strong></p>
+<ul>
+<li><strong>Cluster singleton accounting (item 2): implemented, not just
+  documented.</strong> <code>unclaimed_used_*</code> was folded from the unfiltered
+  usage query, so an instance stranded on an errored, demoted, stale
+  or deleted node inflated the used side of a total its node
+  contributed nothing to — the soak dashboards could show usage
+  exceeding capacity, and phase 3 would have inherited the open
+  semantics silently. The fold is now restricted to nodes holding a
+  capacity row (see the recompute step 5 above); per-claim <code>used_*</code>
+  deliberately stays namespace-wide, and
+  <code>test_claim_usage_is_namespace_wide</code> pins the asymmetry as a
+  decision. The related stale-placement edge (a lost node's
+  <code>instance_location</code> row surviving <code>place_instance()</code>'s
+  best-effort removal, double-counting the instance at node scope)
+  is out of the reconciler's scope and now benign at cluster scope;
+  it belongs to phase 3's placement work.</li>
+<li><strong>BIGINT counters (item 5): adopted.</strong> The proto fields are int64
+  and the tables are new in this release, so widening is free now and
+  a migration later; <code>cluster_capacity.total_memory_mb</code> as INT would
+  overflow around 700 TB of overcommitted RAM with an
+  every-pass-fails-at-WARNING failure mode.</li>
+<li><strong>CancelJob (item 6): honoured.</strong> <code>_run_due_scheduled_jobs()</code> now
+  mirrors <code>Scheduler._run_job()</code>'s cancel handling, making its
+  "semantics are unchanged" docstring true rather than amending the
+  docstring to document a divergence. The raising-job behaviour
+  (propagate, skip the rest of the batch, stay due) is pinned by a
+  test as well.</li>
+</ul>
+<p><strong>Test-coverage suggestions triaged:</strong></p>
+<ul>
+<li>Stateless-node live test: added (required by item 1).</li>
+<li>Cluster-asymmetry and namespace-wide-claim tests: added (item 2).</li>
+<li>Raising-job behaviour test: added (item 6).</li>
+<li>Registration-happens-once test: <strong>declined.</strong> Registration is
+  inline at the top of <code>_run_inner()</code>, which never returns; asserting
+  on it would require extracting a registration helper purely for the
+  test's benefit, and <code>_run_inner</code> is only called once per process by
+  construction (<code>Daemon.run</code>). The behaviour is documented in the
+  registration comment instead.</li>
+<li>Namespace-over-claim-limit live test: <strong>deferred to phase 4.</strong> The
+  overage gap is already recorded as a phase 4 obligation in the
+  claim-accounting decisions above; a test asserting today's
+  incomplete accounting would have to be rewritten by the same change
+  that closes the gap, and nothing consumes the numbers until then.</li>
+</ul>
+<h3 id="step-12-rebase-and-the-fifth-automated-review-2026-08-07">Step 12: rebase and the fifth automated review (2026-08-07)<a class="headerlink" href="#step-12-rebase-and-the-fifth-automated-review-2026-08-07" title="Permanent link">&para;</a></h3>
+<p>The branch was rebased onto develop (which had gained the federation
+abuse-resistance work and a generalised live-MariaDB CI job). Two
+rebase reconciliations worth recording:</p>
+<ul>
+<li>develop added <code>reap_federation_records</code> to the old in-election-loop
+  schedule registration; it now registers in the hoisted
+  once-per-daemon block with the others.</li>
+<li>develop generalised <code>tools/ci-enum-widening-test.sh</code> to run <em>every</em>
+  <code>test_mariadb_*_live</code> module behind one MariaDB install, precisely
+  so a later live module needs no new job. That made this branch's
+  dedicated "Scheduler capacity reconciler" job an exact duplicate
+  (same runner class, same MariaDB install, same tests twice per
+  merge), so the job and <code>tools/ci-capacity-reconcile-test.sh</code> are
+  removed; <code>test_mariadb_capacity_reconcile_live.py</code> runs in the
+  generalised job, which also carries the no-tests-actually-ran
+  guard this branch added in round 3.</li>
+</ul>
+<p>The review itself: two fix items (both genuinely latent bugs — the
+round-over-round trend is 3 → 2 and nothing this round was fallout
+from earlier fixes), three considers (all accepted, each cheapest
+now), two informational.</p>
+<p><strong>Fixed — enum bindings leaned on a case-insensitive collation
+(item 1).</strong> <code>_reconcile_fetch_usage()</code> bound enum member <em>names</em> for
+all four predicates, but only <code>object_states.object_type</code> (a native
+<code>sa.Enum</code>) stores names; the <code>object_references</code> type and relationship
+columns are plain strings written by <code>_direct_record_relationship()</code>
+as <code>str(member)</code>, which for these str-subclass enums is the <em>value</em>.
+The two spellings differ only in case, so the query matched under the
+default utf8mb4 collations and would silently produce zero usage under
+<code>utf8mb4_bin</code> or any <code>_cs</code> collation — all of which
+<code>verify_mariadb_compat()</code> accepts, and the same pass's demand query
+already bound values, so usage and demand would have diverged
+silently. The bindings now name each column's convention explicitly
+(with a fourth parameter, since the object_states join and the
+object_references predicate can no longer share one), and the live
+suite now runs its tables under <code>utf8mb4_bin</code> so this whole class
+fails loudly: mutating one binding back to <code>.name</code> fails 9 of the 15
+live tests. A unit test also pins <code>str(member) == member.value</code>, the
+property the write path and the bindings both depend on.</p>
+<p><strong>Fixed — a node with no <code>node_metrics</code> row at all kept its capacity
+row forever (item 2).</strong> The sixth instance of the recurring class and
+the freshness twin of round four's state-filter bug: the filter
+subtracted a stale set, and a node with <em>no</em> metrics row was in
+neither the fresh nor the stale set. Reachable because sf-resources
+deletes its own node's rows at daemon startup before the first
+upsert. The filter is now membership in a fresh set (derived without
+the <code>is_hypervisor</code> predicate, so the NULL-flag mid-upgrade retention
+is preserved), and the design invariant gains a third clause: filters
+are expressed as membership in a positive qualifying set, never as
+absence from a disqualifying one. Mock and live tests cover the
+no-row case; disabling the freshness removal fails the live test.</p>
+<p><strong>Suggestions triaged — all three accepted:</strong></p>
+<ul>
+<li>Per-claim recompute loop (item 3): a <code># phase 4:</code> comment now marks
+  the one-UPDATE-per-claim loop as a shape to replace with a set-based
+  <code>UPDATE ... JOIN</code> when claims become real, not to inherit.</li>
+<li>Disk-size oracle rounding (item 4): probed MariaDB's
+  JSON-number-to-BIGINT cast on a real server — it rounds half away
+  from zero (10.5 → 11, -2.5 → -3), including numeric strings
+  ('8.7' → 9), where the helper truncated integers and zeroed
+  fractional strings. <code>_disk_spec_virtual_gb()</code> now matches via
+  <code>decimal.ROUND_HALF_UP</code> (Python's <code>round()</code> is banker's and would
+  itself diverge at .5), the messy fixture gained fractional sizes so
+  the live oracle assertion exercises the divergence, and unit tests
+  pin the probed values. Booleans (JSON true → 1) and JSON null
+  (→ SQL NULL, ignored by SUM) were probed too and already agreed.</li>
+<li>Negative <code>limit_memory_mb</code> (item 5): clamped at zero, matching
+  <code>_derive_disk_limit_gb()</code>'s headroom clamp, with the docstring
+  explaining why zero is the right encoding of "admits nothing".</li>
+</ul>
+<p><strong>Also repaired in passing:</strong> a rebase-conflict resolution error left
+a stray conflict marker in <code>protos/database.proto</code> in the rebased
+history, which made <code>grpc_tools.protoc</code> fail — and <code>_make_stubs.sh</code>
+has no <code>set -e</code>, so its sed import-fixing loops ran anyway and
+stacked <code>from shakenfist.protos</code> prefixes onto the stale generated
+files. The proto is fixed and the stubs regenerated at the head;
+intermediate rebased commits retain the broken generated files, which
+matters to <code>git bisect</code> but not to the PR diff or CI.</p>
+<h3 id="step-13-the-sixth-automated-review-2026-08-08">Step 13: the sixth automated review (2026-08-08)<a class="headerlink" href="#step-13-the-sixth-automated-review-2026-08-08" title="Permanent link">&para;</a></h3>
+<p>The sixth review raised <strong>zero fix items</strong> — the landing round under
+the re-review exit rule. One documentation item, six considers (five
+taken, one already-covered), two informational, and six "what's good"
+entries including an endorsement of the positive-membership clause as
+"the clause that actually kills the class".</p>
+<p><strong>Documented — duplicate placements double-count into per-claim
+<code>used_*</code> (item 1).</strong> Round four's "benign" verdict on the
+stale-placement edge was scoped to cluster accounting without saying
+so; per-claim <code>used_*</code> is deliberately namespace-wide and therefore
+exactly the counter the closed-accounting fix does not protect. Now
+recorded as the third phase-4 claim-accounting bullet above and
+mirrored in the <code>_RECONCILE_USAGE_SQL</code> comment block.</p>
+<p><strong>Considers taken (items 2, 3, 5, 6, 7):</strong> baseobject.py now imports
+<code>NODE_ACTIVE_STATES</code> instead of carrying the third hardcoded copy of
+the set (and its comment no longer claims errored nodes are included
+when they were not — a pre-existing comment/code contradiction);
+node.py's comment stops instructing maintainers to hand-sync a copy
+that no longer exists; the schema tests assert <code>sa.BigInteger</code> rather
+than <code>sa.Integer</code> (which BigInteger satisfies, leaving round four's
+deliberate widening unpinned); <code>_reconcile_fetch_demand</code>'s docstring
+records that its window comparison spans hosts like the metrics
+freshness check, with the negative-age clamp as mitigation; and the
+live test module docstring states the <code>--serial</code> requirement the
+collation flip depends on.</p>
+<p><strong>Consider recorded rather than coded (item 8):</strong> the
+<code>BOUNDED_QUERY_TIMEOUT</code> justification is release-scoped; the adopted
+bullet above now carries the phase-3 pairing requirement (raise the
+reconciler budget or disable the guard on consecutive failures).</p>
+<p><strong>No action (items 4, 9):</strong> the MariaDB 10.11 floor bump was verified
+correct and fully documented by the reviewer; the lazy <code>should_run</code>
+evaluation in <code>_run_due_scheduled_jobs</code> was judged benign and
+arguably better (a job falling due mid-batch runs in the same batch).</p>
+<p>No further re-review was requested: the round contained no fix items,
+and the changes above are comments, docstrings, plan text and one
+test-assertion tightening.</p>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<ul>
+<li>After <code>sf-ctl ensure-mariadb-schema</code> and a deploy, the
+  first reconcile pass populates one <code>scheduler_node_capacity</code>
+  row per hypervisor with limits matching a hand check of
+  that node's <code>node_metrics</code> values, and <code>cluster_capacity</code>
+  sums them; a manual sfcbr spot-check confirms <code>used_*</code>
+  matches the actually-placed instances.</li>
+<li>Prometheus gauges are visible from the elected cluster
+  node and move when instances are created and deleted.</li>
+<li><code>sf-database</code> refuses to start against a schema missing the
+  three tables; <code>ensure-mariadb-schema</code> is idempotent.</li>
+<li>An exception inside the reconciler is logged and skipped
+  without breaking the maintenance loop, and cluster CI runs
+  clean (its log-error checks are the functional gate for
+  this phase; a REST-visible functional test waits for the
+  phase 5 read surface).</li>
+<li>Zero behaviour change anywhere else: <code>tox</code> and cluster CI
+  green, scheduler and placement code untouched.</li>
+<li>mypy coverage of touched code does not regress.</li>
+</ul>
+<h3 id="review-checklist-management-session-step-6">Review checklist (management session, step 6)<a class="headerlink" href="#review-checklist-management-session-step-6" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every dashed/undashed uuid join uses the index-friendly
+      transform (pitfall 6); no join compares the two forms
+      directly.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Limit formulas match <code>scheduler.py</code> arithmetic;
+      deviations (allocation-ledger memory, virtual-size
+      disk) are exactly the documented ones.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The reconciler cannot raise out of the scheduled task,
+      and one malformed row (bad <code>disk_spec</code>, NULL metrics)
+      cannot abort the whole pass.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Reconcile is a single RPC; its duration and reply size
+      are bounded and sane at sfcbr scale (watchdog budget,
+      gRPC message limits).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> NULL-columned <code>node_metrics</code> rows (old resources
+      daemon) do not zero existing limits.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Nothing outside the reconciler and its tests reads or
+      writes the new tables.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>in_memory_only</code> objects cannot reach the new tables
+      (the reconciler only reads static tables and writes its
+      own).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> New config options registered with descriptions and
+      flagged provisional pending step 3 data.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The plan file rides in the PR branch; master plan row
+      updated.</li>
+</ul>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, back brief the
+operator as to your understanding of the plan and how the
+work you intend to do aligns with that plan.</p>
 
 
 
@@ -10985,7 +11835,7 @@ operator on:</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-byo-mariadb-phase-01-statelessness.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-byo-mariadb-phase-01-statelessness.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-byo-mariadb-phase-01-statelessness/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-scheduler-reservations-phase-02-capacity-tables/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

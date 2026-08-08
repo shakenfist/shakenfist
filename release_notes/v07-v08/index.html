@@ -11383,7 +11383,21 @@ existing deployments must be rebuilt against the new shape.</p>
 <li>
 <p><strong>Deployer no longer installs MariaDB.</strong> The <code>roles/mariadb/</code> Ansible
   role has been deleted. Operators are responsible for running a MariaDB
-  10.6.0+ server before deploying Shaken Fist.</p>
+  10.11.0+ server before deploying Shaken Fist.</p>
+</li>
+<li>
+<p><strong>The minimum MariaDB version is 10.11.0.</strong> Earlier in the v0.8 cycle
+  this was documented as 10.6.0, but that floor was never actually
+  satisfiable: the <code>ipam_reservations.address</code> column uses the native
+  <code>INET4</code> type, which arrived in MariaDB 10.10, so schema creation on a
+  10.6 server failed <em>after</em> the compatibility check had already passed
+  it. The floor is now 10.11 — the oldest in-support LTS above that
+  requirement, which ships with Debian 12 and 13 and Ubuntu 24.04 and is
+  the version the functional CI exercises. <strong>If you are running MariaDB
+  between 10.6 and 10.10 you must upgrade the database before upgrading
+  Shaken Fist</strong>: <code>sf-ctl ensure-mariadb-schema</code> and <code>sf-database</code> now
+  both refuse to start against it with a clear message, rather than
+  failing partway through schema creation.</p>
 </li>
 <li>
 <p><strong>Bootstrap and tuning helpers ship in the source tree.</strong>
@@ -11414,7 +11428,7 @@ existing deployments must be rebuilt against the new shape.</p>
 <li>
 <p><strong>MariaDB compatibility check at startup.</strong> Both
   <code>sf-ctl ensure-mariadb-schema</code> and <code>sf-database</code> at startup verify
-  that the server is MariaDB (not MySQL), version 10.6.0 or later, with
+  that the server is MariaDB (not MySQL), version 10.11.0 or later, with
   the default storage engine set to InnoDB, the connection charset
   <code>utf8mb4</code>, and a <code>utf8mb4_*</code> collation. An incompatible server
   surfaces as a clear refusal-to-start with a multi-line error rather
