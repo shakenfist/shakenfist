@@ -1091,6 +1091,24 @@ implemented because the following statements will be true:
   anything, which is what it already has. Issuer and rule
   management is where a command line would actually earn
   its keep.
+* **A readable view of a key**
+  ([#3672](https://github.com/shakenfist/shakenfist/issues/3672)),
+  found while planning phase 4. Phase 2 gave keys an expiry
+  and phase 3 gave them scopes and provenance;
+  `NamespaceKey.external_view()` renders all three and
+  calls itself "the operator visible view of a key", and no
+  endpoint calls it. `GET
+  /auth/namespaces/{namespace}/keys` still answers with a
+  list of key *names*, read from the legacy
+  `keys['nonced_keys']` dict. So a namespace owner cannot
+  ask which of their keys expires when, or what a federated
+  key may do, without reading the database — which is the
+  audit question provenance was added to answer. Unlike the
+  two client-python items above this is server side, and it
+  is a breaking change to a published response shape with
+  in-tree consumers, so it needs a compatibility design of
+  its own rather than an edit to the handler. That is why
+  phase 4 documented the gap instead of closing it.
 * **Token introspection / jti denylist** if bounded-delay
   revocation of *scoped keys themselves* (as opposed to
   their derived tokens) ever proves insufficient.

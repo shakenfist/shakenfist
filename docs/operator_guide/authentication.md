@@ -45,6 +45,9 @@ not depend on the sweep having run.
     Setting `NAMESPACE_KEY_REAP_GRACE` to `0` while investigating keeps
     that evidence indefinitely.
 
+    Tracked as
+    [issue #3672](https://github.com/shakenfist/shakenfist/issues/3672).
+
 ## Cluster generated key secrets
 
 Secrets Shaken Fist generates itself — the short-lived service keys
