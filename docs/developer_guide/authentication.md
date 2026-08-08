@@ -1,11 +1,28 @@
 # Authentication and Namespaces
 
-Shaken Fist uses JWT tokens for authentication and access control. These tokens
-are created with a request to the REST API and then passed as part of subsequent
-calls in the form of a HTTP header on the request. The tokens can expire, in
-which case a caller needs to re-authenticate and then retry their request. The
-process to create and use a token is discussed further in the
-*Authentication* section below.
+Authentication in Shaken Fist has three moving parts, and most of this page is
+an expansion of them.
+
+A **namespace key** is a first-class object owned by a namespace, with its own
+UUID, state machine and event stream. It may carry an expiry, a set of scopes,
+and a record of where it came from.
+
+An **access token** is a short lived JWT derived from a key by a request to the
+REST API, and passed on subsequent calls as an HTTP header. It inherits the
+key's scopes, and it is bound to the key by a nonce, so changing or removing
+the key invalidates every token already derived from it. Tokens also expire on
+their own, in which case a caller re-authenticates and retries.
+
+A **scope** names a class of operation that a key, and any token derived from
+it, is permitted to perform. A key with no scopes recorded may do anything its
+namespace may do, which is how every key created before scopes existed
+continues to behave.
+
+Keys arrive two ways. An administrator creates one, or a workload that already
+has an identity somewhere else -- a GitHub Actions job, a service account in an
+Authentik instance -- exchanges that identity for one. A key obtained by
+exchange is an ordinary namespace key in every respect; nothing downstream
+knows or cares how it was created.
 
 Terms used here are defined in the [glossary](../glossary.md).
 
@@ -41,7 +58,7 @@ remove the trust of the system namespace from your namespaces. However, you can
 choose to trust additional namespaces, and this is done via the
 `sf-client namespace trust ...` series of commands and associated API calls.
 
-## Authentication
+## Configuring a client
 
 When the deploy playbook ran, it created two authentication artifacts on each
 node which are useful to get started with Shaken Fist. First off, there
@@ -98,7 +115,7 @@ sf-client namespace create new-namespace
 By default a new namespace has no access keys or trusts configured, and therefore
 is only accessible to users of the system namespace.
 
-## Key management
+## Namespace keys
 
 Namespaces are accessed by providing a valid "key" for the namespace. While
 keys have names, they do not have to be usernames and passwords -- my mental
@@ -116,10 +133,14 @@ There can be more than one key for a namespace. The key name is not used as part
 of the authentication process, and is largely used for key management (deleting
 the key) and logging which access token was used in the event logs.
 
+A key may also carry an expiry, and may have the cluster choose its secret
+rather than supplying one; both are described below, and both are REST API
+features which the command line does not expose yet.
+
 ???+ info
 
     Please note the key prefix "_service_key" is reserved for internal use within
-    Shaken Fist. This usage is discussed in the *Inter-node Authentication* section
+    Shaken Fist. This usage is discussed in the *Inter-node authentication* section
     below.
 
 ### Keys are objects
@@ -133,6 +154,23 @@ being an anonymous entry in a JSON blob hanging off the namespace.
 Nothing about this is visible on the wire. The key management endpoints and
 their responses are unchanged, and a client written against an older release
 behaves identically.
+
+That backwards compatibility has a cost worth knowing about: the key listing
+endpoint still returns a list of key *names*, so a key's expiry, scopes and
+provenance are recorded on the object but are not readable through any API.
+`NamespaceKey.external_view()` renders them and nothing serves it.
+
+### Secrets the cluster generates
+
+Creating a key without supplying a secret has the cluster generate one, which
+is returned exactly once in the response. Generated secrets carry a recognisable
+`sfk_` prefix and a checksum, which makes a leaked credential greppable and lets
+a secret scanner reject lookalikes without calling the API. The prefix is
+reserved against operator-supplied secrets so that `/auth` can reject a
+malformed one before doing any bcrypt work.
+
+The format, the reservation and the upgrade caveat are covered in the
+[operator guide](/operator_guide/authentication/#cluster-generated-key-secrets).
 
 ### Rotation
 
@@ -168,146 +206,6 @@ grace period exists so that an operator debugging automation which suddenly
 stopped working can still see the key that lapsed. Because enforcement is at
 the point of use, none of these timings affect security -- only how long the
 evidence sticks around.
-
-## Authenticating directly to the REST API
-
-The authentication endpoint `/auth` is used to obtain a token to authenticate
-future API requests. For example, I can obtain an authentication token from the
-REST API using `curl` like this:
-
-```
-curl -X POST https://shakenfist/api/auth -d '{"namespace": "system", "key": "oisoSe7T"}'
-{
-    "access_token": "eyJhbG...IkpXVCJ9.eyJmc...wwQ",
-    "token_type": "Bearer",
-    "expires_in": 900
-}
-```
-
-That is, a HTTP POST request to the `/auth` endpoint for the REST API (in our
-case hosted at `https://shakenfist/api`) with a JSON body containing a dictionary
-of the namespace name and the key to use.
-
-In the response the `access_token` value of  `eyJhbG...IkpXVCJ9.eyJmc...wwQ` is
-our JWT token and has been truncated in this example for readability. Authentication
-tokens expire after a fixed period of time (nominally 15 minutes), but you will
-be informed that the token as expired by receiving a 401 Unauthorized response.
-If that occurs, simply create a new token as above and retry your request.
-
-Subsequent requests to the REST API pass the token via an `Authorization` HTTP
-header, and should request a `Content-Type` of `application/json`. For example,
-to list the namespaces in our deployment we would make a `curl` request like this:
-
-```
-curl -X GET https://shakenfist/api/auth/namespaces \
-    -H 'Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ' \
-    -H 'Content-Type: application/json'
-[
-    {
-        "name": "adhoc",
-        "state": "created",
-        "trust": {"full": ["system"]}
-    }, {
-        "name": "ci",
-        "state": "created",
-        "trust": {"full": ["system"]}
-    }, {
-        "name": "system",
-        "state": "created",
-        "trust": {"full": ["system"]}
-    }
-]
-```
-
-The JSON response here has been formatted for readability.
-
-???+ info
-
-    Note the word "Bearer" before the access token in the Authorization header.
-
-## Contents of the JWT tokens
-
-JWT authentication tokens are base64 encoded parts separated by the `.` character.
-They are therefore trivial to decode. A decoded example (generated by the online
-decoder at https://jwt.io/) is:
-
-```
-{
-    "alg": "HS256",
-    "typ": "JWT"
-}
-.
-{
-    "fresh": false,
-    "iat": 1669786988,
-    "jti": "906f4bfa-3218-4d07-a036-ac6b44ded67e",
-    "type": "access",
-    "sub": [
-        "system",
-        "deploy"
-    ],
-    "nbf": 1669786988,
-    "exp": 1669787888,
-    "iss": "shakenfist",
-    "nonce": "ByKNRUVBfMBoQC1Z"
-}
-.
-HMACSHA256(
-    base64UrlEncode(header) + "." +
-    base64UrlEncode(payload),
-    your-256-bit-secret
-)
-```
-
-You can see here that Shaken Fist stores the authenticated namespace `system` and
-the key used to authenticate `deploy` under the `sub` key in this token. *You should
-not assume that the content of JWT tokens produced by Shaken Fist are opaque to
-users.*
-
-For releases prior to v0.7, the token was blindly trusted for authentication. From
-v0.7 we verify that the named key still exists in the namespace before authorizing
-API requests. This test is performed by updating a "nonce" value for a given key
-when the key is updated. The JWT token a caller is handed includes this nonce, and
-if the nonce we are handed on a request does not match the current value in the
-database the request is rejected.
-
-## Inter-node Authentication
-
-Requests between Shaken Fist nodes use the same authentication system and REST API
-as external API requests. When a node makes an API request to another node, the
-originating node will create (or reuse) a "service key" specific to the namespace
-of the original request.
-
-When a request is made from the "system" namespace for a resource in a different
-namespace, the API request is made using the foreign namespace and the foreign
-namespace's service key.
-
-Service keys exist in the namespace's key data structures just as other keys do,
-and are therefore visible when you list keys. As of v0.7, service keys expire
-after five minutes, and are never reused. Before v0.7 service keys were always
-named "_service_key". From v0.7 service keys have a name of the form
-"_service_key[a-zA-Z]+".
-
-## Key Storage
-
-Shaken Fist stores keys in MariaDB across two tables: `namespace_keys` holds
-the immutable values (UUID, owning namespace, key name), and
-`namespace_key_attributes` holds what rotation changes (the hash, the nonce,
-the expiry). The secret itself is never stored -- what is kept is the base64
-encoding of the secret after salting and hashing, with the python `bcrypt`
-library performing salting, hashing and verification.
-
-The `(namespace, name)` pair carries a unique index, which is what makes a key
-name unique within its namespace and what serves the per-namespace listing on
-the authentication path.
-
-Keys previously lived in a `keys` JSON column on the `namespace_attributes`
-table. Existing keys are migrated into the new tables by
-`sf-ctl ensure-mariadb-schema` during upgrade, preserving each key's hash,
-nonce and expiry exactly, so tokens minted before the upgrade continue to
-validate. The old column is left in place but is no longer read or written.
-Note that this means downgrading after the migration loses any key created
-afterwards; keys that predate the upgrade are unaffected.
 
 ## Scopes
 
@@ -400,6 +298,119 @@ scopes: ["cluster-admin", "node.read"]
 grants cluster-wide visibility to a monitoring workload that provably
 cannot delete a node. If administration were a single all-or-nothing
 flag, that credential could not be expressed.
+
+## Access tokens
+
+A key is not sent on every request. It is exchanged once for a short lived
+access token, and that token is what subsequent requests carry.
+
+### Obtaining a token
+
+The authentication endpoint `/auth` is used to obtain a token to authenticate
+future API requests. For example, I can obtain an authentication token from the
+REST API using `curl` like this:
+
+```
+curl -X POST https://shakenfist/api/auth -d '{"namespace": "system", "key": "oisoSe7T"}'
+{
+    "access_token": "eyJhbG...IkpXVCJ9.eyJmc...wwQ",
+    "token_type": "Bearer",
+    "expires_in": 900
+}
+```
+
+That is, a HTTP POST request to the `/auth` endpoint for the REST API (in our
+case hosted at `https://shakenfist/api`) with a JSON body containing a dictionary
+of the namespace name and the key to use.
+
+In the response the `access_token` value of  `eyJhbG...IkpXVCJ9.eyJmc...wwQ` is
+our JWT token and has been truncated in this example for readability. Authentication
+tokens expire after a fixed period of time (nominally 15 minutes), but you will
+be informed that the token as expired by receiving a 401 Unauthorized response.
+If that occurs, simply create a new token as above and retry your request.
+
+Subsequent requests to the REST API pass the token via an `Authorization` HTTP
+header, and should request a `Content-Type` of `application/json`. For example,
+to list the namespaces in our deployment we would make a `curl` request like this:
+
+```
+curl -X GET https://shakenfist/api/auth/namespaces \
+    -H 'Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ' \
+    -H 'Content-Type: application/json'
+[
+    {
+        "name": "adhoc",
+        "state": "created",
+        "trust": {"full": ["system"]}
+    }, {
+        "name": "ci",
+        "state": "created",
+        "trust": {"full": ["system"]}
+    }, {
+        "name": "system",
+        "state": "created",
+        "trust": {"full": ["system"]}
+    }
+]
+```
+
+The JSON response here has been formatted for readability.
+
+???+ info
+
+    Note the word "Bearer" before the access token in the Authorization header.
+
+### What is inside a token
+
+JWT authentication tokens are base64 encoded parts separated by the `.` character.
+They are therefore trivial to decode. A decoded example (generated by the online
+decoder at https://jwt.io/) is:
+
+```
+{
+    "alg": "HS256",
+    "typ": "JWT"
+}
+.
+{
+    "fresh": false,
+    "iat": 1669786988,
+    "jti": "906f4bfa-3218-4d07-a036-ac6b44ded67e",
+    "type": "access",
+    "sub": [
+        "system",
+        "deploy"
+    ],
+    "nbf": 1669786988,
+    "exp": 1669787888,
+    "iss": "shakenfist",
+    "nonce": "ByKNRUVBfMBoQC1Z"
+}
+.
+HMACSHA256(
+    base64UrlEncode(header) + "." +
+    base64UrlEncode(payload),
+    your-256-bit-secret
+)
+```
+
+You can see here that Shaken Fist stores the authenticated namespace `system` and
+the key used to authenticate `deploy` under the `sub` key in this token. *You should
+not assume that the content of JWT tokens produced by Shaken Fist are opaque to
+users.*
+
+### The nonce
+
+For releases prior to v0.7, the token was blindly trusted for authentication. From
+v0.7 we verify that the named key still exists in the namespace before authorizing
+API requests. This test is performed by updating a "nonce" value for a given key
+when the key is updated. The JWT token a caller is handed includes this nonce, and
+if the nonce we are handed on a request does not match the current value in the
+database the request is rejected.
+
+The nonce is therefore the revocation mechanism for derived tokens: rotating,
+deleting or expiring a key changes or removes its nonce, and every token already
+minted from that key stops validating on its next request.
 
 ## Federated identity
 
@@ -570,6 +581,45 @@ ends up holding is scoped to `blob.read` and `artifact.*`, expires an
 hour after it was minted, and its provenance records which rule minted
 it and which claims were satisfied -- so an audit of "what did that
 workflow have access to" is a query rather than an investigation.
+
+## Inter-node authentication
+
+Requests between Shaken Fist nodes use the same authentication system and REST API
+as external API requests. When a node makes an API request to another node, the
+originating node will create (or reuse) a "service key" specific to the namespace
+of the original request.
+
+When a request is made from the "system" namespace for a resource in a different
+namespace, the API request is made using the foreign namespace and the foreign
+namespace's service key.
+
+Service keys exist in the namespace's key data structures just as other keys do,
+and are therefore visible when you list keys. As of v0.7, service keys expire
+after five minutes, and are never reused. Before v0.7 service keys were always
+named "_service_key". From v0.7 service keys have a name of the form
+"_service_key[a-zA-Z]+".
+
+## Key storage
+
+Shaken Fist stores keys in MariaDB across two tables: `namespace_keys` holds
+the immutable values (UUID, owning namespace, key name), and
+`namespace_key_attributes` holds what rotation changes (the hash, the nonce,
+the expiry) along with the key's scopes and its provenance. The secret itself
+is never stored -- what is kept is the base64 encoding of the secret after
+salting and hashing, with the python `bcrypt` library performing salting,
+hashing and verification.
+
+The `(namespace, name)` pair carries a unique index, which is what makes a key
+name unique within its namespace and what serves the per-namespace listing on
+the authentication path.
+
+Keys previously lived in a `keys` JSON column on the `namespace_attributes`
+table. Existing keys are migrated into the new tables by
+`sf-ctl ensure-mariadb-schema` during upgrade, preserving each key's hash,
+nonce and expiry exactly, so tokens minted before the upgrade continue to
+validate. The old column is left in place but is no longer read or written.
+Note that this means downgrading after the migration loses any key created
+afterwards; keys that predate the upgrade are unaffected.
 
 ## Secrets and the event log
 
