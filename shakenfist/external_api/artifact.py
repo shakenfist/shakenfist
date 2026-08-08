@@ -529,7 +529,7 @@ class ArtifactsEndpoint(api_base.Resource):
         for a in Artifacts(namespace=namespace):
             a.add_event(EVENT_TYPE_AUDIT, 'deletion request from REST API')
             a.delete()
-            deleted.append(a.uuid)
+            deleted.append(str(a.uuid))
 
         return deleted
 
