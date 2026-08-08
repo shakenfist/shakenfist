@@ -609,12 +609,12 @@ groundwork exists, and lives mostly outside this repository.
 | 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Complete |
 | 2. Namespace keys as first-class objects | [PLAN-auth-federation-phase-02-key-objects.md](PLAN-auth-federation-phase-02-key-objects.md) | Complete |
 | 3. Federated exchange and scope enforcement | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Complete |
-| 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |
+| 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
 | 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
 | 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
 
-Phase plans for phases 4–7 have not been drafted yet; the
+Phase plans for phases 5–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
 carried into the relevant phase plan) before each phase is
 cut.
@@ -792,11 +792,21 @@ depend on the private CI conductor implementation.
 Phase 3 shipped most of the developer and operator guide
 halves of this as it went, because a security decision is
 cheapest to write down while it is being made. What remains
-is the user guide page, which does not exist at all:
-`docs/user_guide/authentication.md` needs writing from
-scratch. Phase 4 should also re-read the two existing guides
-end to end, rather than assuming a series of incremental
-additions composes into a coherent page.
+is the user guide page. This section previously said that
+page did not exist; it does, at 34 lines, and it predates
+every one of phases 1 to 3, so it is a rewrite of live
+content rather than a green field. Phase 4 should also
+re-read the two existing guides end to end, rather than
+assuming a series of incremental additions composes into a
+coherent page.
+
+Two of this section's other assumptions were also overtaken
+by phase 3 and are corrected in the phase plan: the worked
+GitHub Actions example shipped in the developer guide rather
+than the operator guide, and key expiry and scopes are not
+readable through any API or client, so the user guide cannot
+describe how they "surface in `sf-client`". See the phase
+plan's *What the survey found*.
 
 ### Phase 5: OIDC plan refresh
 
@@ -1081,6 +1091,24 @@ implemented because the following statements will be true:
   anything, which is what it already has. Issuer and rule
   management is where a command line would actually earn
   its keep.
+* **A readable view of a key**
+  ([#3672](https://github.com/shakenfist/shakenfist/issues/3672)),
+  found while planning phase 4. Phase 2 gave keys an expiry
+  and phase 3 gave them scopes and provenance;
+  `NamespaceKey.external_view()` renders all three and
+  calls itself "the operator visible view of a key", and no
+  endpoint calls it. `GET
+  /auth/namespaces/{namespace}/keys` still answers with a
+  list of key *names*, read from the legacy
+  `keys['nonced_keys']` dict. So a namespace owner cannot
+  ask which of their keys expires when, or what a federated
+  key may do, without reading the database — which is the
+  audit question provenance was added to answer. Unlike the
+  two client-python items above this is server side, and it
+  is a breaking change to a published response shape with
+  in-tree consumers, so it needs a compatibility design of
+  its own rather than an edit to the handler. That is why
+  phase 4 documented the gap instead of closing it.
 * **Token introspection / jti denylist** if bounded-delay
   revocation of *scoped keys themselves* (as opposed to
   their derived tokens) ever proves insufficient.
