@@ -23,7 +23,7 @@
                 "max_entries_to_merge": 5,
                 "merge_method": "MERGE",
                 "min_entries_to_merge": 1,
-                "min_entries_to_merge_wait_minutes": 30
+                "min_entries_to_merge_wait_minutes": 5
             },
             "type": "merge_queue"
         },
