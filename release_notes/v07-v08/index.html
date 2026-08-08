@@ -11185,6 +11185,14 @@
   namespace key. It is deliberately unauthenticated -- the identity token is
   the credential -- and is rate limited per source address. An identity token
   may be exchanged only once per mapping rule.</li>
+<li><code>FEDERATION_JWKS_CA_BUNDLE</code> names extra certificate authorities to trust
+  when fetching an issuer's JWKS, for an identity provider behind a private
+  CA -- a self hosted Authentik or Keycloak usually is. The anchors are added
+  to the system ones rather than replacing them, so a private provider and a
+  public one such as GitHub can both be trusted issuers at once. The ansible
+  collection takes it as the <code>node</code> role's <code>federation_jwks_ca_bundle</code>. It
+  relaxes nothing else: <code>jwks_uri</code> must still be <code>https://</code>, and there is
+  deliberately no way to skip verification.</li>
 <li>The parameter declarations in the published OpenAPI specification have been
   audited against the implementation and around 120 of them corrected --
   including instance create's <code>sshkey</code> and <code>userdata</code>, which documented names
@@ -11297,9 +11305,48 @@ that owned the artifact would find the image its instances boot replaced by
 somebody else's. Creating is a gift; overwriting is a substitution.</p>
 <p>If you have tooling which re-uploads the same <code>source_url</code> across a trust --
 a CI job pushing a nightly image into a shared namespace is the usual shape
--- it now needs a key in the owning namespace, or the system namespace.
-Labels are unaffected, because <code>LabelEndpoint</code> resolves a namespace-scoped
-<code>sf://label/&lt;namespace&gt;/&lt;name&gt;</code> URL rather than a caller-supplied one.</p>
+-- it now needs a key in the owning namespace, or the system namespace.</p>
+</li>
+<li>
+<p><strong>Labels are now subject to the same rule, which they were not before.</strong>
+  An earlier note in this section said labels were unaffected because
+  <code>LabelEndpoint</code> builds a namespace-scoped <code>sf://label/&lt;namespace&gt;/&lt;name&gt;</code>
+  URL rather than taking one from the caller. That was wrong: a label may be
+  named as <code>&lt;namespace&gt;/&lt;label&gt;</code>, and the namespace in it came from the
+  requestor. Nothing checked it, so any authenticated caller could
+  <code>POST /label/&lt;somebody else&gt;/&lt;label&gt;</code> and make its own blob the newest
+  version of their label -- and since that ends in <code>delete_old_versions</code>, the
+  versions underneath went too.</p>
+<p>Updating a label now requires the owning namespace or <code>system</code>. Creating a
+label in a namespace which trusts you still works, on the same
+creating-is-a-gift reasoning as the artifact case above. If you have
+tooling which updates labels across a trust, it now needs a key in the
+owning namespace.</p>
+</li>
+<li>
+<p><strong>Booting from the plain URL of an image somebody else shares no longer
+  refetches it.</strong> Previously an instance whose <code>disk.base</code> was
+  <code>https://.../centos.qcow2</code> resolved by visibility, so it could land on the
+  shared artifact another namespace (usually <code>system</code>) owns and roll it
+  forward -- the same <code>delete_old_versions</code> problem as above, reached from the
+  instance create path rather than from the API. It now resolves by ownership.</p>
+<p>Sharing is still honoured, in the direction which does not write: if you
+own no artifact for that URL and somebody visible to you does, the instance
+boots from the blob that artifact already holds. That costs no download and
+changes nothing of theirs. It does mean the boot no longer refreshes the
+image from upstream, where before it sometimes did.</p>
+<p>If you were relying on a boot to pull a newer copy of a URL somebody else
+shares, fetch or upload it into your own namespace instead. An artifact you
+own is refreshed exactly as it always was.</p>
+</li>
+<li>
+<p><strong><code>GET</code> and <code>DELETE</code> on <code>/label/...</code> work again.</strong> Both had answered 500 to
+  every request since v0.7: the URL lookup was handed a <code>(namespace, url)</code>
+  pair where it expected a string, so nothing ever matched, and the resulting
+  404 was constructed but never returned. Reading a label now resolves like
+  every other artifact read -- your own namespace, one which trusts you, or
+  anything shared -- and deleting one requires the owning namespace or
+  <code>system</code>.</p>
 </li>
 </ul>
 <h3 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h3>

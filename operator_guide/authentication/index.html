@@ -10300,6 +10300,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#an-identity-provider-behind-a-private-ca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An identity provider behind a private CA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#if-nobody-uses-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10867,6 +10878,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#an-identity-provider-behind-a-private-ca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An identity provider behind a private CA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#if-nobody-uses-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11153,8 +11175,40 @@ exchange answers 503 rather than assuming the request is fine.</p>
 <td>60</td>
 <td>Exchange attempts allowed per source address per minute. <code>0</code> disables rate limiting entirely</td>
 </tr>
+<tr>
+<td><code>FEDERATION_JWKS_CA_BUNDLE</code></td>
+<td><em>(empty)</em></td>
+<td>Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone</td>
+</tr>
 </tbody>
 </table>
+<h3 id="an-identity-provider-behind-a-private-ca">An identity provider behind a private CA<a class="headerlink" href="#an-identity-provider-behind-a-private-ca" title="Permanent link">&para;</a></h3>
+<p>A self hosted Authentik or Keycloak usually presents a certificate
+signed by the organisation's own CA rather than a public one, and the
+<code>jwks_uri</code> fetch will refuse it. Point <code>FEDERATION_JWKS_CA_BUNDLE</code> at a
+PEM file of the extra authorities to trust, and place that file on
+every node — any node may serve <code>/auth/federated</code>. The ansible
+collection's <code>node</code> role takes this as <code>federation_jwks_ca_bundle</code>;
+getting the file itself onto the nodes is yours to arrange, since it is
+usually the same bundle the rest of your fleet already has.</p>
+<p>These anchors are <strong>added</strong> to the system ones rather than replacing
+them, so configuring a private provider does not stop a public one such
+as GitHub from verifying, and both can be trusted issuers at once.</p>
+<p>Nothing else is relaxed by setting it. <code>jwks_uri</code> must still be
+<code>https://</code>, the hostname must still match, expiry is still checked, and
+a certificate chaining to neither set is still refused. There is
+deliberately no option to skip verification: a JWKS fetched over a
+connection nobody authenticated can be substituted by anyone on the
+path, which makes signature verification theatre.</p>
+<p>If the path is wrong, or the file is not a PEM bundle, <code>sf-api</code> says so
+twice. Each worker complains at startup, so a bad path is a line in the
+log at deploy time rather than a surprise at somebody's first federated
+login weeks later. If it is still wrong when a token arrives,
+<code>/auth/federated</code> answers <strong>503</strong> rather than 401 — the token was never
+examined, and calling it rejected would send the caller to their
+identity provider to look for a fault which is in your config file. The
+log line names <code>FEDERATION_JWKS_CA_BUNDLE</code> and the path; the response
+deliberately does not.</p>
 <h3 id="if-nobody-uses-it">If nobody uses it<a class="headerlink" href="#if-nobody-uses-it" title="Permanent link">&para;</a></h3>
 <p>Federation is inert until an issuer exists. A cluster which never
 creates one behaves exactly as it did before: the two tables stay
@@ -11213,8 +11267,15 @@ again over the artifact that first upload produced: adding a version ends in
 is that an instance of yours booting that artifact afterwards gets somebody
 else's image. So the second upload is refused, and a CI job which pushes a
 nightly image into a shared namespace needs a key in that namespace rather
-than a trust. Labels are not affected — a label URL names its own namespace,
-so a trusted caller cannot reach yours through one.</p>
+than a trust.</p>
+<p>Labels fall on the same side of that line, which they did not until v0.8.
+A label may be named <code>&lt;namespace&gt;/&lt;label&gt;</code>, so a caller <em>can</em> reach into
+your namespace through one, and nothing used to stop it — updating a label
+in your namespace did not even require a trust. A trusted namespace may now
+create a label in yours and may not update one that already exists, matching
+artifacts exactly. This does affect the <code>ci-images</code> pattern above: the first
+gift of a given label works, and a job which republishes under the same label
+name every night needs a key in the receiving namespace.</p>
 <p><strong>Namespace administration is the exception, and it is a large one.</strong>
 Adding a key to your namespace, and writing a mapping rule in it, are both
 gated on this same trust relationship rather than on ownership. A namespace
