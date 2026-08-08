@@ -134,6 +134,9 @@ Four decisions were taken before implementation:
    is shown stable — the deploy is heavy and we have seen merge-queue
    SSH-timeout flakes elsewhere. It is promoted to a PR gate once green and
    reliable.
+   *Superseded 2026-08-08: promoted to a PR smoke gate by two-tier CI
+   phase 2 ([PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/)),
+   under a deliberately relaxed stability criterion recorded there.*
 
 ### Alternatives considered and rejected
 
