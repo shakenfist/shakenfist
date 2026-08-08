@@ -10278,6 +10278,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-worked-github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A worked GitHub Actions example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#abuse-resistance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10856,6 +10867,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-worked-github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A worked GitHub Actions example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#abuse-resistance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10993,6 +11015,20 @@ suddenly stopped working can still see the key that lapsed. Lengthen it if you
 want a longer forensic window; set it to <code>0</code> if you would rather expired keys
 were never removed. Neither choice affects security, because enforcement does
 not depend on the sweep having run.</p>
+<div class="admonition warning">
+<p class="admonition-title">You cannot currently read an expiry back</p>
+<p>A key's expiry is recorded on the key object, and no API returns it.
+<code>GET /auth/namespaces/{namespace}/keys</code> answers with a list of key
+<em>names</em> only, and the same is true of the scopes and the provenance of
+a key minted by the federated exchange.</p>
+<p>This makes the forensic window above more important than it should be:
+when automation stops authenticating, the evidence that the key lapsed
+is the key's disappearance and its events, not a field you can query.
+Setting <code>NAMESPACE_KEY_REAP_GRACE</code> to <code>0</code> while investigating keeps
+that evidence indefinitely.</p>
+<p>Tracked as
+<a href="https://github.com/shakenfist/shakenfist/issues/3672">issue #3672</a>.</p>
+</div>
 <h2 id="cluster-generated-key-secrets">Cluster generated key secrets<a class="headerlink" href="#cluster-generated-key-secrets" title="Permanent link">&para;</a></h2>
 <p>Secrets Shaken Fist generates itself — the short-lived service keys
 used between nodes, keys minted by the federated exchange, and any key
@@ -11008,6 +11044,17 @@ of it.</p>
 <p>To have the cluster generate a key for you, create the key without
 supplying a secret. The generated secret is returned exactly once —
 only its bcrypt hash is stored, so it cannot be recovered afterwards.</p>
+<p>This is a REST API feature which the command line does not expose yet:
+<code>sf-client namespace add-key</code> takes the secret as a mandatory argument,
+so there is no way to omit it. Until that changes, generation means
+<code>curl</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/myproject/keys<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;key_name&quot;: &quot;deploy&quot;}&#39;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="o">{</span><span class="s2">&quot;key_name&quot;</span>:<span class="w"> </span><span class="s2">&quot;deploy&quot;</span>,<span class="w"> </span><span class="s2">&quot;key&quot;</span>:<span class="w"> </span><span class="s2">&quot;sfk_...&quot;</span><span class="o">}</span>
+</code></pre></div>
+<p>The same applies to <code>expiry</code>, which is also body-only.</p>
 <h3 id="the-prefix-is-reserved">The prefix is reserved<a class="headerlink" href="#the-prefix-is-reserved" title="Permanent link">&para;</a></h3>
 <p><code>sfk_</code> may not be used at the start of an operator-supplied key secret;
 attempting it is refused with a 400. This is not cosmetic. <code>/auth</code>
@@ -11122,6 +11169,79 @@ namespace owners can write their own rules without coming back to you.</p>
 </ul>
 <p>Listing a namespace's rules answers "who can get into this namespace",
 which is the inbound counterpart to listing its trusts.</p>
+<h3 id="a-worked-github-actions-example">A worked GitHub Actions example<a class="headerlink" href="#a-worked-github-actions-example" title="Permanent link">&para;</a></h3>
+<p>GitHub can mint an OIDC token for a workflow job, describing the
+repository, the branch and the workflow that asked for it. This is the
+end to end shape of granting a repository's workflows scoped access to
+a namespace.</p>
+<p>The <code>sf-client</code> command line does not wrap these routes yet, so the
+examples below call the REST API directly.</p>
+<p>Configure the issuer once, as an administrator:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="s1">        &quot;name&quot;: &quot;github&quot;,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s1">        &quot;issuer_url&quot;: &quot;https://token.actions.githubusercontent.com&quot;,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="s1">        &quot;jwks_uri&quot;: &quot;https://token.actions.githubusercontent.com/.well-known/jwks&quot;,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s1">        &quot;audience&quot;: &quot;https://sf.example.com&quot;</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s1">      }&#39;</span>
+</code></pre></div>
+<p>Then, as the owner of the namespace the workflow should reach, write a
+rule saying which jobs qualify and what they get:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="s1">        &quot;name&quot;: &quot;ryll&quot;,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="s1">        &quot;issuer&quot;: &quot;github&quot;,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="s1">        &quot;bound_claims&quot;: {</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="s1">          &quot;repository&quot;: &quot;shakenfist/ryll&quot;,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="s1">          &quot;ref&quot;: [&quot;refs/heads/develop&quot;, &quot;refs/heads/main&quot;]</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="s1">        },</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="s1">        &quot;scopes&quot;: [&quot;blob.read&quot;, &quot;artifact.*&quot;],</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="s1">        &quot;key_ttl&quot;: 3600,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="s1">        &quot;key_name_prefix&quot;: &quot;ryll-ci&quot;</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="s1">      }&#39;</span>
+</code></pre></div>
+<p>The workflow needs <code>id-token: write</code> permission to ask GitHub for a
+token, and nothing else:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">permissions</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Get a Shaken Fist key</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">          </span><span class="no">IDENTITY=$(curl -sS \</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">            </span><span class="no">-H &quot;Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}&quot; \</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">            </span><span class="no">&quot;${ACTIONS_ID_TOKEN_REQUEST_URL}&amp;audience=https://sf.example.com&quot; \</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">            </span><span class="no">| jq -r .value)</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">          </span><span class="no">RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">            </span><span class="no">-H &quot;Content-Type: application/json&quot; \</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">            </span><span class="no">-d &quot;{\&quot;token\&quot;: \&quot;${IDENTITY}\&quot;,</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">                 </span><span class="no">\&quot;namespace\&quot;: \&quot;ci\&quot;,</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">                 </span><span class="no">\&quot;rule\&quot;: \&quot;ryll\&quot;}&quot;)</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">          </span><span class="no">echo &quot;::add-mask::$(echo &quot;${RESPONSE}&quot; | jq -r .key)&quot;</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="w">          </span><span class="no">echo &quot;SHAKENFIST_KEY=$(echo &quot;${RESPONSE}&quot; | jq -r .key)&quot; &gt;&gt; &quot;${GITHUB_ENV}&quot;</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">          </span><span class="no">echo &quot;SHAKENFIST_NAMESPACE=ci&quot; &gt;&gt; &quot;${GITHUB_ENV}&quot;</span>
+</code></pre></div>
+<p>The <code>audience</code> in the token request must match the issuer's
+configured <code>audience</code> exactly, and the <code>add-mask</code> line matters: the
+minted secret is a credential, and the response body is the only place
+it will ever appear.</p>
+<p>There is no repository secret anywhere in this. The credential the job
+ends up holding is scoped to <code>blob.read</code> and <code>artifact.*</code>, expires an
+hour after it was minted, and its provenance records which rule minted
+it and which claims were satisfied -- so an audit of "what did that
+workflow have access to" is a query rather than an investigation.</p>
+<p>Nothing here is specific to GitHub's hosted runners; a self hosted
+runner asks for its token the same way.</p>
 <h3 id="abuse-resistance">Abuse resistance<a class="headerlink" href="#abuse-resistance" title="Permanent link">&para;</a></h3>
 <p><code>/auth/federated</code> is unauthenticated by nature, so it carries its own
 protections.</p>
@@ -11241,7 +11361,7 @@ be able to see them.</p>
 <p>What we implemented was:</p>
 <ul>
 <li>a namespace to store the base images (we called it <code>ci-images</code>).</li>
-<li>when our CI conductor creates a new CI runner and associated namespace, it
+<li>when our CI system creates a new CI runner and associated namespace, it
   creates a trust between that ephemeral namespace and the <code>ci-images</code> namespace.</li>
 <li>jobs to create new images build them in their local namespace, and then "gift"
   them to the <code>ci-images</code> namespace via a label.</li>

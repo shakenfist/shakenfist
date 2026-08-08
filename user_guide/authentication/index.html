@@ -8907,6 +8907,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -8923,6 +8941,80 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#keys-the-cluster-generated-for-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys the cluster generated for you
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-key-may-expire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your key may expire
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-key-may-be-limited-in-what-it-can-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your key may be limited in what it can do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys-that-came-from-somewhere-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys that came from somewhere else
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-cannot-currently-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you cannot currently see
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -10545,6 +10637,69 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#keys-the-cluster-generated-for-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys the cluster generated for you
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-key-may-expire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your key may expire
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-key-may-be-limited-in-what-it-can-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your key may be limited in what it can do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys-that-came-from-somewhere-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys that came from somewhere else
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-cannot-currently-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you cannot currently see
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -10575,11 +10730,11 @@ have created a <em>namespace</em> to contain the resources you create in Shaken 
 This namespace can have several authentication keys associated with it, which
 are simply strings you pass to Shaken Fist to prove your identity, much like API
 keys for GitHub or other web services. Normally your administrator will create
-a key per user, but its also possible to create a key per system -- there are
-not real rules imposed by Shaken Fist on when you should create a key not reuse
+a key per user, but it's also possible to create a key per system -- there are
+no real rules imposed by Shaken Fist on when you should create a key or reuse
 an existing one.</p>
 <p>For most users, this key will be provided in the form of a file you should place
-at <code>.shakenfist</code> in your home direct. An example file might be:</p>
+at <code>.shakenfist</code> in your home directory. An example file might be:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    &quot;namespace&quot;: &quot;mynamespace&quot;,
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    &quot;key&quot;: &quot;oisoSe7T&quot;,
@@ -10588,9 +10743,73 @@ at <code>.shakenfist</code> in your home direct. An example file might be:</p>
 </code></pre></div>
 <p>This file specifies your namespace, the key you will use to authenticate, and
 the location of the API server for that Shaken Fist cluster.</p>
-<p>Once you have that file in the correct location, the the Shaken Fist command line
+<p>Once you have that file in the correct location, the Shaken Fist command line
 client and API client will function correctly with no further configuration
 required.</p>
+<h2 id="keys-the-cluster-generated-for-you">Keys the cluster generated for you<a class="headerlink" href="#keys-the-cluster-generated-for-you" title="Permanent link">&para;</a></h2>
+<p>If your administrator asked Shaken Fist to generate your key rather than
+choosing one, it will look like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sfk_QKLZzvTtHM8fVc7XmoVe5ohIorW9Se6JDMUCWH
+</code></pre></div>
+<p>The <code>sfk_</code> prefix is there so that a leaked credential is easy to find --
+in a log file, in a repository, or by an automated secret scanner. Treat it
+exactly as you would any other key. There is nothing you need to do
+differently, but it is worth recognising the shape, because a string starting
+<code>sfk_</code> in a place you did not expect is a credential that has escaped.</p>
+<p>A generated key is shown to you once, when it is created. Shaken Fist stores
+only a hash of it, so nobody -- including your administrator -- can read it
+back to you later. If you lose it, you need a new one.</p>
+<h2 id="your-key-may-expire">Your key may expire<a class="headerlink" href="#your-key-may-expire" title="Permanent link">&para;</a></h2>
+<p>A key can be created with an expiry, and many are. A key with no expiry set
+never expires, which is the case for most keys created by hand.</p>
+<p>When a key expires it stops working immediately. There is no grace period.
+What you will see is a <code>401 Unauthorized</code> from a credential that worked
+yesterday, with nothing else having changed.</p>
+<p>There is one small wrinkle. Your client does not send your key on every
+request; it trades the key for a short lived token, nominally good for fifteen
+minutes, and sends that. So a key which expires part way through a session can
+leave you working for a few more minutes on the token you already hold, and
+then failing. If a long running job stops with a 401 shortly after it seemed
+fine, an expired key is the first thing to check.</p>
+<h2 id="your-key-may-be-limited-in-what-it-can-do">Your key may be limited in what it can do<a class="headerlink" href="#your-key-may-be-limited-in-what-it-can-do" title="Permanent link">&para;</a></h2>
+<p>A key can carry <em>scopes</em>, which name the kinds of operation it is allowed to
+perform -- reading blobs, say, but not deleting instances. A key with no
+scopes recorded can do anything its namespace can do, which is how keys
+behaved before scopes existed and how most hand-created keys still behave.</p>
+<p>If your key is scoped, an operation outside those scopes is refused with a
+<code>403 Forbidden</code> and the message <code>token is not scoped for this operation</code>.</p>
+<p>The distinction that matters when something is refused:</p>
+<ul>
+<li><strong>403</strong> means you are authenticated and in the right namespace, but this
+  key is not permitted to do this particular thing. Ask for a key with wider
+  scopes, or use a different one.</li>
+<li><strong>404</strong> on an object you believe exists usually means it is in a namespace
+  you cannot see. Shaken Fist deliberately answers 404 rather than 403 here,
+  so that a refusal does not reveal which namespaces exist.</li>
+</ul>
+<h2 id="keys-that-came-from-somewhere-else">Keys that came from somewhere else<a class="headerlink" href="#keys-that-came-from-somewhere-else" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist can issue a key to a workload that already has an identity
+elsewhere -- most commonly a CI job, which can prove to Shaken Fist that it is
+a particular workflow in a particular repository and receive a key in return.
+This means an automated job does not need a long lived Shaken Fist key stored
+alongside it.</p>
+<p>If you are handed one of these, there is nothing special about it in use. It
+is an ordinary namespace key: it goes in the same config file, authenticates
+the same way, and is subject to the same scopes and expiry as any other. It
+will simply be one that was created automatically, is scoped narrowly, and
+expires fairly quickly.</p>
+<p>Setting this up is an administrator's job, and is covered in the
+<a href="/operator_guide/authentication/#federated-identity">operator guide</a>.</p>
+<h2 id="what-you-cannot-currently-see">What you cannot currently see<a class="headerlink" href="#what-you-cannot-currently-see" title="Permanent link">&para;</a></h2>
+<p>There is presently no way to ask Shaken Fist what your own key's expiry or
+scopes are. <code>sf-client namespace show &lt;namespace&gt;</code> lists the <em>names</em> of the
+keys in your namespace and nothing further about them, and there is no API
+which returns the rest.</p>
+<p>In practice this means that when a key stops working, the status code is your
+diagnostic -- 401 for expired, 403 for out of scope -- and your namespace
+owner or cluster administrator is the source of truth for what a key was
+created with. If you are chasing an intermittent authentication failure, ask
+them to check the expiry rather than trying to determine it yourself.</p>
 
 
 

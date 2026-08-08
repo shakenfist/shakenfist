@@ -11444,8 +11444,8 @@ on and it is cheap to stop assuming it.</p>
 </tr>
 <tr>
 <td>4. Authentication documentation</td>
-<td>PLAN-auth-federation-phase-04-docs.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-auth-federation-phase-04-docs/">PLAN-auth-federation-phase-04-docs.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5. OIDC plan refresh</td>
@@ -11464,7 +11464,7 @@ on and it is cheap to stop assuming it.</p>
 </tr>
 </tbody>
 </table>
-<p>Phase plans for phases 4–7 have not been drafted yet; the
+<p>Phase plans for phases 5–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
 carried into the relevant phase plan) before each phase is
 cut.</p>
@@ -11633,11 +11633,20 @@ depend on the private CI conductor implementation.</p>
 <p>Phase 3 shipped most of the developer and operator guide
 halves of this as it went, because a security decision is
 cheapest to write down while it is being made. What remains
-is the user guide page, which does not exist at all:
-<code>docs/user_guide/authentication.md</code> needs writing from
-scratch. Phase 4 should also re-read the two existing guides
-end to end, rather than assuming a series of incremental
-additions composes into a coherent page.</p>
+is the user guide page. This section previously said that
+page did not exist; it does, at 34 lines, and it predates
+every one of phases 1 to 3, so it is a rewrite of live
+content rather than a green field. Phase 4 should also
+re-read the two existing guides end to end, rather than
+assuming a series of incremental additions composes into a
+coherent page.</p>
+<p>Two of this section's other assumptions were also overtaken
+by phase 3 and are corrected in the phase plan: the worked
+GitHub Actions example shipped in the developer guide rather
+than the operator guide, and key expiry and scopes are not
+readable through any API or client, so the user guide cannot
+describe how they "surface in <code>sf-client</code>". See the phase
+plan's <em>What the survey found</em>.</p>
 <h3 id="phase-5-oidc-plan-refresh">Phase 5: OIDC plan refresh<a class="headerlink" href="#phase-5-oidc-plan-refresh" title="Permanent link">&para;</a></h3>
 <p>Rewrite <code>PLAN-oidc-authentication.md</code> (the human-login
 sibling, currently a stub) against the as-built reality of
@@ -11907,6 +11916,24 @@ implemented because the following statements will be true:</p>
   anything, which is what it already has. Issuer and rule
   management is where a command line would actually earn
   its keep.</li>
+<li><strong>A readable view of a key</strong>
+  (<a href="https://github.com/shakenfist/shakenfist/issues/3672">#3672</a>),
+  found while planning phase 4. Phase 2 gave keys an expiry
+  and phase 3 gave them scopes and provenance;
+  <code>NamespaceKey.external_view()</code> renders all three and
+  calls itself "the operator visible view of a key", and no
+  endpoint calls it. <code>GET
+  /auth/namespaces/{namespace}/keys</code> still answers with a
+  list of key <em>names</em>, read from the legacy
+  <code>keys['nonced_keys']</code> dict. So a namespace owner cannot
+  ask which of their keys expires when, or what a federated
+  key may do, without reading the database — which is the
+  audit question provenance was added to answer. Unlike the
+  two client-python items above this is server side, and it
+  is a breaking change to a published response shape with
+  in-tree consumers, so it needs a compatibility design of
+  its own rather than an edit to the handler. That is why
+  phase 4 documented the gap instead of closing it.</li>
 <li><strong>Token introspection / jti denylist</strong> if bounded-delay
   revocation of <em>scoped keys themselves</em> (as opposed to
   their derived tokens) ever proves insufficient.</li>

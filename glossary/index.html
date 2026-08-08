@@ -10728,8 +10728,9 @@ type that is never hard-deleted (<code>docs/developer_guide/state_machine.md</co
 and re-verified on every request. When a key is updated, deleted, or expires,
 its nonce changes or disappears; a request whose token carries a stale nonce is
 rejected. The nonce is therefore the revocation mechanism for derived tokens.
-Defined in <code>docs/developer_guide/authentication.md</code> (lines 203 and 218-224) and
-enforced in <code>shakenfist/external_api/base.py</code>.</p>
+Defined in the
+<a href="../developer_guide/authentication/#the-nonce">nonce section</a> of the developer
+guide and enforced in <code>shakenfist/external_api/base.py</code>.</p>
 <p><strong id="object">object / by reference</strong> -- Everything a caller interacts with is an
 object, usually referred to by a version-4 UUID string; the exceptions named by
 name are nodes, namespaces, and keys. Referring to an object <em>by reference</em> means
