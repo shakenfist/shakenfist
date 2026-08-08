@@ -11200,6 +11200,11 @@
 <li>A request to <code>/upload/...uuid.../truncate/...offset...</code> with a non-numeric
   offset now returns a 404 (the route no longer matches) where it previously
   returned a 500.</li>
+<li>The published OpenAPI specification now declares its HTTP <code>schemes</code> as an
+  array (previously a single space separated string, which is invalid OpenAPI
+  2.0) and defines the <code>bearerAuth</code> security scheme that authenticated
+  operations reference, so generated clients can discover how to
+  authenticate. The specification is now validated in CI.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>

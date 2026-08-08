@@ -11149,18 +11149,17 @@ class, 1 from <code>schemes</code>.</p>
   to collapse an operation's body parameters into a single <code>body</code>
   parameter with a generated <code>schema</code> object, which is a change to
   the renderer rather than to any declaration.</li>
-<li><strong><code>schemes</code> renders as a string, not an array.</strong>
-  <code>API_ADVERTISED_HTTP_SCHEMES</code> is typed <code>str</code> in <code>config.py</code> while
-  its own description calls it a "space separated list", and
-  <code>app.py</code> feeds it straight into the specification's top-level
-  <code>schemes</code> key, which OpenAPI 2.0 requires to be an array of
-  strings. A default deployment therefore publishes
-  <code>schemes: 'http'</code>, and a two-scheme one publishes a single
-  nonsense string rather than two entries. Pre-existing —
-  introduced in <code>01ef8a563</code>, not by this plan — but it is the
-  <em>first</em> thing a validator trips over, ahead of the body
-  parameters above, so #3626 has to fix or explicitly waive it to
-  reach anything else.</li>
+<li><strong><code>schemes</code> renders as a string, not an array — fixed in
+  phase 2.</strong> <code>API_ADVERTISED_HTTP_SCHEMES</code> is typed <code>str</code> in
+  <code>config.py</code> while its own description calls it a "space
+  separated list", and <code>app.py</code> fed it straight into the
+  specification's top-level <code>schemes</code> key, which OpenAPI 2.0
+  requires to be an array of strings. A default deployment
+  therefore published <code>schemes: 'http'</code>. Pre-existing —
+  introduced in <code>01ef8a563</code>, not by this plan. Phase 2's first PR
+  splits the documented space-separated contract at the consumer
+  in <code>app.py</code>, and added the <code>securityDefinitions</code> entry the
+  <code>security</code> requirements referenced without defining.</li>
 <li><strong><code>security</code> renders as an object, not an array — fixed in
   phase 1 after all.</strong> <code>swagger_helper()</code> emitted
   <code>'security': {'bearerAuth': []}</code>, but OpenAPI 2.0 requires
@@ -11172,16 +11171,18 @@ class, 1 from <code>schemes</code>.</p>
   <code>'security': [{'bearerAuth': []}]</code> eliminated the entire
   126-error class, the largest remaining. Kept in this list as a
   record of the scoping call rather than as work to do.</li>
-<li><strong>Nothing validates the generated specification.</strong> Phase 1's
-  path-implies-required rule exists to satisfy linters and client
-  generators, and was checked by hand. A unit test running
-  <code>openapi_spec_validator</code> over flasgger's output would catch the
-  next regression, including the body-parameter one above. The
-  only current functional coverage fetches <code>swagger-ui.css</code>.
-  Filed as <a href="https://github.com/shakenfist/shakenfist/issues/3626">#3626</a>
-  so it is not gated on the renderer work — the test is worth
-  having before the fix, since it turns "invalid in N places"
-  into a number that moves.</li>
+<li><strong>Nothing validates the generated specification — fixed in
+  phase 2.</strong> Phase 1's path-implies-required rule exists to
+  satisfy linters and client generators, and was checked by hand.
+  Phase 2's first PR added
+  <code>shakenfist/tests/external_api/test_openapi_spec.py</code>, which
+  runs <code>openapi_spec_validator</code> over flasgger's output and holds
+  the remaining invalidity to an exact ratchet count (128, all in
+  the body-parameter class above), failing on any new error class
+  or any change in the count
+  (<a href="https://github.com/shakenfist/shakenfist/issues/3626">#3626</a>).
+  The test landed before the renderer fix on purpose: it turns
+  "invalid in N places" into a number that moves.</li>
 </ul>
 <h3 id="carried-into-phase-3-from-phase-1">Carried into phase 3 from phase 1<a class="headerlink" href="#carried-into-phase-3-from-phase-1" title="Permanent link">&para;</a></h3>
 <p><strong>Generate the derivation's input space rather than sampling it.</strong>
