@@ -6,22 +6,18 @@
 #        - and link to OpenAPI docs:
 #        - and include examples:
 #   - Has complete CI coverage:
-from functools import partial
-
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.artifact import Artifact
-from shakenfist.artifact import Artifacts
 from shakenfist.artifact import LABEL_URL
-from shakenfist.artifact import type_filter
-from shakenfist.artifact import url_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
+from shakenfist.namespace import namespace_is_trusted
 from shakenfist.util.access_tokens import request_namespace
 
 
@@ -30,6 +26,14 @@ daemon.set_log_level(LOG, 'api')
 
 
 def _label_url(label_name):
+    """Split a label reference into its namespace and its artifact URL.
+
+    A label may be named bare, in which case it lives in the caller's
+    own namespace, or as ``<namespace>/<label>``, which names somebody
+    else's. That second form is why every caller of this has to
+    authorise the namespace it gets back rather than trusting it: the
+    namespace in it was chosen by the requestor.
+    """
     if '/' in label_name:
         elems = label_name.split('/')
         if len(elems) > 2:
@@ -39,6 +43,28 @@ def _label_url(label_name):
         namespace = request_namespace()
         label = label_name
     return (namespace, f'{LABEL_URL}{namespace}/{label}')
+
+
+def _label_url_or_error(label_name):
+    """_label_url, with a malformed name turned into a refusal.
+
+    Returns ``(namespace, url, None)``, or ``(None, None, response)``
+    when the name cannot be parsed.
+
+    The route is registered as ``/label/<path:label_name>``, so the
+    path converter happily matches embedded slashes and a caller can
+    reach here with ``a/b/c``. Nothing caught LabelHierarchyTooDeep, so
+    that answered ``server error: LabelHierarchyTooDeep()`` -- the
+    third way this endpoint had of returning 500, alongside the two
+    fixed in get() and delete(). It is the caller's mistake rather than
+    ours, so it is a 400, and it says which mistake.
+    """
+    try:
+        namespace, label_url = _label_url(label_name)
+    except LabelHierarchyTooDeep:
+        return (None, None, sf_api.error(
+            400, 'label names may contain at most one /'))
+    return (namespace, label_url, None)
 
 
 label_example = """{
@@ -77,14 +103,36 @@ class LabelEndpoint(api_base.Resource):
              'The maximum number of versions to retain, or zero for the '
              'configured default.', False)
         ],
-        [(200, 'The updated artifact.', label_example)],
+        [(200, 'The updated artifact.', label_example),
+         (400, 'The label name is malformed.', None)],
         requires_admin=True))
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
-        namespace, label_url = _label_url(label_name)
-        a = Artifact.from_url(Artifact.TYPE_LABEL, label_url, name=label_name,
-                              max_versions=max_versions, namespace=namespace,
-                              create_if_new=True)
+        namespace, label_url, err = _label_url_or_error(label_name)
+        if err:
+            return err
+
+        # Resolve by ownership and then authorise creating and modifying
+        # apart, exactly as the artifact upload route does. The
+        # requires_admin above is swagger prose and enforces nothing, so
+        # before this every authenticated caller could name
+        # `<namespace>/<label>` and push a version into a label belonging
+        # to anybody who merely shared with, or trusted, them -- and
+        # add_index ends in delete_old_versions, so the owner's older
+        # versions went with it. The operator guide says outright that a
+        # non-system namespace should not be able to update a shared
+        # artifact.
+        a = Artifact.owned_from_url(Artifact.TYPE_LABEL, label_url,
+                                    namespace=namespace)
+        if a:
+            if request_namespace() not in [a.namespace, 'system']:
+                return sf_api.error(404, 'namespace not found')
+        else:
+            if not namespace_is_trusted(namespace, request_namespace()):
+                return sf_api.error(404, 'namespace not found')
+            a = Artifact.new(Artifact.TYPE_LABEL, label_url, name=label_name,
+                             max_versions=max_versions, namespace=namespace)
+
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED
 
@@ -99,17 +147,29 @@ class LabelEndpoint(api_base.Resource):
             ('label_name', 'path', 'string', 'The label name to search for.', True)
         ],
         [(200, 'The label artifact, if found.', label_example),
+         (400, 'The label name is malformed.', None),
          (404, 'Label not found.', None)],
         requires_admin=True))
     @api_base.log_token_use
     def get(self, label_name=None):
-        artifacts = list(Artifacts(filters=[
-            partial(type_filter, Artifact.TYPE_LABEL),
-            partial(url_filter, _label_url(label_name))
-        ], prefilter='active'))
-        if len(artifacts) == 0:
-            sf_api.error(404, 'label %s not found' % label_name)
-        return artifacts[0].external_view()
+        # _label_url returns a pair, and this route used to hand the
+        # whole pair to url_filter, which compares it against a string.
+        # Nothing ever matched, so the lookup below always came back
+        # empty -- and the 404 was not returned, so the endpoint fell
+        # through to an IndexError and a 500. It has answered nothing
+        # else since the pair was introduced.
+        #
+        # Reading resolves by visibility, so a label shared with us or
+        # reached through a trust is legible here. Writing does not; see
+        # post() and delete().
+        _, label_url, err = _label_url_or_error(label_name)
+        if err:
+            return err
+        a = Artifact.from_url(Artifact.TYPE_LABEL, label_url,
+                              namespace=request_namespace())
+        if not a:
+            return sf_api.error(404, 'label %s not found' % label_name)
+        return a.external_view()
 
     @swag_from(api_base.swagger_helper(
         'label', 'Delete a label by name.',
@@ -117,19 +177,27 @@ class LabelEndpoint(api_base.Resource):
             ('label_name', 'path', 'string', 'The label name to delete.', True)
         ],
         [(200, 'The label artifact, if found.', label_example),
+         (400, 'The label name is malformed.', None),
          (404, 'Label not found.', None)],
         requires_admin=True))
     @api_base.log_token_use
     def delete(self, label_name=None):
-        artifacts = list(Artifacts(filters=[
-            partial(type_filter, Artifact.TYPE_LABEL),
-            partial(url_filter, _label_url(label_name))
-        ], prefilter='active'))
-        if len(artifacts) == 0:
-            sf_api.error(404, 'label %s not found' % label_name)
+        # Carried the same pair-into-url_filter bug as get(), and so has
+        # also never deleted anything -- it fell through the unreturned
+        # 404 to a NameError on the loop variable.
+        #
+        # Deleting is a mutation, so resolution is by ownership. Seeing
+        # a label through a share or a trust is not permission to remove
+        # it, which is what requires_artifact_ownership says on the
+        # routes that take a uuid.
+        namespace, label_url, err = _label_url_or_error(label_name)
+        if err:
+            return err
+        a = Artifact.owned_from_url(Artifact.TYPE_LABEL, label_url,
+                                    namespace=namespace)
+        if not a or request_namespace() not in [a.namespace, 'system']:
+            return sf_api.error(404, 'label %s not found' % label_name)
 
-        for a in artifacts:
-            a.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
-            a.delete()
-
+        a.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
+        a.delete()
         return a.external_view()

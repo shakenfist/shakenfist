@@ -400,18 +400,59 @@ class Artifact(dbowo):
         existing and the brand new cases differently: a trust is enough
         to gift a namespace an artifact it did not have, and not enough
         to replace what one it already owns resolves to.
+
+        The namespace goes to SQL as well as to the Python predicate.
+        Ownership is a plain equality on a column the artifacts table
+        already carries, so unlike the visibility predicate it can be
+        pushed down, and this runs on the instance create path. The
+        predicate stays because the criterion is not equivalent: the
+        iterator drops a namespace criterion of 'system' so that
+        listing as system sees the whole cluster, and on its own that
+        would quietly turn an ownership test into no test at all.
         """
         return Artifact._resolve_url(
-            artifact_type, url, namespace_exact_filter, namespace=namespace)
+            artifact_type, url, namespace_exact_filter, namespace=namespace,
+            criteria_namespace=namespace)
+
+    @staticmethod
+    def owned_from_url_or_new(artifact_type, url, name=None, max_versions=0,
+                              namespace=None):
+        """Resolve a URL to an artifact this namespace owns, creating one.
+
+        For a write path whose target namespace is fixed as the
+        caller's own, or which has already authorised the caller
+        against a namespace it named. Those callers have no two cases
+        to tell apart -- whoever may add a version to the artifact may
+        equally bring it into existence -- so they get the create for
+        free, while still never landing on somebody else's artifact.
+
+        This is the reason owned_from_url() itself does not create. The
+        routes which accept a caller-nominated namespace *do* have two
+        cases: a trust is enough to gift a namespace an artifact it did
+        not have, and not enough to replace what one it already owns
+        resolves to. They authorise the two apart by hand rather than
+        calling this.
+
+        ``name`` and ``max_versions`` are only consulted on the create,
+        because an artifact which already exists already has both and
+        this is not the route by which they are changed.
+        """
+        a = Artifact.owned_from_url(artifact_type, url, namespace=namespace)
+        if a:
+            return a
+        return Artifact.new(artifact_type, url, name=name,
+                            max_versions=max_versions, namespace=namespace)
 
     @staticmethod
     def _resolve_url(artifact_type, url, visibility, name=None, max_versions=0,
-                     namespace=None, create_if_new=False):
+                     namespace=None, create_if_new=False,
+                     criteria_namespace=None):
         artifacts = list(Artifacts([
             partial(url_filter, url),
             partial(type_filter, artifact_type),
             not_dead_states_filter,
-            partial(visibility, namespace)]))
+            partial(visibility, namespace)],
+            namespace=criteria_namespace))
 
         if len(artifacts) == 0:
             if create_if_new:

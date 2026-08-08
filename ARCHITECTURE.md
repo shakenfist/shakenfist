@@ -943,6 +943,13 @@ claim matching against a rule. The endpoint composes these in a fixed order —
 cheap local rejections before anything that costs a network round trip — and
 that order is a security property rather than a style, asserted by tests.
 
+The JWKS fetch verifies TLS against the system trust store, plus whatever
+`FEDERATION_JWKS_CA_BUNDLE` names, for a provider behind a private CA. Those
+anchors are added to the system set rather than replacing it —
+`ssl.create_default_context(cafile=...)` would replace it, and quietly stop a
+public issuer verifying — and nothing else is relaxed: `jwks_uri` must be
+`https://`, and there is no skip-verification option.
+
 The rate limit is the dividing line in that order, and only the argument
 checks sit above it. Issuer resolution in particular sits *below* it: it scans
 the configured issuers and reads state and attributes per row, so although a
@@ -1213,6 +1220,58 @@ answers a flat `404` rather than confirming that two exist.
 Instances and networks have the same shape in `arg_is_instance_ref` and
 `arg_is_network_ref` and have not been widened. Sharing is an artifact-only
 concept by design, so only the trust half would apply to them.
+
+#### Resolving a url
+
+The same read/write split applies to URLs, and that is the one that went
+unnoticed for longer. `Artifact.from_url` filters by
+`namespace_or_shared_filter`, so it can return an artifact belonging to
+whoever shares with or trusts the caller. Right for a caller which will read
+the result; wrong for one which will write to it, because the write is
+`add_index` and `add_index` ends in `delete_old_versions`.
+
+| Resolver | Answers | Predicate | Creates |
+|----------|---------|-----------|---------|
+| `from_url()` | what may I read | visibility | optionally |
+| `owned_from_url()` | what may I write to | ownership | never |
+| `owned_from_url_or_new()` | as above, target namespace already settled | ownership | yes |
+
+`owned_from_url()` deliberately does not create, because a route which accepts
+a caller-nominated namespace has two cases to authorise apart: a trust is
+enough to gift a namespace an artifact it did not have, and not enough to
+replace what one it already owns resolves to. `owned_from_url_or_new()` exists
+for the callers which have no such split — their target namespace is their own
+or has already been checked — so they need not restate it. The artifact fetch
+and upload routes are the ones which do have the split, and spell it out
+deliberately; the resemblance between them is the authorisation, not a
+duplication waiting to be factored out.
+
+`owned_from_url()` also passes the namespace to SQL as a query criterion, not
+only to the Python predicate. Ownership is a plain equality, and this runs on
+the instance create path. The predicate is still there, and has to be: the
+object iterator drops a namespace criterion of `system` so that listing as
+system sees the whole cluster, so a pushdown standing on its own would turn an
+ownership test into no test at all. Visibility cannot be pushed down the same
+way — it is a trust graph walk, and narrowing the query to one namespace would
+drop the shared and trusted rows `from_url()` exists to find.
+
+Instance creation from a plain URL is where the two verbs meet, and it is
+worth knowing why it is not simply the ownership call. Resolving `disk.base`
+by ownership alone would give every namespace its own artifact for a shared
+image's URL, and `transfer_image` treats an artifact with no versions as
+"cluster does not have a copy" — so each namespace would download and store
+its own copy of every shared image, which is the opposite of what sharing one
+is for. A visible foreign artifact is therefore resolved to a blob and booted
+from, exactly as the label, snapshot and upload branches of the same loop
+already do, and never fetched into. Read theirs, write only your own.
+
+`Instance.snapshot()` is the fourth write path, and was missed by the original
+sweep because that only covered `external_api/` and `operations/`. It is not
+reachable across namespaces — the URL carries the instance UUID and the type
+filter pins it to `TYPE_SNAPSHOT` — but it resolves by ownership anyway, so
+the next artifact type minted against an instance URL does not have to
+rediscover the rule. When looking for write paths, grep for the sink
+(`add_index`) rather than for callers of the resolver.
 
 ### VDI console token trust model
 

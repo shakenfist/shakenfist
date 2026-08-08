@@ -579,26 +579,56 @@ Two rules fell out of fixing it, and both generalise past artifacts:
   check so a refused caller cannot write to the event log of a namespace it is
   about to be told does not exist.
 
-Three call sites that end in `add_index` still resolve with `from_url`, and the
-sweep was not exhaustive. They are listed here so the next reader does not
-assume otherwise:
+The remaining call sites were narrowed in #3640, and one of them was
+worse than the sweep recorded. `LabelEndpoint.post` had been read as safe
+because it builds its URL from the request — but `_label_url` accepts
+`<namespace>/<label>` and hands back the namespace it was given, so any
+authenticated caller could push a version into any namespace's label. The
+`requires_admin=True` in its `swag_from` is documentation and enforces
+nothing, and the route carried no ownership decorator, so nothing stopped it.
+Two lessons worth carrying:
 
-- `external_api/instance.py` (instance create) resolves a caller-supplied
-  `disk.base` with `create_if_new=True`. Namespace B naming A's `source_url`
-  lands on A's artifact, but the fetch pulls from the owner's own URL rather
-  than from bytes B supplied, so an unchanged URL adds no version. Lower
-  severity than the upload hole, not zero.
-- `external_api/label.py` (`LabelEndpoint.post`) builds
-  `sf://label/<namespace>/<name>` from the request, so the URL is
-  namespace-scoped and a caller cannot steer it into somebody else's namespace.
-  Note that the `requires_admin=True` in its `swag_from` is documentation and
-  enforces nothing — see the swagger note elsewhere in this file.
-- `operations/artifact_fetch_op.py` runs behind the instance path above and
-  inherits its namespace.
+- **"Built from the request" is not the same as "not caller-controlled."**
+  The URL was assembled by our code out of a value the caller chose. Follow
+  the value, not the construction.
+- **A read path can be broken in a way that hides the write path's bug.**
+  `LabelEndpoint.get` and `delete` had answered 500 to every request since
+  2024 (a pair handed to a filter expecting a string, and a 404 that was
+  computed but never returned), so nobody exercised the endpoint hard enough
+  to notice what `post` would accept.
 
-Issue #3640 tracks narrowing them. Until then, treat "write paths use
-`owned_from_url`" as the rule being converged on rather than one the tree
-already satisfies, and do not add a fourth exception.
+The instance path is the case where the obvious narrowing was the wrong fix,
+and it is worth knowing why before someone "simplifies" it:
+
+- **Resolving `disk.base` by ownership alone would have broken sharing.**
+  Reuse is the entire point of a shared image, and `transfer_image` treats an
+  artifact with no versions as "cluster does not have a copy", so giving every
+  namespace its own artifact would have meant its own download and its own
+  stored copy of every shared image.
+- The split is therefore per verb, not per artifact. A visible foreign
+  artifact is resolved to a blob and booted from — the same move the label and
+  snapshot branches already made — and never fetched into. `owned_from_url()`
+  picks the write target; `from_url()` still picks what you may read.
+
+`Artifact.owned_from_url_or_new()` exists for the write paths whose target
+namespace is fixed as the caller's own, or already authorised: they have no
+two cases to tell apart, so they get the create for free. Routes which accept
+a caller-nominated namespace must still authorise creating and modifying by
+hand, which is why `owned_from_url()` itself does not create. The artifact
+fetch and upload routes both spell the two cases out for that reason, and the
+apparent duplication between them is the authorisation rather than a missing
+abstraction.
+
+One more lesson, from the review of that change:
+
+- **A sweep is only as wide as the directory it was run over.** The original
+  #3640 audit listed three sites because it looked at `external_api/` and
+  `operations/`. `Instance.snapshot()` is a fourth, in the core object, and
+  neither the issue nor the first draft of the fix saw it. It was not
+  exploitable — the URL carries the instance UUID and `type_filter` pins the
+  type — but "not reachable today" is an argument for the guard being cheap,
+  not for going without it. Grep for the *sink* (`add_index`), not for the
+  callers of the resolver you happen to be changing.
 
 ### Credential-carrying routes are not logged, not redacted
 
@@ -726,6 +756,27 @@ rejects, the validator is usually right: change the test, never carve a
 loopback or test-only exemption into a security check. If that makes the test
 unrunnable, make it skip loudly and file the issue -- see #3639 for the JWKS
 certificate case.
+
+That issue is a worked example of how the second habit tends to resolve. The
+test needed the cluster to trust a certificate it had minted, and the tempting
+fix was a test-only exemption in the deploy. What it became instead was
+`FEDERATION_JWKS_CA_BUNDLE` -- extra trust anchors for JWKS fetches, which a
+self hosted Authentik or Keycloak needs anyway -- with CI as its first user.
+When a test cannot run because a security check is doing its job, the useful
+question is usually "what would a real operator need here", not "how do we get
+around this in CI".
+
+Two traps it also left behind, both of which cost a debugging round:
+
+- **`ssl.create_default_context(cafile=...)` replaces the system trust store
+  rather than adding to it.** Build the default context and then call
+  `load_verify_locations` on it. The wrong spelling passes every test that
+  only checks the new anchor is present.
+- **Python 3.13 enables `ssl.VERIFY_X509_STRICT` by default**, so a leaf
+  certificate with no Authority Key Identifier is refused with "Missing
+  Authority Key Identifier". If you generate certificates in a test, give
+  them AKI, SKI and basic constraints -- and be aware the symptom is
+  indistinguishable from the CA not being trusted at all.
 
 ### Key Directories
 

@@ -434,6 +434,81 @@ class TestTrusts(base.BaseNamespacedTestCase):
         self.system_client.delete_namespace(self.namespace + '-2')
 
 
+class TestLabelWriteTargets(base.BaseNamespacedTestCase):
+    """Which namespace's label a POST /label is allowed to land on.
+
+    A label may be named as `<namespace>/<label>`, and until v0.8
+    nothing checked the namespace in it: any authenticated caller could
+    make its blob the newest version of anybody's label, and since
+    add_index ends in delete_old_versions the versions underneath went
+    too. Updating one now takes the owning namespace or system.
+
+    Creating is still additive and a trust is still enough for it. That
+    split is the whole design and neither half proves the other, so
+    both are asserted here, against a real cluster and real keys.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'labelwrites'
+        super().__init__(*args, **kwargs)
+
+    def _blob(self):
+        """A blob to hang a label off, via a URL nothing else uses."""
+        img = self.system_client.cache_artifact(
+            'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
+            % random.randint(-999999, 999999))
+        results = self._await_artifacts_ready([img['uuid']])
+        self.assertEqual('created', results[0].get('state'))
+        return results[0]['blob_uuid']
+
+    def test_label_write_targets(self):
+        one = self.namespace + '-1'
+        two = self.namespace + '-2'
+        client_one = self._make_namespace(one, self.namespace_key)
+        client_two = self._make_namespace(two, self.namespace_key)
+
+        blob = self._blob()
+
+        # One owns a label. The control: the owner reaches the write.
+        lbl = client_one.update_label('%s/thing' % one, blob)
+        self.addDetail('label', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
+        self.assertEqual(one, lbl['namespace'])
+
+        # A stranger cannot replace it. 404 rather than 403, matching
+        # every other artifact route: a caller who may not touch an
+        # object should not learn that it exists.
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            client_two.update_label, '%s/thing' % one, blob)
+
+        # Nor can somebody one trusts. This is the case which makes the
+        # change more than theoretical -- a trust is set up on purpose,
+        # expecting it to grant sight, and replacing what a label points
+        # at is not a smaller version of being able to see it.
+        client_one.add_namespace_trust(one, two)
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            client_two.update_label, '%s/thing' % one, blob)
+
+        # But the trust does let two seed a label one does not have,
+        # which is the creating-is-a-gift half of the same rule.
+        created = client_two.update_label('%s/brandnew' % one, blob)
+        self.assertEqual(one, created['namespace'])
+
+        # And system can still fix a tenant's label, or it is not an
+        # administrative namespace.
+        fixed = self.system_client.update_label('%s/thing' % one, blob)
+        self.assertEqual(one, fixed['namespace'])
+
+        # A bare name still means one of your own, unchanged.
+        mine = client_two.update_label('ownlabel', blob)
+        self.assertEqual(two, mine['namespace'])
+
+        self.system_client.delete_namespace(one)
+        self.system_client.delete_namespace(two)
+
+
 class TestTypoedLabel(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'sharedimages'

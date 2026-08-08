@@ -96,9 +96,16 @@ class ArtifactFetchOp(BaseClusterOperation):
 
     def _image_fetch(self, inst):
         try:
-            a = Artifact.from_url(
-                Artifact.TYPE_IMAGE, self.url, namespace=self.namespace,
-                create_if_new=True)
+            # By ownership. This operation ends in add_index, which ends in
+            # delete_old_versions, so it must never land on an artifact
+            # belonging to a namespace other than the one it runs for. Both
+            # routes which enqueue it resolve by ownership too, so in practice
+            # this finds the artifact they already settled on -- but it is the
+            # layer where the write actually happens, and the invariant is
+            # cheaper to make true here than to keep true by inspection of
+            # every caller.
+            a = Artifact.owned_from_url_or_new(
+                Artifact.TYPE_IMAGE, self.url, namespace=self.namespace)
         except TooManyMatches as e:
             self.add_event(
                 EVENT_TYPE_AUDIT,

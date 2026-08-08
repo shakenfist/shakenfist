@@ -9,6 +9,7 @@ from unittest import mock
 
 import pycdlib
 import testtools
+from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
@@ -859,3 +860,77 @@ class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
             ['op-from-the-api'],
             self.inst.agent_operations.get('queue', []))
         self.assertEqual({'os': 'debian'}, self.inst.agent_facts)
+
+
+class InstanceSnapshotTargetTestCase(base.ShakenFistTestCase):
+    """Which artifact a snapshot is indexed into.
+
+    The fourth write path, and the one the original #3640 sweep missed
+    because that only looked at `external_api/` and `operations/`. It
+    resolved by visibility and fed the result straight to `add_index`,
+    which ends in `delete_old_versions`.
+
+    It is not reachable across namespaces today -- the URL carries the
+    instance UUID and the type filter pins it to TYPE_SNAPSHOT, so
+    nothing else resolves there. That makes the guard cheap rather than
+    unnecessary, and this test is what stops the next artifact type
+    minted against an instance URL having to rediscover the rule.
+    """
+
+    URL = '%san-instance/vda' % artifact.INSTANCE_URL
+
+    def setUp(self):
+        super().setUp()
+
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+        for ns in ['system', 'owner', 'stranger']:
+            self.mock_mariadb.create_namespace(ns, 'key1', '%skey' % ns)
+
+        for target in ['os.path.exists',
+                       'shakenfist.instance.niso_snapshot',
+                       'shakenfist.instance.niso_create_and_enqueue']:
+            patcher = mock.patch(target)
+            started = patcher.start()
+            self.addCleanup(patcher.stop)
+            if target == 'os.path.exists':
+                started.return_value = True
+
+    def _snapshot_as(self, namespace):
+        """Run the resolution half of Instance.snapshot.
+
+        A MagicMock stands in for the instance: building a real one
+        needs a scheduler, a node and a disk on the filesystem, none of
+        which have anything to say about which artifact the snapshot is
+        written into.
+        """
+        inst = mock.MagicMock()
+        inst.uuid = 'an-instance'
+        inst.namespace = namespace
+        inst.uefi = False
+        inst.block_devices = {'devices': [{
+            'type': 'qcow2', 'device': 'vda',
+            'path': '/somewhere/vda', 'snapshot_ignores': False}]}
+
+        out = instance.Instance.snapshot(inst)
+        return out['vda']['artifact_uuid']
+
+    def test_a_foreign_artifact_is_not_snapshotted_into(self):
+        # Shared, so visibility resolution would have found it. Snapshot
+        # URLs are not caller supplied, so this is the invariant rather
+        # than an exploit -- but it is the invariant the docs assert.
+        theirs = artifact.Artifact.new(
+            artifact.Artifact.TYPE_SNAPSHOT, self.URL,
+            name='an-instance/vda', namespace='owner')
+        theirs.state = artifact.Artifact.STATE_CREATED
+        theirs.shared = True
+
+        self.assertNotEqual(str(theirs.uuid), self._snapshot_as('stranger'))
+
+    def test_our_own_snapshot_artifact_is_reused(self):
+        # The control. Resolving rather than creating is what makes a
+        # second snapshot of the same disk a new version of one artifact
+        # instead of a second artifact, which is what max_versions
+        # counts.
+        first = self._snapshot_as('owner')
+        self.assertEqual(first, self._snapshot_as('owner'))

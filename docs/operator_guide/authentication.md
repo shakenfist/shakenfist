@@ -204,6 +204,39 @@ exchange answers 503 rather than assuming the request is fine.
 | `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
 | `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
 | `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Exchange attempts allowed per source address per minute. `0` disables rate limiting entirely |
+| `FEDERATION_JWKS_CA_BUNDLE` | *(empty)* | Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone |
+
+### An identity provider behind a private CA
+
+A self hosted Authentik or Keycloak usually presents a certificate
+signed by the organisation's own CA rather than a public one, and the
+`jwks_uri` fetch will refuse it. Point `FEDERATION_JWKS_CA_BUNDLE` at a
+PEM file of the extra authorities to trust, and place that file on
+every node — any node may serve `/auth/federated`. The ansible
+collection's `node` role takes this as `federation_jwks_ca_bundle`;
+getting the file itself onto the nodes is yours to arrange, since it is
+usually the same bundle the rest of your fleet already has.
+
+These anchors are **added** to the system ones rather than replacing
+them, so configuring a private provider does not stop a public one such
+as GitHub from verifying, and both can be trusted issuers at once.
+
+Nothing else is relaxed by setting it. `jwks_uri` must still be
+`https://`, the hostname must still match, expiry is still checked, and
+a certificate chaining to neither set is still refused. There is
+deliberately no option to skip verification: a JWKS fetched over a
+connection nobody authenticated can be substituted by anyone on the
+path, which makes signature verification theatre.
+
+If the path is wrong, or the file is not a PEM bundle, `sf-api` says so
+twice. Each worker complains at startup, so a bad path is a line in the
+log at deploy time rather than a surprise at somebody's first federated
+login weeks later. If it is still wrong when a token arrives,
+`/auth/federated` answers **503** rather than 401 — the token was never
+examined, and calling it rejected would send the caller to their
+identity provider to look for a fault which is in your config file. The
+log line names `FEDERATION_JWKS_CA_BUNDLE` and the path; the response
+deliberately does not.
 
 ### If nobody uses it
 
@@ -272,8 +305,16 @@ again over the artifact that first upload produced: adding a version ends in
 is that an instance of yours booting that artifact afterwards gets somebody
 else's image. So the second upload is refused, and a CI job which pushes a
 nightly image into a shared namespace needs a key in that namespace rather
-than a trust. Labels are not affected — a label URL names its own namespace,
-so a trusted caller cannot reach yours through one.
+than a trust.
+
+Labels fall on the same side of that line, which they did not until v0.8.
+A label may be named `<namespace>/<label>`, so a caller *can* reach into
+your namespace through one, and nothing used to stop it — updating a label
+in your namespace did not even require a trust. A trusted namespace may now
+create a label in yours and may not update one that already exists, matching
+artifacts exactly. This does affect the `ci-images` pattern above: the first
+gift of a given label works, and a job which republishes under the same label
+name every night needs a key in the receiving namespace.
 
 **Namespace administration is the exception, and it is a large one.**
 Adding a key to your namespace, and writing a mapping rule in it, are both

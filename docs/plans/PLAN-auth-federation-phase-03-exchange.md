@@ -514,9 +514,10 @@ the security boundary of this whole plan. After 3i:
 - [x] `pre-commit run --all-files` clean; `tox -e genprotos` no-op;
       unit tests green. Re-confirmed by the pre-push audit after the
       rebase onto develop.
-- [ ] Functional CI green on the branch **before** the PR merges.
-      Deliberately left unticked: it cannot be established from a
-      local tree and is the operator's gate at pull request time.
+- [x] Functional CI green on the branch **before** the PR merges.
+      Could not be established from a local tree and was the operator's
+      gate at pull request time; #3625 merged as `c64269e63` on
+      2026-08-06 with the merge queue green.
 - [x] Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10 and 11
       marked resolved; phase status updated in the Execution table
       and `docs/plans/index.md`; glossary and guides updated.
@@ -921,6 +922,209 @@ rather than growing this pull request further.
 `ProxyFix` was reviewed and agreed with as already analysed and
 documented. The absence of functional coverage for a successful
 exchange is the subject of #3639, above.
+
+## Follow-up: the deferred write paths (#3640)
+
+#3625 merged as `c64269e63`. This section records what closing #3640
+found, because two of the three sites turned out to be misdescribed in
+the issue and the reasoning is worth more later than the diff.
+
+**The label endpoint was the real hole, and the issue called it the
+safe one.** #3640 recorded `LabelEndpoint.post` as "close to safe by
+construction", because it resolves an `sf://label/<namespace>/<name>`
+URL built from the request rather than taken from the caller. That
+reading followed the construction and not the value: `_label_url`
+accepts `<namespace>/<label>` and hands back the namespace it was
+given. The route carries no ownership decorator, and the
+`requires_admin=True` in its `swag_from` is prose appended to the
+generated description. So any authenticated caller holding
+`label.write` — which every legacy unscoped key does, through the
+wildcard — could `POST /label/<somebody else>/<label>` and make its
+own blob the newest version of their label, with
+`delete_old_versions` taking the versions underneath. That is a wider
+hole than the upload one #3625 closed, since it needed no trust and no
+share.
+
+It survived partly because the rest of the endpoint was broken.
+`_label_url` returns a pair, and `get` and `delete` both handed the
+whole pair to `url_filter`, which compares it against a string. Nothing
+ever matched, and the resulting 404 was constructed but not returned,
+so `get` fell through to an `IndexError` and `delete` to a `NameError`.
+Both have answered 500 to every request since the pair was introduced
+in 2024. An endpoint nobody could successfully read from is not one
+anybody probed hard enough to find out what it would accept.
+
+**The instance path is where the obvious narrowing was the wrong fix.**
+Resolving `disk.base` with `owned_from_url` alone would have given every
+namespace its own artifact for a shared image's URL — and
+`transfer_image` treats an artifact with no versions as "cluster does
+not have a copy", while `_http_get_inner` mints a fresh blob per fetch.
+Every tenant would have downloaded and stored its own copy of every
+shared image. The operator guide describes reuse as the entire point of
+sharing one ("an official CentOS image that many users will want"), and
+in the same paragraph says non-system namespaces "should not be able to
+update such an artifact". Both halves of that sentence are the
+requirement.
+
+So the split is per verb rather than per artifact: a visible foreign
+artifact is resolved to a blob and booted from, which is what the
+label, snapshot and upload branches of the same loop already do, and
+never fetched into. `owned_from_url()` picks the write target and
+`from_url()` still picks what may be read. Two tests discriminate —
+the enqueued fetch names a blob URL rather than the source URL, and its
+`artifact_uuid` is not the foreign artifact's — and both fail when the
+resolution is put back.
+
+`Artifact.owned_from_url_or_new()` was added for the write paths whose
+target namespace is fixed as the caller's own or already authorised.
+They have no two cases to tell apart, so they get the create for free;
+`owned_from_url()` itself still refuses to create, because the routes
+which accept a caller-nominated namespace must authorise creating and
+modifying separately.
+
+**Behaviour changes worth flagging at review.** Updating a label across
+a trust is now refused, which affects the `ci-images` pattern in the
+operator guide: the first gift of a label works, a nightly republish
+under the same name needs a key in the receiving namespace. This is the
+same break #3625 already took for artifact uploads, and the guide
+already said so for uploads — the label carve-out beside it was the
+inconsistency, and it was wrong on the facts as well. Separately, a
+tenant booting from a shared image's URL now pins to the blob that
+image currently has rather than causing a refetch, which is the
+intended reading of "should not be able to update".
+
+## Follow-up: the CI JWKS certificate (#3639)
+
+The issue offered three options and said the choice needed making
+before anyone wrote code. None of the three was taken as written.
+
+**What the issue got wrong about the shape of the problem.** It
+assumed a CA installed into the node trust stores by the deploy
+playbooks. Two facts undercut that. The tests run over SSH *on the
+primary node* (`smoke-cluster.yml` scps the repo there and runs stestr
+under `/etc/sf/sfrc`), while `internal_ca` bootstraps on the ansible
+control node — so the CA key and the test process are on different
+machines, and closing the gap means shipping a signing key to a
+hypervisor. And `internal_ca` is a production role: widening it so
+every deployment's SPICE CA also anchors outbound TLS is a real change
+to production posture in service of a test.
+
+**What was done instead.** `FEDERATION_JWKS_CA_BUNDLE`, an extra set
+of trust anchors used only for JWKS fetches. This is a feature in its
+own right rather than a test affordance — a self hosted Authentik or
+Keycloak is normally behind a private CA, and an operator needs some
+way to say so — and CI is simply its first user. It relaxes nothing:
+`jwks_uri` must still be https, hostname and expiry are still checked,
+and there is no skip-verification escape.
+
+The anchors are *added* to the system set rather than replacing it,
+and that is the part which is easy to get wrong.
+`ssl.create_default_context(cafile=...)` loads the named file
+**instead of** the system store, so the short spelling would mean that
+configuring a private Authentik silently stopped GitHub tokens from
+verifying — weeks later, when somebody added the second issuer. The
+unit test asserts the union by count, and fails on the short spelling.
+
+CI gets a throwaway CA from `tools/ci-jwks-ca.sh`, minted per run,
+trusted for nothing but JWKS, with its key left on the primary for the
+test to issue a leaf with; `smoke-cluster.yml` calls it before the
+cluster suite. Putting a CA key on a node is only acceptable because
+that cluster is destroyed within the hour, and the script says so
+loudly. The deployment CA is untouched.
+
+**Verified locally rather than assumed, and it mattered.** A harness
+borrowed the real `_tls_context`, `_ci_ca` and `_start_jwks_server`
+off the shipped test class, minted a CA with the script's exact
+openssl invocation, and fetched through a real `PyJWKClient` built by
+the real `jwks_ssl_context`. The first run failed: *Missing Authority
+Key Identifier*. Python 3.13 turns on `ssl.VERIFY_X509_STRICT` by
+default, and a leaf without an AKI is refused by it. The symptom is
+indistinguishable from a cluster that does not trust the CA, so this
+would have shipped as five tests still skipping, for a reason the skip
+message does not mention. The leaf now carries AKI, SKI, basic
+constraints and an extended key usage; with them the harness fetches,
+and without the CA it is still refused with zero fetches — which is
+the skip path working as intended.
+
+**Not closed by this.** The five tests will only actually run once the
+`shakenfist/actions` change merges; until then the fallback keeps them
+skipping honestly. That change is a branch in the actions repo for the
+operator to raise.
+
+## Pull request review (#3641)
+
+Eleven items from the automated reviewer. Ten were acted on; one was
+declined with reasons.
+
+**The findings worth remembering.**
+
+- **A fourth write path.** `Instance.snapshot()` resolved by visibility
+  and fed the result to `add_index`. The original #3640 sweep listed
+  three sites because it was run over `external_api/` and
+  `operations/`, and this one is in the core object. Not exploitable
+  — the URL carries the instance UUID and the type filter pins it —
+  but that is an argument for the guard being cheap. The lesson, now
+  in AGENTS.md: grep for the *sink* (`add_index`), not for callers of
+  the resolver you happen to be changing.
+- **A discarded error response is not free.** The disk.base
+  fall-through called `_artifact_safety_checks` for its truthiness.
+  That helper builds a Flask 404 and `sf_api.error` logs `Returning
+  API error: 404` with a traceback as it does, so the ordinary case —
+  a foreign artifact which exists and is not usable — wrote a refusal
+  into the log of a request which returned 200. Split into
+  `_artifact_unusable_reason`, a predicate returning a (log message,
+  API message) pair, with the response building left where refusals
+  actually happen.
+- **The one setting that names a file.** A wrong
+  `FEDERATION_JWKS_CA_BUNDLE` path raised `FileNotFoundError` from
+  `PyJWKClient` construction on the request path of the
+  unauthenticated exchange endpoint, escaping as `server error:
+  FileNotFoundError(2, ...)` with no mention of the setting, forever
+  (the client is never cached on that path). Now
+  `JWKSTrustAnchorUnusable`, deliberately not a
+  `TokenValidationFailed`: the token was never examined, so 401 would
+  send the caller to their identity provider for a fault in our config
+  file. The exchange answers 503, each gunicorn worker complains at
+  startup, and the log names the setting and the path while the
+  response does not.
+- **The pushdown has a landmine.** Pushing the ownership namespace to
+  SQL is correct and worth doing on the instance create path, but the
+  object iterator drops a namespace criterion of `system` so that
+  listing as system sees the whole cluster. A pushdown *replacing* the
+  Python predicate would silently turn an ownership test into no test.
+  Both are kept, and there is a test for exactly that sabotage.
+
+**Declined: item 10**, replacing the artifact fetch route's
+resolve-then-fall-back block with `owned_from_url_or_new`. The review
+read the `request_namespace() not in [a.namespace, 'system']` guard as
+a redundant restatement of the trust check above it. It is not — it is
+strictly stronger, and it is the entire authorisation for the existing
+artifact case. The trust is enough to gift a namespace an artifact it
+lacked; replacing what one it already owns resolves to takes the owner
+or system. That is the two-case split `owned_from_url_or_new` documents
+itself as *not* being for. Comment added at the site so the resemblance
+is not mistaken for duplication again.
+
+**Also done.** `set -u` and explicit `${nodes:?}` / `${primary:?}`
+guards in `tools/ci-jwks-ca.sh` (an unsourced environment previously
+exited 0 having installed nothing, producing exactly the silent skip
+the script exists to remove); the CA key scp'd straight into the 0700
+directory rather than via world-readable `/tmp`; a post-restart check
+that the setting actually landed, since readiness only proves sf-api
+came back; `LabelHierarchyTooDeep` caught and answered 400 rather than
+500 on all three verbs; release note for the disk.base pinning change;
+function-level imports hoisted.
+
+**Coverage added**: 24 tests across five files — the three resolvers
+directly, `Instance.snapshot`, `artifact_fetch_op._image_fetch`, the
+disk.base fall-throughs including the state-refused case and the
+system-creates-elsewhere asymmetry, the malformed label name on all
+three verbs, label creation by system into a namespace it does not
+own, the two bad-bundle cases, and a functional
+(`cluster_ci_tests/test_artifacts.py`) test of the whole label
+authorisation split against a real cluster. Every fix was
+sabotage-verified: revert, confirm the specific expected tests fail and
+the controls hold, restore.
 
 ## Back brief
 

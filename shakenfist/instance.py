@@ -1902,12 +1902,23 @@ class Instance(dbowo):
             if not os.path.exists(disk['path']):
                 continue
 
-            a = artifact.Artifact.from_url(
+            # By ownership, because this ends in add_index -- here for
+            # nvram, and in node_inst_snap_op for everything else --
+            # and add_index ends in delete_old_versions. The target
+            # namespace is fixed as the instance's own, so there are no
+            # two cases to authorise apart and the create comes free.
+            #
+            # Not currently reachable as a cross namespace write: the
+            # URL contains the instance UUID and type_filter pins it to
+            # TYPE_SNAPSHOT, so nothing else resolves here. That is an
+            # argument for the guard being cheap rather than for going
+            # without it -- the next artifact type minted against an
+            # instance URL should not have to rediscover the rule.
+            a = artifact.Artifact.owned_from_url_or_new(
                 artifact.Artifact.TYPE_SNAPSHOT,
                 f'{artifact.INSTANCE_URL}{self.uuid}/{disk["device"]}',
                 name=f'{self.uuid}/{disk["device"]}',
-                max_versions=max_versions, namespace=self.namespace,
-                create_if_new=True)
+                max_versions=max_versions, namespace=self.namespace)
 
             blob_uuid = str(uuid4())
             out[disk['device']] = {

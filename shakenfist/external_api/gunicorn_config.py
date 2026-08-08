@@ -130,6 +130,25 @@ def post_fork(server, worker):
             'Failed to start readiness checker in gunicorn worker; '
             '/readyz will report not-ready until the checker runs')
 
+    # Load FEDERATION_JWKS_CA_BUNDLE once, for its exception. It is
+    # otherwise read on the request path of /auth/federated, so a path
+    # which exists on the deploy host but not on this node would first
+    # be noticed as a failed federated login some weeks later, by
+    # somebody with no reason to suspect a config file. Complaining
+    # here makes it a line in the log at deploy time instead.
+    #
+    # A warning rather than a refusal to start: an sf-api that will not
+    # serve instances because a federation setting is wrong is a much
+    # worse outage than one where federated exchange answers 503, and
+    # federation is optional. A no-op when the setting is empty.
+    try:
+        from shakenfist import federation
+        federation.jwks_ssl_context()
+    except Exception as e:
+        LOG.with_fields({'error': str(e), 'pid': worker.pid}).warning(
+            'FEDERATION_JWKS_CA_BUNDLE could not be loaded; federated '
+            'token exchange will answer 503 until it is fixed')
+
 
 def post_worker_init(worker):
     """Install a SIGTERM handler that drains before shutting down.

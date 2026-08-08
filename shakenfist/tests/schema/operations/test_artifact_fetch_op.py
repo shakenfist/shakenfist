@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from shakenfist.artifact import Artifact
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.schema.operations.artifact_fetch_op import create_and_enqueue
@@ -176,3 +177,66 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             ArtifactFetchOp.object_type in OPERATION_NAMES_TO_CLASSES)
         self.assertTrue(
             ArtifactFetchOp.object_type in OBJECT_NAMES_TO_CLASSES)
+
+
+class ArtifactFetchOpResolutionTestCase(base.ShakenFistTestCase):
+    """Which artifact the fetch operation writes into.
+
+    This is where the write actually lands: get_image ends in
+    add_index, and add_index ends in delete_old_versions. Both routes
+    which enqueue this operation resolve by ownership before they do,
+    so in practice it re-resolves to the artifact they already settled
+    on -- but "in practice" is an inspection of every caller, and this
+    is one line in the operation.
+    """
+
+    URL = 'https://example.com/an-image.qcow2'
+
+    def setUp(self):
+        super().setUp()
+
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+        for ns in ['system', 'owner', 'stranger']:
+            self.mock_mariadb.create_namespace(ns, 'key1', '%skey' % ns)
+
+        self.theirs = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='an-image',
+            namespace='owner')
+        self.theirs.state = Artifact.STATE_CREATED
+        self.theirs.shared = True
+
+    def _fetch_for(self, namespace):
+        """Run the resolution, and report the artifact it chose.
+
+        The download itself is stubbed: what this asks is which object
+        ImageFetchHelper was pointed at, not whether it can fetch.
+        """
+        _, op_uuid = create_and_enqueue(
+            namespace, self.URL, None, [model_tasks.image_fetch],
+            PRIORITY.user_facing)
+        afo = ArtifactFetchOp.from_db(op_uuid)
+
+        with mock.patch(
+                'shakenfist.operations.artifact_fetch_op.images') as images:
+            afo._image_fetch(None)
+
+        images.ImageFetchHelper.assert_called_once()
+        return images.ImageFetchHelper.call_args.args[1]
+
+    def test_a_shared_artifact_is_not_fetched_into(self):
+        # The regression. Resolution by visibility landed here, and the
+        # operator guide says a non-system namespace should not be able
+        # to update a shared artifact.
+        a = self._fetch_for('stranger')
+
+        self.assertNotEqual(str(self.theirs.uuid), str(a.uuid))
+        self.assertEqual('stranger', a.namespace)
+
+    def test_our_own_artifact_is_fetched_into(self):
+        # The control. Ownership resolution has to still find the
+        # artifact the enqueueing route created, or every fetch would
+        # mint a second artifact for the same URL.
+        a = self._fetch_for('owner')
+
+        self.assertEqual(str(self.theirs.uuid), str(a.uuid))

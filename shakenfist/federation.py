@@ -16,6 +16,7 @@
 # unauthenticated caller with a made-up issuer can tie up workers.
 
 import hashlib
+import ssl
 import threading
 import time
 from typing import Any
@@ -67,6 +68,55 @@ ALLOWED_ALGORITHMS = [
 LEEWAY_SECONDS = 0
 
 
+def jwks_ssl_context() -> Optional[ssl.SSLContext]:
+    """How to verify the TLS certificate of a JWKS endpoint.
+
+    None when FEDERATION_JWKS_CA_BUNDLE is unset, which leaves
+    PyJWKClient to build its own default context -- the ordinary case,
+    and the one every public issuer needs.
+
+    When it is set, the anchors in it are *added* to the system ones.
+    That distinction is the whole point and is easy to get backwards:
+    ssl.create_default_context(cafile=...) loads that file *instead of*
+    the system store, so writing it the short way would mean that
+    configuring a private Authentik silently stopped GitHub tokens from
+    verifying. Building the default context first and calling
+    load_verify_locations on it is what makes the two sets union.
+
+    Nothing else is relaxed. The bundle only says which authorities may
+    vouch for a certificate; hostname checking and expiry are still on,
+    jwks_uri must still be https, and a certificate chaining to neither
+    set is still refused.
+
+    Raises JWKSTrustAnchorUnusable when the file cannot be loaded. This
+    is the one setting in the federation group which names a file on
+    disk, and the ansible template writes it to every node, so a path
+    that exists on the deploy host and not on the nodes is an ordinary
+    mistake. Unhandled, load_verify_locations raises FileNotFoundError
+    for a typo and ssl.SSLError for a file that is not PEM, neither of
+    which the exchange endpoint catches -- so the operator got `server
+    error: FileNotFoundError(2, 'No such file or directory')` off an
+    unauthenticated endpoint, with no mention of which setting caused
+    it, on every exchange attempt from then on.
+    """
+    bundle = config.FEDERATION_JWKS_CA_BUNDLE
+    if not bundle:
+        return None
+
+    context = ssl.create_default_context()
+    try:
+        # OSError alone covers both, because ssl.SSLError subclasses it.
+        context.load_verify_locations(cafile=bundle)
+    except OSError as e:
+        LOG.with_fields({
+            'setting': 'FEDERATION_JWKS_CA_BUNDLE', 'path': bundle
+        }).error(f'JWKS CA bundle could not be loaded: {e}')
+        raise exceptions.JWKSTrustAnchorUnusable(
+            f'FEDERATION_JWKS_CA_BUNDLE ({bundle}) could not be loaded: '
+            f'{e}') from e
+    return context
+
+
 class JWKSCache:
     """One PyJWKClient per trusted issuer, plus a lock per issuer.
 
@@ -109,11 +159,16 @@ class JWKSCache:
                 # A changed jwks_uri means the operator repointed the
                 # issuer, so the old client's cached keys are no longer
                 # the right answer and the client is replaced.
+                # The context is built per client rather than once at
+                # import, so an operator who fixes a wrong bundle path
+                # gets it picked up by an sf-api restart rather than
+                # needing the file to have been right at install time.
                 client = PyJWKClient(
                     jwks_uri,
                     cache_jwk_set=True,
                     lifespan=config.FEDERATION_JWKS_CACHE_SECONDS,
-                    timeout=config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS)
+                    timeout=config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS,
+                    ssl_context=jwks_ssl_context())
                 self._clients[issuer_uuid] = client
                 self._locks[issuer_uuid] = threading.Lock()
             return client, self._locks[issuer_uuid]
@@ -229,8 +284,13 @@ def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
 
     Checks the signature against the issuer's published keys, then the
     audience, the issuer, and the lifetime. Raises
-    TokenValidationFailed for every failure, with a message intended
-    for the audit log rather than for the caller.
+    TokenValidationFailed for every failure of the token, with a
+    message intended for the audit log rather than for the caller.
+
+    The one exception it raises which is not about the token is
+    JWKSTrustAnchorUnusable, which says our JWKS CA bundle is
+    unloadable. It is separate precisely so the endpoint can avoid
+    reporting our misconfiguration as the caller's bad token.
     """
     # One read of the issuer's row for all three columns this needs.
     # Three separate property reads was three round trips on the one
