@@ -705,3 +705,44 @@ class TestArtifactLookupByName(base.BaseNamespacedTestCase):
                 self.system_client.delete_namespace(ns_b_name)
             except apiclient.ResourceNotFoundException:
                 pass
+
+
+class TestBulkArtifactDelete(base.BaseNamespacedTestCase):
+    """Functional test for the bulk DELETE /artifacts endpoint.
+
+    The delete-all-artifacts-in-a-namespace form used to perform the
+    deletions and then 500 while serializing its own response, because
+    the uuid list it returned contained raw uuid.UUID objects (issue
+    3657). This exercises the documented 200 response: a list of the
+    artifact uuids that were deleted.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'bulkartdel'
+        super().__init__(*args, **kwargs)
+
+    def _upload_tiny_artifact(self, artifact_name):
+        up = self.test_client.create_upload()
+        self.test_client.send_upload(up['uuid'], b'\x00' * 16)
+        art = self.test_client.upload_artifact(artifact_name, up['uuid'])
+        self.addDetail(
+            'artifact_%s' % artifact_name,
+            content.text_content(json.dumps(art, indent=4, sort_keys=True)))
+        return art
+
+    def test_bulk_delete_returns_deleted_uuids(self):
+        created = {
+            self._upload_tiny_artifact('bulk-delete-1')['uuid'],
+            self._upload_tiny_artifact('bulk-delete-2')['uuid']
+        }
+
+        deleted = self.test_client.delete_all_artifacts(self.namespace)
+        self.addDetail(
+            'deleted', content.text_content(json.dumps(
+                deleted, indent=4, sort_keys=True)))
+
+        self.assertEqual(created, set(deleted))
+        for artifact_uuid in created:
+            self.assertEqual(
+                'deleted',
+                self.system_client.get_artifact(artifact_uuid)['state'])
