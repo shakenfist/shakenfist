@@ -110,10 +110,9 @@ class Node(dbo):
     STATE_STOPPED = 'stopped'
     STATE_DEGRADED = 'degraded'
 
-    # Note that this list of active states is duplicated in baseobject as well to avoid
-    # a circular import, and if changed must be updated there as well. It is defined in
-    # constants so that mariadb can filter capacity queries on it in SQL without
-    # importing this module.
+    # The active state set is defined in constants so that baseobject's metrics
+    # gathering and mariadb's SQL capacity filters can share it without importing
+    # this module.
     ACTIVE_STATES = set(NODE_ACTIVE_STATES)
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 

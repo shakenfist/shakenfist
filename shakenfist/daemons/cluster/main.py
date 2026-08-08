@@ -604,7 +604,7 @@ class Monitor(daemon.Daemon):
                     except Exception as e:
                         util_exceptions.ignore_exception('cluster', e)
 
-                    # run_pending() above and the cleanup below are unbounded
+                    # _run_due_scheduled_jobs() above and the cleanup below are unbounded
                     # maintenance phases; pet between them so a slow scheduled
                     # task does not eat the whole watchdog budget before the
                     # cleanup's own per-loop pets start.

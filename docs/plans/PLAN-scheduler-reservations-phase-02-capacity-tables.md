@@ -312,6 +312,20 @@ semantics being built now:
   should enforce one active claim per namespace; a unique
   partial index would make that structural rather than
   procedural.
+* **Duplicate placements double-count into per-claim
+  `used_*`.** The stale-placement edge (a lost node's
+  `instance_location` row surviving `place_instance()`'s
+  best-effort removal, so one instance appears on two nodes)
+  is benign *at cluster scope only*, because the unclaimed
+  fold is restricted to nodes holding a capacity row.
+  Per-claim `used_*` is deliberately namespace-wide (see
+  above), so a duplicated placement adds that instance's
+  resources to the claim twice, and a namespace could be
+  denied capacity it is not using once `used_*` is a quota.
+  Phase 4 must either de-duplicate by instance uuid in the
+  usage query (one placement row per `target_uuid`) or rely
+  on phase 3 having eliminated stale placement rows. The
+  `_RECONCILE_USAGE_SQL` comment block carries the same note.
 
 The reply carries a summary (per-node limits/used/demand, the
 cluster row, expired-claim and added/removed node counts, and
@@ -376,6 +390,7 @@ surface yet: the admin capacity view migrates in phase 5.
 | 10 | Address third automated review of PR #3614 | medium | management session | none | Complete — see Third review response |
 | 11 | Address fourth automated review of PR #3614 | medium | management session | none | Complete — see Fourth review response |
 | 12 | Rebase onto develop; address fifth automated review of PR #3614 | medium | management session | none | Complete — see Fifth review response |
+| 13 | Rebase again; record the sixth automated review's documentation batch | low | management session | none | Complete — see Sixth review response |
 
 ## Validation
 
@@ -477,6 +492,17 @@ records the measurement so the change is not re-proposed.
   its server side is one analytical query — the exact shape
   that SIGABRTed non-database daemons in issue 3586. A skipped
   pass is harmless because the next one recomputes everything.
+  That justification is release-scoped: once phase 3's guarded
+  UPDATEs make the recompute a drift correction, a reconciler
+  persistently exceeding its deadline means drift accumulates
+  indefinitely with only a counter and a frozen last-success
+  gauge as signal. Phase 3 must pair enabling the counter
+  guard with a persistent-failure decision — either raise the
+  reconciler's budget above `BOUNDED_QUERY_TIMEOUT` (it is not
+  on a watchdog-critical path, since `_run_due_scheduled_jobs`
+  pets before each job), or treat consecutive failures as a
+  condition that disables the guard rather than admitting
+  against stale counters.
 * `SCHEDULER_CAPACITY_LAST_DURATION` is now set before the
   failure return, so a slow-then-failing pass reports its own
   duration instead of the last successful one.
@@ -853,6 +879,49 @@ stacked `from shakenfist.protos` prefixes onto the stale generated
 files. The proto is fixed and the stubs regenerated at the head;
 intermediate rebased commits retain the broken generated files, which
 matters to `git bisect` but not to the PR diff or CI.
+
+### Step 13: the sixth automated review (2026-08-08)
+
+The sixth review raised **zero fix items** — the landing round under
+the re-review exit rule. One documentation item, six considers (five
+taken, one already-covered), two informational, and six "what's good"
+entries including an endorsement of the positive-membership clause as
+"the clause that actually kills the class".
+
+**Documented — duplicate placements double-count into per-claim
+`used_*` (item 1).** Round four's "benign" verdict on the
+stale-placement edge was scoped to cluster accounting without saying
+so; per-claim `used_*` is deliberately namespace-wide and therefore
+exactly the counter the closed-accounting fix does not protect. Now
+recorded as the third phase-4 claim-accounting bullet above and
+mirrored in the `_RECONCILE_USAGE_SQL` comment block.
+
+**Considers taken (items 2, 3, 5, 6, 7):** baseobject.py now imports
+`NODE_ACTIVE_STATES` instead of carrying the third hardcoded copy of
+the set (and its comment no longer claims errored nodes are included
+when they were not — a pre-existing comment/code contradiction);
+node.py's comment stops instructing maintainers to hand-sync a copy
+that no longer exists; the schema tests assert `sa.BigInteger` rather
+than `sa.Integer` (which BigInteger satisfies, leaving round four's
+deliberate widening unpinned); `_reconcile_fetch_demand`'s docstring
+records that its window comparison spans hosts like the metrics
+freshness check, with the negative-age clamp as mitigation; and the
+live test module docstring states the `--serial` requirement the
+collation flip depends on.
+
+**Consider recorded rather than coded (item 8):** the
+`BOUNDED_QUERY_TIMEOUT` justification is release-scoped; the adopted
+bullet above now carries the phase-3 pairing requirement (raise the
+reconciler budget or disable the guard on consecutive failures).
+
+**No action (items 4, 9):** the MariaDB 10.11 floor bump was verified
+correct and fully documented by the reviewer; the lazy `should_run`
+evaluation in `_run_due_scheduled_jobs` was judged benign and
+arguably better (a job falling due mid-batch runs in the same batch).
+
+No further re-review was requested: the round contained no fix items,
+and the changes above are comments, docstrings, plan text and one
+test-assertion tightening.
 
 ### Success criteria
 

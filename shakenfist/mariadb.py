@@ -23485,6 +23485,17 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # enable the counter guard until the legacy column and its union are
 # gone.
 #
+# Duplicated placements are the other way this ledger is inexact: a
+# lost node's INSTANCE_LOCATION row can survive place_instance()'s
+# best-effort removal, so one instance appears on two nodes. The
+# cluster row is protected because the unclaimed fold is restricted to
+# nodes holding a capacity row, but the per-claim used_* recompute
+# deliberately folds the namespace-wide total, so a duplicate counts an
+# instance twice there. Inert while namespace_claims is empty; before
+# used_* becomes a quota, phase 4 must either de-duplicate by instance
+# uuid in this query (one placement row per target_uuid) or rely on
+# phase 3 having eliminated stale placement rows.
+#
 # Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
 # (available since MariaDB 10.6, below the MIN_MARIADB_VERSION floor).
 # The derived table aggregates per instance first so the JSON_TABLE only
@@ -23606,6 +23617,14 @@ def _reconcile_fetch_demand(
     _decayed_demand_contribution. The set-based query bounds the fetch
     to the recent window, so the Python fold is over a handful of rows
     and the arithmetic is exactly the unit-tested helper.
+
+    Like the metrics freshness check (see the note on
+    RECONCILE_METRICS_MAX_AGE_SECONDS), the window comparison spans
+    hosts: ``refs.created`` is a client-written float from the placing
+    node's clock, compared against this daemon's ``now``. A node
+    running fast under-contributes demand and one running slow
+    over-contributes; _decayed_demand_contribution's negative-age clamp
+    is the mitigation for the slow side.
     """
     demand: dict[UUID, float] = {}
     if demand_decay_seconds <= 0:

@@ -34,7 +34,10 @@ the assertions here are the same hand-computed numbers recorded in
 docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
 
 DESTRUCTIVE: tables in the target database are dropped during cleanup.
-Never point SF_MARIADB_TEST_DSN at a real deployment.
+Never point SF_MARIADB_TEST_DSN at a real deployment. The
+test_mariadb_*_live modules share one database (and this one flips its
+collation to utf8mb4_bin for the duration of each test), so they must
+be run serially -- ``stestr run --serial``, as CI does.
 """
 
 import json

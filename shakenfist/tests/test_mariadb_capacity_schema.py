@@ -111,10 +111,13 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
         self.assertTrue(table.c['node_uuid'].primary_key)
 
         # expected_demand is a DOUBLE with a server-side default of zero;
-        # the counters are integers defaulting to zero.
+        # the counters are BIGINTs defaulting to zero. BigInteger is asserted
+        # rather than Integer (which BigInteger would also satisfy) so a
+        # future narrowing of the deliberate overflow-avoiding widening
+        # fails a test rather than requiring a migration.
         self.assertIsInstance(table.c['expected_demand'].type, sa.Double)
         for name in ('used_cpus', 'used_memory_mb', 'used_disk_gb'):
-            self.assertIsInstance(table.c[name].type, sa.Integer)
+            self.assertIsInstance(table.c[name].type, sa.BigInteger)
             self.assertIsNotNone(table.c[name].server_default,
                                  f'{name} should default to zero')
 
@@ -156,10 +159,12 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
         self.assertTrue(table.c['id'].primary_key)
         self.assertFalse(table.c['id'].autoincrement)
 
+        # BigInteger asserted rather than Integer for the same reason as the
+        # node capacity counters above: pin the deliberate widening.
         for name in EXPECTED_COLUMNS['cluster_capacity']:
             if name in ('id', 'updated_at'):
                 continue
-            self.assertIsInstance(table.c[name].type, sa.Integer)
+            self.assertIsInstance(table.c[name].type, sa.BigInteger)
 
         self.assertIsInstance(table.c['updated_at'].type, sa.DateTime)
 
