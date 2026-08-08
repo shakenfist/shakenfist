@@ -40,7 +40,7 @@ If your administrator asked Shaken Fist to generate your key rather than
 choosing one, it will look like this:
 
 ```
-sfk_XW3n8QvKcR2mTb7yLp4dHs9FgZjA6eNusk41
+sfk_QKLZzvTtHM8fVc7XmoVe5ohIorW9Se6JDMUCWH
 ```
 
 The `sfk_` prefix is there so that a leaked credential is easy to find --

@@ -609,7 +609,7 @@ groundwork exists, and lives mostly outside this repository.
 | 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Complete |
 | 2. Namespace keys as first-class objects | [PLAN-auth-federation-phase-02-key-objects.md](PLAN-auth-federation-phase-02-key-objects.md) | Complete |
 | 3. Federated exchange and scope enforcement | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Complete |
-| 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Planned |
+| 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
 | 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
 | 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
