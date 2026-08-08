@@ -1,0 +1,338 @@
+# Phase 2: Type vocabulary and a valid published specification
+
+Phase 2 of [PLAN-api-input-validation](PLAN-api-input-validation.md).
+Phase 1 made every individual parameter declaration correct; this
+phase makes the *rendered* specification valid, measurable in CI,
+and expressive enough to carry the bounds phase 3 will compile.
+
+## Context
+
+Phase 1 (PR #3620) corrected ~120 declarations and added the audit
+that keeps them correct, but deliberately did not change how
+`swagger_helper()` renders them. The published specification is
+therefore still invalid OpenAPI 2.0, and nothing in CI measures
+that. Measured with `openapi_spec_validator` over the flasgger
+output at the end of phase 1: **129 validation errors**, in
+exactly two classes:
+
+* **128 from body parameters.** Swagger 2.0 permits at most one
+  `in: body` parameter per operation, and it must carry a
+  `schema` rather than `type`/`format`. `swagger_helper()` emits
+  one `type`/`format` parameter per declaration, so the 32 of 132
+  operations that declare more than one body parameter render an
+  invalid operation — and even single body parameters carry
+  `type` where a `schema` is required.
+* **1 from `schemes`.** `API_ADVERTISED_HTTP_SCHEMES` is typed
+  `str` in `config.py` (its own description says "space separated
+  list") and `app.py` feeds it straight into the top-level
+  `schemes` key, which must be an array of strings. A default
+  deployment publishes `schemes: 'http'`. Pre-existing
+  (`01ef8a563`), and the *first* thing a validator trips over.
+
+A third defect found while planning this phase: the flasgger
+template in `app.py` defines no `securityDefinitions`, so the
+`security: [{'bearerAuth': []}]` requirement phase 1 attached to
+every authenticated operation references a scheme the document
+never defines. A generated client has no way to learn that
+`bearerAuth` means "Authorization header carrying a JWT".
+
+The master plan's phase table also assigns D9 here: new type
+tokens (`unsignedinteger`, `macaddr`, `base64`, `netblock`) and
+an optional constraints element (`minimum`/`maximum`/`pattern`),
+rendered into the published OpenAPI so bounds are visible to
+callers rather than invisible the way the events `limit` cap was.
+
+## Shape of the work: three PRs, not one
+
+Phase 1 shipped as a single PR and took twelve review rounds,
+four of which found defects in machinery added the round before.
+The review loop converges faster on small diffs, and each step
+below is independently landable and independently valuable. The
+ordering is forced anyway: the master plan records that the
+validation test is worth having *before* the renderer fix,
+because it turns "invalid in N places" into a number that moves.
+
+| PR | Delivers | Ratchet after |
+|----|----------|---------------|
+| 1 | Specification-validation test (#3626); `schemes` and `securityDefinitions` template fixes | 128 errors, one class |
+| 2 | Collapse body parameters into one schema-carrying parameter | 0 errors |
+| 3 | New type tokens and the constraints element, applied where the issue list demands | 0 errors, richer spec |
+
+### PR 1 — the validation ratchet and template fixes
+
+**Closes #3626** (the test is the issue; the remaining error
+class it measures is PR 2's job).
+
+1. **Add `openapi_spec_validator` to the `test` extra** in
+   `pyproject.toml` (Apache-2.0, so the license comment pattern
+   holds). It is a test-only dependency; the API daemon never
+   validates its own spec at runtime.
+
+2. **New test module**
+   `shakenfist/tests/external_api/test_openapi_spec.py`. The unit
+   test suite already builds the real Flask app with mocks
+   (`test_health_endpoints.py` is the minimal pattern: set
+   `external_api.TESTING`, pin `config.NODE_UUID`, use
+   `external_api.app.test_client()`). The test fetches
+   `/apispec_1.json` (flasgger 0.9.7.1's default specs route —
+   verify it is served unauthenticated, since flasgger registers
+   it directly on the Flask app rather than through
+   `api_base.Resource`; if it is not reachable, fall back to
+   `swagger.get_apispecs()` inside an app context) and runs
+   `openapi_spec_validator.validate()` over it.
+
+   The assertion is a **ratchet with an exact count, not a
+   ceiling**: iterate the validator's errors, classify each
+   against a small table of known classes (initially just
+   "multiple/typed body parameters"), fail on any error outside
+   the table, and assert the total equals the recorded number.
+   Exact equality means a new endpoint that adds another
+   multi-body operation fails CI instead of quietly raising the
+   count — the same honesty rule the phase 1 audit applies to
+   declarations. When PR 2 lands, the table empties and the test
+   collapses to "the specification is valid", which is its
+   permanent form.
+
+3. **Fix `schemes`.** Split in `app.py`:
+   `config.API_ADVERTISED_HTTP_SCHEMES.split()`. The config
+   field's documented contract is already "space separated
+   list", so the consumer honours it; changing the field to
+   `list[str]` would change the environment-variable format for
+   every deployment to fix a rendering bug, which is the wrong
+   trade. One-scheme deployments publish `['http']`, two-scheme
+   deployments finally publish two entries.
+
+4. **Define `securityDefinitions`** in the flasgger template:
+
+   ```python
+   'securityDefinitions': {
+       'bearerAuth': {
+           'type': 'apiKey',
+           'name': 'Authorization',
+           'in': 'header',
+           'description': 'JWT bearer token, as "Bearer <token>".'
+       }
+   }
+   ```
+
+   Swagger 2.0 has no first-class bearer scheme (that arrived in
+   OpenAPI 3); `apiKey` in the `Authorization` header is the
+   standard 2.0 idiom. This makes the per-operation `security`
+   requirement resolvable and lets generated clients attach the
+   header automatically.
+
+5. **Rider: issue #3643.** The locale-dependent `open()` calls in
+   `test_parameter_declarations.py` get `encoding='utf-8'` while
+   a PR is already touching the test tree. Trivial, and keeps the
+   issue from going stale. (`Fixes #3643` in the commit that does
+   it.)
+
+### PR 2 — one body parameter per operation
+
+A change to the renderer only: declarations keep their
+five-element shape, the audit and fixer read tuples via AST and
+never see rendered output, so neither needs to change.
+
+In `swagger_helper()`, parameters declared `body` no longer
+append individual entries. They accumulate, and after the loop
+render as a single parameter:
+
+```python
+{
+    'name': 'body',
+    'in': 'body',
+    'required': <any body declaration is required>,
+    'schema': {
+        'type': 'object',
+        'properties': {
+            <name>: {'type': ..., 'format': ...,
+                     'description': <argdescription>},
+            ...
+        },
+        'required': [<names declared required>],  # omitted if empty
+    }
+}
+```
+
+Rules and edge cases, enumerated up front (the phase 1 review
+loop existed because edges were found one round at a time):
+
+* **Zero body declarations** — no body parameter is emitted at
+  all. Eight operations have empty parameter lists; more have
+  only path/query parameters.
+* **One body declaration** — still collapses. A single body
+  parameter carrying `type` instead of `schema` is just as
+  invalid as three of them.
+* **`RAW_BODY_PARAMETER`** — a declaration named `body` with type
+  `binary` means "the raw request body", renders as
+  `schema: {'type': 'string', 'format': 'binary'}` with no
+  object wrapper, and **must be the only body declaration** on
+  its operation: raw bytes and named JSON keys cannot share a
+  request body, so mixing them raises `InvalidAPIDeclaration` at
+  import time like every other malformed declaration.
+* **A named parameter that happens to be called `body`** with a
+  non-binary type is not the raw marker; it becomes a property
+  like any other. No collision: the wrapper's `name: 'body'`
+  lives at parameter level, properties live inside the schema.
+* **`required` inside a schema is a JSON Schema array of property
+  names** — a different thing from the parameter-level boolean —
+  and an *empty* `required` array is itself invalid, so it is
+  omitted when no body property is required. The wrapper's
+  parameter-level `required` is true iff any property is.
+* **Descriptions survive** as per-property `description` keys.
+  The prose "formats" phase 1 kept (`'a JSON dictionary'` etc.)
+  ride along unchanged; `format` is an open string in schema
+  objects too. Turning `arrayofstring`/`arrayofdict` into real
+  `type: array` schemas is deliberately deferred to PR 3's
+  vocabulary work — one behaviour change per PR.
+
+Verification for this PR:
+
+* The ratchet count goes 128 → 0 and the test's known-class
+  table empties; the test now asserts plain validity.
+* Direct unit tests of `swagger_helper()` output in
+  `test_parameter_declarations.py`'s
+  `SwaggerHelperValidationTestCase`: multi-body collapse shape,
+  single-body collapse, raw-body rendering, the
+  raw-plus-named-body rejection, empty-required omission.
+* `tools/check-api-declaration-guards.sh` still passes — the
+  mutations target declarations, which have not changed shape.
+* The generated OpenAPI published at openapi.shakenfist.com
+  changes shape for every operation with a body: release note
+  required. The official Python client does not read the spec,
+  so nothing breaks operationally; anyone *generating* a client
+  finally can.
+
+### PR 3 — type tokens and the constraints element (D9)
+
+Two vocabulary changes to `swagger_helper()`, then their
+application across the tree.
+
+**New tokens** in `argtypes`:
+
+| Token | Renders as | For |
+|-------|-----------|-----|
+| `unsignedinteger` | `{'type': 'integer', 'format': 'int64', 'minimum': 0}` | artifact `max_versions` (negative is silently destructive — `delete_old_versions()` slices `[:-max]`), version indexes, blob offsets |
+| `macaddr` | `{'type': 'string', 'format': 'mac address', 'pattern': <colon-separated hex>}` | #534 |
+| `base64` | `{'type': 'string', 'format': 'byte'}` — `byte` is Swagger 2.0's standard token for base64 | user data, #3269 |
+| `netblock` | `{'type': 'string', 'format': 'CIDR netblock', 'pattern': <a.b.c.d/n>}` | network create, #323 |
+
+`arrayofstring` and `arrayofdict` also become real schemas here
+(`type: array` with `items`) now that body rendering goes through
+schema objects where `array` is legal.
+
+**The constraints element**: an optional sixth tuple element, a
+dict whose keys are drawn from `{'minimum', 'maximum',
+'pattern'}`. Validated at import time in the established style —
+every malformed declaration raises `InvalidAPIDeclaration`:
+
+* arity check becomes "5 or 6 elements";
+* a sixth element must be a dict with only known keys;
+* `minimum`/`maximum` must be numbers, `pattern` must compile
+  under `re.compile`;
+* a constraint that contradicts its token (a `minimum` on a
+  `string`, a second `minimum` on `unsignedinteger`) is rejected
+  rather than merged silently.
+
+Constraints render directly onto query/path parameters (valid
+Swagger 2.0 parameter keywords) and into body schema properties
+(valid JSON Schema keywords) — the ratchet test proves both stay
+valid.
+
+**Applications in this PR** (documentation-layer only; nothing is
+*enforced* until phases 3–4 compile and turn on rejection):
+
+* events `limit`: `{'minimum': 0, 'maximum': 1000}` — the cap
+  exists in code today and is invisible to callers, the original
+  D9 motivating case;
+* blob read `offset`/`limit` and upload truncate `offset` →
+  `unsignedinteger`;
+* artifact `max_versions` → `unsignedinteger`;
+* interface MAC on instance create → `macaddr`;
+* instance `user_data` → `base64`;
+* network `netblock` → `netblock` (the reserved-range *semantic*
+  check stays in phase 6).
+
+**Machinery updates forced by the sixth element:**
+
+* `test_parameter_declarations.py`'s AST walk and
+  `tools/fix-api-parameter-locations.py` both destructure
+  declaration tuples; both learn the optional element. The
+  fixer's byte-splice targets element `[1]` by AST node offsets,
+  so a sixth element does not move what it splices — verify with
+  a fixture rather than asserting it in review.
+* `tools/check-api-declaration-guards.sh` gains mutations: a
+  six-element tuple with an unknown constraint key, a non-dict
+  sixth element, an uncompilable `pattern`, a `minimum` on a
+  string token. Run the harness; every new guard must be caught,
+  not read.
+* `docs/developer_guide/writing_an_endpoint.md`: tuple shape
+  becomes "five elements, or six when constrained", new token
+  table, constraints reference.
+* **Rider: issue #3642.** The variadic-handler vacuous pass in
+  the accepted-parameters check is audit machinery this PR is
+  already editing; fix it here (`Fixes #3642`).
+
+## Coordination and adjacencies
+
+* **#1974 / api-query-batching-roadmap** — the bounded
+  `limit`/`offset` types PR 3 defines are exactly what pagination
+  needs. Coordinate on the tokens; the query and response-shape
+  work stays in that roadmap.
+* **#3616 (mypy for `external_api/base.py`)** — the master plan
+  lists it as enabling. Optional rider on PR 2, which rewrites
+  the renderer anyway; take it if the annotation diff stays
+  small, defer without guilt otherwise.
+* **The autofixer** may pick up filed issues; #3642 and #3643
+  have sat since 2026-08-03 untouched, but label them
+  `automated-fix-attempted` when their carrying PR branches, so
+  an automated fix does not race the in-flight work.
+* **openapi.shakenfist.com** republishes from the tree, so PR 2's
+  shape change propagates on the next docs sync; nothing manual.
+
+## What this phase does not do
+
+* No request is validated or rejected — compilation is phase 3,
+  enforcement phase 4. Everything here changes what is
+  *published* and what the compiler will later have to work with.
+* No `required` semantics change (phase 6).
+* No response validation (out of scope by D7).
+* No semantic validators (netblock overlap, MAC uniqueness) —
+  the tokens publish the format; cluster-state checks are
+  phase 6.
+
+## Verification, phase-wide
+
+* The ratchet number: 129 before PR 1, 128 after it, 0 after
+  PR 2, still 0 after PR 3. Each PR's commit message records the
+  measurement.
+* `tools/check-api-declaration-guards.sh` after every PR — a
+  guard that passes on a deliberately broken tree is not a
+  guard, and the harness grows with PR 3's constraint checks.
+* `pre-commit run --all-files` before every commit; the
+  `check-api-parameter-locations` hook must stay green through
+  the tuple-arity change.
+* Adversarial pass per the review-loop lessons: enumerate the
+  declaration input space (0/1/N body parameters, raw body,
+  raw-plus-named, five- and six-element tuples, every new token,
+  every constraint key, contradictory constraints) rather than
+  sampling what the tree happens to contain today.
+
+## Success criteria
+
+- [ ] CI fails when the generated specification acquires a new
+      validity error class (#3626 closed).
+- [ ] `openapi_spec_validator` reports zero errors on the
+      generated specification.
+- [ ] `securityDefinitions` published; `security` requirements
+      resolvable; `schemes` an array.
+- [ ] Every operation renders at most one body parameter, always
+      schema-carrying.
+- [ ] The four D9 tokens and the constraints element exist,
+      import-time validated, mutation-tested, documented.
+- [ ] The events `limit` bounds are visible in the published
+      OpenAPI.
+- [ ] #3642 and #3643 closed as riders.
+- [ ] Master plan phase table, `docs/plans/index.md`, and
+      `writing_an_endpoint.md` updated; release note for the
+      published-spec shape change.

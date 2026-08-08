@@ -157,7 +157,9 @@ Two known gaps:
   count the wrong way (the federated-authentication endpoints then
   added several more). The published specification is not yet
   linter-clean. Phase 2 collapses the parameters into a generated
-  `schema`;
-  [issue #3626](https://github.com/shakenfist/shakenfist/issues/3626)
-  tracks the specification-validation test that will prove the count
-  reaches zero rather than asserting it.
+  `schema`; until that lands,
+  `shakenfist/tests/external_api/test_openapi_spec.py` validates the
+  generated specification and holds this class to an exact count, so
+  a change that adds another invalid body parameter fails CI rather
+  than quietly raising the number
+  ([issue #3626](https://github.com/shakenfist/shakenfist/issues/3626)).
