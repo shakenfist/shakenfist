@@ -20,9 +20,11 @@ for the full walkthrough.
 
 ## Prerequisites
 
-Shaken Fist requires an operator-provided MariaDB 10.6.0+ server. Before
-deploying, provision a MariaDB instance and apply the bootstrap snippet
-(`tools/bootstrap-mariadb.sql`). See
+Shaken Fist requires an operator-provided MariaDB 10.11.0+ server (the
+`INET4` column type it uses arrived in 10.10, and 10.11 is the oldest
+in-support LTS above that, so this is a hard requirement rather than a
+preference). Before deploying, provision a MariaDB instance and apply
+the bootstrap snippet (`tools/bootstrap-mariadb.sql`). See
 [`docs/operator_guide/database.md`](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/database.md) for the
 complete setup workflow.
 

@@ -33,6 +33,20 @@ METRICS_DELTA_PER_SECOND_SUFFIX = '_delta_per_second'
 DISK_BUSY_PER_SECOND_METRIC = 'disk_busy_time' + METRICS_DELTA_PER_SECOND_SUFFIX
 
 
+# The node states a node may be scheduled onto. A node in any other state
+# -- errored, missing, stopping, stopped, deleted -- is not a scheduling
+# candidate, so nothing may count its resources as available capacity.
+# Note that "degraded" is active: a node with one unhealthy store still
+# runs instances.
+#
+# This lives here rather than only as Node.ACTIVE_STATES so that
+# ``shakenfist.mariadb`` can filter on it in SQL without importing
+# ``shakenfist.node`` (which imports mariadb) -- the same trick as
+# CLUSTER_LOCK_LEASE_SECONDS above. ``Node.ACTIVE_STATES`` is defined
+# from this set, so there is one definition rather than two that drift.
+NODE_ACTIVE_STATES = frozenset({'initial', 'created', 'degraded'})
+
+
 # Disk caching mode. Refer to docs/development/io_performance_tuning.md for
 # more details than you really want.
 #

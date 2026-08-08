@@ -252,6 +252,34 @@ class SFConfig(BaseSettings):
             'share of new instances.'
         )
     )
+    SCHEDULER_DEMAND_PER_VCPU: float = Field(
+        2.5,
+        description=(
+            'The expected-demand feedforward term for scheduler '
+            'reservations: each placement adds this much anticipated '
+            'load per requested vCPU to the target node\'s '
+            'expected_demand, closing the actuation-to-observation gap '
+            'for correlated placement bursts before their load shows in '
+            'measured metrics. The capacity reconciler decays each '
+            'placement\'s contribution linearly to zero over '
+            'SCHEDULER_DEMAND_DECAY_SECONDS of instance age. The '
+            'default is a provisional seed pending the scheduler '
+            'reservations phase 0 step 3 data analysis.'
+        )
+    )
+    SCHEDULER_DEMAND_DECAY_SECONDS: int = Field(
+        600,
+        description=(
+            'How long, in seconds, a placement contributes to a node\'s '
+            'expected_demand. Each placement starts at vcpus x '
+            'SCHEDULER_DEMAND_PER_VCPU and the capacity reconciler '
+            'decays that contribution linearly to zero over this window '
+            'of instance age, by which time the real load is assumed to '
+            'be visible in measured metrics. The default is a '
+            'provisional seed pending the scheduler reservations '
+            'phase 0 step 3 data analysis.'
+        )
+    )
     CPU_OVERCOMMIT_RATIO: float = Field(
         3.0,
         description=(

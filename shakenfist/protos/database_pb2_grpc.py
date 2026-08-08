@@ -1139,6 +1139,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.ReapFederationRateLimitsRequest.SerializeToString,
                 response_deserializer=database__pb2.ReapFederationReply.FromString,
                 _registered_method=True)
+        self.ReconcileSchedulerCapacity = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReconcileSchedulerCapacity',
+                request_serializer=database__pb2.ReconcileSchedulerCapacityRequest.SerializeToString,
+                response_deserializer=database__pb2.ReconcileSchedulerCapacityReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer:
@@ -2574,6 +2579,20 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ReconcileSchedulerCapacity(self, request, context):
+        """Scheduler Capacity Operations (MariaDB)
+        Scheduler-reservations phase 2: the reconciler's single RPC. One
+        call expires stale namespace claims, refreshes per-node limits from
+        node_metrics, recomputes usage and expected demand from placement
+        ground truth, and rebuilds the cluster_capacity singleton. The
+        demand parameters ride in the request so the database daemon needs
+        no copy of the caller's scheduler configuration. See
+        docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -3681,6 +3700,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.ReapFederationRateLimits,
                     request_deserializer=database__pb2.ReapFederationRateLimitsRequest.FromString,
                     response_serializer=database__pb2.ReapFederationReply.SerializeToString,
+            ),
+            'ReconcileSchedulerCapacity': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReconcileSchedulerCapacity,
+                    request_deserializer=database__pb2.ReconcileSchedulerCapacityRequest.FromString,
+                    response_serializer=database__pb2.ReconcileSchedulerCapacityReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -9650,6 +9674,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/ReapFederationRateLimits',
             database__pb2.ReapFederationRateLimitsRequest.SerializeToString,
             database__pb2.ReapFederationReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReconcileSchedulerCapacity(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReconcileSchedulerCapacity',
+            database__pb2.ReconcileSchedulerCapacityRequest.SerializeToString,
+            database__pb2.ReconcileSchedulerCapacityReply.FromString,
             options,
             channel_credentials,
             insecure,

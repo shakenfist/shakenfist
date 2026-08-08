@@ -638,6 +638,17 @@ jobs:
         timeout-minutes: 15
         run: bash tools/ci-enum-widening-test.sh ci-test-password
 
+  # The scheduler capacity reconciler's live tests
+  # (test_mariadb_capacity_reconcile_live.py) also run in the job
+  # above: its script runs every shakenfist/tests/test_mariadb_*_live.py
+  # module, because installing MariaDB is the expensive part and any
+  # test needing a real server belongs behind the same setup. They need
+  # one because the reconciler's other tests assert the shape of the
+  # SQL rather than its behaviour, and its likely failure modes (uuid
+  # form joins, JSON_TABLE defaults, nullable-column filters, enum
+  # storage conventions under a case-sensitive collation) are silently
+  # wrong numbers rather than errors.
+
   can_see_status:
     name: "Can see status"
     runs-on: [self-hosted, static]

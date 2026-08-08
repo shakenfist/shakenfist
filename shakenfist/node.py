@@ -15,6 +15,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
+from shakenfist.constants import NODE_ACTIVE_STATES
 from shakenfist.eventlog import add_event
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
@@ -109,9 +110,10 @@ class Node(dbo):
     STATE_STOPPED = 'stopped'
     STATE_DEGRADED = 'degraded'
 
-    # Note that this list of active states is duplicated in baseobject as well to avoid
-    # a circular import, and if changed must be updated there as well.
-    ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, STATE_DEGRADED}
+    # The active state set is defined in constants so that baseobject's metrics
+    # gathering and mariadb's SQL capacity filters can share it without importing
+    # this module.
+    ACTIVE_STATES = set(NODE_ACTIVE_STATES)
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 
     # Remember that this list must align with the daemon names sf-ctl is called with

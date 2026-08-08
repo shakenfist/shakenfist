@@ -2,6 +2,7 @@ import queue
 import time
 
 from prometheus_client import Counter
+from prometheus_client import Gauge
 from shakenfist_utilities import logs                 # noreorder
 
 from shakenfist.config import config
@@ -42,6 +43,56 @@ REAPER_REJECTED = Counter(
     'cluster_op_reaper_rejected_total',
     'Stuck cluster operation work items that exceeded '
     'max_attempts and were rejected.')
+
+# Scheduler capacity reconciler metrics (phase 2, D5). Per-node gauges are
+# labelled by node uuid and resource dimension; the resource label values
+# are 'cpus', 'memory_mb' and 'disk_gb'.
+CAPACITY_RESOURCES = ('cpus', 'memory_mb', 'disk_gb')
+SCHEDULER_CAPACITY_NODE_LIMIT = Gauge(
+    'scheduler_capacity_node_limit',
+    'Per-node scheduler capacity limit, by resource dimension.',
+    ['node', 'resource'])
+SCHEDULER_CAPACITY_NODE_USED = Gauge(
+    'scheduler_capacity_node_used',
+    'Per-node scheduler capacity usage, by resource dimension.',
+    ['node', 'resource'])
+SCHEDULER_CAPACITY_NODE_EXPECTED_DEMAND = Gauge(
+    'scheduler_capacity_node_expected_demand',
+    'Per-node decayed expected demand from recent placements.',
+    ['node'])
+SCHEDULER_CAPACITY_CLUSTER_TOTAL = Gauge(
+    'scheduler_capacity_cluster_total',
+    'Cluster-wide scheduler capacity (sum of node limits), by resource '
+    'dimension.',
+    ['resource'])
+SCHEDULER_CAPACITY_CLUSTER_CLAIMED = Gauge(
+    'scheduler_capacity_cluster_claimed',
+    'Cluster-wide capacity reserved by active namespace claims, by '
+    'resource dimension.',
+    ['resource'])
+SCHEDULER_CAPACITY_CLUSTER_UNCLAIMED_USED = Gauge(
+    'scheduler_capacity_cluster_unclaimed_used',
+    'Cluster-wide usage by namespaces without an active claim, by '
+    'resource dimension.',
+    ['resource'])
+SCHEDULER_CAPACITY_PASSES = Counter(
+    'scheduler_capacity_reconcile_passes_total',
+    'Scheduler capacity reconcile passes attempted.')
+SCHEDULER_CAPACITY_FAILURES = Counter(
+    'scheduler_capacity_reconcile_failures_total',
+    'Scheduler capacity reconcile passes that failed.')
+SCHEDULER_CAPACITY_LAST_SUCCESS = Gauge(
+    'scheduler_capacity_reconcile_last_success_timestamp',
+    'Unix timestamp of the last successful scheduler capacity reconcile '
+    'pass.')
+SCHEDULER_CAPACITY_LAST_DURATION = Gauge(
+    'scheduler_capacity_reconcile_last_duration_seconds',
+    'Duration of the last scheduler capacity reconcile pass in seconds.')
+
+# The node label sets we most recently exported, so a node deleted from
+# the cluster has its per-node gauges removed rather than lingering at
+# their final values forever.
+_CAPACITY_EXPORTED_NODES: set[str] = set()
 
 
 @util_general.recorded_method
@@ -628,3 +679,131 @@ def reconcile_orphaned_objects():
             except Exception as e:
                 util_exceptions.ignore_exception(
                     f'zombie repair of {objtype} {obj_uuid}', e)
+
+
+def clear_scheduler_capacity_metrics() -> None:
+    """Drop the capacity gauges when this node stops being the leader.
+
+    The cluster-wide gauges describe singleton cluster state rather than
+    this node's own work, so a demoted node that keeps exporting its
+    final values leaves two nodes publishing contradictory cluster
+    numbers until the demoted one restarts. Counters do not have this
+    problem -- they are monotonic and aggregate correctly across nodes --
+    but these are gauges, so the demoted node has to stop answering. The
+    newly elected node repopulates all of them on its first pass.
+
+    The last-success and last-duration gauges are deliberately left
+    alone. They describe this node's own last pass, not cluster state,
+    and are worth keeping for debugging ("when did this node last
+    reconcile successfully?"). They are also unlabelled, so they cannot
+    be removed the way a label set can -- only overwritten. That means a
+    freshness alert on them must aggregate across instances or it will
+    fire forever on every node that has ever held the lock; see
+    docs/operator_guide/database.md for the query.
+    """
+    for node_uuid in _CAPACITY_EXPORTED_NODES:
+        for gauge in (SCHEDULER_CAPACITY_NODE_LIMIT,
+                      SCHEDULER_CAPACITY_NODE_USED):
+            for resource in CAPACITY_RESOURCES:
+                try:
+                    gauge.remove(node_uuid, resource)
+                except KeyError:
+                    pass
+        try:
+            SCHEDULER_CAPACITY_NODE_EXPECTED_DEMAND.remove(node_uuid)
+        except KeyError:
+            pass
+    _CAPACITY_EXPORTED_NODES.clear()
+
+    for gauge in (SCHEDULER_CAPACITY_CLUSTER_TOTAL,
+                  SCHEDULER_CAPACITY_CLUSTER_CLAIMED,
+                  SCHEDULER_CAPACITY_CLUSTER_UNCLAIMED_USED):
+        for resource in CAPACITY_RESOURCES:
+            try:
+                gauge.remove(resource)
+            except KeyError:
+                pass
+
+
+@util_general.recorded_method
+def reconcile_scheduler_capacity() -> None:
+    """Run the scheduler capacity reconciler (phase 2, D5) cadence.
+
+    Runs only on the elected cluster node. One pass is a single
+    mariadb.reconcile_scheduler_capacity() RPC which expires stale
+    claims, refreshes the node capacity rows from node_metrics,
+    recomputes usage and expected demand, and recomputes the cluster
+    singleton row. This phase is observable-but-inert: nothing consumes
+    the capacity tables for admission until phase 3, so this task's
+    whole job is to keep the tables fresh and export what it saw as
+    prometheus metrics and one structured log line per pass. See
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+    """
+    SCHEDULER_CAPACITY_PASSES.inc()
+
+    start_time = time.time()
+    try:
+        reply = mariadb.reconcile_scheduler_capacity()
+    except Exception as e:
+        util_exceptions.ignore_exception('scheduler capacity reconcile', e)
+        reply = None
+    duration = time.time() - start_time
+    # Set before the failure return: a slow-then-failing pass is exactly
+    # when an operator wants to know how long it ran, and leaving the
+    # gauge at the last successful pass's duration hides that.
+    SCHEDULER_CAPACITY_LAST_DURATION.set(duration)
+
+    if not reply:
+        SCHEDULER_CAPACITY_FAILURES.inc()
+        LOG.with_fields({'duration': duration}).warning(
+            'Scheduler capacity reconcile pass failed')
+        return
+
+    seen_nodes = set()
+    for node in reply['nodes']:
+        node_uuid = node['node_uuid']
+        seen_nodes.add(node_uuid)
+        for resource in CAPACITY_RESOURCES:
+            SCHEDULER_CAPACITY_NODE_LIMIT.labels(
+                node=node_uuid, resource=resource).set(node[f'limit_{resource}'])
+            SCHEDULER_CAPACITY_NODE_USED.labels(
+                node=node_uuid, resource=resource).set(node[f'used_{resource}'])
+        SCHEDULER_CAPACITY_NODE_EXPECTED_DEMAND.labels(
+            node=node_uuid).set(node['expected_demand'])
+
+    # Remove label sets for nodes which have left the cluster since the
+    # last pass. Removing a label set which was never exported (for
+    # example after a daemon restart) raises KeyError, so guard each.
+    for node_uuid in _CAPACITY_EXPORTED_NODES - seen_nodes:
+        for gauge in (SCHEDULER_CAPACITY_NODE_LIMIT,
+                      SCHEDULER_CAPACITY_NODE_USED):
+            for resource in CAPACITY_RESOURCES:
+                try:
+                    gauge.remove(node_uuid, resource)
+                except KeyError:
+                    pass
+        try:
+            SCHEDULER_CAPACITY_NODE_EXPECTED_DEMAND.remove(node_uuid)
+        except KeyError:
+            pass
+    _CAPACITY_EXPORTED_NODES.clear()
+    _CAPACITY_EXPORTED_NODES.update(seen_nodes)
+
+    cluster = reply['cluster']
+    for resource in CAPACITY_RESOURCES:
+        SCHEDULER_CAPACITY_CLUSTER_TOTAL.labels(
+            resource=resource).set(cluster[f'total_{resource}'])
+        SCHEDULER_CAPACITY_CLUSTER_CLAIMED.labels(
+            resource=resource).set(cluster[f'claimed_{resource}'])
+        SCHEDULER_CAPACITY_CLUSTER_UNCLAIMED_USED.labels(
+            resource=resource).set(cluster[f'unclaimed_used_{resource}'])
+
+    SCHEDULER_CAPACITY_LAST_SUCCESS.set(time.time())
+
+    LOG.with_fields({
+        'nodes': len(reply['nodes']),
+        'nodes_added': reply['nodes_added'],
+        'nodes_removed': reply['nodes_removed'],
+        'claims_expired': reply['claims_expired'],
+        'duration': duration
+    }).info('Scheduler capacity reconcile pass complete')

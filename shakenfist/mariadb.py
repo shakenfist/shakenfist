@@ -22,8 +22,10 @@
 # because enum growth changes no table version and so cannot be caught by
 # the version gate.
 
+import decimal
 from ipaddress import IPv4Address
 import json
+import math
 import random
 import time
 import threading
@@ -43,6 +45,8 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
+from shakenfist.constants import GiB
+from shakenfist.constants import NODE_ACTIVE_STATES
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -348,7 +352,9 @@ CLUSTER_OPERATION_TARGETS_VERSION = 2
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
 # metrics_json at upsert time (scheduler-reservations phase 1).
-NODE_METRICS_VERSION = 3
+# v4: adds is_hypervisor, projected the same way, so the capacity
+# reconciler can filter to hypervisors in SQL (phase 2).
+NODE_METRICS_VERSION = 4
 # v1: schema creation. v2: data migration from node_attributes.daemon_states
 # JSON column.
 NODE_DAEMON_STATES_VERSION = 2
@@ -366,14 +372,24 @@ CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENTS_VERSION = 1
 EVENT_OBJECTS_VERSION = 1
+# Scheduler-reservations capacity tables (see docs/plans/
+# PLAN-scheduler-reservations-phase-02-capacity-tables.md). v1: schema
+# creation.
+SCHEDULER_NODE_CAPACITY_VERSION = 1
+NAMESPACE_CLAIMS_VERSION = 1
+CLUSTER_CAPACITY_VERSION = 1
 
 
-# Minimum supported MariaDB version. See docs/plans/PLAN-byo-mariadb-phase-01-
-# statelessness.md decision 1 for the rationale; in short: comfortably above
-# the 10.2 JSON-features floor SF uses today, matches Ubuntu 22.04 LTS so the
-# floor lines up with a vendor-supported LTS distro, and well below what
-# cluster_ci's debian-12 functional tests (MariaDB 10.11) exercise.
-MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 6, 0)
+# Minimum supported MariaDB version. Originally 10.6.0 (see
+# docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md decision 1: alignment
+# with Ubuntu 22.04's MariaDB), but the ipam_reservations.address column uses
+# the native INET4 type, which only exists from MariaDB 10.10 -- so schema
+# creation on 10.6 fails and that floor had silently stopped being real
+# (found by scheduler-reservations phase 2 validation). 10.11 is the oldest
+# in-support LTS above 10.10 (itself a short-term release, EOL 2023), is the
+# version the debian-12 cluster CI functional tests actually exercise, and
+# ships with Debian 12/13 and Ubuntu 24.04.
+MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 11, 0)
 
 
 # Consolidated mapping of every MariaDB table managed by ensure_schema() to
@@ -432,6 +448,9 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'cluster_config': CLUSTER_CONFIG_VERSION,
     'events': EVENTS_VERSION,
     'event_objects': EVENT_OBJECTS_VERSION,
+    'scheduler_node_capacity': SCHEDULER_NODE_CAPACITY_VERSION,
+    'namespace_claims': NAMESPACE_CLAIMS_VERSION,
+    'cluster_capacity': CLUSTER_CAPACITY_VERSION,
 }
 
 
@@ -483,6 +502,27 @@ GRPC_RETRY_DELAY = 0.5
 # watchdog pet -- hostage. Used as the connect/read/write timeout on the
 # bounded direct engine and as the gRPC deadline for bounded calls.
 BOUNDED_QUERY_TIMEOUT = 10
+
+# How old a node_metrics row may be before the capacity reconciler stops
+# treating it as evidence of a live node's capacity. The resources daemon
+# publishes every 60 seconds and the reconciler runs every 5 minutes, so
+# this is three reconcile cadences and fifteen publish intervals: long
+# enough that an ordinary slow pass or a daemon restart cannot make a
+# node's capacity row flap in and out (which would also make the pass's
+# nodes_added/nodes_removed counts meaningless), short enough that a node
+# whose resources daemon has died stops inflating the cluster totals
+# within the quarter hour. Deliberately not the scheduler's 120 second
+# window: that is tuned for a cache refreshed on demand, and copying it
+# here would put the threshold below the reconcile period.
+#
+# Note this comparison spans hosts, unlike everything else in the
+# capacity work: node_metrics.timestamp is a float written by each
+# node's resources daemon from that node's clock, while the comparison
+# runs on the database daemon's. That is forced by the data model (the
+# column is not a server-side TIMESTAMP the way claim expiry is), so a
+# node whose clock runs more than this window slow loses its capacity
+# row. Fifteen minutes absorbs any skew a working NTP setup produces.
+RECONCILE_METRICS_MAX_AGE_SECONDS = 900
 
 
 def _get_database_stub() -> Any:
@@ -1602,6 +1642,33 @@ def _node_metric_to_float(value: Any) -> float:
     return float(value)
 
 
+def _node_metric_to_bool(value: Any) -> bool:
+    """Coerce a metrics value to a boolean column value.
+
+    The published value is a real JSON boolean, but be defensive about
+    the string and integer forms so a publisher change cannot silently
+    turn every node into a hypervisor -- bool('false') is True, which is
+    exactly the trap this avoids.
+
+    An empty string is not False. It carries no more information than a
+    missing key, and the reconciler is careful to treat an unknown
+    is_hypervisor as evidence of nothing rather than as a confirmed
+    non-hypervisor -- the latter deletes the node's capacity row. So
+    refuse it, and let the caller store NULL.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ('true', 't', 'yes', 'y', '1'):
+            return True
+        if lowered in ('false', 'f', 'no', 'n', '0'):
+            return False
+    raise ValueError(f'Cannot coerce {value!r} to a boolean')
+
+
 # Projection of capacity-relevant metrics_json fields to typed columns on
 # node_metrics (scheduler-reservations phase 1). Each entry is
 # (metrics_key, column_name, coercion). This single spec drives both the
@@ -1623,6 +1690,13 @@ NODE_METRICS_EXTRACTION_SPEC: tuple[tuple[str, str, Callable[[Any], Any]], ...] 
     ('disk_reservation_gb', 'disk_reservation_gb', _node_metric_to_int),
     (DISK_BUSY_PER_SECOND_METRIC, 'disk_busy_time_delta_per_second', _node_metric_to_float),
     ('node_queue_waiting', 'node_queue_waiting', _node_metric_to_int),
+    # Not a capacity number, but the reconciler must filter capacity rows
+    # to hypervisors the way the scheduler does (scheduler.py drops
+    # non-hypervisor candidates before any capacity arithmetic), and
+    # sf-resources publishes metrics from every node regardless of role.
+    # A typed column keeps that filter in SQL rather than unpacking
+    # metrics_json per row (scheduler-reservations phase 2).
+    ('is_hypervisor', 'is_hypervisor', _node_metric_to_bool),
 )
 
 
@@ -1696,8 +1770,29 @@ def _get_node_metrics_table() -> sa.Table:
                 sa.Column('disk_reservation_gb', sa.Integer(), nullable=True),
                 sa.Column('disk_busy_time_delta_per_second', sa.Double(), nullable=True),
                 sa.Column('node_queue_waiting', sa.Integer(), nullable=True),
+                sa.Column('is_hypervisor', sa.Boolean(), nullable=True),
             )
     return _node_metrics_table
+
+
+def _add_missing_node_metrics_columns(
+        engine: sa.Engine, table: sa.Table, table_name: str) -> None:
+    """Add any NODE_METRICS_EXTRACTION_SPEC column the table is missing.
+
+    The column types are taken from the table definition so the DDL can
+    not drift from it, and each ADD COLUMN is guarded by an existence
+    check so re-runs (and re-runs from an older schema version) are safe.
+    """
+    mysql_dialect = sa.dialects.mysql.dialect()
+    with engine.begin() as conn:
+        cols = get_table_columns(engine, table_name)
+        for _, column_name, _ in NODE_METRICS_EXTRACTION_SPEC:
+            if column_name in cols:
+                continue
+            column_type = table.c[column_name].type.compile(dialect=mysql_dialect)
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} ADD COLUMN '
+                f'{column_name} {column_type} NULL'))
 
 
 def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
@@ -1727,17 +1822,21 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
         # and each ADD COLUMN is guarded by an existence check so re-runs
         # are safe.
         LOG.info(f'Adding typed capacity columns to {table_name} table (version 3)')
-        mysql_dialect = sa.dialects.mysql.dialect()
-        with engine.begin() as conn:
-            cols = get_table_columns(engine, table_name)
-            for _, column_name, _ in NODE_METRICS_EXTRACTION_SPEC:
-                if column_name in cols:
-                    continue
-                column_type = table.c[column_name].type.compile(dialect=mysql_dialect)
-                conn.execute(sa.text(
-                    f'ALTER TABLE {table_name} ADD COLUMN '
-                    f'{column_name} {column_type} NULL'))
+        _add_missing_node_metrics_columns(engine, table, table_name)
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v4 adds is_hypervisor, projected from metrics_json alongside the
+        # v3 capacity columns so the capacity reconciler can filter to
+        # hypervisors in SQL (scheduler-reservations phase 2). Same
+        # spec-driven, existence-guarded ADD COLUMN pass as v3: both steps
+        # simply converge the table onto NODE_METRICS_EXTRACTION_SPEC, so
+        # running them in sequence on an old database is safe and the end
+        # state does not depend on which step introduced a column.
+        LOG.info(f'Adding is_hypervisor column to {table_name} table (version 4)')
+        _add_missing_node_metrics_columns(engine, table, table_name)
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -3259,6 +3358,257 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+# =============================================================================
+# Scheduler Capacity Table Definitions (scheduler-reservations phase 2)
+# =============================================================================
+
+_scheduler_node_capacity_table: Optional[sa.Table] = None
+_namespace_claims_table: Optional[sa.Table] = None
+_cluster_capacity_table: Optional[sa.Table] = None
+
+
+def _get_scheduler_node_capacity_table() -> sa.Table:
+    """Get or create the scheduler_node_capacity table definition.
+
+    One of the three scheduler-reservations capacity tables (see
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
+    One row per hypervisor: the schedulable limits derived from the typed
+    node_metrics columns, the materialised usage counters recomputed from
+    placed instances, and the decaying expected-demand signal. In this
+    phase the tables are maintained solely by the reconciler; the
+    guarded-UPDATE admission path arrives in phase 3.
+
+    ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
+    server-side timestamp so comparisons happen against the database's
+    NOW(), never a per-node clock.
+    """
+    global _scheduler_node_capacity_table
+    if _scheduler_node_capacity_table is None:
+        with TABLE_CREATION_LOCK:
+            if _scheduler_node_capacity_table is not None:
+                return _scheduler_node_capacity_table
+            metadata = _get_metadata()
+            if 'scheduler_node_capacity' in metadata.tables:
+                _scheduler_node_capacity_table = \
+                    metadata.tables['scheduler_node_capacity']
+                return _scheduler_node_capacity_table
+            _scheduler_node_capacity_table = sa.Table(
+                'scheduler_node_capacity',
+                metadata,
+                sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+                # BIGINT to match the int64 proto fields. Per-node
+                # counters can not realistically overflow INT, but the
+                # cluster singleton sums them and the tables are new in
+                # this release, so widening everything now is free where
+                # it would be a migration later.
+                sa.Column('limit_cpus', sa.BigInteger(), nullable=False),
+                sa.Column('limit_memory_mb', sa.BigInteger(),
+                          nullable=False),
+                sa.Column('limit_disk_gb', sa.BigInteger(), nullable=False),
+                sa.Column('used_cpus', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_memory_mb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_disk_gb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('expected_demand', sa.Double(), nullable=False,
+                          server_default='0'),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+            )
+    return _scheduler_node_capacity_table
+
+
+def _get_namespace_claims_table() -> sa.Table:
+    """Get or create the namespace_claims table definition.
+
+    One of the three scheduler-reservations capacity tables (see
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
+    One row per capacity claim: the claiming namespace (indexed, because
+    phase 3 admission looks claims up by namespace; the column matches
+    the namespaces table's name primary key), the claimed limits, the
+    materialised usage counters, the claim state, and its expiry. The
+    table is created empty in this phase -- the claims API is phase 4 --
+    and is maintained solely by the reconciler; the guarded-UPDATE
+    admission path arrives in phase 3.
+
+    ``expires_at`` and ``updated_at`` follow the cluster_locks TIMESTAMP
+    idiom: server-side timestamps so the expiry sweep compares against
+    the database's NOW(), never a per-node clock.
+    """
+    global _namespace_claims_table
+    if _namespace_claims_table is None:
+        with TABLE_CREATION_LOCK:
+            if _namespace_claims_table is not None:
+                return _namespace_claims_table
+            metadata = _get_metadata()
+            if 'namespace_claims' in metadata.tables:
+                _namespace_claims_table = metadata.tables['namespace_claims']
+                return _namespace_claims_table
+            _namespace_claims_table = sa.Table(
+                'namespace_claims',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('namespace', sa.String(255), nullable=False),
+                # BIGINT to match the int64 proto fields; see the
+                # scheduler_node_capacity definition.
+                sa.Column('limit_cpus', sa.BigInteger(), nullable=False),
+                sa.Column('limit_memory_mb', sa.BigInteger(),
+                          nullable=False),
+                sa.Column('limit_disk_gb', sa.BigInteger(), nullable=False),
+                sa.Column('used_cpus', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_memory_mb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('used_disk_gb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('state', sa.String(32), nullable=False),
+                sa.Column('expires_at', sa.DateTime(), nullable=False),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+                sa.Index('idx_namespace_claims_namespace', 'namespace'),
+            )
+    return _namespace_claims_table
+
+
+def _get_cluster_capacity_table() -> sa.Table:
+    """Get or create the cluster_capacity table definition.
+
+    One of the three scheduler-reservations capacity tables (see
+    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
+    A singleton row (id always 1): cluster-wide totals summed from node
+    limits, capacity claimed by active namespace claims, and usage by
+    instances in namespaces without an active claim. The D14 admission
+    guards run against this row in phases 3/4; in this phase it is
+    maintained solely by the reconciler.
+
+    ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
+    server-side timestamp so comparisons happen against the database's
+    NOW(), never a per-node clock.
+    """
+    global _cluster_capacity_table
+    if _cluster_capacity_table is None:
+        with TABLE_CREATION_LOCK:
+            if _cluster_capacity_table is not None:
+                return _cluster_capacity_table
+            metadata = _get_metadata()
+            if 'cluster_capacity' in metadata.tables:
+                _cluster_capacity_table = metadata.tables['cluster_capacity']
+                return _cluster_capacity_table
+            _cluster_capacity_table = sa.Table(
+                'cluster_capacity',
+                metadata,
+                sa.Column('id', sa.Integer(), primary_key=True,
+                          autoincrement=False),
+                # BIGINT because these are cluster-wide sums and the
+                # proto fields are int64. total_memory_mb as INT would
+                # overflow around 700 TB of overcommitted RAM, and the
+                # failure mode is an upsert that raises under strict
+                # mode, failing every pass with only a WARNING to show
+                # for it. The tables are new in this release, so
+                # widening now is free where it would be a migration
+                # later.
+                sa.Column('total_cpus', sa.BigInteger(), nullable=False),
+                sa.Column('total_memory_mb', sa.BigInteger(),
+                          nullable=False),
+                sa.Column('total_disk_gb', sa.BigInteger(), nullable=False),
+                sa.Column('claimed_cpus', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('claimed_memory_mb', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('claimed_disk_gb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('unclaimed_used_cpus', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('unclaimed_used_memory_mb', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('unclaimed_used_disk_gb', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+            )
+    return _cluster_capacity_table
+
+
+def _ensure_scheduler_node_capacity_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the scheduler_node_capacity table schema is up to date."""
+    table_name = 'scheduler_node_capacity'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_scheduler_node_capacity_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. This table is new in scheduler-
+    # reservations phase 2, so there is no prior shape to migrate.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {SCHEDULER_NODE_CAPACITY_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = SCHEDULER_NODE_CAPACITY_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': SCHEDULER_NODE_CAPACITY_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_namespace_claims_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the namespace_claims table schema is up to date."""
+    table_name = 'namespace_claims'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespace_claims_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. This table is new in scheduler-
+    # reservations phase 2, so there is no prior shape to migrate. The
+    # namespace index is part of the table definition and is created by
+    # create_all alongside the table.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {NAMESPACE_CLAIMS_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = NAMESPACE_CLAIMS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACE_CLAIMS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_cluster_capacity_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_capacity table schema is up to date."""
+    table_name = 'cluster_capacity'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_capacity_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. This table is new in scheduler-
+    # reservations phase 2, so there is no prior shape to migrate. The
+    # singleton row (id=1) is written by the reconciler, not here.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {CLUSTER_CAPACITY_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = CLUSTER_CAPACITY_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_CAPACITY_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -3332,6 +3682,9 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_cluster_config_schema(engine))
     results.append(_ensure_events_schema(engine))
     results.append(_ensure_event_objects_schema(engine))
+    results.append(_ensure_scheduler_node_capacity_schema(engine))
+    results.append(_ensure_namespace_claims_schema(engine))
+    results.append(_ensure_cluster_capacity_schema(engine))
 
     # Widen any native ENUM column whose Python enum has grown since the
     # table was created. This runs after the per-table ensures so every
@@ -3412,6 +3765,9 @@ def register_all_tables() -> None:
     _get_cluster_config_table()
     _get_events_table()
     _get_event_objects_table()
+    _get_scheduler_node_capacity_table()
+    _get_namespace_claims_table()
+    _get_cluster_capacity_table()
     LOG.info('Registered %d MariaDB Table objects in metadata',
              len(_get_metadata().tables))
 
@@ -22922,3 +23278,858 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
     if _use_database_service():
         return _grpc_delete_orphaned_artifact_attributes()
     return _direct_delete_orphaned_artifact_attributes()
+
+
+# =============================================================================
+# Scheduler capacity reconcile (scheduler-reservations phase 2)
+#
+# The reconciler (D5) recomputes every counter in the three capacity
+# tables from ground truth in a single RPC: it expires stale namespace
+# claims, refreshes per-node limits from the typed node_metrics columns,
+# recomputes usage from placed instances (instance_location rows in
+# object_references), recomputes the D13 expected-demand decay, and
+# rebuilds the cluster_capacity singleton. In this phase the reconciler
+# is the only writer of these tables; phase 3's guarded-UPDATE admission
+# path turns the recompute into a drift correction.
+#
+# The limit formulas below deliberately mirror scheduler.py
+# (_has_sufficient_cpu/_ram/_disk) so that the phase 3 guard
+# ``used + x <= limit`` admits exactly what today's Python filter admits.
+# See docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+# =============================================================================
+
+
+def _derive_cpu_memory_limits(
+        cpu_schedulable: Optional[int],
+        memory_max: Optional[int],
+        memory_reserved_mb: Optional[int],
+        cpu_overcommit_ratio: float,
+        ram_overcommit_ratio: float) -> tuple[Optional[int], Optional[int]]:
+    """Derive (limit_cpus, limit_memory_mb) from typed node_metrics values.
+
+    ``limit_cpus`` mirrors one scheduler check exactly: the
+    _has_sufficient_cpu bound ``floor(cpu_schedulable ×
+    CPU_OVERCOMMIT_RATIO)``.
+
+    ``limit_memory_mb`` does not mirror a single check. It is a
+    deliberately conservative blend of two independent ones: the
+    overcommit ceiling from _has_sufficient_ram (``memory_max ×
+    RAM_OVERCOMMIT_RATIO``, which has no reservation term), reduced by
+    the node's published reservation, which comes from the separate
+    free-memory check (that one tests ``memory_available -
+    memory_reserved_mb``, a measurement of what is free right now rather
+    than a ceiling on what may be allocated). Neither scheduler test has
+    this shape. It is an allocation ledger, not the KSM-aware
+    actual-usage check; the actual-free and actual-usage checks remain
+    phase 3 candidate *filters* over the typed node_metrics columns per
+    D7, with this as the allocation backstop underneath them.
+
+    A dimension whose inputs are NULL (a metrics row written by an old
+    resources daemon mid-upgrade) derives as None so the caller keeps
+    the previous limit rather than zeroing it. Note that the mirroring
+    of scheduler.py covers the arithmetic but deliberately not the
+    inputs: Scheduler._schedulable_threads() and
+    Scheduler._memory_reserved_mb() substitute per-node fallbacks for a
+    pre-phase-1 metrics row, where this returns None and the caller
+    prefers no capacity row to a guessed one. So mid-upgrade the
+    scheduler may place on a node that has no capacity row yet. That is
+    the conservative direction, but it means the two are not
+    interchangeable while an upgrade is in flight.
+
+    ``limit_memory_mb`` is clamped at zero, matching the headroom clamp
+    in _derive_disk_limit_gb: a reservation exceeding the overcommit
+    ceiling (RAM_OVERCOMMIT_RATIO at or below 1.0 with a large
+    NODE_MEMORY_RESERVATION_MB) means the node admits nothing, and zero
+    says that without silently dragging the cluster total below the sum
+    of the other nodes the way a negative limit would.
+    """
+    limit_cpus = None
+    if cpu_schedulable is not None:
+        limit_cpus = math.floor(cpu_schedulable * cpu_overcommit_ratio)
+
+    limit_memory_mb = None
+    if memory_max is not None and memory_reserved_mb is not None:
+        limit_memory_mb = max(
+            0,
+            math.floor(memory_max * ram_overcommit_ratio) -
+            memory_reserved_mb)
+
+    return limit_cpus, limit_memory_mb
+
+
+def _derive_disk_limit_gb(
+        used_disk_gb: int,
+        disk_free_instances: Optional[int],
+        disk_reservation_gb: Optional[int]) -> Optional[int]:
+    """Derive limit_disk_gb from recomputed usage and node_metrics values.
+
+    ``disk_free_instances`` is in bytes (as published by the resources
+    daemon); the conversion to GiB matches scheduler.py's
+    _has_sufficient_disk. There is no total-disk metric and free space
+    is the only ground truth that survives qcow2 growth, so the limit is
+    "current virtual drawdown plus what the filesystem says still fits":
+    ``used_disk_gb + max(0, floor(disk_free_instances/GiB) -
+    disk_reservation_gb)``. The phase 3 guard ``used + x <= limit`` is
+    then exactly today's free-space check, while accounting virtual size.
+
+    Returns None when the metrics inputs are NULL, so the caller keeps
+    the previous limit rather than zeroing it.
+    """
+    if disk_free_instances is None or disk_reservation_gb is None:
+        return None
+    return used_disk_gb + max(
+        0, math.floor(disk_free_instances / GiB) - disk_reservation_gb)
+
+
+def _decayed_demand_contribution(
+        cpus: int,
+        age_seconds: float,
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> float:
+    """One placement's contribution to a node's expected_demand (D13).
+
+    A placement starts at ``cpus × demand_per_vcpu`` of anticipated load
+    and decays linearly to zero over ``demand_decay_seconds`` of
+    instance age. Ages outside the window (including negative ages from
+    clock skew between the placement writer and the database) clamp to
+    the window edges; a non-positive decay window disables the term
+    entirely rather than dividing by zero.
+    """
+    if demand_decay_seconds <= 0:
+        return 0.0
+    age = max(0.0, age_seconds)
+    if age >= demand_decay_seconds:
+        return 0.0
+    return cpus * demand_per_vcpu * (1.0 - age / demand_decay_seconds)
+
+
+def _disk_spec_virtual_gb(disk_spec: Any) -> int:
+    """Sum the virtual sizes (in GB) of a disk_spec JSON list.
+
+    This is the executable specification of the JSON_TABLE aggregation in
+    _RECONCILE_USAGE_SQL: elements without a numeric ``size`` (missing,
+    null, or garbage) contribute 0, and a disk_spec that is not a list
+    contributes 0 with a warning. Production reads the SQL, not this --
+    validation settled that question in JSON_TABLE's favour -- but the
+    live-MariaDB CI job asserts the two agree on the same payloads
+    against a real server, so this stays an oracle rather than becoming
+    stale prose.
+
+    Fractional sizes follow MariaDB's JSON-number-to-BIGINT cast, which
+    rounds half away from zero (10.5 -> 11, -2.5 -> -3, and a numeric
+    string "8.7" -> 9) -- probed against a real server rather than
+    assumed, because Python's round() would give banker's rounding and
+    int() would truncate, and either divergence is exactly the silent
+    wrong number this oracle exists to expose. Booleans cast to 0/1 as
+    they do in SQL. No current write path produces fractional sizes, so
+    this is soundness of the oracle rather than a live behaviour.
+    """
+    if not isinstance(disk_spec, list):
+        LOG.warning(f'Malformed disk_spec (not a list): {disk_spec!r}')
+        return 0
+    total = 0
+    for disk in disk_spec:
+        if not isinstance(disk, dict):
+            LOG.warning(f'Malformed disk_spec element: {disk!r}')
+            continue
+        size = disk.get('size')
+        if size is None:
+            # JSON null casts to SQL NULL, which SUM() ignores.
+            continue
+        if isinstance(size, bool):
+            total += int(size)
+            continue
+        try:
+            total += int(decimal.Decimal(str(size)).quantize(
+                decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP))
+        except (decimal.InvalidOperation, TypeError, ValueError):
+            LOG.warning(f'Malformed disk_spec size: {size!r}')
+    return total
+
+
+# Usage recompute, grouped by (node, namespace) so one query feeds the
+# per-node counters, the per-claim counters and the cluster singleton's
+# unclaimed sums. Ground truth is the instance_location rows in
+# object_references (source: node uuid, target: instance uuid), joined
+# to instances for the allocated resources and to object_states for the
+# instance state. Only state 'deleted' is excluded: errored instances
+# keep their placement and their resources until hard-delete, so they
+# count; a stateless (zombie) instance also counts until the orphan
+# reconciler removes it.
+#
+# Format note (pitfall 6): object_references uuid columns store the
+# dashed 36-character form while instances.uuid is sa.Uuid (undashed
+# CHAR(32) on MariaDB), so the join transforms the reference-side value
+# with REPLACE so the lookup lands on the instances primary key.
+# object_states.object_uuid is dashed like object_references, so that
+# join compares directly.
+#
+# These are allocation ledgers, not measurements. used_cpus and
+# used_memory_mb sum what every placed, non-deleted instance was
+# allocated, which is deliberately not what the resources daemon
+# publishes as cpu_total_instance_vcpus and memory_total_instance_actual
+# -- those count only *active* libvirt domains. A powered-off instance,
+# or one placed but not yet defined in libvirt, still holds its
+# reservation here and does not appear there, so used_cpus reads higher
+# than today's scheduler filter sees whenever a node has powered-off
+# instances. That is the right semantics for a reservation ledger, but
+# it means phase 3 must decide explicitly which number its guard uses
+# rather than assuming the two agree.
+#
+# The ledger reads only these INSTANCE_LOCATION rows. During the one
+# transition release where Node.instances still unions in the legacy
+# node_attributes.instances JSON column, a placement written by a
+# pre-cutover node exists only in that column and is invisible here, so
+# mid-rolling-upgrade the used_* counters under-count -- the
+# non-conservative direction for an admission guard. Phase 3 must not
+# enable the counter guard until the legacy column and its union are
+# gone.
+#
+# Duplicated placements are the other way this ledger is inexact: a
+# lost node's INSTANCE_LOCATION row can survive place_instance()'s
+# best-effort removal, so one instance appears on two nodes. The
+# cluster row is protected because the unclaimed fold is restricted to
+# nodes holding a capacity row, but the per-claim used_* recompute
+# deliberately folds the namespace-wide total, so a duplicate counts an
+# instance twice there. Inert while namespace_claims is empty; before
+# used_* becomes a quota, phase 4 must either de-duplicate by instance
+# uuid in this query (one placement row per target_uuid) or rely on
+# phase 3 having eliminated stale placement rows.
+#
+# Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
+# (available since MariaDB 10.6, below the MIN_MARIADB_VERSION floor).
+# The derived table aggregates per instance first so the JSON_TABLE only
+# ever sees one document at a time. It reads as though it expands every
+# instance row -- including the deleted-but-not-hard-deleted backlog,
+# which on a long-lived cluster dwarfs the live set -- and then throws
+# most of them away in the outer join, so do not "fix" that by
+# restricting it to the placement set: MariaDB already resolves it as a
+# LATERAL DERIVED correlated on i.uuid, and only expands the instances
+# the outer query joins to. Measured at 73,640 instance rows of which
+# 1,205 were placed, adding an
+# ``i2.uuid IN (SELECT ... FROM object_references)`` restriction turned
+# the plan from LATERAL DERIVED into a materialised DERIVED with a
+# semi-join and made the query slower (10ms to 13ms), for identical
+# results.
+#
+# The JSON_TYPE guard skips a disk_spec that is somehow not an array, and
+# the DEFAULT ... ON EMPTY / ON ERROR clauses make elements without a
+# numeric size contribute 0 -- one malformed disk_spec can not abort the
+# pass (see _disk_spec_virtual_gb for the reference semantics).
+#
+# The enum-typed predicates span two storage conventions, and the bound
+# parameters must match each column's convention exactly.
+# object_states.object_type is a native sa.Enum(ObjectType), which
+# SQLAlchemy persists as the member *name* ('INSTANCE'); the
+# object_references type and relationship columns are plain String(64)
+# written by _direct_record_relationship() as str(member), which for
+# these str-subclass enums is the *value* ('instance',
+# 'instance_location'). The two spellings differ only in case, so a
+# mismatched binding still matches under MariaDB's default
+# case-insensitive utf8mb4 collations -- and silently returns zero rows
+# under utf8mb4_bin or any _cs collation, all of which
+# verify_mariadb_compat() accepts. The live test suite runs against
+# utf8mb4_bin precisely so a wrong binding here fails loudly.
+#
+# The reference row's endpoint types are constrained as well as its
+# relationship. Nothing writes an INSTANCE_LOCATION row with other
+# endpoint types today, so that is defensive rather than load-bearing --
+# but the table's primary key and its source index both lead with the
+# type columns, so it costs nothing and says out loud what shape of row
+# the query expects.
+_RECONCILE_USAGE_SQL = sa.text('''
+    SELECT r.source_uuid AS node_uuid,
+           i.namespace AS namespace,
+           COALESCE(SUM(i.cpus), 0) AS used_cpus,
+           COALESCE(SUM(i.memory), 0) AS used_memory_mb,
+           COALESCE(SUM(d.disk_gb), 0) AS used_disk_gb
+      FROM object_references r
+      JOIN instances i
+        ON i.uuid = REPLACE(r.target_uuid, '-', '')
+      LEFT JOIN (
+               SELECT i2.uuid AS instance_uuid,
+                      COALESCE(SUM(jt.size_gb), 0) AS disk_gb
+                 FROM instances i2,
+                      JSON_TABLE(i2.disk_spec, '$[*]'
+                          COLUMNS (size_gb BIGINT PATH '$.size'
+                                   DEFAULT '0' ON EMPTY
+                                   DEFAULT '0' ON ERROR)) jt
+                WHERE JSON_TYPE(i2.disk_spec) = 'ARRAY'
+                GROUP BY i2.uuid) d
+        ON d.instance_uuid = i.uuid
+      LEFT JOIN object_states s
+        ON s.object_uuid = r.target_uuid
+       AND s.object_type = :instance_object_type
+     WHERE r.relationship = :instance_location
+       AND r.source_object_type = :node_object_type
+       AND r.target_object_type = :instance_ref_type
+       AND (s.state_value IS NULL OR s.state_value != 'deleted')
+     GROUP BY r.source_uuid, i.namespace
+''')
+
+
+def _reconcile_fetch_usage(
+        conn: sa.Connection) -> dict[tuple[UUID, str], tuple[int, int, int]]:
+    """Recompute usage from ground truth, grouped by (node, namespace).
+
+    Returns {(node_uuid, namespace): (cpus, memory_mb, disk_gb)}. Rows
+    whose node uuid does not parse are skipped with a warning (they can
+    not be attributed to a capacity row anyway).
+    """
+    usage: dict[tuple[UUID, str], tuple[int, int, int]] = {}
+    rows = conn.execute(_RECONCILE_USAGE_SQL, {
+        # object_states.object_type is a native sa.Enum, which persists
+        # member names.
+        'instance_object_type': ObjectType.INSTANCE.name,
+        # The object_references type and relationship columns are plain
+        # String(64) written by _direct_record_relationship() as
+        # str(member), i.e. the enum *value*. Do not rely on a
+        # case-insensitive collation to bridge the two conventions --
+        # see the comment block above _RECONCILE_USAGE_SQL.
+        'instance_ref_type': ObjectType.INSTANCE.value,
+        'node_object_type': ObjectType.NODE.value,
+        'instance_location': RelationshipType.INSTANCE_LOCATION.value,
+    }).fetchall()
+    for row in rows:
+        try:
+            node_uuid = UUID(str(row.node_uuid))
+        except ValueError:
+            LOG.warning(
+                f'Skipping usage row with malformed node uuid '
+                f'{row.node_uuid!r}')
+            continue
+        usage[(node_uuid, str(row.namespace))] = (
+            int(row.used_cpus), int(row.used_memory_mb),
+            int(row.used_disk_gb))
+    return usage
+
+
+def _reconcile_fetch_demand(
+        conn: sa.Connection,
+        now: float,
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> dict[UUID, float]:
+    """Recompute expected_demand per node (D13).
+
+    Fetches the placements younger than the decay window (the
+    instance_location reference row's ``created`` timestamp is the
+    placement time) and folds each one's decayed contribution via
+    _decayed_demand_contribution. The set-based query bounds the fetch
+    to the recent window, so the Python fold is over a handful of rows
+    and the arithmetic is exactly the unit-tested helper.
+
+    Like the metrics freshness check (see the note on
+    RECONCILE_METRICS_MAX_AGE_SECONDS), the window comparison spans
+    hosts: ``refs.created`` is a client-written float from the placing
+    node's clock, compared against this daemon's ``now``. A node
+    running fast under-contributes demand and one running slow
+    over-contributes; _decayed_demand_contribution's negative-age clamp
+    is the mitigation for the slow side.
+    """
+    demand: dict[UUID, float] = {}
+    if demand_decay_seconds <= 0:
+        return demand
+
+    refs = _get_object_references_table()
+    instances = _get_instances_table()
+    states = _get_object_states_table()
+
+    joined = refs.join(
+        instances,
+        instances.c.uuid == sa.func.replace(refs.c.target_uuid, '-', '')
+    ).outerjoin(
+        states,
+        sa.and_(
+            states.c.object_uuid == refs.c.target_uuid,
+            states.c.object_type == ObjectType.INSTANCE))
+    stmt = sa.select(
+        refs.c.source_uuid, refs.c.created, instances.c.cpus
+    ).select_from(joined).where(sa.and_(
+        refs.c.relationship == RelationshipType.INSTANCE_LOCATION,
+        refs.c.source_object_type == ObjectType.NODE,
+        refs.c.target_object_type == ObjectType.INSTANCE,
+        sa.or_(
+            states.c.state_value.is_(None),
+            states.c.state_value != 'deleted'),
+        refs.c.created > now - demand_decay_seconds))
+
+    for row in conn.execute(stmt).fetchall():
+        try:
+            node_uuid = UUID(str(row.source_uuid))
+        except ValueError:
+            LOG.warning(
+                f'Skipping demand row with malformed node uuid '
+                f'{row.source_uuid!r}')
+            continue
+        contribution = _decayed_demand_contribution(
+            int(row.cpus), now - float(row.created), demand_per_vcpu,
+            demand_decay_seconds)
+        demand[node_uuid] = demand.get(node_uuid, 0.0) + contribution
+    return demand
+
+
+def _direct_reconcile_scheduler_capacity(
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> Optional[dict[str, Any]]:
+    """Run one full capacity reconcile pass directly against MariaDB.
+
+    One pass, in order (D5): expire stale namespace claims; refresh node
+    limit rows from node_metrics; recompute usage from placement ground
+    truth; recompute expected_demand; rebuild the cluster_capacity
+    singleton. Usage is computed before limits are written because
+    limit_disk_gb depends on the recomputed used_disk_gb.
+
+    CPU_OVERCOMMIT_RATIO and RAM_OVERCOMMIT_RATIO come from this
+    process's config: they are cluster-wide settings the database daemon
+    shares, unlike the demand parameters which ride in from the caller.
+
+    Nothing else writes these tables until phase 3, so the
+    per-statement writes need no enclosing transaction; the single
+    commit at the end simply keeps a failed pass from leaving a partial
+    write behind.
+
+    Returns the summary dict the reply is built from (counts, per-node
+    rows with previous-vs-new used deltas, the cluster row), or None on
+    error.
+    """
+    engine = _get_engine()
+    capacity = _get_scheduler_node_capacity_table()
+    claims = _get_namespace_claims_table()
+    cluster = _get_cluster_capacity_table()
+    metrics = _get_node_metrics_table()
+    states = _get_object_states_table()
+    nodes = _get_nodes_table()
+
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            # (1) Expire claims: the D4 crash backstop. Server-side
+            # NOW() comparison, matching the cluster_locks idiom.
+            claims_expired = int(conn.execute(
+                sa.update(claims).where(sa.and_(
+                    claims.c.state == 'active',
+                    claims.c.expires_at < sa.func.now()
+                )).values(state='expired', updated_at=sa.func.now())
+            ).rowcount)
+
+            # Snapshot the previous capacity rows for delta reporting,
+            # NULL-metrics limit retention and node add/remove counting.
+            previous = {}
+            for row in conn.execute(sa.select(capacity)).fetchall():
+                previous[row.node_uuid] = row
+
+            # The typed capacity columns from node_metrics (phase 1),
+            # restricted to hypervisors with fresh metrics.
+            #
+            # sf-resources publishes metrics from every node whatever its
+            # roles, but only a hypervisor can host an instance -- the
+            # scheduler drops non-hypervisor candidates before any
+            # capacity arithmetic, so capacity rows exist per hypervisor,
+            # not per node, and the cluster totals only sum capacity that
+            # can actually be scheduled onto.
+            #
+            # Freshness matters because node_metrics rows are only
+            # deleted when the node is, so a node whose resources daemon
+            # has died would otherwise keep contributing its last-known
+            # limits forever. The node-state filter below catches a node
+            # that has gone missing outright; this catches the narrower
+            # case of a live node that has stopped publishing. Like the
+            # state filter, it is expressed positively -- membership in
+            # a fresh set, with absence removing the row -- because a
+            # node can also have *no* metrics row at all: sf-resources
+            # deletes its own node's rows at daemon startup before the
+            # first upsert, so a resources daemon that dies in that
+            # window leaves a live, active node with no row, which a
+            # stale-set subtraction would retain forever.
+            #
+            # A NULL is_hypervisor (a metrics row written by a
+            # pre-upgrade resources daemon, before the first upsert
+            # repopulates the column) is neither a hypervisor nor a
+            # confirmed non-hypervisor: it is left out of the refresh
+            # below and out of non_hypervisors, so an existing row keeps
+            # its limits and no row is created or destroyed on the
+            # strength of a missing value.
+            fresh_after = now - RECONCILE_METRICS_MAX_AGE_SECONDS
+            metrics_rows = {}
+            for row in conn.execute(sa.select(
+                    metrics.c.node_uuid,
+                    metrics.c.cpu_schedulable,
+                    metrics.c.memory_max,
+                    metrics.c.memory_reserved_mb,
+                    metrics.c.disk_free_instances,
+                    metrics.c.disk_reservation_gb).where(sa.and_(
+                        metrics.c.is_hypervisor.is_(True),
+                        metrics.c.timestamp > fresh_after))).fetchall():
+                metrics_rows[row.node_uuid] = row
+
+            non_hypervisors = {
+                row.node_uuid for row in conn.execute(
+                    sa.select(metrics.c.node_uuid).where(
+                        metrics.c.is_hypervisor.is_(False))).fetchall()}
+
+            # Derived without the is_hypervisor predicate, so a fresh
+            # row whose is_hypervisor is still NULL (mid-upgrade) keeps
+            # qualifying and the no-evidence retention below still
+            # applies to it.
+            fresh_metrics_nodes = {
+                row.node_uuid for row in conn.execute(
+                    sa.select(metrics.c.node_uuid).where(
+                        metrics.c.timestamp > fresh_after)).fetchall()}
+
+            # Node existence and schedulability ground truth. The
+            # scheduler builds its candidate set from
+            # Nodes([], prefilter='active'), which resolves through
+            # get_objects_by_state and so only ever sees nodes that have
+            # an object_states row in NODE_ACTIVE_STATES. The query here
+            # is expressed the same way round -- IN the active set, with
+            # candidates intersected against it -- so that everything
+            # outside that set is excluded by default: an errored,
+            # missing, stopping, stopped or deleted node, a state added
+            # to the state machine later, and a node with no state row
+            # at all (stateless zombies are a real condition here, which
+            # is why the orphan reconciler exists). None of those is
+            # evidence that a node can be scheduled onto. An earlier
+            # draft subtracted a NOT IN inactive set instead, and a
+            # stateless node appeared in neither set and slipped
+            # through.
+            known_nodes = {
+                row.uuid for row in
+                conn.execute(sa.select(nodes.c.uuid)).fetchall()}
+            active_nodes = set()
+            for row in conn.execute(sa.select(states.c.object_uuid).where(
+                    sa.and_(
+                        states.c.object_type == ObjectType.NODE,
+                        states.c.state_value.in_(
+                            sorted(NODE_ACTIVE_STATES))))).fetchall():
+                try:
+                    active_nodes.add(UUID(str(row.object_uuid)))
+                except ValueError:
+                    pass
+
+            # (3) Recompute usage from ground truth, and (4) expected
+            # demand. Usage comes before the limit writes because
+            # limit_disk_gb depends on used_disk_gb.
+            usage = _reconcile_fetch_usage(conn)
+            demand = _reconcile_fetch_demand(
+                conn, now, demand_per_vcpu, demand_decay_seconds)
+
+            usage_by_node: dict[UUID, list[int]] = {}
+            usage_by_namespace: dict[str, list[int]] = {}
+            for (node_uuid, namespace), used_row in usage.items():
+                for totals in (usage_by_node.setdefault(
+                                   node_uuid, [0, 0, 0]),
+                               usage_by_namespace.setdefault(
+                                   namespace, [0, 0, 0])):
+                    totals[0] += used_row[0]
+                    totals[1] += used_row[1]
+                    totals[2] += used_row[2]
+
+            # (2) Refresh node rows. A node has a capacity row while it
+            # is an active hypervisor with fresh metrics and a row in the
+            # nodes table; NULL metrics columns keep the previous limits
+            # rather than zeroing them. A node that stops qualifying on
+            # any of those loses its row -- which is also how rows
+            # written before these filters existed get cleaned up on
+            # upgrade.
+            #
+            # Existence in the nodes table gates creation as well as
+            # removal. Gating only removal leaves a permanent phantom: a
+            # node_metrics row that outlived its node's static and state
+            # rows has nothing to mark it inactive, so it reads as a
+            # fresh hypervisor, gets a row created, and then appears in
+            # both previous and metrics_rows on every later pass, so no
+            # removal condition ever fires and its limits sit in the
+            # cluster totals forever.
+            removals = [
+                node_uuid for node_uuid in previous
+                if node_uuid not in active_nodes
+                or node_uuid in non_hypervisors
+                or node_uuid not in fresh_metrics_nodes
+                or node_uuid not in known_nodes]
+            candidates = (
+                (set(previous) | set(metrics_rows))
+                & known_nodes & active_nodes) - set(removals)
+
+            nodes_added = 0
+            reply_nodes = []
+            total_limits = [0, 0, 0]
+            capacity_nodes = set()
+            for node_uuid in sorted(candidates, key=lambda u: u.hex):
+                prev_row = previous.get(node_uuid)
+                metrics_row = metrics_rows.get(node_uuid)
+                used = usage_by_node.get(node_uuid, [0, 0, 0])
+
+                limit_cpus: Optional[int] = None
+                limit_memory_mb: Optional[int] = None
+                limit_disk_gb: Optional[int] = None
+                if metrics_row is not None:
+                    limit_cpus, limit_memory_mb = _derive_cpu_memory_limits(
+                        metrics_row.cpu_schedulable,
+                        metrics_row.memory_max,
+                        metrics_row.memory_reserved_mb,
+                        config.CPU_OVERCOMMIT_RATIO,
+                        config.RAM_OVERCOMMIT_RATIO)
+                    limit_disk_gb = _derive_disk_limit_gb(
+                        used[2],
+                        metrics_row.disk_free_instances,
+                        metrics_row.disk_reservation_gb)
+                if prev_row is not None:
+                    if limit_cpus is None:
+                        limit_cpus = prev_row.limit_cpus
+                    if limit_memory_mb is None:
+                        limit_memory_mb = prev_row.limit_memory_mb
+                    if limit_disk_gb is None:
+                        limit_disk_gb = prev_row.limit_disk_gb
+                if (limit_cpus is None or limit_memory_mb is None or
+                        limit_disk_gb is None):
+                    # A new node whose metrics row lacks the needed
+                    # columns: there is nothing defensible to write yet,
+                    # so wait for the next resources-daemon upsert.
+                    LOG.info(
+                        f'Skipping capacity row for node {node_uuid}: '
+                        f'metrics row lacks capacity columns')
+                    continue
+
+                expected_demand = demand.get(node_uuid, 0.0)
+                values = {
+                    'limit_cpus': limit_cpus,
+                    'limit_memory_mb': limit_memory_mb,
+                    'limit_disk_gb': limit_disk_gb,
+                    'used_cpus': used[0],
+                    'used_memory_mb': used[1],
+                    'used_disk_gb': used[2],
+                    'expected_demand': expected_demand,
+                    'updated_at': sa.func.now(),
+                }
+                stmt = sa.dialects.mysql.insert(capacity).values(
+                    node_uuid=node_uuid, **values)
+                conn.execute(stmt.on_duplicate_key_update(**values))
+                if prev_row is None:
+                    nodes_added += 1
+
+                total_limits[0] += limit_cpus
+                total_limits[1] += limit_memory_mb
+                total_limits[2] += limit_disk_gb
+                capacity_nodes.add(node_uuid)
+                reply_nodes.append({
+                    'node_uuid': str(node_uuid),
+                    'limit_cpus': limit_cpus,
+                    'limit_memory_mb': limit_memory_mb,
+                    'limit_disk_gb': limit_disk_gb,
+                    'used_cpus': used[0],
+                    'used_memory_mb': used[1],
+                    'used_disk_gb': used[2],
+                    'expected_demand': expected_demand,
+                    'delta_used_cpus': used[0] - (
+                        prev_row.used_cpus if prev_row is not None else 0),
+                    'delta_used_memory_mb': used[1] - (
+                        prev_row.used_memory_mb
+                        if prev_row is not None else 0),
+                    'delta_used_disk_gb': used[2] - (
+                        prev_row.used_disk_gb
+                        if prev_row is not None else 0),
+                })
+
+            nodes_removed = 0
+            if removals:
+                nodes_removed = int(conn.execute(
+                    sa.delete(capacity).where(
+                        capacity.c.node_uuid.in_(removals))).rowcount)
+
+            # Per-claim usage recompute over the same instance set,
+            # grouped by namespace. Empty in production this phase (the
+            # claims API is phase 4), but the machinery must be proven.
+            #
+            # phase 4: this loop is one UPDATE per active claim, inside
+            # the pass's transaction. Fine at zero claims; N round trips
+            # holding write locks once claims are real. Fold it into a
+            # single set-based UPDATE ... JOIN over the namespace usage
+            # aggregation rather than inheriting the loop.
+            claimed_limits = [0, 0, 0]
+            claimed_namespaces = set()
+            active_claims = conn.execute(sa.select(claims).where(
+                claims.c.state == 'active')).fetchall()
+            for claim_row in active_claims:
+                ns_used = usage_by_namespace.get(
+                    claim_row.namespace, [0, 0, 0])
+                conn.execute(sa.update(claims).where(
+                    claims.c.uuid == claim_row.uuid
+                ).values(
+                    used_cpus=ns_used[0],
+                    used_memory_mb=ns_used[1],
+                    used_disk_gb=ns_used[2],
+                    updated_at=sa.func.now()))
+                claimed_limits[0] += claim_row.limit_cpus
+                claimed_limits[1] += claim_row.limit_memory_mb
+                claimed_limits[2] += claim_row.limit_disk_gb
+                claimed_namespaces.add(claim_row.namespace)
+
+            # (5) Rebuild the cluster_capacity singleton: node limit
+            # sums, active claim limit sums, and usage by instances in
+            # namespaces without an active claim.
+            #
+            # The unclaimed fold is restricted to nodes that hold a
+            # capacity row after this pass, so the singleton is a closed
+            # accounting over the schedulable cluster: an instance
+            # stranded on an errored, demoted, stale-metrics or deleted
+            # node contributes to neither side, rather than inflating
+            # the used side of a total its node contributes nothing to.
+            # Without the restriction a drained hypervisor makes the
+            # soak dashboards show unclaimed usage exceeding total
+            # capacity, which reads as a bug rather than as accounting.
+            # Per-claim used_* above is deliberately different: it stays
+            # namespace-wide, because a namespace quota covers the
+            # namespace's instances wherever they are stranded.
+            unclaimed_used = [0, 0, 0]
+            for (node_uuid, namespace), used_row in usage.items():
+                if namespace in claimed_namespaces:
+                    continue
+                if node_uuid not in capacity_nodes:
+                    continue
+                unclaimed_used[0] += used_row[0]
+                unclaimed_used[1] += used_row[1]
+                unclaimed_used[2] += used_row[2]
+
+            cluster_values = {
+                'total_cpus': total_limits[0],
+                'total_memory_mb': total_limits[1],
+                'total_disk_gb': total_limits[2],
+                'claimed_cpus': claimed_limits[0],
+                'claimed_memory_mb': claimed_limits[1],
+                'claimed_disk_gb': claimed_limits[2],
+                'unclaimed_used_cpus': unclaimed_used[0],
+                'unclaimed_used_memory_mb': unclaimed_used[1],
+                'unclaimed_used_disk_gb': unclaimed_used[2],
+                'updated_at': sa.func.now(),
+            }
+            cluster_stmt = sa.dialects.mysql.insert(cluster).values(
+                id=1, **cluster_values)
+            conn.execute(
+                cluster_stmt.on_duplicate_key_update(**cluster_values))
+
+            conn.commit()
+
+            del cluster_values['updated_at']
+            return {
+                'success': True,
+                'nodes_added': nodes_added,
+                'nodes_removed': nodes_removed,
+                'claims_expired': claims_expired,
+                'nodes': reply_nodes,
+                'cluster': cluster_values,
+            }
+    except (OperationalError, IntegrityError) as e:
+        LOG.warning(f'MariaDB reconcile_scheduler_capacity failed: {e}')
+        return None
+
+
+def _grpc_reconcile_scheduler_capacity(
+        demand_per_vcpu: float,
+        demand_decay_seconds: int) -> Optional[dict[str, Any]]:
+    """Run a capacity reconcile pass via the database microservice.
+
+    The only caller is the cluster daemon's elected loop, which pets the
+    systemd watchdog itself between maintenance passes, so this uses the
+    bounded budget rather than the default GRPC_RETRIES * GRPC_TIMEOUT
+    worst case that exceeds WatchdogSec (issue 3586). The server side is
+    deliberately one analytical query rather than a point lookup, which
+    makes DEADLINE_EXCEEDED on a loaded database realistic rather than
+    pathological -- and harmless, because the next pass recomputes every
+    counter from ground truth. A skipped pass costs five minutes of gauge
+    freshness, not correctness.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReconcileSchedulerCapacityRequest(
+            demand_per_vcpu=demand_per_vcpu,
+            demand_decay_seconds=demand_decay_seconds)
+        reply = _grpc_call(
+            stub.ReconcileSchedulerCapacity, request,
+            timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
+        if not reply.success:
+            return None
+        return {
+            'success': True,
+            'nodes_added': int(reply.nodes_added),
+            'nodes_removed': int(reply.nodes_removed),
+            'claims_expired': int(reply.claims_expired),
+            'nodes': [
+                {
+                    'node_uuid': n.node_uuid,
+                    'limit_cpus': int(n.limit_cpus),
+                    'limit_memory_mb': int(n.limit_memory_mb),
+                    'limit_disk_gb': int(n.limit_disk_gb),
+                    'used_cpus': int(n.used_cpus),
+                    'used_memory_mb': int(n.used_memory_mb),
+                    'used_disk_gb': int(n.used_disk_gb),
+                    'expected_demand': float(n.expected_demand),
+                    'delta_used_cpus': int(n.delta_used_cpus),
+                    'delta_used_memory_mb': int(n.delta_used_memory_mb),
+                    'delta_used_disk_gb': int(n.delta_used_disk_gb),
+                } for n in reply.nodes],
+            'cluster': {
+                'total_cpus': int(reply.cluster.total_cpus),
+                'total_memory_mb': int(reply.cluster.total_memory_mb),
+                'total_disk_gb': int(reply.cluster.total_disk_gb),
+                'claimed_cpus': int(reply.cluster.claimed_cpus),
+                'claimed_memory_mb': int(reply.cluster.claimed_memory_mb),
+                'claimed_disk_gb': int(reply.cluster.claimed_disk_gb),
+                'unclaimed_used_cpus': int(
+                    reply.cluster.unclaimed_used_cpus),
+                'unclaimed_used_memory_mb': int(
+                    reply.cluster.unclaimed_used_memory_mb),
+                'unclaimed_used_disk_gb': int(
+                    reply.cluster.unclaimed_used_disk_gb),
+            },
+        }
+    except exceptions.DatabaseUnavailable as e:
+        # The bounded budget above makes this the *expected* outcome of a
+        # loaded or restarting database tier, not an anomaly, so it must
+        # not reach the caller's ignore_exception() path -- that logs at
+        # ERROR with a traceback and writes a recorded-exception file
+        # every five minutes for a condition this design calls harmless,
+        # and cluster CI's log-error checks are the functional gate for
+        # this phase. The failure counter and the un-advanced
+        # last-success timestamp are the signal operators need.
+        LOG.warning(
+            f'Scheduler capacity reconcile skipped, database unavailable: {e}')
+        return None
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC ReconcileSchedulerCapacity failed: {e}')
+        return None
+
+
+def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
+    """Run one scheduler capacity reconcile pass.
+
+    Called from the cluster daemon's elected-leader loop. The demand
+    parameters come from this process's config so the database daemon
+    needs no copy of the scheduler configuration.
+
+    Returns a summary dict:
+
+        {'success': True,
+         'nodes_added': int, 'nodes_removed': int, 'claims_expired': int,
+         'nodes': [{'node_uuid': str, 'limit_cpus': int,
+                    'limit_memory_mb': int, 'limit_disk_gb': int,
+                    'used_cpus': int, 'used_memory_mb': int,
+                    'used_disk_gb': int, 'expected_demand': float,
+                    'delta_used_cpus': int, 'delta_used_memory_mb': int,
+                    'delta_used_disk_gb': int}, ...],
+         'cluster': {'total_cpus': int, 'total_memory_mb': int,
+                     'total_disk_gb': int, 'claimed_cpus': int,
+                     'claimed_memory_mb': int, 'claimed_disk_gb': int,
+                     'unclaimed_used_cpus': int,
+                     'unclaimed_used_memory_mb': int,
+                     'unclaimed_used_disk_gb': int}}
+
+    or None on error.
+    """
+    if _use_database_service():
+        return _grpc_reconcile_scheduler_capacity(
+            config.SCHEDULER_DEMAND_PER_VCPU,
+            config.SCHEDULER_DEMAND_DECAY_SECONDS)
+    return _direct_reconcile_scheduler_capacity(
+        config.SCHEDULER_DEMAND_PER_VCPU,
+        config.SCHEDULER_DEMAND_DECAY_SECONDS)

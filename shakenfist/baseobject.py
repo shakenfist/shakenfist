@@ -18,6 +18,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import get_object_class
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.constants import NODE_ACTIVE_STATES
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import locks
@@ -69,11 +70,9 @@ def _maintain_version_cache(max_cache_age):
 
     metrics = {}
 
-    # Ignore metrics for deleted nodes, but include nodes in an
-    # error state as they may return.
-    target_states = [DatabaseBackedObject.STATE_INITIAL,
-                     DatabaseBackedObject.STATE_CREATED,
-                     'degraded']
+    # Only gather metrics for nodes in an active state -- deleted, errored
+    # and missing nodes are ignored.
+    target_states = sorted(NODE_ACTIVE_STATES)
     # One bulk RPC returns {node_uuid, fqdn, timestamp, metrics} per node,
     # replacing the previous per-node get_node (used only for fqdn) plus a
     # per-node get_node_metrics fan-out. Nodes without a metrics row are simply

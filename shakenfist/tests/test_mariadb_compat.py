@@ -124,7 +124,19 @@ class TestVerifyMariaDBCompat(base.ShakenFistTestCase):
             mariadb.verify_mariadb_compat(mock_engine)
         msg = str(ctx.exception)
         self.assertIn('10.5.0', msg)
-        self.assertIn('10.6.0', msg)
+        self.assertIn('10.11.0', msg)
+
+    def test_version_below_floor_but_above_old_floor(self):
+        # The floor was originally 10.6.0, but the ipam_reservations INET4
+        # column has required 10.10+ since it landed; the floor is now the
+        # 10.11 LTS. A 10.6 server must be refused rather than passing
+        # compat and then failing schema creation.
+        mock_engine = self._good_engine(version='10.6.16-MariaDB')
+        with self.assertRaises(exceptions.MariaDBIncompatibleError) as ctx:
+            mariadb.verify_mariadb_compat(mock_engine)
+        msg = str(ctx.exception)
+        self.assertIn('10.6.16', msg)
+        self.assertIn('10.11.0', msg)
 
     def test_non_mariadb_server(self):
         # '8.0.35' contains no 'MariaDB' substring.

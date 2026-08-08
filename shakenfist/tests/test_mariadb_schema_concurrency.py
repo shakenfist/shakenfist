@@ -196,6 +196,9 @@ EXPECTED_TABLE_NAMES = sorted([
     'cluster_config',
     'events',
     'event_objects',
+    'scheduler_node_capacity',
+    'namespace_claims',
+    'cluster_capacity',
 ])
 
 

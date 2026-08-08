@@ -60,6 +60,17 @@ echo "Running live MariaDB tests..."
 # --serial because these share one database and drop their tables on
 # cleanup. The regex is anchored on the module name so a live test
 # module added later is picked up without touching this script.
-stestr run --serial 'shakenfist\.tests\.test_mariadb_.*_live\.'
+stestr run --serial 'shakenfist\.tests\.test_mariadb_.*_live\.' \
+    | tee /tmp/live-mariadb-output
+
+# Every test in these modules is @unittest.skipUnless(SF_MARIADB_TEST_DSN),
+# so a broken export -- a typo, a rename of the environment variable, a
+# shell change that drops it -- turns this job into a clean run of zero
+# tests and a green tick, and the guard silently stops guarding.
+if ! grep -qE '^ - Passed: [1-9]' /tmp/live-mariadb-output; then
+    echo "ERROR: no live MariaDB tests actually ran." >&2
+    echo "Is SF_MARIADB_TEST_DSN reaching the test process?" >&2
+    exit 1
+fi
 
 echo "Live MariaDB tests passed."

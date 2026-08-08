@@ -380,6 +380,72 @@ resources daemons (the CPU fallback subtracts this node's own
 un-upgraded nodes don't look artificially large) — admission,
 ordering and `summarize_resources()` all go through these helpers,
 so keep them in sync if you touch capacity arithmetic.
+A third participant mirrors the same arithmetic: the scheduler
+capacity reconciler's limit-derivation helpers in
+`shakenfist/mariadb.py` (`_derive_cpu_memory_limits()`,
+`_derive_disk_limit_gb()`) deliberately reproduce `scheduler.py`'s
+admission *limits*, so the phase 3 counter guard bounds capacity the
+same way today's Python filter does — a change to one must change
+both. The mirroring covers the arithmetic but not the inputs:
+`_schedulable_threads()` and `_memory_reserved_mb()` substitute
+per-node fallbacks for a metrics row that predates the phase 1
+columns, where the reconciler derives None and prefers to write no
+capacity row at all rather than a guessed one. So mid-upgrade a node
+can be schedulable while having no capacity row — the conservative
+direction, but the two are not interchangeable while an upgrade is in
+flight. The *usage* side is deliberately not a mirror: the reconciler's
+`used_cpus` and `used_memory_mb` are allocation ledgers over every
+placed, non-deleted instance, whereas the resources daemon's
+`cpu_total_instance_vcpus` and `memory_total_instance_actual` count
+only active libvirt domains. A powered-off instance holds its
+reservation in the ledger and is absent from the measurement, so the
+two legitimately disagree and phase 3 has to choose between them
+explicitly rather than assume parity. The ledger also reads only
+`INSTANCE_LOCATION` rows in `object_references`: during the one
+transition release where `Node.instances` still unions in the legacy
+`node_attributes.instances` JSON column, a placement written by a
+pre-cutover node exists only in that column and is invisible to the
+ledger, so mid-rolling-upgrade the `used_*` counters under-count — the
+non-conservative direction for an admission guard. Phase 3 must not
+enable the counter guard until the legacy column and its union are
+removed. The reconciler maintains the
+`scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
+tables from the elected cluster node every five minutes. Rows exist
+per *schedulable hypervisor*, not per node, because a row that
+describes capacity the scheduler would never use is worse than no row
+at all: it inflates the cluster totals. Four filters enforce that,
+each mirroring something `scheduler.py` already does — the
+`is_hypervisor` column projected into `node_metrics` (sf-resources
+publishes metrics from every node whatever its roles), node state
+against `constants.NODE_ACTIVE_STATES` (the scheduler builds its
+candidates from `Nodes([], prefilter='active')`; the filter is
+expressed positively, as membership in the active set, so a node with
+no state row at all is excluded exactly as `get_objects_by_state`
+would exclude it), metrics freshness against
+`RECONCILE_METRICS_MAX_AGE_SECONDS` (the scheduler discards metrics
+older than 120s; the reconciler's window is much wider because its
+cadence is), and existence in the `nodes` table. The
+`cluster_capacity` singleton is a closed accounting over the nodes
+that pass those filters: usage on a node without a capacity row counts
+toward neither the total nor the unclaimed-used side (a claim's
+`used_*` stays namespace-wide — a quota covers a namespace's instances
+wherever they are stranded). If you add a capacity consumer, it
+inherits these filters by reading the tables — do not re-derive
+capacity from `node_metrics` directly. In this release nothing
+consumes the tables for admission
+(`docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md`).
+The SQL itself is covered by
+`shakenfist/tests/test_mariadb_capacity_reconcile_live.py`, which runs
+against a real MariaDB in the "Schema ENUM widening" CI job (whose
+script runs every `test_mariadb_*_live` module behind one MariaDB
+install); the mocked unit tests cannot catch a broken uuid join, a
+JSON_TABLE change, or an enum binding that names the wrong storage
+convention, because all of those fail as silently wrong numbers rather
+than errors. The live suite runs under `utf8mb4_bin` for that last
+reason: `object_states.object_type` is a native `sa.Enum` persisting
+member *names* while the `object_references` type and relationship
+columns store member *values* (written as `str(member)`), and only a
+case-sensitive collation makes a binding that confuses the two fail.
 Operator-facing documentation is
 [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).
 

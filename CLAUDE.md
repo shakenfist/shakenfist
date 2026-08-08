@@ -189,11 +189,10 @@ shakenfist/
 │   ├── schema/              # Pydantic models
 │   ├── util/                # Utility modules
 │   ├── client/              # CLI tools
-│   └── tests/               # Test suite
-├── docs/                    # MkDocs documentation
-└── deploy/                  # Ansible collection deployer and functional CI
-                             # (lives at shakenfist/deploy/; the collection
-                             # is shakenfist/deploy/collection/)
+│   ├── tests/               # Test suite
+│   └── deploy/              # Ansible collection (collection/) and
+│                            # functional CI suite (shakenfist_ci/)
+└── docs/                    # MkDocs documentation
 ```
 
 ### Core Components
@@ -504,10 +503,29 @@ performance. This is required for all deployments - MariaDB must be configured.
   for the schemaless metrics payload (~50+ fields); `metrics_json`
   remains authoritative for readers. Capacity-relevant fields (CPU,
   memory, disk counts, disk-busy rate) are additionally projected into
-  15 typed nullable columns at upsert time (see
+  typed nullable columns at upsert time (see
   `NODE_METRICS_EXTRACTION_SPEC` in `shakenfist/mariadb.py`) so SQL-side
-  capacity arithmetic doesn't need to unpack JSON. One row per node,
+  capacity arithmetic doesn't need to unpack JSON. `is_hypervisor` is
+  projected the same way: sf-resources publishes metrics from every node
+  whatever its roles, so anything doing capacity arithmetic in SQL has
+  to filter on the role the way `scheduler.py` does. One row per node,
   upserted each update cycle. Primary key is `node_uuid`.
+- **Scheduler capacity** (`scheduler_node_capacity`, `namespace_claims`,
+  `cluster_capacity` tables): Materialised capacity counters for
+  scheduler reservations. `scheduler_node_capacity` has one row per
+  hypervisor (limit and used counters for cpus/memory_mb/disk_gb plus a
+  decaying `expected_demand`); `namespace_claims` has one row per
+  capacity claim (limits, usage, state, server-side `expires_at`) and
+  is empty until the claims API lands in phase 4; `cluster_capacity` is
+  a singleton (id always 1) of total/claimed/unclaimed-used sums.
+  Maintained solely by the reconciler (a single
+  `ReconcileSchedulerCapacity` RPC run every 5 minutes on the elected
+  cluster node) which recomputes every counter from ground truth. The
+  `used_*` counters are allocation ledgers over placed, non-deleted
+  instances, so they deliberately differ from the resources daemon's
+  active-domain measurements whenever instances are powered off.
+  Nothing consumes these tables for admission until phase 3's
+  guarded-UPDATE path (`docs/plans/PLAN-scheduler-reservations.md`).
 - **Per-daemon state** (`node_daemon_states` table): One row per
   `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
   and optional `message`. Replaces the JSON `daemon_states` dict that

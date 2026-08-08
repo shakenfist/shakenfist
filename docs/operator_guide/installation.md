@@ -62,7 +62,7 @@ infrastructure whose addresses you tell it. It deliberately does not install
 or manage that infrastructure for you:
 
 * **MariaDB**: Shaken Fist does not install or manage its database server.
-  Provision a MariaDB 10.6.0+ instance reachable from the database-tier
+  Provision a MariaDB 10.11.0+ instance reachable from the database-tier
   nodes before deploying. The repository ships
   `tools/bootstrap-mariadb.sql` to create the user, database and grants, and
   `examples/mariadb-tuning.cnf` as optional starting-point tuning. See

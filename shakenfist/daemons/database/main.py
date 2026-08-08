@@ -2448,6 +2448,54 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=False, error=str(e))
 
     # =========================================================
+    # Scheduler Capacity Operations (MariaDB)
+    # =========================================================
+
+    def ReconcileSchedulerCapacity(
+        self,
+        request: database_pb2.ReconcileSchedulerCapacityRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReconcileSchedulerCapacityReply:
+        """Run one scheduler capacity reconcile pass (phase 2, D5).
+
+        The client calls with a bounded deadline, so check the call is
+        still alive before starting what is deliberately one long
+        analytical query: a caller that has already given up should not
+        have a pass run on its behalf. Overlapping passes are benign in
+        this release regardless -- the reconciler is the sole writer and
+        every statement is an idempotent recompute from ground truth --
+        but that stops being true in phase 3, when guarded UPDATEs give
+        these counters a second writer, so do not lean on it.
+        """
+        try:
+            self.monitor.counters['reconcile_scheduler_capacity'].inc()
+            if not context.is_active():
+                LOG.info('Skipping scheduler capacity reconcile pass: the '
+                         'caller has already abandoned the call')
+                return database_pb2.ReconcileSchedulerCapacityReply(
+                    success=False)
+            result = mariadb._direct_reconcile_scheduler_capacity(
+                request.demand_per_vcpu, request.demand_decay_seconds)
+            if result is None:
+                return database_pb2.ReconcileSchedulerCapacityReply(
+                    success=False)
+            reply = database_pb2.ReconcileSchedulerCapacityReply(
+                success=True,
+                nodes_added=result['nodes_added'],
+                nodes_removed=result['nodes_removed'],
+                claims_expired=result['claims_expired'])
+            for node in result['nodes']:
+                reply.nodes.add(**node)
+            reply.cluster.CopyFrom(
+                database_pb2.ClusterCapacity(**result['cluster']))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReconcileSchedulerCapacity failed', e)
+            return database_pb2.ReconcileSchedulerCapacityReply(
+                success=False)
+
+    # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
 
@@ -5951,6 +5999,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB node daemon state operations
             'set_node_daemon_state', 'get_node_daemon_state',
             'get_all_node_daemon_states', 'delete_node_daemon_state',
+            # MariaDB scheduler capacity operations
+            'reconcile_scheduler_capacity',
         ]
         for op in operations:
             self.counters[op] = Counter(

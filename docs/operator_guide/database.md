@@ -15,7 +15,7 @@ database server before deploying the cluster.
 1. **Provision a MariaDB server.** Any host reachable from every SF node
    works — it need not be an SF node itself. The server must meet the
    [compatibility requirements](#mariadb-compatibility-requirements) below
-   (MariaDB 10.6.0+, InnoDB, utf8mb4).
+   (MariaDB 10.11.0+, InnoDB, utf8mb4).
 
 2. **Apply the bootstrap snippet.** The repository ships
    `tools/bootstrap-mariadb.sql`, which creates the `shakenfist` database,
@@ -77,8 +77,11 @@ any schema work, the server is checked against these requirements:
 - **MariaDB, not MySQL.** The `VERSION()` string must contain `MariaDB`.
   Shaken Fist uses MariaDB-specific column types (such as `INET4`) that are
   not available in MySQL.
-- **Version 10.6.0 or later.** This matches the version shipped with
-  Ubuntu 22.04 LTS and is well above the 10.2 JSON-features floor.
+- **Version 10.11.0 or later.** The `ipam_reservations` table uses the
+  `INET4` column type, which only exists from MariaDB 10.10, and 10.11
+  is the oldest in-support LTS above that. It is also the version the
+  functional CI suite exercises, and ships with Debian 12/13 and
+  Ubuntu 24.04.
 - **Default storage engine: InnoDB.** Shaken Fist relies on row-level
   locking and transactional semantics provided by InnoDB.
 - **Default character set: utf8mb4.** Required for full Unicode support,
@@ -487,9 +490,12 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
 | `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
-| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus 15 typed nullable columns projecting the capacity-relevant fields |
+| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus typed nullable columns projecting the capacity-relevant fields and the node's hypervisor role |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
 | `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
+| `scheduler_node_capacity` | One row per schedulable hypervisor: limits derived from the typed `node_metrics` columns, materialised usage counters, and a decaying expected-demand signal |
+| `namespace_claims` | One row per namespace capacity claim: limits, usage counters, state and server-side expiry. Created empty in this release — the claims API arrives later |
+| `cluster_capacity` | A singleton row (id always 1): cluster-wide totals, capacity claimed by active claims, and usage by namespaces without a claim |
 
 IPAM reservations are stored separately because:
 
@@ -499,10 +505,15 @@ IPAM reservations are stored separately because:
   one object
 
 `node_metrics` additionally projects its capacity-relevant fields (CPU,
-memory, disk counts and the disk-busy bandwidth rate) from `metrics_json`
-into typed nullable columns at upsert time, so SQL-side capacity arithmetic
-(the scheduler-reservations work) can query them directly instead of
-unpacking JSON per row. `metrics_json` remains the full payload and stays
+memory, disk counts and the disk-busy bandwidth rate), plus the node's
+`is_hypervisor` role flag, from `metrics_json` into typed nullable columns
+at upsert time, so SQL-side capacity arithmetic (the
+scheduler-reservations work) can query them directly instead of
+unpacking JSON per row. The role flag is projected because the resources
+daemon runs on every node and publishes metrics whatever that node's
+roles are, so a query that sums schedulable capacity has to exclude
+network-only and database-only nodes the same way the scheduler does.
+`metrics_json` remains the full payload and stays
 authoritative for readers; the typed columns are only a projection of it,
 extracted server-side in `_direct_upsert_node_metrics()` so rows written by
 an older resources daemon during a rolling upgrade still get their columns
@@ -511,6 +522,77 @@ ensure-mariadb-schema` to add the columns (run it before rolling the
 daemons, as always), existing rows keep NULL columns until the next 60
 second upsert cycle repopulates every live node — no backfill needed for a
 table whose rows are ephemeral by design.
+
+The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and
+`cluster_capacity`) belong to scheduler-reservations phase 2 and are
+maintained solely by a reconciler that runs every five minutes on the
+elected cluster node. Each pass is a single `ReconcileSchedulerCapacity`
+RPC which expires stale claims, re-derives each hypervisor's limits from
+the typed `node_metrics` columns (deliberately mirroring the scheduler's
+admission arithmetic), recomputes usage counters from placed instances,
+recomputes the decaying expected-demand signal, and rebuilds the
+`cluster_capacity` singleton. The tables are created by `sf-ctl
+ensure-mariadb-schema` (run it before rolling the daemons after an
+upgrade, as always). In this release nothing consumes them for admission —
+the scheduler still admits directly from `node_metrics`; guarded-UPDATE
+admission against these counters arrives in a later release (phase 3 of
+`docs/plans/PLAN-scheduler-reservations.md`). Operator-facing
+observability is the `scheduler_capacity_*` family of prometheus metrics
+(per-node limit/used/expected-demand gauges, cluster-row gauges, and
+reconcile pass/failure counters, last-success timestamp and duration)
+exported from the cluster daemon's metrics port (`CLUSTER_METRICS_PORT`,
+default `13007`), plus one structured log line per reconcile pass.
+
+A node only has a capacity row while it could actually be scheduled
+onto, so expect rows to appear and disappear as nodes change state. A
+node loses its row when it stops being a hypervisor, when it leaves the
+active states (so anything the node-health cascade takes out of service
+stops contributing to the cluster totals), when it has no row in the
+`nodes` table at all, or when its `node_metrics` row goes stale — more
+than fifteen minutes without an update, which means the resources daemon
+has stopped publishing even though the node itself still looks alive.
+Each of those mirrors a filter the scheduler already applies before
+considering a node as a placement candidate.
+
+Severe clock skew is a fifth way to lose the row. The
+`node_metrics.timestamp` column is written by each node's resources
+daemon from that node's clock, and the staleness check runs on the
+database daemon's, so a node running more than fifteen minutes slow
+looks permanently stale. Any working NTP setup is far inside that, but
+it is worth knowing if a node drops out of the capacity tables while
+otherwise looking healthy.
+
+Three things to know when reading those numbers. The `used_*` counters
+are allocation ledgers: they sum what every placed, non-deleted instance
+was allocated, so an instance that is powered off but not deleted still
+counts, and the numbers will not match the resources daemon's
+`cpu_total_instance_vcpus` and `memory_total_instance_actual` (which
+count only running libvirt domains) on a cluster with powered-off
+instances. The `cluster_capacity` singleton is a closed accounting over
+the nodes that hold capacity rows: an instance stranded on a node that
+has lost its row (errored, demoted, stale metrics, deleted) contributes
+to neither the total nor the unclaimed-used side, so a drained
+hypervisor makes both numbers shrink together rather than showing usage
+exceeding capacity. A namespace claim's `used_*` counters are the
+deliberate exception — they stay namespace-wide, because a quota covers
+the namespace's instances wherever they are stranded.
+And the gauges are published only by the elected cluster node,
+which drops them when it loses the lock, so during a leadership handoff
+there is a window with no capacity gauges at all until the new leader's
+first pass. Alert on the reconciler falling behind rather than on a
+gauge disappearing, and make the alert cluster-scoped:
+
+```
+time() - max(scheduler_capacity_reconcile_last_success_timestamp) > 900
+```
+
+The `max()` matters. Unlike the capacity gauges, the last-success
+timestamp is not cleared on demotion — it records when *that node* last
+reconciled successfully, which is useful for debugging — so every node
+that has ever held and lost the maintenance lock keeps publishing its
+own frozen value. A per-instance staleness alert would fire permanently
+on all of them. Aggregating asks the question you actually want
+answered: has *anybody* reconciled recently.
 
 Cluster operation headers (`cluster_operations`) and work queue rows
 (`work_queue`) live in MariaDB so the create-and-enqueue step can run in a

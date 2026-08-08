@@ -502,9 +502,74 @@ class Monitor(daemon.Daemon):
             b.remove_location(n.fqdn)
             b.request_replication()
 
+    def _run_due_scheduled_jobs(self):
+        """Run every due maintenance job, petting between each one.
+
+        This is schedule.run_pending() with a watchdog pet before each
+        job. The batch matters because job timers run continuously while
+        a node is idle but only fire while it is elected, so a node that
+        has been up for hours and is then elected finds every job
+        overdue at once -- including the three heaviest (prune_events,
+        reconcile_orphaned_objects, per_blob_checks). Petting only
+        around the batch, with WatchdogSec at 60s, makes that first
+        elected pass the most likely place to be killed for
+        unresponsiveness. A pet between jobs bounds the exposure to one
+        job rather than nine.
+
+        Sorting, the should_run check and the CancelJob handling mirror
+        run_pending() and _run_job() themselves, so job ordering and
+        semantics are unchanged. A job that raises propagates to the
+        caller's ignore_exception, skipping the rest of this batch; the
+        raising job never reached _schedule_next_run() so it stays due
+        and retries on the next 60 second cycle, exactly as it would
+        under run_pending().
+        """
+        for job in sorted(schedule.jobs):
+            if not job.should_run:
+                continue
+            self.pet_watchdog()
+            ret = job.run()
+            if isinstance(ret, schedule.CancelJob) or ret is schedule.CancelJob:
+                schedule.cancel_job(job)
+        self.pet_watchdog()
+
     def _run_inner(self):
         last_defer_message = 0
         last_loop_run = 0
+
+        # Set up the maintenance schedule once, for the life of the
+        # daemon, rather than on each election. schedule.every() appends
+        # to a module-global job list and computes each job's next run
+        # from the moment it is registered, so registering inside the
+        # election loop had two problems: a node elected twice ran every
+        # task twice per cadence (three times after a third election, and
+        # so on), and re-registering restarted every period from zero, so
+        # on a cluster where the maintenance lock changes hands often the
+        # long-period tasks -- prune_events daily, reconcile_orphaned
+        # _objects hourly -- could go indefinitely without ever running.
+        # Registering once fixes both: run_pending() below is only called
+        # while elected, so an idle node still does no maintenance, but
+        # the timers are continuous and a newly elected node promptly
+        # runs whatever fell due while it was idle.
+        schedule.every(1).minutes.do(
+            scheduled_tasks.log_cluster_queue_lengths)
+        schedule.every(1).minutes.do(
+            scheduled_tasks.reap_stuck_cluster_operation_jobs)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.per_blob_checks)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.per_instance_checks_and_usage)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.reconcile_scheduler_capacity)
+        schedule.every(15).minutes.do(
+            scheduled_tasks.per_deleted_object_checks)
+        schedule.every(15).minutes.do(
+            scheduled_tasks.reap_expired_namespace_keys)
+        schedule.every(15).minutes.do(
+            scheduled_tasks.reap_federation_records)
+        schedule.every(60).minutes.do(
+            scheduled_tasks.reconcile_orphaned_objects)
+        schedule.every(1).days.do(scheduled_tasks.prune_events)
 
         while daemon.check_abort_path(self.abort_path):
             util_concurrency.set_thread_name('idle')
@@ -521,25 +586,6 @@ class Monitor(daemon.Daemon):
                 self.idle(60)
                 continue
 
-            # Setup a schedule of things to do
-            schedule.every(1).minutes.do(
-                scheduled_tasks.log_cluster_queue_lengths)
-            schedule.every(1).minutes.do(
-                scheduled_tasks.reap_stuck_cluster_operation_jobs)
-            schedule.every(5).minutes.do(
-                scheduled_tasks.per_blob_checks)
-            schedule.every(5).minutes.do(
-                scheduled_tasks.per_instance_checks_and_usage)
-            schedule.every(15).minutes.do(
-                scheduled_tasks.per_deleted_object_checks)
-            schedule.every(15).minutes.do(
-                scheduled_tasks.reap_expired_namespace_keys)
-            schedule.every(15).minutes.do(
-                scheduled_tasks.reap_federation_records)
-            schedule.every(60).minutes.do(
-                scheduled_tasks.reconcile_orphaned_objects)
-            schedule.every(1).days.do(scheduled_tasks.prune_events)
-
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
                 # This elected loop sleeps via lock.lost_event.wait() rather
@@ -554,11 +600,11 @@ class Monitor(daemon.Daemon):
                         with util_general.RecordedOperation(
                                 'scheduled cluster operations',
                                 None, threshold=10):
-                            schedule.run_pending()
+                            self._run_due_scheduled_jobs()
                     except Exception as e:
                         util_exceptions.ignore_exception('cluster', e)
 
-                    # run_pending() above and the cleanup below are unbounded
+                    # _run_due_scheduled_jobs() above and the cleanup below are unbounded
                     # maintenance phases; pet between them so a slow scheduled
                     # task does not eat the whole watchdog budget before the
                     # cleanup's own per-loop pets start.
@@ -585,6 +631,12 @@ class Monitor(daemon.Daemon):
                     LOG.warning(
                         'Cluster maintenance lock lost; re-entering election')
                     self.is_elected = False
+
+            # No longer the leader (lock lost, or shutting down). The
+            # capacity gauges describe cluster-wide singleton state, so
+            # stop publishing them rather than leaving this node
+            # contradicting whichever node takes over.
+            scheduled_tasks.clear_scheduler_capacity_metrics()
 
         # Stop being the cluster maintenance node if we were. Release
         # may raise LockNotHeld if our lease has lapsed -- swallow it,

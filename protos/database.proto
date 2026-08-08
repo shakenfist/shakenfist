@@ -372,6 +372,16 @@ service DatabaseService {
   rpc CountFederatedAttempt (CountFederatedAttemptRequest) returns (CountFederatedAttemptReply) {}
   rpc ReapFederationReplay (ReapFederationReplayRequest) returns (ReapFederationReply) {}
   rpc ReapFederationRateLimits (ReapFederationRateLimitsRequest) returns (ReapFederationReply) {}
+
+  // Scheduler Capacity Operations (MariaDB)
+  // Scheduler-reservations phase 2: the reconciler's single RPC. One
+  // call expires stale namespace claims, refreshes per-node limits from
+  // node_metrics, recomputes usage and expected demand from placement
+  // ground truth, and rebuilds the cluster_capacity singleton. The
+  // demand parameters ride in the request so the database daemon needs
+  // no copy of the caller's scheduler configuration. See
+  // docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+  rpc ReconcileSchedulerCapacity (ReconcileSchedulerCapacityRequest) returns (ReconcileSchedulerCapacityReply) {}
 }
 
 // Generic status reply
@@ -2522,4 +2532,57 @@ message ReapFederationRateLimitsRequest {
 
 message ReapFederationReply {
   int32 removed = 1;
+}
+
+// Scheduler Capacity Operations (MariaDB)
+// Scheduler-reservations phase 2 (see docs/plans/
+// PLAN-scheduler-reservations-phase-02-capacity-tables.md). The demand
+// parameters come from the caller's configuration (D13): placement adds
+// vcpus x demand_per_vcpu of expected load, and the reconciler decays
+// each placement's contribution linearly to zero over
+// demand_decay_seconds of instance age.
+
+message ReconcileSchedulerCapacityRequest {
+  double demand_per_vcpu = 1;      // Expected load per placed vCPU
+  int64 demand_decay_seconds = 2;  // Linear decay window for placements
+}
+
+// One scheduler_node_capacity row after the pass. The delta_used_*
+// fields are the change relative to the row's previous values; until
+// phase 3 adds guarded-UPDATE drawdown they are ordinary between-pass
+// churn, after which they become the drift-detection signal (D5).
+message NodeCapacity {
+  string node_uuid = 1;  // Dashed uuid form
+  int64 limit_cpus = 2;
+  int64 limit_memory_mb = 3;
+  int64 limit_disk_gb = 4;
+  int64 used_cpus = 5;
+  int64 used_memory_mb = 6;
+  int64 used_disk_gb = 7;
+  double expected_demand = 8;
+  int64 delta_used_cpus = 9;
+  int64 delta_used_memory_mb = 10;
+  int64 delta_used_disk_gb = 11;
+}
+
+// The cluster_capacity singleton after the pass.
+message ClusterCapacity {
+  int64 total_cpus = 1;
+  int64 total_memory_mb = 2;
+  int64 total_disk_gb = 3;
+  int64 claimed_cpus = 4;
+  int64 claimed_memory_mb = 5;
+  int64 claimed_disk_gb = 6;
+  int64 unclaimed_used_cpus = 7;
+  int64 unclaimed_used_memory_mb = 8;
+  int64 unclaimed_used_disk_gb = 9;
+}
+
+message ReconcileSchedulerCapacityReply {
+  bool success = 1;
+  int64 nodes_added = 2;
+  int64 nodes_removed = 3;
+  int64 claims_expired = 4;
+  repeated NodeCapacity nodes = 5;
+  ClusterCapacity cluster = 6;
 }
