@@ -213,12 +213,18 @@ class TestFederation(base.BaseNamespacedTestCase):
 
     def _create_rule(self, name, scopes=None, bound_claims=None,
                      key_ttl=3600, token=None):
+        # Distinguish "not supplied" from "supplied but empty": the rule
+        # validation test passes empty containers on purpose, and an `or`
+        # here would silently replace them with the valid defaults.
+        if bound_claims is None:
+            bound_claims = {'repository': 'sf/ci'}
+        if scopes is None:
+            scopes = ['artifact.read']
         return requests.post(
             self._rules_url(),
             headers={'Authorization': 'Bearer %s' % (token or self.token)},
             json={'name': name, 'issuer': self.issuer_name,
-                  'bound_claims': bound_claims or {'repository': 'sf/ci'},
-                  'scopes': scopes or ['artifact.read'],
+                  'bound_claims': bound_claims, 'scopes': scopes,
                   'key_ttl': key_ttl, 'key_name_prefix': 'ci'},
             timeout=30)
 
