@@ -1841,7 +1841,7 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
             'A list of the cluster operations not yet executed for this instance.',
             instance_outstanding_operations_example),
          (404, 'Instance not found.', None)]))
-    @use_kwargs(get_args, location='query')
+    @use_kwargs(get_args, location='json_or_query')
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
