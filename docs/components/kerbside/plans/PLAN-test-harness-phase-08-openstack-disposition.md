@@ -76,6 +76,13 @@ they can be challenged before code lands.
   per-PR Nova coverage is worth its cost. A future demotion to a
   schedule is foreseeable but not yet. Phase 8 therefore makes no
   cadence change; it records the decision and the revisit criteria.
+  *Superseded 2026-08-09 by two-tier CI phase 3
+  ([PLAN-two-tier-ci-phase-03-merge-queue.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/)):
+  the cloud matrices moved to the merge-queue tier. The half of this
+  disposition that says both legs stay blocking survives — they now
+  block merges via the queue rather than PRs — but the per-PR cadence
+  does not, for a different reason than the revisit criteria below
+  anticipated (tier split, not flake or cost).*
 - **Revisit-to-schedule criteria (for a future phase, not now):** demote
   the heavy legs to nightly + `workflow_dispatch` when any of — the
   Nova+Kerbside integration has been stable for a sustained period and

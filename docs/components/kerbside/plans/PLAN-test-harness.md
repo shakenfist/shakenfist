@@ -231,6 +231,10 @@ master plan, but listed here so they are not forgotten:
   primary focus, so the per-PR Nova coverage is worth its
   cost. A future demotion to a schedule is foreseeable;
   see the revisit criteria in Future work.
+  *Superseded 2026-08-09 by two-tier CI phase 3
+  (PLAN-two-tier-ci-phase-03-merge-queue.md): the cloud
+  matrices moved to the merge-queue tier — still both
+  legs blocking, but per merge rather than per PR.*
 
 ## Execution
 
@@ -402,6 +406,10 @@ Items deliberately deferred:
   drops enough that per-PR cost outweighs value; or runner
   capacity becomes a binding constraint. Until then it
   stays per-PR.
+  *Superseded 2026-08-09: two-tier CI phase 3 moved the
+  lane to the merge-queue tier instead (blocking merges,
+  not PRs); schedule-only demotion remains the further
+  escape hatch, now recorded in the two-tier plan.*
 - **Audit the multi-node provisioning playbooks for the
   same port-only SSH wait.** Phase 8 fixed the readiness
   gate in `shakenfist/actions`
