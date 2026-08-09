@@ -420,7 +420,13 @@ Notable decisions and deviations, all deliberate:
 
 ### Live capture validation (step 4f, 2026-07-07)
 
-Full results are in `tools/direct-qemu/VERIFY-FIREWALL.md`. Summary:
+Full results were recorded in `tools/direct-qemu/VERIFY-FIREWALL.md`,
+since folded into this Outcome (the harness documentation now lives in
+`docs/direct-qemu-harness.md`). Run environment: release proxy binary
+at ryll pin `1c6f19f` (the completed main/display message-type
+tables), `uncalibrated-sextant.qcow2` guest under qemu (TCG, no KVM in
+that environment).
+
 remote-viewer (spice-gtk) driven through the proxy in `WarnOnly` mode
 against the `uncalibrated-sextant.qcow2` guest completed a clean
 session across 4 channels (main, display, inputs, cursor), ~1.17 MB
@@ -433,6 +439,13 @@ end to end (`authorized=0`, `denied=1`, no bytes relayed). virt-viewer
 was not run separately (it shares remote-viewer's spice-gtk client
 engine); ryll headless was not run this pass and remains a worthwhile
 follow-up capture.
+
+Only 4 channels were carried: record, playback, smartcard, usbredir,
+port and webdav were not opened by this client+guest, confirming the
+`ChannelUnmodeled` (observe-only) handling of record/smartcard is safe
+for this workload. No cap was approached — the tight 4 KiB
+inputs/cursor client-side cap and the generous 16 MiB elsewhere held
+with zero `size_cap` verdicts.
 
 ### Pre-push audit (2026-07-07)
 

@@ -152,6 +152,10 @@ Guides for working on Kerbside itself:
 - [Testing](/components/kerbside/testing/) - CI lanes, the Ryll-based harnesses, the oVirt
   console probe, the Tempest plugin, and the load-test container images
 
+- [Direct-qemu Harness](/components/kerbside/direct-qemu-harness/) - Exercising the Rust
+  proxy locally against qemu with a mock control plane: end-to-end
+  relay, firewall capture, and session-termination checks
+
 ### Architecture Documentation
 
 Internal design of the Kerbside proxy:

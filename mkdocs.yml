@@ -215,6 +215,7 @@ nav:
             - "Installation": components/kerbside/installation.md
             - "Kerbside Proxy Architecture": components/kerbside/proxy-architecture.md
             - "Testing": components/kerbside/testing.md
+            - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
