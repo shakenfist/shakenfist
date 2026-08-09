@@ -89,10 +89,14 @@ ryll-specific constraints that shape the port:
 * The Windows builds have unique signal (the
   `--no-default-features` graph and windows-sys churn break in
   ways Linux cannot see), but the runners are the slowest in the
-  pipeline. `--no-default-features` drops gui/audio/capture, so
-  the slim graph has no opus/cmake native build — which makes a
-  cross-target `cargo check` from the Linux devcontainer a
-  plausible cheap smoke substitute.
+  pipeline, which makes a cross-target `cargo check` from the
+  Linux devcontainer a plausible cheap smoke substitute. (This
+  bullet originally claimed `--no-default-features` drops the
+  opus/cmake native build. The phase 2 spike disproved that:
+  only `gui` is feature-gated in `ryll/Cargo.toml`, and
+  `shakenfist-spice-webrtc` — an unconditional dependency —
+  depends on `opus` directly. The cross-check still works, it
+  just cross-compiles more than expected.)
 * `PLAN-ci-platform-matrix.md` (not started) plans macOS/Windows
   *runtime* smoke coverage; any jobs it adds later should land in
   the merge tier defined here.
@@ -151,12 +155,21 @@ non-required workflow (matching shakenfist).
    Recommendation: the residual scheduled workflow keeps only
    those two jobs; gitleaks/shellcheck/bidi only change when the
    tree changes, and every PR runs them.
-3. **Windows cross-check feasibility.** `cargo check` still runs
-   build scripts, so the spike must confirm the
-   `--no-default-features` graph needs no Windows-native
-   toolchain (ring/aws-lc-rs are the likely obstacles). If the
-   spike fails, we accept occasional merge-queue ejections for
-   Windows breakage and record why in this plan.
+3. **Windows cross-check feasibility.** *Resolved 2026-08-09 by
+   the phase 2 spike.* The answer was neither of the two outcomes
+   anticipated here. `x86_64-pc-windows-msvc` — the triple CI
+   actually builds — cannot be checked from Linux: `cargo check`
+   runs build scripts, and `aws-lc-sys` compiles vendored
+   BoringSSL C for the target, which needs an MSVC toolchain
+   (`xwin` plus `clang-cl`) to work. `x86_64-pc-windows-gnu`
+   does work, in about 24 seconds, once mingw-w64 is added to
+   the devcontainer image. That triple is a proxy: it shares the
+   `cfg(windows)`/`windows-sys` surface that breaks in practice,
+   but not `target_env = "msvc"` breakage, link failures, or
+   anything aarch64-specific. We take the proxy as a smoke-tier
+   step and leave the merge tier as the authoritative Windows
+   signal. See
+   [PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/).
 4. **Post-merge builds.** With a `pull_request` ruleset rule and
    the merge queue, direct pushes to `develop` stop happening, and
    the queue tests the exact merge commit that lands. The `push:
@@ -175,8 +188,8 @@ non-required workflow (matching shakenfist).
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Two-tier ci.yml | [PLAN-two-stage-ci-phase-01-workflow-tiers.md](/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/) | Implemented; CI validation pending push |
-| 2. Windows cross-check spike | PLAN-two-stage-ci-phase-02-windows-check.md | Not started |
+| 1. Two-tier ci.yml | [PLAN-two-stage-ci-phase-01-workflow-tiers.md](/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/) | Complete (PR #255, merged 2026-08-09) |
+| 2. Windows cross-check spike | [PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/) | Implemented; CI validation pending push |
 | 3. Merge queue enablement | PLAN-two-stage-ci-phase-03-merge-queue.md | Not started |
 | 4. Documentation | PLAN-two-stage-ci-phase-04-docs.md | Not started |
 
@@ -229,20 +242,21 @@ for merge behaviour (nothing is required yet).
 ### Phase 2: Windows cross-check spike
 
 Answer open question 3 empirically, then implement or document.
+The spike ran on 2026-08-09 and its results, together with the
+resulting design, are in
+[PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/).
 
-* Spike (in the devcontainer, throwaway): `rustup target add
-  x86_64-pc-windows-msvc`, then `cargo check --target
-  x86_64-pc-windows-msvc --no-default-features -p ryll`. Build
-  scripts run on the host; the question is whether any crate in
-  the slim graph (ring / aws-lc-rs being the suspects) demands a
-  Windows toolchain.
-* If it works: add the target to `.devcontainer/Dockerfile`, a
-  `check-windows` Makefile target following the existing
-  devcontainer-wrapped pattern, and a smoke-tier step or job in
-  `ci.yml`.
-* If it does not work cheaply: no CI change; record the failure
-  mode in this plan under Future work and accept merge-queue
-  ejections as the detection point for Windows breakage.
+* The msvc triple is not cross-checkable from Linux without
+  `xwin` and `clang-cl` (aws-lc-sys compiles vendored BoringSSL
+  C for the target). Rejected as not cheap.
+* The gnu triple works in ~24 seconds once mingw-w64 is in the
+  devcontainer image, and exercises every native build in the
+  graph including the cmake/libopus one.
+* Implemented as: mingw-w64 plus the `x86_64-pc-windows-gnu`
+  target in `.devcontainer/Dockerfile`, a `check-windows`
+  Makefile target, and a step at the head of the `build-linux`
+  smoke job. It is a proxy for the merge tier's msvc builds, not
+  a replacement for them.
 
 ### Phase 3: Merge queue enablement
 
