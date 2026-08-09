@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci/">
       
       
-        <link rel="prev" href="../PLAN-two-tier-ci-phase-01-ovirt-kerbside/">
+        <link rel="prev" href="../PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">
       
       
         <link rel="next" href="../PLAN-use-case-docs/">
@@ -5703,6 +5703,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 2: promote sf-e2e to a PR smoke gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -11039,7 +11067,10 @@ nightly CI catches independently), this is a good trade.</p>
   plan does not start execution until sf-e2e meets the
   promotion criteria in Open questions below. Until then
   the current PR gates stay as they are — we do not
-  weaken PR coverage before its replacement is trusted.</li>
+  weaken PR coverage before its replacement is trusted.
+  <strong>Resolved 2026-08-08:</strong> the maintainer relaxed the
+  criterion and phase 2 executed against it — see open
+  question 1 and the phase 2 plan.</li>
 </ul>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
 <ol>
@@ -11048,7 +11079,16 @@ nightly CI catches independently), this is a good trade.</p>
    schedule to more than nightly to accumulate signal
    faster), with runtime consistently under ~30 minutes.
    To be confirmed against whatever is blocking it in the
-   other session.</li>
+   other session.
+   <strong>Resolved 2026-08-08 (maintainer decision):</strong> N=10
+   was too harsh in hindsight for an experimental
+   project on an underspecced CI cluster — nightly-only
+   signal accumulates too slowly, and the lane's only
+   post-bring-up failures (2026-08-02/03) were a real
+   kerbside-proxy compile break the gate exists to
+   catch, not lane flake. Promoted on four consecutive
+   green nightlies (2026-08-04..07, 16–35 minutes); see
+   <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md</a>.</li>
 <li><strong>Does the oVirt lane belong in the merge tier or
    nightly?</strong> Once fixed to deploy kerbside it becomes a
    genuine integration gate and the merge tier is
@@ -11095,8 +11135,8 @@ nightly CI catches independently), this is a good trade.</p>
 </tr>
 <tr>
 <td>2. Promote sf-e2e to PR smoke gate</td>
-<td>PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md</td>
-<td>Blocked on precondition</td>
+<td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. Merge queue adoption and tier split</td>
