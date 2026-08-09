@@ -11,9 +11,11 @@ lane boots a real qemu/SPICE guest, drives it with the ryll headless
 client through the proxy, and asserts the full Sextant scenario, plus
 API-driven in-flight session termination and a non-gating
 relay-latency loadtest. See
-[plans/PLAN-rust-proxy.md](/components/kerbside/plans/PLAN-rust-proxy/),
-[ARCHITECTURE.md](https://github.com/shakenfist/kerbside/blob/develop/ARCHITECTURE.md),
-and `tools/direct-qemu/VERIFY-RUST-PROXY.md`.
+[plans/PLAN-rust-proxy.md](/components/kerbside/plans/PLAN-rust-proxy/) and
+[ARCHITECTURE.md](https://github.com/shakenfist/kerbside/blob/develop/ARCHITECTURE.md).
+The same proxy path can be exercised locally without MariaDB or the
+daemon via the standalone mock harness — see
+[direct-qemu-harness.md](/components/kerbside/direct-qemu-harness/).
 
 ## Ryll
 

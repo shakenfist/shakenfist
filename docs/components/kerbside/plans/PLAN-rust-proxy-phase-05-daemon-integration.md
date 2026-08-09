@@ -336,7 +336,12 @@ Notable decisions, all deliberate and none revised from planning:
 
 ### Live termination validation (step 5f, 2026-07-08)
 
-Full results are in `tools/direct-qemu/VERIFY-TERMINATION.md`. Summary:
+Full results were recorded in `tools/direct-qemu/VERIFY-TERMINATION.md`,
+since folded into this Outcome (the harness documentation now lives in
+`docs/direct-qemu-harness.md`). Run environment: release proxy binary
+at ryll pin `1c6f19f`, `uncalibrated-sextant.qcow2` guest under qemu
+(TCG), `MOCK_GRPC_TERMINATE_AFTER=15`, `remote-viewer` client.
+
 `remote-viewer` was driven through the release proxy binary against the
 `uncalibrated-sextant.qcow2` guest under qemu, establishing its 4 core
 channels (`authorized_total=4`: main, display, inputs, cursor). 15

@@ -436,7 +436,8 @@ daemon's SIGKILL.
 
 ### Verifying it live
 
-`tools/direct-qemu/VERIFY-TERMINATION.md` drives this end to end against a
+The mock harness ([direct-qemu-harness.md](/components/kerbside/direct-qemu-harness/))
+drives this end to end against a
 real client: the mock gRPC server's `ProxyControl` stream emits a one-shot
 `TerminateSession` a configurable number of seconds after the first
 authorization (`MOCK_GRPC_TERMINATE_AFTER`), standing in for the

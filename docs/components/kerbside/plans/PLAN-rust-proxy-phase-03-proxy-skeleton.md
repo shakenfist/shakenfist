@@ -312,11 +312,14 @@ linted (`clippy -D warnings`), and tested in the Docker build.
   (permissive).
 - 3g: lifecycle wiring, concurrency cap, Prometheus `/metrics`,
   SIGTERM shutdown.
-- 3h: end-to-end verification harness (mock gRPC + qemu + proxy). A
-  live run drove `remote-viewer` through the proxy to a booted qemu
-  SPICE server: 4 channels authorised via the gRPC service and ~345
-  KB of display data relayed server→client (plus input
-  client→server) — the full client → proxy → hypervisor path.
+- 3h: end-to-end verification harness (mock gRPC + qemu + proxy),
+  documented today in `docs/direct-qemu-harness.md`. A live run
+  (2026-07-06) drove `remote-viewer` through the proxy to a booted
+  qemu SPICE server: 4 channels (main, display, inputs, cursor)
+  authorised via the gRPC service and ~345 KB of display data relayed
+  server→client (plus input client→server), with the mock logging
+  `AuthorizeConnection` per channel and `DeregisterChannel` on
+  teardown — the full client → proxy → hypervisor path.
 - 3i: this Outcome, the `.github/workflows/rust.yml` CI (fmt / clippy
   / test / build), and doc updates.
 
