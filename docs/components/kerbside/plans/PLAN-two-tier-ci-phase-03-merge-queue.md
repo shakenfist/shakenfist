@@ -234,25 +234,30 @@ Target: `~DEFAULT_BRANCH`. Rules:
   `sanity_checks`) asserts every context in the exported ruleset
   matches a workflow job name — it passes trivially until this
   step's change is exported, which is the natural ordering.
-- `bypass_actors` (the first review round caught that omitting
-  these breaks prune-reviews):
-  - The GitHub Actions app (integration 15368), `bypass_mode:
-    always`. This exists specifically for
-    `prune-reviews.yml`, which lands its bot commit with a direct
-    `git push origin develop` using the workflow `GITHUB_TOKEN`
-    after every merge — it has no PR to route through the queue,
-    and a "require a pull request" rule would otherwise reject it,
-    silently stopping review-mark pruning until the consistency
-    audit noticed. The bypass is broad on paper but scoped in
-    practice by workflow token permissions: the repo's workflows
-    default to `contents: read` and only the prune job elevates to
-    `contents: write`. Accepted side effect: a prune push landing
-    while entries are queued invalidates the in-flight merge group
-    and it rebuilds.
+- `bypass_actors` (the first review round caught that omitting a
+  bypass breaks prune-reviews; applying the change corrected the
+  mechanism):
   - The shakenfist org team "SF Can Skip Merge Queue" (the same
     team shakenfist/shakenfist's ruleset trusts, id 11722172),
-    `bypass_mode: always` — the human escape hatch for a wedged
-    queue.
+    `bypass_mode: always` — and this is the ONLY bypass actor.
+    The originally-planned GitHub Actions app bypass (integration
+    15368) is impossible: the API rejects it with "Actor GitHub
+    Actions integration must be part of the ruleset source or
+    owner organization" — the built-in Actions app is not an
+    installable org app and cannot be a bypass actor, which is
+    also why shakenfist/shakenfist's ruleset carries only the
+    team bypass.
+  - `prune-reviews.yml` — which lands its bot commit with a direct
+    `git push origin develop` after every merge, has no PR to
+    route through the queue, and would otherwise be rejected by
+    the "require a pull request" rule — therefore pushes as the
+    `shakenfist-bot` user (checkout `token:
+    secrets.DEPENDENCIES_TOKEN`), with shakenfist-bot added to the
+    bypass team (2026-08-09). Unlike a `GITHUB_TOKEN` push, a PAT
+    push retriggers the workflow once; that is safe, not a loop —
+    the second run finds nothing to prune and pushes nothing.
+    Accepted side effect: a prune push landing while entries are
+    queued invalidates the in-flight merge group and it rebuilds.
 
   No bypass is needed for export-repo-config.yml: despite the
   direct-looking single-parent bot commits on develop, those are
@@ -283,7 +288,7 @@ step 4, in order:
    dorny-on-merge_group evidence on this repo, now with the
    explicit `base: develop`) — that it merges on green, and that
    the prune-reviews push after the merge still lands (proving the
-   Actions-app bypass).
+   shakenfist-bot team bypass).
 2. Prove the negative path once: push a deliberately-broken commit
    to a scratch PR (e.g. a lint failure) and confirm "Can enqueue"
    goes red on the PR, and — if queued with a bypass — that
