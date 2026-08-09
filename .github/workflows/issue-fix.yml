@@ -26,6 +26,11 @@
 #   workflow has no path to merging code.
 #
 # NOTES:
+# - The fix attempt runs through tools/claude-model-fallback.sh, which
+#   tries each model in the `models` input in order and moves on when one
+#   reports its subscription credit is exhausted (an HTTP 429 that the
+#   claude CLI's own --fallback-model flag does not cover). Triage stays
+#   pinned to Haiku, which is cheap enough not to need this.
 # - GitHub does not run CI on pull requests created with the default
 #   workflow token (this prevents recursive workflow triggering), so
 #   the draft PR needs a human nudge -- push to it, or close and
@@ -64,10 +69,10 @@ on:
         required: false
         default: '400'
         type: string
-      model:
-        description: 'Model used for the fix attempt'
+      models:
+        description: 'Comma-separated models to try for the fix, in preference order'
         required: false
-        default: 'claude-fable-5'
+        default: 'claude-fable-5,claude-opus-5'
         type: string
       dry_run:
         description: 'Dry run (no label, no comments, no commits, no PR)'
@@ -274,7 +279,7 @@ jobs:
       ISSUE_NUMBER: ${{ needs.triage.outputs.issue_number }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       DRY_RUN: ${{ inputs.dry_run }}
-      MODEL: ${{ inputs.model }}
+      MODELS: ${{ inputs.models }}
       MAX_TURNS: ${{ inputs.max_turns }}
       MAX_DIFF_LINES: ${{ inputs.max_diff_lines }}
 
@@ -464,9 +469,20 @@ jobs:
 
           start_time=$(date +%s)
 
-          claude -p "$(cat ${{ runner.temp }}/claude-prompt.txt)" \
+          # Run the wrapper from a copy outside the workspace: Claude is
+          # about to edit this checkout, and bash reads a script lazily as
+          # it executes, so a fix which touched tools/ would corrupt the
+          # running wrapper.
+          cp tools/claude-model-fallback.sh ${{ runner.temp }}/
+
+          # MODELS is tried in order, moving on when a model reports its
+          # subscription credit is exhausted (HTTP 429). Every model being
+          # out of credit exits 1 and produces no output, which the assess
+          # step below sees as "no changes".
+          ${{ runner.temp }}/claude-model-fallback.sh \
+            --models "${MODELS}" \
+            -- "$(cat ${{ runner.temp }}/claude-prompt.txt)" \
             --dangerously-skip-permissions \
-            --model "${MODEL}" \
             --max-turns "${MAX_TURNS}" \
             --output-format text \
             2>&1 | tee ${{ runner.temp }}/claude-output.txt \
