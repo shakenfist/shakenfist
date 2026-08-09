@@ -11282,10 +11282,14 @@ queue with ALLGREEN grouping.</p>
 <li>The Windows builds have unique signal (the
   <code>--no-default-features</code> graph and windows-sys churn break in
   ways Linux cannot see), but the runners are the slowest in the
-  pipeline. <code>--no-default-features</code> drops gui/audio/capture, so
-  the slim graph has no opus/cmake native build — which makes a
-  cross-target <code>cargo check</code> from the Linux devcontainer a
-  plausible cheap smoke substitute.</li>
+  pipeline, which makes a cross-target <code>cargo check</code> from the
+  Linux devcontainer a plausible cheap smoke substitute. (This
+  bullet originally claimed <code>--no-default-features</code> drops the
+  opus/cmake native build. The phase 2 spike disproved that:
+  only <code>gui</code> is feature-gated in <code>ryll/Cargo.toml</code>, and
+  <code>shakenfist-spice-webrtc</code> — an unconditional dependency —
+  depends on <code>opus</code> directly. The cross-check still works, it
+  just cross-compiles more than expected.)</li>
 <li><code>PLAN-ci-platform-matrix.md</code> (not started) plans macOS/Windows
   <em>runtime</em> smoke coverage; any jobs it adds later should land in
   the merge tier defined here.</li>
@@ -11342,12 +11346,21 @@ non-required workflow (matching shakenfist).</p>
    Recommendation: the residual scheduled workflow keeps only
    those two jobs; gitleaks/shellcheck/bidi only change when the
    tree changes, and every PR runs them.
-3. <strong>Windows cross-check feasibility.</strong> <code>cargo check</code> still runs
-   build scripts, so the spike must confirm the
-   <code>--no-default-features</code> graph needs no Windows-native
-   toolchain (ring/aws-lc-rs are the likely obstacles). If the
-   spike fails, we accept occasional merge-queue ejections for
-   Windows breakage and record why in this plan.
+3. <strong>Windows cross-check feasibility.</strong> <em>Resolved 2026-08-09 by
+   the phase 2 spike.</em> The answer was neither of the two outcomes
+   anticipated here. <code>x86_64-pc-windows-msvc</code> — the triple CI
+   actually builds — cannot be checked from Linux: <code>cargo check</code>
+   runs build scripts, and <code>aws-lc-sys</code> compiles vendored
+   BoringSSL C for the target, which needs an MSVC toolchain
+   (<code>xwin</code> plus <code>clang-cl</code>) to work. <code>x86_64-pc-windows-gnu</code>
+   does work, in about 24 seconds, once mingw-w64 is added to
+   the devcontainer image. That triple is a proxy: it shares the
+   <code>cfg(windows)</code>/<code>windows-sys</code> surface that breaks in practice,
+   but not <code>target_env = "msvc"</code> breakage, link failures, or
+   anything aarch64-specific. We take the proxy as a smoke-tier
+   step and leave the merge tier as the authoritative Windows
+   signal. See
+   <a href="/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/">PLAN-two-stage-ci-phase-02-windows-check.md</a>.
 4. <strong>Post-merge builds.</strong> With a <code>pull_request</code> ruleset rule and
    the merge queue, direct pushes to <code>develop</code> stop happening, and
    the queue tests the exact merge commit that lands. The <code>push:
@@ -11374,12 +11387,12 @@ non-required workflow (matching shakenfist).</p>
 <tr>
 <td>1. Two-tier ci.yml</td>
 <td><a href="/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/">PLAN-two-stage-ci-phase-01-workflow-tiers.md</a></td>
-<td>Implemented; CI validation pending push</td>
+<td>Complete (PR #255, merged 2026-08-09)</td>
 </tr>
 <tr>
 <td>2. Windows cross-check spike</td>
-<td>PLAN-two-stage-ci-phase-02-windows-check.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/">PLAN-two-stage-ci-phase-02-windows-check.md</a></td>
+<td>Implemented; CI validation pending push</td>
 </tr>
 <tr>
 <td>3. Merge queue enablement</td>
@@ -11439,21 +11452,22 @@ for merge behaviour (nothing is required yet).</p>
   cancel a queue run.</li>
 </ul>
 <h3 id="phase-2-windows-cross-check-spike">Phase 2: Windows cross-check spike<a class="headerlink" href="#phase-2-windows-cross-check-spike" title="Permanent link">&para;</a></h3>
-<p>Answer open question 3 empirically, then implement or document.</p>
+<p>Answer open question 3 empirically, then implement or document.
+The spike ran on 2026-08-09 and its results, together with the
+resulting design, are in
+<a href="/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/">PLAN-two-stage-ci-phase-02-windows-check.md</a>.</p>
 <ul>
-<li>Spike (in the devcontainer, throwaway): <code>rustup target add
-  x86_64-pc-windows-msvc</code>, then <code>cargo check --target
-  x86_64-pc-windows-msvc --no-default-features -p ryll</code>. Build
-  scripts run on the host; the question is whether any crate in
-  the slim graph (ring / aws-lc-rs being the suspects) demands a
-  Windows toolchain.</li>
-<li>If it works: add the target to <code>.devcontainer/Dockerfile</code>, a
-  <code>check-windows</code> Makefile target following the existing
-  devcontainer-wrapped pattern, and a smoke-tier step or job in
-  <code>ci.yml</code>.</li>
-<li>If it does not work cheaply: no CI change; record the failure
-  mode in this plan under Future work and accept merge-queue
-  ejections as the detection point for Windows breakage.</li>
+<li>The msvc triple is not cross-checkable from Linux without
+  <code>xwin</code> and <code>clang-cl</code> (aws-lc-sys compiles vendored BoringSSL
+  C for the target). Rejected as not cheap.</li>
+<li>The gnu triple works in ~24 seconds once mingw-w64 is in the
+  devcontainer image, and exercises every native build in the
+  graph including the cmake/libopus one.</li>
+<li>Implemented as: mingw-w64 plus the <code>x86_64-pc-windows-gnu</code>
+  target in <code>.devcontainer/Dockerfile</code>, a <code>check-windows</code>
+  Makefile target, and a step at the head of the <code>build-linux</code>
+  smoke job. It is a proxy for the merge tier's msvc builds, not
+  a replacement for them.</li>
 </ul>
 <h3 id="phase-3-merge-queue-enablement">Phase 3: Merge queue enablement<a class="headerlink" href="#phase-3-merge-queue-enablement" title="Permanent link">&para;</a></h3>
 <p>Only after phase 1 has merged to develop.</p>
