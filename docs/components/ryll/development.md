@@ -171,25 +171,36 @@ five or more in-scope files need review.
 ## CI and automation
 
 GitHub Actions CI builds and tests ryll on Linux (x86_64 + aarch64),
-macOS (Apple Silicon), and Windows (x86_64 + aarch64) on every push to
-`develop` and on pull requests. Linux x86_64 jobs run on self-hosted
-runners with the build wrapped in the devcontainer (via the same
-Makefile targets used locally); macOS, Windows, and aarch64 Linux use
-GitHub-hosted runners because we own no matching hardware. PRs also
-receive an automated code review via Claude Code. Changes that only
-touch code-review artifacts (`REVIEWS.md`, `.vscode/*.weaudit*`,
-`.vscode/review-scope.toml`) skip the CI and CodeQL workflows
-entirely; the supply-chain content scanners still run on them.
+macOS (Apple Silicon), and Windows (x86_64 + aarch64) in two tiers. A
+smoke tier runs on pull requests — lint, the self-hosted Linux x86_64
+build and tests, a Windows cross-check, and the supply-chain scanners
+— while a merge tier runs on `merge_group` with the fuzz targets and
+the cross-platform build matrix, so the expensive jobs run once,
+against the commit that is about to land. Linux x86_64 jobs run on
+self-hosted runners with the build wrapped in the devcontainer (via
+the same Makefile targets used locally); macOS, Windows, and aarch64
+Linux use GitHub-hosted runners because we own no matching hardware.
+PRs also receive an automated code review via Claude Code. Changes
+that only touch code-review artifacts (`REVIEWS.md`,
+`.vscode/*.weaudit*`, `.vscode/review-scope.toml`) skip every CI job
+and the CodeQL workflow.
+
+`make check-windows` is the smoke tier's Windows cross-check: it
+cross-compiles the `x86_64-pc-windows-gnu` triple from the Linux
+devcontainer as a cheap proxy for the msvc builds in the merge tier.
+It catches `cfg(windows)` and windows-sys breakage; msvc-specific and
+link-time breakage still surface only in the merge tier. Run it
+locally exactly as CI does.
 
 Workflows in `.github/workflows/`:
 
 | Workflow | Purpose |
 |----------|---------|
-| `ci.yml` | Lint, fuzz smoke, build, test (multi-platform), automated PR review |
+| `ci.yml` | Smoke tier (lint, Linux build and test, Windows cross-check, supply-chain scanners, automated PR review) and merge tier (fuzz, multi-platform builds) |
 | `manual-build.yml` | On-demand binary builds of arbitrary branches |
 | `release.yml` | Build and publish release artifacts |
 | `codeql-analysis.yml` | CodeQL security scanning |
-| `supply-chain.yml` | Dependency advisories, license policy, secret scanning, bidi/unicode checks |
+| `supply-chain.yml` | Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in `ci.yml` |
 | `renovate.yml` | Automated dependency updates (hourly) |
 | `export-repo-config.yml` | Daily repository configuration export |
 | `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
