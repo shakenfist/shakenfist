@@ -133,6 +133,15 @@ span around the connection lifecycle). A denied authorization, a failed
 backend TLS verification, an oversized/dis-allowed message, and an idle-read
 timeout each end the connection deterministically rather than leaking a task.
 
+### Log Output
+
+The proxy writes `tracing` output to stdout. Under the daemon that stdout is
+inherited into the kerbside log, so colouring is decided by the sink: ANSI
+escapes are emitted only when stdout is a terminal, and a redirected log gets
+plain text. This matters for anything that parses the log — with colour on,
+`tracing` renders a structured field as `name<esc>[0m<esc>[2m=<esc>[0mvalue`,
+so a search for a literal `name=` finds nothing at all.
+
 ## Security Considerations
 
 ### Token Validation
