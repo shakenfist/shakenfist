@@ -247,6 +247,17 @@ def swagger_helper(section, description, parameters, responses,
 
     declarable = set(argtypes) - {'bearer'}
 
+    # Swagger 2.0 permits at most one in: body parameter per operation,
+    # and it must carry a schema rather than type/format. Declarations
+    # stay one tuple per parameter -- that is the shape the audit reads
+    # and phase 3 will compile -- but body-located declarations render
+    # as properties of a single generated schema instead of as
+    # parameters of their own, which used to be the largest class of
+    # specification-validity errors (128 at its peak).
+    body_properties = {}
+    body_required = []
+    raw_body = None
+
     for parameter in parameters:
         # Checked explicitly, and first, because every malformed
         # declaration has to arrive as an InvalidAPIDeclaration for
@@ -293,13 +304,66 @@ def swagger_helper(section, description, parameters, responses,
                 '%s parameter %s declares type %r, which is not one of %s'
                 % (section, name, argtype, ', '.join(sorted(declarable))))
 
+        if location != 'body':
+            out['parameters'].append({
+                'name': name,
+                'in': location,
+                'required': argrequired,
+                'description': argdescription
+            })
+            out['parameters'][-1].update(argtypes[argtype])
+            continue
+
+        # The raw request body marker: the handler reads bytes from
+        # flask.request rather than receiving named JSON keys. A
+        # parameter which merely happens to be called 'body' but has a
+        # non-binary type is not the marker; it becomes a schema
+        # property like any other named parameter, and there is no
+        # collision because the generated wrapper's name lives at
+        # parameter level while properties live inside the schema.
+        if name == RAW_BODY_PARAMETER and argtype == 'binary':
+            raw_body = (argdescription, argrequired)
+            continue
+
+        prop = dict(argtypes[argtype])
+        prop['description'] = argdescription
+        body_properties[name] = prop
+        if argrequired:
+            body_required.append(name)
+
+    if raw_body is not None and body_properties:
+        raise exceptions.InvalidAPIDeclaration(
+            '%s declares both the raw request body and named body '
+            'parameters (%s); raw bytes and JSON keys cannot share a '
+            'request body' % (section, ', '.join(sorted(body_properties))))
+
+    if raw_body is not None:
+        (argdescription, argrequired) = raw_body
         out['parameters'].append({
-            'name': name,
-            'in': location,
+            'name': RAW_BODY_PARAMETER,
+            'in': 'body',
             'required': argrequired,
-            'description': argdescription
+            'description': argdescription,
+            'schema': dict(argtypes['binary'])
         })
-        out['parameters'][-1].update(argtypes[argtype])
+    elif body_properties:
+        schema = {
+            'type': 'object',
+            'properties': body_properties
+        }
+        # In a schema object 'required' is a JSON Schema array of
+        # property names -- a different thing from the parameter-level
+        # boolean -- and an empty array is itself invalid, so it is
+        # only present when something is required.
+        if body_required:
+            schema['required'] = body_required
+        out['parameters'].append({
+            'name': RAW_BODY_PARAMETER,
+            'in': 'body',
+            'required': bool(body_required),
+            'description': 'The JSON request body.',
+            'schema': schema
+        })
 
     if requires_auth:
         responses.append((
