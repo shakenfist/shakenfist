@@ -80,6 +80,15 @@
         that: not ci_network_b['failed']
         fail_msg: "failed should be false in {{ ci_network_b }}"
 
+    # NOTE(mikal): we await this instance so that the debian:11 image is a
+    # fully resolved artifact in this (non-system) namespace by the time we
+    # return. Scenario 005 then creates an instance as system, which resolves
+    # debian:11 to the blob behind this artifact and stores a blob_uuid in the
+    # instance's disk_spec. Without the await, whether 005 sees a resolved
+    # blob_uuid is a race against this image fetch, and 005's idempotency
+    # assertion is the regression coverage for issue 3669 (the module used to
+    # treat that server populated key as a specification change and recreate
+    # the instance).
     - name: Create a test instance that uses those networks
       sf_instance:
         name: "ansibleci-004"
@@ -95,6 +104,7 @@
         networkspecs:
           - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
         state: present
+        await: true
       register: ci_instance
 
     - name: Assert the instance is new

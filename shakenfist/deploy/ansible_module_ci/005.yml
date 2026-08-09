@@ -1,4 +1,10 @@
 # Tests: sf_instance metadata, instance affinity
+#
+# Also the regression coverage for issue 3669: these instances are created as
+# system, so the server resolves debian:11 to the blob behind the artifact
+# scenario 004 fetched and records a blob_uuid in the stored disk_spec. The
+# re-presentation below must still be judged idempotent despite that extra
+# server populated key.
 
 - hosts: localhost
   gather_facts: no
