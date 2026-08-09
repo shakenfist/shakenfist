@@ -99,7 +99,9 @@ against a running Kolla-Ansible deployment. It is invoked
 automatically by the `openstack_matrix` job in
 `.github/workflows/functional-tests.yml` after the `test-console`
 smoke check, so the GitHub Actions CI iterates on the plugin's tests
-on every PR rather than relying on upstream Zuul as the first signal.
+on every merge-queue entry (the cloud matrices moved from per-PR to
+the merge tier in two-tier CI phase 3) rather than relying on
+upstream Zuul as the first signal.
 The script:
 
 1. Creates a Python venv at `/srv/kerbside-tempest/venv`.
