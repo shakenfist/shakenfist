@@ -1002,7 +1002,7 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
             'A list of the cluster operations not yet executed for this artifact.',
             artifact_outstanding_operations_example),
          (404, 'Artifact not found.', None)]))
-    @use_kwargs(get_args, location='query')
+    @use_kwargs(get_args, location='json_or_query')
     @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, all=False, artifact_from_db=None):

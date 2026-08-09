@@ -796,7 +796,7 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
             'A list of the cluster operations not yet executed for this network.',
             network_outstanding_operations_example),
          (404, 'Network not found.', None)]))
-    @use_kwargs(get_args, location='query')
+    @use_kwargs(get_args, location='json_or_query')
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use

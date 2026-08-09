@@ -19,6 +19,7 @@ from jwt.exceptions import PyJWTError
 from jwt.exceptions import DecodeError
 from jwt.exceptions import ExpiredSignatureError
 import requests
+from webargs.flaskparser import parser as webargs_parser
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -94,6 +95,31 @@ SWAGGER_PARAMETER_LOCATIONS = frozenset(
 # OpenAPI 2.0 permits at most one body parameter and conventionally
 # names it 'body'.
 RAW_BODY_PARAMETER = 'body'
+
+
+# The shipped client serialises every request -- including GETs -- to a
+# JSON body and never builds a query string, but webargs binds each
+# schema to a single request location, so a schema bound to 'query'
+# silently discards body-supplied values (issue 3629: the schema's
+# load_default overwrote the body value log_request had merged into
+# kwargs). This loader accepts a parameter from either place, named
+# after webargs' built-in 'json_or_form'. Per decision D6 of
+# docs/plans/PLAN-api-input-validation.md the JSON body is authoritative
+# when a key arrives in both. Keys the schema does not name are dropped
+# to match the unknown=EXCLUDE default webargs applies to the query
+# location; without that, a stray query key would 422 the request. Not
+# registered under a ('query', 'json') tuple even though webargs permits
+# one: validation failures report as {location: messages} and a tuple
+# key turns the 422 into a 500 when flask_restful JSON-serialises it.
+# declarations.py derives a schema bound here as query parameters, so
+# the published declarations stay 'query'.
+@webargs_parser.location_loader('json_or_query')
+def _load_json_or_query(req, schema):
+    data = req.args.to_dict()
+    json_body = req.get_json(force=True, silent=True)
+    if isinstance(json_body, dict):
+        data.update(json_body)
+    return {key: value for key, value in data.items() if key in schema.fields}
 
 
 def caller_is_admin(func):

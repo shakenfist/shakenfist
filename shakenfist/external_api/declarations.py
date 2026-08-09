@@ -245,12 +245,13 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
     ``post`` declaring a same-named parameter, would both have been
     derived wrongly.
 
-    webargs accepts a tuple of locations as well as a single one, so a
-    schema bound at ``('query', 'json')`` is a query schema too. No site
-    uses that today, but it is the shape a fix for issue 3629 -- and
-    decision D6's fallback -- would introduce, and reading it as "not
-    query" would send the fixer to rewrite the very declarations the fix
-    had just made true.
+    A schema bound at ``'json_or_query'`` -- the custom location
+    base.py registers so a query parameter may also arrive in the JSON
+    body (issue 3629, decision D6's fallback) -- is a query schema too,
+    as is one bound at a tuple of locations naming ``'query'``. The
+    outstanding-operations endpoints bind their ``all`` parameter at
+    ``'json_or_query'``; reading it as "not query" would send the fixer
+    to rewrite the very declarations the fix made true.
     """
     out: set[str] = set()
     for dec in fn.decorator_list:
@@ -274,7 +275,7 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
         if isinstance(location, (tuple, list)):
             if 'query' not in location:
                 continue
-        elif location != 'query':
+        elif location not in ('query', 'json_or_query'):
             continue
         keys = _schema_keys(scopes, ast.unparse(dec.args[0]), problems)
         if keys is None:
