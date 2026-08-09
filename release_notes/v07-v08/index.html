@@ -11317,6 +11317,12 @@
   2.0) and defines the <code>bearerAuth</code> security scheme that authenticated
   operations reference, so generated clients can discover how to
   authenticate. The specification is now validated in CI.</li>
+<li>Operations that accept several request body values now publish a single
+  <code>in: body</code> parameter carrying a generated JSON schema, as OpenAPI 2.0
+  requires, instead of one <code>type</code>/<code>format</code> parameter per value. With this
+  change the published specification validates cleanly, so standard client
+  generators can consume it. The request wire format is unchanged — this
+  only alters how the API is described.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>

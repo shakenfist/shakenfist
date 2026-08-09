@@ -11248,19 +11248,22 @@ and a rebase brought in the eleven federated-authentication
 handlers, so the branch now measures <strong>129</strong>: 128 from the body
 class, 1 from <code>schemes</code>.</p>
 <ul>
-<li><strong>Multiple body parameters per operation.</strong> Swagger 2.0 permits
-  at most one <code>in: body</code> parameter, and it must carry a <code>schema</code>
-  rather than <code>type</code>/<code>format</code>; <code>swagger_helper()</code> emits
-  <code>type</code>/<code>format</code> for everything. 32 of 132 operations declare
-  more than one body parameter (23 before phase 1 — correcting
-  <code>key</code> from query to body on the metadata endpoints added most
-  of the rest, and the federated-authentication endpoints arrived
-  with several more). Every individual declaration is now right
-  and the specification is still invalid, so the generated-client
-  problem this plan opens with is only partly closed. The fix is
-  to collapse an operation's body parameters into a single <code>body</code>
-  parameter with a generated <code>schema</code> object, which is a change to
-  the renderer rather than to any declaration.</li>
+<li><strong>Multiple body parameters per operation — fixed in phase 2.</strong>
+  Swagger 2.0 permits at most one <code>in: body</code> parameter, and it
+  must carry a <code>schema</code> rather than <code>type</code>/<code>format</code>;
+  <code>swagger_helper()</code> emitted <code>type</code>/<code>format</code> for everything, and
+  32 of 132 operations declared more than one body parameter (23
+  before phase 1 — correcting <code>key</code> from query to body on the
+  metadata endpoints added most of the rest, and the
+  federated-authentication endpoints arrived with several more).
+  Phase 2's second PR collapses an operation's body declarations
+  into a single generated <code>schema</code> at render time — declarations
+  keep their one-tuple-per-parameter shape, which is what the
+  audit reads and phase 3 compiles. The raw-body marker renders
+  as a binary schema, and declaring raw and named body parameters
+  together is rejected at import time. This took the validation
+  error count from 128 to zero, so the ratchet in
+  <code>test_openapi_spec.py</code> became a plain validity assertion.</li>
 <li><strong><code>schemes</code> renders as a string, not an array — fixed in
   phase 2.</strong> <code>API_ADVERTISED_HTTP_SCHEMES</code> is typed <code>str</code> in
   <code>config.py</code> while its own description calls it a "space
