@@ -82,12 +82,25 @@ devcontainer-wrapped pattern (`ensure-cache` prerequisite,
 `$(DOCKER_RUN) $(RYLL_IMAGE) cargo check ...`), and a line in the
 `help` target's build section.
 
-`.github/workflows/ci.yml` — a `Cross-check Windows target` step in
-the existing `build-linux` smoke job, placed immediately after the
-checkout so it fails fast. Reusing that job means the devcontainer
-image is built once, so the marginal CI cost is the image-build
-delta plus the check itself; a standalone job on an ephemeral runner
-would rebuild the whole image for a 25-second check.
+`.github/workflows/ci.yml` — a `Cross-check Windows` smoke-tier job
+on the same runner class as `lint`, gated by `check_paths` like its
+peers and added to the `needs` of both `automated_reviewer` and
+`Can enqueue`.
+
+This was first implemented as a step at the head of `build-linux`,
+on the reasoning that reusing that job's devcontainer image would
+make the marginal cost little more than the check itself. PR #256
+measured that and it was wrong: `Build (Linux x86_64)` went from
+8m56s to 12m3s. The ~25 second figure came from a warm local cargo
+registry; on an ephemeral runner the check compiles the whole
+dependency graph for the Windows target cold, and mingw-w64 adds to
+the image build on top of that. Three minutes on the longest smoke
+job is three minutes of pull request feedback latency.
+
+As a separate job it runs concurrently, so the smoke tier's wall
+clock is unchanged and the Windows signal still arrives in about
+five minutes. The cost moves from latency to capacity: a second
+devcontainer image build on another `l` runner.
 
 ## Steps
 
@@ -108,14 +121,21 @@ useful without the others.
   (nothing in the repo invokes actionlint despite
   `.github/actionlint.yaml` existing — run it via
   `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint`).
-* On the PR, `Build (Linux x86_64)` shows the new step passing and
-  the job's total runtime has not moved materially.
+* On the PR, `Cross-check Windows` passes, `Can enqueue` still goes
+  green with it in its `needs`, and `Build (Linux x86_64)` is back
+  to its pre-change runtime of about nine minutes.
 
 ## Risks and notes
 
-* The check adds its cost to the critical path of the longest smoke
-  job. Placing it first means a Windows-only breakage fails the job
-  in about two minutes instead of nine.
+* The check costs an `l` runner slot on every pull request run, on
+  a cluster whose merge-tier failures are already mostly load. That
+  is the trade taken to keep it off the feedback critical path; if
+  capacity turns out to be the binding constraint, folding it back
+  into `build-linux` is a two-line change in the other direction.
+* Whether it earns its keep at all is worth revisiting once phase 3
+  has the merge queue running and ejection rates are observable.
+  The case for it rests on renovate lockfile churn breaking
+  `windows-sys`, which is frequent in this repo but not measured.
 * `PLAN-ci-platform-matrix.md` plans macOS/Windows *runtime* smoke
   coverage. This check is a compile-time proxy only and does not
   reduce the value of that plan.

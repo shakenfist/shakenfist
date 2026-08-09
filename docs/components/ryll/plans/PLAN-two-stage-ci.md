@@ -254,9 +254,12 @@ resulting design, are in
   graph including the cmake/libopus one.
 * Implemented as: mingw-w64 plus the `x86_64-pc-windows-gnu`
   target in `.devcontainer/Dockerfile`, a `check-windows`
-  Makefile target, and a step at the head of the `build-linux`
-  smoke job. It is a proxy for the merge tier's msvc builds, not
-  a replacement for them.
+  Makefile target, and a `Cross-check Windows` smoke-tier job. It
+  is a proxy for the merge tier's msvc builds, not a replacement
+  for them.
+* It started as a step inside `build-linux` and moved to its own
+  job after PR #256 measured that folding it in cost three
+  minutes of pull request feedback latency. See the phase plan.
 
 ### Phase 3: Merge queue enablement
 
