@@ -5907,6 +5907,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 3: merge queue adoption and tier split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -8835,6 +8863,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-two-stage-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-stage CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10952,7 +11008,9 @@ against a running Kolla-Ansible deployment. It is invoked
 automatically by the <code>openstack_matrix</code> job in
 <code>.github/workflows/functional-tests.yml</code> after the <code>test-console</code>
 smoke check, so the GitHub Actions CI iterates on the plugin's tests
-on every PR rather than relying on upstream Zuul as the first signal.
+on every merge-queue entry (the cloud matrices moved from per-PR to
+the merge tier in two-tier CI phase 3) rather than relying on
+upstream Zuul as the first signal.
 The script:</p>
 <ol>
 <li>Creates a Python venv at <code>/srv/kerbside-tempest/venv</code>.</li>

@@ -5970,6 +5970,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 3: merge queue adoption and tier split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -8898,6 +8926,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-two-stage-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-stage CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11208,7 +11264,11 @@ master plan, but listed here so they are not forgotten:</p>
   frequent and getting Nova reliable with Kerbside is the
   primary focus, so the per-PR Nova coverage is worth its
   cost. A future demotion to a schedule is foreseeable;
-  see the revisit criteria in Future work.</li>
+  see the revisit criteria in Future work.
+  <em>Superseded 2026-08-09 by two-tier CI phase 3
+  (PLAN-two-tier-ci-phase-03-merge-queue.md): the cloud
+  matrices moved to the merge-queue tier — still both
+  legs blocking, but per merge rather than per PR.</em></li>
 </ul>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <p>Phases land across three repos. The "Repo" column tells
@@ -11466,7 +11526,11 @@ true:</p>
   the per-PR signal stops catching regressions; PR volume
   drops enough that per-PR cost outweighs value; or runner
   capacity becomes a binding constraint. Until then it
-  stays per-PR.</li>
+  stays per-PR.
+  <em>Superseded 2026-08-09: two-tier CI phase 3 moved the
+  lane to the merge-queue tier instead (blocking merges,
+  not PRs); schedule-only demotion remains the further
+  escape hatch, now recorded in the two-tier plan.</em></li>
 <li><strong>Audit the multi-node provisioning playbooks for the
   same port-only SSH wait.</strong> Phase 8 fixed the readiness
   gate in <code>shakenfist/actions</code>

@@ -5758,6 +5758,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 3: merge queue adoption and tier split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -8770,6 +8798,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-two-stage-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-stage CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10950,6 +11006,13 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>Port <code>shakenfist-spice-webrtc</code> from webrtc-rs 0.17.1 to 0.20.x. 0.20 re-homes the crate on a sans-io <code>rtc</code> core behind a thin async layer, moving <code>RTCPeerConnection</code>'s operations onto a trait, collapsing the per-object callbacks into a single <code>PeerConnectionEventHandler</code>, dropping <code>gathering_complete_promise</code> and <code>connection_state</code>, and requiring explicit UDP bind addresses. Deferred from Renovate PR #245, which was repurposed to carry the <code>&lt; 0.18</code> pin and this plan.</td>
 <td>Not started</td>
 <td>1. Pre-work on 0.17, 2. Atomic bump, 3. Socket binding config, 4. Soak and docs (phase plans pending)</td>
+</tr>
+<tr>
+<td>2026-08-09</td>
+<td><a href="/components/ryll/plans/PLAN-two-stage-ci/">Two-stage CI</a></td>
+<td>Split CI into a cheap smoke tier on <code>pull_request</code> (lint, Linux build + tests, supply-chain scanners) gating <code>Can enqueue</code>, and an expensive merge tier on <code>merge_group</code> (fuzz ×4, cross-platform builds ×4) gating <code>Can merge</code>, modelled on shakenfist/shakenfist's merge-queue scheme, so a failing <code>cargo deny</code> no longer wastes eight heavy builds.</td>
+<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/">1. Two-tier ci.yml</a>, 2. Windows cross-check spike, 3. Merge queue enablement, 4. Docs (remaining phase plans pending)</td>
 </tr>
 </tbody>
 </table>

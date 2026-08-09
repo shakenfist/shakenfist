@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci/">
       
       
-        <link rel="prev" href="../PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">
+        <link rel="prev" href="../PLAN-two-tier-ci-phase-03-merge-queue/">
       
       
         <link rel="next" href="../PLAN-use-case-docs/">
@@ -5759,6 +5759,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 3: merge queue adoption and tier split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -8859,6 +8887,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-two-stage-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-stage CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11121,13 +11177,22 @@ nightly CI catches independently), this is a good trade.</p>
    nightly?</strong> Once fixed to deploy kerbside it becomes a
    genuine integration gate and the merge tier is
    defensible. If flake from the RPM-built environment
-   dominates, demote it to schedule-only like sf-e2e was.</li>
+   dominates, demote it to schedule-only like sf-e2e was.
+   <strong>Resolved 2026-08-09 (phase 3):</strong> merge tier, with
+   schedule-only demotion kept as the escape hatch.</li>
 <li><strong>Renovate interaction.</strong> Renovate PRs are the bulk of
    PR volume. Confirm renovate's automerge/rebase flow
    drives the merge queue correctly (memory:
    close/reopen is the reliable retrigger for stale
    rollups), and that queue entries batch rather than
-   serialise four-hour lanes per dependency bump.</li>
+   serialise four-hour lanes per dependency bump.
+   <strong>Resolved 2026-08-09 (phase 3):</strong> renovate has no
+   automerge enabled in this repo, so queueing stays a
+   human act; the <code>ALLGREEN</code> grouping with
+   max_entries_to_merge 5 batches queued PRs into one
+   merge-tier run rather than serialising cloud lanes
+   per bump. Confirm batching empirically in phase 3's
+   step 5 validation.</li>
 <li><strong>Merge queue mechanics.</strong> Branch protection on
    develop must switch to a merge queue with per-tier
    required checks; workflow <code>concurrency:</code> groups must
@@ -11135,7 +11200,13 @@ nightly CI catches independently), this is a good trade.</p>
    <code>automated_reviewer</code> job currently <code>needs:</code> the cloud
    matrices and must be re-anchored to smoke-tier jobs
    only. Repository-settings changes are manual GitHub UI
-   work (cf. PLAN-consistency-audit.md).</li>
+   work (cf. PLAN-consistency-audit.md).
+   <strong>Resolved 2026-08-09 (phase 3):</strong> the mechanics are
+   copied from shakenfist/shakenfist's live design (gate
+   jobs + ruleset) rather than re-derived; concurrency
+   groups were audited and already key on
+   <code>github.ref</code>, which is unique per merge-group entry;
+   the reviewer re-anchor landed with phase 3.</li>
 <li><strong>What does "oVirt CI uses kerbside" drive?</strong> Minimum:
    deploy the PR's kerbside (wheel built as in the other
    lanes) against the engine, register the ovirt source,
@@ -11168,8 +11239,8 @@ nightly CI catches independently), this is a good trade.</p>
 </tr>
 <tr>
 <td>3. Merge queue adoption and tier split</td>
-<td>PLAN-two-tier-ci-phase-03-merge-queue.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">PLAN-two-tier-ci-phase-03-merge-queue.md</a></td>
+<td>Workflows landed; queue enablement is an operator step (phase plan steps 4-5)</td>
 </tr>
 <tr>
 <td>4. Documentation</td>
@@ -11198,11 +11269,14 @@ nightly CI catches independently), this is a good trade.</p>
   pull_request once the promotion criteria are met, and
   removes the phase-9 "not a PR gate" caveat.</li>
 <li><strong>Phase 3</strong> moves ovirt_matrix and openstack_matrix out
-  of <code>functional-tests.yml</code> into a merge-tier workflow
-  triggered on <code>merge_group</code>, re-anchors
-  automated_reviewer onto smoke jobs, adds <code>merge_group</code>
-  triggers to the smoke workflows so queue entries re-run
-  them, and documents the manual branch-protection
+  of the PR tier onto <code>merge_group</code> (the phase plan kept
+  them in <code>functional-tests.yml</code>, event-gated, because the
+  fleet's aggregate gate jobs require same-file <code>needs:</code> —
+  the separate-workflow sketch originally written here is
+  superseded), re-anchors automated_reviewer onto smoke
+  jobs, adds <code>merge_group</code> triggers to the smoke workflows
+  so queue entries carry their required checks (satisfied
+  by skips), and documents the manual branch-protection
   changes. Ordering: only after phases 1 and 2, so PR
   coverage is never weakened first.</li>
 <li><strong>Phase 4</strong> updates <code>docs/testing.md</code>,
