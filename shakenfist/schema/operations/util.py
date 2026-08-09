@@ -7,6 +7,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
@@ -35,6 +36,14 @@ def enqueue_cluster_operation(
     itself plus one per metadata key ending in _uuid (other than
     'uuid' itself); add_event_multi() auto-generates a
     correlation_id across those targets.
+
+    Raises ClusterOperationEnqueueFailed if the write did not happen.
+    This used to log and return, which the callers could not tell
+    apart from success -- so create_and_enqueue() returned the uuid of
+    an operation that did not exist, an API request 200'd with a uuid
+    the client then polled forever, and the work was dropped without
+    anything retrying it (issue 3631, and the stray vxlans of issue
+    3597).
     """
     if not target:
         target = metadata['node_uuid']
@@ -81,7 +90,9 @@ def enqueue_cluster_operation(
                 f'{ot.name.lower()}:{u}' for ot, u in op_targets],
             'error': error,
         }).error('Failed to enqueue cluster operation')
-        return
+        raise exceptions.ClusterOperationEnqueueFailed(
+            f'{object_type_str} operation {metadata["uuid"]} was not '
+            f'enqueued to {queue_name}: {error}')
 
     LOG.with_fields({
         'operation_uuid': metadata['uuid'],

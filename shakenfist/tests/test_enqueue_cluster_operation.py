@@ -12,6 +12,7 @@ from unittest import mock
 from pydantic import BaseModel
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist import exceptions
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import util
 from shakenfist.tests import base
@@ -179,7 +180,9 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.mock_create_and_enqueue.return_value = (
             False, 'MariaDB error: deadlock')
 
-        util.enqueue_cluster_operation(
+        self.assertRaises(
+            exceptions.ClusterOperationEnqueueFailed,
+            util.enqueue_cluster_operation,
             _FakeObjectType('NODE_INST_OP'),
             self._metadata())
 
@@ -199,7 +202,9 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
 
         with mock.patch(
                 'shakenfist.schema.operations.util.LOG') as mock_log:
-            util.enqueue_cluster_operation(
+            self.assertRaises(
+                exceptions.ClusterOperationEnqueueFailed,
+                util.enqueue_cluster_operation,
                 _FakeObjectType('NODE_INST_OP'),
                 self._metadata(),
                 model_class=_NullableTargetModel)
@@ -217,6 +222,28 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         mock_log.with_fields.return_value.error.assert_called_once_with(
             'Failed to enqueue cluster operation')
         self.mock_add_event_multi.assert_not_called()
+
+    def test_rpc_failure_raises_with_actionable_message(self):
+        # Issue 3631: logging and returning made a dropped enqueue
+        # indistinguishable from success to every caller, so the API
+        # handed clients a uuid for an operation that was never
+        # written. The failure must reach the caller.
+        self.mock_create_and_enqueue.return_value = (
+            False, 'MariaDB error: (1213, \'Deadlock found\')')
+
+        exc = self.assertRaises(
+            exceptions.ClusterOperationEnqueueFailed,
+            util.enqueue_cluster_operation,
+            _FakeObjectType('NET_OP'),
+            self._metadata(),
+            target='networknode')
+
+        message = str(exc)
+        self.assertIn(OP_UUID, message)
+        self.assertIn('net_op', message)
+        self.assertIn(
+            'networknode-clusteroperation-user_waiting', message)
+        self.assertIn('Deadlock found', message)
 
 
 class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):

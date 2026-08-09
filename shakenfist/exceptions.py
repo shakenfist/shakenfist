@@ -488,6 +488,18 @@ class OperationTimeout(Exception):
     ...
 
 
+class ClusterOperationEnqueueFailed(Exception):
+    """Raised when a cluster operation could not be written to the
+    database, so the work it describes will never happen.
+
+    This must never be swallowed. The create_and_enqueue() wrappers
+    return an operation uuid to their caller, and an API request which
+    returns a uuid for an operation that was never written hands the
+    client a phantom to poll while the work is silently dropped
+    (issue 3631)."""
+    ...
+
+
 class NetworkOperationFailed(Exception):
     """Raised by ``op.raise_for_error()`` when a cluster operation
     reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as

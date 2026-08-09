@@ -8,6 +8,7 @@
 # the whole transaction back.
 
 from unittest import mock
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
@@ -42,6 +43,15 @@ def _make_mock_engine():
     mock_engine.connect.return_value.__exit__ = mock.Mock(
         return_value=False)
     return mock_engine, mock_conn
+
+
+def _make_deadlock_error():
+    """Build a SQLAlchemy OperationalError whose orig is shaped
+    like the mysqldb driver's deadlock exception (errno 1213)."""
+    orig = Exception(
+        1213, 'Deadlock found when trying to get lock; '
+              'try restarting transaction')
+    return OperationalError('stmt', {}, orig)
 
 
 def _make_metadata(**overrides):
@@ -330,6 +340,104 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.assertEqual(params['state_value'], 'queued')
         self.assertEqual(params['update_time'], 1000.0)
         self.assertIsNone(params['message'])
+
+
+class CreateAndEnqueueDeadlockRetryTestCase(base.ShakenFistTestCase):
+    """Issue 3631: deadlock retries on the enqueue transaction.
+
+    This is the widest transaction in mariadb.py and so the most
+    likely deadlock victim. Before this it had no retry at all, so an
+    InnoDB 1213 permanently dropped a cluster operation -- observed on
+    sfcbr as a network delete whose net_op never ran.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch(
+            'shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # Don't actually sleep through the backoff.
+        mock.patch('shakenfist.mariadb.time.sleep').start()
+        self.addCleanup(mock.patch.stopall)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_deadlock_is_retried_and_succeeds(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        # First attempt deadlocks on the object_states upsert -- the
+        # exact statement seen failing in the issue -- then the whole
+        # transaction is replayed and succeeds.
+        mock_conn.execute.side_effect = [
+            mock.Mock(),
+            _make_deadlock_error(),
+            mock.Mock(),
+            mock.Mock(),
+            mock.Mock(),
+        ]
+        mock_get_engine.return_value = mock_engine
+
+        success, error = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'net_op',
+                _make_metadata(),
+                1000.0,
+                'networknode-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertTrue(success)
+        self.assertEqual('', error)
+        # Two executes for the failed attempt, three for the retry.
+        self.assertEqual(5, mock_conn.execute.call_count)
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_sustained_deadlock_reports_failure(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = _make_deadlock_error()
+        mock_get_engine.return_value = mock_engine
+
+        success, error = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'net_op',
+                _make_metadata(),
+                1000.0,
+                'networknode-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(success)
+        self.assertIn('Deadlock found', error)
+        self.assertEqual(
+            mariadb._DEADLOCK_MAX_ATTEMPTS,
+            mock_conn.execute.call_count)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_duplicate_uuid_is_not_retried(self, mock_get_engine):
+        # An IntegrityError is a permanent failure, not a transient
+        # one -- replaying it just inserts the same duplicate again.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = IntegrityError(
+            'insert', {}, Exception('duplicate'))
+        mock_get_engine.return_value = mock_engine
+
+        success, error = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'net_op',
+                _make_metadata(),
+                1000.0,
+                'networknode-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(success)
+        self.assertIn('duplicate', error)
+        self.assertEqual(1, mock_conn.execute.call_count)
 
 
 class GrpcCreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):

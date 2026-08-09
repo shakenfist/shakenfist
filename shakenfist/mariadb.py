@@ -20435,14 +20435,21 @@ def _direct_create_and_enqueue_cluster_operation(
     duplicated inline instead. That duplication is the price of
     getting the atomicity right.
 
+    Because this is the widest transaction in mariadb.py it is also
+    the most likely to be picked as an InnoDB deadlock victim, so the
+    whole transaction is run under _retry_on_deadlock() just like the
+    cluster lock paths. A dropped enqueue is not recoverable later --
+    the operation simply never happens (issue 3631) -- so paying a few
+    milliseconds of jittered backoff here is always the better trade.
+
     Returns (True, '') on success. Returns (False, error) if the
     cluster_operations insert hits a duplicate uuid (IntegrityError)
-    or if any write raises OperationalError -- in both cases the
-    `with` context rolls back the uncommitted transaction
-    automatically and ``error`` describes the underlying failure so
-    callers can log an actionable diagnostic. Audit events are out
-    of scope; callers emit them via eventlog after the RPC returns
-    successfully.
+    or if any write raises OperationalError (including a deadlock
+    which survived every retry) -- in both cases the `with` context
+    rolls back the uncommitted transaction automatically and ``error``
+    describes the underlying failure so callers can log an actionable
+    diagnostic. Audit events are out of scope; callers emit them via
+    eventlog after the RPC returns successfully.
     """
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
@@ -20456,7 +20463,7 @@ def _direct_create_and_enqueue_cluster_operation(
         'operation_uuid': str(op_uuid),
     }
 
-    try:
+    def _do_create_and_enqueue() -> None:
         with engine.connect() as conn:
             cluster_stmt = sa.insert(cluster_ops_table).values(
                 uuid=op_uuid,
@@ -20509,7 +20516,12 @@ def _direct_create_and_enqueue_cluster_operation(
                 conn.execute(target_stmt)
 
             conn.commit()
-            return True, ''
+
+    try:
+        _retry_on_deadlock(
+            _do_create_and_enqueue,
+            f'create_and_enqueue_cluster_operation({op_uuid})')
+        return True, ''
     except IntegrityError as e:
         LOG.warning(
             f'MariaDB atomic create+enqueue refused duplicate '
