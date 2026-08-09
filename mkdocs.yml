@@ -246,6 +246,7 @@ nav:
                 - "Rust SPICE proxy (kerbside-proxy)": components/kerbside/plans/PLAN-rust-proxy.md
                 - "Shaken Fist VDI console tokens (kerbside side)": components/kerbside/plans/PLAN-kerbside-vdi-tokens.md
                 - "Two-tier CI phase 1: the oVirt lane deploys and drives kerbside": components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md
+                - "Two-tier CI phase 2: promote sf-e2e to a PR smoke gate": components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md
                 - "Two-tier CI: smoke gates on PRs, full clouds in the merge queue": components/kerbside/plans/PLAN-two-tier-ci.md
                 - "Use case documentation": components/kerbside/plans/PLAN-use-case-docs.md
             - Spice:

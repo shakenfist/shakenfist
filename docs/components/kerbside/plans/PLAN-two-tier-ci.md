@@ -195,6 +195,9 @@ nightly CI catches independently), this is a good trade.
   promotion criteria in Open questions below. Until then
   the current PR gates stay as they are — we do not
   weaken PR coverage before its replacement is trusted.
+  **Resolved 2026-08-08:** the maintainer relaxed the
+  criterion and phase 2 executed against it — see open
+  question 1 and the phase 2 plan.
 
 ## Open questions
 
@@ -204,6 +207,15 @@ nightly CI catches independently), this is a good trade.
    faster), with runtime consistently under ~30 minutes.
    To be confirmed against whatever is blocking it in the
    other session.
+   **Resolved 2026-08-08 (maintainer decision):** N=10
+   was too harsh in hindsight for an experimental
+   project on an underspecced CI cluster — nightly-only
+   signal accumulates too slowly, and the lane's only
+   post-bring-up failures (2026-08-02/03) were a real
+   kerbside-proxy compile break the gate exists to
+   catch, not lane flake. Promoted on four consecutive
+   green nightlies (2026-08-04..07, 16–35 minutes); see
+   [PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/).
 2. **Does the oVirt lane belong in the merge tier or
    nightly?** Once fixed to deploy kerbside it becomes a
    genuine integration gate and the merge tier is
@@ -239,7 +251,7 @@ Phases will get detailed plan files as each is started.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. oVirt lane deploys kerbside | [PLAN-two-tier-ci-phase-01-ovirt-kerbside.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/) | Complete |
-| 2. Promote sf-e2e to PR smoke gate | PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md | Blocked on precondition |
+| 2. Promote sf-e2e to PR smoke gate | [PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/) | Complete |
 | 3. Merge queue adoption and tier split | PLAN-two-tier-ci-phase-03-merge-queue.md | Not started |
 | 4. Documentation | PLAN-two-tier-ci-phase-04-docs.md | Not started |
 
