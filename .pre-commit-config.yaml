@@ -96,6 +96,18 @@ repos:
         files: ^shakenfist/external_api/.*\.py$
         pass_filenames: false
 
+      - id: check-doc-anchors
+        name: Check documentation anchor links resolve
+        description: >-
+          An intra-documentation link to an anchor which does not exist still
+          renders, and silently drops the reader at the top of the target page.
+          Neither mkdocs nor the docs-tests workflow notices, so a renamed
+          heading breaks inbound links invisibly. Check them here instead.
+        entry: python3 tools/check-doc-anchors.py
+        language: system
+        files: ^docs/.*\.md$
+        pass_filenames: false
+
   # Type checking with mypy (incremental rollout via tox)
   # Requires: pip install tox mypy
   - repo: local
