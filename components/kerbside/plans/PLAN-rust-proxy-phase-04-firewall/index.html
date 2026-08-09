@@ -4814,6 +4814,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../direct-qemu-harness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The direct-qemu mock harness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -4827,10 +4855,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" checked>
         
           
-          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
             
   
   
@@ -4848,8 +4876,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_7_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6013,10 +6041,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -6034,8 +6062,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11434,8 +11462,13 @@ Python step passed <code>flake8</code>/<code>py3</code>.</p>
   blocker (the plan's success criteria do not require it).</li>
 </ul>
 <h3 id="live-capture-validation-step-4f-2026-07-07">Live capture validation (step 4f, 2026-07-07)<a class="headerlink" href="#live-capture-validation-step-4f-2026-07-07" title="Permanent link">&para;</a></h3>
-<p>Full results are in <code>tools/direct-qemu/VERIFY-FIREWALL.md</code>. Summary:
-remote-viewer (spice-gtk) driven through the proxy in <code>WarnOnly</code> mode
+<p>Full results were recorded in <code>tools/direct-qemu/VERIFY-FIREWALL.md</code>,
+since folded into this Outcome (the harness documentation now lives in
+<code>docs/direct-qemu-harness.md</code>). Run environment: release proxy binary
+at ryll pin <code>1c6f19f</code> (the completed main/display message-type
+tables), <code>uncalibrated-sextant.qcow2</code> guest under qemu (TCG, no KVM in
+that environment).</p>
+<p>remote-viewer (spice-gtk) driven through the proxy in <code>WarnOnly</code> mode
 against the <code>uncalibrated-sextant.qcow2</code> guest completed a clean
 session across 4 channels (main, display, inputs, cursor), ~1.17 MB
 relayed (<code>bytes{s2c}=1,174,716</code>, <code>bytes{c2s}=1,468</code>), with <strong>zero</strong>
@@ -11447,6 +11480,12 @@ end to end (<code>authorized=0</code>, <code>denied=1</code>, no bytes relayed).
 was not run separately (it shares remote-viewer's spice-gtk client
 engine); ryll headless was not run this pass and remains a worthwhile
 follow-up capture.</p>
+<p>Only 4 channels were carried: record, playback, smartcard, usbredir,
+port and webdav were not opened by this client+guest, confirming the
+<code>ChannelUnmodeled</code> (observe-only) handling of record/smartcard is safe
+for this workload. No cap was approached — the tight 4 KiB
+inputs/cursor client-side cap and the generous 16 MiB elsewhere held
+with zero <code>size_cap</code> verdicts.</p>
 <h3 id="pre-push-audit-2026-07-07">Pre-push audit (2026-07-07)<a class="headerlink" href="#pre-push-audit-2026-07-07" title="Permanent link">&para;</a></h3>
 <p>Ran the <code>PUSH-AUDIT.md</code> audit against <code>git diff origin/develop..HEAD</code>.
 Wave 1 (mechanical) was clean: Docker <code>make lint</code> (fmt + <code>clippy -D

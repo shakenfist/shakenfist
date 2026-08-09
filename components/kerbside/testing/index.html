@@ -16,7 +16,7 @@
         <link rel="prev" href="../proxy-architecture/">
       
       
-        <link rel="next" href="../plans/">
+        <link rel="next" href="../direct-qemu-harness/">
       
       
         
@@ -4963,6 +4963,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../direct-qemu-harness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The direct-qemu mock harness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -4972,10 +5000,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
             
   
   
@@ -4993,8 +5021,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5951,10 +5979,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -5972,8 +6000,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -10849,9 +10877,11 @@ lane boots a real qemu/SPICE guest, drives it with the ryll headless
 client through the proxy, and asserts the full Sextant scenario, plus
 API-driven in-flight session termination and a non-gating
 relay-latency loadtest. See
-<a href="/components/kerbside/plans/PLAN-rust-proxy/">plans/PLAN-rust-proxy.md</a>,
-<a href="https://github.com/shakenfist/kerbside/blob/develop/ARCHITECTURE.md">ARCHITECTURE.md</a>,
-and <code>tools/direct-qemu/VERIFY-RUST-PROXY.md</code>.</p>
+<a href="/components/kerbside/plans/PLAN-rust-proxy/">plans/PLAN-rust-proxy.md</a> and
+<a href="https://github.com/shakenfist/kerbside/blob/develop/ARCHITECTURE.md">ARCHITECTURE.md</a>.
+The same proxy path can be exercised locally without MariaDB or the
+daemon via the standalone mock harness — see
+<a href="/components/kerbside/direct-qemu-harness/">direct-qemu-harness.md</a>.</p>
 <h2 id="ryll">Ryll<a class="headerlink" href="#ryll" title="Permanent link">&para;</a></h2>
 <p>Ryll is the upstream Rust SPICE client at
 <a href="https://github.com/shakenfist/ryll">shakenfist/ryll</a>. The latency

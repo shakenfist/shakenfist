@@ -4814,6 +4814,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../direct-qemu-harness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The direct-qemu mock harness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -4827,10 +4855,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" checked>
         
           
-          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
             
   
   
@@ -4848,8 +4876,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_7_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6002,10 +6030,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -6023,8 +6051,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11304,11 +11332,14 @@ linted (<code>clippy -D warnings</code>), and tested in the Docker build.</p>
   (permissive).</li>
 <li>3g: lifecycle wiring, concurrency cap, Prometheus <code>/metrics</code>,
   SIGTERM shutdown.</li>
-<li>3h: end-to-end verification harness (mock gRPC + qemu + proxy). A
-  live run drove <code>remote-viewer</code> through the proxy to a booted qemu
-  SPICE server: 4 channels authorised via the gRPC service and ~345
-  KB of display data relayed server→client (plus input
-  client→server) — the full client → proxy → hypervisor path.</li>
+<li>3h: end-to-end verification harness (mock gRPC + qemu + proxy),
+  documented today in <code>docs/direct-qemu-harness.md</code>. A live run
+  (2026-07-06) drove <code>remote-viewer</code> through the proxy to a booted
+  qemu SPICE server: 4 channels (main, display, inputs, cursor)
+  authorised via the gRPC service and ~345 KB of display data relayed
+  server→client (plus input client→server), with the mock logging
+  <code>AuthorizeConnection</code> per channel and <code>DeregisterChannel</code> on
+  teardown — the full client → proxy → hypervisor path.</li>
 <li>3i: this Outcome, the <code>.github/workflows/rust.yml</code> CI (fmt / clippy
   / test / build), and doc updates.</li>
 </ul>

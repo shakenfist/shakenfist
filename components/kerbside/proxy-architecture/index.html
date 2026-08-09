@@ -5157,6 +5157,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../direct-qemu-harness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The direct-qemu mock harness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -5166,10 +5194,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
             
   
   
@@ -5187,8 +5215,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6145,10 +6173,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -6166,8 +6194,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11606,7 +11634,8 @@ above it, so a supervised restart lets in-flight sessions finish tearing
 down on their own terms rather than being cut off mid-drain by the
 daemon's SIGKILL.</p>
 <h3 id="verifying-it-live">Verifying it live<a class="headerlink" href="#verifying-it-live" title="Permanent link">&para;</a></h3>
-<p><code>tools/direct-qemu/VERIFY-TERMINATION.md</code> drives this end to end against a
+<p>The mock harness (<a href="/components/kerbside/direct-qemu-harness/">direct-qemu-harness.md</a>)
+drives this end to end against a
 real client: the mock gRPC server's <code>ProxyControl</code> stream emits a one-shot
 <code>TerminateSession</code> a configurable number of seconds after the first
 authorization (<code>MOCK_GRPC_TERMINATE_AFTER</code>), standing in for the
