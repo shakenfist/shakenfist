@@ -322,6 +322,15 @@ class LabelHierarchyTooDeep(ArtifactException):
     ...
 
 
+class InvalidMaxVersions(ArtifactException):
+    """A max_versions which is not a whole number of versions to keep.
+
+    Carries a message suitable for returning to an API caller: every
+    raising site is reached from a request body.
+    """
+    ...
+
+
 # Blobs
 class BlobException(Exception):
     ...

@@ -82,10 +82,19 @@ phase 2 work rather than by a machine:
 The check against both is `STRUCTURED_PARAMETERS` in
 `shakenfist/tests/external_api/test_openapi_spec.py`: every parameter
 publishing a structure or a bound is listed there with the shape the
-handler actually accepts, and an entry with no `minimum` asserts that
-none is published. Add an entry whenever a declaration gains a
-structured type or a bound, and read the handler before you do — the
-point is agreement with the code, not with the declaration.
+handler actually accepts, and an entry describes that shape in full —
+a constraint key the entry does not list must not be published, which
+is how the console `length` entry asserts that nothing bounds it in
+either direction.
+
+You do not have to remember to add an entry.
+`test_every_published_structure_or_bound_is_registered` derives the
+set which ought to be listed from the published specification and
+fails until each member has one. What you do have to do is read the
+handler before writing the entry: the derivation can say that
+something is missing, but only you can say what the handler really
+accepts, and the point is agreement with the code rather than with
+the declaration.
 
 The constraints element is a dict with keys drawn from `minimum`,
 `maximum` and `pattern`. All three are valid Swagger 2.0 keywords, so
@@ -108,6 +117,15 @@ key its type token already renders (a second `minimum` on
 declared constraints are *published documentation* until phase 3 of
 [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
 compiles them — a constraint does not reject anything yet.
+
+Three keys, deliberately. `maxLength`, `minLength`, `minItems` and
+`enum` are equally valid Swagger 2.0 keywords with real consumers
+waiting for them — a rule `name` is refused above 255 characters,
+`scopes` must be non-empty, `configdrive` accepts only two values —
+but each needs its own import-time validation and its own mutation in
+the guard harness, and phase 2 set out to publish the numeric and
+pattern bounds. They are scoped out rather than overlooked; phase 3
+is where the case for adding them gets concrete.
 
 **There is no per-handler authentication decorator.** Authentication is
 the default, applied to every handler by `_authenticate_unless_public`

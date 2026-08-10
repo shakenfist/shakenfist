@@ -492,9 +492,12 @@ def swagger_helper(section, description, parameters, responses,
             raw_body = (argdescription, argrequired, rendered)
             continue
 
-        prop = copy.deepcopy(rendered)
-        prop['description'] = argdescription
-        body_properties[name] = prop
+        # No second copy: rendered is already a fresh deep copy made
+        # once per iteration and nothing else holds it, so handing it
+        # on directly is what the non-body and raw-body branches above
+        # both do.
+        rendered['description'] = argdescription
+        body_properties[name] = rendered
         if argrequired:
             body_required.append(name)
 

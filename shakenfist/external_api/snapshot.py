@@ -9,14 +9,17 @@
 from functools import partial
 
 from flasgger import swag_from
+from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
 from shakenfist import blob
 from shakenfist.artifact import Artifacts
+from shakenfist.artifact import validated_max_versions
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import InvalidMaxVersions
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 
@@ -45,6 +48,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
              'SNAPSHOTS_DEFAULT_TO_THIN.', False)
         ],
         [(200, 'Information about the snapshots taken.', None),
+         (400, 'The max_versions is not a non-negative integer.', None),
          (404, 'Instance not found.', None),
          (406, 'Instance is not in a state where it can be snapshotted.',
           None)]))
@@ -65,6 +69,16 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         # key when unset.
         if not thin:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
+
+        # Snapshotting reaches Artifact.owned_from_url_or_new() and so
+        # the max_versions setter, where a negative persists and has
+        # every later add_index() delete the oldest surviving version.
+        # The declaration publishes minimum 0, so the server backs it
+        # here as well as on the artifact and label routes.
+        try:
+            max_versions = validated_max_versions(max_versions)
+        except InvalidMaxVersions as e:
+            return sf_api.error(400, str(e))
 
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'snapshot request from REST API')

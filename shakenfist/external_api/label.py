@@ -12,9 +12,11 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import LABEL_URL
+from shakenfist.artifact import validated_max_versions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import InvalidMaxVersions
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
 from shakenfist.namespace import namespace_is_trusted
@@ -104,13 +106,25 @@ class LabelEndpoint(api_base.Resource):
              'configured default.', False)
         ],
         [(200, 'The updated artifact.', label_example),
-         (400, 'The label name is malformed.', None)],
+         (400, 'The label name is malformed, or the max_versions is not a '
+          'non-negative integer.', None)],
         requires_admin=True))
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         namespace, label_url, err = _label_url_or_error(label_name)
         if err:
             return err
+
+        # Checked before anything is created: this reaches
+        # Artifact.new() and then the max_versions setter, where a
+        # negative would persist and have every later add_index()
+        # delete the oldest surviving version. The declaration
+        # publishes minimum 0, so the server has to back it here as
+        # well as on the artifact route.
+        try:
+            max_versions = validated_max_versions(max_versions)
+        except InvalidMaxVersions as e:
+            return sf_api.error(400, str(e))
 
         # Resolve by ownership and then authorise creating and modifying
         # apart, exactly as the artifact upload route does. The

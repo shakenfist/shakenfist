@@ -346,9 +346,12 @@ landing decision, not an implementation one. Measurements landed
 where the plan predicted: 129 errors before the work, 128 after the
 `schemes` fix (the ratchet's one recorded value), zero after the
 collapse, still zero with the vocabulary applied. The mutation
-harness grew from 12 to 16 (the four constraint-validation guards,
-all `caught-import`), and its NO-OP verdict earned its keep during
-the work: retyping the blob `offset`/`limit` declarations to
+harness grew from 12 to 24 across the review rounds: first the four
+constraint-validation guards (all `caught-import`), then one per
+defect review turned up, so each new guard is demonstrably able to
+fail on the tree that shipped without it. Its NO-OP verdict earned
+its keep during the work: retyping the blob `offset`/`limit`
+declarations to
 `unsignedinteger` moved them out from under mutation 3's search
 text, which reported NO-OP instead of a false catch.
 
@@ -400,24 +403,53 @@ anything -- `declarations.py` reads a declaration's name and location
 and never looks at its type -- so
 `test_openapi_spec.STRUCTURED_PARAMETERS` now lists every parameter
 publishing a structure or a bound alongside the shape its handler
-actually accepts, and an entry without a `minimum` asserts that none
-is published. Both shipped defects fail that table, verified by
-mutation (21 and 22 in the guard harness). It is a registry rather
-than a derivation, so it constrains the next author to think rather
-than proving them right; a real derivation of types from handler
-bodies is phase 3's problem, where the warn-only rollout measures
-declarations against live traffic.
+actually accepts, and an entry describes that shape in full: a
+constraint key the entry does not list must not be published. Both
+shipped defects fail that table, verified by mutation (20 and 21 in
+the guard harness), as does a spurious `maximum` on an entry which
+asserts no bound (mutation 24) and a bound on a parameter nobody
+registered (mutation 23). It remains a registry rather than a
+derivation of *what* a handler accepts, so it constrains the next
+author to think rather than proving them right; only its completeness
+is derived. A real derivation of types from handler bodies is phase
+3's problem, where the warn-only rollout measures declarations
+against live traffic.
 
 The `unsignedinteger` comment named a live data-loss foot-gun --
 a negative `max_versions` deletes the oldest version on every index
 add -- so this phase closes it rather than documenting it and waiting
-for phase 4: `ArtifactMaxVersionsEndpoint.post` now refuses a negative
-with a 400, and catches `TypeError` as well as `ValueError` so a list
-or dict body value is a 400 rather than a 500. That is the only
-behaviour change in a phase which is otherwise documentation.
+for phase 4. The first attempt closed it in
+`ArtifactMaxVersionsEndpoint.post` alone, which a later review round
+correctly called one of *three* routes writing the attribute: label
+create and instance snapshot both pass a caller's `max_versions`
+into `Artifact.new()`, which reaches the same setter and the same
+`delete_old_versions()`. The coercion and the check now live in
+`artifact.validated_max_versions()`, called from the setter so every
+writer inherits the guard whether or not it ever sees a request
+body, and from all three handlers so the refusal is a 400 rather
+than a 500. `TypeError` is caught alongside `ValueError` so a list
+or dict body value is a 400 too.
+
+The same "publish only what the server backs" rider applies to the
+blob data route, whose `offset` and `limit` now publish minimum 0.
+Unbacked, both failed worse than meaninglessly: a negative offset
+reached `f.seek()` inside `stream_with_context`, so the `OSError`
+arrived after the 200 had begun and the caller saw a truncated body
+rather than an error, and a negative limit read to EOF and defeated
+the cap it was asked for. Both are checked in the handler. A
+marshmallow `validate=Range(min=0)` on the webargs schema was tried
+first and rejected: webargs raises `UnprocessableEntity` and the
+app's error handler renders it as a **500**, which is the same
+serialisation hazard the `json_or_query` loader in `base.py`
+documents. Nothing in the tree uses `validate=` today, so the
+webargs error path is a latent phase 3 problem rather than a live
+one, but it is worth knowing before phase 3 reaches for it.
+
+Those, and the `key_ttl` bounds below, are the only behaviour changes
+in a phase which is otherwise documentation.
 
 A related judgement call, made when the review raised it: `cpus`,
-`memory`, `key_ttl`, `version_id` and console `length` are typed
+`memory`, `version_id` and console `length` are typed
 `unsignedinteger` (minimum 0) rather than carrying a `{'minimum': 1}`
 constraint. Nothing in the create path rejects a zero or negative
 `cpus` today — the scheduler's `_has_sufficient_cpu()` compares
@@ -425,3 +457,54 @@ constraint. Nothing in the create path rejects a zero or negative
 is the strongest claim the server actually backs. Tightening to 1 is
 a phase 3 warn-only question, decided with data, not a documentation
 change.
+
+`key_ttl` was in that list and should not have been: it is the one
+member of it the server already bounds on both sides.
+`validate_key_ttl()` refuses `<= 0` and refuses anything above
+`MAX_KEY_TTL_SECONDS` (86400), and both rule endpoints turn the
+resulting `RuleValidationError` into a 400. Typed
+`unsignedinteger` it published a minimum of 0 — documenting a value
+the server answers 400 to — while the enforced cap stayed invisible,
+which is the very invisible-cap problem the events `limit` change in
+this phase exists to fix. Both declarations now carry
+`{'minimum': 1, 'maximum': MAX_KEY_TTL_SECONDS}`, sourced from the
+constant rather than restated, so the specification cannot drift from
+the check.
+
+Two decisions the review asked to see recorded rather than inferred:
+
+* **The events `limit` maximum of 1000 will not compile into a
+  rejection.** `get_events_for_object()` *clamps* rather than
+  refuses, so `limit=5000` succeeds today and returns 1000 rows.
+  Phase 4 must keep clamping. The published maximum is a statement
+  of what a caller can usefully ask for, not a promise that asking
+  for more is an error, and turning it into a 400 would be a
+  documentation commit changing wire behaviour two phases later —
+  precisely the trap the `netblock` decision avoids.
+* **`CONSTRAINT_KEYS` is deliberately three keys.** `maxLength`,
+  `minLength`, `minItems` and `enum` are all valid Swagger 2.0
+  keywords and all have real consumers waiting — rule `name` is
+  refused above 255 characters, `MAX_SCOPE_LENGTH` bounds each
+  scope, `scopes` must be non-empty, `configdrive` accepts only
+  `none` and `openstack-disk` — but this phase set out to publish
+  the numeric and pattern bounds D9 named, and each new key needs
+  its own validation and its own mutation. They are scoped out, not
+  overlooked; phase 3 is where the compiler makes the case for
+  adding them concrete.
+
+Finally, `STRUCTURED_PARAMETERS` grew a derived completeness
+assertion. As shipped it was a hand-maintained list which could fall
+silently behind the tree — the same failure mode as the prose types
+it replaced, one level up, and it was already missing twelve of the
+tree's structured or bounded declarations when the review counted
+them.
+`test_every_published_structure_or_bound_is_registered()` now walks
+the published specification, collects every parameter carrying an
+`object`/`array` type or any key in `CONSTRAINT_KEYS`, and fails
+until each one has an entry. The entries themselves still have to be
+written by hand against the handler, which is the point: the
+derivation says *something is missing*, and a human still has to say
+what the handler really accepts. An entry now also describes the
+published shape in full — a constraint key it does not list must not
+be published — so a `maximum` appearing on console `length` fails
+the same way a `minimum` already did.

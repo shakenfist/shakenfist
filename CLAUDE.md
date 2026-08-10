@@ -356,11 +356,14 @@ does not start**. The rules, in full in
    import time.
 
 Declare the token that matches what the handler actually accepts —
-nothing derives a type, so the only check is
-`test_openapi_spec.py`'s `STRUCTURED_PARAMETERS` table, which is where
-a new structured or bounded parameter is registered. Publish what the
-server backs: a tighter bound belongs in the specification only where
-the server already coerces or rejects outside it.
+nothing derives a type, so the check is `test_openapi_spec.py`'s
+`STRUCTURED_PARAMETERS` table, where every structured or bounded
+parameter is registered with the shape its handler really accepts. The
+table's *completeness* is derived from the published specification, so
+a new structure or bound fails CI until it has an entry; what the entry
+says still has to be written by hand against the handler. Publish what
+the server backs: a tighter bound belongs in the specification only
+where the server already coerces or rejects outside it.
 
 `python3 tools/fix-api-parameter-locations.py --apply` corrects
 location drift mechanically. The check runs as a pre-commit hook and,

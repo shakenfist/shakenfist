@@ -349,6 +349,28 @@ sed -i "s/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)/('blob_uu
     shakenfist/external_api/blob.py
 check 'python only regex construct'
 
+# 23. A bound on a parameter nobody registered. Legal at import time
+# and legal OpenAPI, so the only thing which can see it is the derived
+# completeness assertion -- which is the point of that assertion: the
+# STRUCTURED_PARAMETERS table is written by hand and would otherwise
+# fall behind the tree silently, which is the same failure mode as the
+# prose types it replaced. The rule update endpoint is used because its
+# key_name_prefix is the one declaration in the tree whose final line
+# is unique enough to sed without also matching its sibling on create.
+sed -i "s/'Prefix for minted key names.', True)/'Prefix for minted key names.', True, {'pattern': '^[a-z]+$'})/" \
+    shakenfist/external_api/auth.py
+check 'bound on an unregistered parameter'
+
+# 24. A bound on a parameter which IS registered, and registered
+# precisely to assert that nothing bounds it: -1 is a supported
+# sentinel on console length. Distinct from mutation 21, which retypes
+# the token; this leaves the token alone and adds a maximum, so it is
+# caught only by an entry describing the published shape in full
+# rather than just its minimum.
+sed -i "s/'to fetch the entire console log.', False)/'to fetch the entire console log.', False, {'maximum': 65536})/" \
+    shakenfist/external_api/instance.py
+check 'spurious maximum on a registered parameter'
+
 echo
 if [ "${failures}" -ne 0 ]; then
     echo "${failures} of ${total} mutations were not caught."

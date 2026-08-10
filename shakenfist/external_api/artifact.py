@@ -31,6 +31,7 @@ from shakenfist.artifact import Artifact
 from shakenfist.artifact import Artifacts
 from shakenfist.artifact import namespace_or_shared_filter
 from shakenfist.artifact import UPLOAD_URL
+from shakenfist.artifact import validated_max_versions
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -794,21 +795,16 @@ class ArtifactVersionsEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, artifact_ref=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
+        # The coercion and the negativity check live in
+        # artifact.validated_max_versions() so that all three routes
+        # which write this attribute -- here, label create and
+        # instance snapshot -- refuse the same values. The declaration
+        # publishes minimum 0; this is the server backing it, rather
+        # than waiting for phase 4 to compile the bound.
         try:
-            mv = int(max_versions)
-        except (TypeError, ValueError):
-            # TypeError as well as ValueError: a list or dict body
-            # value reaches int() and used to 500 here.
-            return sf_api.error(400, 'max version is not an integer')
-        # A negative maximum is silently destructive rather than
-        # merely meaningless: delete_old_versions() tests
-        # len(indexes) > max, which is always true, and then slices
-        # [:-max], so every index add deletes the oldest surviving
-        # version. The declaration publishes minimum 0; this is the
-        # server backing it, rather than waiting for phase 4 to
-        # compile the bound.
-        if mv < 0:
-            return sf_api.error(400, 'max version cannot be negative')
+            mv = validated_max_versions(max_versions)
+        except exceptions.InvalidMaxVersions as e:
+            return sf_api.error(400, str(e))
         artifact_from_db.add_event(
             EVENT_TYPE_AUDIT, 'max versions set from REST API')
         artifact_from_db.max_versions = mv

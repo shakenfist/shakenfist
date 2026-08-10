@@ -40,6 +40,32 @@ SNAPSHOT_URL = 'sf://snapshot/'
 UPLOAD_URL = 'sf://upload/'
 
 
+def validated_max_versions(value):
+    """Coerce a caller supplied max_versions, refusing a destructive one.
+
+    Zero means "the configured default" and is legal. A negative is not
+    merely meaningless, it is silently destructive:
+    delete_old_versions() tests len(indexes) > max, which a negative
+    makes always true, and then slices [:-max], so every subsequent
+    index add drops the oldest surviving version.
+
+    Raises InvalidMaxVersions, whose message is safe to hand back to an
+    API caller. This lives beside the setter rather than in one
+    endpoint because three endpoints write this attribute -- the
+    artifact max_versions route, label create and instance snapshot --
+    and only the first of them used to check.
+    """
+    try:
+        out = int(value)
+    except (TypeError, ValueError):
+        # TypeError as well as ValueError: a list or dict body value
+        # reaches int() and used to 500.
+        raise exceptions.InvalidMaxVersions('max version is not an integer')
+    if out < 0:
+        raise exceptions.InvalidMaxVersions('max version cannot be negative')
+    return out
+
+
 class Artifact(dbowo):
     object_type = ObjectType.ARTIFACT
     initial_version = 8
@@ -505,6 +531,10 @@ class Artifact(dbowo):
 
     @max_versions.setter
     def max_versions(self, value):
+        # Validated here rather than only in the endpoints so that
+        # every writer inherits the guard, including Artifact.new()
+        # and any future caller which never sees a request body.
+        value = validated_max_versions(value)
         if self.in_memory_only:
             return
         self._update_attributes(max_versions=value)
