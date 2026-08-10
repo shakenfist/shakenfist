@@ -203,6 +203,11 @@ genuinely must not be published, add it to `UNDECLARED_BY_DESIGN` with
 a reason. Objects the decorators inject — anything ending in
 `_from_db` — are not parameters and must not be declared.
 
+A handler must therefore name its parameters: `*args` or `**kwargs` in
+the signature accepts body keys nothing can enumerate (`log_request`
+merges the whole JSON body into the handler's kwargs), so the audit
+refuses to proceed rather than reporting a tree it could not check.
+
 ## Checking your work
 
 The audit derives the correct location for every declaration and
