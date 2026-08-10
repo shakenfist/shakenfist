@@ -1020,6 +1020,20 @@ def log_request(func):
     return wrapper
 
 
+def redirect_to_root_clearing_jwt() -> flask.Response:
+    # Send a browser back to the root URL with its now useless JWT
+    # cookies cleared. flask.redirect() is declared as returning
+    # werkzeug's Response, but unset_jwt_cookies() requires flask's
+    # subclass of it. make_response() coerces the redirect to the
+    # application's response class -- which is what a redirect built
+    # inside a request context already is at runtime -- so the object
+    # genuinely is the type the callee asks for rather than being cast
+    # into shape.
+    resp = flask.make_response(flask.redirect('/', code=302))
+    unset_jwt_cookies(resp)
+    return resp
+
+
 def handle_authorization_exceptions(func):
     def wrapper(*args, **kwargs):
         try:
@@ -1033,9 +1047,7 @@ def handle_authorization_exceptions(func):
             # is a web browser, redirect them back to the root URL. Otherwise just
             # return a 401.
             if flask.request.headers.get('Accept', 'text/html').find('text/html') != -1:
-                resp = flask.redirect('/', code=302)
-                unset_jwt_cookies(resp)
-                return resp
+                return redirect_to_root_clearing_jwt()
             return sf_api.error(401, 'invalid JWT in Authorization header',
                                 suppress_traceback=True)
 
@@ -1044,9 +1056,7 @@ def handle_authorization_exceptions(func):
             # browser, redirect them back to the root URL. Otherwise just return
             # a 401.
             if flask.request.headers.get('Accept', 'text/html').find('text/html') != -1:
-                resp = flask.redirect('/', code=302)
-                unset_jwt_cookies(resp)
-                return resp
+                return redirect_to_root_clearing_jwt()
             return sf_api.error(401, str(e), suppress_traceback=True)
 
         except (JWTDecodeError,

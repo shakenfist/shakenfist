@@ -117,6 +117,6 @@ repos:
         description: Run mypy type checking on selected files (incremental rollout)
         entry: tox -e mypy
         language: system
-        files: ^shakenfist/(schema/|mariadb\.py|daemons/database/|operations/|resource_health\.py|node_health\.py|external_api/declarations\.py)
+        files: ^shakenfist/(schema/|mariadb\.py|daemons/database/|operations/|resource_health\.py|node_health\.py|external_api/(declarations|base)\.py)
         pass_filenames: false
         types: [python]
