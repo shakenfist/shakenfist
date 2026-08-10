@@ -98,6 +98,16 @@ Authorized users can trigger automation by commenting on PRs:
   unit test failures (`tox -ecover`). Uses `test-drift-fix.yml` with
   structured commit summaries.
 
+`issue-fix.yml` runs its fix attempt through
+`tools/claude-model-fallback.sh`, which takes a comma-separated
+preference list (`--models`, default `claude-fable-5,claude-opus-5`) and
+moves to the next model when one reports its subscription credit is
+exhausted. That case arrives as an HTTP 429 in the `--output-format json`
+payload (`api_error_status`), which the claude CLI's own
+`--fallback-model` flag does not handle -- it only covers overloaded or
+unavailable models. A refused request is free, so the wrapper attempts
+the real job rather than paying for a pre-flight probe.
+
 ## Working with This Codebase
 
 ### Code Style
