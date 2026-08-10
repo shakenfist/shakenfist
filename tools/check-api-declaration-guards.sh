@@ -291,6 +291,16 @@ sed -i "s/('event_type', 'body', 'string', 'The type of event to return.', False
     shakenfist/external_api/blob.py
 check 'minimum on a string type'
 
+# 17. An array of objects outside the body. Every use in the tree is
+# body-located, so this guard is a no-op today and exists for the next
+# declaration; the mutation is how we know it is real. A query
+# location is used rather than path because a path parameter would
+# also trip the route-symmetry check, and a mutation which trips two
+# guards does not prove the one it was written for.
+sed -i "s/('disk', 'body', 'arrayofdict',/('disk', 'query', 'arrayofdict',/" \
+    shakenfist/external_api/instance.py
+check 'array of objects outside the body'
+
 echo
 if [ "${failures}" -ne 0 ]; then
     echo "${failures} of ${total} mutations were not caught."

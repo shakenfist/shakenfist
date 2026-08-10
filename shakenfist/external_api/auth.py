@@ -1043,7 +1043,7 @@ class AuthNamespaceRulesEndpoint(api_base.Resource):
             ('scopes', 'body', 'arrayofstring',
              'The scopes granted to keys minted through this rule. Must be '
              'non-empty.', True),
-            ('key_ttl', 'body', 'integer',
+            ('key_ttl', 'body', 'unsignedinteger',
              'Seconds of life for keys minted through this rule.', True),
             ('key_name_prefix', 'body', 'string',
              'Prefix for minted key names. The cluster appends a random '
@@ -1114,7 +1114,7 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
              'Claim name to matcher, as for creation.', True),
             ('scopes', 'body', 'arrayofstring',
              'The scopes granted to keys minted through this rule.', True),
-            ('key_ttl', 'body', 'integer',
+            ('key_ttl', 'body', 'unsignedinteger',
              'Seconds of life for keys minted through this rule.', True),
             ('key_name_prefix', 'body', 'string',
              'Prefix for minted key names.', True)

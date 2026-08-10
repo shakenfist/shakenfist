@@ -49,8 +49,13 @@ obvious primitives it includes `unsignedinteger` (an integer whose
 published `minimum` is 0 — use it for anything where a negative value
 is meaningless or destructive, like `max_versions`), `base64` (a
 string whose published format is Swagger 2.0's standard `byte` token),
-`macaddr` and `netblock` (strings carrying a published validation
-`pattern`), and real array types for `arrayofstring`/`arrayofdict`.
+`macaddr` (a string carrying a published validation `pattern`),
+`netblock` (format only — `ipaddress.ip_network()` in the handler
+stays the single source of truth for what parses, and a published
+IPv4 pattern would describe the API as narrower than it is), and real
+array types for `arrayofstring`/`arrayofdict`. An array of objects
+can only be declared in the body: outside one there is no schema
+object to nest it in, so it is rejected at import time.
 
 The constraints element is a dict with keys drawn from `minimum`,
 `maximum` and `pattern`. All three are valid Swagger 2.0 keywords, so

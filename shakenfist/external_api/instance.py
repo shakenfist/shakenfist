@@ -467,8 +467,9 @@ class InstancesEndpoint(api_base.Resource):
         [
             ('name', 'body', 'string',
              'The name of the instance, must meet the requirements of DNS RFCs.', True),
-            ('cpus', 'body', 'integer', 'The number of vCPUs', True),
-            ('memory', 'body', 'integer', 'The amount of RAM in MB.', True),
+            ('cpus', 'body', 'unsignedinteger', 'The number of vCPUs', True),
+            ('memory', 'body', 'unsignedinteger',
+             'The amount of RAM in MB.', True),
             ('network', 'body', 'arrayofdict',
              'A list of networkspecs defining the networking for this instance. '
              'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
@@ -1412,7 +1413,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True),
-            ('length', 'body', 'integer',
+            ('length', 'body', 'unsignedinteger',
              'The amount of data to fetch, defaults to 10240 bytes.', False)
         ],
         [(200, 'The console data as an application/octet-stream.', None),

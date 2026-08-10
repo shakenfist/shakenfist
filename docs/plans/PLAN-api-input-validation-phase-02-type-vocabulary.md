@@ -352,7 +352,7 @@ the work: retyping the blob `offset`/`limit` declarations to
 `unsignedinteger` moved them out from under mutation 3's search
 text, which reported NO-OP instead of a false catch.
 
-Two deviations from the letter of the plan, both recorded rather
+Three deviations from the letter of the plan, all recorded rather
 than silent:
 
 * **`macaddr` is defined but unapplied.** No declaration site
@@ -367,3 +367,23 @@ than silent:
   documents the values a caller can usefully send. Whether phase 4
   enforcement should reject 0 or keep tolerating it is a warn-only
   question for phase 3's sfcbr data.
+* **`netblock` ships without its planned pattern.** The table above
+  specifies `<a.b.c.d/n>`, but `NetworksEndpoint.post()` validates
+  with `ipaddress.ip_network()`, which parses IPv6 as well, so an
+  IPv4-only pattern would publish the API as narrower than it is —
+  and phase 4 would then compile a documentation commit into a 400
+  for input that works today. The pattern was also loose enough to
+  admit `999.999.999.999/99`, so it was not carrying its weight as
+  validation either. `netblock` is therefore a format-only token and
+  `ip_network()` remains the single source of truth for what parses.
+  The reserved-range semantic (#323) was always out of scope.
+
+A related judgement call, made when the review raised it: `cpus`,
+`memory`, `key_ttl`, `version_id` and console `length` are typed
+`unsignedinteger` (minimum 0) rather than carrying a `{'minimum': 1}`
+constraint. Nothing in the create path rejects a zero or negative
+`cpus` today — the scheduler's `_has_sufficient_cpu()` compares
+`current + cpus > hard_max`, which a negative passes — so minimum 0
+is the strongest claim the server actually backs. Tightening to 1 is
+a phase 3 warn-only question, decided with data, not a documentation
+change.

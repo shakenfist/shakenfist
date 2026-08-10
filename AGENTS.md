@@ -188,7 +188,9 @@ decorator-injected `*_from_db` objects. A declaration tuple has five
 elements plus an optional sixth constraints dict
 (`minimum`/`maximum`/`pattern`), also validated at import time. Body
 declarations stay one tuple per parameter but *render* as a single
-schema-carrying body parameter, because Swagger 2.0 allows only one.
+schema-carrying body parameter, because Swagger 2.0 allows only one;
+an array of objects can only be declared in the body, since outside
+one there is no schema object to nest it in.
 
 `shakenfist/external_api/declarations.py` derives the correct answer
 from the source and is shared by the fixer

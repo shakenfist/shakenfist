@@ -812,7 +812,8 @@ class ArtifactVersionEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('version_id', 'path', 'integer', 'The version number to remove.', True)
+            ('version_id', 'path', 'unsignedinteger',
+             'The version number to remove.', True)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact index not found.', None)]))

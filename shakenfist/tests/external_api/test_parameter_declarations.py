@@ -848,8 +848,9 @@ class Thing:
         self.assertIsNone(declared[0].location)
 
     def test_wrong_arity_declaration_is_reported(self):
-        """swagger_helper() destructures five elements, so a tuple of
-        any other length is malformed however readable its parts are."""
+        """swagger_helper() destructures five elements plus an optional
+        constraints dictionary, so a tuple of any other length is
+        malformed however readable its parts are."""
         source = '''
 class Thing(api_base.Resource):
     @swag_from(api_base.swagger_helper(
@@ -864,6 +865,28 @@ class Thing(api_base.Resource):
 
         self.assertEqual(1, len(declared))
         self.assertIsNone(declared[0].name)
+
+    def test_constrained_declaration_parses(self):
+        """The six element form is legal, and the constraints element
+        does not disturb the five values the audit reads. Without a
+        positive test the arity widening is covered only by the tree
+        happening to contain a constrained declaration today."""
+        source = '''
+class Thing(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'things', 'A thing.',
+        [('limit', 'body', 'integer', 'How many.', False,
+          {'minimum': 1, 'maximum': 1000})],
+        []))
+    def get(self, limit=None):
+        pass
+'''
+        cls = self._parse_class(source)
+        declared = declarations.declarations(cls.body[0])
+
+        self.assertEqual(1, len(declared))
+        self.assertEqual('limit', declared[0].name)
+        self.assertEqual('body', declared[0].location)
 
     def test_only_resource_subclasses_are_endpoints(self):
         """A helper class with a get() accessor is not an endpoint, and
@@ -1505,10 +1528,14 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 # A pattern which does not compile.
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '('})],
+                # A sixth element which is not a dictionary, in the
+                # shape that used to be a wrong-arity case.
+                [('thing', 'body', 'string', 'A thing.', False, 1)],
                 # Seven elements.
                 [('thing', 'body', 'string', 'A thing.', False, {}, 8)]):
-            self.assertRaises(
-                exceptions.InvalidAPIDeclaration, self._helper, parameters)
+            with self.subTest(parameters=parameters):
+                self.assertRaises(
+                    exceptions.InvalidAPIDeclaration, self._helper, parameters)
 
     def test_new_tokens_render_their_bounds(self):
         # The D9 vocabulary: bounds and formats phase 3 will compile,
@@ -1530,10 +1557,30 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             re.match(props['mac']['pattern'], '02:00:00:73:18:66'))
         self.assertFalse(
             re.match(props['mac']['pattern'], '02:00:00:73:18:zz'))
-        self.assertTrue(
-            re.match(props['block']['pattern'], '192.168.20.0/24'))
-        self.assertFalse(
-            re.match(props['block']['pattern'], 'not-a-netblock'))
+        # netblock is deliberately format-only. An IPv4 CIDR pattern
+        # would publish the API as narrower than ip_network() actually
+        # accepts, which phase 4 would then compile into a 400 for
+        # input that works today.
+        self.assertEqual('a CIDR netblock', props['block']['format'])
+        self.assertNotIn('pattern', props['block'])
+
+    def test_array_of_objects_outside_the_body_is_rejected(self):
+        """Outside a body there is no schema object to nest an array of
+        objects in, so the specification would be invalid. Refused at
+        import time like every other declaration defect, rather than
+        left for test_openapi_spec.py to find after sf-api has started
+        serving it."""
+        for location in ('query', 'path', 'header', 'formData'):
+            with self.subTest(location=location):
+                self.assertRaises(
+                    exceptions.InvalidAPIDeclaration, self._helper,
+                    [('disk', location, 'arrayofdict', 'Disks.', True)])
+
+        # An array of strings is fine anywhere: its items are primitive.
+        out = self._helper(
+            [('scopes', 'query', 'arrayofstring', 'Scopes.', False)])
+        scopes = [p for p in out['parameters'] if p['name'] == 'scopes'][0]
+        self.assertEqual('array', scopes['type'])
 
     def test_arrays_render_as_arrays(self):
         # These were prose-formatted strings before the D9 work; now
@@ -1558,16 +1605,20 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         TypeError on them, which is the other way a malformed
         declaration escapes the single exception type that phase 3's
         compiler catches.
+
+        Six elements is now legal arity, so a bad constraints element
+        is a constraints defect and is tested as one in
+        test_malformed_constraints_are_rejected.
         """
         for parameters in ([('thing', 'body', 'string', 'A thing.')],
-                           [('thing', 'body', 'string', 'A thing.', False, 1)],
                            [()],
                            [None],
                            [42],
                            [(x for x in range(5))],
                            ['a five character string']):
-            self.assertRaises(
-                exceptions.InvalidAPIDeclaration, self._helper, parameters)
+            with self.subTest(parameters=parameters):
+                self.assertRaises(
+                    exceptions.InvalidAPIDeclaration, self._helper, parameters)
 
     def test_bearer_is_not_declarable(self):
         """swagger_helper injects the Authorization header itself; an

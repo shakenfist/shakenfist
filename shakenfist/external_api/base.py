@@ -279,10 +279,9 @@ def swagger_helper(section, description, parameters, responses,
     argtypes = {
         # Real array types rather than prose-formatted strings: body
         # parameters render through schema objects, where array is
-        # legal JSON Schema. Every use in the tree is body-located; an
-        # arrayofdict on a query parameter would render an invalid
-        # specification (non-body items must be primitive), which
-        # test_openapi_spec.py catches naming the operation.
+        # legal JSON Schema. Every use in the tree is body-located, and
+        # an array of objects outside a body is refused at import time
+        # below.
         'arrayofdict': {'type': 'array', 'items': {'type': 'object'}},
         'arrayofstring': {'type': 'array', 'items': {'type': 'string'}},
         # byte is Swagger 2.0's standard format token for base64
@@ -301,9 +300,15 @@ def swagger_helper(section, description, parameters, responses,
             'type': 'string', 'format': 'a MAC address',
             'pattern': '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'},
         'namespace': {'type': 'string', 'format': 'the name of a namespace'},
-        'netblock': {
-            'type': 'string', 'format': 'a CIDR netblock',
-            'pattern': '^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$'},
+        # Deliberately format-only, with no pattern. An IPv4 CIDR
+        # pattern would describe the API as narrower than it is:
+        # NetworksEndpoint.post() validates with ipaddress.ip_network(),
+        # which parses IPv6 too. It would also be loose enough to admit
+        # 999.999.999.999/99, so it earns nothing as validation while
+        # setting phase 4 up to compile a documentation commit into a
+        # 400 for input the API accepts today. ip_network() stays the
+        # single source of truth for what parses.
+        'netblock': {'type': 'string', 'format': 'a CIDR netblock'},
         'node': {'type': 'string', 'format': 'the name of a node'},
         'number': {'type': 'number', 'format': 'a floating point number'},
         'string': {'type': 'string', 'format': 'string'},
@@ -413,6 +418,20 @@ def swagger_helper(section, description, parameters, responses,
                 section, name, rendered, parameter[5]))
 
         if location != 'body':
+            # Outside a body, a parameter's items must be primitive:
+            # there is no schema object to nest an array of objects in,
+            # so an arrayofdict on a query or path parameter renders an
+            # invalid specification. test_openapi_spec.py would catch
+            # it, but every other declaration defect is refused at
+            # import time so sf-api does not start at all, and a tree
+            # which fails CI should not be able to serve an invalid
+            # specification in the meantime.
+            if rendered.get('items', {}).get('type') == 'object':
+                raise exceptions.InvalidAPIDeclaration(
+                    '%s parameter %s declares type %r in the %s, but an '
+                    'array of objects can only be declared in the body'
+                    % (section, name, argtype, location))
+
             out['parameters'].append({
                 'name': name,
                 'in': location,
@@ -488,14 +507,14 @@ def swagger_helper(section, description, parameters, responses,
                 'application/json': sample
             }
 
-    constraints = []
+    access_notes = []
     if requires_admin:
-        constraints.append(
+        access_notes.append(
             'Requires authentication as a member of the system namespace.')
 
-    if constraints:
+    if access_notes:
         out['description'] += \
-            '<br/><br/><i>%s</i>' % '<br/>'.join(constraints)
+            '<br/><br/><i>%s</i>' % '<br/>'.join(access_notes)
 
     return out
 
