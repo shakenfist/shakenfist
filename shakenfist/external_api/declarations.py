@@ -561,6 +561,15 @@ def audit(api_dir: str = API_DIR, app: Optional[str] = None
     underivable = []
 
     for path, tree, cls, fn in handlers(api_dir, problems):
+        # Called for its problems, not its answer: a variadic handler
+        # accepts names no enumeration can produce, and the fixer's
+        # promise to refuse to derive from input it could not read is
+        # only complete if that arrives through audit() like every
+        # other problem. Without this the guard existed only in the
+        # unit test, so the pre-commit hook would still rewrite a tree
+        # containing one.
+        handler_kwargs(fn, problems)
+
         for declared in declarations(fn, path=path, cls=cls.name):
             if declared.location in UNDERIVABLE_LOCATIONS:
                 underivable.append((declared, None))

@@ -42,9 +42,8 @@ element for constraints:
 (name, location, type, description, required[, constraints])
 ```
 
-The type is a token from the `argtypes` table in
-`api_base.swagger_helper()` — read the table for the current
-vocabulary; an unknown token is rejected at import time. Beyond the
+The type is a token from `api_base.ARGTYPES` — read that table for the
+current vocabulary; an unknown token is rejected at import time. Beyond the
 obvious primitives it includes `unsignedinteger` (an integer whose
 published `minimum` is 0 — use it for anything where a negative value
 is meaningless or destructive, like `max_versions`), `base64` (a
@@ -53,9 +52,17 @@ string whose published format is Swagger 2.0's standard `byte` token),
 `netblock` (format only — `ipaddress.ip_network()` in the handler
 stays the single source of truth for what parses, and a published
 IPv4 pattern would describe the API as narrower than it is), and real
-array types for `arrayofstring`/`arrayofdict`. An array of objects
-can only be declared in the body: outside one there is no schema
-object to nest it in, so it is rejected at import time.
+array types for `arrayofstring`/`arrayofdict` and a real object type
+for `dict`. Objects, and arrays of objects, can only be declared in
+the body: outside one there is no schema object to nest a structure
+in, so they are rejected at import time.
+
+Declare the token that matches what the handler accepts. `metadata` on
+instance create was declared `arrayofdict` while the handler answers
+400 to anything but a dictionary — harmless while the token rendered
+as prose, but a positive assertion of the wrong shape once the type
+became machine readable, and something phase 3 would compile into
+rejecting the only shape that works.
 
 The constraints element is a dict with keys drawn from `minimum`,
 `maximum` and `pattern`. All three are valid Swagger 2.0 keywords, so

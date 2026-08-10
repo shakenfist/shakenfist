@@ -501,7 +501,7 @@ class InstancesEndpoint(api_base.Resource):
             ('configdrive', 'body', 'string',
              'A config drive type. Currently "none" and "openstack-disk" are '
              'supported.', False),
-            ('metadata', 'body', 'arrayofdict',
+            ('metadata', 'body', 'dict',
              'Any metadata to be set for the instance at creation time. See '
              'https://shakenfist.com/developer_guide/api_reference/instances/ for '
              'a discussion of instance metadata.', False),

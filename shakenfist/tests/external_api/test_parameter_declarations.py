@@ -1531,6 +1531,9 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 # A sixth element which is not a dictionary, in the
                 # shape that used to be a wrong-arity case.
                 [('thing', 'body', 'string', 'A thing.', False, 1)],
+                # A fractional bound on an integer type.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'minimum': 1.5})],
                 # Seven elements.
                 [('thing', 'body', 'string', 'A thing.', False, {}, 8)]):
             with self.subTest(parameters=parameters):
@@ -1564,23 +1567,37 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual('a CIDR netblock', props['block']['format'])
         self.assertNotIn('pattern', props['block'])
 
-    def test_array_of_objects_outside_the_body_is_rejected(self):
-        """Outside a body there is no schema object to nest an array of
-        objects in, so the specification would be invalid. Refused at
-        import time like every other declaration defect, rather than
-        left for test_openapi_spec.py to find after sf-api has started
-        serving it."""
-        for location in ('query', 'path', 'header', 'formData'):
-            with self.subTest(location=location):
-                self.assertRaises(
-                    exceptions.InvalidAPIDeclaration, self._helper,
-                    [('disk', location, 'arrayofdict', 'Disks.', True)])
+    def test_objects_outside_the_body_are_rejected(self):
+        """Outside a body there is no schema object to nest a structure
+        in, so the specification would be invalid. Refused at import
+        time like every other declaration defect, rather than left for
+        test_openapi_spec.py to find after sf-api has started serving
+        it."""
+        for argtype in ('arrayofdict', 'dict'):
+            for location in ('query', 'path', 'header', 'formData'):
+                with self.subTest(argtype=argtype, location=location):
+                    self.assertRaises(
+                        exceptions.InvalidAPIDeclaration, self._helper,
+                        [('thing', location, argtype, 'A thing.', True)])
 
         # An array of strings is fine anywhere: its items are primitive.
         out = self._helper(
             [('scopes', 'query', 'arrayofstring', 'Scopes.', False)])
         scopes = [p for p in out['parameters'] if p['name'] == 'scopes'][0]
         self.assertEqual('array', scopes['type'])
+
+    def test_dicts_render_as_objects(self):
+        """instance create metadata is a dictionary on the wire -- the
+        handler answers 400 to anything else -- so it must not be
+        published as an array. It was declared arrayofdict, which was
+        inert prose until the array tokens became machine readable."""
+        out = self._helper([
+            ('metadata', 'body', 'dict', 'Metadata.', False)])
+
+        props = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']
+        self.assertEqual('object', props['metadata']['type'])
+        self.assertNotIn('items', props['metadata'])
 
     def test_arrays_render_as_arrays(self):
         # These were prose-formatted strings before the D9 work; now

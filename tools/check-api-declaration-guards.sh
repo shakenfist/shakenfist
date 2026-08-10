@@ -85,7 +85,16 @@ trap 'rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; rm -rf "${BACKUP}
 total=0
 failures=0
 
-run() { "${PYTHON}" -m stestr run test_parameter_declarations 2>&1; }
+# Both modules, because the guard surface spans both: the import-time
+# checks are asserted by test_parameter_declarations, but whether a
+# declaration describes the shape the handler actually accepts can only
+# be seen in the generated specification, which is
+# test_openapi_spec's subject. A mutation caught by neither is a gap in
+# the guards, not in the mutation.
+run() {
+    "${PYTHON}" -m stestr run \
+        '(test_parameter_declarations|test_openapi_spec)' 2>&1
+}
 
 restore() { rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; }
 
@@ -300,6 +309,30 @@ check 'minimum on a string type'
 sed -i "s/('disk', 'body', 'arrayofdict',/('disk', 'query', 'arrayofdict',/" \
     shakenfist/external_api/instance.py
 check 'array of objects outside the body'
+
+# 18. A bare object outside the body, which is the same defect without
+# the array wrapper and is guarded by the other half of the same
+# condition.
+sed -i "s/('video', 'body', 'dict',/('video', 'query', 'dict',/" \
+    shakenfist/external_api/instance.py
+check 'object outside the body'
+
+# 19. A fractional bound on an integer type. Renders as valid JSON
+# Schema, so nothing downstream would notice; it is refused because it
+# is typo-shaped, like minimum=True.
+sed -i "s/{'minimum': 1, 'maximum': 1000})/{'minimum': 1.5, 'maximum': 1000})/" \
+    shakenfist/external_api/blob.py
+check 'fractional bound on an integer'
+
+# 20. instance create metadata retyped back to an array. The handler
+# answers 400 to anything but a dictionary, so this publishes -- and
+# would later compile -- a shape which cannot work. Caught by
+# test_openapi_spec.py rather than at import time: both tokens are
+# legal in a body, so only the endpoint's own semantics distinguish
+# them.
+sed -i "s/('metadata', 'body', 'dict',/('metadata', 'body', 'arrayofdict',/" \
+    shakenfist/external_api/instance.py
+check 'instance metadata published as an array'
 
 echo
 if [ "${failures}" -ne 0 ]; then

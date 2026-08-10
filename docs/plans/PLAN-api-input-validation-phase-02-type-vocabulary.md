@@ -378,6 +378,18 @@ than silent:
   `ip_network()` remains the single source of truth for what parses.
   The reserved-range semantic (#323) was always out of scope.
 
+Review of the implementation found one real defect the vocabulary
+work created rather than inherited: instance create declared
+`metadata` as `arrayofdict` while the handler answers 400 to anything
+but a dictionary. That was inert prose before this phase and a
+machine-readable assertion of the wrong shape after it -- exactly the
+trap the `netblock` decision above avoids, arrived at from the other
+direction. `metadata` is now `dict`, and the `dict` token renders as
+a real `{'type': 'object'}` for the same reason the array tokens do,
+which also corrects `video` and `bound_claims`. `test_openapi_spec.py`
+pins the published shape, since a token swap is legal at import time
+and only the endpoint's semantics distinguish the two.
+
 A related judgement call, made when the review raised it: `cpus`,
 `memory`, `key_ttl`, `version_id` and console `length` are typed
 `unsignedinteger` (minimum 0) rather than carrying a `{'minimum': 1}`

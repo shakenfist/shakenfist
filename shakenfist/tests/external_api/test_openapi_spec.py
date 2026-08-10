@@ -83,6 +83,28 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                                 'scheme %r' % (method, path, scheme))
         self.assertEqual([], unresolved, '\n'.join(unresolved))
 
+    def test_structured_parameters_publish_their_real_shape(self):
+        # instance create metadata is a dictionary on the wire: the
+        # handler answers 400 to anything else, and the functional
+        # suite posts a dict. It was declared arrayofdict, which was
+        # inert while the token rendered as prose but became a positive
+        # assertion of the wrong shape once array types became real --
+        # and phase 3 would compile it into rejecting the only shape
+        # that works. Pinned against the published specification rather
+        # than the declaration, because the specification is what a
+        # client generator reads.
+        spec = self._fetch_spec()
+        body = [p for p in spec['paths']['/instances']['post']['parameters']
+                if p.get('in') == 'body'][0]
+        properties = body['schema']['properties']
+
+        self.assertEqual('object', properties['metadata']['type'])
+        self.assertNotIn('items', properties['metadata'])
+        self.assertEqual('object', properties['video']['type'])
+        # Its neighbours which genuinely are arrays stay arrays.
+        self.assertEqual('array', properties['disk']['type'])
+        self.assertEqual('array', properties['network']['type'])
+
     def test_at_most_one_body_parameter_per_operation(self):
         # The validator catches an unschemad body parameter, but "at
         # most one body parameter" is checked here directly so a
