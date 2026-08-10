@@ -549,6 +549,30 @@ class ArtifactMutationTestCase(ArtifactAccessFixture):
             with self.subTest(route=name):
                 self.assertEqual(expected, call().status_code)
 
+    def test_a_negative_max_versions_is_refused(self):
+        """A negative maximum is silently destructive rather than
+        merely meaningless: delete_old_versions() tests len(indexes) >
+        max, always true for a negative, and then slices [:-max], so
+        every index add deletes the oldest surviving version. The
+        declaration publishes minimum 0 and this is the server backing
+        it."""
+        auth = {'Authorization': self._token('owner')}
+        resp = self.client.post(
+            '/artifacts/%s/versions' % self.artifact.uuid, headers=auth,
+            data=json.dumps({'max_versions': -1}))
+        self.assertEqual(400, resp.status_code)
+
+    def test_an_unparsable_max_versions_is_a_400_not_a_500(self):
+        # int() raises TypeError, not ValueError, for a list or dict,
+        # so this path used to serve a 500.
+        auth = {'Authorization': self._token('owner')}
+        for value in (['two'], {'two': 2}, 'two'):
+            with self.subTest(value=value):
+                resp = self.client.post(
+                    '/artifacts/%s/versions' % self.artifact.uuid,
+                    headers=auth, data=json.dumps({'max_versions': value}))
+                self.assertEqual(400, resp.status_code)
+
     def test_a_trusted_namespace_can_still_read(self):
         # The whole point: nothing about visibility changed. Trust
         # still opens the read paths it always did.

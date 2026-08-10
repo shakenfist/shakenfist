@@ -1413,8 +1413,14 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True),
-            ('length', 'body', 'unsignedinteger',
-             'The amount of data to fetch, defaults to 10240 bytes.', False)
+            # Not unsignedinteger: -1 is a supported sentinel meaning
+            # "the whole log", which get_console_data() special-cases
+            # and the functional suite relies on. Publishing minimum 0
+            # would describe the API as narrower than it is, and phase
+            # 4 would compile that into rejecting a value which works.
+            ('length', 'body', 'integer',
+             'The amount of data to fetch, defaults to 10240 bytes. Use -1 '
+             'to fetch the entire console log.', False)
         ],
         [(200, 'The console data as an application/octet-stream.', None),
          (404, 'Instance not found.', None)],

@@ -390,6 +390,32 @@ which also corrects `video` and `bound_claims`. `test_openapi_spec.py`
 pins the published shape, since a token swap is legal at import time
 and only the endpoint's semantics distinguish the two.
 
+A third round found the same defect class again in the opposite
+direction: console `length` was retyped to `unsignedinteger` while
+`-1` is a supported sentinel meaning "the whole log", used by the
+functional suite itself. Two instances of one class, both found by
+review rather than by a machine, is the signal that the class needed
+a mechanism rather than another fix. Types are not derived from
+anything -- `declarations.py` reads a declaration's name and location
+and never looks at its type -- so
+`test_openapi_spec.STRUCTURED_PARAMETERS` now lists every parameter
+publishing a structure or a bound alongside the shape its handler
+actually accepts, and an entry without a `minimum` asserts that none
+is published. Both shipped defects fail that table, verified by
+mutation (21 and 22 in the guard harness). It is a registry rather
+than a derivation, so it constrains the next author to think rather
+than proving them right; a real derivation of types from handler
+bodies is phase 3's problem, where the warn-only rollout measures
+declarations against live traffic.
+
+The `unsignedinteger` comment named a live data-loss foot-gun --
+a negative `max_versions` deletes the oldest version on every index
+add -- so this phase closes it rather than documenting it and waiting
+for phase 4: `ArtifactMaxVersionsEndpoint.post` now refuses a negative
+with a 400, and catches `TypeError` as well as `ValueError` so a list
+or dict body value is a 400 rather than a 500. That is the only
+behaviour change in a phase which is otherwise documentation.
+
 A related judgement call, made when the review raised it: `cpus`,
 `memory`, `key_ttl`, `version_id` and console `length` are typed
 `unsignedinteger` (minimum 0) rather than carrying a `{'minimum': 1}`

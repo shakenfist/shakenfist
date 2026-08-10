@@ -334,6 +334,21 @@ sed -i "s/('metadata', 'body', 'dict',/('metadata', 'body', 'arrayofdict',/" \
     shakenfist/external_api/instance.py
 check 'instance metadata published as an array'
 
+# 21. Console length retyped to unsignedinteger, which publishes
+# minimum 0 while -1 is a supported sentinel meaning "the whole log"
+# that the functional suite itself uses. Like mutation 20 this is a
+# token both legal in a body, so only the endpoint's semantics
+# distinguish them and only the specification pin can see it.
+sed -i "s/('length', 'body', 'integer',/('length', 'body', 'unsignedinteger',/" \
+    shakenfist/external_api/instance.py
+check 'console length published as unsigned'
+
+# 22. A pattern using a Python-only regex construct. Compiles fine, so
+# only the dialect check refuses it.
+sed -i "s/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True, {'pattern': '(?P<u>.*)'})/" \
+    shakenfist/external_api/blob.py
+check 'python only regex construct'
+
 echo
 if [ "${failures}" -ne 0 ]; then
     echo "${failures} of ${total} mutations were not caught."

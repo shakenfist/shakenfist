@@ -1,7 +1,9 @@
+import copy
 import json
 import re
 import sys
 import traceback
+from typing import Any
 
 import flask
 import flask_restful
@@ -191,7 +193,7 @@ CONSTRAINT_KEYS = frozenset(['minimum', 'maximum', 'pattern'])
 
 
 # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
-ARGTYPES = {
+ARGTYPES: dict[str, dict[str, Any]] = {
     # Real array types rather than prose-formatted strings: body
     # parameters render through schema objects, where array is
     # legal JSON Schema. Every use in the tree is body-located, and
@@ -247,7 +249,9 @@ ARGTYPES = {
 }
 
 
-def _validated_constraints(section, name, rendered, constraints):
+def _validated_constraints(section: str, name: str,
+                           rendered: dict[str, Any],
+                           constraints: Any) -> dict[str, Any]:
     """Check a declaration's constraints element, InvalidAPIDeclaration
     on any defect, so phase 3's compiler catches one exception type."""
     if not isinstance(constraints, dict):
@@ -321,6 +325,19 @@ def _validated_constraints(section, name, rendered, constraints):
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares a pattern which does not '
                 'compile: %r (%s)' % (section, name, pattern, e))
+        # re.compile() answers "valid for CPython", but the consumers
+        # of this pattern are JSON Schema validators and client
+        # generators, where pattern is ECMA-262. The Python-only
+        # constructs are refused explicitly rather than left to fail
+        # in somebody else's toolchain. Note also that JSON Schema
+        # pattern is an unanchored partial match, so a pattern which
+        # means to match the whole value needs ^...$ as macaddr does.
+        dialect = [c for c in ('(?P', '(?#', '\\A', '\\Z') if c in pattern]
+        if dialect:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares a pattern using the Python only '
+                'construct(s) %s; OpenAPI patterns are ECMA-262'
+                % (section, name, ', '.join(dialect)))
 
     return constraints
 
@@ -428,7 +445,13 @@ def swagger_helper(section, description, parameters, responses,
         # Validated whatever the location, and merged here rather than
         # in each branch below, so a constraint cannot be silently
         # dropped by the path it happens to render through.
-        rendered = dict(ARGTYPES[argtype])
+        # Deep, because the array tokens nest an items dict: a
+        # shallow copy would alias one module-level mutable into every
+        # declaration in the tree and into the specification flasgger
+        # re-reads on every request, where a single in-place write
+        # anywhere downstream would poison the vocabulary
+        # process-wide.
+        rendered = copy.deepcopy(ARGTYPES[argtype])
         if len(parameter) == 6:
             rendered.update(_validated_constraints(
                 section, name, rendered, parameter[5]))
@@ -469,7 +492,7 @@ def swagger_helper(section, description, parameters, responses,
             raw_body = (argdescription, argrequired, rendered)
             continue
 
-        prop = dict(rendered)
+        prop = copy.deepcopy(rendered)
         prop['description'] = argdescription
         body_properties[name] = prop
         if argrequired:

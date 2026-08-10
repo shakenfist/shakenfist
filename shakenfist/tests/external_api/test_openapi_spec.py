@@ -83,27 +83,88 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                                 'scheme %r' % (method, path, scheme))
         self.assertEqual([], unresolved, '\n'.join(unresolved))
 
-    def test_structured_parameters_publish_their_real_shape(self):
-        # instance create metadata is a dictionary on the wire: the
-        # handler answers 400 to anything else, and the functional
-        # suite posts a dict. It was declared arrayofdict, which was
-        # inert while the token rendered as prose but became a positive
-        # assertion of the wrong shape once array types became real --
-        # and phase 3 would compile it into rejecting the only shape
-        # that works. Pinned against the published specification rather
-        # than the declaration, because the specification is what a
-        # client generator reads.
-        spec = self._fetch_spec()
-        body = [p for p in spec['paths']['/instances']['post']['parameters']
-                if p.get('in') == 'body'][0]
-        properties = body['schema']['properties']
+    # Every parameter which publishes a structure or a bound, and the
+    # shape the handler actually accepts. A type token is not derived
+    # from anything -- declarations.py reads a declaration's name and
+    # location and never looks at its type -- so this table is the
+    # audit. Two defects of exactly this class shipped in review
+    # rounds of this PR: metadata declared as an array while the
+    # handler answers 400 to anything but a mapping, and console
+    # length declared unsigned while -1 means "the whole log".
+    #
+    # A new entry belongs here whenever a declaration gains a
+    # structured type or a bound. Read the handler before adding one:
+    # the point is agreement with the code, not with the declaration.
+    STRUCTURED_PARAMETERS = [
+        # (path, method, parameter, expected subset of its schema)
+        ('/instances', 'post', 'metadata', {'type': 'object'}),
+        ('/instances', 'post', 'video', {'type': 'object'}),
+        ('/instances', 'post', 'disk', {'type': 'array'}),
+        ('/instances', 'post', 'network', {'type': 'array'}),
+        ('/instances', 'post', 'side_channels', {'type': 'array'}),
+        ('/instances', 'post', 'cpus', {'type': 'integer', 'minimum': 0}),
+        ('/instances', 'post', 'memory', {'type': 'integer', 'minimum': 0}),
+        ('/instances', 'post', 'user_data',
+         {'type': 'string', 'format': 'byte'}),
+        # -1 is a supported sentinel meaning the whole log, so this one
+        # must NOT publish a minimum.
+        ('/instances/{instance_ref}/consoledata', 'get', 'length',
+         {'type': 'integer'}),
+        ('/instances/{instance_ref}/interfaces', 'post', 'network',
+         {'type': 'object'}),
+        ('/instances/{instance_ref}/events', 'get', 'limit',
+         {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
+        ('/networks', 'post', 'netblock', {'type': 'string'}),
+        ('/artifacts/{artifact_ref}/versions', 'post', 'max_versions',
+         {'type': 'integer', 'minimum': 0}),
+        ('/auth/namespaces/{namespace}/rules', 'post', 'scopes',
+         {'type': 'array'}),
+        ('/auth/namespaces/{namespace}/rules', 'post', 'bound_claims',
+         {'type': 'object'}),
+        ('/auth/namespaces/{namespace}/rules', 'post', 'key_ttl',
+         {'type': 'integer', 'minimum': 0}),
+    ]
 
-        self.assertEqual('object', properties['metadata']['type'])
-        self.assertNotIn('items', properties['metadata'])
-        self.assertEqual('object', properties['video']['type'])
-        # Its neighbours which genuinely are arrays stay arrays.
-        self.assertEqual('array', properties['disk']['type'])
-        self.assertEqual('array', properties['network']['type'])
+    def test_structured_parameters_publish_their_real_shape(self):
+        # Pinned against the published specification rather than
+        # against the declarations, because the specification is what a
+        # client generator reads and what phase 3 will compile.
+        spec = self._fetch_spec()
+        wrong = []
+
+        for (path, method, name, expected) in self.STRUCTURED_PARAMETERS:
+            operation = spec['paths'][path][method]
+            parameters = operation.get('parameters', [])
+            bodies = [p for p in parameters if p.get('in') == 'body']
+            if bodies:
+                published = bodies[0]['schema'].get('properties', {})
+            else:
+                published = {}
+            published.update(
+                {p['name']: p for p in parameters if p.get('in') != 'body'})
+
+            if name not in published:
+                wrong.append('%s %s has no parameter %r' % (method, path, name))
+                continue
+
+            for (key, value) in expected.items():
+                if published[name].get(key) != value:
+                    wrong.append(
+                        '%s %s %s: %s is %r, expected %r'
+                        % (method, path, name, key,
+                           published[name].get(key), value))
+
+            # A bound nobody asked for is the failure mode that shipped
+            # twice, so an entry which declares no minimum asserts the
+            # absence of one.
+            if 'minimum' not in expected and 'minimum' in published[name]:
+                wrong.append(
+                    '%s %s %s publishes minimum %r, which this table does '
+                    'not expect -- if the handler really refuses values '
+                    'below it, add it here'
+                    % (method, path, name, published[name]['minimum']))
+
+        self.assertEqual([], wrong, '\n'.join(wrong))
 
     def test_at_most_one_body_parameter_per_operation(self):
         # The validator catches an unschemad body parameter, but "at

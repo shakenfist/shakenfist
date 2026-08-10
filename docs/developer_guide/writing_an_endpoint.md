@@ -57,12 +57,35 @@ for `dict`. Objects, and arrays of objects, can only be declared in
 the body: outside one there is no schema object to nest a structure
 in, so they are rejected at import time.
 
-Declare the token that matches what the handler accepts. `metadata` on
-instance create was declared `arrayofdict` while the handler answers
-400 to anything but a dictionary — harmless while the token rendered
-as prose, but a positive assertion of the wrong shape once the type
-became machine readable, and something phase 3 would compile into
-rejecting the only shape that works.
+Declare the token that matches what the handler accepts, and **publish
+what the server backs**: a bound tighter than the server's own
+behaviour belongs in the specification only where the server already
+coerces or rejects outside it. The events `limit` publishes a minimum
+of 1 because the server replaces anything lower with the default;
+`cpus` and `memory` publish 0 rather than 1 because nothing rejects a
+zero today, and tightening them is a phase 3 decision to be made with
+warn-only data.
+
+Nothing derives a type from the handler the way locations are derived,
+so getting this wrong is invisible until a client generator or phase
+3's compiler acts on it. Two examples, both caught in review of the
+phase 2 work rather than by a machine:
+
+* `metadata` on instance create was declared `arrayofdict` while the
+  handler answers 400 to anything but a dictionary — harmless while
+  the token rendered as prose, a positive assertion of the wrong shape
+  once the type became machine readable.
+* console `length` was declared `unsignedinteger` while `-1` is a
+  supported sentinel meaning "the whole log", which the functional
+  suite itself relies on — publishing the API as narrower than it is.
+
+The check against both is `STRUCTURED_PARAMETERS` in
+`shakenfist/tests/external_api/test_openapi_spec.py`: every parameter
+publishing a structure or a bound is listed there with the shape the
+handler actually accepts, and an entry with no `minimum` asserts that
+none is published. Add an entry whenever a declaration gains a
+structured type or a bound, and read the handler before you do — the
+point is agreement with the code, not with the declaration.
 
 The constraints element is a dict with keys drawn from `minimum`,
 `maximum` and `pattern`. All three are valid Swagger 2.0 keywords, so
