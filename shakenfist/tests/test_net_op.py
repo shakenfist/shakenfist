@@ -9,6 +9,7 @@ ErrorReport-persistence wiring added to all exception branches in
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist.exceptions import ClusterOperationEnqueueFailed
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.operations.net_op import NetOp
@@ -587,3 +588,41 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
         # InvalidStateForTask raise and persists the ErrorReport.
         self.assertEqual(NetOp.STATE_ERROR, op.state.value)
         mock_set_error.assert_called_once()
+
+
+class NetOpEnqueueFailureTestCase(base.ShakenFistTestCase):
+    """Issue 3631: a failed enqueue must not return a phantom uuid.
+
+    ``create_and_enqueue`` returns the operation uuid its caller then
+    reports to the client (and, in the API, polls). If the database
+    write was rolled back -- an InnoDB deadlock which survived every
+    retry, say -- there is no such operation and the work will never
+    happen, so the caller has to hear about it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+    def test_enqueue_failure_propagates_instead_of_returning_uuid(self):
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                return_value=(
+                    False,
+                    'MariaDB error: (1213, \'Deadlock found when trying '
+                    'to get lock; try restarting transaction\')')):
+            self.assertRaises(
+                ClusterOperationEnqueueFailed,
+                create_and_enqueue,
+                network_uuid=str(uuid4()),
+                tasks=[model_tasks.network_destroy],
+                priority=PRIORITY.user_waiting)
+
+    def test_successful_enqueue_still_returns_a_usable_uuid(self):
+        _, op_uuid = create_and_enqueue(
+            network_uuid=str(uuid4()),
+            tasks=[model_tasks.network_destroy],
+            priority=PRIORITY.user_waiting)
+
+        self.assertIsNotNone(NetOp.from_db(op_uuid))
