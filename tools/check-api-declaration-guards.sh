@@ -371,6 +371,16 @@ sed -i "s/'to fetch the entire console log.', False)/'to fetch the entire consol
     shakenfist/external_api/instance.py
 check 'spurious maximum on a registered parameter'
 
+# 25. A variadic handler. log_request merges the whole JSON body into
+# a handler's kwargs, so `**kwargs` accepts every body key a caller
+# sends while the enumeration returns only the named arguments. The
+# mutation declares nothing extra, so no drift or completeness check
+# can see it: the only thing which can catch it is the signature being
+# reported as unreadable.
+sed -i "s/def get(self, instance_ref=None, instance_from_db=None):/def get(self, instance_ref=None, instance_from_db=None, **kwargs):/" \
+    shakenfist/external_api/snapshot.py
+check 'variadic handler signature'
+
 echo
 if [ "${failures}" -ne 0 ]; then
     echo "${failures} of ${total} mutations were not caught."

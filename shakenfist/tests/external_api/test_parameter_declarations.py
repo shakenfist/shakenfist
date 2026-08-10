@@ -1082,6 +1082,31 @@ class Thing(api_base.Resource):
         self.assertEqual(1, len(problems))
         self.assertIn('cannot resolve', problems[0])
 
+    def test_variadic_handler_reaches_problems(self):
+        """The audit has to refuse to proceed, not merely be able to.
+
+        handler_kwargs() is not otherwise part of the derivation, so
+        the report only reaches the fixer and the pre-commit hook if
+        audit() asks for it. Without that, a tree carrying a variadic
+        handler is reported as clean.
+        """
+        self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
+        self._write('fake.py', '''
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('name', 'body', 'string', 'A name.', False)],
+        []))
+    def post(self, name=None, **kwargs):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual([], drifted)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('cannot be enumerated', problems[0])
+
     def test_raw_body_sentinel_resolves(self):
         """RAW_BODY_PARAMETER is referenced rather than spelled out, and
         is read from base.py's source rather than imported."""
