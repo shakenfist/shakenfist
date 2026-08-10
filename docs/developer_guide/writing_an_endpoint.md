@@ -35,11 +35,97 @@ class InstanceEndpoint(api_base.Resource):
         return instance_from_db.external_view()
 ```
 
-Each parameter is a five-element tuple:
+Each parameter is a five-element tuple, with an optional sixth
+element for constraints:
 
 ```
-(name, location, type, description, required)
+(name, location, type, description, required[, constraints])
 ```
+
+The type is a token from `api_base.ARGTYPES` — read that table for the
+current vocabulary; an unknown token is rejected at import time. Beyond the
+obvious primitives it includes `unsignedinteger` (an integer whose
+published `minimum` is 0 — use it for anything where a negative value
+is meaningless or destructive, like `max_versions`), `base64` (a
+string whose published format is Swagger 2.0's standard `byte` token),
+`macaddr` (a string carrying a published validation `pattern`),
+`netblock` (format only — `ipaddress.ip_network()` in the handler
+stays the single source of truth for what parses, and a published
+IPv4 pattern would describe the API as narrower than it is), and real
+array types for `arrayofstring`/`arrayofdict` and a real object type
+for `dict`. Objects, and arrays of objects, can only be declared in
+the body: outside one there is no schema object to nest a structure
+in, so they are rejected at import time.
+
+Declare the token that matches what the handler accepts, and **publish
+what the server backs**: a bound tighter than the server's own
+behaviour belongs in the specification only where the server already
+coerces or rejects outside it. The events `limit` publishes a minimum
+of 1 because the server replaces anything lower with the default;
+`cpus` and `memory` publish 0 rather than 1 because nothing rejects a
+zero today, and tightening them is a phase 3 decision to be made with
+warn-only data.
+
+Nothing derives a type from the handler the way locations are derived,
+so getting this wrong is invisible until a client generator or phase
+3's compiler acts on it. Two examples, both caught in review of the
+phase 2 work rather than by a machine:
+
+* `metadata` on instance create was declared `arrayofdict` while the
+  handler answers 400 to anything but a dictionary — harmless while
+  the token rendered as prose, a positive assertion of the wrong shape
+  once the type became machine readable.
+* console `length` was declared `unsignedinteger` while `-1` is a
+  supported sentinel meaning "the whole log", which the functional
+  suite itself relies on — publishing the API as narrower than it is.
+
+The check against both is `STRUCTURED_PARAMETERS` in
+`shakenfist/tests/external_api/test_openapi_spec.py`: every parameter
+publishing a structure or a bound is listed there with the shape the
+handler actually accepts, and an entry describes that shape in full —
+a constraint key the entry does not list must not be published, which
+is how the console `length` entry asserts that nothing bounds it in
+either direction.
+
+You do not have to remember to add an entry.
+`test_every_published_structure_or_bound_is_registered` derives the
+set which ought to be listed from the published specification and
+fails until each member has one. What you do have to do is read the
+handler before writing the entry: the derivation can say that
+something is missing, but only you can say what the handler really
+accepts, and the point is agreement with the code rather than with
+the declaration.
+
+The constraints element is a dict with keys drawn from `minimum`,
+`maximum` and `pattern`. All three are valid Swagger 2.0 keywords, so
+a bound renders into the published OpenAPI instead of living only in
+code — the events `limit` cap was invisible to callers for years for
+exactly that reason, and now reads:
+
+```python
+('limit', 'body', 'integer',
+ 'The number of events to return, defaults to 100 and is '
+ 'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
+```
+
+Constraints are validated at import time in the same style as
+everything else: unknown keys, non-numeric bounds, bounds on
+non-numeric types, contradictory bounds, patterns that do not
+compile, patterns on non-string types, and a constraint restating a
+key its type token already renders (a second `minimum` on
+`unsignedinteger`) all raise `InvalidAPIDeclaration`. Note that
+declared constraints are *published documentation* until phase 3 of
+[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
+compiles them — a constraint does not reject anything yet.
+
+Three keys, deliberately. `maxLength`, `minLength`, `minItems` and
+`enum` are equally valid Swagger 2.0 keywords with real consumers
+waiting for them — a rule `name` is refused above 255 characters,
+`scopes` must be non-empty, `configdrive` accepts only two values —
+but each needs its own import-time validation and its own mutation in
+the guard harness, and phase 2 set out to publish the numeric and
+pattern bounds. They are scoped out rather than overlooked; phase 3
+is where the case for adding them gets concrete.
 
 **There is no per-handler authentication decorator.** Authentication is
 the default, applied to every handler by `_authenticate_unless_public`

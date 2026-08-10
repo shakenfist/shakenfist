@@ -467,8 +467,9 @@ class InstancesEndpoint(api_base.Resource):
         [
             ('name', 'body', 'string',
              'The name of the instance, must meet the requirements of DNS RFCs.', True),
-            ('cpus', 'body', 'integer', 'The number of vCPUs', True),
-            ('memory', 'body', 'integer', 'The amount of RAM in MB.', True),
+            ('cpus', 'body', 'unsignedinteger', 'The number of vCPUs', True),
+            ('memory', 'body', 'unsignedinteger',
+             'The amount of RAM in MB.', True),
             ('network', 'body', 'arrayofdict',
              'A list of networkspecs defining the networking for this instance. '
              'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
@@ -481,10 +482,10 @@ class InstancesEndpoint(api_base.Resource):
              'A ssh public key to add to the default users authorized_keys file '
              'via cloud-init. Requires that both configdrive be enabled, and that '
              'cloud-init be installed on the instance before boot.', False),
-            ('user_data', 'body', 'string',
-             'Other user-data to be provided to cloud-init. Requires that both '
-             'configdrive be enabled, and that cloud-init be installed on the '
-             'instance before boot.', False),
+            ('user_data', 'body', 'base64',
+             'Other user-data to be provided to cloud-init, base64 encoded. '
+             'Requires that both configdrive be enabled, and that cloud-init '
+             'be installed on the instance before boot.', False),
             ('placed_on', 'body', 'node',
              'The name of a Node to place this instance on.', False),
             ('namespace', 'body', 'namespace',
@@ -500,7 +501,7 @@ class InstancesEndpoint(api_base.Resource):
             ('configdrive', 'body', 'string',
              'A config drive type. Currently "none" and "openstack-disk" are '
              'supported.', False),
-            ('metadata', 'body', 'arrayofdict',
+            ('metadata', 'body', 'dict',
              'Any metadata to be set for the instance at creation time. See '
              'https://shakenfist.com/developer_guide/api_reference/instances/ for '
              'a discussion of instance metadata.', False),
@@ -1146,7 +1147,8 @@ class InstanceEventsEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single instance.', instance_events_example),
          (404, 'Instance not found.', None)]))
@@ -1411,8 +1413,14 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True),
+            # Not unsignedinteger: -1 is a supported sentinel meaning
+            # "the whole log", which get_console_data() special-cases
+            # and the functional suite relies on. Publishing minimum 0
+            # would describe the API as narrower than it is, and phase
+            # 4 would compile that into rejecting a value which works.
             ('length', 'body', 'integer',
-             'The amount of data to fetch, defaults to 10240 bytes.', False)
+             'The amount of data to fetch, defaults to 10240 bytes. Use -1 '
+             'to fetch the entire console log.', False)
         ],
         [(200, 'The console data as an application/octet-stream.', None),
          (404, 'Instance not found.', None)],

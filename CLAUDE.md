@@ -344,13 +344,31 @@ does not start**. The rules, in full in
    `flask.request.args` read is `query`, everything else is `body`
    (`log_request` merges the JSON body into kwargs).
 3. A `path` parameter must be `required=True`.
-4. A raw request body is declared as `api_base.RAW_BODY_PARAMETER`.
+4. A raw request body is declared as `api_base.RAW_BODY_PARAMETER`, and
+   cannot be combined with named body parameters.
 5. Every kwarg the handler accepts is declared; decorator-injected
    `*_from_db` objects are not parameters.
+6. The type is a token from `api_base.ARGTYPES`. Objects and arrays of
+   objects can only be declared in the body, since outside one there is
+   no schema object to nest a structure in.
+7. A declaration is five elements plus an optional sixth constraints
+   dict with keys from `minimum`/`maximum`/`pattern`, also validated at
+   import time.
 
-`python3 tools/fix-api-parameter-locations.py --apply` corrects drift
-mechanically. The check runs as a pre-commit hook and, because no
-workflow runs pre-commit, as `test_parameter_declarations.py` in CI.
+Declare the token that matches what the handler actually accepts —
+nothing derives a type, so the check is `test_openapi_spec.py`'s
+`STRUCTURED_PARAMETERS` table, where every structured or bounded
+parameter is registered with the shape its handler really accepts. The
+table's *completeness* is derived from the published specification, so
+a new structure or bound fails CI until it has an entry; what the entry
+says still has to be written by hand against the handler. Publish what
+the server backs: a tighter bound belongs in the specification only
+where the server already coerces or rejects outside it.
+
+`python3 tools/fix-api-parameter-locations.py --apply` corrects
+location drift mechanically. The check runs as a pre-commit hook and,
+because no workflow runs pre-commit, as
+`test_parameter_declarations.py` in CI.
 
 ### REST API URL Structure
 

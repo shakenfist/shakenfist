@@ -31,6 +31,7 @@ from shakenfist.artifact import Artifact
 from shakenfist.artifact import Artifacts
 from shakenfist.artifact import namespace_or_shared_filter
 from shakenfist.artifact import UPLOAD_URL
+from shakenfist.artifact import validated_max_versions
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -707,7 +708,8 @@ class ArtifactEventsEndpoint(api_base.Resource):
              'The UUID or name of the artifact.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
          (404, 'Artifact not found.', None)]))
@@ -781,7 +783,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('max_versions', 'body', 'integer',
+            ('max_versions', 'body', 'unsignedinteger',
              'The maximum number of versions, or revert to the default it not set.',
              False)
         ],
@@ -793,10 +795,16 @@ class ArtifactVersionsEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, artifact_ref=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
+        # The coercion and the negativity check live in
+        # artifact.validated_max_versions() so that all three routes
+        # which write this attribute -- here, label create and
+        # instance snapshot -- refuse the same values. The declaration
+        # publishes minimum 0; this is the server backing it, rather
+        # than waiting for phase 4 to compile the bound.
         try:
-            mv = int(max_versions)
-        except ValueError:
-            return sf_api.error(400, 'max version is not an integer')
+            mv = validated_max_versions(max_versions)
+        except exceptions.InvalidMaxVersions as e:
+            return sf_api.error(400, str(e))
         artifact_from_db.add_event(
             EVENT_TYPE_AUDIT, 'max versions set from REST API')
         artifact_from_db.max_versions = mv
@@ -811,7 +819,8 @@ class ArtifactVersionEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
-            ('version_id', 'path', 'integer', 'The version number to remove.', True)
+            ('version_id', 'path', 'unsignedinteger',
+             'The version number to remove.', True)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact index not found.', None)]))

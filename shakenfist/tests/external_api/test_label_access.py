@@ -101,7 +101,7 @@ class LabelAccessFixture(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         return 'Bearer %s' % resp.get_json()['access_token']
 
-    def _post(self, requestor, label_name='owner/thing'):
+    def _post(self, requestor, label_name='owner/thing', extra_body=None):
         """Update a label, with add_index stubbed out.
 
         The write itself needs a real blob and a real hash, neither of
@@ -111,11 +111,13 @@ class LabelAccessFixture(base.ShakenFistTestCase):
         is the entire question this file asks. autospec keeps `self`
         in the recorded call so the second half can be answered.
         """
+        body = {'blob_uuid': self.BLOB_UUID}
+        body.update(extra_body or {})
         with mock.patch.object(Artifact, 'add_index', autospec=True) as ai:
             resp = self.client.post(
                 '/label/%s' % label_name,
                 headers={'Authorization': self._token(requestor)},
-                data=json.dumps({'blob_uuid': self.BLOB_UUID}))
+                data=json.dumps(body))
         return resp, ai
 
     def _get(self, requestor, label_name='owner/thing'):
@@ -243,6 +245,40 @@ class LabelWriteTargetTestCase(LabelAccessFixture):
         with mock.patch.object(Artifact, 'add_event') as add_event:
             self._post('owner')
         add_event.assert_called()
+
+    def test_a_negative_max_versions_is_refused(self):
+        # This route reaches Artifact.new() and so the max_versions
+        # setter, where a negative persists and has every later
+        # add_index() delete the oldest surviving version -- the same
+        # defect the artifact versions route already refused, on the
+        # second of its three write paths. The label has to be one
+        # which does not exist yet, because max_versions is only
+        # consulted on the create.
+        resp, add_index = self._post(
+            'owner', label_name='owner/brandnew',
+            extra_body={'max_versions': -1})
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        add_index.assert_not_called()
+        self.assertIsNone(self._labels_owned_by('owner', 'brandnew'))
+
+    def test_an_unparsable_max_versions_is_a_400_not_a_500(self):
+        for value in (['two'], {'two': 2}, 'two'):
+            with self.subTest(value=value):
+                resp, add_index = self._post(
+                    'owner', label_name='owner/brandnew',
+                    extra_body={'max_versions': value})
+                self.assertEqual(400, resp.status_code, resp.get_json())
+                add_index.assert_not_called()
+
+    def test_a_valid_max_versions_still_creates(self):
+        # The control: without it the two refusals above could be a
+        # route which now refuses every max_versions.
+        resp, add_index = self._post(
+            'owner', label_name='owner/brandnew',
+            extra_body={'max_versions': 3})
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        add_index.assert_called_once()
+        self.assertIsNotNone(self._labels_owned_by('owner', 'brandnew'))
 
 
 class LabelReadTestCase(LabelAccessFixture):

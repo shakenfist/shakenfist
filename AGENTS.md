@@ -192,13 +192,22 @@ valid, no declaration at all is not); `location` is one of
 arrives (route segment → `path`, `use_kwargs(location='query')` key or
 `flask.request.args` read → `query`, otherwise `body`); a `path`
 parameter must be `required=True`; a raw body is declared as
-`api_base.RAW_BODY_PARAMETER`; and every accepted kwarg is declared,
-excluding the decorator-injected `*_from_db` objects.
+`api_base.RAW_BODY_PARAMETER` (and cannot be combined with named body
+parameters); and every accepted kwarg is declared, excluding the
+decorator-injected `*_from_db` objects. A declaration tuple has five
+elements plus an optional sixth constraints dict
+(`minimum`/`maximum`/`pattern`), also validated at import time. Body
+declarations stay one tuple per parameter but *render* as a single
+schema-carrying body parameter, because Swagger 2.0 allows only one;
+objects and arrays of objects can only be declared in the body, since
+outside one there is no schema object to nest a structure in. The
+token vocabulary is `api_base.ARGTYPES`.
 
 `shakenfist/external_api/declarations.py` derives the correct answer
 from the source and is shared by the fixer
 (`tools/fix-api-parameter-locations.py --apply`), the pre-commit hook
-and `test_parameter_declarations.py`. Full reference in
+and `test_parameter_declarations.py`; `test_openapi_spec.py` validates
+the generated specification itself in CI. Full reference in
 `docs/developer_guide/writing_an_endpoint.md`.
 
 ### Events vs logs

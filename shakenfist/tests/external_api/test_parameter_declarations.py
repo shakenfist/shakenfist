@@ -2,6 +2,7 @@
 import ast
 import importlib.util
 import os
+import re
 import shutil
 import tempfile
 
@@ -260,7 +261,12 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         here rather than kept for symmetry.
         """
         for cls, method, fn in _endpoints():
-            accepted = declarations.handler_kwargs(fn)
+            problems = []
+            accepted = declarations.handler_kwargs(fn, problems)
+            self.assertEqual(
+                [], problems,
+                '%s.%s: the accepted parameter list could not be '
+                'enumerated: %s' % (cls, method, '; '.join(problems)))
             for parameter in declarations.declarations(fn):
                 if parameter.name == api_base.RAW_BODY_PARAMETER:
                     # Documents the raw request body, read from
@@ -286,7 +292,18 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             if not declarations.documented(fn):
                 continue
             names = {d.name for d in declarations.declarations(fn)}
-            for kwarg in declarations.handler_kwargs(fn):
+            # A variadic handler would make this loop pass vacuously --
+            # **kwargs accepts arbitrary undeclared names while the
+            # enumeration below stays near-empty (issue 3642) -- so an
+            # unreadable parameter list is a failure, not an absence.
+            problems = []
+            kwargs = declarations.handler_kwargs(fn, problems)
+            self.assertEqual(
+                [], problems,
+                '%s.%s: the accepted parameter list could not be '
+                'enumerated, so this assertion cannot hold: %s'
+                % (cls, method, '; '.join(problems)))
+            for kwarg in kwargs:
                 if (cls, method, kwarg) in UNDECLARED_BY_DESIGN:
                     continue
                 self.assertIn(
@@ -759,6 +776,40 @@ class Thing:
         # in the return value.
         self.assertEqual(set(), declarations.request_args_parameters(fn))
 
+    def test_variadic_handler_is_a_problem(self):
+        """A handler taking *args or **kwargs accepts names no
+        enumeration can produce -- log_request merges the whole JSON
+        body into kwargs -- so handler_kwargs() must report it rather
+        than return a near-empty list an assertion iterates vacuously
+        (issue 3642). By definition the shape is not in the tree, so it
+        is pinned on constructed source.
+        """
+        source = '''
+class Thing:
+    def post(self, thing_ref=None, **kwargs):
+        pass
+
+    def put(self, thing_ref=None, *extras):
+        pass
+'''
+        cls = self._parse_class(source)
+
+        problems = []
+        accepted = declarations.handler_kwargs(cls.body[0], problems)
+        self.assertEqual(['thing_ref'], accepted)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('**kwargs', problems[0])
+
+        problems = []
+        declarations.handler_kwargs(cls.body[1], problems)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('*extras', problems[0])
+
+        # And without the problems channel the answer is unchanged --
+        # the channel reports, it does not filter.
+        self.assertEqual(
+            ['thing_ref'], declarations.handler_kwargs(cls.body[0]))
+
     def test_underivable_request_args_read_is_a_problem(self):
         """The reviewer's demonstration case: a handler reading
         flask.request.args.get(TARGET_KEY) derives to body -- which is
@@ -797,8 +848,9 @@ class Thing:
         self.assertIsNone(declared[0].location)
 
     def test_wrong_arity_declaration_is_reported(self):
-        """swagger_helper() destructures five elements, so a tuple of
-        any other length is malformed however readable its parts are."""
+        """swagger_helper() destructures five elements plus an optional
+        constraints dictionary, so a tuple of any other length is
+        malformed however readable its parts are."""
         source = '''
 class Thing(api_base.Resource):
     @swag_from(api_base.swagger_helper(
@@ -813,6 +865,28 @@ class Thing(api_base.Resource):
 
         self.assertEqual(1, len(declared))
         self.assertIsNone(declared[0].name)
+
+    def test_constrained_declaration_parses(self):
+        """The six element form is legal, and the constraints element
+        does not disturb the five values the audit reads. Without a
+        positive test the arity widening is covered only by the tree
+        happening to contain a constrained declaration today."""
+        source = '''
+class Thing(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'things', 'A thing.',
+        [('limit', 'body', 'integer', 'How many.', False,
+          {'minimum': 1, 'maximum': 1000})],
+        []))
+    def get(self, limit=None):
+        pass
+'''
+        cls = self._parse_class(source)
+        declared = declarations.declarations(cls.body[0])
+
+        self.assertEqual(1, len(declared))
+        self.assertEqual('limit', declared[0].name)
+        self.assertEqual('body', declared[0].location)
 
     def test_only_resource_subclasses_are_endpoints(self):
         """A helper class with a get() accessor is not an endpoint, and
@@ -1398,6 +1472,148 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             exceptions.InvalidAPIDeclaration, self._helper,
             [('thing', 'body', 'stringy', 'A thing.', False)])
 
+    def test_constraints_render_on_a_query_parameter(self):
+        # minimum, maximum and pattern are valid Swagger 2.0 parameter
+        # keywords, so a bound renders into the published OpenAPI
+        # rather than living only in code -- the property that kept the
+        # events limit cap invisible to callers for years.
+        out = self._helper([
+            ('limit', 'query', 'integer', 'A limit.', False,
+             {'minimum': 1, 'maximum': 1000})])
+
+        declared = [p for p in out['parameters'] if p['name'] == 'limit'][0]
+        self.assertEqual(1, declared['minimum'])
+        self.assertEqual(1000, declared['maximum'])
+
+    def test_constraints_render_into_body_properties(self):
+        out = self._helper([
+            ('limit', 'body', 'integer', 'A limit.', False,
+             {'minimum': 1, 'maximum': 1000})])
+
+        prop = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']['limit']
+        self.assertEqual(1, prop['minimum'])
+        self.assertEqual(1000, prop['maximum'])
+
+    def test_malformed_constraints_are_rejected(self):
+        # Every defect arrives as InvalidAPIDeclaration so phase 3's
+        # compiler catches one exception type, in the established
+        # import-time style: sf-api does not start with one of these
+        # in the tree.
+        for parameters in (
+                # A sixth element which is not a dictionary.
+                [('thing', 'body', 'integer', 'A thing.', False, 'nope')],
+                # An unknown constraint key.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'maximim': 3})],
+                # A bound which is not a number.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'minimum': True})],
+                # A bound on a non-numeric type.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'minimum': 1})],
+                # Contradictory bounds.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'minimum': 10, 'maximum': 1})],
+                # A constraint restating a key the token already
+                # renders: unsignedinteger defines its own minimum.
+                [('thing', 'body', 'unsignedinteger', 'A thing.', False,
+                  {'minimum': 3})],
+                # A pattern on a non-string type.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'pattern': '^a$'})],
+                # A pattern which is not a string.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': 7})],
+                # A pattern which does not compile.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '('})],
+                # A sixth element which is not a dictionary, in the
+                # shape that used to be a wrong-arity case.
+                [('thing', 'body', 'string', 'A thing.', False, 1)],
+                # A fractional bound on an integer type.
+                [('thing', 'body', 'integer', 'A thing.', False,
+                  {'minimum': 1.5})],
+                # Seven elements.
+                [('thing', 'body', 'string', 'A thing.', False, {}, 8)]):
+            with self.subTest(parameters=parameters):
+                self.assertRaises(
+                    exceptions.InvalidAPIDeclaration, self._helper, parameters)
+
+    def test_new_tokens_render_their_bounds(self):
+        # The D9 vocabulary: bounds and formats phase 3 will compile,
+        # published in the specification in the meantime.
+        out = self._helper([
+            ('count', 'query', 'unsignedinteger', 'A count.', False),
+            ('mac', 'body', 'macaddr', 'A MAC.', False),
+            ('data', 'body', 'base64', 'Some data.', False),
+            ('block', 'body', 'netblock', 'A netblock.', False)])
+
+        count = [p for p in out['parameters'] if p['name'] == 'count'][0]
+        self.assertEqual(0, count['minimum'])
+
+        props = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']
+        # byte is Swagger 2.0's standard format for base64 content.
+        self.assertEqual('byte', props['data']['format'])
+        self.assertTrue(
+            re.match(props['mac']['pattern'], '02:00:00:73:18:66'))
+        self.assertFalse(
+            re.match(props['mac']['pattern'], '02:00:00:73:18:zz'))
+        # netblock is deliberately format-only. An IPv4 CIDR pattern
+        # would publish the API as narrower than ip_network() actually
+        # accepts, which phase 4 would then compile into a 400 for
+        # input that works today.
+        self.assertEqual('a CIDR netblock', props['block']['format'])
+        self.assertNotIn('pattern', props['block'])
+
+    def test_objects_outside_the_body_are_rejected(self):
+        """Outside a body there is no schema object to nest a structure
+        in, so the specification would be invalid. Refused at import
+        time like every other declaration defect, rather than left for
+        test_openapi_spec.py to find after sf-api has started serving
+        it."""
+        for argtype in ('arrayofdict', 'dict'):
+            for location in ('query', 'path', 'header', 'formData'):
+                with self.subTest(argtype=argtype, location=location):
+                    self.assertRaises(
+                        exceptions.InvalidAPIDeclaration, self._helper,
+                        [('thing', location, argtype, 'A thing.', True)])
+
+        # An array of strings is fine anywhere: its items are primitive.
+        out = self._helper(
+            [('scopes', 'query', 'arrayofstring', 'Scopes.', False)])
+        scopes = [p for p in out['parameters'] if p['name'] == 'scopes'][0]
+        self.assertEqual('array', scopes['type'])
+
+    def test_dicts_render_as_objects(self):
+        """instance create metadata is a dictionary on the wire -- the
+        handler answers 400 to anything else -- so it must not be
+        published as an array. It was declared arrayofdict, which was
+        inert prose until the array tokens became machine readable."""
+        out = self._helper([
+            ('metadata', 'body', 'dict', 'Metadata.', False)])
+
+        props = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']
+        self.assertEqual('object', props['metadata']['type'])
+        self.assertNotIn('items', props['metadata'])
+
+    def test_arrays_render_as_arrays(self):
+        # These were prose-formatted strings before the D9 work; now
+        # that body parameters render through schema objects, a real
+        # array type is legal and generators produce list-typed
+        # bindings from it.
+        out = self._helper([
+            ('scopes', 'body', 'arrayofstring', 'Scopes.', False),
+            ('disk', 'body', 'arrayofdict', 'Disks.', False)])
+
+        props = [p for p in out['parameters'] if p['in'] == 'body'][0][
+            'schema']['properties']
+        self.assertEqual('array', props['scopes']['type'])
+        self.assertEqual({'type': 'string'}, props['scopes']['items'])
+        self.assertEqual({'type': 'object'}, props['disk']['items'])
+
     def test_wrong_arity_is_rejected(self):
         """The one malformed declaration that used to arrive as a bare
         ValueError from the five-element unpack.
@@ -1406,16 +1622,20 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         TypeError on them, which is the other way a malformed
         declaration escapes the single exception type that phase 3's
         compiler catches.
+
+        Six elements is now legal arity, so a bad constraints element
+        is a constraints defect and is tested as one in
+        test_malformed_constraints_are_rejected.
         """
         for parameters in ([('thing', 'body', 'string', 'A thing.')],
-                           [('thing', 'body', 'string', 'A thing.', False, 1)],
                            [()],
                            [None],
                            [42],
                            [(x for x in range(5))],
                            ['a five character string']):
-            self.assertRaises(
-                exceptions.InvalidAPIDeclaration, self._helper, parameters)
+            with self.subTest(parameters=parameters):
+                self.assertRaises(
+                    exceptions.InvalidAPIDeclaration, self._helper, parameters)
 
     def test_bearer_is_not_declarable(self):
         """swagger_helper injects the Authorization header itself; an

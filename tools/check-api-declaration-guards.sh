@@ -85,7 +85,16 @@ trap 'rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; rm -rf "${BACKUP}
 total=0
 failures=0
 
-run() { "${PYTHON}" -m stestr run test_parameter_declarations 2>&1; }
+# Both modules, because the guard surface spans both: the import-time
+# checks are asserted by test_parameter_declarations, but whether a
+# declaration describes the shape the handler actually accepts can only
+# be seen in the generated specification, which is
+# test_openapi_spec's subject. A mutation caught by neither is a gap in
+# the guards, not in the mutation.
+run() {
+    "${PYTHON}" -m stestr run \
+        '(test_parameter_declarations|test_openapi_spec)' 2>&1
+}
 
 restore() { rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; }
 
@@ -168,9 +177,9 @@ p = 'shakenfist/external_api/blob.py'
 s = open(p).read()
 s = s.replace("""        [
             ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
-            ('offset', 'query', 'integer',
+            ('offset', 'query', 'unsignedinteger',
              'The offset into the file to start reading from.', False),
-            ('limit', 'query', 'integer',
+            ('limit', 'query', 'unsignedinteger',
              ('The maximum amount of data to return in one response. '
               '0 means no limit.'), False)
         ],""", '        [],', 1)
@@ -266,6 +275,101 @@ class NodeEndpoint(api_base.Resource):
 open(p, 'w').write(s)
 PY
 check 'two endpoint classes sharing a name'
+
+# 13. An unknown constraint key. The blob events limit carries the
+# tree's canonical constraints element, so the constraint mutations
+# all target it or its neighbours in blob.py.
+sed -i "s/{'minimum': 1, 'maximum': 1000})/{'minimom': 1, 'maximum': 1000})/" \
+    shakenfist/external_api/blob.py
+check 'unknown constraint key'
+
+# 14. A constraints element which is not a dictionary.
+sed -i "s/, {'minimum': 1, 'maximum': 1000})/, 'soon')/" \
+    shakenfist/external_api/blob.py
+check 'non-dict constraints element'
+
+# 15. A pattern which does not compile. uuid renders as a string
+# type, so this passes the pattern-on-a-string check and must be
+# caught by the compile check specifically.
+sed -i "s/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True, {'pattern': '('})/" \
+    shakenfist/external_api/blob.py
+check 'uncompilable pattern constraint'
+
+# 16. A numeric bound on a non-numeric type.
+sed -i "s/('event_type', 'body', 'string', 'The type of event to return.', False)/('event_type', 'body', 'string', 'The type of event to return.', False, {'minimum': 1})/" \
+    shakenfist/external_api/blob.py
+check 'minimum on a string type'
+
+# 17. An array of objects outside the body. Every use in the tree is
+# body-located, so this guard is a no-op today and exists for the next
+# declaration; the mutation is how we know it is real. A query
+# location is used rather than path because a path parameter would
+# also trip the route-symmetry check, and a mutation which trips two
+# guards does not prove the one it was written for.
+sed -i "s/('disk', 'body', 'arrayofdict',/('disk', 'query', 'arrayofdict',/" \
+    shakenfist/external_api/instance.py
+check 'array of objects outside the body'
+
+# 18. A bare object outside the body, which is the same defect without
+# the array wrapper and is guarded by the other half of the same
+# condition.
+sed -i "s/('video', 'body', 'dict',/('video', 'query', 'dict',/" \
+    shakenfist/external_api/instance.py
+check 'object outside the body'
+
+# 19. A fractional bound on an integer type. Renders as valid JSON
+# Schema, so nothing downstream would notice; it is refused because it
+# is typo-shaped, like minimum=True.
+sed -i "s/{'minimum': 1, 'maximum': 1000})/{'minimum': 1.5, 'maximum': 1000})/" \
+    shakenfist/external_api/blob.py
+check 'fractional bound on an integer'
+
+# 20. instance create metadata retyped back to an array. The handler
+# answers 400 to anything but a dictionary, so this publishes -- and
+# would later compile -- a shape which cannot work. Caught by
+# test_openapi_spec.py rather than at import time: both tokens are
+# legal in a body, so only the endpoint's own semantics distinguish
+# them.
+sed -i "s/('metadata', 'body', 'dict',/('metadata', 'body', 'arrayofdict',/" \
+    shakenfist/external_api/instance.py
+check 'instance metadata published as an array'
+
+# 21. Console length retyped to unsignedinteger, which publishes
+# minimum 0 while -1 is a supported sentinel meaning "the whole log"
+# that the functional suite itself uses. Like mutation 20 this is a
+# token both legal in a body, so only the endpoint's semantics
+# distinguish them and only the specification pin can see it.
+sed -i "s/('length', 'body', 'integer',/('length', 'body', 'unsignedinteger',/" \
+    shakenfist/external_api/instance.py
+check 'console length published as unsigned'
+
+# 22. A pattern using a Python-only regex construct. Compiles fine, so
+# only the dialect check refuses it.
+sed -i "s/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True)/('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True, {'pattern': '(?P<u>.*)'})/" \
+    shakenfist/external_api/blob.py
+check 'python only regex construct'
+
+# 23. A bound on a parameter nobody registered. Legal at import time
+# and legal OpenAPI, so the only thing which can see it is the derived
+# completeness assertion -- which is the point of that assertion: the
+# STRUCTURED_PARAMETERS table is written by hand and would otherwise
+# fall behind the tree silently, which is the same failure mode as the
+# prose types it replaced. The rule update endpoint is used because its
+# key_name_prefix is the one declaration in the tree whose final line
+# is unique enough to sed without also matching its sibling on create.
+sed -i "s/'Prefix for minted key names.', True)/'Prefix for minted key names.', True, {'pattern': '^[a-z]+$'})/" \
+    shakenfist/external_api/auth.py
+check 'bound on an unregistered parameter'
+
+# 24. A bound on a parameter which IS registered, and registered
+# precisely to assert that nothing bounds it: -1 is a supported
+# sentinel on console length. Distinct from mutation 21, which retypes
+# the token; this leaves the token alone and adds a maximum, so it is
+# caught only by an entry describing the published shape in full
+# rather than just its minimum.
+sed -i "s/'to fetch the entire console log.', False)/'to fetch the entire console log.', False, {'maximum': 65536})/" \
+    shakenfist/external_api/instance.py
+check 'spurious maximum on a registered parameter'
 
 echo
 if [ "${failures}" -ne 0 ]; then

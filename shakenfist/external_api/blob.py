@@ -167,6 +167,14 @@ class BlobDataEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (blob_uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
+    # NOTE(mikal): a marshmallow validate=Range(min=0) here would be
+    # the obvious place for the bound, but webargs raises
+    # UnprocessableEntity and the app's error handler renders that as a
+    # 500 -- the same serialisation hazard the json_or_query loader in
+    # base.py documents. So the bound is checked in the handler, where
+    # it can answer 400 like every other malformed argument in the
+    # tree. Phase 3 compiles the declaration into real validation and
+    # this goes away.
     get_args = {
         'offset': fields.Int(load_default=0),
         'limit': fields.Int(load_default=0)
@@ -176,18 +184,34 @@ class BlobDataEndpoint(api_base.Resource):
         'blobs', 'Get blob data.',
         [
             ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
-            ('offset', 'query', 'integer',
+            ('offset', 'query', 'unsignedinteger',
              'The offset into the file to start reading from.', False),
-            ('limit', 'query', 'integer',
+            ('limit', 'query', 'unsignedinteger',
              ('The maximum amount of data to return in one response. '
               '0 means no limit.'), False)
         ],
         [(200, 'Content of a blob as a streaming binary HTTP result.', 'n/a'),
+         (400, 'The offset or limit is negative.', None),
          (404, 'Blob not found.', None)]))
     @use_kwargs(get_args, location='query')
     @api_base.log_token_use
     @arg_is_blob_uuid
     def get(self, blob_uuid=None, offset=0, limit=0, blob_from_db=None):
+        # The declaration publishes minimum 0 on both, and this is the
+        # server backing it rather than waiting for phase 4 to compile
+        # the bound. Unbacked, both failed worse than meaninglessly: a
+        # negative offset reached f.seek() inside stream_with_context,
+        # so the OSError arrived after the 200 had begun and the caller
+        # saw a truncated body rather than an error, and a negative
+        # limit made `remaining` negative so f.read(min(CHUNK_SIZE, -1))
+        # read to EOF, quietly defeating the cap it was asked for.
+        # Checked before the local and the proxied paths, because the
+        # proxy would otherwise pass the bad value to another node.
+        if offset < 0:
+            return sf_api.error(400, 'offset cannot be negative')
+        if limit < 0:
+            return sf_api.error(400, 'limit cannot be negative')
+
         # Fast path if we have the blob locally
         blob_path = Blob.filepath(blob_uuid)
         if os.path.exists(blob_path):
@@ -270,7 +294,8 @@ class BlobEventsEndpoint(api_base.Resource):
             ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single blob.', blob_events_example),
          (404, 'Blob not found.', None)]))

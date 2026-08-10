@@ -32,6 +32,7 @@ from shakenfist.external_api import base as api_base
 from shakenfist.external_api import scopes as api_scopes
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.mapping_rule import MappingRules
+from shakenfist.mapping_rule import MAX_KEY_TTL_SECONDS
 from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
@@ -1043,8 +1044,16 @@ class AuthNamespaceRulesEndpoint(api_base.Resource):
             ('scopes', 'body', 'arrayofstring',
              'The scopes granted to keys minted through this rule. Must be '
              'non-empty.', True),
+            # Not unsignedinteger: validate_key_ttl() refuses zero and
+            # negatives outright, so a published minimum of 0 would
+            # document a value the server answers 400 to. Its upper
+            # bound was enforced and invisible, which is the same
+            # defect as the events limit cap this phase exists to
+            # publish.
             ('key_ttl', 'body', 'integer',
-             'Seconds of life for keys minted through this rule.', True),
+             'Seconds of life for keys minted through this rule. Must be '
+             f'positive, and no greater than {MAX_KEY_TTL_SECONDS}.', True,
+             {'minimum': 1, 'maximum': MAX_KEY_TTL_SECONDS}),
             ('key_name_prefix', 'body', 'string',
              'Prefix for minted key names. The cluster appends a random '
              'discriminator, so minted names never collide.', True)
@@ -1114,8 +1123,12 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
              'Claim name to matcher, as for creation.', True),
             ('scopes', 'body', 'arrayofstring',
              'The scopes granted to keys minted through this rule.', True),
+            # Bounded for the same reason as the create endpoint's
+            # declaration above; both reach validate_key_ttl().
             ('key_ttl', 'body', 'integer',
-             'Seconds of life for keys minted through this rule.', True),
+             'Seconds of life for keys minted through this rule. Must be '
+             f'positive, and no greater than {MAX_KEY_TTL_SECONDS}.', True,
+             {'minimum': 1, 'maximum': MAX_KEY_TTL_SECONDS}),
             ('key_name_prefix', 'body', 'string',
              'Prefix for minted key names.', True)
         ],

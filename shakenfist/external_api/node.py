@@ -163,7 +163,8 @@ class NodeEventsEndpoint(api_base.Resource):
             ('node', 'path', 'node', 'The name of a node.', True),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
-             'The number of events to return, defaults to 100.', False)
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single node.', node_events_example),
          (404, 'Node not found.', None)]))
