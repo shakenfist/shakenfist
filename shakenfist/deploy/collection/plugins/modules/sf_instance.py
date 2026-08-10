@@ -190,6 +190,12 @@ log:
 '''
 
 
+# Keys the server adds to a stored disk specification which no caller
+# supplied, and which therefore must not contribute to the dirtiness
+# comparison. See the comment at the comparison itself in _check_instance().
+SERVER_POPULATED_DISK_KEYS = ['blob_uuid', 'disk_base']
+
+
 class InstanceCreationException(Exception):
     ...
 
@@ -356,13 +362,24 @@ def _check_instance(client, existing, params, log):
             defn[s[0]] = s[1]
         requested_disks.append(defn)
 
-    # Clean up existing disk specifications. disk_base is an internal
-    # representation of a cleaned up disk's base.
+    # Clean up existing disk specifications. The server adds keys of its own
+    # to the disk spec it stores: disk_base is its internal representation of
+    # a cleaned up disk's base, and blob_uuid is the blob that base resolved
+    # to. blob_uuid in particular only appears once the base has been
+    # resolved, which makes its presence a race against the image fetch --
+    # an unchanged request compares equal before resolution and dirty after,
+    # so the module would tear down and recreate an otherwise identical
+    # instance. Neither key is something the caller asked for, so neither
+    # should make a request look dirty unless the caller did ask for it: we
+    # only strip keys the corresponding requested disk does not mention.
     cleaned_existing_disks = []
-    for e in existing.get('disk_spec', []):
-        if 'disk_base' in e:
-            del e['disk_base']
-        cleaned_existing_disks.append(e)
+    for idx, e in enumerate(existing.get('disk_spec', [])):
+        cleaned = dict(e)
+        requested = requested_disks[idx] if idx < len(requested_disks) else {}
+        for key in SERVER_POPULATED_DISK_KEYS:
+            if key not in requested:
+                cleaned.pop(key, None)
+        cleaned_existing_disks.append(cleaned)
 
     json_requested = json.dumps(requested_disks, sort_keys=True)
     json_existing = json.dumps(cleaned_existing_disks, sort_keys=True)
