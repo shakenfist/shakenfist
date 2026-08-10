@@ -221,6 +221,7 @@ nav:
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
                 - "Backend host_subject enforcement": components/kerbside/plans/PLAN-host-subject.md
                 - "Consistency Audit Deferred Work": components/kerbside/plans/PLAN-consistency-audit.md
+                - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
@@ -245,6 +246,9 @@ nav:
                 - "Rust proxy phase 7: CI lane + loadtest": components/kerbside/plans/PLAN-rust-proxy-phase-07-ci.md
                 - "Rust proxy phase 8: cutover (Rust is the only proxy)": components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover.md
                 - "Rust SPICE proxy (kerbside-proxy)": components/kerbside/plans/PLAN-rust-proxy.md
+                - "sfui conversion phase 1: template smoke tests": components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests.md
+                - "sfui conversion phase 2: vendor sfui and its plumbing": components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring.md
+                - "sfui conversion phase 3: shared styling and morphdom": components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical.md
                 - "Shaken Fist VDI console tokens (kerbside side)": components/kerbside/plans/PLAN-kerbside-vdi-tokens.md
                 - "Two-tier CI phase 1: the oVirt lane deploys and drives kerbside": components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md
                 - "Two-tier CI phase 2: promote sf-e2e to a PR smoke gate": components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md
