@@ -4865,6 +4865,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#sfui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sfui
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5137,6 +5148,34 @@
     
   
     Consistency Audit Deferred Work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convert the kerbside admin UI to sfui
   
 
     
@@ -5809,6 +5848,90 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 1: template smoke tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 2: vendor sfui and its plumbing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 3: shared styling and morphdom
   
 
     
@@ -10909,6 +11032,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#sfui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sfui
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11013,6 +11147,37 @@ downloading Bootstrap 5.3 and jQuery 3.7.0 and then installing to
 <h3 id="axios">Axios<a class="headerlink" href="#axios" title="Permanent link">&para;</a></h3>
 <p>Kerbside's web administration API uses Axios for HTTP requests.
 Version 1.6.5 is cached at <code>kerbside/api/static/js</code>.</p>
+<h3 id="sfui">sfui<a class="headerlink" href="#sfui" title="Permanent link">&para;</a></h3>
+<p><code>kerbside/api/static/sfui</code> is a vendored copy of
+<a href="https://github.com/shakenfist/sfui">shakenfist/sfui</a>, the Shaken
+Fist design system: design tokens (<code>tokens.css</code>), the shared page
+stylesheet (<code>sf.css</code>), a theme boot script, the brand logo,
+Lit-based web components such as <code>sf-tabs</code>, and the vendored Lit
+and morphdom libraries those pages need. It is copied in verbatim
+by sfui's own <code>tools/vendor.sh</code>, which also stamps the copy with
+its source commit in <code>.sfui-commit</code>.</p>
+<p>The design system's own <code>README.md</code> is vendored along with it, so
+the full contract -- the token rules, what <code>sf.css</code> provides and
+how its cascade layer works, and the component contract -- is
+readable at <code>kerbside/api/static/sfui/README.md</code> without leaving
+the repository.</p>
+<p>Never edit anything under <code>kerbside/api/static/sfui/</code> in place:
+change the canonical sfui checkout instead and re-vendor, or the
+next sync will silently discard the local change. To re-vendor from
+a clean, up-to-date sfui checkout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tools/vendor.sh<span class="w"> </span>&lt;path-to-kerbside&gt;/kerbside/api/static/sfui
+</code></pre></div>
+<p>To check whether the vendored copy has drifted from canonical sfui
+without copying anything:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tools/vendor.sh<span class="w"> </span>--check<span class="w"> </span>&lt;path-to-kerbside&gt;/kerbside/api/static/sfui
+</code></pre></div>
+<p>Both commands are run from the sfui checkout, not from kerbside.</p>
+<p>Re-vendor from sfui's <code>develop</code> branch once the change you need has
+merged there, not from the branch you made it on. The <code>sfui-vendor</code>
+consistency audit compares <code>.sfui-commit</code> against canonical
+<code>develop</code> and reports a copy that is behind it, so a stamp naming a
+feature branch commit -- or an ancestor of a merge commit -- is
+flagged even when every vendored file is byte for byte correct.</p>
 
 
 

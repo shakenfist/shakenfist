@@ -1205,6 +1205,22 @@
          <lastmod>2026-08-10</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/</loc>
+         <lastmod>2026-08-10</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/</loc>
+         <lastmod>2026-08-10</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/</loc>
+         <lastmod>2026-08-10</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion/</loc>
+         <lastmod>2026-08-10</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/</loc>
          <lastmod>2026-08-10</lastmod>
     </url>
