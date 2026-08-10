@@ -8,51 +8,12 @@ from testtools import content
 from shakenfist_ci import base
 
 
-class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
-    """The network maintainer must delete vxlan devices which belong to no
-    network, and must leave every other device alone.
+class StrayVxlanHostMixin:
+    """Host-side helpers shared by the stray vxlan tests.
 
-    This is the one thing the unit tests for the reaper structurally
-    cannot cover: they mock the host away, so they prove the decision
-    logic and nothing about whether a real device is actually removed --
-    for a change whose failure mode is taking a live network down, that
-    is the wrong half to test in isolation.
-
-    The test plants an orphan on the network node: a vxlan device and its
-    bridge, named for a vxid no network holds. Nothing in the cluster has
-    any legitimate use for it, so it is exactly what maintain should
-    reap. The same node's live networks are the control -- the network
-    node carries a device for every active network, so if the reaper is
-    too eager the control network's bridge disappears with the orphan.
-
-    A second orphan is planted with a foreign device enslaved to its
-    bridge, standing in for a guest tap. The database view of that
-    orphan is identical to the first one's, so it is the host side
-    cross-check and nothing else which has to save it. It costs no
-    extra wall clock, because both orphans age out over the same wait.
-
-    A third orphan is planted as a bare vxlan device with no bridge at
-    all. That is not an exotic shape: hypervisor teardown deletes the
-    bridge before the vxlan interface, so an interrupted teardown leaves
-    exactly this, and it is the case where a host side cross-check which
-    treated a missing bridge as unanswerable would protect the residue
-    forever.
-
-    The wait is real: maintain only acts once a device has been stray for
-    MAINTAIN_STRAY_VXLAN_GRACE_SECONDS (five minutes by default), which
-    is why this test is slow. A deployment which sets that option lower
-    makes it correspondingly faster.
+    Every helper acts on ``self.node``, which each test class sets in
+    setUp to whichever node it needs to plant devices on.
     """
-
-    def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'strayvxlan'
-        super().__init__(*args, **kwargs)
-
-    def setUp(self):
-        super().setUp()
-
-        self.node = self._network_node()
-        self._require_node_exec(self.node)
 
     def _node_config_value(self, option, default):
         """Read a SHAKENFIST_ option from the node's /etc/sf/config."""
@@ -101,8 +62,7 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
                 pass
 
     def _plant_orphan(self, vxid, mesh_nic, with_bridge=True):
-        """Create a vxlan device, and usually its bridge, for a vxid no
-        network holds.
+        """Create a vxlan device, and usually its bridge, for a vxid.
 
         ``with_bridge=False`` plants the residue an interrupted
         hypervisor teardown leaves behind: the bridge is deleted before
@@ -121,6 +81,53 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
                 ['ip', 'link', 'add', 'br-vxlan-%06x' % vxid,
                  'type', 'bridge'],
                 sudo=True)
+
+
+class TestStrayVxlanReaping(StrayVxlanHostMixin, base.BaseNamespacedTestCase):
+    """The network maintainer must delete vxlan devices which belong to no
+    network, and must leave every other device alone.
+
+    This is the one thing the unit tests for the reaper structurally
+    cannot cover: they mock the host away, so they prove the decision
+    logic and nothing about whether a real device is actually removed --
+    for a change whose failure mode is taking a live network down, that
+    is the wrong half to test in isolation.
+
+    The test plants an orphan on the network node: a vxlan device and its
+    bridge, named for a vxid no network holds. Nothing in the cluster has
+    any legitimate use for it, so it is exactly what maintain should
+    reap. The same node's live networks are the control -- the network
+    node carries a device for every active network, so if the reaper is
+    too eager the control network's bridge disappears with the orphan.
+
+    A second orphan is planted with a foreign device enslaved to its
+    bridge, standing in for a guest tap. The database view of that
+    orphan is identical to the first one's, so it is the host side
+    cross-check and nothing else which has to save it. It costs no
+    extra wall clock, because both orphans age out over the same wait.
+
+    A third orphan is planted as a bare vxlan device with no bridge at
+    all. That is not an exotic shape: hypervisor teardown deletes the
+    bridge before the vxlan interface, so an interrupted teardown leaves
+    exactly this, and it is the case where a host side cross-check which
+    treated a missing bridge as unanswerable would protect the residue
+    forever.
+
+    The wait is real: maintain only acts once a device has been stray for
+    MAINTAIN_STRAY_VXLAN_GRACE_SECONDS (five minutes by default), which
+    is why this test is slow. A deployment which sets that option lower
+    makes it correspondingly faster.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'strayvxlan'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+
+        self.node = self._network_node()
+        self._require_node_exec(self.node)
 
     def test_orphan_vxlan_is_reaped_and_live_network_survives(self):
         # A live network for the control assertion. The network node
@@ -250,3 +257,127 @@ class TestStrayVxlanReaping(base.BaseNamespacedTestCase):
             'br-vxlan-%06x' % occupied_vxid, links,
             'The reaper removed a bridge which still had a foreign device '
             'enslaved to it')
+
+
+class TestStrayVxlanInstanceProtection(StrayVxlanHostMixin,
+                                       base.BaseNamespacedTestCase):
+    """On a hypervisor, whether a claimed stray may be torn down turns on
+    a single SQL query: "which vxids do the instances placed on this node
+    use?".
+
+    That query joins this node's placement references to
+    network_interfaces to networks, and it spans both of the project's
+    uuid storage conventions (references hold the dashed form, the static
+    tables the undashed one) and two enum spellings. Every way of getting
+    it wrong returns fewer rows than it should, and a row it fails to
+    return is a live instance's network being torn down underneath it.
+    The unit tests run the same SQL, but against SQLite -- only a real
+    cluster exercises MariaDB's types, collation and indexes.
+
+    So the test plants a stray on a hypervisor for a network which
+    genuinely exists but which nothing on that node uses, alongside an
+    instance hosted there on a different network. The stray must go and
+    the instance's plumbing must stay: the first assertion fails if the
+    query returns too much, the second if it returns too little.
+
+    As with the reaping test the wait is real, because maintain only acts
+    on a device which has been stray for
+    MAINTAIN_STRAY_VXLAN_GRACE_SECONDS.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'strayvxlanprot'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+
+        # The network node is excluded deliberately: it carries a device
+        # for every active network whatever it hosts, and the reaper
+        # never tears a stray down there, so it cannot show this.
+        candidates = self._hypervisor_nodes(exclude_network_node=True)
+        if not candidates:
+            self.skipTest(
+                'Need a hypervisor which is not the network node; the '
+                'cluster reports none.')
+        self.node = candidates[0]
+        self._require_node_exec(self.node)
+
+    def test_stray_torn_down_while_a_hosted_network_survives(self):
+        # The network the hypervisor legitimately carries, because it
+        # hosts an instance on it. Its devices exist only for as long as
+        # the placement query can see that instance.
+        hosted_net = self.test_client.allocate_network(
+            '192.168.244.0/24', True, True, '%s-hosted' % self.namespace)
+        self.addDetail('hosted_net', content.text_content(
+            json.dumps(hosted_net, indent=4, sort_keys=True)))
+        self._await_networks_ready([hosted_net['uuid']])
+
+        inst = self.test_client.create_instance(
+            'strayvxlanprot', 1, 1024,
+            [{'network_uuid': hosted_net['uuid']}],
+            [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}],
+            None, None, force_placement=self.node['name'])
+        self.addDetail('instance', content.text_content(
+            json.dumps(inst, indent=4, sort_keys=True)))
+        # If the scheduler did not honour the placement the protection
+        # assertion below would be testing the wrong node.
+        self.assertEqual(self.node['uuid'], inst['node'])
+        self._await_instance_create(inst['uuid'])
+
+        hosted_vxlan = 'vxlan-%06x' % hosted_net['vxlan_id']
+        hosted_bridge = 'br-vxlan-%06x' % hosted_net['vxlan_id']
+        self.assertIn(
+            hosted_vxlan, self._node_link_names(self.node),
+            'A hypervisor hosting an instance should carry that '
+            'network, but %s is missing' % hosted_vxlan)
+
+        # A second network which exists but which nothing on this node
+        # uses. Its vxid is claimed, so the reaper cannot delete the
+        # device itself -- it has to decide, from the placement query
+        # alone, that no instance here needs it and enqueue a teardown.
+        stray_net = self.test_client.allocate_network(
+            '192.168.245.0/24', True, True, '%s-stray' % self.namespace)
+        self.addDetail('stray_net', content.text_content(
+            json.dumps(stray_net, indent=4, sort_keys=True)))
+        self._await_networks_ready([stray_net['uuid']])
+
+        stray_vxid = stray_net['vxlan_id']
+        mesh_nic = self._node_config_value('NODE_MESH_NIC', 'eth0')
+        self.addCleanup(self._remove_devices, stray_vxid)
+        self._plant_orphan(stray_vxid, mesh_nic)
+
+        links = self._node_link_names(self.node)
+        self.assertIn('vxlan-%06x' % stray_vxid, links)
+        self.assertIn('br-vxlan-%06x' % stray_vxid, links)
+
+        grace = int(self._node_config_value(
+            'MAINTAIN_STRAY_VXLAN_GRACE_SECONDS', 300))
+        deadline = time.time() + grace + 180
+        while time.time() < deadline:
+            links = self._node_link_names(self.node)
+            if 'vxlan-%06x' % stray_vxid not in links:
+                break
+            time.sleep(10)
+
+        links = self._node_link_names(self.node)
+        self.addDetail('links_at_end', content.text_content(
+            json.dumps(sorted(links), indent=4)))
+
+        self.assertNotIn(
+            'vxlan-%06x' % stray_vxid, links,
+            'A claimed stray no instance on this node uses was not torn '
+            'down within %d seconds' % (grace + 180))
+
+        # The control, and the assertion which actually guards the
+        # query: the hosted network's plumbing must be untouched. A
+        # placement join which matches nothing looks exactly like "no
+        # instance here uses this network" for this network too.
+        self.assertIn(
+            hosted_vxlan, links,
+            'The reaper removed the vxlan of a network an instance on '
+            'this node is attached to')
+        self.assertIn(
+            hosted_bridge, links,
+            'The reaper removed the bridge of a network an instance on '
+            'this node is attached to')

@@ -109,44 +109,35 @@ class Job(util_concurrency.Job):
         Returns None when the set cannot be determined, which callers
         must treat as "protect everything".
 
-        The instance list comes from this node's INSTANCE_LOCATION
-        references rather than from ``instance.Instances`` filtered by
-        ``this_node_filter``: that filter is a Python side predicate
-        over ``inst.placement``, so it hydrates every active instance in
-        the cluster and then issues a further interface query for each.
+        The whole question is a single indexed query: this node's
+        INSTANCE_LOCATION reference rows joined to network_interfaces
+        joined to networks, filtered by instance state. A protected
+        stray is by design never reaped, so this runs on every 30 second
+        maintain pass for as long as the stray survives -- hydrating
+        every instance placed here plus one network per distinct network
+        uuid, which is what this used to do, made that permanent cost
+        proportional to the node's instance count.
 
-        This is still O(instances on this node) hydrations plus one
-        network hydration per distinct network, and a stray which is
-        deliberately protected forever pays that on every 30 second
-        pass for as long as it survives. Pushing the whole question
-        down to a single indexed query -- object_references joined to
-        network_interfaces joined to networks, filtered by instance
-        state -- is the improvement CLAUDE.md asks for and is tracked
-        separately; it is not done here because the cost is bounded by
-        one node's instance count and only accrues while a protected
-        stray exists.
+        The query reads only the reference rows, not the transition-only
+        ``node_attributes.instances`` column ``Node.instances`` still
+        unions in. That is safe here because the placements which matter
+        are this node's own, and this node's queues daemon reconciles
+        them into references on startup (see
+        ``queues.startup_tasks.restore_instances``) -- so by the time
+        sf-net is running this code after an upgrade, the references are
+        complete.
+
+        Note that a database failure is not caught here.
+        ``mariadb.get_node_instance_vxids()`` deliberately propagates
+        rather than returning an empty set, because an empty set is
+        permission to tear down host network devices. Aborting the
+        maintain pass is the safe outcome.
         """
         if not this_node:
             return None
 
-        network_uuids = set()
-        for instance_uuid in this_node.instances:
-            inst = instance.Instance.from_db(
-                instance_uuid, suppress_failure_audit=True)
-            if not inst:
-                continue
-            if inst.state.value not in VXLAN_PROTECTING_INSTANCE_STATES:
-                continue
-            for ni in inst.interfaces:
-                network_uuids.add(ni.network_uuid)
-
-        vxids = set()
-        for network_uuid in network_uuids:
-            n = network.Network.from_db(
-                network_uuid, suppress_failure_audit=True)
-            if n:
-                vxids.add(n.vxid)
-        return vxids
+        return mariadb.get_node_instance_vxids(
+            str(this_node.uuid), sorted(VXLAN_PROTECTING_INSTANCE_STATES))
 
     def _first_report(self, vxid: int, key: str) -> bool:
         """Has ``key`` already been reported for this stray episode?
@@ -392,9 +383,10 @@ class Job(util_concurrency.Job):
         # Only pay for the node and instance lookups when a claimed
         # stray might be cleanable on this node. On the network node,
         # and when nothing claimed is overdue, there is no disposition
-        # the instance list could change, so skip it entirely. Note
-        # that a claimed stray which is protected forever does pay for
-        # this on every pass -- see _local_instance_vxids().
+        # the instance list could change, so skip it entirely. A claimed
+        # stray which is protected forever does pay for this on every
+        # pass, which is why it is one query -- see
+        # _local_instance_vxids().
         this_node = None
         node_loaded = False
         protected_vxids = None

@@ -5549,6 +5549,56 @@ class FindNetworkVxidsReply(_message.Message):
 Global___FindNetworkVxidsReply: _TypeAlias = FindNetworkVxidsReply  # noqa: Y015
 
 @_typing.final
+class GetNodeInstanceVxidsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    STATES_FIELD_NUMBER: _builtins.int
+    node_uuid: _builtins.str
+    """The node whose instances we want"""
+    @_builtins.property
+    def states(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Instance states which protect a vxid"""
+
+    def __init__(
+        self,
+        *,
+        node_uuid: _builtins.str = ...,
+        states: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["node_uuid", b"node_uuid", "states", b"states"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNodeInstanceVxidsRequest: _TypeAlias = GetNodeInstanceVxidsRequest  # noqa: Y015
+
+@_typing.final
+class GetNodeInstanceVxidsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    VXIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def vxids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """The vxids of every network an instance in one of the requested
+        states, placed on the requested node, is attached to.
+        """
+
+    def __init__(
+        self,
+        *,
+        vxids: _abc.Iterable[_builtins.int] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["vxids", b"vxids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNodeInstanceVxidsReply: _TypeAlias = GetNodeInstanceVxidsReply  # noqa: Y015
+
+@_typing.final
 class DeleteNetworkRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

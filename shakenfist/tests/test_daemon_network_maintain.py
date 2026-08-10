@@ -171,11 +171,12 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                 lambda uuid, **kw: uuid_to_net.get(uuid))
             active['network'].floating_network.return_value = floating_network
 
-            # ``local_instances`` is what the stray reaper sees: it reads
-            # this node's INSTANCE_LOCATION references and hydrates each
-            # one, rather than scanning every active instance in the
-            # cluster.
-            local_instances = {}
+            # ``local_vxids`` maps a vxid an instance on this node is
+            # attached to, to the state of that instance. The stray
+            # reaper reads this through a single indexed query which
+            # applies the state filter in SQL, so the mock does the same
+            # against the states it is handed.
+            local_vxids = {}
 
             # For the non-network-node path, surface one instance whose
             # interfaces reference each test network.
@@ -188,8 +189,8 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                     ni = mock.MagicMock()
                     ni.network_uuid = net.uuid
                     fake_inst.interfaces.append(ni)
+                    local_vxids[net.vxid] = 'created'
                 healthy_instances.append(fake_inst)
-                local_instances['inst-healthy'] = fake_inst
 
             # Instances which exist on this node but are not healthy, so
             # they never reach host_networks and their networks look
@@ -200,21 +201,13 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                 attached_net.uuid = net_uuid
                 attached_net.vxid = vxid
                 uuid_to_net[net_uuid] = attached_net
-
-                fake_inst = mock.MagicMock()
-                fake_inst.state.value = attached_state
-                ni = mock.MagicMock()
-                ni.network_uuid = net_uuid
-                fake_inst.interfaces = [ni]
-                local_instances['inst-%06x' % vxid] = fake_inst
+                local_vxids[vxid] = attached_state
 
             def _instances(_filters, prefilter=None, **kwargs):
                 return healthy_instances
 
             active['instance'].Instances.side_effect = _instances
             active['instance'].Instance.STATE_PREFLIGHT = 'preflight'
-            active['instance'].Instance.from_db.side_effect = (
-                lambda uuid, **kw: local_instances.get(uuid))
 
             active['get_node_network_queues'].return_value = [
                 'q-node-a', 'q-node-b']
@@ -239,6 +232,14 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                     lambda vxids: {v: 'claiming-net-%06x' % v
                                    for v in vxids if v in claimed})
 
+            # The protecting-instance question is a single query which
+            # filters on instance state in SQL, so the mock applies the
+            # states the caller asked for rather than every state.
+            mar.get_node_instance_vxids.side_effect = (
+                lambda node_uuid, states: {
+                    vxid for vxid, inst_state in local_vxids.items()
+                    if inst_state in states})
+
             if execute_side_effect is not None:
                 active['util_concurrency'].execute.side_effect = (
                     execute_side_effect)
@@ -247,7 +248,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                 active['node'].from_db.return_value = None
             else:
                 fake_node = mock.MagicMock()
-                fake_node.instances = list(local_instances)
+                fake_node.uuid = 'node-uuid-test'
                 active['node'].from_db.return_value = fake_node
 
             from shakenfist.daemons.network.maintain import Job
@@ -989,7 +990,13 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             db_network_vxids=[0x123],
         )
 
-        self.assertEqual([], active['node'].from_db.return_value.instances)
+        # The protecting-vxid query was asked about this node, and
+        # returned nothing because nothing is placed here.
+        call = active['mariadb'].get_node_instance_vxids.call_args
+        self.assertEqual('node-uuid-test', call.args[0])
+        self.assertEqual(
+            set(),
+            active['mariadb'].get_node_instance_vxids.side_effect(*call.args))
         active['nn_create_and_enqueue'].assert_called_once()
 
     def test_claimed_stray_protected_when_this_node_row_is_missing(self):
@@ -1059,7 +1066,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['util_concurrency'].execute.assert_any_call(
             'ip link delete vxlan-000123')
-        active['instance'].Instance.from_db.assert_not_called()
+        active['mariadb'].get_node_instance_vxids.assert_not_called()
         self.assertNotIn(0x123, maintain.EXTRA_VLANS_HISTORY)
 
     def test_guest_tap_on_the_bridge_protects_an_unclaimed_stray(self):

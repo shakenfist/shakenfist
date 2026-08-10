@@ -3108,6 +3108,32 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.FindNetworkVxidsReply(claims=[])
 
+    def GetNodeInstanceVxids(
+        self,
+        request: database_pb2.GetNodeInstanceVxidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeInstanceVxidsReply:
+        """Return the vxids instances on a node are attached to.
+
+        As with FindNetworkVxids, an empty reply is a meaningful answer
+        -- it means no instance on that node uses the network, and the
+        caller tears down host network devices on the strength of it.
+        The error path therefore sets an INTERNAL status so the client
+        raises rather than reading the empty reply as an answer.
+        """
+        try:
+            self.monitor.counters['get_node_instance_vxids'].inc()
+            vxids = mariadb._direct_get_node_instance_vxids(
+                request.node_uuid, list(request.states))
+            return database_pb2.GetNodeInstanceVxidsReply(
+                vxids=sorted(vxids))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNodeInstanceVxids failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeInstanceVxidsReply(vxids=[])
+
     def DeleteNetwork(
         self,
         request: database_pb2.DeleteNetworkRequest,
@@ -5993,6 +6019,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
             'find_network_interfaces', 'find_network_vxids',
+            'get_node_instance_vxids',
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',

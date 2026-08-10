@@ -218,6 +218,7 @@ service DatabaseService {
   rpc GetAllNetworks (GetAllNetworksRequest) returns (GetAllNetworksReply) {}
   rpc FindNetworks (FindNetworksRequest) returns (FindNetworksReply) {}
   rpc FindNetworkVxids (FindNetworkVxidsRequest) returns (FindNetworkVxidsReply) {}
+  rpc GetNodeInstanceVxids (GetNodeInstanceVxidsRequest) returns (GetNodeInstanceVxidsReply) {}
   rpc DeleteNetwork (DeleteNetworkRequest) returns (StatusReply) {}
 
   // Network Attributes Operations (MariaDB)
@@ -1711,6 +1712,17 @@ message FindNetworkVxidsReply {
   // route cleanup for a still-existing network through a cluster
   // operation rather than mutating host state directly.
   repeated NetworkVxidClaim claims = 1;
+}
+
+message GetNodeInstanceVxidsRequest {
+  string node_uuid = 1;              // The node whose instances we want
+  repeated string states = 2;        // Instance states which protect a vxid
+}
+
+message GetNodeInstanceVxidsReply {
+  // The vxids of every network an instance in one of the requested
+  // states, placed on the requested node, is attached to.
+  repeated int32 vxids = 1;
 }
 
 message DeleteNetworkRequest {

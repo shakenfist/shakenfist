@@ -17433,6 +17433,94 @@ def _direct_find_network_vxids(vxids: list[int]) -> dict[int, str]:
         }
 
 
+# The vxids an instance on a given node is attached to, in one indexed
+# query. The alternative -- hydrating every instance placed on the node
+# and then one network per distinct network uuid -- is paid on every 30
+# second maintain pass for as long as a protected stray vxlan survives,
+# which by design is forever.
+#
+# The driving table is the node's INSTANCE_LOCATION reference rows,
+# which the object_references primary key (and its source index) leads
+# with, so the scan is bounded by this node's placements rather than by
+# the cluster's instance count.
+#
+# Format note (pitfall 6): object_references uuid columns store the
+# dashed 36 character form while network_interfaces.instance_uuid is
+# sa.Uuid (undashed CHAR(32) on MariaDB), so the join transforms the
+# reference side value with REPLACE to land on the indexed column.
+# object_states.object_uuid is dashed like object_references, so that
+# join compares directly.
+#
+# The enum-typed predicates span two storage conventions and the bound
+# parameters must match each column exactly: object_states.object_type
+# is a native sa.Enum(ObjectType) which SQLAlchemy persists as the
+# member *name* ('INSTANCE'), while the object_references type and
+# relationship columns are plain String(64) written by
+# _direct_record_relationship() as str(member), i.e. the enum *value*
+# ('instance', 'instance_location'). See the comment above
+# _RECONCILE_USAGE_SQL for why a case-insensitive collation must not be
+# relied on to bridge the two.
+#
+# Interfaces are filtered on ``active IS NOT NULL`` rather than on their
+# state, which is the same test the macaddr UNIQUE constraint uses:
+# ``active`` is NULLed only when an interface enters the deleted state.
+# That is a superset of NetworkInterface.ACTIVE_STATES (it also keeps
+# delete-wait-error interfaces), and erring towards protecting a device
+# is the right direction here. Networks are deliberately not filtered by
+# state at all: a soft deleted network still protects its device, which
+# matches Network.from_db() in the code this replaced.
+_NODE_INSTANCE_VXIDS_SQL = sa.text('''
+    SELECT DISTINCT n.vxid AS vxid
+      FROM object_references r
+      JOIN object_states s
+        ON s.object_uuid = r.target_uuid
+       AND s.object_type = :instance_object_type
+      JOIN network_interfaces ni
+        ON ni.instance_uuid = REPLACE(r.target_uuid, '-', '')
+      JOIN networks n
+        ON n.uuid = ni.network_uuid
+     WHERE r.source_object_type = :node_object_type
+       AND r.source_uuid = :node_uuid
+       AND r.relationship = :instance_location
+       AND r.target_object_type = :instance_ref_type
+       AND ni.active IS NOT NULL
+       AND s.state_value IN :states
+''').bindparams(sa.bindparam('states', expanding=True))
+
+
+def _direct_get_node_instance_vxids(
+        node_uuid: str, states: list[str]) -> set[int]:
+    """The vxids of networks used by instances on a node, in one query.
+
+    Returns the set of vxids of every network an instance placed on
+    ``node_uuid``, and in one of ``states``, has an undeleted interface
+    on.
+
+    Like ``_direct_find_network_vxids`` this deliberately does not
+    swallow OperationalError. The caller treats "no instance here uses
+    this network" as permission to tear down a host network device, so
+    a database failure must not be reported as an empty result --
+    letting it propagate aborts the maintain pass instead.
+    """
+    if not states:
+        return set()
+
+    engine = _get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(_NODE_INSTANCE_VXIDS_SQL, {
+            'node_uuid': node_uuid,
+            # object_states.object_type is a native sa.Enum, which
+            # persists member names. The object_references columns are
+            # plain strings holding enum values.
+            'instance_object_type': ObjectType.INSTANCE.name,
+            'instance_ref_type': ObjectType.INSTANCE.value,
+            'node_object_type': ObjectType.NODE.value,
+            'instance_location': RelationshipType.INSTANCE_LOCATION.value,
+            'states': list(states),
+        }).fetchall()
+        return {int(row.vxid) for row in rows}
+
+
 def _direct_find_networks(
         criteria: ObjectFilterCriteria) -> list[NetworkData]:
     """Find networks matching the given filter criteria.
@@ -17732,6 +17820,26 @@ def _grpc_find_network_vxids(vxids: list[int]) -> dict[int, str]:
     return {claim.vxid: claim.uuid for claim in reply.claims}
 
 
+def _grpc_get_node_instance_vxids(
+        node_uuid: str, states: list[str]) -> set[int]:
+    """The vxids used by instances on a node, via the database
+    microservice.
+
+    As with ``_direct_get_node_instance_vxids``, errors are deliberately
+    not swallowed: an empty result here means "no instance on this node
+    uses that network" and the caller tears down host network devices on
+    the strength of it.
+    """
+    if not states:
+        return set()
+
+    stub = _get_database_stub()
+    request = database_pb2.GetNodeInstanceVxidsRequest(
+        node_uuid=node_uuid, states=list(states))
+    reply = _grpc_call(stub.GetNodeInstanceVxids, request)
+    return set(reply.vxids)
+
+
 def _grpc_find_networks(
         criteria: ObjectFilterCriteria) -> list[NetworkData]:
     """Find networks matching criteria via the database microservice."""
@@ -17937,6 +18045,26 @@ def find_network_vxids(vxids: list[int]) -> dict[int, str]:
     if _use_database_service():
         return _grpc_find_network_vxids(vxids)
     return _direct_find_network_vxids(vxids)
+
+
+def get_node_instance_vxids(node_uuid: str, states: list[str]) -> set[int]:
+    """The vxids of networks used by instances placed on a node.
+
+    Args:
+        node_uuid: The UUID of the node.
+        states: The instance states to consider.
+
+    Returns:
+        The set of vxids of every network an instance on that node, in
+        one of those states, has an undeleted interface on. Errors
+        propagate rather than presenting as an empty result -- see
+        ``_direct_get_node_instance_vxids``.
+    """
+    if not states:
+        return set()
+    if _use_database_service():
+        return _grpc_get_node_instance_vxids(node_uuid, states)
+    return _direct_get_node_instance_vxids(node_uuid, states)
 
 
 def find_networks(
