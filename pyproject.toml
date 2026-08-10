@@ -96,7 +96,7 @@ dependencies = [
     # agree with it or break resolution.
     # never-pin: pydantic-core
     "pydantic==2.13.4",                   # mit
-    "pydantic-settings==2.14.2",          # mit
+    "pydantic-settings==2.15.0",          # mit
     "pydantic-extra-types==2.11.1",       # mit
 
     # Is difficult to get install working, use system packages instead.
