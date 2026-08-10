@@ -11323,6 +11323,38 @@
   change the published specification validates cleanly, so standard client
   generators can consume it. The request wire format is unchanged — this
   only alters how the API is described.</li>
+<li>Parameter bounds and formats that previously existed only in server code
+  are now visible in the published OpenAPI: the events <code>limit</code> documents its
+  cap of 1000, counters like <code>max_versions</code>, <code>cpus</code>, <code>memory</code> and blob read
+  offsets are published as non-negative integers, and <code>user_data</code> is
+  published as base64 content. A rule's <code>key_ttl</code> also documents its real
+  bounds of 1 to 86400 seconds, which the server has always enforced.
+  These are documentation — requests are not yet rejected against them.
+  There are two exceptions, both cases where publishing a bound the
+  server did not back would have been worse than publishing nothing:<ul>
+<li>A negative <code>max_versions</code> is now refused with a 400 on all three
+  routes that set it — the artifact versions route, label create and
+  instance snapshot. It was silently destructive rather than merely
+  meaningless, deleting the oldest surviving version on every index
+  add, and only the first of the three ever checked.</li>
+<li>A negative <code>offset</code> or <code>limit</code> on a blob data read is now refused
+  with a 400. Previously a negative offset failed part way through
+  the response, so the caller received a truncated body under a 200
+  rather than an error, and a negative limit read to the end of the
+  blob, ignoring the cap it was given.</li>
+</ul>
+</li>
+<li>Two changes here are visible to anyone regenerating a client from the
+  specification. Structured parameters are now published as real JSON
+  structures rather than as strings: <code>network</code> (on instance create),
+  <code>disk</code>, <code>scopes</code> and <code>side_channels</code> as arrays, and <code>metadata</code>,
+  <code>video</code>, <code>bound_claims</code> and the <code>network</code> networkspec on interface
+  create as objects. A regenerated client binds them as lists and dictionaries,
+  so code passing a serialised string will need updating. And <code>user_data</code>
+  is published with format <code>byte</code>, which some generators treat as an
+  instruction to base64 encode on the caller's behalf — check that a
+  regenerated client does not double encode content you already encode
+  yourself, as the API has always required.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>

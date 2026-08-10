@@ -11209,8 +11209,8 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>2: Type vocabulary</td>
-<td>Not started</td>
-<td>New tokens and the constraints element, rendered into the OpenAPI so the bounds are visible to callers rather than invisible the way the events <code>limit</code> cap was. Also: collapse the N body parameters of an operation into one <code>body</code> parameter carrying a generated <code>schema</code>, and add a test that validates the generated specification — see below</td>
+<td>Complete</td>
+<td>The specification-validation test (#3626) plus <code>schemes</code>/<code>securityDefinitions</code> template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; <code>unsignedinteger</code>/<code>macaddr</code>/<code>base64</code>/<code>netblock</code> tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events <code>limit</code> cap are visible to callers. See <a href="../PLAN-api-input-validation-phase-02-type-vocabulary/">phase 2</a></td>
 </tr>
 <tr>
 <td>3: Compile and warn</td>

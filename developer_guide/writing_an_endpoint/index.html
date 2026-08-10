@@ -10741,9 +10741,86 @@ declarations already in the tree, is in
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instance_ref</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">instance_from_db</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        <span class="k">return</span> <span class="n">instance_from_db</span><span class="o">.</span><span class="n">external_view</span><span class="p">()</span>
 </code></pre></div>
-<p>Each parameter is a five-element tuple:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>(name, location, type, description, required)
+<p>Each parameter is a five-element tuple, with an optional sixth
+element for constraints:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>(name, location, type, description, required[, constraints])
 </code></pre></div>
+<p>The type is a token from <code>api_base.ARGTYPES</code> — read that table for the
+current vocabulary; an unknown token is rejected at import time. Beyond the
+obvious primitives it includes <code>unsignedinteger</code> (an integer whose
+published <code>minimum</code> is 0 — use it for anything where a negative value
+is meaningless or destructive, like <code>max_versions</code>), <code>base64</code> (a
+string whose published format is Swagger 2.0's standard <code>byte</code> token),
+<code>macaddr</code> (a string carrying a published validation <code>pattern</code>),
+<code>netblock</code> (format only — <code>ipaddress.ip_network()</code> in the handler
+stays the single source of truth for what parses, and a published
+IPv4 pattern would describe the API as narrower than it is), and real
+array types for <code>arrayofstring</code>/<code>arrayofdict</code> and a real object type
+for <code>dict</code>. Objects, and arrays of objects, can only be declared in
+the body: outside one there is no schema object to nest a structure
+in, so they are rejected at import time.</p>
+<p>Declare the token that matches what the handler accepts, and <strong>publish
+what the server backs</strong>: a bound tighter than the server's own
+behaviour belongs in the specification only where the server already
+coerces or rejects outside it. The events <code>limit</code> publishes a minimum
+of 1 because the server replaces anything lower with the default;
+<code>cpus</code> and <code>memory</code> publish 0 rather than 1 because nothing rejects a
+zero today, and tightening them is a phase 3 decision to be made with
+warn-only data.</p>
+<p>Nothing derives a type from the handler the way locations are derived,
+so getting this wrong is invisible until a client generator or phase
+3's compiler acts on it. Two examples, both caught in review of the
+phase 2 work rather than by a machine:</p>
+<ul>
+<li><code>metadata</code> on instance create was declared <code>arrayofdict</code> while the
+  handler answers 400 to anything but a dictionary — harmless while
+  the token rendered as prose, a positive assertion of the wrong shape
+  once the type became machine readable.</li>
+<li>console <code>length</code> was declared <code>unsignedinteger</code> while <code>-1</code> is a
+  supported sentinel meaning "the whole log", which the functional
+  suite itself relies on — publishing the API as narrower than it is.</li>
+</ul>
+<p>The check against both is <code>STRUCTURED_PARAMETERS</code> in
+<code>shakenfist/tests/external_api/test_openapi_spec.py</code>: every parameter
+publishing a structure or a bound is listed there with the shape the
+handler actually accepts, and an entry describes that shape in full —
+a constraint key the entry does not list must not be published, which
+is how the console <code>length</code> entry asserts that nothing bounds it in
+either direction.</p>
+<p>You do not have to remember to add an entry.
+<code>test_every_published_structure_or_bound_is_registered</code> derives the
+set which ought to be listed from the published specification and
+fails until each member has one. What you do have to do is read the
+handler before writing the entry: the derivation can say that
+something is missing, but only you can say what the handler really
+accepts, and the point is agreement with the code rather than with
+the declaration.</p>
+<p>The constraints element is a dict with keys drawn from <code>minimum</code>,
+<code>maximum</code> and <code>pattern</code>. All three are valid Swagger 2.0 keywords, so
+a bound renders into the published OpenAPI instead of living only in
+code — the events <code>limit</code> cap was invisible to callers for years for
+exactly that reason, and now reads:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">(</span><span class="s1">&#39;limit&#39;</span><span class="p">,</span> <span class="s1">&#39;body&#39;</span><span class="p">,</span> <span class="s1">&#39;integer&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a> <span class="s1">&#39;The number of events to return, defaults to 100 and is &#39;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a> <span class="s1">&#39;capped at 1000.&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;minimum&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;maximum&#39;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">})</span>
+</code></pre></div>
+<p>Constraints are validated at import time in the same style as
+everything else: unknown keys, non-numeric bounds, bounds on
+non-numeric types, contradictory bounds, patterns that do not
+compile, patterns on non-string types, and a constraint restating a
+key its type token already renders (a second <code>minimum</code> on
+<code>unsignedinteger</code>) all raise <code>InvalidAPIDeclaration</code>. Note that
+declared constraints are <em>published documentation</em> until phase 3 of
+<a href="../../plans/PLAN-api-input-validation/">PLAN-api-input-validation</a>
+compiles them — a constraint does not reject anything yet.</p>
+<p>Three keys, deliberately. <code>maxLength</code>, <code>minLength</code>, <code>minItems</code> and
+<code>enum</code> are equally valid Swagger 2.0 keywords with real consumers
+waiting for them — a rule <code>name</code> is refused above 255 characters,
+<code>scopes</code> must be non-empty, <code>configdrive</code> accepts only two values —
+but each needs its own import-time validation and its own mutation in
+the guard harness, and phase 2 set out to publish the numeric and
+pattern bounds. They are scoped out rather than overlooked; phase 3
+is where the case for adding them gets concrete.</p>
 <p><strong>There is no per-handler authentication decorator.</strong> Authentication is
 the default, applied to every handler by <code>_authenticate_unless_public</code>
 in <code>api_base.Resource.method_decorators</code>; an endpoint opts <em>out</em> rather
@@ -10831,8 +10908,8 @@ a reason. Objects the decorators inject — anything ending in
 <h2 id="checking-your-work">Checking your work<a class="headerlink" href="#checking-your-work" title="Permanent link">&para;</a></h2>
 <p>The audit derives the correct location for every declaration and
 compares it against what is declared:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w">            </span><span class="c1"># report drift</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w"> </span>--apply<span class="w">    </span><span class="c1"># correct it</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w">            </span><span class="c1"># report drift</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w"> </span>--apply<span class="w">    </span><span class="c1"># correct it</span>
 </code></pre></div>
 <p>The same derivation runs as a pre-commit hook
 (<code>check-api-parameter-locations</code>) and, more importantly, as a unit

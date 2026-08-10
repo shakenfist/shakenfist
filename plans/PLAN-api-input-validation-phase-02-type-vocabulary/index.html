@@ -10752,6 +10752,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -11125,23 +11136,185 @@ valid.</p>
 </ul>
 <h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> CI fails when the generated specification acquires a new
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> CI fails when the generated specification acquires a new
       validity error class (#3626 closed).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>openapi_spec_validator</code> reports zero errors on the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>openapi_spec_validator</code> reports zero errors on the
       generated specification.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>securityDefinitions</code> published; <code>security</code> requirements
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>securityDefinitions</code> published; <code>security</code> requirements
       resolvable; <code>schemes</code> an array.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every operation renders at most one body parameter, always
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every operation renders at most one body parameter, always
       schema-carrying.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The four D9 tokens and the constraints element exist,
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The four D9 tokens and the constraints element exist,
       import-time validated, mutation-tested, documented.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The events <code>limit</code> bounds are visible in the published
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The events <code>limit</code> bounds are visible in the published
       OpenAPI.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> #3642 and #3643 closed as riders.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Master plan phase table, <code>docs/plans/index.md</code>, and
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> #3642 and #3643 closed as riders.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Master plan phase table, <code>docs/plans/index.md</code>, and
       <code>writing_an_endpoint.md</code> updated; release note for the
       published-spec shape change.</li>
 </ul>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Implemented 2026-08-08 as three commits on
+<code>api-input-validation-phase-02</code>, one per planned PR scope, so the
+work can land as one PR or be split back into three — that is a
+landing decision, not an implementation one. Measurements landed
+where the plan predicted: 129 errors before the work, 128 after the
+<code>schemes</code> fix (the ratchet's one recorded value), zero after the
+collapse, still zero with the vocabulary applied. The mutation
+harness grew from 12 to 24 across the review rounds: first the four
+constraint-validation guards (all <code>caught-import</code>), then one per
+defect review turned up, so each new guard is demonstrably able to
+fail on the tree that shipped without it. Its NO-OP verdict earned
+its keep during the work: retyping the blob <code>offset</code>/<code>limit</code>
+declarations to
+<code>unsignedinteger</code> moved them out from under mutation 3's search
+text, which reported NO-OP instead of a false catch.</p>
+<p>Three deviations from the letter of the plan, all recorded rather
+than silent:</p>
+<ul>
+<li><strong><code>macaddr</code> is defined but unapplied.</strong> No declaration site
+  exists for it: interface MACs arrive inside the <code>network</code>
+  arrayofdict specs on instance create, not as a standalone
+  parameter, so its first consumer is the structured value types
+  work (#936, phase 6). The token ships now because D9 committed
+  the vocabulary and the pattern is mutation-tested either way.</li>
+<li><strong>The events <code>limit</code> minimum is 1, not 0.</strong> The server replaces
+  <code>limit &lt;= 0</code> with the default 100 (the mariadb limit-hardening
+  rules), so 0 is <em>accepted</em> but meaningless; the published bound
+  documents the values a caller can usefully send. Whether phase 4
+  enforcement should reject 0 or keep tolerating it is a warn-only
+  question for phase 3's sfcbr data.</li>
+<li><strong><code>netblock</code> ships without its planned pattern.</strong> The table above
+  specifies <code>&lt;a.b.c.d/n&gt;</code>, but <code>NetworksEndpoint.post()</code> validates
+  with <code>ipaddress.ip_network()</code>, which parses IPv6 as well, so an
+  IPv4-only pattern would publish the API as narrower than it is —
+  and phase 4 would then compile a documentation commit into a 400
+  for input that works today. The pattern was also loose enough to
+  admit <code>999.999.999.999/99</code>, so it was not carrying its weight as
+  validation either. <code>netblock</code> is therefore a format-only token and
+  <code>ip_network()</code> remains the single source of truth for what parses.
+  The reserved-range semantic (#323) was always out of scope.</li>
+</ul>
+<p>Review of the implementation found one real defect the vocabulary
+work created rather than inherited: instance create declared
+<code>metadata</code> as <code>arrayofdict</code> while the handler answers 400 to anything
+but a dictionary. That was inert prose before this phase and a
+machine-readable assertion of the wrong shape after it -- exactly the
+trap the <code>netblock</code> decision above avoids, arrived at from the other
+direction. <code>metadata</code> is now <code>dict</code>, and the <code>dict</code> token renders as
+a real <code>{'type': 'object'}</code> for the same reason the array tokens do,
+which also corrects <code>video</code> and <code>bound_claims</code>. <code>test_openapi_spec.py</code>
+pins the published shape, since a token swap is legal at import time
+and only the endpoint's semantics distinguish the two.</p>
+<p>A third round found the same defect class again in the opposite
+direction: console <code>length</code> was retyped to <code>unsignedinteger</code> while
+<code>-1</code> is a supported sentinel meaning "the whole log", used by the
+functional suite itself. Two instances of one class, both found by
+review rather than by a machine, is the signal that the class needed
+a mechanism rather than another fix. Types are not derived from
+anything -- <code>declarations.py</code> reads a declaration's name and location
+and never looks at its type -- so
+<code>test_openapi_spec.STRUCTURED_PARAMETERS</code> now lists every parameter
+publishing a structure or a bound alongside the shape its handler
+actually accepts, and an entry describes that shape in full: a
+constraint key the entry does not list must not be published. Both
+shipped defects fail that table, verified by mutation (20 and 21 in
+the guard harness), as does a spurious <code>maximum</code> on an entry which
+asserts no bound (mutation 24) and a bound on a parameter nobody
+registered (mutation 23). It remains a registry rather than a
+derivation of <em>what</em> a handler accepts, so it constrains the next
+author to think rather than proving them right; only its completeness
+is derived. A real derivation of types from handler bodies is phase
+3's problem, where the warn-only rollout measures declarations
+against live traffic.</p>
+<p>The <code>unsignedinteger</code> comment named a live data-loss foot-gun --
+a negative <code>max_versions</code> deletes the oldest version on every index
+add -- so this phase closes it rather than documenting it and waiting
+for phase 4. The first attempt closed it in
+<code>ArtifactMaxVersionsEndpoint.post</code> alone, which a later review round
+correctly called one of <em>three</em> routes writing the attribute: label
+create and instance snapshot both pass a caller's <code>max_versions</code>
+into <code>Artifact.new()</code>, which reaches the same setter and the same
+<code>delete_old_versions()</code>. The coercion and the check now live in
+<code>artifact.validated_max_versions()</code>, called from the setter so every
+writer inherits the guard whether or not it ever sees a request
+body, and from all three handlers so the refusal is a 400 rather
+than a 500. <code>TypeError</code> is caught alongside <code>ValueError</code> so a list
+or dict body value is a 400 too.</p>
+<p>The same "publish only what the server backs" rider applies to the
+blob data route, whose <code>offset</code> and <code>limit</code> now publish minimum 0.
+Unbacked, both failed worse than meaninglessly: a negative offset
+reached <code>f.seek()</code> inside <code>stream_with_context</code>, so the <code>OSError</code>
+arrived after the 200 had begun and the caller saw a truncated body
+rather than an error, and a negative limit read to EOF and defeated
+the cap it was asked for. Both are checked in the handler. A
+marshmallow <code>validate=Range(min=0)</code> on the webargs schema was tried
+first and rejected: webargs raises <code>UnprocessableEntity</code> and the
+app's error handler renders it as a <strong>500</strong>, which is the same
+serialisation hazard the <code>json_or_query</code> loader in <code>base.py</code>
+documents. Nothing in the tree uses <code>validate=</code> today, so the
+webargs error path is a latent phase 3 problem rather than a live
+one, but it is worth knowing before phase 3 reaches for it.</p>
+<p>Those, and the <code>key_ttl</code> bounds below, are the only behaviour changes
+in a phase which is otherwise documentation.</p>
+<p>A related judgement call, made when the review raised it: <code>cpus</code>,
+<code>memory</code>, <code>version_id</code> and console <code>length</code> are typed
+<code>unsignedinteger</code> (minimum 0) rather than carrying a <code>{'minimum': 1}</code>
+constraint. Nothing in the create path rejects a zero or negative
+<code>cpus</code> today — the scheduler's <code>_has_sufficient_cpu()</code> compares
+<code>current + cpus &gt; hard_max</code>, which a negative passes — so minimum 0
+is the strongest claim the server actually backs. Tightening to 1 is
+a phase 3 warn-only question, decided with data, not a documentation
+change.</p>
+<p><code>key_ttl</code> was in that list and should not have been: it is the one
+member of it the server already bounds on both sides.
+<code>validate_key_ttl()</code> refuses <code>&lt;= 0</code> and refuses anything above
+<code>MAX_KEY_TTL_SECONDS</code> (86400), and both rule endpoints turn the
+resulting <code>RuleValidationError</code> into a 400. Typed
+<code>unsignedinteger</code> it published a minimum of 0 — documenting a value
+the server answers 400 to — while the enforced cap stayed invisible,
+which is the very invisible-cap problem the events <code>limit</code> change in
+this phase exists to fix. Both declarations now carry
+<code>{'minimum': 1, 'maximum': MAX_KEY_TTL_SECONDS}</code>, sourced from the
+constant rather than restated, so the specification cannot drift from
+the check.</p>
+<p>Two decisions the review asked to see recorded rather than inferred:</p>
+<ul>
+<li><strong>The events <code>limit</code> maximum of 1000 will not compile into a
+  rejection.</strong> <code>get_events_for_object()</code> <em>clamps</em> rather than
+  refuses, so <code>limit=5000</code> succeeds today and returns 1000 rows.
+  Phase 4 must keep clamping. The published maximum is a statement
+  of what a caller can usefully ask for, not a promise that asking
+  for more is an error, and turning it into a 400 would be a
+  documentation commit changing wire behaviour two phases later —
+  precisely the trap the <code>netblock</code> decision avoids.</li>
+<li><strong><code>CONSTRAINT_KEYS</code> is deliberately three keys.</strong> <code>maxLength</code>,
+  <code>minLength</code>, <code>minItems</code> and <code>enum</code> are all valid Swagger 2.0
+  keywords and all have real consumers waiting — rule <code>name</code> is
+  refused above 255 characters, <code>MAX_SCOPE_LENGTH</code> bounds each
+  scope, <code>scopes</code> must be non-empty, <code>configdrive</code> accepts only
+  <code>none</code> and <code>openstack-disk</code> — but this phase set out to publish
+  the numeric and pattern bounds D9 named, and each new key needs
+  its own validation and its own mutation. They are scoped out, not
+  overlooked; phase 3 is where the compiler makes the case for
+  adding them concrete.</li>
+</ul>
+<p>Finally, <code>STRUCTURED_PARAMETERS</code> grew a derived completeness
+assertion. As shipped it was a hand-maintained list which could fall
+silently behind the tree — the same failure mode as the prose types
+it replaced, one level up, and it was already missing twelve of the
+tree's structured or bounded declarations when the review counted
+them.
+<code>test_every_published_structure_or_bound_is_registered()</code> now walks
+the published specification, collects every parameter carrying an
+<code>object</code>/<code>array</code> type or any key in <code>CONSTRAINT_KEYS</code>, and fails
+until each one has an entry. The entries themselves still have to be
+written by hand against the handler, which is the point: the
+derivation says <em>something is missing</em>, and a human still has to say
+what the handler really accepts. An entry now also describes the
+published shape in full — a constraint key it does not list must not
+be published — so a <code>maximum</code> appearing on console <code>length</code> fails
+the same way a <code>minimum</code> already did.</p>
 
 
 
