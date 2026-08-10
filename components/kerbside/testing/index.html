@@ -4849,6 +4849,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#ci-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI tiers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI tiers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gate-jobs-and-required-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gate jobs and required checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#end-to-end-ci-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4875,6 +4903,17 @@
     <span class="md-ellipsis">
       
         Testing the SPICE console of an oVirt VM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-shaken-fist-end-to-end-lane-sf-e2e" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Shaken Fist end-to-end lane (sf-e2e)
       
     </span>
   </a>
@@ -6047,6 +6086,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 4: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -6390,6 +6457,89 @@
     
   
     VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/ovirt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for oVirt
   
 
     
@@ -10915,6 +11065,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#ci-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI tiers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI tiers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gate-jobs-and-required-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gate jobs and required checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#end-to-end-ci-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10941,6 +11119,17 @@
     <span class="md-ellipsis">
       
         Testing the SPICE console of an oVirt VM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-shaken-fist-end-to-end-lane-sf-e2e" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Shaken Fist end-to-end lane (sf-e2e)
       
     </span>
   </a>
@@ -11039,6 +11228,135 @@
 <p>How Kerbside is tested: the CI lanes, the Ryll-based harnesses, the
 oVirt console probe, the Tempest plugin, and the load-test container
 images.</p>
+<h2 id="ci-tiers">CI tiers<a class="headerlink" href="#ci-tiers" title="Permanent link">&para;</a></h2>
+<p>Since two-tier CI phase 3, develop is protected by a GitHub merge
+queue and the lanes are split into two tiers.</p>
+<ul>
+<li><strong>The smoke tier</strong> runs on every pull request push: unit tests and
+  lint, the direct-qemu lane, and the Shaken Fist end-to-end lane.
+  Between them these deploy the PR's own code and relay real SPICE
+  traffic through the real proxy, so a PR still gets end-to-end
+  signal in tens of minutes rather than hours.</li>
+<li><strong>The merge tier</strong> runs only in the merge queue: the oVirt and
+  OpenStack cloud matrices, each of which builds an entire cloud
+  from scratch. These are the expensive lanes, and their failure
+  modes are dominated by upstream environment churn rather than by
+  Kerbside regressions, so running them per PR bought little for
+  what it cost.</li>
+</ul>
+<p>The trade is deliberate: a cloud-specific breakage now surfaces in
+the merge queue rather than on the PR, blocking the queue and
+costing a rerun.</p>
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Runs on</th>
+<th>Tier</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>functional-tests.yml</code> (<code>sanity_checks</code>)</td>
+<td>pull_request, merge_group</td>
+<td>smoke</td>
+</tr>
+<tr>
+<td><code>functional-tests.yml</code> (<code>ovirt_matrix</code>, <code>openstack_matrix</code>)</td>
+<td>merge_group, workflow_dispatch</td>
+<td>merge</td>
+</tr>
+<tr>
+<td><code>direct-qemu-functional.yml</code></td>
+<td>pull_request, merge_group, nightly</td>
+<td>smoke</td>
+</tr>
+<tr>
+<td><code>sf-e2e-functional.yml</code></td>
+<td>pull_request, merge_group, nightly</td>
+<td>smoke</td>
+</tr>
+<tr>
+<td><code>rust.yml</code></td>
+<td>push and pull_request, path-filtered to <code>rust/**</code> and the proto</td>
+<td>neither (advisory)</td>
+</tr>
+<tr>
+<td><code>codeql-analysis.yml</code></td>
+<td>push, pull_request, weekly</td>
+<td>neither</td>
+</tr>
+<tr>
+<td><code>prune-reviews.yml</code></td>
+<td>push to develop</td>
+<td>neither</td>
+</tr>
+<tr>
+<td><code>pin-indirect-dependencies.yml</code></td>
+<td>daily, and on PRs touching the pinning script</td>
+<td>neither</td>
+</tr>
+</tbody>
+</table>
+<p><code>rust.yml</code> is advisory rather than gating. Rust breakage still
+blocks merges, because the proxy wheel is built by the direct-qemu
+lane in the smoke tier and by both cloud matrices in the merge
+tier; what never runs against the merged tree is <code>clippy</code> and
+<code>cargo test</code>, which is an accepted gap.</p>
+<p>The direct-qemu lane also runs nightly, because the merge queue
+does not re-run it against the merged tree.</p>
+<h3 id="gate-jobs-and-required-checks">Gate jobs and required checks<a class="headerlink" href="#gate-jobs-and-required-checks" title="Permanent link">&para;</a></h3>
+<p>Branch protection cannot require "whatever ran"; it requires named
+checks. Since a job that does not run reports nothing, and a
+required check that never reports blocks every merge forever, each
+tier ends in a small aggregate gate job whose only work is to
+assert that everything it depends on succeeded or skipped:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Asserts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Can see status</code></td>
+<td>nothing; it always succeeds, proving the workflow was evaluated at all</td>
+</tr>
+<tr>
+<td><code>Can enqueue</code></td>
+<td>the smoke-tier jobs in <code>functional-tests.yml</code>, on non-merge_group events</td>
+</tr>
+<tr>
+<td><code>Can enqueue: direct-qemu</code></td>
+<td>the direct-qemu lane</td>
+</tr>
+<tr>
+<td><code>Can enqueue: sf-e2e</code></td>
+<td>the Shaken Fist end-to-end lane</td>
+</tr>
+<tr>
+<td><code>Can merge</code></td>
+<td>the cloud matrices, on merge_group events only</td>
+</tr>
+</tbody>
+</table>
+<p>Those five names are the entire required-check list on the develop
+ruleset. Because a skipped required check satisfies the rule, one
+list serves both refs: on a pull request <code>Can merge</code> skips, and in
+the merge queue the three <code>Can enqueue</code> checks skip.</p>
+<p>The binding between a required check and the job that satisfies it
+is the job's display name, matched as a string. <strong>Renaming a gate
+job without updating the ruleset blocks every merge in the
+repository.</strong> <code>sanity_checks</code> runs <code>tools/check-required-checks.sh</code>
+to catch that as a red smoke check rather than as an outage: it
+asserts every required context in the exported ruleset
+(<code>.github/exported-config/ruleset-*.json</code>, archived daily by
+<code>export-repo-config.yml</code>) still matches a job name in
+<code>.github/workflows/</code>.</p>
+<p>For the design rationale see
+<a href="/components/kerbside/plans/PLAN-two-tier-ci/">plans/PLAN-two-tier-ci.md</a> and
+<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">plans/PLAN-two-tier-ci-phase-03-merge-queue.md</a>.</p>
 <h2 id="end-to-end-ci-coverage">End-to-end CI coverage<a class="headerlink" href="#end-to-end-ci-coverage" title="Permanent link">&para;</a></h2>
 <p>The proxy is exercised end to end in CI: the direct-qemu functional
 lane boots a real qemu/SPICE guest, drives it with the ryll headless
@@ -11096,6 +11414,21 @@ which CI checks out alongside this one:</p>
 <li><code>tools/ovirt-gather-artifacts.sh</code> — collects RPM lists and logs for
   CI artifacts</li>
 </ul>
+<h2 id="the-shaken-fist-end-to-end-lane-sf-e2e">The Shaken Fist end-to-end lane (<code>sf-e2e</code>)<a class="headerlink" href="#the-shaken-fist-end-to-end-lane-sf-e2e" title="Permanent link">&para;</a></h2>
+<p><code>.github/workflows/sf-e2e-functional.yml</code> is the only lane that
+exercises the <code>type: shakenfist</code> console source against a real
+cluster. It stands up a single-node Shaken Fist (via
+<code>shakenfist/actions/build-smoke-cluster</code>), provisions <code>KERBSIDE_URL</code>
+and a signing key, deploys a co-located Kerbside with a
+<code>type: shakenfist</code> source (via
+<code>shakenfist/actions/deploy-kerbside-on-shakenfist</code>), and drives an
+SF-minted token through offline verification, exchange, and a
+proxied SPICE session against the Sextant guest booted inside the SF
+instance — followed by an adversarial matrix covering replay,
+expiry, wrong audience, unknown kid, and cross-namespace mint.</p>
+<p>Driver scripts live in <code>tools/sf-e2e/</code> (see
+<code>tools/sf-e2e/README.md</code>). It is a smoke-tier PR gate, and also runs
+nightly and on dispatch.</p>
 <h2 id="the-ovirt-end-to-end-kerbside-lane">The oVirt end-to-end kerbside lane<a class="headerlink" href="#the-ovirt-end-to-end-kerbside-lane" title="Permanent link">&para;</a></h2>
 <p>Since two-tier CI phase 1, the <code>ovirt_matrix</code> job in
 <code>.github/workflows/functional-tests.yml</code> does more than build and
@@ -11107,10 +11440,24 @@ through the Rust proxy — asserting from the proxy log that the
 backend leg escalated to TLS with a non-empty certificate-subject
 pin on every escalation, then terminating the in-flight session via
 the REST API and asserting the proxy dropped it.</p>
+<p>The engine also holds a second VM, <code>no-spice-test</code>: diskless,
+network-boot, with a VNC display and therefore no SPICE console
+(<code>tools/create-ovirt-vnc-vm.py</code>). It exists to be ignored. Discovery
+has to skip a VM it cannot broker and carry on scraping, and every
+other VM in every lane has a SPICE display, so that branch had never
+run in CI — which is how a missing <code>continue</code> in
+<code>kerbside/sources/ovirt.py</code> survived: it errored the whole source,
+dropped every VM discovered after the offending one, and reaped
+their consoles as no longer available, once a minute.
+<code>drive-console.py</code> now asserts that VM is absent from the console
+list while the SPICE one is present.</p>
 <p>The runner-side scripts live in <code>tools/ovirt-e2e/</code> and are
 documented in <code>tools/ovirt-e2e/README.md</code>; the architecture decision
 and bring-up history are in
-<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</a>.</p>
+<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</a>.
+The lane is a worked example of the deployment described in
+<a href="/components/kerbside/use-cases/ovirt/">use-cases/ovirt.md</a>, which is the operator-facing
+version of what it proves.</p>
 <h2 id="tempest-tests-against-a-kolla-ansible-deployment">Tempest tests against a Kolla-Ansible deployment<a class="headerlink" href="#tempest-tests-against-a-kolla-ansible-deployment" title="Permanent link">&para;</a></h2>
 <p>The <code>tempest-plugin/</code> directory is a separate releasable that
 contributes Kerbside-specific Tempest tests; see

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci/">
       
       
-        <link rel="prev" href="../PLAN-two-tier-ci-phase-03-merge-queue/">
+        <link rel="prev" href="../PLAN-two-tier-ci-phase-04-docs/">
       
       
         <link rel="next" href="../PLAN-use-case-docs/">
@@ -5899,6 +5899,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 4: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -6414,6 +6442,89 @@
     
   
     VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/ovirt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for oVirt
   
 
     
@@ -11082,6 +11193,16 @@
 
 
 <h1 id="two-tier-ci-smoke-gates-on-prs-full-clouds-in-the-merge-queue">Two-tier CI: smoke gates on PRs, full clouds in the merge queue<a class="headerlink" href="#two-tier-ci-smoke-gates-on-prs-full-clouds-in-the-merge-queue" title="Permanent link">&para;</a></h1>
+<p><strong>Status: complete (2026-08-10).</strong> All four phases have landed and
+the merge queue has been live since 2026-08-09. Like every plan in
+this directory this is a point-in-time record: the Situation below
+describes CI as it was on 2026-08-02, not as it is now — for that,
+read <code>docs/testing.md</code>.</p>
+<p>Two validation items from phase 3 remain undemonstrated rather than
+undone, and are recorded there: a review-marks-only PR through the
+queue, and the close/reopen dance on a bot-created configuration
+PR. Both will happen on their own the next time one of those PRs
+appears; neither blocks anything.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the kerbside codebase thoroughly. Read
@@ -11352,12 +11473,12 @@ nightly CI catches independently), this is a good trade.</p>
 <tr>
 <td>3. Merge queue adoption and tier split</td>
 <td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">PLAN-two-tier-ci-phase-03-merge-queue.md</a></td>
-<td>Workflows landed; queue enablement is an operator step (phase plan steps 4-5)</td>
+<td>Complete — queue live 2026-08-09</td>
 </tr>
 <tr>
 <td>4. Documentation</td>
-<td>PLAN-two-tier-ci-phase-04-docs.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/">PLAN-two-tier-ci-phase-04-docs.md</a></td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -11427,6 +11548,18 @@ nightly CI catches independently), this is a good trade.</p>
   per-deployment-permutation documentation suite (Shaken
   Fist, OpenStack, multi-cloud, static, and eventually
   Proxmox) as follow-on work outside this plan's scope.</p>
+<p><strong>Executed 2026-08-10.</strong> The page is
+  <code>docs/use-cases/ovirt.md</code>; the tier split is documented
+  in <code>docs/testing.md</code>'s "CI tiers" section, which every
+  other file now points at rather than restating. Two
+  things worth carrying forward: the master plan's prose
+  blurred <code>SpiceProxyDefault</code> into something kerbside
+  needs unset, when in fact kerbside never reads
+  engine-generated <code>.vv</code> files and the setting is simply
+  irrelevant to it — the page says so precisely. And the
+  engine account's least-privilege story is documented as
+  untested rather than invented, since only <code>SuperUser</code>
+  has ever been exercised.</p>
 <p>Future work, explicitly out of scope here but shaping the
 design: a multinode Shaken Fist lane and a Proxmox source
 plus lane, both landing directly in the merge tier. On

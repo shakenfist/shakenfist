@@ -6024,6 +6024,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 4: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -6367,6 +6395,89 @@
     
   
     VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/ovirt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for oVirt
   
 
     
@@ -11128,11 +11239,11 @@ keys cannot be fetched, the source is marked as errored.</p>
 </tr>
 <tr>
 <td>url</td>
-<td>The oVirt Engine URL (e.g., <code>https://ovirt.example.org/ovirt-engine</code>)</td>
+<td>The oVirt Engine URL (e.g., <code>https://ovirt.example.org/ovirt-engine</code>). Must <strong>not</strong> end in <code>/api</code> -- Kerbside appends that itself</td>
 </tr>
 <tr>
 <td>username</td>
-<td>The username to authenticate to the source as (e.g., <code>admin@internal</code>)</td>
+<td>The username to authenticate to the source as. oVirt 4.4.7 and later name the built-in administrator <code>admin@ovirt@internalsso</code>; older deployments use <code>admin@internal</code></td>
 </tr>
 <tr>
 <td>password</td>
@@ -11140,13 +11251,27 @@ keys cannot be fetched, the source is marked as errored.</p>
 </tr>
 <tr>
 <td>ca_cert</td>
-<td>Required: the SSL CA public key certificate to validate API and VDI connections against</td>
+<td>Required: the SSL CA public key certificate to validate API and VDI connections against. Inline PEM text, not a path</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Note</strong>: The CA certificate is verified against the engine's PKI certificate
 during initialization. If they don't match, the source will be marked as
-errored.</p>
+errored. A source that errors as soon as it is configured usually means the
+pasted CA is stale or truncated, rather than that the engine is unreachable.</p>
+<p>The engine URL must use the name the engine's certificate was issued for,
+and that name must resolve from the Kerbside host: an IP address URL fails
+certificate verification.</p>
+<p>The account needs to list VMs, list hosts (Kerbside pins each VM's host
+certificate subject), read graphics consoles, and acquire console tickets
+-- the last requires the <code>RECONNECT_TO_VM</code> action group on the VMs. Listing
+hosts is an administrative operation, so a plain VM-portal role is not
+enough; only <code>SuperUser</code> has been tested.</p>
+<p>Kerbside connects to the hypervisor's SPICE ports directly, so it needs L3
+reachability to every hypervisor, and oVirt's own SPICE proxy
+(<code>SpiceProxyDefault</code>) is not in the path. See
+<a href="/components/kerbside/use-cases/ovirt/">Kerbside for oVirt</a> for the deployment architecture,
+the network prerequisites, and what is and is not proven.</p>
 <h2 id="openstack">OpenStack<a class="headerlink" href="#openstack" title="Permanent link">&para;</a></h2>
 <p>OpenStack sources work differently from Shaken Fist and oVirt. Instead of
 periodically scraping for available consoles, Kerbside validates authentication

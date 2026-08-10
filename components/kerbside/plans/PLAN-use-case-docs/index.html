@@ -5902,6 +5902,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 4: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -6325,6 +6353,89 @@
     
   
     VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/ovirt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for oVirt
   
 
     
@@ -10982,10 +11093,27 @@ Operator Documentation section of the index. README.md is
 only touched if the curated doc links change (per the
 readme-discipline policy).</p>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>Not started, except that the oVirt page is scheduled as
-PLAN-two-tier-ci.md phase 4's deliverable. Do not start
-the remaining pages before that page has settled the
-format.</p>
+<p>The oVirt page landed 2026-08-10 as PLAN-two-tier-ci.md
+phase 4's deliverable, and settles the format. The
+remaining six pages are unblocked.</p>
+<p>Two things it decided that the rest should follow:</p>
+<ul>
+<li><strong>The pages live in <code>docs/use-cases/</code>, not flat in
+  <code>docs/</code>.</strong> Seven pages would have buried the reference
+  material; <code>docs/spice/</code> and <code>docs/plans/</code> set the
+  subdirectory precedent.</li>
+<li><strong>They are indexed under their own "Use Cases" heading
+  in <code>docs/index.md</code>, listed before Operator
+  Documentation</strong>, rather than joining the Operator
+  section as this plan originally proposed. A prospective
+  operator reads "is this for me?" before "what are the
+  config keys?".</li>
+</ul>
+<p>One thing worth imitating: the oVirt page's "Status and
+limitations" section is a table of what is <em>not</em> proven,
+each row naming why. That is more useful than a prose
+paragraph and much harder to let quietly rot, because a
+row either still applies or gets deleted.</p>
 
 
 

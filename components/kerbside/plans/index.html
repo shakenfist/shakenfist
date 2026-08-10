@@ -5971,6 +5971,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 4: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-two-tier-ci/" class="md-nav__link">
         
   
@@ -6314,6 +6342,89 @@
     
   
     VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/ovirt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for oVirt
   
 
     
@@ -10933,8 +11044,8 @@ repo root. For pre-push audits of our own work see
 <td>2026-08-02</td>
 <td><a href="/components/kerbside/plans/PLAN-two-tier-ci/">Two-tier CI</a></td>
 <td>Adopt the shakenfist/shakenfist two-tier CI flow: smoke gates (sanity, direct-qemu, Rust, single-node sf-e2e) on PRs; oVirt and Kolla/OpenStack move to a merge-queue tier; fix the oVirt lane to actually deploy kerbside; record the oVirt front-door architecture decision</td>
-<td>Draft, blocked on sf-e2e PR-readiness</td>
-<td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">phase 1</a> (done), phases 2-4 not yet planned</td>
+<td>Complete</td>
+<td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">phase 1</a> (done), <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">phase 2</a> (done, promoted on four green nightlies), <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">phase 3</a> (done, queue live 2026-08-09; first entry caught a real failure), <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/">phase 4</a> (done)</td>
 </tr>
 <tr>
 <td>2026-08-08</td>
@@ -10966,7 +11077,7 @@ repo root. For pre-push audits of our own work see
 <td>2026-08-02</td>
 <td><a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a></td>
 <td>One docs page per deployment permutation (Shaken Fist, OpenStack, oVirt, multi-cloud aggregation, placement topologies, static, later Proxmox), each covering value proposition, how it works, and setup; the oVirt page is delivered by two-tier CI phase 4 as the format-setting first instance</td>
-<td>Not started</td>
+<td>In progress — oVirt page landed 2026-08-10 and settles the format (<code>docs/use-cases/</code>, own index section); six pages remain</td>
 </tr>
 </tbody>
 </table>

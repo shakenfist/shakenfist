@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">
       
       
-        <link rel="next" href="../PLAN-two-tier-ci/">
+        <link rel="next" href="../PLAN-two-tier-ci-phase-04-docs/">
       
       
         
@@ -6039,6 +6039,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#step-5-what-actually-happened-2026-08-0910" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: what actually happened (2026-08-09/10)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6081,6 +6092,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Two-tier CI phase 4: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -6436,6 +6475,89 @@
     
   
     VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/ovirt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for oVirt
   
 
     
@@ -11066,6 +11188,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#step-5-what-actually-happened-2026-08-0910" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: what actually happened (2026-08-09/10)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11335,12 +11468,12 @@ smaller repo). The pattern:</p>
 <tr>
 <td>4</td>
 <td>Operator: apply the ruleset change (below), then dispatch <code>export-repo-config.yml</code> to archive it</td>
-<td>Not started</td>
+<td>Complete 2026-08-09 — ruleset 20252051 "Develop branch"</td>
 </tr>
 <tr>
 <td>5</td>
 <td>Live validation: merge a scratch PR through the queue; watch the first real merge group end to end</td>
-<td>Not started</td>
+<td>Complete 2026-08-09 — three merge groups, see below</td>
 </tr>
 </tbody>
 </table>
@@ -11442,6 +11575,53 @@ step 4, in order:</p>
    bypass (it lands via PRs), but its PRs are created with a
    workflow token and so start with zero check runs.</li>
 </ol>
+<h3 id="step-5-what-actually-happened-2026-08-0910">Step 5: what actually happened (2026-08-09/10)<a class="headerlink" href="#step-5-what-actually-happened-2026-08-0910" title="Permanent link">&para;</a></h3>
+<p>Validation ran against real PRs rather than scratch ones, because
+real ones arrived first. Against the four items above:</p>
+<ol>
+<li><strong>Proven.</strong> Merge group <code>pr-273</code> (run 31334740094) ran
+   <code>sanity_checks</code>, <code>Check paths</code>, and <strong>both</strong> cloud matrices —
+   they ran, they did not skip — and <code>Can merge</code> went green, and
+   the PR merged. The prune-reviews push landed afterwards as
+   shakenfist-bot (<code>a623c09</code>, pushed directly to develop), which
+   is the first time that path has fired: every run since #270 had
+   found nothing to prune.</li>
+<li><strong>Proven, but not deliberately.</strong> Two earlier merge groups
+   failed with <code>Can merge</code> red — <code>pr-271</code> (run 31300325748) and
+   <code>pr-259</code> (run 31308040793) — both because <code>ovirt_matrix</code>
+   failed. No scratch PR was needed; the gate's red path is
+   demonstrated on this repo.</li>
+<li><strong>Not demonstrated.</strong> No review-marks-only PR has been through
+   the queue yet. The <code>check_paths</code> skip path is still unproven
+   in a merge group.</li>
+<li><strong>Not demonstrated.</strong> PR #269 ("Repository configuration
+   changed") merged at 05:34 on 2026-08-09 without a merge group,
+   so the close/reopen dance has not been exercised against the
+   queue.</li>
+</ol>
+<p>The first entry into the queue caught a real, previously-invisible
+failure (the oVirt lane's <code>host_subject</code> oracle, issue #272, fixed
+in #273), which is the clearest possible argument for the phase.</p>
+<p><strong>The queue is not mandatory, by choice.</strong> Six PRs merged after the
+ruleset went live and only one (#273) went through the queue; the
+other five used the bypass. That is not a defect in the design:
+the "SF Can Skip Merge Queue" team was added so shakenfist-bot
+could push review-mark prunes, GitHub applies a bypass to the
+<em>whole ruleset</em> rather than per-rule, and the maintainer is a
+member of that team and wants to keep the force-merge capability
+because it is exactly what you need when CI is broken — which is
+what several of those five merges were working around. The
+practical consequences to remember:</p>
+<ul>
+<li>A human in the bypass team gets a plain "Merge pull request"
+  button and skips the queue silently. There is no warning.</li>
+<li>"Merge when ready" is the opt-in path into the queue; use it
+  deliberately.</li>
+<li>Merge-tier coverage is therefore advisory for anyone in that
+  team. If the cloud matrices need to be genuinely mandatory for
+  everyone, the bypass has to narrow to an App or a bot-only team
+  — a decision consciously not taken here.</li>
+</ul>
 <p><code>workflow_dispatch</code> still runs the matrices directly for lane
 debugging, but note a dispatch run never attaches checks to a PR —
 for a wedged PR rollup, close/reopen remains the reliable
@@ -11607,13 +11787,20 @@ outcomes:</p>
 <ul>
 <li>A pull request runs sanity, direct-qemu, sf-e2e (and rust when
   touched) but <strong>no cloud matrices</strong>; PR feedback time drops from
-  ~2 hours to the slowest smoke lane.</li>
+  ~2 hours to the slowest smoke lane. <strong>Met.</strong></li>
 <li>Merging requires the merge queue; a queue entry deploys oVirt
-  and OpenStack against the merged tree and blocks on failure.</li>
+  and OpenStack against the merged tree and blocks on failure.
+  <strong>Met for anyone outside the bypass team, which as written was
+  the wrong criterion</strong> — see step 5's outcome. A queue entry does
+  deploy both clouds and does block on failure (demonstrated three
+  times), but the maintainer can and does bypass the queue
+  deliberately. Restate as: <em>a queue entry deploys oVirt and
+  OpenStack against the merged tree and blocks on failure, and the
+  queue is the default path to merge.</em></li>
 <li>A review-marks-only PR merges through the queue with every
-  required check satisfied by skips.</li>
+  required check satisfied by skips. <strong>Not yet demonstrated.</strong></li>
 <li>The automated reviewer posts after the smoke tier, not after the
-  cloud lanes.</li>
+  cloud lanes. <strong>Met</strong> — it is <code>skipped</code> in merge groups.</li>
 </ul>
 <p>Steady-state throughput expectation, to make the phase 4 review
 concrete: a queue entry costs roughly two hours (sanity plus the
