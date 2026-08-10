@@ -16,6 +16,20 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
+# How long an address must look leaked, continuously and across more than
+# one sweep, before we act on it. The lifecycle operations which own
+# floating IPs are not atomic, so a single sweep can easily observe an
+# object mid-teardown and mistake it for a leak. Requiring the same
+# address to look leaked for this long means an in flight delete (seconds)
+# never gets reaped, while a genuine leak (forever) still does.
+LEAK_CONFIRMATION_SECONDS = 300
+
+# Addresses which looked leaked on previous sweeps, mapped to the time we
+# first saw them look that way. Rebuilt on every sweep, so an address
+# which stops looking leaked forgets its history.
+_leak_candidates: dict[str, float] = {}
+
+
 def reap_floating_ips():
     """Run one reconciliation sweep of the floating network's IPAM.
 
@@ -104,7 +118,9 @@ def reap_floating_ips():
 
     # Now the reverse check. Test if there are any reserved IPs which
     # are not actually in use. Free any we find.
+    now = time.time()
     leaks = []
+    candidates = {}
     for ip in floating_network.ipam.in_use:
         if ip not in itertools.chain(floating_gateways,
                                      floating_addresses,
@@ -113,7 +129,7 @@ def reap_floating_ips():
                                      floating_halo):
             # This IP needs to have been allocated more than 300 seconds
             # ago to ensure that the network setup isn't still queued.
-            if time.time() - floating_network.ipam.get_allocation_age(ip) < 300:
+            if now - floating_network.ipam.get_allocation_age(ip) < 300:
                 continue
 
             # However, the inverse is also true -- the deletion of whatever
@@ -125,16 +141,35 @@ def reap_floating_ips():
                     obj_state = o.state
                     if (
                         obj_state.value == dbo.STATE_DELETED and
-                        time.time() - obj_state.update_time < 300
+                        now - obj_state.update_time < 300
                     ):
                         continue
 
+            # This address _looks_ leaked, but the observations which got
+            # us here are not a consistent snapshot -- the object holding
+            # the address might have been torn down between the scan above
+            # and the reservation lookup here. Only act once the address
+            # has looked leaked for LEAK_CONFIRMATION_SECONDS of
+            # continuous observation, which no in flight teardown lasts
+            # for (issue 3645).
+            first_seen = _leak_candidates.get(ip, now)
+            candidates[ip] = first_seen
+            if now - first_seen < LEAK_CONFIRMATION_SECONDS:
+                LOG.with_fields({
+                    'address': ip,
+                    'first_seen': first_seen
+                }).info('Floating IP might have leaked, awaiting confirmation')
+                continue
+
             # A leak!
-            LOG.error(f'Floating IP {ip} has leaked.')
+            LOG.warning(f'Floating IP {ip} has leaked.')
             leaks.append(ip)
 
+    _leak_candidates.clear()
+    _leak_candidates.update(candidates)
+
     for ip in leaks:
-        LOG.error('Leaked floating IP %s has been released.' % ip)
+        LOG.warning('Leaked floating IP %s has been released.' % ip)
         floating_network.ipam.release(ip)
 
     return True

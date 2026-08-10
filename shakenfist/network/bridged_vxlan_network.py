@@ -553,6 +553,17 @@ class BridgedVXLanNetwork:
             util_concurrency.execute(
                 'ip netns del %s' % str(self.network.uuid))
 
+        # Release the floating gateway reservation _before_ the network is
+        # marked deleted. The floating IP reaper considers a gateway
+        # reservation whose owning network is deleted to be a leak, so
+        # leaving the reservation in place across the state transition
+        # opens a window (observed at 250ms to 6s on a busy cluster) in
+        # which a reaper pass will release the reservation out from under
+        # this teardown and log the perfectly healthy address as leaked
+        # (issue 3645). Once "deleted" is published the network must
+        # therefore hold no floating network resources at all.
+        self._apply_remove_nat()
+
         self.network.ipam.state = self.network.ipam.STATE_DELETED
         self.network.state = self.network.STATE_DELETED
 
@@ -572,7 +583,6 @@ class BridgedVXLanNetwork:
         # the sibling apply methods directly on ``self``.
         if self.network.provide_dhcp or self.network.provide_dns:
             self._apply_remove_dnsmasq()
-        self._apply_remove_nat()
 
     def _apply_enable_nat(self) -> None:
         """Install the masquerade rules for the wrapped network.
