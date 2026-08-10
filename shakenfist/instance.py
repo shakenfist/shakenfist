@@ -13,6 +13,7 @@ import socket
 import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from contextlib import contextmanager
 from functools import partial
 from uuid import UUID
 from uuid import uuid4
@@ -236,6 +237,12 @@ class Instance(dbowo):
     METADATA_KEY_TAGS = 'tags'
     METADATA_KEY_AFFINITY = 'affinity'
 
+    # Per-call memo of the instance_attributes row, only populated inside
+    # an attribute_memo() block. Class level defaults so that an attribute
+    # read during object construction doesn't need __init__ to have run.
+    __attribute_memo = None
+    __attribute_memo_depth = 0
+
     def __init__(self, static_values):
         self.upgrade(static_values)
 
@@ -397,14 +404,44 @@ class Instance(dbowo):
                 f' in namespace "{namespace}"')
         return cls(cls._static_values_to_dict(matches[0]))
 
+    @contextmanager
+    def attribute_memo(self):
+        """Serve MariaDB attribute reads in this block from one row fetch.
+
+        Every MariaDB-backed attribute lives in the same
+        ``instance_attributes`` row, but ``_db_get_attribute`` fetches
+        that row per read, so a caller reading several attributes (an
+        external view reads nine) issues that many identical
+        ``GetInstanceAttributes`` RPCs. Inside this block the row is
+        fetched at most once and reused.
+
+        This is a per-call memo, not a cache: it is discarded when the
+        block exits and invalidated by any attribute write inside it, so
+        nothing outside the block observes different staleness. Reads
+        inside the block share one row object, so a caller must not
+        mutate a returned value in place and then re-read it.
+        """
+        self.__attribute_memo_depth += 1
+        try:
+            yield
+        finally:
+            self.__attribute_memo_depth = max(
+                0, self.__attribute_memo_depth - 1)
+            if not self.__attribute_memo_depth:
+                self.__attribute_memo = None
+
     def _db_get_attribute(self, attribute, default=None):
         """Get an attribute, routing MariaDB-stored attributes appropriately."""
         if attribute in self.MARIADB_ATTRIBUTES:
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
-            attrs = mariadb.get_instance_attributes(_uuid)
+            attrs = self.__attribute_memo
             if not attrs:
-                attrs = InstanceAttributesData(uuid=_uuid)
-                mariadb.create_instance_attributes(attrs)
+                attrs = mariadb.get_instance_attributes(_uuid)
+                if not attrs:
+                    attrs = InstanceAttributesData(uuid=_uuid)
+                    mariadb.create_instance_attributes(attrs)
+                if self.__attribute_memo_depth:
+                    self.__attribute_memo = attrs
 
             # Map the attribute name to the model field
             field_name = attribute
@@ -436,6 +473,11 @@ class Instance(dbowo):
     def _db_set_attribute(self, attribute, value):
         """Set an attribute, routing MariaDB-stored attributes appropriately."""
         if attribute in self.MARIADB_ATTRIBUTES:
+            # Writing an attribute invalidates any memo of the row, both so
+            # this read-modify-write starts from fresh data and so later
+            # reads in an enclosing attribute_memo() block see the new value.
+            self.__attribute_memo = None
+
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
             attrs = mariadb.get_instance_attributes(_uuid)
             if not attrs:
@@ -515,6 +557,14 @@ class Instance(dbowo):
         return i
 
     def external_view(self):
+        # Building the view reads nine MariaDB-backed attributes, all of
+        # which live in a single instance_attributes row. Memo the row for
+        # the duration of the call so we make one database round trip
+        # instead of nine.
+        with self.attribute_memo():
+            return self._build_external_view()
+
+    def _build_external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
         i = self._external_view()

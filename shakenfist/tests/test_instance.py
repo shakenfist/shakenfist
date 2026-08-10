@@ -862,6 +862,135 @@ class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
         self.assertEqual({'os': 'debian'}, self.inst.agent_facts)
 
 
+class InstanceAttributeMemoTestCase(base.ShakenFistTestCase):
+    """Regression tests for the per-external-view attributes memo.
+
+    Every MariaDB backed instance attribute lives in one
+    instance_attributes row, but _db_get_attribute fetched that row per
+    read. Building an external view reads nine of them, so a single API
+    GET of an instance cost nine identical GetInstanceAttributes RPCs.
+    Inside an attribute_memo() block the row must be fetched once, while
+    remaining a per-call memo -- no read outside the block, and no read
+    after a write inside it, may be served from stale data.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        # Object reference grouping asks who is making the request, which
+        # outside of a Flask request context has no answer.
+        self.request_namespace = mock.patch(
+            'shakenfist.schema.object_reference.request_namespace',
+            return_value='system')
+        self.mock_request_namespace = self.request_namespace.start()
+        self.addCleanup(self.request_namespace.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', self.instance_uuid,
+            set_state=instance.Instance.STATE_CREATED)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+    def _counting_fetch(self):
+        """Count fetches of the instance_attributes row."""
+        return mock.patch(
+            'shakenfist.mariadb.get_instance_attributes',
+            side_effect=self.mock_mariadb._mariadb_get_instance_attributes)
+
+    def test_external_view_fetches_attributes_row_once(self):
+        with self._counting_fetch() as fetch:
+            self.inst.external_view()
+        self.assertEqual(1, fetch.call_count)
+
+    def test_external_view_still_reports_attributes(self):
+        self.inst.ports = {'console_port': 12345, 'vdi_port': 12346}
+        self.inst._db_set_attribute(
+            'power_state', {'power_state': 'on'})
+
+        view = self.inst.external_view()
+        self.assertEqual(12345, view['console_port'])
+        self.assertEqual(12346, view['vdi_port'])
+        self.assertEqual('on', view['power_state'])
+
+    def test_memo_does_not_persist_between_calls(self):
+        # A memo which outlived the call would be a cache with staleness
+        # semantics of its own, which is explicitly not what this is.
+        with self._counting_fetch() as fetch:
+            self.inst.external_view()
+            self.inst.external_view()
+        self.assertEqual(2, fetch.call_count)
+
+    def test_no_memo_outside_a_block(self):
+        with self._counting_fetch() as fetch:
+            self.inst.power_state
+            self.inst.ports
+        self.assertEqual(2, fetch.call_count)
+
+    def test_memo_serves_repeated_reads_from_one_fetch(self):
+        with self._counting_fetch() as fetch:
+            with self.inst.attribute_memo():
+                self.inst.power_state
+                self.inst.ports
+                self.inst.block_devices
+        self.assertEqual(1, fetch.call_count)
+
+    def test_nested_memo_blocks_share_one_fetch(self):
+        with self._counting_fetch() as fetch:
+            with self.inst.attribute_memo():
+                self.inst.power_state
+                with self.inst.attribute_memo():
+                    self.inst.ports
+                # The inner block exiting must not discard the outer
+                # block's memo.
+                self.inst.block_devices
+            self.inst.power_state
+        self.assertEqual(2, fetch.call_count)
+
+    def test_write_inside_a_memo_is_visible_to_later_reads(self):
+        with self.inst.attribute_memo():
+            self.assertEqual({}, self.inst.ports)
+            self.inst.ports = {'console_port': 4242}
+            self.assertEqual({'console_port': 4242}, self.inst.ports)
+
+    def test_write_by_another_writer_is_seen_after_the_block(self):
+        with self.inst.attribute_memo():
+            self.inst.power_state
+
+        other = instance.Instance.from_db(self.instance_uuid)
+        other._db_set_attribute('power_state', {'power_state': 'off'})
+        self.assertEqual({'power_state': 'off'}, self.inst.power_state)
+
+    def test_memo_is_released_when_the_block_raises(self):
+        try:
+            with self.inst.attribute_memo():
+                raise exceptions.InstanceException('boom')
+        except exceptions.InstanceException:
+            pass
+
+        with self._counting_fetch() as fetch:
+            self.inst.power_state
+            self.inst.ports
+        self.assertEqual(2, fetch.call_count)
+
+
 class InstanceSnapshotTargetTestCase(base.ShakenFistTestCase):
     """Which artifact a snapshot is indexed into.
 
