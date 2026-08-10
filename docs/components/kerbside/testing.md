@@ -4,6 +4,82 @@ How Kerbside is tested: the CI lanes, the Ryll-based harnesses, the
 oVirt console probe, the Tempest plugin, and the load-test container
 images.
 
+## CI tiers
+
+Since two-tier CI phase 3, develop is protected by a GitHub merge
+queue and the lanes are split into two tiers.
+
+- **The smoke tier** runs on every pull request push: unit tests and
+  lint, the direct-qemu lane, and the Shaken Fist end-to-end lane.
+  Between them these deploy the PR's own code and relay real SPICE
+  traffic through the real proxy, so a PR still gets end-to-end
+  signal in tens of minutes rather than hours.
+- **The merge tier** runs only in the merge queue: the oVirt and
+  OpenStack cloud matrices, each of which builds an entire cloud
+  from scratch. These are the expensive lanes, and their failure
+  modes are dominated by upstream environment churn rather than by
+  Kerbside regressions, so running them per PR bought little for
+  what it cost.
+
+The trade is deliberate: a cloud-specific breakage now surfaces in
+the merge queue rather than on the PR, blocking the queue and
+costing a rerun.
+
+| Workflow | Runs on | Tier |
+|----------|---------|------|
+| `functional-tests.yml` (`sanity_checks`) | pull_request, merge_group | smoke |
+| `functional-tests.yml` (`ovirt_matrix`, `openstack_matrix`) | merge_group, workflow_dispatch | merge |
+| `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
+| `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
+| `rust.yml` | push and pull_request, path-filtered to `rust/**` and the proto | neither (advisory) |
+| `codeql-analysis.yml` | push, pull_request, weekly | neither |
+| `prune-reviews.yml` | push to develop | neither |
+| `pin-indirect-dependencies.yml` | daily, and on PRs touching the pinning script | neither |
+
+`rust.yml` is advisory rather than gating. Rust breakage still
+blocks merges, because the proxy wheel is built by the direct-qemu
+lane in the smoke tier and by both cloud matrices in the merge
+tier; what never runs against the merged tree is `clippy` and
+`cargo test`, which is an accepted gap.
+
+The direct-qemu lane also runs nightly, because the merge queue
+does not re-run it against the merged tree.
+
+### Gate jobs and required checks
+
+Branch protection cannot require "whatever ran"; it requires named
+checks. Since a job that does not run reports nothing, and a
+required check that never reports blocks every merge forever, each
+tier ends in a small aggregate gate job whose only work is to
+assert that everything it depends on succeeded or skipped:
+
+| Check | Asserts |
+|-------|---------|
+| `Can see status` | nothing; it always succeeds, proving the workflow was evaluated at all |
+| `Can enqueue` | the smoke-tier jobs in `functional-tests.yml`, on non-merge_group events |
+| `Can enqueue: direct-qemu` | the direct-qemu lane |
+| `Can enqueue: sf-e2e` | the Shaken Fist end-to-end lane |
+| `Can merge` | the cloud matrices, on merge_group events only |
+
+Those five names are the entire required-check list on the develop
+ruleset. Because a skipped required check satisfies the rule, one
+list serves both refs: on a pull request `Can merge` skips, and in
+the merge queue the three `Can enqueue` checks skip.
+
+The binding between a required check and the job that satisfies it
+is the job's display name, matched as a string. **Renaming a gate
+job without updating the ruleset blocks every merge in the
+repository.** `sanity_checks` runs `tools/check-required-checks.sh`
+to catch that as a red smoke check rather than as an outage: it
+asserts every required context in the exported ruleset
+(`.github/exported-config/ruleset-*.json`, archived daily by
+`export-repo-config.yml`) still matches a job name in
+`.github/workflows/`.
+
+For the design rationale see
+[plans/PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/) and
+[plans/PLAN-two-tier-ci-phase-03-merge-queue.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/).
+
 ## End-to-end CI coverage
 
 The proxy is exercised end to end in CI: the direct-qemu functional
@@ -70,6 +146,24 @@ which CI checks out alongside this one:
 - `tools/ovirt-gather-artifacts.sh` — collects RPM lists and logs for
   CI artifacts
 
+## The Shaken Fist end-to-end lane (`sf-e2e`)
+
+`.github/workflows/sf-e2e-functional.yml` is the only lane that
+exercises the `type: shakenfist` console source against a real
+cluster. It stands up a single-node Shaken Fist (via
+`shakenfist/actions/build-smoke-cluster`), provisions `KERBSIDE_URL`
+and a signing key, deploys a co-located Kerbside with a
+`type: shakenfist` source (via
+`shakenfist/actions/deploy-kerbside-on-shakenfist`), and drives an
+SF-minted token through offline verification, exchange, and a
+proxied SPICE session against the Sextant guest booted inside the SF
+instance — followed by an adversarial matrix covering replay,
+expiry, wrong audience, unknown kid, and cross-namespace mint.
+
+Driver scripts live in `tools/sf-e2e/` (see
+`tools/sf-e2e/README.md`). It is a smoke-tier PR gate, and also runs
+nightly and on dispatch.
+
 ## The oVirt end-to-end kerbside lane
 
 Since two-tier CI phase 1, the `ovirt_matrix` job in
@@ -83,10 +177,25 @@ backend leg escalated to TLS with a non-empty certificate-subject
 pin on every escalation, then terminating the in-flight session via
 the REST API and asserting the proxy dropped it.
 
+The engine also holds a second VM, `no-spice-test`: diskless,
+network-boot, with a VNC display and therefore no SPICE console
+(`tools/create-ovirt-vnc-vm.py`). It exists to be ignored. Discovery
+has to skip a VM it cannot broker and carry on scraping, and every
+other VM in every lane has a SPICE display, so that branch had never
+run in CI — which is how a missing `continue` in
+`kerbside/sources/ovirt.py` survived: it errored the whole source,
+dropped every VM discovered after the offending one, and reaped
+their consoles as no longer available, once a minute.
+`drive-console.py` now asserts that VM is absent from the console
+list while the SPICE one is present.
+
 The runner-side scripts live in `tools/ovirt-e2e/` and are
 documented in `tools/ovirt-e2e/README.md`; the architecture decision
 and bring-up history are in
 [plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/).
+The lane is a worked example of the deployment described in
+[use-cases/ovirt.md](/components/kerbside/use-cases/ovirt/), which is the operator-facing
+version of what it proves.
 
 ## Tempest tests against a Kolla-Ansible deployment
 

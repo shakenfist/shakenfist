@@ -127,6 +127,20 @@ of a HTML5 desktop environment.
 
 ## Documentation Index
 
+### Use Cases
+
+One page per deployment permutation: what Kerbside is worth in that
+setting, how the pieces fit together, and how to set it up.
+
+- [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/) - Replacing oVirt's SPICE
+  proxy (squid) with a protocol-aware front door: discovery via the
+  engine API, host-subject pinned TLS to the hypervisor, and the
+  engine, network, and account prerequisites
+
+Pages for Shaken Fist, OpenStack, multi-cloud aggregation, placement
+topologies, and the standalone static source are planned; see
+[plans/PLAN-use-case-docs.md](/components/kerbside/plans/PLAN-use-case-docs/).
+
 ### Operator Documentation
 
 Guides for deploying and configuring Kerbside:
