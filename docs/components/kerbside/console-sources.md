@@ -104,14 +104,31 @@ The following options are used to configure an oVirt console source
 |--------|-------------|
 | source | The name of the source (used as an identifier) |
 | type | The type of the source: `ovirt` |
-| url | The oVirt Engine URL (e.g., `https://ovirt.example.org/ovirt-engine`) |
-| username | The username to authenticate to the source as (e.g., `admin@internal`) |
+| url | The oVirt Engine URL (e.g., `https://ovirt.example.org/ovirt-engine`). Must **not** end in `/api` -- Kerbside appends that itself |
+| username | The username to authenticate to the source as. oVirt 4.4.7 and later name the built-in administrator `admin@ovirt@internalsso`; older deployments use `admin@internal` |
 | password | The password to authenticate with |
-| ca_cert | Required: the SSL CA public key certificate to validate API and VDI connections against |
+| ca_cert | Required: the SSL CA public key certificate to validate API and VDI connections against. Inline PEM text, not a path |
 
 **Note**: The CA certificate is verified against the engine's PKI certificate
 during initialization. If they don't match, the source will be marked as
-errored.
+errored. A source that errors as soon as it is configured usually means the
+pasted CA is stale or truncated, rather than that the engine is unreachable.
+
+The engine URL must use the name the engine's certificate was issued for,
+and that name must resolve from the Kerbside host: an IP address URL fails
+certificate verification.
+
+The account needs to list VMs, list hosts (Kerbside pins each VM's host
+certificate subject), read graphics consoles, and acquire console tickets
+-- the last requires the `RECONNECT_TO_VM` action group on the VMs. Listing
+hosts is an administrative operation, so a plain VM-portal role is not
+enough; only `SuperUser` has been tested.
+
+Kerbside connects to the hypervisor's SPICE ports directly, so it needs L3
+reachability to every hypervisor, and oVirt's own SPICE proxy
+(`SpiceProxyDefault`) is not in the path. See
+[Kerbside for oVirt](/components/kerbside/use-cases/ovirt/) for the deployment architecture,
+the network prerequisites, and what is and is not proven.
 
 ## OpenStack
 

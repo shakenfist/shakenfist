@@ -57,7 +57,25 @@ readme-discipline policy).
 
 ## Status
 
-Not started, except that the oVirt page is scheduled as
-PLAN-two-tier-ci.md phase 4's deliverable. Do not start
-the remaining pages before that page has settled the
-format.
+The oVirt page landed 2026-08-10 as PLAN-two-tier-ci.md
+phase 4's deliverable, and settles the format. The
+remaining six pages are unblocked.
+
+Two things it decided that the rest should follow:
+
+- **The pages live in `docs/use-cases/`, not flat in
+  `docs/`.** Seven pages would have buried the reference
+  material; `docs/spice/` and `docs/plans/` set the
+  subdirectory precedent.
+- **They are indexed under their own "Use Cases" heading
+  in `docs/index.md`, listed before Operator
+  Documentation**, rather than joining the Operator
+  section as this plan originally proposed. A prospective
+  operator reads "is this for me?" before "what are the
+  config keys?".
+
+One thing worth imitating: the oVirt page's "Status and
+limitations" section is a table of what is *not* proven,
+each row naming why. That is more useful than a prose
+paragraph and much harder to let quietly rot, because a
+row either still applies or gets deleted.

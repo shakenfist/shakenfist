@@ -1,5 +1,17 @@
 # Two-tier CI: smoke gates on PRs, full clouds in the merge queue
 
+**Status: complete (2026-08-10).** All four phases have landed and
+the merge queue has been live since 2026-08-09. Like every plan in
+this directory this is a point-in-time record: the Situation below
+describes CI as it was on 2026-08-02, not as it is now — for that,
+read `docs/testing.md`.
+
+Two validation items from phase 3 remain undemonstrated rather than
+undone, and are recorded there: a review-marks-only PR through the
+queue, and the close/reopen dance on a bot-created configuration
+PR. Both will happen on their own the next time one of those PRs
+appears; neither blocks anything.
+
 ## Prompt
 
 Before responding to questions or discussion points in this
@@ -267,8 +279,8 @@ Phases will get detailed plan files as each is started.
 |-------|------|--------|
 | 1. oVirt lane deploys kerbside | [PLAN-two-tier-ci-phase-01-ovirt-kerbside.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/) | Complete |
 | 2. Promote sf-e2e to PR smoke gate | [PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/) | Complete |
-| 3. Merge queue adoption and tier split | [PLAN-two-tier-ci-phase-03-merge-queue.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/) | Workflows landed; queue enablement is an operator step (phase plan steps 4-5) |
-| 4. Documentation | PLAN-two-tier-ci-phase-04-docs.md | Not started |
+| 3. Merge queue adoption and tier split | [PLAN-two-tier-ci-phase-03-merge-queue.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/) | Complete — queue live 2026-08-09 |
+| 4. Documentation | [PLAN-two-tier-ci-phase-04-docs.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/) | Complete |
 
 - **Phase 1** is independent of the precondition and can
   start first: extend the oVirt lane so the environment
@@ -336,6 +348,19 @@ Phases will get detailed plan files as each is started.
   per-deployment-permutation documentation suite (Shaken
   Fist, OpenStack, multi-cloud, static, and eventually
   Proxmox) as follow-on work outside this plan's scope.
+
+  **Executed 2026-08-10.** The page is
+  `docs/use-cases/ovirt.md`; the tier split is documented
+  in `docs/testing.md`'s "CI tiers" section, which every
+  other file now points at rather than restating. Two
+  things worth carrying forward: the master plan's prose
+  blurred `SpiceProxyDefault` into something kerbside
+  needs unset, when in fact kerbside never reads
+  engine-generated `.vv` files and the setting is simply
+  irrelevant to it — the page says so precisely. And the
+  engine account's least-privilege story is documented as
+  untested rather than invented, since only `SuperUser`
+  has ever been exercised.
 
 Future work, explicitly out of scope here but shaping the
 design: a multinode Shaken Fist lane and a Proxmox source

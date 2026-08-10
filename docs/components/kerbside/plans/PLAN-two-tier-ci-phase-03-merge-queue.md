@@ -196,8 +196,8 @@ smaller repo). The pattern:
 | 1 | Restructure `functional-tests.yml`: `merge_group` trigger, `check_paths`, event-gate the matrices, gate jobs, reviewer re-anchor | Complete |
 | 2 | `direct-qemu-functional.yml` + `sf-e2e-functional.yml`: `merge_group` trigger, `check_paths`, skip-in-queue | Complete |
 | 3 | Documentation: falsified statements only (AGENTS.md CI sections, master plan cross-offs); the full docs pass stays phase 4 | Complete |
-| 4 | Operator: apply the ruleset change (below), then dispatch `export-repo-config.yml` to archive it | Not started |
-| 5 | Live validation: merge a scratch PR through the queue; watch the first real merge group end to end | Not started |
+| 4 | Operator: apply the ruleset change (below), then dispatch `export-repo-config.yml` to archive it | Complete 2026-08-09 — ruleset 20252051 "Develop branch" |
+| 5 | Live validation: merge a scratch PR through the queue; watch the first real merge group end to end | Complete 2026-08-09 — three merge groups, see below |
 
 Rollout order matters and is safe: the workflow changes land first
 and are inert without a queue (`merge_group` triggers never fire,
@@ -302,6 +302,55 @@ step 4, in order:
    it merges through the queue — the export flow itself needs no
    bypass (it lands via PRs), but its PRs are created with a
    workflow token and so start with zero check runs.
+
+### Step 5: what actually happened (2026-08-09/10)
+
+Validation ran against real PRs rather than scratch ones, because
+real ones arrived first. Against the four items above:
+
+1. **Proven.** Merge group `pr-273` (run 31334740094) ran
+   `sanity_checks`, `Check paths`, and **both** cloud matrices —
+   they ran, they did not skip — and `Can merge` went green, and
+   the PR merged. The prune-reviews push landed afterwards as
+   shakenfist-bot (`a623c09`, pushed directly to develop), which
+   is the first time that path has fired: every run since #270 had
+   found nothing to prune.
+2. **Proven, but not deliberately.** Two earlier merge groups
+   failed with `Can merge` red — `pr-271` (run 31300325748) and
+   `pr-259` (run 31308040793) — both because `ovirt_matrix`
+   failed. No scratch PR was needed; the gate's red path is
+   demonstrated on this repo.
+3. **Not demonstrated.** No review-marks-only PR has been through
+   the queue yet. The `check_paths` skip path is still unproven
+   in a merge group.
+4. **Not demonstrated.** PR #269 ("Repository configuration
+   changed") merged at 05:34 on 2026-08-09 without a merge group,
+   so the close/reopen dance has not been exercised against the
+   queue.
+
+The first entry into the queue caught a real, previously-invisible
+failure (the oVirt lane's `host_subject` oracle, issue #272, fixed
+in #273), which is the clearest possible argument for the phase.
+
+**The queue is not mandatory, by choice.** Six PRs merged after the
+ruleset went live and only one (#273) went through the queue; the
+other five used the bypass. That is not a defect in the design:
+the "SF Can Skip Merge Queue" team was added so shakenfist-bot
+could push review-mark prunes, GitHub applies a bypass to the
+*whole ruleset* rather than per-rule, and the maintainer is a
+member of that team and wants to keep the force-merge capability
+because it is exactly what you need when CI is broken — which is
+what several of those five merges were working around. The
+practical consequences to remember:
+
+- A human in the bypass team gets a plain "Merge pull request"
+  button and skips the queue silently. There is no warning.
+- "Merge when ready" is the opt-in path into the queue; use it
+  deliberately.
+- Merge-tier coverage is therefore advisory for anyone in that
+  team. If the cloud matrices need to be genuinely mandatory for
+  everyone, the bypass has to narrow to an App or a bot-only team
+  — a decision consciously not taken here.
 
 `workflow_dispatch` still runs the matrices directly for lane
 debugging, but note a dispatch run never attaches checks to a PR —
@@ -470,13 +519,20 @@ Round 3 (2 fix, 6 consider, 2 info) — the substantive outcomes:
 
 - A pull request runs sanity, direct-qemu, sf-e2e (and rust when
   touched) but **no cloud matrices**; PR feedback time drops from
-  ~2 hours to the slowest smoke lane.
+  ~2 hours to the slowest smoke lane. **Met.**
 - Merging requires the merge queue; a queue entry deploys oVirt
   and OpenStack against the merged tree and blocks on failure.
+  **Met for anyone outside the bypass team, which as written was
+  the wrong criterion** — see step 5's outcome. A queue entry does
+  deploy both clouds and does block on failure (demonstrated three
+  times), but the maintainer can and does bypass the queue
+  deliberately. Restate as: *a queue entry deploys oVirt and
+  OpenStack against the merged tree and blocks on failure, and the
+  queue is the default path to merge.*
 - A review-marks-only PR merges through the queue with every
-  required check satisfied by skips.
+  required check satisfied by skips. **Not yet demonstrated.**
 - The automated reviewer posts after the smoke tier, not after the
-  cloud lanes.
+  cloud lanes. **Met** — it is `skipped` in merge groups.
 
 Steady-state throughput expectation, to make the phase 4 review
 concrete: a queue entry costs roughly two hours (sanity plus the

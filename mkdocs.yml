@@ -253,6 +253,7 @@ nav:
                 - "Two-tier CI phase 1: the oVirt lane deploys and drives kerbside": components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md
                 - "Two-tier CI phase 2: promote sf-e2e to a PR smoke gate": components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md
                 - "Two-tier CI phase 3: merge queue adoption and tier split": components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue.md
+                - "Two-tier CI phase 4: documentation": components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs.md
                 - "Two-tier CI: smoke gates on PRs, full clouds in the merge queue": components/kerbside/plans/PLAN-two-tier-ci.md
                 - "Use case documentation": components/kerbside/plans/PLAN-use-case-docs.md
             - Spice:
@@ -265,6 +266,8 @@ nav:
                 - "SPICE Protocol Overview": components/kerbside/spice/protocol-overview.md
                 - "USB Redirection Protocol": components/kerbside/spice/usb-redirection.md
                 - "VD Agent Protocol": components/kerbside/spice/vd-agent-protocol.md
+            - Use Cases:
+                - "Kerbside for oVirt": components/kerbside/use-cases/ovirt.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
