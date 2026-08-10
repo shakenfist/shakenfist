@@ -11017,6 +11017,10 @@ years while the handler read <code>ssh_key</code> and <code>user_data</code>. If
 genuinely must not be published, add it to <code>UNDECLARED_BY_DESIGN</code> with
 a reason. Objects the decorators inject — anything ending in
 <code>_from_db</code> — are not parameters and must not be declared.</p>
+<p>A handler must therefore name its parameters: <code>*args</code> or <code>**kwargs</code> in
+the signature accepts body keys nothing can enumerate (<code>log_request</code>
+merges the whole JSON body into the handler's kwargs), so the audit
+refuses to proceed rather than reporting a tree it could not check.</p>
 <h2 id="checking-your-work">Checking your work<a class="headerlink" href="#checking-your-work" title="Permanent link">&para;</a></h2>
 <p>The audit derives the correct location for every declaration and
 compares it against what is declared:</p>
