@@ -757,6 +757,31 @@ class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
         self.assertEqual('deleted', network.state)
         self.assertEqual('deleted', network.ipam.state)
 
+    def test_releases_floating_gateway_before_marking_deleted(self):
+        # The floating IP reaper treats a gateway reservation owned by a
+        # deleted network as a leak, so the reservation must be gone
+        # before "deleted" is published, not afterwards (issue 3645).
+        network = self._make_network()
+        network.floating_gateway = '203.0.113.100'
+        network.state = 'created'
+        network.ipam.state = 'created'
+
+        observed = {}
+
+        def _record_states():
+            observed['network'] = network.state
+            observed['ipam'] = network.ipam.state
+        network.unassign_floating_gateway.side_effect = _record_states
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_delete_on_network_node()
+
+        network.unassign_floating_gateway.assert_called_once_with()
+        self.assertEqual('created', observed['network'])
+        self.assertEqual('created', observed['ipam'])
+        self.assertEqual('deleted', network.state)
+        self.assertEqual('deleted', network.ipam.state)
+
     def test_calls_remove_dnsmasq_when_dhcp(self):
         network = self._make_network(provide_dhcp=True)
         fake_dnsmasq = mock.Mock()

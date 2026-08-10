@@ -148,3 +148,63 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
         self._await_network_presence(self.network_node, False)
         self._await_network_presence(node_a, False)
         self._await_network_presence(node_b, False)
+
+
+class TestNetworkDeleteReleasesFloatingGateway(base.BaseNamespacedTestCase):
+    """A deleted network must never still hold a floating gateway.
+
+    A NAT network reserves a gateway address on the floating network for
+    the lifetime of the network. The delete path must release that
+    reservation before it publishes the "deleted" state, because the
+    floating IP reaper considers a gateway reservation whose owning
+    network is deleted to be a leak: any window between the two lets a
+    reaper pass release the address out from under the still running
+    teardown and log a healthy address as leaked. That was github issue
+    #3645, which fired roughly fortnightly on a busy CI cluster.
+
+    This needs no host level access, only the API, so it does not use the
+    node-exec helpers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'netfloatgw'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+
+        # provide_nat must be true, it is what causes a floating gateway
+        # to be reserved at all.
+        self.net = self.test_client.allocate_network(
+            '192.168.243.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_delete_releases_floating_gateway_before_deleted(self):
+        n = self.test_client.get_network(self.net['uuid'])
+        self.assertIsNotNone(
+            n.get('floating_gateway'),
+            'NAT network %s never acquired a floating gateway'
+            % self.net['uuid'])
+
+        self.test_client.delete_network(self.net['uuid'])
+
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            n = self.test_client.get_network(self.net['uuid'])
+            if n['state'] == 'deleted':
+                self.addDetail(
+                    'deleted network',
+                    content.text_content(
+                        json.dumps(n, indent=4, sort_keys=True)))
+                self.assertIsNone(
+                    n.get('floating_gateway'),
+                    'Network %s still held floating gateway %s while in the '
+                    'deleted state' % (self.net['uuid'],
+                                       n.get('floating_gateway')))
+                return
+            time.sleep(1)
+
+        self.fail('Network %s was never deleted' % self.net['uuid'])

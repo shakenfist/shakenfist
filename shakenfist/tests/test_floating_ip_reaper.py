@@ -6,20 +6,29 @@
 # previously reserved the wrong address (a leftover variable from the
 # gateway loop), leaving the actual floating address unreserved and
 # eligible for double allocation.
+#
+# The leak branch is covered here too: the sweep is built from several
+# separate database reads and is therefore not a consistent snapshot,
+# so an address must look leaked for LEAK_CONFIRMATION_SECONDS of
+# continuous observation before it is released (issue 3645).
 
+import time
 from unittest import mock
 
 from shakenfist.daemons.network import floating_ip_reaper
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
 
 class FakeIPAM:
-    def __init__(self, free_addresses):
+    def __init__(self, free_addresses, in_use=None, reservations=None):
         self.free_addresses = free_addresses
         self.reserve_calls = []
-        self.in_use = set()
+        self.released = []
+        self.in_use = in_use if in_use is not None else set()
+        self.reservations = reservations or {}
         self.broadcast_address = '192.168.10.255'
         self.network_address = '192.168.10.0'
 
@@ -38,16 +47,46 @@ class FakeIPAM:
         return iter([])
 
     def get_reservation(self, address):
-        return None
+        return self.reservations.get(address)
 
     def get_allocation_age(self, address):
         return 0
 
     def release(self, address):
-        pass
+        self.released.append(address)
+
+
+def _reservation(user_type=None, user_uuid=None):
+    res = mock.Mock()
+    res.reservation_type = ReservationType.GATEWAY
+    res.user_type = user_type
+    res.user_uuid = user_uuid
+    return res
 
 
 class FloatingIPReaperTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        # The candidate leak history is module level state which
+        # persists between sweeps, so each test starts from empty.
+        floating_ip_reaper._leak_candidates.clear()
+        self.addCleanup(floating_ip_reaper._leak_candidates.clear)
+
+    def _sweep(self, ipam, networks=None, interfaces=None):
+        fake_floating_network = mock.MagicMock()
+        fake_floating_network.ipam = ipam
+
+        with mock.patch.object(
+                floating_ip_reaper.network, 'floating_network',
+                return_value=fake_floating_network), \
+            mock.patch.object(
+                floating_ip_reaper.network, 'Networks',
+                return_value=networks or []), \
+            mock.patch.object(
+                floating_ip_reaper.interface, 'NetworkInterfaces',
+                return_value=interfaces or []):
+            return floating_ip_reaper.reap_floating_ips()
+
     def test_unreserved_floating_address_rescue_reserves_that_address(
             self):
         # A gateway with a valid reservation, so the gateway loop
@@ -67,19 +106,8 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
             ObjectType.INTERFACE, 'iface-uuid')
 
         ipam = FakeIPAM(free_addresses={'192.168.10.42'})
-        fake_floating_network = mock.MagicMock()
-        fake_floating_network.ipam = ipam
-
-        with mock.patch.object(
-                floating_ip_reaper.network, 'floating_network',
-                return_value=fake_floating_network), \
-            mock.patch.object(
-                floating_ip_reaper.network, 'Networks',
-                return_value=[fake_gw_network]), \
-            mock.patch.object(
-                floating_ip_reaper.interface, 'NetworkInterfaces',
-                return_value=[fake_ni]):
-            self.assertTrue(floating_ip_reaper.reap_floating_ips())
+        self.assertTrue(self._sweep(
+            ipam, networks=[fake_gw_network], interfaces=[fake_ni]))
 
         self.assertEqual(1, len(ipam.reserve_calls))
         address, user, reservation_type, _ = ipam.reserve_calls[0]
@@ -92,3 +120,93 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
                 floating_ip_reaper.network, 'floating_network',
                 return_value=None):
             self.assertFalse(floating_ip_reaper.reap_floating_ips())
+
+    def test_unowned_address_is_not_reaped_on_first_sighting(self):
+        # The first time an address looks leaked we merely remember it.
+        # A network delete in flight briefly presents exactly this way.
+        ipam = FakeIPAM(free_addresses=set(), in_use={'192.168.10.154'})
+
+        self.assertTrue(self._sweep(ipam))
+
+        self.assertEqual([], ipam.released)
+        self.assertIn('192.168.10.154', floating_ip_reaper._leak_candidates)
+
+    def test_address_is_reaped_once_confirmed(self):
+        # An address which has looked leaked for longer than the
+        # confirmation period really has leaked, so release it.
+        ipam = FakeIPAM(free_addresses=set(), in_use={'192.168.10.154'})
+        floating_ip_reaper._leak_candidates['192.168.10.154'] = (
+            time.time() - floating_ip_reaper.LEAK_CONFIRMATION_SECONDS - 1)
+
+        self.assertTrue(self._sweep(ipam))
+
+        self.assertEqual(['192.168.10.154'], ipam.released)
+
+    def test_candidate_is_forgotten_when_it_stops_looking_leaked(self):
+        # The address is now claimed by an active network, so its leak
+        # history must be discarded rather than accumulating towards a
+        # future reap.
+        floating_ip_reaper._leak_candidates['192.168.10.154'] = (
+            time.time() - 1000)
+
+        fake_network = mock.MagicMock()
+        fake_network.floating_gateway = '192.168.10.154'
+        fake_network.unique_label.return_value = (
+            ObjectType.NETWORK, 'network-uuid')
+
+        ipam = FakeIPAM(
+            free_addresses=set(), in_use={'192.168.10.154'})
+        self.assertTrue(self._sweep(ipam, networks=[fake_network]))
+
+        self.assertEqual([], ipam.released)
+        self.assertEqual({}, floating_ip_reaper._leak_candidates)
+
+    def test_recently_deleted_owner_is_not_a_leak_candidate(self):
+        # A gateway reservation owned by a network which was deleted
+        # moments ago is mid-teardown, not leaked. It must not even
+        # start accruing confirmation time.
+        ipam = FakeIPAM(
+            free_addresses=set(), in_use={'192.168.10.154'},
+            reservations={
+                '192.168.10.154': _reservation(
+                    user_type=ObjectType.NETWORK, user_uuid='network-uuid')
+            })
+
+        owner = mock.Mock()
+        owner.state = State(value='deleted', update_time=time.time())
+        owner_class = mock.Mock()
+        owner_class.from_db.return_value = owner
+
+        with mock.patch.object(
+                floating_ip_reaper, 'get_object_class',
+                return_value=owner_class):
+            self.assertTrue(self._sweep(ipam))
+
+        self.assertEqual([], ipam.released)
+        self.assertEqual({}, floating_ip_reaper._leak_candidates)
+
+    def test_long_deleted_owner_is_reaped_once_confirmed(self):
+        # A genuine leak: the owning object was deleted long ago and the
+        # reservation has looked leaked for longer than the confirmation
+        # period.
+        ipam = FakeIPAM(
+            free_addresses=set(), in_use={'192.168.10.154'},
+            reservations={
+                '192.168.10.154': _reservation(
+                    user_type=ObjectType.NETWORK, user_uuid='network-uuid')
+            })
+        floating_ip_reaper._leak_candidates['192.168.10.154'] = (
+            time.time() - floating_ip_reaper.LEAK_CONFIRMATION_SECONDS - 1)
+
+        owner = mock.Mock()
+        owner.state = State(
+            value='deleted', update_time=time.time() - 100000)
+        owner_class = mock.Mock()
+        owner_class.from_db.return_value = owner
+
+        with mock.patch.object(
+                floating_ip_reaper, 'get_object_class',
+                return_value=owner_class):
+            self.assertTrue(self._sweep(ipam))
+
+        self.assertEqual(['192.168.10.154'], ipam.released)
