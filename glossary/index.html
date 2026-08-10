@@ -10816,6 +10816,20 @@ first-class object owned by its namespace, with its own lifecycle, events and
 soft delete. Defined in <code>shakenfist/namespace_key.py</code> (the object) and
 <code>shakenfist/namespace.py</code> (the <code>keys</code>, <code>lookup_key</code>, <code>add_key</code> and <code>remove_key</code>
 members), and described in <code>docs/developer_guide/authentication.md</code>.</p>
+<p><strong id="network">network</strong> -- The virtual network object: a namespaced, isolated
+layer 2 broadcast domain, implemented as a VXLAN mesh spanning every node which
+carries it. Each network owns a <em>netblock</em> (the CIDR its addresses are
+allocated from, managed by an IPAM object), a cluster-unique <em>VXLAN id</em>
+(<code>vxid</code>), and switches for whether it provides DHCP, DNS and NAT. Instances
+attach to it through <em>network interfaces</em>, which are separate objects.
+Defined in <code>shakenfist/network/network.py</code> (the object),
+<code>shakenfist/network/interface.py</code> (the interfaces), and
+<code>docs/developer_guide/api_reference/networks.md</code>. Not to be confused with the
+<em>network node</em> role, the elected cluster ingress and egress point for all
+virtual networks (see <a href="#node">node</a>); with the underlying physical network the
+mesh is built on top of (the <code>node_egress_nic</code> and <code>node_mesh_nic</code> deployment
+settings in <code>docs/operator_guide/installation.md</code>); or with the netblock alone,
+which is only one attribute of a network.</p>
 <p><strong id="node">node</strong> -- A cluster member machine. A node carries one or more <em>roles</em>,
 which are configuration, not object types:</p>
 <ul>
