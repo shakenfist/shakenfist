@@ -108,3 +108,45 @@ downloading Bootstrap 5.3 and jQuery 3.7.0 and then installing to
 
 Kerbside's web administration API uses Axios for HTTP requests.
 Version 1.6.5 is cached at `kerbside/api/static/js`.
+
+### sfui
+
+`kerbside/api/static/sfui` is a vendored copy of
+[shakenfist/sfui](https://github.com/shakenfist/sfui), the Shaken
+Fist design system: design tokens (`tokens.css`), the shared page
+stylesheet (`sf.css`), a theme boot script, the brand logo,
+Lit-based web components such as `sf-tabs`, and the vendored Lit
+and morphdom libraries those pages need. It is copied in verbatim
+by sfui's own `tools/vendor.sh`, which also stamps the copy with
+its source commit in `.sfui-commit`.
+
+The design system's own `README.md` is vendored along with it, so
+the full contract -- the token rules, what `sf.css` provides and
+how its cascade layer works, and the component contract -- is
+readable at `kerbside/api/static/sfui/README.md` without leaving
+the repository.
+
+Never edit anything under `kerbside/api/static/sfui/` in place:
+change the canonical sfui checkout instead and re-vendor, or the
+next sync will silently discard the local change. To re-vendor from
+a clean, up-to-date sfui checkout:
+
+```shell
+tools/vendor.sh <path-to-kerbside>/kerbside/api/static/sfui
+```
+
+To check whether the vendored copy has drifted from canonical sfui
+without copying anything:
+
+```shell
+tools/vendor.sh --check <path-to-kerbside>/kerbside/api/static/sfui
+```
+
+Both commands are run from the sfui checkout, not from kerbside.
+
+Re-vendor from sfui's `develop` branch once the change you need has
+merged there, not from the branch you made it on. The `sfui-vendor`
+consistency audit compares `.sfui-commit` against canonical
+`develop` and reports a copy that is behind it, so a stamp naming a
+feature branch commit -- or an ancestor of a merge commit -- is
+flagged even when every vendored file is byte for byte correct.
