@@ -189,8 +189,8 @@ non-required workflow (matching shakenfist).
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Two-tier ci.yml | [PLAN-two-stage-ci-phase-01-workflow-tiers.md](/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/) | Complete (PR #255, merged 2026-08-09) |
-| 2. Windows cross-check spike | [PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/) | Implemented; CI validation pending push |
-| 3. Merge queue enablement | PLAN-two-stage-ci-phase-03-merge-queue.md | Not started |
+| 2. Windows cross-check spike | [PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/) | Complete (PRs #256 and #257, merged 2026-08-10) |
+| 3. Merge queue enablement | [PLAN-two-stage-ci-phase-03-merge-queue.md](/components/ryll/plans/PLAN-two-stage-ci-phase-03-merge-queue/) | In progress: token change written, ruleset change awaiting approval |
 | 4. Documentation | PLAN-two-stage-ci-phase-04-docs.md | Not started |
 
 ### Phase 1: Two-tier ci.yml
