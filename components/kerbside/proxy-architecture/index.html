@@ -4918,6 +4918,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Error Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11094,6 +11111,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Error Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11423,6 +11457,13 @@ connection and are logged with a per-connection correlation id (a <code>tracing<
 span around the connection lifecycle). A denied authorization, a failed
 backend TLS verification, an oversized/dis-allowed message, and an idle-read
 timeout each end the connection deterministically rather than leaking a task.</p>
+<h3 id="log-output">Log Output<a class="headerlink" href="#log-output" title="Permanent link">&para;</a></h3>
+<p>The proxy writes <code>tracing</code> output to stdout. Under the daemon that stdout is
+inherited into the kerbside log, so colouring is decided by the sink: ANSI
+escapes are emitted only when stdout is a terminal, and a redirected log gets
+plain text. This matters for anything that parses the log — with colour on,
+<code>tracing</code> renders a structured field as <code>name&lt;esc&gt;[0m&lt;esc&gt;[2m=&lt;esc&gt;[0mvalue</code>,
+so a search for a literal <code>name=</code> finds nothing at all.</p>
 <h2 id="security-considerations">Security Considerations<a class="headerlink" href="#security-considerations" title="Permanent link">&para;</a></h2>
 <h3 id="token-validation">Token Validation<a class="headerlink" href="#token-validation" title="Permanent link">&para;</a></h3>
 <p>Tickets are validated by the control plane, not the proxy: <code>AuthorizeConnection</code>
