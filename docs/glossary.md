@@ -160,6 +160,21 @@ soft delete. Defined in `shakenfist/namespace_key.py` (the object) and
 `shakenfist/namespace.py` (the `keys`, `lookup_key`, `add_key` and `remove_key`
 members), and described in `docs/developer_guide/authentication.md`.
 
+**network**{#network} -- The virtual network object: a namespaced, isolated
+layer 2 broadcast domain, implemented as a VXLAN mesh spanning every node which
+carries it. Each network owns a *netblock* (the CIDR its addresses are
+allocated from, managed by an IPAM object), a cluster-unique *VXLAN id*
+(`vxid`), and switches for whether it provides DHCP, DNS and NAT. Instances
+attach to it through *network interfaces*, which are separate objects.
+Defined in `shakenfist/network/network.py` (the object),
+`shakenfist/network/interface.py` (the interfaces), and
+`docs/developer_guide/api_reference/networks.md`. Not to be confused with the
+*network node* role, the elected cluster ingress and egress point for all
+virtual networks (see [node](#node)); with the underlying physical network the
+mesh is built on top of (the `node_egress_nic` and `node_mesh_nic` deployment
+settings in `docs/operator_guide/installation.md`); or with the netblock alone,
+which is only one attribute of a network.
+
 **node**{#node} -- A cluster member machine. A node carries one or more *roles*,
 which are configuration, not object types:
 

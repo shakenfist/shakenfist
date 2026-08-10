@@ -230,7 +230,7 @@ details.
 ???+ note
 
     For a detailed reference on the state machine for uploads, see the
-    [developer documentation on object states](/developer_guide/state_machine/#uploads).
+    [developer documentation on object states](/developer_guide/state_machine/#upload).
 
 ???+ tip "REST API calls"
 
