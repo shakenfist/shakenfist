@@ -99,6 +99,7 @@ from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.schema.sqlalchemy import TABLE_CREATION_LOCK
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util.caller_identity import get_caller_daemon
 
 
 LOG, _ = logs.setup(__name__)
@@ -454,6 +455,20 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
 }
 
 
+# Processes which may bypass the gRPC tier when direct MariaDB access is
+# configured. MARIADB_HOST is not a per-process signal: it is rendered into
+# /etc/sf/config, which is the shared systemd EnvironmentFile for every
+# daemon on the node, so on a database-tier node every daemon sees it. Only
+# these two processes actually cannot use the tier -- sf-database because
+# routing through the tier would mean calling itself, and sf-ctl because it
+# runs `ensure-mariadb-schema` and `initialise-node` before sf-database has
+# started. Every other daemon must use the tier even when it is co-located
+# with MariaDB: that is the documented architecture, and going direct hides
+# the daemon's load from sf-database's metrics, connection accounting and
+# caching.
+DIRECT_MARIADB_CALLERS = frozenset(['database', 'ctl'])
+
+
 def _use_database_service() -> bool:
     """Decide whether to route a MariaDB access through the gRPC tier.
 
@@ -461,11 +476,11 @@ def _use_database_service() -> bool:
     this process has direct MariaDB access available and
     should prefer it.
 
-    MARIADB_HOST being set signals direct access is available
-    (sf-database itself, or sf-ctl ensure-mariadb-schema).
-    Direct access wins when both configs are set, because
-    the only process with direct access does not gain anything
-    by hopping through the tier to reach itself.
+    MARIADB_HOST being set signals direct access is available on this
+    node, but only sf-database and sf-ctl (see DIRECT_MARIADB_CALLERS)
+    are permitted to use it. For them direct access wins when both
+    configs are set, because neither gains anything by hopping through
+    the tier to reach itself.
 
     MARIADB_GATEWAY_HOSTS provides one or more sf-database
     endpoints for processes without direct access. Phase 3 of
@@ -473,9 +488,11 @@ def _use_database_service() -> bool:
     client-side load-balanced channel; today the channel
     construction simply takes the first entry.
     """
-    if config.MARIADB_HOST:
-        return False
     if not config.MARIADB_GATEWAY_HOSTS:
+        # No tier to route to, so use whatever direct access we have. This
+        # is also the unit test and single-process case.
+        return False
+    if config.MARIADB_HOST and get_caller_daemon() in DIRECT_MARIADB_CALLERS:
         return False
     return True
 

@@ -113,10 +113,13 @@ Only the database service daemon (`sf-database`) has direct access to MariaDB.
 All other daemons reach MariaDB through `sf-database`'s gRPC interface. This
 keeps connection management in one place, gives consistent Prometheus metrics
 for every database operation, and makes the tier independently scalable. The
-`shakenfist.mariadb` module dispatches automatically: if `MARIADB_HOST` is set
-(the `sf-database` daemon and the schema tool) it uses direct SQLAlchemy
-access; otherwise it goes over gRPC to the `sf-database` tier listed in
-`MARIADB_GATEWAY_HOSTS`.
+`shakenfist.mariadb` module dispatches automatically: `sf-database` and
+`sf-ctl` use direct SQLAlchemy access when `MARIADB_HOST` is set, and every
+other process goes over gRPC to the `sf-database` tier listed in
+`MARIADB_GATEWAY_HOSTS`. The dispatch is per-process, not per-node, because
+`MARIADB_HOST` lives in `/etc/sf/config` — the shared systemd
+`EnvironmentFile` for every daemon on the node — so on a database-tier node
+all of them can see it and only those two may act on it.
 
 The driver layer uses the `mariadb://` SQLAlchemy dialect so MariaDB-specific
 column types such as `INET4` (4-byte IPv4 storage with native comparison and
@@ -202,10 +205,11 @@ the distinction helps when troubleshooting or planning a deployment.
 
 **`MARIADB_HOST`** is set only on nodes that have *direct* access to the MariaDB
 server. In practice this means nodes running `sf-database`, and any node where
-an operator runs `sf-ctl ensure-mariadb-schema`. The presence of `MARIADB_HOST`
-tells the `shakenfist.mariadb` module to bypass the gRPC layer and talk to
-MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running `sf-api`,
-`sf-queues`, etc.) do **not** have `MARIADB_HOST` set and should never need it.
+an operator runs `sf-ctl ensure-mariadb-schema`. It lets `sf-database` and
+`sf-ctl` bypass the gRPC layer and talk to MariaDB directly using SQLAlchemy;
+no other process does so, even when it can see the key. Ordinary cluster nodes
+(running `sf-api`, `sf-queues`, etc.) do **not** have `MARIADB_HOST` set and
+should never need it.
 
 **`MARIADB_GATEWAY_HOSTS`** is set on every cluster node. It is the list of
 `sf-database` gRPC endpoints that non-database daemons connect to. For a

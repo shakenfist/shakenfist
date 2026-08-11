@@ -47,17 +47,19 @@ def _scrape_database_counters(mesh_ip):
 
 
 def _scrape_operation_requests(mesh_ip, operation, caller_daemon):
-    """Sum database_requests_total for one operation and one caller.
+    """Sum database_requests_total for a caller, optionally one operation.
 
-    The samples this reads are labelled, so their names do not end in
-    _total and _scrape_database_counters() skips them.
+    ``operation`` may be None to sum every operation that caller has
+    made. The samples this reads are labelled, so their names do not end
+    in _total and _scrape_database_counters() skips them.
     """
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
     resp = requests.get(url, timeout=METRICS_TIMEOUT)
     resp.raise_for_status()
 
-    wanted = ['operation="%s"' % operation,
-              'caller_daemon="%s"' % caller_daemon]
+    wanted = ['caller_daemon="%s"' % caller_daemon]
+    if operation:
+        wanted.append('operation="%s"' % operation)
 
     total = 0.0
     for line in resp.text.splitlines():
@@ -157,6 +159,40 @@ class TestDatabaseTier(base.BaseNamespacedTestCase):
                 'sf-database instance %s served %.1f RPCs which is below the '
                 '5%% floor of %.1f (total_delta=%.1f). Per-node deltas: %s'
                 % (name, delta, floor, total_delta, per_node_delta))
+
+    def test_api_database_traffic_reaches_the_database_tier(self):
+        # sf-database is the only process with direct MariaDB access; every
+        # other daemon reaches MariaDB through its gRPC tier. That is easy to
+        # break silently, because MARIADB_HOST is rendered into /etc/sf/config
+        # -- the shared systemd EnvironmentFile for every daemon on the node
+        # -- so on a database-tier node every daemon sees the direct-access
+        # config and could take it. A daemon which does is invisible to the
+        # tier's metrics, connection accounting and caching, and no unit test
+        # can see it because the routing decision depends on the deployed
+        # config. This asserts the API's reads actually arrive at the tier.
+        nodes = self.system_client.get_nodes()
+        database_nodes = [n for n in nodes if n.get('is_database_node')]
+        if not database_nodes:
+            self.skipTest('no sf-database instances found')
+
+        def _api_requests():
+            return sum(
+                _scrape_operation_requests(n['ip'], None, 'api')
+                for n in database_nodes)
+
+        before = _api_requests()
+        for _ in range(CALL_COUNT):
+            self.system_client.get_namespaces()
+        delta = _api_requests() - before
+
+        self.addDetail(
+            'api_request_delta', content.text_content(str(delta)))
+        self.assertGreater(
+            delta, 0,
+            'Expected %d namespace GETs to produce sf-database RPCs '
+            'attributed to the api daemon, but the counter did not move. '
+            'The API is reaching MariaDB without going through the database '
+            'tier. delta=%s' % (CALL_COUNT, delta))
 
     def test_instance_get_fetches_the_attributes_row_once(self):
         # Every MariaDB backed instance attribute lives in one
