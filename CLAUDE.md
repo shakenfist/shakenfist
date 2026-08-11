@@ -249,10 +249,25 @@ Configuration options:
   `sf-ctl ensure-mariadb-schema` is executed; enables direct MariaDB access.
   Do **not** set this on ordinary cluster nodes.
 
-**Database daemon special case**: The database daemon has `MARIADB_HOST`
-set, which causes it to use direct MariaDB access for its own startup and
-shutdown recording. All other daemons access MariaDB via the database
-service's gRPC interface.
+**Database daemon special case**: Direct MariaDB access requires *both*
+`MARIADB_HOST` and a caller identity in `mariadb.DIRECT_MARIADB_CALLERS`
+(`database`, `ctl`). `MARIADB_HOST` alone is not enough, and it is not a
+per-node switch: it is rendered into `/etc/sf/config`, the shared systemd
+`EnvironmentFile`, so on a database-tier node every daemon can see it. Only
+`sf-database` (which would otherwise call itself) and `sf-ctl` (which runs
+`ensure-mariadb-schema` and `initialise-node` before `sf-database` starts)
+may act on it. Every other daemon uses the gRPC tier even when co-located
+with MariaDB -- going direct hides its load from the tier's metrics and
+connection accounting.
+
+Because that decision reads a process-global identity, an entry point must
+call `set_caller_identity()` before anything which might dispatch. An unset
+identity reads as `unknown`, which correctly routes to the tier for ordinary
+daemons but would make `sf-database` call itself; it therefore claims its
+identity as the first statement of `main()`, before `write_pid_file()` starts
+the eventlog drainer. The one path exempt from all of this is
+`config.load_cluster_config()`, which runs at import time before any identity
+exists -- see its docstring.
 
 ### Systemd Service Ordering
 

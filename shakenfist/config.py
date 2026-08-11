@@ -28,10 +28,23 @@ def load_cluster_config() -> None:
     """Load cluster-wide config into environment variables.
 
     If MARIADB_HOST is set, this process has direct MariaDB
-    access available and uses it -- this path is used by
-    sf-database itself and by `sf-ctl ensure-mariadb-schema`.
-    Direct access is preferred when available because it
-    avoids a self-loop through the sf-database gRPC tier.
+    access available and uses it. Direct access is preferred
+    when available because it avoids a self-loop through the
+    sf-database gRPC tier.
+
+    NOTE: this is the one MariaDB dispatch in the codebase which
+    is not per-caller. Everywhere else only the daemons named in
+    ``mariadb.DIRECT_MARIADB_CALLERS`` may act on MARIADB_HOST;
+    here any process which can see it uses it, so on a
+    database-tier node every daemon makes one direct MariaDB
+    connection at startup. That is a deliberate exception rather
+    than an oversight: this runs at ``shakenfist.config`` import
+    time, before any entry point has been able to call
+    ``set_caller_identity()``, so there is no identity to
+    consult. The cost is one connection per daemon start, which
+    is invisible to the tier's metrics and connection
+    accounting. Anything which needs to be visible there must go
+    through mariadb.py rather than being added here.
 
     Otherwise, if MARIADB_GATEWAY_HOSTS is set, the process
     reaches the sf-database tier via gRPC. Phase 3 of
