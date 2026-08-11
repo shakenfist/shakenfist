@@ -162,6 +162,81 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, method.call_count)
         mock_reset.assert_called_once()
 
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_cancelled_retry_rebuilds_the_channel(
+            self, mock_stub, mock_reset, mock_time):
+        # A CANCELLED never comes from the server -- a stopping sf-database
+        # surfaces as UNAVAILABLE -- it means the channel our in-flight call
+        # was riding on was torn down locally (issue 3605). So retry, and
+        # rebuild first, because that channel is closed and reusing it only
+        # earns a "closed channel" ValueError on every remaining attempt.
+        method = mock.MagicMock(
+            side_effect=[FakeRpcError(grpc.StatusCode.CANCELLED), 'ok'])
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertEqual('ok', mariadb._grpc_call(method, mock.MagicMock()))
+        self.assertEqual(2, method.call_count)
+        mock_reset.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_cancelled_exhaustion_raises_database_unavailable(
+            self, mock_stub, mock_reset, mock_time):
+        # A cancellation fails fast (nothing waited out a deadline), so it
+        # gets the larger fast-failing budget, and once that is spent the
+        # caller sees DatabaseUnavailable rather than an RpcError the
+        # wrappers would translate into "object not found".
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.CANCELLED))
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_call, method, mock.MagicMock())
+        self.assertEqual(mariadb.GRPC_UNAVAILABLE_RETRIES, method.call_count)
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_cancelled_dequeue_is_not_reported_as_an_empty_queue(
+            self, mock_stub, mock_reset, mock_time):
+        # The failure that made this matter: a Dequeue cancelled mid-flight
+        # during a redeploy was caught by the wrapper and returned as [],
+        # which the queues daemon cannot tell apart from "no work waiting".
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.CANCELLED))
+        method._method = b'/shakenfist.protos.DatabaseService/Dequeue'
+        mock_stub.return_value.Dequeue = method
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_work_queue_dequeue_batch, ['queue-1'], 1)
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_cancelled_write_is_not_reported_as_a_failed_write(
+            self, mock_stub, mock_reset, mock_time):
+        # Same shape on the write side: a cancelled SetNodeDaemonState used
+        # to return False, which reads as "the database refused this", not
+        # "we could not ask".
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.CANCELLED))
+        method._method = (
+            b'/shakenfist.protos.DatabaseService/SetNodeDaemonState')
+        mock_stub.return_value.SetNodeDaemonState = method
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_set_node_daemon_state,
+            uuid.UUID('11111111-1111-1111-1111-111111111111'), 'api',
+            'running', 1234.0, None)
+
     @mock.patch('shakenfist.mariadb._grpc_call',
                 side_effect=exceptions.DatabaseUnavailable('down'))
     @mock.patch('shakenfist.mariadb._get_database_stub')

@@ -567,18 +567,19 @@ def _grpc_call(
     stalled database tier SIGABRTed non-database daemons via their
     check_daemon_state() poll (issue 3586).
 
-    Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
-    between attempts. On DEADLINE_EXCEEDED it rebuilds the channel
-    between attempts to shed a wedged subchannel; on UNAVAILABLE it
+    Retries on UNAVAILABLE, DEADLINE_EXCEEDED and CANCELLED with a
+    short delay between attempts. On DEADLINE_EXCEEDED and CANCELLED it
+    rebuilds the channel between attempts (to shed a wedged subchannel,
+    or a channel that has been torn down under us); on UNAVAILABLE it
     keeps the channel so round_robin can serve the retry from a
     surviving peer (see the per-code reasoning at the retry site).
 
     The retry budget is split by cost: a DEADLINE_EXCEEDED attempt
     blocks for the full GRPC_TIMEOUT before failing, so those are
     capped at GRPC_RETRIES to bound the caller's worst-case wall time.
-    UNAVAILABLE (and closed-channel) attempts fail fast, so the loop
-    allows up to GRPC_UNAVAILABLE_RETRIES total attempts -- enough
-    patience, with the escalating sleeps, to outlast the channel's 5s
+    UNAVAILABLE, CANCELLED and closed-channel attempts fail fast, so
+    the loop allows up to GRPC_UNAVAILABLE_RETRIES total attempts --
+    enough patience, with the escalating sleeps, to outlast the 5s
     reconnect-backoff cap and ride out a brief window with no READY
     backend rather than storm DatabaseUnavailable cluster-wide during
     the database-tier rolling restart (#3430).
@@ -615,6 +616,24 @@ def _grpc_call(
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
+        # CANCELLED never comes from the server: a stopping sf-database
+        # (graceful drain or hard exit) surfaces on the client as
+        # UNAVAILABLE, and no servicer sets CANCELLED. It means our own
+        # call was torn down locally while in flight -- the channel was
+        # closed or deallocated beneath the blocked thread, or gRPC core
+        # shut down under it. So the request never reached a server
+        # answer, which makes it exactly as retryable as UNAVAILABLE,
+        # and it must not be left to the client wrappers below, which
+        # translate RpcError into "object not found" (a cancelled
+        # Dequeue read as an empty queue is how a redeploy dropped queue
+        # jobs -- issue 3605).
+        grpc.StatusCode.CANCELLED,
+    }
+    # Codes where the channel we just used is presumed unusable and must be
+    # rebuilt before the retry, rather than reused (see the retry site).
+    rebuild_codes = {
+        grpc.StatusCode.DEADLINE_EXCEEDED,
+        grpc.StatusCode.CANCELLED,
     }
     # grpcio's multicallable (returned by ``stub.X``) uses ``__slots__`` and
     # exposes no ``__name__``; the wire method name lives in ``self._method``
@@ -671,12 +690,16 @@ def _grpc_call(
                 # to a still-serving gateway) for a cold one whose own first
                 # RPC fails UNAVAILABLE too, amplifying a single gateway's
                 # rolling restart into a client-wide outage (#3430).
+                # CANCELLED goes with DEADLINE_EXCEEDED: the channel our call
+                # was riding on has been closed or deallocated under us, so
+                # reusing it would only earn a "Cannot invoke RPC on closed
+                # channel!" ValueError on every remaining attempt (#3605).
                 #
                 # This cascade can still silently consume up to
                 # GRPC_RETRIES * GRPC_TIMEOUT seconds of the caller's time
                 # (a DEADLINE_EXCEEDED attempt blocks for the full deadline
                 # before we get here), so always log each retry.
-                rebuild = e.code() == grpc.StatusCode.DEADLINE_EXCEEDED
+                rebuild = e.code() in rebuild_codes
                 LOG.warning(
                     f'gRPC {method_name or "call"} failed with '
                     f'{e.code().name}, retrying'
