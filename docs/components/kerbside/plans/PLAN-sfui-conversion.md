@@ -136,8 +136,13 @@ Concretely, the converted UI has:
 - The reference brand treatment: the globe mark beside the
   page heading and `--sf-brand` confined to the chrome, in
   place of the hardcoded teal navbar.
-- `<sf-tabs>` for the Sources / Consoles / Sessions
+- An sfui tab strip for the Sources / Consoles / Sessions
   navigation, with the audit page highlighting correctly.
+  **Amended in phase 4:** the navigation is anchors styled by
+  `sf.css`'s `.sf-nav`, not `<sf-tabs>`, because the
+  component's arrow-key selection would navigate and its
+  `role="tab"` buttons are not links. See phase 4's design
+  decision 1.
 - Native `<details>` disclosures replacing the
   HTML-in-attribute popovers.
 - morphdom-based polling replacing the meta-refresh reload,
@@ -232,8 +237,8 @@ locally-running kerbside.
 |-------|------|--------|
 | 1. Template smoke tests | PLAN-sfui-conversion-phase-01-smoke-tests.md | Done |
 | 2. Vendor sfui + static plumbing | PLAN-sfui-conversion-phase-02-vendoring.md | Done |
-| 3. sfui canonical additions (shakenfist/sfui repo) | PLAN-sfui-conversion-phase-03-sfui-canonical.md | Done (sfui commits unpushed) |
-| 4. New base + login page | PLAN-sfui-conversion-phase-04-base-login.md | Not started |
+| 3. sfui canonical additions (shakenfist/sfui repo) | PLAN-sfui-conversion-phase-03-sfui-canonical.md | Done |
+| 4. New base + login page | PLAN-sfui-conversion-phase-04-base-login.md | Done |
 | 5. Consoles page | PLAN-sfui-conversion-phase-05-consoles.md | Not started |
 | 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Not started |
 | 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Not started |
@@ -279,9 +284,9 @@ Phase notes, dependencies and recommended planning effort:
    working): correct head (`charset`, `viewport`, `lang`,
    sfui script/stylesheet order), brand header per the
    reference treatment with the sfui globe mark (retiring
-   kerbside's Inkscape `logo.svg`), `<sf-tabs>` nav wired
-   to the `navitems` context (fixing the audit-page
-   highlight and the keyboard-dead logout link),
+   kerbside's Inkscape `logo.svg`), a nav strip wired to the
+   `navitems` context (fixing the audit-page highlight and
+   the keyboard-dead logout link),
    `<sf-theme-toggle>`, and the refresh footer. Convert
    `login.html` onto it, fixing the mismatched tags,
    `<font>`, invalid input type, missing autocomplete
@@ -289,6 +294,10 @@ Phase notes, dependencies and recommended planning effort:
    axios for `fetch`. Decide here whether the login page
    should stop rendering the nav entirely (it currently
    shows links to protected pages while unauthenticated).
+   **Decided in phase 4:** the nav is `.sf-nav` anchors
+   rather than `<sf-tabs>`, which adds a small canonical
+   sfui step, and the login page renders no nav and no
+   logout control (the theme toggle stays).
 5. **Consoles page** (plan at high effort — the largest and
    densest page: popover replacement, two dropdown
    button-groups, icons). Convert `consoles.html` onto the
