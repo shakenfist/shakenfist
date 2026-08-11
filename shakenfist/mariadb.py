@@ -466,6 +466,14 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
 # with MariaDB: that is the documented architecture, and going direct hides
 # the daemon's load from sf-database's metrics, connection accounting and
 # caching.
+#
+# One path is exempt because it cannot consult this set:
+# config.load_cluster_config() reads cluster_config directly whenever
+# MARIADB_HOST is visible, whatever the process. It runs at
+# shakenfist.config import time, which is before any entry point has called
+# set_caller_identity(), so there is no identity to check yet. On a
+# database-tier node that means one direct connection per daemon start which
+# this rule does not cover -- see the note on that function.
 DIRECT_MARIADB_CALLERS = frozenset(['database', 'ctl'])
 
 

@@ -39,6 +39,11 @@ INSTANCE_GET_COUNT = 50
 ATTRIBUTE_FETCH_CEILING_PER_GET = 4
 AMBIENT_SAMPLE_SECONDS = 10
 
+# A metrics scrape is a plain HTTP GET against a daemon's port, so a
+# single failure is not evidence about the property under test.
+SCRAPE_ATTEMPTS = 3
+SCRAPE_RETRY_SECONDS = 2
+
 
 def scrape_database_counters(mesh_ip):
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
@@ -127,6 +132,37 @@ class DatabaseTierTestsMixin:
                 % json.dumps([n.get('name') for n in nodes], sort_keys=True))
         return database_nodes
 
+    def _sum_requests(self, database_nodes, operation, caller_daemon):
+        """Sum one counter across the tier, retrying a failed scrape.
+
+        The cluster LB test wraps its scrapes and calls self.fail() on
+        error rather than letting a raw requests exception out, and
+        these need the same treatment for the same reason: a scrape is
+        a plain HTTP GET against a daemon's metrics port, and a single
+        refused or timed-out connection says nothing about the property
+        under test. These tests gate every PR, so a transient scrape
+        failure would be a flake rather than a finding -- retry briefly
+        first, and only then fail with something that names the node.
+        """
+        total = 0.0
+        for node in database_nodes:
+            last = None
+            for attempt in range(SCRAPE_ATTEMPTS):
+                try:
+                    total += scrape_operation_requests(
+                        node['ip'], operation, caller_daemon)
+                    break
+                except Exception as e:
+                    last = e
+                    if attempt < SCRAPE_ATTEMPTS - 1:
+                        time.sleep(SCRAPE_RETRY_SECONDS)
+            else:
+                self.fail(
+                    'Failed to scrape database metrics from %s (%s) after '
+                    '%d attempts: %s'
+                    % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
+        return total
+
     def test_api_database_traffic_reaches_the_database_tier(self):
         # sf-database is the only process with direct MariaDB access; every
         # other daemon reaches MariaDB through its gRPC tier. That is easy to
@@ -144,9 +180,7 @@ class DatabaseTierTestsMixin:
         database_nodes = self._database_nodes()
 
         def _api_requests():
-            return sum(
-                scrape_operation_requests(n['ip'], None, 'api')
-                for n in database_nodes)
+            return self._sum_requests(database_nodes, None, 'api')
 
         before = _api_requests()
         for _ in range(CALL_COUNT):
@@ -190,10 +224,8 @@ class DatabaseTierTestsMixin:
         self._await_instance_create(inst['uuid'])
 
         def _fetches():
-            return sum(
-                scrape_operation_requests(
-                    n['ip'], 'GetInstanceAttributes', 'api')
-                for n in database_nodes)
+            return self._sum_requests(
+                database_nodes, 'GetInstanceAttributes', 'api')
 
         # Other API traffic on the cluster reads attribute rows too, so
         # measure that rate and subtract it from the measurement below.
@@ -206,24 +238,42 @@ class DatabaseTierTestsMixin:
         for _ in range(INSTANCE_GET_COUNT):
             self.test_client.get_instance(inst['uuid'])
         elapsed = time.time() - start
-        delta = _fetches() - before - (ambient_rate * elapsed)
+        raw_delta = _fetches() - before
+        delta = raw_delta - (ambient_rate * elapsed)
 
         measurement = {
             'ambient_rate_per_second': ambient_rate,
             'elapsed_seconds': elapsed,
             'gets': INSTANCE_GET_COUNT,
             'attribute_fetches': delta,
+            'attribute_fetches_raw': raw_delta,
         }
         self.addDetail(
             'measurement',
             content.text_content(json.dumps(
                 measurement, indent=2, sort_keys=True)))
 
+        # The floor is asserted on the raw counter delta, not the
+        # ambient-corrected one. What it exists to catch is the counter
+        # not moving at all -- #3708 measured exactly 0.0 over 50 GETs,
+        # because the API was reaching MariaDB directly and never
+        # touching the tier's interceptor. A raw delta is monotonic and
+        # cannot be pushed below zero by an ambient estimate sampled
+        # over a different window than the one it is extrapolated
+        # across, so this cannot fail for a cluster which is merely
+        # busy. Correcting it before comparing against zero would
+        # reintroduce that as a flake, which matters more now these run
+        # in the smoke suite and gate every PR.
         self.assertGreater(
-            delta, 0,
+            raw_delta, 0,
             'Expected instance GETs to fetch the attributes row at all; '
             'measurement=%s' % measurement)
 
+        # The ceiling keeps the correction, because ambient reads inflate
+        # the delta and so push this assertion towards a spurious
+        # failure; subtracting the measured background rate is what
+        # protects it. The 4x headroom over the expected single fetch
+        # then absorbs whatever the estimate did not.
         per_get = delta / INSTANCE_GET_COUNT
         self.assertLess(
             per_get, ATTRIBUTE_FETCH_CEILING_PER_GET,

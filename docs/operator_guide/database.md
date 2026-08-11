@@ -121,6 +121,15 @@ other process goes over gRPC to the `sf-database` tier listed in
 `EnvironmentFile` for every daemon on the node — so on a database-tier node
 all of them can see it and only those two may act on it.
 
+There is one exception, and it is worth knowing about when reading the tier's
+connection counts. Cluster configuration is bootstrapped by
+`config.load_cluster_config()`, which runs at import time — before a process
+has established its identity — and so reads the `cluster_config` table
+directly whenever `MARIADB_HOST` is visible, whatever the process. On a
+database-tier node every daemon therefore makes one direct MariaDB connection
+as it starts. It is a single short-lived read per daemon start, it does not
+appear in `database_requests_total`, and nothing after startup uses that path.
+
 The driver layer uses the `mariadb://` SQLAlchemy dialect so MariaDB-specific
 column types such as `INET4` (4-byte IPv4 storage with native comparison and
 indexing) are available. The underlying client library (`mysqlclient`)
@@ -207,7 +216,9 @@ the distinction helps when troubleshooting or planning a deployment.
 server. In practice this means nodes running `sf-database`, and any node where
 an operator runs `sf-ctl ensure-mariadb-schema`. It lets `sf-database` and
 `sf-ctl` bypass the gRPC layer and talk to MariaDB directly using SQLAlchemy;
-no other process does so, even when it can see the key. Ordinary cluster nodes
+no other process does so for its ongoing work, even when it can see the key —
+the sole exception being the import-time cluster-config bootstrap described
+above. Ordinary cluster nodes
 (running `sf-api`, `sf-queues`, etc.) do **not** have `MARIADB_HOST` set and
 should never need it.
 

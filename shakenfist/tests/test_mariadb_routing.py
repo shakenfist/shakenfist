@@ -7,6 +7,7 @@
 from unittest import mock
 
 from shakenfist import mariadb
+from shakenfist.daemons.database import main as database_main
 from shakenfist.tests import base
 from shakenfist.util import caller_identity
 
@@ -93,3 +94,54 @@ class TestUseDatabaseService(base.ShakenFistTestCase):
 
         mock_grpc.assert_called_once_with(mock.sentinel.instance_uuid)
         mock_direct.assert_not_called()
+
+
+class TestDatabaseDaemonClaimsIdentityEarly(base.ShakenFistTestCase):
+    """sf-database must own its identity before it can touch MariaDB.
+
+    Routing is decided per process from the caller identity, and an
+    unset one reads as 'unknown', which routes to the tier. For every
+    other daemon that is what we want; for sf-database it means routing
+    to itself, which on a single node deployment is a process that is
+    not listening yet. The identity therefore has to be claimed before
+    anything which might dispatch -- and write_pid_file() dispatches
+    indirectly, because it starts the eventlog drainer whose flush
+    calls mariadb.record_event_batch().
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        original = caller_identity.get_caller_daemon()
+        self.addCleanup(caller_identity.set_caller_identity, original)
+
+    def test_identity_is_claimed_before_write_pid_file(self):
+        caller_identity.set_caller_identity('unknown')
+        seen = {}
+
+        def _record_identity(name):
+            seen['at_write_pid_file'] = caller_identity.get_caller_daemon()
+            # Stop main() here; everything after this point is startup we
+            # do not want to run in a unit test, and the assertion below
+            # only cares about what came before it.
+            raise _StopStartup()
+
+        with mock.patch('shakenfist.daemons.database.main.daemon'
+                        '.write_pid_file', side_effect=_record_identity):
+            with mock.patch('shakenfist.daemons.database.main'
+                            '.util_exceptions.install_exception_tracking'):
+                try:
+                    database_main.main()
+                except _StopStartup:
+                    pass
+
+        self.assertEqual(
+            'database', seen.get('at_write_pid_file'),
+            'sf-database must call set_caller_identity("database") before '
+            'write_pid_file() starts the eventlog drainer, or the drainer '
+            'routes its flush through the gRPC tier back into this '
+            'process before it is listening.')
+
+
+class _StopStartup(Exception):
+    pass

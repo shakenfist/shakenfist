@@ -67,6 +67,7 @@ from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
+from shakenfist.util.caller_identity import set_caller_identity
 
 
 LOG, _ = logs.setup(__name__)
@@ -6135,6 +6136,19 @@ def drain_and_stop(server: Any, health_servicer: Any) -> None:
 
 def main() -> None:
     util_exceptions.install_exception_tracking()
+
+    # Claim this process' caller identity before anything which might touch
+    # MariaDB. _use_database_service() consults it, and an unset identity
+    # reads as 'unknown', which is deliberately not in
+    # DIRECT_MARIADB_CALLERS -- so until this runs sf-database would route
+    # its own database access through the gRPC tier, which on a single node
+    # deployment is this very process, before it is listening. The window
+    # is real rather than theoretical: write_pid_file() below starts the
+    # eventlog drainer thread, whose record_event_batch() flush is a
+    # dispatching call. Daemon.__init__ sets the same identity again later;
+    # this is the same value, just claimed early enough to matter.
+    set_caller_identity('database')
+
     daemon.write_pid_file('database')
 
     # NOTE: do not add faulthandler.dump_traceback_later() here. Its
