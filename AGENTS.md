@@ -797,6 +797,46 @@ Two traps it also left behind, both of which cost a debugging round:
   them AKI, SKI and basic constraints -- and be aware the symptom is
   indistinguishable from the CA not being trusted at all.
 
+#### If a cluster test can run on one node, share it with the smoke suite
+
+`cluster_ci_tests/test_database_tier.py` landed with two independent defects at
+once (#3694, #3708) and blocked the merge queue for four days, because the
+merge queue was the first place it ever ran. Both defects were reproducible on
+a single node.
+
+The two suites are disjoint directories -- `smoke-ci.conf` discovers only
+`smoke_ci_tests/`, `cluster-ci.conf` only `cluster_ci_tests/` -- so "add it to
+smoke" cannot mean moving it without losing the multi-node coverage. Define the
+test bodies once in a mixin under `deploy/shakenfist_ci/` (not in either suite
+directory, or stestr collects it twice from one run) and subclass the mixin
+from both suites. `database_tier.DatabaseTierTestsMixin` is the worked example:
+the two tests needing one sf-database run in both, and the load-balancer test
+needing N>=2 stays in the cluster suite where its skip is honest.
+
+Prefer this whenever a cluster test's preconditions are met by the single-node
+`localhost` topology. Sometimes that topology is also the *better* test: the
+API and sf-database share a machine there, so it is the most exposed to the
+direct-MariaDB routing regression #3708 was about.
+
+#### tearDown runs before addCleanup, and the base class already deletes
+
+`BaseNamespacedTestCase.tearDown()` deletes every instance in the namespace and
+blocks until they are gone, swallowing `ResourceNotFoundException` as it goes.
+testtools runs `tearDown()` *before* the `addCleanup` stack:
+
+```
+ORDER: ['tearDown', 'cleanup_from_test', 'cleanup_from_setUp']
+```
+
+So `self.addCleanup(self.test_client.delete_instance, uuid)` in a namespaced
+test can only ever 404, and unlike tearDown's own deletes it is not guarded --
+it fails the test after the assertions have passed. This is what kept
+`test_instance_get_fetches_the_attributes_row_once` red even once its
+measurement bug was fixed. Do not register instance cleanups in a namespaced
+test; the base class already reaps them. Reserve `addCleanup` for state the
+base class knows nothing about, such as the host devices in
+`test_stray_vxlan.py` or a namespace the test made itself.
+
 ### Key Directories
 
 - `shakenfist/` - Core package
