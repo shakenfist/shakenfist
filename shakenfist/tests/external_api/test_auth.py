@@ -1022,6 +1022,153 @@ class AuthNonceMismatchTestCase(base.ShakenFistTestCase):
         self.assertEqual(401, resp.status_code)
 
 
+class AuthRejectionLoggingTestCase(base.ShakenFistTestCase):
+    """A rejected token must say who presented it, and not shout.
+
+    Issue 3606: 'JWT token has incorrect nonce' was logged at ERROR
+    with no attribution at all -- the fields were built with a set
+    literal rather than a dict, which with_fields() silently discards
+    -- so a rotation induced 401 read as a cluster fault that nobody
+    could trace to a client.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+
+        self.events = []
+        patcher = mock.patch(
+            'shakenfist.eventlog.add_event',
+            side_effect=lambda event_type, object_type, object_uuid, message,
+            duration=None, extra=None, **kwargs: self.events.append(
+                (message, extra or {})))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client = external_api.app.test_client()
+
+    def _mint(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+        self.assertEqual(200, resp.status_code)
+        return 'Bearer %s' % resp.get_json()['access_token']
+
+    def _replay(self, token):
+        """Replay a now invalid token, returning the (level, fields, message)
+        triples base.py logged while doing so.
+
+        with_fields() hands back a fresh logger per call so that each
+        message can be paired with the fields it was actually logged
+        with, rather than with whatever the last caller happened to
+        pass.
+        """
+        logged = []
+
+        def _with_fields(fields):
+            logger = mock.MagicMock()
+            for level in ('debug', 'info', 'warning', 'error'):
+                getattr(logger, level).side_effect = (
+                    lambda message, _level=level, _fields=fields:
+                    logged.append((_level, _fields, message)))
+            return logger
+
+        with mock.patch('shakenfist.external_api.base.LOG') as mock_log:
+            mock_log.with_fields.side_effect = _with_fields
+            resp = self.client.get(
+                '/auth/namespaces', headers={'Authorization': token},
+                environ_base={'REMOTE_ADDR': '10.0.0.5'})
+        self.assertEqual(401, resp.status_code)
+        return logged
+
+    def _fields_for(self, logged, message):
+        """The fields logged alongside ``message``, as a dict."""
+        matching = [(level, fields) for level, fields, logged_message
+                    in logged if logged_message == message]
+        self.assertNotEqual(
+            [], matching,
+            f'{message!r} was never logged, so this test is not '
+            f'exercising what it claims to')
+
+        (level, fields) = matching[0]
+
+        # A rejected credential is the client's problem, not the
+        # cluster's, so it must not be logged at ERROR.
+        self.assertEqual('info', level)
+        self.assertIsInstance(
+            fields, dict,
+            'fields were not a dict, so with_fields() discarded them')
+        return fields
+
+    def _assert_attributed(self, fields):
+        self.assertEqual('banana', fields['namespace'])
+        self.assertEqual('key1', fields['keyname'])
+        self.assertEqual('GET', fields['method'])
+        self.assertEqual('/auth/namespaces', fields['path'])
+        self.assertEqual('10.0.0.5', fields['remote-address'])
+
+    def test_nonce_mismatch_is_attributed_and_not_an_error(self):
+        token = self._mint()
+
+        # Rotating the key mints a new nonce, so the outstanding token
+        # is now a stale replay -- the routine case from issue 3606.
+        Namespace.from_db('banana').add_key('key1', 'bacon')
+
+        logged = self._replay(token)
+        self._assert_attributed(
+            self._fields_for(logged, 'JWT token has incorrect nonce'))
+
+    def test_nonce_mismatch_is_audited_on_the_namespace(self):
+        token = self._mint()
+        Namespace.from_db('banana').add_key('key1', 'bacon')
+
+        self.events = []
+        self._replay(token)
+
+        audited = [extra for message, extra in self.events
+                   if message == 'JWT token has incorrect nonce']
+        self.assertEqual(1, len(audited))
+        self._assert_attributed(audited[0])
+
+    def test_nonce_mismatch_does_not_log_the_nonce(self):
+        token = self._mint()
+        Namespace.from_db('banana').add_key('key1', 'bacon')
+        nonce = Namespace.from_db('banana').lookup_key('key1').nonce
+
+        logged = self._replay(token)
+        fields = self._fields_for(logged, 'JWT token has incorrect nonce')
+        for name, value in fields.items():
+            self.assertNotIn(nonce, str(value),
+                             f'the nonce leaked into the log in {name!r}')
+
+    def test_removed_key_is_attributed_and_not_an_error(self):
+        token = self._mint()
+        Namespace.from_db('banana').remove_key('key1')
+
+        logged = self._replay(token)
+        self._assert_attributed(
+            self._fields_for(logged, 'JWT token uses non-existent key'))
+
+    def test_deleted_namespace_is_attributed_and_not_an_error(self):
+        token = self._mint()
+        Namespace.from_db('banana').state = dbo.STATE_DELETED
+
+        logged = self._replay(token)
+        self._assert_attributed(
+            self._fields_for(logged, 'JWT token is for deleted namespace'))
+
+
 class EventSecretsTestCase(base.ShakenFistTestCase):
     """Audit events must never carry tokens or key material.
 
