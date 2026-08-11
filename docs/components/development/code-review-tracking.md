@@ -75,6 +75,39 @@ this repository and passes through to the script.
    !.vscode/review-scope.toml
    ```
 
+   Then, *if the repository runs a pre-commit hook that rewrites the
+   files it is given* -- `end-of-file-fixer`, `trailing-whitespace`
+   and friends -- exempt the review marks from those hooks:
+
+   ```yaml
+   - id: end-of-file-fixer
+     exclude: ^\.vscode/.*\.weaudit
+   - id: trailing-whitespace
+     exclude: ^\.vscode/.*\.weaudit
+   ```
+
+   Without it, `end-of-file-fixer` rewrites the weAudit file on every
+   `pre-commit run --all-files`, because the generator emits no
+   trailing newline -- and reports a failure that cannot usefully be
+   fixed, since committing the newline only means the next regen drops
+   it again. The pattern deliberately covers the `.weaudit-shas.json`
+   sidecar as well as the weAudit file itself.
+
+   Scope the exclude to those hooks rather than putting it at the top
+   level of `.pre-commit-config.yaml`. A top-level exclude is shorter,
+   but it hides the review marks from *every* hook, including content
+   scanners -- and review notes are prose, so a blanket exclude stops
+   gitleaks and the bidi/zero-width check from reading exactly the
+   kind of human-written text a secret or a smuggled character would
+   land in. This is the same reasoning that keeps content scanners out
+   of the `paths-ignore` block in step 8; it applies just as much to a
+   local hook as to a CI workflow. A repository that runs no rewriting
+   hook at all (ryll, today) needs no exclude and should not add one.
+
+   The consistency audit's `review-marks-pre-commit` check enforces
+   this, and reports not applicable where no rewriting hook is
+   configured.
+
 2. Ensure commit signing is configured for the clone(s) reviews
    will be made from (see below).
 
