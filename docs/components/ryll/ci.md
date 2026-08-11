@@ -1,0 +1,286 @@
+# Continuous integration
+
+Ryll's CI runs in two tiers, and `develop` is behind a merge
+queue. The short version: a pull request runs the cheap, fast
+checks on our own hardware, and the expensive cross-platform
+builds run exactly once, against the commit that is about to
+land.
+
+This page describes what runs where, how to read a failure, and
+how the pieces fit together. For building and testing locally
+see [development.md](/components/ryll/development/).
+
+## Why two tiers
+
+Every ryll change used to run about fifteen jobs, including four
+fuzz builds and four cross-platform builds. The common failure
+was a cheap job failing — most often `cargo deny` on advisory
+drift — while eight heavy jobs ran to completion anyway. Most of
+the compute in a failed run was wasted, and the slowest jobs sat
+directly on pull request feedback latency.
+
+The two-tier scheme is modelled on
+`shakenfist/shakenfist`'s `functional-tests.yml`, which in turn
+implements the [merge queue gate pattern described by
+boinkor.net](https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/).
+
+## The two tiers
+
+All of CI lives in `.github/workflows/ci.yml`.
+
+The **smoke tier** runs on `pull_request` and gates the `Can
+enqueue` status check:
+
+| Job | Runner | What it does |
+|-----|--------|--------------|
+| `Lint` | self-hosted `l` | `make lint` (rustfmt + clippy) |
+| `Cross-check Windows` | self-hosted `l` | `make check-windows` |
+| `Build (Linux x86_64)` | self-hosted `l` | `make release`, both `--web` smoke tests, `make test`, `.deb` and `.rpm` |
+| `cargo audit` | self-hosted `s` | RustSec advisory check |
+| `cargo deny` | self-hosted `s` | Licence, ban, and advisory policy (`deny.toml`) |
+| `gitleaks` | self-hosted `s` | Secret scanning over full history |
+| `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh` |
+| `bidi and zero-width` | self-hosted `s` | `tools/check-bidi.sh` |
+
+The **merge tier** runs on `merge_group` and gates `Can merge`:
+
+| Job | Runner | What it does |
+|-----|--------|--------------|
+| `Fuzz (×4)` | self-hosted `l` | Build and smoke-run each `cargo-fuzz` target |
+| `Build (Linux aarch64)` | `ubuntu-24.04-arm` | Build, test, `--web` smokes, `.deb`, `.rpm` |
+| `Build (macOS aarch64)` | `macos-latest` | Build, test, tarball |
+| `Build (Windows x86_64)` | `windows-latest` | Build, test, zip (`--no-default-features`) |
+| `Build (Windows aarch64)` | `windows-11-arm` | Build, test, zip (`--no-default-features`) |
+
+In practice the smoke tier finishes in about ten minutes, paced
+by the Linux build, and the merge tier in about fifteen, paced
+by the Windows x86_64 build.
+
+`workflow_dispatch` deliberately runs **both** tiers, which is
+what makes `@shakenfist-bot please retest` a full retest.
+
+### The Windows cross-check is a proxy
+
+`make check-windows` cross-compiles the
+`x86_64-pc-windows-gnu` triple from the Linux devcontainer. It
+is a cheap stand-in for the merge tier's real Windows builds,
+not a replacement: it catches `cfg(windows)` and windows-sys
+breakage, which is what actually breaks in practice, but not
+`target_env = "msvc"` differences, link failures, or anything
+aarch64-specific. The msvc triple cannot be checked from Linux
+without an MSVC toolchain, because `cargo check` still runs
+build scripts and `aws-lc-sys` compiles vendored BoringSSL C for
+the target. See
+[PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/).
+
+## The three gates
+
+The `develop` ruleset requires exactly three status checks, and
+none of them builds anything — they are aggregators over the
+jobs that do:
+
+* **`Can see status`** runs `true` on every event. It exists so
+  the ruleset always has at least one check it can see, on both
+  pull requests and merge groups.
+* **`Can enqueue`** depends on every smoke-tier job and runs
+  only when the event is not `merge_group`.
+* **`Can merge`** depends on every merge-tier job and runs only
+  when the event *is* `merge_group`.
+
+Each gate uses `if: always()` so it still runs when a dependency
+failed or was skipped, and then evaluates a jq expression over
+the `needs` context that maps each dependency to "success or
+skipped" and requires all of them:
+
+```bash
+jq '. | to_entries
+      | map([.value.result == "success",
+             .value.result == "skipped"] | any)
+      | all'
+```
+
+Treating a skipped dependency as success is what makes the
+review-only fast path work — see below. A failed or cancelled
+dependency fails the gate.
+
+The gate that does not apply to a given event is itself skipped,
+and GitHub treats a skipped required check as satisfied. That is
+why `Can merge` being skipped does not block a pull request, and
+`Can enqueue` being skipped does not block a merge group.
+
+> **Adding a job means editing a gate.** A new job is not
+> really required until it is in a gate's `needs` list. Add
+> smoke-tier jobs to `can_enqueue` (and, if the automated
+> reviewer should wait for them, to `automated_reviewer`); add
+> merge-tier jobs to `can_merge`. A job that no gate depends on
+> can fail without blocking anything.
+
+## The life of a pull request
+
+1. You push a branch and open a pull request against `develop`.
+2. The smoke tier runs. The automated reviewer runs once every
+   smoke job has passed.
+3. `Can enqueue` goes green. `Can merge` shows as skipped.
+4. You merge the pull request. GitHub does not merge it
+   immediately — it adds it to the merge queue.
+5. The queue creates a `gh-readonly-queue/develop/pr-N-<sha>`
+   ref containing your change merged onto the current `develop`,
+   and CI runs on it with the `merge_group` event. Only the
+   merge tier runs; every smoke-tier job is skipped.
+6. `Can merge` goes green and the queue moves `develop` to the
+   merge commit it just tested.
+
+The queue is configured with ALLGREEN grouping and
+`max_entries_to_build: 1`, which deliberately disables
+speculative stacking: one entry builds at a time. For a
+single-developer project on a loaded CI cluster that trades peak
+throughput for never wasting a run on a speculative build that
+gets ejected and rebuilt.
+
+## Reading a merge queue ejection
+
+If a merge-tier job fails, `Can merge` fails, and GitHub removes
+the pull request from the queue. This is the part that surprises
+people:
+
+**The failing checks do not appear in the pull request's checks
+list.** They ran against the merge group ref, not against your
+branch, so the pull request shows only a timeline event saying
+it was removed from the merge queue.
+
+To find out what happened:
+
+* Follow the link in that timeline event, or
+* go to **Actions → CI** and look for the run whose branch is
+  `gh-readonly-queue/develop/pr-<your PR>-<sha>`.
+
+An ejection means one of two things. Either your change really
+does break a platform the smoke tier cannot see — the usual
+suspects are the msvc Windows builds and anything that only
+compiles on aarch64 — or the merge tier hit infrastructure
+flakiness. Push a fix and merge again, or just re-queue the
+unchanged pull request if you believe it was flaky.
+
+A queued entry is also rebuilt when `develop` moves underneath
+it, which the `prune-reviews` bot does after most merges. With
+one entry at a time this is usually invisible, but it is the
+thing to look at if you see queue churn.
+
+## Review-only changes
+
+Changes that touch only the code-review artefacts —
+`REVIEWS.md`, `.vscode/*.weaudit`, `.vscode/*.weaudit-shas.json`
+and `.vscode/review-scope.toml` — cannot affect the build, so
+the `check_paths` job skips every tier job for them. Both gates
+still pass, because their jq counts a skipped dependency as
+success, so such a pull request goes through the queue without
+running a single build.
+
+`check_paths` uses `dorny/paths-filter` with
+`predicate-quantifier: 'every'`. That matters: with the default
+quantifier a file matches if it matches *any* pattern, so `'**'`
+would match everything and silently defeat the `!REVIEWS.md`
+exclusions. Keep its skip list in sync with the `.vscode`
+whitelist in `.gitignore` and with `codeql-analysis.yml`.
+
+## Retesting
+
+Commenting `@shakenfist-bot please retest` on a pull request
+runs `gh workflow run ci.yml` against the branch. Because
+`workflow_dispatch` runs both tiers, this exercises the merge
+tier on the branch — useful for confirming a Windows or macOS
+fix before queueing, rather than discovering it by ejection.
+
+A dispatch run does **not** report into a queued entry. To
+retest something already in the queue, remove it from the queue
+and add it again.
+
+## Where binaries come from
+
+There is no longer a `push: branches: [develop]` trigger on
+`ci.yml`. The merge queue already tests the exact commit that
+lands, so a push-triggered run would only repeat it.
+
+| You want | Look at |
+|----------|---------|
+| Binaries for a pull request | The `Build (Linux x86_64)` job's artifacts on the pull request's CI run (`.deb` and `.rpm`, 30-day retention) |
+| Binaries for a `develop` SHA | The `merge_group` CI run that landed it — all four platform builds attach their artifacts there |
+| Binaries for an arbitrary branch | Run `manual-build.yml` (Actions → Manual build) and pick the platforms |
+| Release binaries | `release.yml`, triggered by a `v*` tag — see [releasing.md](/components/ryll/releasing/) |
+
+## Branch protection and the bot
+
+The `develop` ruleset ("Develop branch") requires a pull
+request, enables the merge queue, requires the three gate
+checks, and blocks deletion and non-fast-forward pushes.
+
+The one thing that still pushes directly to `develop` is the
+`prune-reviews` workflow, which drops review marks invalidated
+by whatever just merged. It authenticates as `shakenfist-bot`
+using the `DEPENDENCIES_TOKEN` secret; the bot is a member of
+the "SF Can Skip Merge Queue" team, which is the ruleset's
+bypass actor. GitHub does not accept the built-in Actions app as
+a bypass actor at all, so the token is load-bearing rather than
+a preference. That team also contains a human, which is the
+escape hatch if the ruleset ever wedges.
+
+A push made with a personal access token retriggers workflows,
+where a `GITHUB_TOKEN` push does not, so `prune-reviews`
+triggers itself once. That is safe rather than a loop: the
+second run finds nothing to prune and exits before committing.
+
+The workflow is guarded to `refs/heads/develop`, because
+`tools/ci-prune-reviews.sh` rebases onto `develop` and pushes to
+`develop` whatever ref was checked out — dispatching it on a
+branch would otherwise push that branch's unmerged commits
+straight to `develop`.
+
+Ruleset changes are captured under `.github/exported-config/`
+by `export-repo-config.yml`, which runs daily and on demand.
+
+## Reproducing CI locally
+
+Every Linux x86_64 job runs inside the devcontainer via the
+Makefile, so the local commands are the ones CI runs:
+
+```bash
+make lint            # rustfmt + clippy, as the Lint job
+make check-windows   # the Windows cross-check
+make test            # the unit test suite
+make web-smoke       # --web startup and shutdown
+make web-smoke-tls   # the same, with TLS
+```
+
+The merge tier cannot be reproduced locally — we own no macOS,
+Windows, or aarch64 Linux hardware, which is also why those jobs
+use GitHub-hosted runners and carry `audit-ok:
+github-hosted-runner` markers for the workflow-standards
+consistency audit.
+
+## Workflow inventory
+
+| Workflow | Purpose |
+|----------|---------|
+| `ci.yml` | Smoke tier and merge tier, the three gates, and the automated PR review |
+| `manual-build.yml` | On-demand binary builds of arbitrary branches |
+| `release.yml` | Build and publish release artifacts |
+| `codeql-analysis.yml` | CodeQL security scanning |
+| `supply-chain.yml` | Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in `ci.yml` |
+| `renovate.yml` | Automated dependency updates (hourly) |
+| `export-repo-config.yml` | Daily repository configuration export |
+| `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
+| `pr-address-comments.yml` | Bot-triggered comment addressing (`@shakenfist-bot please address comments`) |
+| `pr-retest.yml` | Bot-triggered CI re-run (`@shakenfist-bot please retest`) |
+| `prune-reviews.yml` | Prune stale review marks after each push to develop |
+
+## Concurrency
+
+Every job a pull request or PR comment can trigger must declare
+a job-level `concurrency:` block that cancels superseded runs.
+The self-hosted fleet runs `MAX_WORKERS = 6` across every
+Shaken Fist repository, and the `l` pool is its scarcest
+resource: without a concurrency group a superseded run can hold
+an `l` slot for its full 45-minute timeout while its replacement
+queues behind it. The convention, including the different group
+key needed for comment-triggered workflows, is documented in
+[AGENTS.md](https://github.com/shakenfist/ryll/blob/develop/AGENTS.md).

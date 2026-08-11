@@ -44,6 +44,36 @@ commit, master-plan table updated as work lands).
 - QEMU integration tests (`make test-qemu*`) run nowhere in
   CI today — they need KVM and a libvirt-style stack.
 
+### Since this plan was written: the two-tier restructure
+
+The description above is CI as of 2026-05-08. On 2026-08-10
+[PLAN-two-stage-ci.md](/components/ryll/plans/PLAN-two-stage-ci/) split `ci.yml`
+into a smoke tier on `pull_request` and a merge tier on
+`merge_group`, and put `develop` behind a merge queue. The job
+inventory is unchanged in substance, but where a job runs now
+matters. See [ci.md](/components/ryll/ci/).
+
+Two consequences for this plan:
+
+- **The platform runtime smokes belong in the merge tier.**
+  They need macOS and Windows runners, the slowest in the
+  pipeline; running them on every push to a pull request is
+  exactly the cost the two-tier split exists to avoid. Prefer
+  adding them as steps in the existing `build` matrix, which
+  is already merge-tier, over adding new jobs.
+- **Any genuinely new job must be added to a gate's `needs`.**
+  A merge-tier job goes in `can_merge`; a smoke-tier one goes
+  in `can_enqueue` and, if the automated reviewer should wait
+  for it, in `automated_reviewer`. A job no gate depends on
+  can fail without blocking a merge.
+
+Phase 3 (the smoke-test portability audit) also gains a cheaper
+option it did not have: `make check-windows` cross-compiles the
+`x86_64-pc-windows-gnu` triple from the Linux devcontainer in
+the smoke tier, so compile-level Windows breakage is caught
+before the queue. It runs nothing, so it does not substitute
+for the runtime coverage this plan is about.
+
 ### Bug classes the current matrix catches
 
 - Compile errors anywhere in the workspace, on every platform.
