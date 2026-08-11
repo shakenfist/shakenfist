@@ -7527,6 +7527,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Continuous integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../control-socket-protocol/" class="md-nav__link">
         
   
@@ -7967,10 +7995,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_16" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_16" id="__nav_3_9_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
             
   
   
@@ -7988,8 +8016,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_16">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_17">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11306,7 +11334,7 @@ five or more in-scope files need review.</p>
 macOS (Apple Silicon), and Windows (x86_64 + aarch64) in two tiers. A
 smoke tier runs on pull requests — lint, the self-hosted Linux x86_64
 build and tests, a Windows cross-check, and the supply-chain scanners
-— while a merge tier runs on <code>merge_group</code> with the fuzz targets and
+— while a merge tier runs in the merge queue with the fuzz targets and
 the cross-platform build matrix, so the expensive jobs run once,
 against the commit that is about to land. Linux x86_64 jobs run on
 self-hosted runners with the build wrapped in the devcontainer (via
@@ -11316,67 +11344,20 @@ PRs also receive an automated code review via Claude Code. Changes
 that only touch code-review artifacts (<code>REVIEWS.md</code>,
 <code>.vscode/*.weaudit*</code>, <code>.vscode/review-scope.toml</code>) skip every CI job
 and the CodeQL workflow.</p>
-<p><code>make check-windows</code> is the smoke tier's Windows cross-check: it
-cross-compiles the <code>x86_64-pc-windows-gnu</code> triple from the Linux
-devcontainer as a cheap proxy for the msvc builds in the merge tier.
-It catches <code>cfg(windows)</code> and windows-sys breakage; msvc-specific and
-link-time breakage still surface only in the merge tier. Run it
-locally exactly as CI does.</p>
-<p>Workflows in <code>.github/workflows/</code>:</p>
-<table>
-<thead>
-<tr>
-<th>Workflow</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ci.yml</code></td>
-<td>Smoke tier (lint, Linux build and test, Windows cross-check, supply-chain scanners, automated PR review) and merge tier (fuzz, multi-platform builds)</td>
-</tr>
-<tr>
-<td><code>manual-build.yml</code></td>
-<td>On-demand binary builds of arbitrary branches</td>
-</tr>
-<tr>
-<td><code>release.yml</code></td>
-<td>Build and publish release artifacts</td>
-</tr>
-<tr>
-<td><code>codeql-analysis.yml</code></td>
-<td>CodeQL security scanning</td>
-</tr>
-<tr>
-<td><code>supply-chain.yml</code></td>
-<td>Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in <code>ci.yml</code></td>
-</tr>
-<tr>
-<td><code>renovate.yml</code></td>
-<td>Automated dependency updates (hourly)</td>
-</tr>
-<tr>
-<td><code>export-repo-config.yml</code></td>
-<td>Daily repository configuration export</td>
-</tr>
-<tr>
-<td><code>pr-re-review.yml</code></td>
-<td>Bot-triggered PR re-review (<code>@shakenfist-bot please re-review</code>)</td>
-</tr>
-<tr>
-<td><code>pr-address-comments.yml</code></td>
-<td>Bot-triggered comment addressing (<code>@shakenfist-bot please address comments</code>)</td>
-</tr>
-<tr>
-<td><code>pr-retest.yml</code></td>
-<td>Bot-triggered CI re-run (<code>@shakenfist-bot please retest</code>)</td>
-</tr>
-<tr>
-<td><code>prune-reviews.yml</code></td>
-<td>Prune stale review marks after each push to develop</td>
-</tr>
-</tbody>
-</table>
+<p>Because <code>develop</code> is behind a merge queue, merging a pull request
+enqueues it rather than merging it immediately, and the merge tier's
+results appear on the queue's run rather than on the pull request.
+<a href="/components/ryll/ci/">ci.md</a> is the full reference: the job inventory, the three
+gate checks, how to read a queue ejection, how retesting interacts
+with the tiers, and where binaries for a given commit come from.</p>
+<p>The commands CI runs on Linux x86_64 are the local ones — <code>make lint</code>,
+<code>make check-windows</code>, <code>make test</code>, <code>make web-smoke</code> and
+<code>make web-smoke-tls</code> — so a smoke-tier failure can normally be
+reproduced verbatim. <code>make check-windows</code> cross-compiles the
+<code>x86_64-pc-windows-gnu</code> triple from the Linux devcontainer as a cheap
+proxy for the msvc builds in the merge tier: it catches <code>cfg(windows)</code>
+and windows-sys breakage, while msvc-specific and link-time breakage
+still surface only in the merge tier.</p>
 <h2 id="key-dependencies">Key dependencies<a class="headerlink" href="#key-dependencies" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>eframe/egui</strong> - Immediate mode GUI</li>

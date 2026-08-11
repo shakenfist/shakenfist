@@ -1449,6 +1449,10 @@
          <lastmod>2026-08-11</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/ryll/ci/</loc>
+         <lastmod>2026-08-11</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/ryll/configuration/</loc>
          <lastmod>2026-08-11</lastmod>
     </url>
@@ -2042,6 +2046,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci-phase-03-merge-queue/</loc>
+         <lastmod>2026-08-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci-phase-04-docs/</loc>
          <lastmod>2026-08-11</lastmod>
     </url>
     <url>

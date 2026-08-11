@@ -7527,6 +7527,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Continuous integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../control-socket-protocol/" class="md-nav__link">
         
   
@@ -7817,10 +7845,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_16" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" checked>
         
           
-          <label class="md-nav__link" for="__nav_3_9_16" id="__nav_3_9_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
             
   
   
@@ -7838,8 +7866,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_16_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_9_16">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_9_17">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -8895,6 +8923,17 @@
     <span class="md-ellipsis">
       
         What CI does today
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#since-this-plan-was-written-the-two-tier-restructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Since this plan was written: the two-tier restructure
       
     </span>
   </a>
@@ -11139,6 +11178,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#since-this-plan-was-written-the-two-tier-restructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Since this plan was written: the two-tier restructure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#bug-classes-the-current-matrix-catches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11341,6 +11391,33 @@ commit, master-plan table updated as work lands).</p>
 <li>QEMU integration tests (<code>make test-qemu*</code>) run nowhere in
   CI today — they need KVM and a libvirt-style stack.</li>
 </ul>
+<h3 id="since-this-plan-was-written-the-two-tier-restructure">Since this plan was written: the two-tier restructure<a class="headerlink" href="#since-this-plan-was-written-the-two-tier-restructure" title="Permanent link">&para;</a></h3>
+<p>The description above is CI as of 2026-05-08. On 2026-08-10
+<a href="/components/ryll/plans/PLAN-two-stage-ci/">PLAN-two-stage-ci.md</a> split <code>ci.yml</code>
+into a smoke tier on <code>pull_request</code> and a merge tier on
+<code>merge_group</code>, and put <code>develop</code> behind a merge queue. The job
+inventory is unchanged in substance, but where a job runs now
+matters. See <a href="/components/ryll/ci/">ci.md</a>.</p>
+<p>Two consequences for this plan:</p>
+<ul>
+<li><strong>The platform runtime smokes belong in the merge tier.</strong>
+  They need macOS and Windows runners, the slowest in the
+  pipeline; running them on every push to a pull request is
+  exactly the cost the two-tier split exists to avoid. Prefer
+  adding them as steps in the existing <code>build</code> matrix, which
+  is already merge-tier, over adding new jobs.</li>
+<li><strong>Any genuinely new job must be added to a gate's <code>needs</code>.</strong>
+  A merge-tier job goes in <code>can_merge</code>; a smoke-tier one goes
+  in <code>can_enqueue</code> and, if the automated reviewer should wait
+  for it, in <code>automated_reviewer</code>. A job no gate depends on
+  can fail without blocking a merge.</li>
+</ul>
+<p>Phase 3 (the smoke-test portability audit) also gains a cheaper
+option it did not have: <code>make check-windows</code> cross-compiles the
+<code>x86_64-pc-windows-gnu</code> triple from the Linux devcontainer in
+the smoke tier, so compile-level Windows breakage is caught
+before the queue. It runs nothing, so it does not substitute
+for the runtime coverage this plan is about.</p>
 <h3 id="bug-classes-the-current-matrix-catches">Bug classes the current matrix catches<a class="headerlink" href="#bug-classes-the-current-matrix-catches" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Compile errors anywhere in the workspace, on every platform.</li>
