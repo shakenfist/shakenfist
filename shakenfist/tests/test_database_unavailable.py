@@ -26,11 +26,15 @@ from shakenfist.tests import base
 
 
 class FakeRpcError(grpc.RpcError):
-    def __init__(self, code):
+    def __init__(self, code, details=None):
         self._code = code
+        self._details = details
 
     def code(self):
         return self._code
+
+    def details(self):
+        return self._details
 
 
 class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
@@ -91,6 +95,51 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
             exceptions.DatabaseUnavailable,
             mariadb._grpc_call, method, mock.MagicMock())
         self.assertEqual(mariadb.GRPC_RETRIES, method.call_count)
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_exhaustion_reports_the_status_code_and_budget(
+            self, mock_stub, mock_reset, mock_time):
+        # Issue 3607: 262 of these were logged in 23 minutes with
+        # exception_class and stack_trace both null, so nothing recorded
+        # whether the calls timed out, were cancelled, or hit a resource
+        # limit -- nor that "after 1 attempts" is the bounded budget doing
+        # its job rather than a broken retry loop.
+        method = mock.MagicMock(side_effect=FakeRpcError(
+            grpc.StatusCode.DEADLINE_EXCEEDED, 'Deadline Exceeded'))
+        method._method = (
+            '/shakenfist.protos.DatabaseService/GetNodeDaemonState')
+        mock_stub.return_value.GetNodeDaemonState = method
+
+        try:
+            mariadb._grpc_call(
+                method, mock.MagicMock(),
+                timeout=mariadb.BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
+            self.fail('DatabaseUnavailable not raised')
+        except exceptions.DatabaseUnavailable as e:
+            message = str(e)
+        self.assertIn('GetNodeDaemonState', message)
+        self.assertIn('failed after 1 attempts', message)
+        self.assertIn(f'deadline {mariadb.BOUNDED_QUERY_TIMEOUT}s', message)
+        self.assertIn('slow attempt budget 1', message)
+        self.assertIn('DEADLINE_EXCEEDED', message)
+        self.assertIn('Deadline Exceeded', message)
+
+    def test_error_description_survives_a_bare_rpc_error(self):
+        # grpc.RpcError itself has neither code() nor details(); only the
+        # subclass the runtime raises does. The describer must not blow up
+        # on the bare one _grpc_call seeds last_error with.
+        self.assertIn(
+            'RpcError', mariadb._describe_rpc_error(grpc.RpcError()))
+
+    def test_error_description_of_a_closed_channel_value_error(self):
+        # The other thing _grpc_call can exhaust on is the concurrent
+        # channel-close ValueError, which has no gRPC status at all.
+        described = mariadb._describe_rpc_error(
+            ValueError('Cannot invoke RPC on closed channel!'))
+        self.assertIn('ValueError', described)
+        self.assertIn('closed channel', described)
 
     @mock.patch('shakenfist.mariadb.time')
     @mock.patch('shakenfist.mariadb._reset_database_stub')
@@ -386,6 +435,7 @@ class CheckDaemonStateTestCase(base.ShakenFistTestCase):
         d.daemon_name = 'queues'
         d.abort_path = '/run/sf/queues.abort'
         d._last_daemon_state_check = 0.0
+        d._daemon_state_poll_interval = daemon.DAEMON_STATE_POLL_INTERVAL
         return d
 
     @mock.patch('shakenfist.daemons.daemon.set_abort_path')
@@ -463,6 +513,59 @@ class CheckDaemonStateTestCase(base.ShakenFistTestCase):
             d._last_daemon_state_check -= (daemon.DAEMON_STATE_POLL_INTERVAL + 1)
             d.check_daemon_state()
             self.assertEqual(2, mock_get_state.call_count)
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state',
+                side_effect=exceptions.DatabaseUnavailable('down'))
+    def test_poll_backs_off_while_the_database_cannot_answer(
+            self, mock_get_state, mock_set_abort):
+        # Re-asking every two seconds during a database stall is what piled
+        # abandoned reads onto sf-database and sustained the failure burst
+        # in issue 3607.
+        d = self._daemon()
+        with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+            expected = daemon.DAEMON_STATE_POLL_INTERVAL
+            for _ in range(10):
+                d._last_daemon_state_check = 0.0
+                d.check_daemon_state()
+                expected = min(expected * 2,
+                               daemon.DAEMON_STATE_POLL_MAX_INTERVAL)
+                self.assertEqual(expected, d._daemon_state_poll_interval)
+
+        # Capped, not unbounded.
+        self.assertEqual(daemon.DAEMON_STATE_POLL_MAX_INTERVAL,
+                         d._daemon_state_poll_interval)
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state')
+    def test_poll_backoff_resets_on_success(
+            self, mock_get_state, mock_set_abort):
+        d = self._daemon()
+        d._daemon_state_poll_interval = daemon.DAEMON_STATE_POLL_MAX_INTERVAL
+        mock_get_state.return_value = mock.Mock(
+            value=daemon.Node.DAEMON_STATE_RUNNING)
+
+        with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+            d.check_daemon_state()
+
+        self.assertEqual(daemon.DAEMON_STATE_POLL_INTERVAL,
+                         d._daemon_state_poll_interval)
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state',
+                side_effect=exceptions.DatabaseUnavailable('down'))
+    def test_backoff_actually_suppresses_the_next_read(
+            self, mock_get_state, mock_set_abort):
+        d = self._daemon()
+        with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+            d.check_daemon_state()
+            self.assertEqual(1, mock_get_state.call_count)
+
+            # The base interval has elapsed, but the backed off one has not.
+            d._last_daemon_state_check -= (
+                daemon.DAEMON_STATE_POLL_INTERVAL + 1)
+            d.check_daemon_state()
+            self.assertEqual(1, mock_get_state.call_count)
 
 
 class ClusterLockAcquireTestCase(base.ShakenFistTestCase):

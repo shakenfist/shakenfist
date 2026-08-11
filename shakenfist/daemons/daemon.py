@@ -52,6 +52,21 @@ WATCHDOG_PET_INTERVAL = 10
 DAEMON_STATE_POLL_INTERVAL = 2
 
 
+# Ceiling for the backoff applied to that poll while the database cannot
+# answer it. Every daemon on every node issues this read, and it is by
+# far the most frequent of the bounded-deadline calls we make, so it is
+# the first thing to fail when the database tier slows down (issue 3607
+# recorded 262 failures of it in 23 minutes while every other RPC, on
+# the longer default deadline, kept working) -- and re-issuing it every two
+# seconds during a stall piles abandoned reads onto sf-database's worker
+# pool, which lengthens the stall it is a symptom of (issue 3607).
+# Backing off geometrically to a minute costs nothing (the poll only
+# notices a manually written stop request, which has no latency
+# expectation) and lets a struggling database recover. The interval
+# snaps back to DAEMON_STATE_POLL_INTERVAL on the first successful read.
+DAEMON_STATE_POLL_MAX_INTERVAL = 60
+
+
 # Adaptive backoff for the idle dequeue loops (the queues and net
 # dispatchers). Those loops slept a flat IDLE_POLL_FAST_SECONDS whenever a
 # dequeue came back empty, so a completely idle cluster still issued ~5
@@ -299,6 +314,7 @@ class Daemon:
         self.last_stability_log = 0
         self._last_watchdog = 0.0
         self._last_daemon_state_check = 0.0
+        self._daemon_state_poll_interval = DAEMON_STATE_POLL_INTERVAL
 
     def _resolve_node_uuid(self):
         """Populate config.NODE_UUID if not already set.
@@ -411,7 +427,7 @@ class Daemon:
         # before the read so a database outage is polled at that cadence rather
         # than hammered every tick.
         now = time.time()
-        if now - self._last_daemon_state_check < DAEMON_STATE_POLL_INTERVAL:
+        if now - self._last_daemon_state_check < self._daemon_state_poll_interval:
             return
         self._last_daemon_state_check = now
 
@@ -433,7 +449,14 @@ class Daemon:
             row = mariadb.get_node_daemon_state(
                 uuid.UUID(node_uuid), self.daemon_name, bounded=True)
         except DatabaseUnavailable:
+            # Back off rather than re-asking a database which just told us it
+            # could not answer within the bounded deadline. See the comment on
+            # DAEMON_STATE_POLL_MAX_INTERVAL.
+            self._daemon_state_poll_interval = min(
+                self._daemon_state_poll_interval * 2,
+                DAEMON_STATE_POLL_MAX_INTERVAL)
             return
+        self._daemon_state_poll_interval = DAEMON_STATE_POLL_INTERVAL
         daemon_state = row.value if row is not None else None
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
