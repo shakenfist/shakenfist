@@ -150,11 +150,12 @@ non-required workflow (matching shakenfist).
    cluster load; that is the right trade for a single-developer
    project with a loaded CI cluster, and applies equally to
    ryll's self-hosted merge-tier jobs.
-2. **Scanner cron scope.** The weekly cron exists to catch
-   advisory drift, which only affects cargo-audit and cargo-deny.
-   Recommendation: the residual scheduled workflow keeps only
-   those two jobs; gitleaks/shellcheck/bidi only change when the
-   tree changes, and every PR runs them.
+2. **Scanner cron scope.** *Resolved 2026-08-09 in phase 1.*
+   The weekly cron exists to catch advisory drift, which only
+   affects cargo-audit and cargo-deny. `supply-chain.yml` now
+   keeps only those two jobs on the cron; gitleaks, shellcheck
+   and the bidi scan moved into `ci.yml`'s smoke tier, where
+   every pull request runs them.
 3. **Windows cross-check feasibility.** *Resolved 2026-08-09 by
    the phase 2 spike.* The answer was neither of the two outcomes
    anticipated here. `x86_64-pc-windows-msvc` — the triple CI
@@ -170,14 +171,15 @@ non-required workflow (matching shakenfist).
    step and leave the merge tier as the authoritative Windows
    signal. See
    [PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/).
-4. **Post-merge builds.** With a `pull_request` ruleset rule and
-   the merge queue, direct pushes to `develop` stop happening, and
-   the queue tests the exact merge commit that lands. The `push:
-   branches: [develop]` trigger on `ci.yml` then only re-runs
-   what the queue just ran. Recommendation: drop it; artifacts
-   for a develop SHA come from its merge-group run. CodeQL keeps
-   its push trigger (the security tab wants a default-branch
-   baseline).
+4. **Post-merge builds.** *Resolved 2026-08-09 in phase 1.*
+   With a `pull_request` ruleset rule and the merge queue,
+   direct pushes to `develop` stop happening, and the queue
+   tests the exact merge commit that lands. The `push:
+   branches: [develop]` trigger on `ci.yml` would then only
+   re-run what the queue just ran, so it was dropped; artifacts
+   for a develop SHA come from its merge-group run, which
+   `docs/ci.md` now says. CodeQL keeps its push trigger (the
+   security tab wants a default-branch baseline).
 5. **Docs-only fast path.** shakenfist's `check_paths` also skips
    heavy tests for docs-only changes. ryll's current skip list is
    only the review-artefact files. Extending it to `docs/**` is
@@ -190,8 +192,8 @@ non-required workflow (matching shakenfist).
 |-------|------|--------|
 | 1. Two-tier ci.yml | [PLAN-two-stage-ci-phase-01-workflow-tiers.md](/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/) | Complete (PR #255, merged 2026-08-09) |
 | 2. Windows cross-check spike | [PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/) | Complete (PRs #256 and #257, merged 2026-08-10) |
-| 3. Merge queue enablement | [PLAN-two-stage-ci-phase-03-merge-queue.md](/components/ryll/plans/PLAN-two-stage-ci-phase-03-merge-queue/) | In progress: token change written, ruleset change awaiting approval |
-| 4. Documentation | PLAN-two-stage-ci-phase-04-docs.md | Not started |
+| 3. Merge queue enablement | [PLAN-two-stage-ci-phase-03-merge-queue.md](/components/ryll/plans/PLAN-two-stage-ci-phase-03-merge-queue/) | Complete (PR #262, ruleset applied 2026-08-10, proven end to end by PR #263) |
+| 4. Documentation | [PLAN-two-stage-ci-phase-04-docs.md](/components/ryll/plans/PLAN-two-stage-ci-phase-04-docs/) | Complete (2026-08-11) |
 
 ### Phase 1: Two-tier ci.yml
 
@@ -283,17 +285,35 @@ Only after phase 1 has merged to develop.
   PR (touching only `REVIEWS.md`) also passes through both gates
   via the skipped-counts-as-success path.
 
+What actually happened, beyond the above: the ruleset extends
+the existing history ruleset (18708684) rather than adding a
+second one, and it needed an unplanned prerequisite. The
+`prune-reviews` workflow pushes straight to `develop`, which the
+new `pull_request` rule forbids, and GitHub does not accept the
+built-in Actions app as a bypass actor — so the workflow now
+authenticates as `shakenfist-bot` via `DEPENDENCIES_TOKEN`,
+whose team is the ruleset's bypass actor, copying kerbside. PR
+#263 then proved the queue end to end on 2026-08-10: every
+smoke job skipped in the merge group, four fuzz and four
+platform builds green, `Can merge` reporting in nine seconds,
+merge-tier wall clock about fifteen minutes. The review-only
+case has not been re-exercised since the checks became
+required.
+
 ### Phase 4: Documentation
 
 * Describe the two-tier model in `docs/development.md` (or a new
   `docs/ci.md` if the CI material has outgrown it): what runs on
   PR vs queue, how to read a queue ejection, how `@shakenfist-bot
   please retest` interacts with the tiers, where develop-SHA
-  artifacts now come from.
+  artifacts now come from. It had outgrown it: the reference
+  lives in `docs/ci.md` and `development.md` links to it.
 * Update `AGENTS.md` (CI expectations for agents) and
   `ARCHITECTURE.md` only if it describes CI today; note the
   changed artifact provenance in `docs/releasing.md` if it
-  references push-to-develop builds.
+  references push-to-develop builds. `ARCHITECTURE.md` describes
+  CI only as of the web-frontend work and was left alone;
+  `releasing.md` never referenced push-to-develop builds.
 * Annotate `PLAN-ci-platform-matrix.md` so its future platform
   runtime smokes are specified as merge-tier jobs.
 * Update this plan's phase table and `docs/plans/index.md`

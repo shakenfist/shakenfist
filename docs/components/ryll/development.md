@@ -174,7 +174,7 @@ GitHub Actions CI builds and tests ryll on Linux (x86_64 + aarch64),
 macOS (Apple Silicon), and Windows (x86_64 + aarch64) in two tiers. A
 smoke tier runs on pull requests — lint, the self-hosted Linux x86_64
 build and tests, a Windows cross-check, and the supply-chain scanners
-— while a merge tier runs on `merge_group` with the fuzz targets and
+— while a merge tier runs in the merge queue with the fuzz targets and
 the cross-platform build matrix, so the expensive jobs run once,
 against the commit that is about to land. Linux x86_64 jobs run on
 self-hosted runners with the build wrapped in the devcontainer (via
@@ -185,28 +185,21 @@ that only touch code-review artifacts (`REVIEWS.md`,
 `.vscode/*.weaudit*`, `.vscode/review-scope.toml`) skip every CI job
 and the CodeQL workflow.
 
-`make check-windows` is the smoke tier's Windows cross-check: it
-cross-compiles the `x86_64-pc-windows-gnu` triple from the Linux
-devcontainer as a cheap proxy for the msvc builds in the merge tier.
-It catches `cfg(windows)` and windows-sys breakage; msvc-specific and
-link-time breakage still surface only in the merge tier. Run it
-locally exactly as CI does.
+Because `develop` is behind a merge queue, merging a pull request
+enqueues it rather than merging it immediately, and the merge tier's
+results appear on the queue's run rather than on the pull request.
+[ci.md](/components/ryll/ci/) is the full reference: the job inventory, the three
+gate checks, how to read a queue ejection, how retesting interacts
+with the tiers, and where binaries for a given commit come from.
 
-Workflows in `.github/workflows/`:
-
-| Workflow | Purpose |
-|----------|---------|
-| `ci.yml` | Smoke tier (lint, Linux build and test, Windows cross-check, supply-chain scanners, automated PR review) and merge tier (fuzz, multi-platform builds) |
-| `manual-build.yml` | On-demand binary builds of arbitrary branches |
-| `release.yml` | Build and publish release artifacts |
-| `codeql-analysis.yml` | CodeQL security scanning |
-| `supply-chain.yml` | Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in `ci.yml` |
-| `renovate.yml` | Automated dependency updates (hourly) |
-| `export-repo-config.yml` | Daily repository configuration export |
-| `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
-| `pr-address-comments.yml` | Bot-triggered comment addressing (`@shakenfist-bot please address comments`) |
-| `pr-retest.yml` | Bot-triggered CI re-run (`@shakenfist-bot please retest`) |
-| `prune-reviews.yml` | Prune stale review marks after each push to develop |
+The commands CI runs on Linux x86_64 are the local ones — `make lint`,
+`make check-windows`, `make test`, `make web-smoke` and
+`make web-smoke-tls` — so a smoke-tier failure can normally be
+reproduced verbatim. `make check-windows` cross-compiles the
+`x86_64-pc-windows-gnu` triple from the Linux devcontainer as a cheap
+proxy for the msvc builds in the merge tier: it catches `cfg(windows)`
+and windows-sys breakage, while msvc-specific and link-time breakage
+still surface only in the merge tier.
 
 ## Key dependencies
 

@@ -92,8 +92,9 @@ both ends of the traffic through the proxy. This would allow:
 - [Web frontend](/components/ryll/web-frontend/) - Operator guide for `--web` mode
 - [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools
 - [Multi-mode feature parity](/components/ryll/multi-mode-parity/) - Which features work in GUI, headless, and web modes
-- [Development](/components/ryll/development/) - Building, testing, CI, and contributing
+- [Development](/components/ryll/development/) - Building, testing, and contributing
 - [macOS Development](/components/ryll/development-macos/) - Build and test locally on macOS
+- [Continuous integration](/components/ryll/ci/) - The two CI tiers, the merge queue, and where binaries come from
 - [Troubleshooting](/components/ryll/troubleshooting/) - Common issues and debugging
 - [Binary Portability](/components/ryll/portability/) - How to share built binaries
 - [Releasing](/components/ryll/releasing/) - How to publish a new release
