@@ -1,11 +1,14 @@
 import datetime
 import os
 import tempfile
+import uuid
 from unittest import mock
 
 import schedule
 
+from shakenfist import eventlog
 from shakenfist import instance
+from shakenfist import node
 from shakenfist.config import BaseSettings
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.daemons.cleaner import main as cleaner_main
@@ -598,6 +601,110 @@ class CleanerIOErrorPausedInstanceTestCase(CleanerTestCase):
             ObjectType.INSTANCE, instance_uuids['paused'])
         self.assertEqual(
             instance.Instance.STATE_DELETE_WAIT, db_state['value'])
+
+
+class CleanerNodeSelfLookupTestCase(base.ShakenFistTestCase):
+    """The cleaner's lookup of its own node record can miss.
+
+    Between the daemon starting and sf-resources writing the node row,
+    every cleaner pass looks up a node which does not exist yet (and the
+    same happens if the node is removed from the cluster while the
+    daemon runs). That is anticipated and handled, so the lookup must
+    pass suppress_failure_audit -- otherwise baseobject audits it as an
+    ERROR and every restart logs "attempt to lookup non-existent object"
+    (github issue 3704).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+
+        self.config = mock.patch(
+            'shakenfist.daemons.cleaner.main.config',
+            FakeConfig(STORAGE_PATH=self.tempdir.name))
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # None of the mocked nodes are named 'abigcomputer', so the
+        # cleaner's self lookup genuinely misses.
+        self.mock_mariadb = MockMariaDB(self, node_count=2)
+        self.mock_mariadb.setup()
+
+    def _lookup_failure_audits(self):
+        return [c for c in eventlog.add_event_multi.call_args_list
+                if 'attempt to lookup non-existent object' in c[0][2]]
+
+    def _create_this_node(self):
+        self.mock_mariadb._mariadb_create_node(
+            uuid.uuid4(), fake_config.NODE_NAME, '10.0.0.42',
+            node.Node.current_version)
+
+    @mock.patch('shakenfist.mariadb.get_active_blob_uuids', return_value=[])
+    def test_maintain_blobs_absent_node(self, mock_active_blobs):
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        m._maintain_blobs()
+
+        self.assertEqual([], self._lookup_failure_audits())
+
+    def test_find_missing_blobs_absent_node(self):
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        m._find_missing_blobs()
+
+        self.assertEqual([], self._lookup_failure_audits())
+
+    def test_run_inner_absent_node(self):
+        """The startup lookup must not audit, and must be retried.
+
+        _run_inner looks its node up once before entering the loop
+        purely to attribute recorded operations. A startup miss used to
+        both log an ERROR and leave the attribution permanently None.
+        """
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.abort_path = '/does/not/exist'
+        m.pet_watchdog = mock.MagicMock()
+        m.wait_for_nodelock = mock.MagicMock()
+        m.cluster_stable = mock.MagicMock(return_value=True)
+        m.idle = mock.MagicMock()
+        m._maintain_blobs = mock.MagicMock()
+        m._find_missing_blobs = mock.MagicMock()
+
+        # Two passes: the node record appears between them, as it does
+        # once sf-resources catches up.
+        passes = [True, True, False]
+
+        def fake_check_abort_path(_path):
+            keep_going = passes.pop(0)
+            if keep_going and len(passes) == 1:
+                self._create_this_node()
+            return keep_going
+
+        with mock.patch('shakenfist.daemons.cleaner.main.schedule'), \
+                mock.patch(
+                    'shakenfist.daemons.cleaner.main.scheduled_tasks'), \
+                mock.patch(
+                    'shakenfist.daemons.cleaner.main.util_general.'
+                    'RecordedOperation') as mock_recorded, \
+                mock.patch(
+                    'shakenfist.daemons.cleaner.main.daemon.check_abort_path',
+                    side_effect=fake_check_abort_path):
+            m._run_inner()
+
+        self.assertEqual([], self._lookup_failure_audits())
+
+        # The first pass had no node to attribute operations to, but the
+        # second one did.
+        attributions = [c[0][1] for c in mock_recorded.call_args_list
+                        if c[0][0] == 'maintain blobs']
+        self.assertEqual(2, len(attributions))
+        self.assertIsNone(attributions[0])
+        self.assertIsNotNone(attributions[1])
+        self.assertEqual(fake_config.NODE_NAME, attributions[1].fqdn)
 
 
 class CleanerWatchdogTestCase(base.ShakenFistTestCase):

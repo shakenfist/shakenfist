@@ -49,9 +49,11 @@ class Monitor(daemon.Daemon):
         os.makedirs(cache_path, exist_ok=True)
 
         active_blob_uuids = mariadb.get_active_blob_uuids()
-        n = node.Node.from_db(config.NODE_NAME)
+        n = node.Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
         if not n:
-            # We have started up enough yet to exist in etcd
+            # We have not started up enough yet to exist in the database.
+            # That's an expected startup race, not an error, so the lookup
+            # failure audit is suppressed above.
             return
 
         all_node_blobs = n.blobs
@@ -162,8 +164,10 @@ class Monitor(daemon.Daemon):
 
     def _find_missing_blobs(self):
         # Find blobs which should be on this node but are not.
-        n = node.Node.from_db(config.NODE_NAME)
+        n = node.Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
         if not n:
+            # Not in the database yet, or removed from the cluster. Either
+            # way there is nothing to check and it isn't an error.
             return
 
         for blob_uuid in n.blobs:
@@ -187,9 +191,17 @@ class Monitor(daemon.Daemon):
         last_missing_blob_check = 0
         last_libvirt_log_clean = 0
 
-        n = node.Node.from_db(config.NODE_NAME)
+        # This is only used to attribute recorded operations to this node, and
+        # the node record might not exist yet this early in startup. That's
+        # expected, so don't audit the miss -- just retry once a pass until
+        # the record shows up.
+        n = node.Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
         while daemon.check_abort_path(self.abort_path):
             self.wait_for_nodelock()
+
+            if not n:
+                n = node.Node.from_db(
+                    config.NODE_NAME, suppress_failure_audit=True)
 
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
