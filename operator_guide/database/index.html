@@ -12395,10 +12395,21 @@ atomically in a single transaction).</p>
 All other daemons reach MariaDB through <code>sf-database</code>'s gRPC interface. This
 keeps connection management in one place, gives consistent Prometheus metrics
 for every database operation, and makes the tier independently scalable. The
-<code>shakenfist.mariadb</code> module dispatches automatically: if <code>MARIADB_HOST</code> is set
-(the <code>sf-database</code> daemon and the schema tool) it uses direct SQLAlchemy
-access; otherwise it goes over gRPC to the <code>sf-database</code> tier listed in
-<code>MARIADB_GATEWAY_HOSTS</code>.</p>
+<code>shakenfist.mariadb</code> module dispatches automatically: <code>sf-database</code> and
+<code>sf-ctl</code> use direct SQLAlchemy access when <code>MARIADB_HOST</code> is set, and every
+other process goes over gRPC to the <code>sf-database</code> tier listed in
+<code>MARIADB_GATEWAY_HOSTS</code>. The dispatch is per-process, not per-node, because
+<code>MARIADB_HOST</code> lives in <code>/etc/sf/config</code> — the shared systemd
+<code>EnvironmentFile</code> for every daemon on the node — so on a database-tier node
+all of them can see it and only those two may act on it.</p>
+<p>There is one exception, and it is worth knowing about when reading the tier's
+connection counts. Cluster configuration is bootstrapped by
+<code>config.load_cluster_config()</code>, which runs at import time — before a process
+has established its identity — and so reads the <code>cluster_config</code> table
+directly whenever <code>MARIADB_HOST</code> is visible, whatever the process. On a
+database-tier node every daemon therefore makes one direct MariaDB connection
+as it starts. It is a single short-lived read per daemon start, it does not
+appear in <code>database_requests_total</code>, and nothing after startup uses that path.</p>
 <p>The driver layer uses the <code>mariadb://</code> SQLAlchemy dialect so MariaDB-specific
 column types such as <code>INET4</code> (4-byte IPv4 storage with native comparison and
 indexing) are available. The underlying client library (<code>mysqlclient</code>)
@@ -12464,10 +12475,13 @@ once a concrete caller exists.</p>
 the distinction helps when troubleshooting or planning a deployment.</p>
 <p><strong><code>MARIADB_HOST</code></strong> is set only on nodes that have <em>direct</em> access to the MariaDB
 server. In practice this means nodes running <code>sf-database</code>, and any node where
-an operator runs <code>sf-ctl ensure-mariadb-schema</code>. The presence of <code>MARIADB_HOST</code>
-tells the <code>shakenfist.mariadb</code> module to bypass the gRPC layer and talk to
-MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running <code>sf-api</code>,
-<code>sf-queues</code>, etc.) do <strong>not</strong> have <code>MARIADB_HOST</code> set and should never need it.</p>
+an operator runs <code>sf-ctl ensure-mariadb-schema</code>. It lets <code>sf-database</code> and
+<code>sf-ctl</code> bypass the gRPC layer and talk to MariaDB directly using SQLAlchemy;
+no other process does so for its ongoing work, even when it can see the key —
+the sole exception being the import-time cluster-config bootstrap described
+above. Ordinary cluster nodes
+(running <code>sf-api</code>, <code>sf-queues</code>, etc.) do <strong>not</strong> have <code>MARIADB_HOST</code> set and
+should never need it.</p>
 <p><strong><code>MARIADB_GATEWAY_HOSTS</code></strong> is set on every cluster node. It is the list of
 <code>sf-database</code> gRPC endpoints that non-database daemons connect to. For a
 single-replica deployment this list has one entry; for higher availability,
