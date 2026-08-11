@@ -4871,6 +4871,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#merge-queue-concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge queue concurrency
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11115,6 +11126,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#merge-queue-concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge queue concurrency
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11382,6 +11404,29 @@ asserts every required context in the exported ruleset
 (<code>.github/exported-config/ruleset-*.json</code>, archived daily by
 <code>export-repo-config.yml</code>) still matches a job name in
 <code>.github/workflows/</code>.</p>
+<h3 id="merge-queue-concurrency">Merge queue concurrency<a class="headerlink" href="#merge-queue-concurrency" title="Permanent link">&para;</a></h3>
+<p>Every job in <code>functional-tests.yml</code> carries a <code>concurrency</code> group so a
+superseded run is cancelled rather than left to finish. Keying that
+group needs care, because <code>github.ref</code> means something different in the
+merge queue: it is the per-attempt queue branch,
+<code>gh-readonly-queue/develop/pr-NNN-SHA</code>, and GitHub mints a fresh SHA
+each time it rebuilds the group — which it does on every push to
+develop. Keying on it puts each rebuild in a group of its own, so
+nothing ever matches and nothing is ever cancelled. The superseded runs
+keep building whole clouds against sfcbr, starving the one group that
+can still merge.</p>
+<p>So on <code>merge_group</code> the group is keyed on the base branch instead, and
+on every other event on <code>github.ref</code> as usual. That is only safe
+because the develop ruleset sets <code>max_entries_to_build: 1</code>: the queue
+builds one entry at a time, so any other in-flight <code>merge_group</code> run is
+by definition superseded and GitHub has already abandoned its queue
+branch. <strong>Raising <code>max_entries_to_build</code> above 1 would make this wrong</strong>
+— speculative groups for different entries would then cancel each other
+— so that setting and this concurrency key have to move together.</p>
+<p>The sibling smoke workflows (<code>direct-qemu-functional.yml</code>,
+<code>sf-e2e-functional.yml</code>) still key on <code>github.ref</code> alone. They trigger
+on <code>merge_group</code> but skip their heavy jobs there, so a piled-up run
+costs seconds and no cloud capacity.</p>
 <p>For the design rationale see
 <a href="/components/kerbside/plans/PLAN-two-tier-ci/">plans/PLAN-two-tier-ci.md</a> and
 <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">plans/PLAN-two-tier-ci-phase-03-merge-queue.md</a>.</p>
@@ -11479,6 +11524,17 @@ dropped every VM discovered after the offending one, and reaped
 their consoles as no longer available, once a minute.
 <code>drive-console.py</code> now asserts that VM is absent from the console
 list while the SPICE one is present.</p>
+<p>Attaching that VM's NIC has one trap worth knowing about. The lane runs
+two datacenters — <code>Default</code>, from <code>engine-setup</code>, and <code>test</code>, from
+<code>start-test-target.py</code> — and each gets its own network named
+<code>ovirtmgmt</code>, with its own id and its own vNIC profile of the same name.
+Selecting a profile by name alone picks whichever the engine lists
+first, and attaching the wrong datacenter's profile fails with HTTP 409
+<code>The specified Logical Network doesn't exist in the current Cluster</code>.
+<code>create-ovirt-vnc-vm.py</code> therefore resolves the network through the
+cluster that will host the VM, which is the constraint the engine
+actually enforces; <code>_resolve_vnic_profile</code> is covered by
+<code>kerbside/tests/unit/test_create_ovirt_vnc_vm.py</code>.</p>
 <p>The runner-side scripts live in <code>tools/ovirt-e2e/</code> and are
 documented in <code>tools/ovirt-e2e/README.md</code>; the architecture decision
 and bring-up history are in

@@ -11200,6 +11200,33 @@ this repository and passes through to the script.</p>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>!.vscode/*.weaudit-shas.json
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>!.vscode/review-scope.toml
 </code></pre></div>
+<p>Then, <em>if the repository runs a pre-commit hook that rewrites the
+   files it is given</em> -- <code>end-of-file-fixer</code>, <code>trailing-whitespace</code>
+   and friends -- exempt the review marks from those hooks:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">end-of-file-fixer</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^\.vscode/.*\.weaudit</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">trailing-whitespace</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^\.vscode/.*\.weaudit</span>
+</code></pre></div>
+<p>Without it, <code>end-of-file-fixer</code> rewrites the weAudit file on every
+   <code>pre-commit run --all-files</code>, because the generator emits no
+   trailing newline -- and reports a failure that cannot usefully be
+   fixed, since committing the newline only means the next regen drops
+   it again. The pattern deliberately covers the <code>.weaudit-shas.json</code>
+   sidecar as well as the weAudit file itself.</p>
+<p>Scope the exclude to those hooks rather than putting it at the top
+   level of <code>.pre-commit-config.yaml</code>. A top-level exclude is shorter,
+   but it hides the review marks from <em>every</em> hook, including content
+   scanners -- and review notes are prose, so a blanket exclude stops
+   gitleaks and the bidi/zero-width check from reading exactly the
+   kind of human-written text a secret or a smuggled character would
+   land in. This is the same reasoning that keeps content scanners out
+   of the <code>paths-ignore</code> block in step 8; it applies just as much to a
+   local hook as to a CI workflow. A repository that runs no rewriting
+   hook at all (ryll, today) needs no exclude and should not add one.</p>
+<p>The consistency audit's <code>review-marks-pre-commit</code> check enforces
+   this, and reports not applicable where no rewriting hook is
+   configured.</p>
 <ol>
 <li>
 <p>Ensure commit signing is configured for the clone(s) reviews
@@ -11212,16 +11239,16 @@ this repository and passes through to the script.</p>
    minimum. For example:</p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh api -X POST repos/shakenfist/&lt;repo&gt;/rulesets --input - &lt;&lt;&#39;EOF&#39;
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  &quot;name&quot;: &quot;Protect default branch history&quot;,
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  &quot;target&quot;: &quot;branch&quot;,
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  &quot;enforcement&quot;: &quot;active&quot;,
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  &quot;conditions&quot;: {&quot;ref_name&quot;: {&quot;include&quot;: [&quot;~DEFAULT_BRANCH&quot;],
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>                              &quot;exclude&quot;: []}},
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  &quot;rules&quot;: [{&quot;type&quot;: &quot;deletion&quot;}, {&quot;type&quot;: &quot;non_fast_forward&quot;}]
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>}
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>EOF
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>gh api -X POST repos/shakenfist/&lt;repo&gt;/rulesets --input - &lt;&lt;&#39;EOF&#39;
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>{
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  &quot;name&quot;: &quot;Protect default branch history&quot;,
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  &quot;target&quot;: &quot;branch&quot;,
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  &quot;enforcement&quot;: &quot;active&quot;,
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  &quot;conditions&quot;: {&quot;ref_name&quot;: {&quot;include&quot;: [&quot;~DEFAULT_BRANCH&quot;],
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                              &quot;exclude&quot;: []}},
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  &quot;rules&quot;: [{&quot;type&quot;: &quot;deletion&quot;}, {&quot;type&quot;: &quot;non_fast_forward&quot;}]
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>}
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>EOF
 </code></pre></div>
 <p>(<code>~DEFAULT_BRANCH</code> tracks whatever the default branch is, so the
    same command works on every repo.)</p>
@@ -11234,20 +11261,20 @@ this repository and passes through to the script.</p>
    exclude generated, vendored, and ephemeral files. For example
    (ryll's config; adjust the language patterns to the repo):</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Source in every language the repo uses, plus shell scripts,</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># protobuf definitions, the YAML that configures CI and</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># deployment, and the Markdown documentation.</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;*.rs&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.sh&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.py&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.pyi&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.js&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.proto&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.md&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.yml&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.yaml&#39;</span><span class="p">]</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># docs/plans/ is a point-in-time archive, not living artifacts;</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># protoc output is generated, so reviewing it would attest to the</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># generator rather than to anything a human wrote.</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="s1">&#39;docs/plans/*&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="s1">&#39;*_pb2.py&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="s1">&#39;*_pb2.pyi&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="s1">&#39;*_pb2_grpc.py&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="s1">&#39;*_pb2_grpc.pyi&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Source in every language the repo uses, plus shell scripts,</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># protobuf definitions, the YAML that configures CI and</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># deployment, and the Markdown documentation.</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;*.rs&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.sh&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.py&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.pyi&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.js&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.proto&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.md&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.yml&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.yaml&#39;</span><span class="p">]</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># docs/plans/ is a point-in-time archive, not living artifacts;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># protoc output is generated, so reviewing it would attest to the</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># generator rather than to anything a human wrote.</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="s1">&#39;docs/plans/*&#39;</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="s1">&#39;*_pb2.py&#39;</span><span class="p">,</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="s1">&#39;*_pb2.pyi&#39;</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="s1">&#39;*_pb2_grpc.py&#39;</span><span class="p">,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="s1">&#39;*_pb2_grpc.pyi&#39;</span><span class="p">,</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">]</span>
 </code></pre></div>
 <p>An empty <code>include</code> means all tracked files, which is a fine
    starting point for a small repo -- but then lean on <code>exclude</code> to
@@ -11282,9 +11309,9 @@ this repository and passes through to the script.</p>
 <li>
 <p>Run the stamp by hand, and correct the recorded dates to the
      true review dates (a fresh stamp records today):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>./tools/review-tracking.sh stamp
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a># fix dates in .vscode/&lt;user&gt;.weaudit-shas.json if needed
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>./tools/review-tracking.sh regen
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>./tools/review-tracking.sh stamp
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a># fix dates in .vscode/&lt;user&gt;.weaudit-shas.json if needed
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>./tools/review-tracking.sh regen
 </code></pre></div>
 </li>
 <li>
@@ -11308,14 +11335,14 @@ this repository and passes through to the script.</p>
    not burn a CI run on files no build reads:</p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">on</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">develop</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;REVIEWS.md&#39;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/*.weaudit&#39;</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/*.weaudit-shas.json&#39;</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/review-scope.toml&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">on</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">develop</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;REVIEWS.md&#39;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/*.weaudit&#39;</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/*.weaudit-shas.json&#39;</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/review-scope.toml&#39;</span>
 </code></pre></div>
 <p>Apply it to the code-shaped workflows (unit tests, lint, CodeQL,
    functional lanes) but <em>not</em> to content scanners like gitleaks or
@@ -11347,16 +11374,16 @@ and every signature is recorded in the Rekor transparency log --
 which gives each review attestation an independent public
 timestamp as a side effect.</p>
 <p>Setup in the review account:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git config --global commit.gpgsign true
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git config --global gpg.format x509
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>git config --global gpg.x509.program gitsign
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git config --global commit.gpgsign true
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git config --global gpg.format x509
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>git config --global gpg.x509.program gitsign
 </code></pre></div>
 <p>Verification, from any account with gitsign installed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>gitsign verify \
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    --certificate-identity=mikal@stillhq.com \
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    &lt;sha&gt;
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>git log --show-signature -- .vscode/   # with the config above
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>gitsign verify \
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    --certificate-identity=mikal@stillhq.com \
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    &lt;sha&gt;
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>git log --show-signature -- .vscode/   # with the config above
 </code></pre></div>
 <p>Note that GitHub's web UI shows gitsign commits as "Unverified"
 (reason <code>bad_cert</code>): GitHub cannot validate Fulcio's short-lived
@@ -11377,8 +11404,8 @@ covers, which imposes three rules:</p>
    pulling or rebasing, so the marking commit's tree reflects the
    reviewed state:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git add .vscode/*.weaudit*
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>git commit    # signed, with a &quot;reviewed N files&quot; style message
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git add .vscode/*.weaudit*
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git commit    # signed, with a &quot;reviewed N files&quot; style message
 </code></pre></div>
 <ol>
 <li><strong>Never rewrite history</strong> on the branch carrying review state
@@ -11388,7 +11415,7 @@ covers, which imposes three rules:</p>
 <ol>
 <li><code>git pull</code> on a clean tree, then:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>./tools/review-tracking.sh prune
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>./tools/review-tracking.sh prune
 </code></pre></div>
 <p>discards marks for files changed since their review and
    regenerates <code>REVIEWS.md</code>. Anything it pruned is a good
@@ -11402,7 +11429,7 @@ covers, which imposes three rules:</p>
    conflicts on push. The local prune usually finds nothing left
    to do.
 2. Pick a file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>./tools/review-tracking.sh next
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>./tools/review-tracking.sh next
 </code></pre></div>
 <p>picks a random unreviewed in-scope file and opens it in VSCode
    (<code>--no-open</code> to just print it).
@@ -11411,9 +11438,9 @@ covers, which imposes three rules:</p>
 4. Mark it reviewed (<code>weAudit: Mark File as Reviewed</code>), attach
    findings or notes as needed.
 5. Repeat from 2. At the end of the session:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>./tools/review-tracking.sh stamp
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>git add .vscode/*.weaudit* REVIEWS.md
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>git commit
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>./tools/review-tracking.sh stamp
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>git add .vscode/*.weaudit* REVIEWS.md
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>git commit
 </code></pre></div>
 <p>The stamp records each newly reviewed file's blob SHA and date
    in the sidecar and regenerates <code>REVIEWS.md</code>, printing exactly
