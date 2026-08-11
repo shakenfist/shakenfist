@@ -2379,6 +2379,27 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get one (node, daemon) state row."""
         try:
             self.monitor.counters['get_node_daemon_state'].inc()
+            # Do not start a read nobody is waiting for. This is by a wide
+            # margin our highest frequency RPC: every daemon on every node
+            # polls its own row every DAEMON_STATE_POLL_INTERVAL seconds
+            # with a BOUNDED_QUERY_TIMEOUT deadline, so it is the only call
+            # whose caller re-issues several times over within its own
+            # deadline. When MariaDB slows, those re-issues arrive faster
+            # than the worker pool retires them and the queue fills with
+            # already-expired polls, each of which used to run a full
+            # database read on arrival -- so the pool never catches up and
+            # every subsequent poll times out too, sustaining the burst
+            # long after the original stall (issue 3607). Dropping an
+            # expired call costs microseconds instead, which lets the
+            # backlog drain. A caller that is somehow still waiting sees
+            # DEADLINE_EXCEEDED, which _grpc_call already treats as
+            # retryable, rather than a found=False that reads as "no row".
+            remaining = context.time_remaining()
+            if isinstance(remaining, (int, float)) and remaining <= 0:
+                context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
+                context.set_details(
+                    'caller deadline expired before the read started')
+                return database_pb2.GetNodeDaemonStateReply(found=False)
             row = mariadb._direct_get_node_daemon_state(
                 UUID(request.node_uuid), request.daemon)
             if row is None:

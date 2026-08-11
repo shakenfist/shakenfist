@@ -5,10 +5,13 @@
 import uuid
 from unittest import mock
 
+import grpc
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
+from shakenfist.daemons.database import main as daemons_database_main
+from shakenfist.protos import database_pb2
 from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.tests import base
 
@@ -181,6 +184,68 @@ class GetNodeDaemonStateTestCase(base.ShakenFistTestCase):
         _, kwargs = mock_grpc_call.call_args
         self.assertEqual(kwargs['timeout'], mariadb.BOUNDED_QUERY_TIMEOUT)
         self.assertEqual(kwargs['max_slow_failures'], 1)
+
+
+class GetNodeDaemonStateServicerTestCase(base.ShakenFistTestCase):
+    """The servicer must not run reads for callers which have given up.
+
+    Every daemon polls its own row every couple of seconds with a
+    BOUNDED_QUERY_TIMEOUT deadline, so a slow MariaDB queues up several
+    expired copies of the same poll per caller. Running each of those to
+    completion is what kept sf-database's worker pool full and made the
+    failures self-sustaining (issue 3607).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+        self.request = database_pb2.GetNodeDaemonStateRequest(
+            node_uuid=str(NODE_UUID), daemon='net')
+
+    def _context(self, time_remaining):
+        context = mock.MagicMock()
+        context.time_remaining.return_value = time_remaining
+        return context
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_daemon_state')
+    def test_expired_call_is_dropped_without_a_read(self, mock_direct):
+        context = self._context(0.0)
+
+        reply = self.servicer.GetNodeDaemonState(self.request, context)
+
+        mock_direct.assert_not_called()
+        self.assertFalse(reply.found)
+        # A found=False with no status would read as "no such row", which
+        # is a different (and wrong) answer to "I did not look".
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.DEADLINE_EXCEEDED)
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_daemon_state',
+                return_value=NodeDaemonStateData(
+                    node_uuid=NODE_UUID, daemon='net',
+                    value='daemon-running', update_time=1.0, message=None))
+    def test_live_call_is_served(self, mock_direct):
+        context = self._context(9.5)
+
+        reply = self.servicer.GetNodeDaemonState(self.request, context)
+
+        mock_direct.assert_called_once()
+        self.assertTrue(reply.found)
+        self.assertEqual('daemon-running', reply.data.value)
+        context.set_code.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_daemon_state',
+                return_value=None)
+    def test_call_without_a_deadline_is_served(self, mock_direct):
+        # time_remaining() is None when the caller set no deadline at all.
+        context = self._context(None)
+
+        reply = self.servicer.GetNodeDaemonState(self.request, context)
+
+        mock_direct.assert_called_once()
+        self.assertFalse(reply.found)
+        context.set_code.assert_not_called()
 
 
 class GetAllNodeDaemonStatesTestCase(base.ShakenFistTestCase):

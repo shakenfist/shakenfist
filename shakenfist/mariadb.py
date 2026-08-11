@@ -551,6 +551,25 @@ def _reset_database_stub() -> None:
     _local.database_stub = None
 
 
+def _describe_rpc_error(error: BaseException) -> str:
+    """Summarise a gRPC failure as "STATUS_CODE: details".
+
+    grpc.RpcError itself declares neither code() nor details() -- they
+    come from the _InactiveRpcError subclass the runtime actually
+    raises -- so both are probed rather than assumed, and anything else
+    degrades to the exception's class name and str().
+    """
+    code = getattr(error, 'code', None)
+    code = code() if callable(code) else None
+    details = getattr(error, 'details', None)
+    details = details() if callable(details) else None
+
+    described = code.name if code is not None else type(error).__name__
+    if not details:
+        details = str(error)
+    return f'{described}: {details}' if details else described
+
+
 def _grpc_call(
     method: Any, request: Any,
     timeout: Optional[int] = None,
@@ -699,14 +718,22 @@ def _grpc_call(
                 _reset_database_stub()
 
     attempts_made = attempt + 1
-    LOG.error(
-        f'gRPC {method_name or "call"} failed after {attempts_made} attempts')
+    # Say *why* we gave up. Without this the log records only that a call
+    # failed, with exception_class and stack_trace both null, so an
+    # operator cannot tell a deadline from a resource limit from a
+    # cancellation -- and cannot tell that "after 1 attempts" is the
+    # bounded budget working as designed rather than a broken retry loop
+    # (issue 3607). Both facts are cheap to state, so state them.
+    summary = (
+        f'gRPC {method_name or "call"} failed after {attempts_made} '
+        f'attempts (deadline {timeout}s, slow attempt budget '
+        f'{max_slow_failures}): {_describe_rpc_error(last_error)}')
+    LOG.error(summary)
     # Raise a non-RpcError so the client wrappers below, which translate
     # RpcError into "object not found" return values, let an exhausted
     # outage propagate to the caller instead (issue 3373).
     raise exceptions.DatabaseUnavailable(
-        f'database service unreachable: gRPC {method_name or "call"} '
-        f'failed after {attempts_made} attempts') from last_error
+        f'database service unreachable: {summary}') from last_error
 
 
 # =============================================================================
