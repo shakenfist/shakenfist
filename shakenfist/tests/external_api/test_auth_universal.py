@@ -152,14 +152,44 @@ class DecoratorOrderingTestCase(base.ShakenFistTestCase):
         # authentication. In method_decorators the last entry is
         # outermost and therefore runs first, so authentication being
         # at index 0 puts it innermost of the class-level set.
+        #
+        # Asserted as an ordering rather than as authentication sitting
+        # at index 0, which is what this said while authentication was
+        # the innermost entry. Phase 3's request validation is now
+        # inside it -- deliberately, so an unauthenticated caller cannot
+        # probe an endpoint's schema -- and pinning the index would have
+        # made that read as a regression rather than as the property it
+        # is.
         decorators = api_base.Resource.method_decorators
-        self.assertEqual(
-            api_base._authenticate_unless_public, decorators[0],
-            'authentication must be first in the list, which makes it '
-            'the last class-level decorator to run and therefore the '
-            'closest to the endpoint body')
+        self.assertLess(
+            decorators.index(api_base._authenticate_unless_public),
+            decorators.index(api_base.log_request),
+            'authentication must sit inside log_request, so an attempt '
+            'is logged even when the caller turns out to be '
+            'unauthenticated')
         self.assertLess(
             decorators.index(api_base._authenticate_unless_public),
             decorators.index(api_base.handle_authorization_exceptions),
             'authentication must sit inside handle_authorization_'
             'exceptions so the errors it raises become responses')
+
+    def test_validation_runs_after_authentication(self):
+        """An unauthenticated caller must not be able to probe a schema.
+
+        Decision D3. Validation is innermost of the class-level set, so
+        it runs after authentication and before every per-method
+        decorator -- which is also why enforcing it in phase 4 will
+        answer ahead of the 404s those decorators produce.
+        """
+        decorators = api_base.Resource.method_decorators
+
+        self.assertEqual(
+            api_base.validate_request, decorators[0],
+            'request validation must be first in the list, which makes '
+            'it the last class-level decorator to run')
+        self.assertLess(
+            decorators.index(api_base.validate_request),
+            decorators.index(api_base._authenticate_unless_public),
+            'validation must run after authentication, so an '
+            'unauthenticated caller cannot learn what an endpoint '
+            'accepts by watching which errors it returns')

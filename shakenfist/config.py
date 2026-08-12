@@ -166,6 +166,17 @@ class SFConfig(BaseSettings):
         15,
         description='How long in minutes an API token is valid for.'
     )
+    API_VALIDATION_MODE: str = Field(
+        'warn',
+        description=(
+            'What the request validation layer does with input which does '
+            'not match an endpoint\'s published parameter declarations. '
+            '"warn" logs what it would have rejected and changes nothing, '
+            'which is phase 3 of PLAN-api-input-validation; "enforce" '
+            'answers 400. Leave this at "warn" until the warn log is '
+            'understood -- see docs/developer_guide/writing_an_endpoint.md.'
+        )
+    )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(
         16384,
         description=(

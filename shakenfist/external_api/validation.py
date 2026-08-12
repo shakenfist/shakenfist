@@ -218,3 +218,124 @@ def build_registry(app: Any) -> dict[tuple[str, str], CompiledEndpoint]:
             out[(cls.__name__, method)] = compile_parameters(
                 specs.get('parameters', []))
     return out
+
+
+# ---------------------------------------------------------------------
+# Warn-only checking.
+#
+# Nothing below rejects anything while API_VALIDATION_MODE is 'warn',
+# which is the default and is what phase 3 ships. The findings are
+# recorded on flask.g and emitted once the response status is known,
+# because "what did this request return anyway" is what separates a
+# rejection enforcement would introduce from a status code it would
+# merely change -- and at validation time that is not yet known.
+
+# The request-scoped hand-off, named like base.py's
+# _RECORDED_EXCEPTION_FIELDS because it is the same pattern.
+VALIDATION_FINDINGS = 'sf_validation_findings'
+BODY_PATH_COLLISIONS = 'sf_body_path_collisions'
+
+# Reason codes. Counted separately because they answer different
+# questions: see the table in the phase 3 plan.
+UNKNOWN_PARAMETER = 'unknown-parameter'
+TYPE_MISMATCH = 'type-mismatch'
+MISSING_REQUIRED = 'missing-required'
+BODY_PATH_COLLISION = 'body-path-collision'
+
+
+class Finding:
+    """One thing validation would have refused.
+
+    Carries the offending value's *type* and never its value: decision
+    D5, and several of these routes carry credentials, which is why
+    log_request drops the whole body on a credential-handling route
+    rather than naming fields.
+    """
+
+    def __init__(self, reason: str, parameter: str, detail: str,
+                 value: Any = None):
+        self.reason = reason
+        self.parameter = parameter
+        self.detail = detail
+        self.value_type = type(value).__name__ if value is not None else None
+
+    def fields(self) -> dict[str, Any]:
+        return {
+            'validation-reason': self.reason,
+            'validation-parameter': self.parameter,
+            'validation-detail': self.detail,
+            'validation-value-type': self.value_type,
+        }
+
+
+def _schema_findings(schema: Optional[marshmallow.Schema],
+                     supplied: dict[str, Any]) -> list[Finding]:
+    if schema is None:
+        return []
+    known = {name: value for name, value in supplied.items()
+             if name in schema.fields}
+    findings = []
+    for parameter, messages in schema.validate(known).items():
+        findings.append(Finding(
+            TYPE_MISMATCH, str(parameter),
+            '; '.join(messages) if isinstance(messages, list)
+            else str(messages),
+            known.get(parameter)))
+    return findings
+
+
+def check(compiled: CompiledEndpoint, body: dict[str, Any],
+          query: dict[str, Any], collisions: set[str]) -> list[Finding]:
+    """Everything this request would have been refused for.
+
+    Pure, so it is testable without a request context, and so the
+    decorator is only responsible for deciding what to do with the
+    answer.
+    """
+    findings: list[Finding] = []
+
+    # An undeclared body key is already fatal when the request reaches
+    # its handler -- log_request merges every key into kwargs and no
+    # handler is variadic, so Python raises TypeError and the broad
+    # except in handle_authorization_exceptions returns it as a 400
+    # carrying interpreter text. Counting these is how phase 4 chooses
+    # between webargs' EXCLUDE and RAISE (decision D10).
+    if not compiled.raw_body:
+        for name in body:
+            if name not in compiled.names:
+                findings.append(Finding(
+                    UNKNOWN_PARAMETER, name,
+                    'not declared by this endpoint', body[name]))
+
+    supplied = dict(body)
+    supplied.update(query)
+    for name in sorted(compiled.required_names):
+        if name not in supplied and name not in compiled.path_names:
+            findings.append(Finding(
+                MISSING_REQUIRED, name, 'declared required but not supplied'))
+
+    if not compiled.raw_body:
+        findings.extend(_schema_findings(compiled.body, body))
+    findings.extend(_schema_findings(compiled.query, query))
+
+    for name in sorted(collisions):
+        findings.append(Finding(
+            BODY_PATH_COLLISION, name,
+            'a body key of this name overwrote the URL path parameter'))
+
+    return findings
+
+
+# Populated by install(), which app.py calls once every route is
+# mounted. A module global rather than something base.py builds,
+# because base.py is imported to define the endpoints and so cannot see
+# the finished app.
+REGISTRY: dict[tuple[str, str], CompiledEndpoint] = {}
+
+
+def install(app: Any) -> None:
+    """Compile every mounted handler. Call once, after the last route."""
+    REGISTRY.clear()
+    REGISTRY.update(build_registry(app))
+    LOG.with_fields({'handlers': len(REGISTRY)}).info(
+        'Compiled API parameter declarations')

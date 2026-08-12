@@ -446,4 +446,63 @@ networkspec parser makes every non-empty value truthy).
 
 ## Outcome
 
-To be filled in as the phase lands.
+The three PRs have landed. The measurement has not: warn-only is
+deployed nowhere yet, so the phase is code-complete and evidence-empty.
+
+**Four deviations from this plan, all recorded because each was a
+better answer than the one planned.**
+
+1. **Compiled from the rendered specification, not from `ARGTYPES`.**
+   The plan called for a second token-to-marshmallow mapping. Reading
+   `swagger_helper()`'s output instead means there is exactly one
+   interpretation of a token in the process, so the compiled schema and
+   the published specification cannot drift apart — and the three
+   special cases the plan wrote out (netblock, prose formats, raw body)
+   became consequences of the rendering rather than rules this module
+   states and could get wrong.
+2. **The derivation had a defect, and PR 1 found it.**
+   `derived_location()` returned `path` before consulting the query
+   sources, so a handler whose declared parameters are all path
+   parameters could read `flask.request.args` with a key the walk
+   cannot name and the audit would report the tree clean. No handler in
+   the tree has that shape, which is exactly why the generated cross
+   product was a precondition rather than a nicety.
+3. **The decorator had to propagate markers.** Putting `validate_request`
+   at index 0 puts it between the bound method and
+   `_authenticate_unless_public`, which reads `__self__` for the
+   resource class and `_sf_public` / `_sf_scope` for the policy
+   markers. Without `functools.wraps` plus an explicit `__self__` copy,
+   **every `@public` endpoint would have started demanding a token**.
+   The plan named this file's attribute-propagation trap as a reason to
+   avoid `specs_dict`; it did not notice the decorator itself walks
+   into it.
+4. **No prometheus counter.** The plan asked for one alongside the log
+   line. sf-api has no metrics exporter — it is a gunicorn app, and the
+   database daemon's `start_http_server` has no equivalent here — so
+   the counter would have meant inventing one. The structured log is
+   what the measurement step actually reads, and it carries the same
+   labels. Adding an exporter to sf-api is worth doing, and is not this
+   phase.
+
+**D10's framing was wrong in the first draft and is corrected in the
+plan above.** `RAISE` was written up as behaviour-preserving; probing
+`POST /auth` without mocking the namespace lookup disproved it, because
+`arg_is_namespace` short-circuits to 404 before the handler is reached.
+Neither `RAISE` nor `EXCLUDE` is neutral. The recommendation stands as
+`RAISE`, provisionally, and warn-only counts the two populations.
+
+**Not done, and deliberately.** `required` is recorded and never
+enforced. Semantic validation of the prose formats is untouched.
+`except TypeError` is still broad — narrowing it is phase 5 and is
+gated on phase 4, because it is currently absorbing the malformed
+input this layer will start handling.
+
+**Verification.** All 31 mutations in
+`tools/check-api-declaration-guards.sh` caught, including three which
+break the derivation and three which break the compiler. 2725 unit
+tests pass. `pre-commit run --all-files` clean. The published
+specification still validates with zero errors.
+
+**The next step is not code.** Deploy to sfcbr, run functional CI, and
+read the warn log. Success criterion 3 is that every remaining finding
+is explained, not that there are none.

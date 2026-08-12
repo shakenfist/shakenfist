@@ -452,8 +452,20 @@ check 'raw body compiled as JSON'
 # of being left out of the registry. Absence and success would then be
 # indistinguishable: a route mounted without a declaration would simply
 # not be validated, and nothing would say so.
-sed -i "s/            if specs is None:/            if False:/" \
-    shakenfist/external_api/validation.py
+#
+# Compiled as empty rather than "stop skipping it", which was the first
+# attempt: the registry is built at import time, so letting None reach
+# specs.get() raised AttributeError before any test ran and the harness
+# correctly reported HARNESS BROKEN rather than a catch. A mutation
+# which prevents the run says nothing about the guards.
+python3 - <<'PY'
+p = 'shakenfist/external_api/validation.py'
+s = open(p).read()
+s = s.replace("""                # quietly arriving here.
+                continue""", """                # quietly arriving here.
+                specs = {}""")
+open(p, 'w').write(s)
+PY
 check 'undocumented handler compiled as empty'
 
 echo

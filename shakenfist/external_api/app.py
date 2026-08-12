@@ -45,6 +45,7 @@ from shakenfist.external_api import node as api_node
 from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import upload as api_upload
+from shakenfist.external_api import validation
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
@@ -509,3 +510,47 @@ api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')
 # response for a different one with nothing wrong to fix.
 api.add_resource(api_upload.UploadTruncateEndpoint,
                  '/upload/<upload_uuid>/truncate/<int:offset>')
+
+
+# Compile every mounted handler's parameter declarations. Last, because
+# it reads the finished route table: a call placed above any
+# add_resource() would compile a registry missing whatever followed it,
+# and a handler missing from the registry is simply not validated.
+# test_validation_compiler.py asserts the count rather than trusting
+# placement.
+validation.install(app)
+
+
+@app.after_request
+def log_validation_findings(response):
+    """Emit what validation would have refused, once the outcome is known.
+
+    Deliberately after the fact rather than at validation time. A
+    finding on a request which went on to return 200 is a rejection
+    enforcement would introduce; one on a request which returned 404 is
+    a status code enforcement would change, because validation sits
+    ahead of the per-method decorators which produce those. Phase 4
+    needs to tell those two populations apart to choose between
+    webargs' EXCLUDE and RAISE (decision D10), and neither is knowable
+    from inside the validator.
+
+    Values are never logged, only their types: decision D5, and some of
+    these routes carry credentials.
+    """
+    findings = getattr(flask.g, validation.VALIDATION_FINDINGS, None)
+    if not findings:
+        return response
+
+    for finding in findings:
+        fields = finding.fields()
+        fields.update({
+            'request-id': flask.request.environ.get(
+                'FLASK_REQUEST_ID', 'none'),
+            'method': flask.request.method,
+            'path': flask.request.path,
+            'validation-mode': config.API_VALIDATION_MODE,
+            'validation-response-status': response.status_code,
+        })
+        LOG.with_fields(fields).info('API request validation finding')
+
+    return response

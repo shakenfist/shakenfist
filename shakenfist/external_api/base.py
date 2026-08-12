@@ -1,4 +1,5 @@
 import copy
+import functools
 import json
 import re
 import sys
@@ -24,6 +25,8 @@ from jwt.exceptions import ExpiredSignatureError
 import requests
 from webargs.flaskparser import parser as webargs_parser
 from shakenfist_utilities import api as sf_api  # noreorder
+
+from shakenfist.external_api import validation
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
@@ -123,6 +126,34 @@ def _load_json_or_query(req, schema):
     if isinstance(json_body, dict):
         data.update(json_body)
     return {key: value for key, value in data.items() if key in schema.fields}
+
+
+@webargs_parser.error_handler
+def _webargs_error(error, req, schema, *, error_status_code, error_headers):
+    """Answer a webargs parse failure in this API's error shape.
+
+    webargs' default handler aborts 422 carrying its own
+    {"json": {"field": ["message"]}} body. Nothing registered a handler
+    before phase 3, so the four @use_kwargs sites have always answered
+    a bad query parameter that way: the wrong status, and the only
+    responses in the API which are not {"error": ..., "status": ...}.
+
+    Decision D4 fixes the shape without changing what is rejected --
+    every request webargs refused before is still refused, and one it
+    accepted is still accepted. Only the response changes.
+    """
+    # error.messages is keyed by location, then by field. The location
+    # is not useful to a caller, and for the custom json_or_query
+    # loader it would name a location no caller can address.
+    parameters = []
+    for by_field in error.messages.values():
+        if isinstance(by_field, dict):
+            for field, messages in by_field.items():
+                detail = ('; '.join(messages)
+                          if isinstance(messages, list) else str(messages))
+                parameters.append('%s: %s' % (field, detail))
+    flask.abort(sf_api.error(
+        400, parameters[0] if parameters else 'invalid request parameter'))
 
 
 def caller_is_admin(func):
@@ -952,12 +983,30 @@ def log_request(func):
         j = sf_api.flask_get_post_body()
 
         if j:
-            for key in j:
-                if key == 'uuid':
-                    destkey = 'passed_uuid'
-                else:
-                    destkey = key
-                kwargs[destkey] = j[key]
+            # A body key with the same name as a URL path parameter
+            # overwrites it. Recorded here rather than in the validator
+            # because this decorator is applied outside it and so runs
+            # first: by the time the validator sees kwargs the overwrite
+            # has happened and is indistinguishable from a path
+            # parameter which simply had that value (decision D12).
+            #
+            # The 'uuid' -> 'passed_uuid' remap which used to live here
+            # was not the dodge decision D8 cites it as. 'passed_uuid'
+            # occurred nowhere else in the tree, so no handler accepted
+            # it and a body 'uuid' was a guaranteed 400 carrying
+            # interpreter text on every endpoint in the API. Dropped, so
+            # a body 'uuid' is now an undeclared parameter like any
+            # other and is reported as one (decision D11).
+            collisions = set(j) & set(kwargs)
+            if collisions:
+                try:
+                    setattr(flask.g, validation.BODY_PATH_COLLISIONS,
+                            collisions)
+                except RuntimeError:
+                    # No application context. Losing the record is
+                    # survivable; replacing the request is not.
+                    pass
+            kwargs.update(j)
 
         formatted_headers = []
         for header in flask.request.headers:
@@ -1252,6 +1301,77 @@ def _enforce_scope(func, resource_class, override):
     return wrapper
 
 
+def validate_request(func):
+    """Check a request against its published parameter declarations.
+
+    Phase 3 of PLAN-api-input-validation. While API_VALIDATION_MODE is
+    'warn' -- the default, and what phase 3 ships -- this changes
+    nothing about any request: it records what it would have refused
+    and calls through. app.py emits those records once the response
+    status is known, because whether a finding represents a rejection
+    enforcement would *introduce* or a status code it would merely
+    *change* depends on what the request returned anyway.
+
+    First in Resource.method_decorators and so innermost, which puts it
+    after authentication (an unauthenticated caller cannot probe the
+    schema) and before every per-method decorator. That ordering is
+    also why enforcement is a contract change beyond the obvious: a
+    request which is both malformed and refers to a missing object is
+    answered here rather than by the 404 an arg_is_* decorator would
+    have returned.
+
+    Being innermost is also what makes func a bound method, so the
+    endpoint class is readable from it without depending on attribute
+    propagation through the decorators in this file which predate
+    functools.wraps.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        resource = getattr(func, '__self__', None)
+        if resource is None:
+            return func(*args, **kwargs)
+
+        compiled = validation.REGISTRY.get(
+            (type(resource).__name__, flask.request.method.lower()))
+        if compiled is None:
+            # Undocumented by design: Root, Livez and Readyz. The list is
+            # held closed by test_parameter_declarations.py, so this is
+            # not a way for a new endpoint to opt out silently.
+            return func(*args, **kwargs)
+
+        findings = validation.check(
+            compiled, sf_api.flask_get_post_body() or {},
+            flask.request.args.to_dict(),
+            getattr(flask.g, validation.BODY_PATH_COLLISIONS, set()))
+        if not findings:
+            return func(*args, **kwargs)
+
+        if config.API_VALIDATION_MODE == 'enforce':
+            first = findings[0]
+            return sf_api.error(
+                400, '%s: %s' % (first.parameter, first.detail))
+
+        try:
+            setattr(flask.g, validation.VALIDATION_FINDINGS, findings)
+        except RuntimeError:
+            pass
+        return func(*args, **kwargs)
+
+    # Being first in method_decorators means every entry after this one
+    # sees this wrapper rather than the bound method.
+    # _authenticate_unless_public reads __self__ for the resource class
+    # and _sf_public / _sf_scope for the policy markers, and this file
+    # already documents that several of its decorators predate
+    # functools.wraps and swallow attributes. functools.wraps above
+    # carries the function __dict__, which is where _sf_public,
+    # _sf_scope and flasgger's specs_dict live; __self__ is a bound
+    # method attribute rather than a dict entry, so it is copied here.
+    # Without both, every @public endpoint would start demanding a token
+    # and every scope check would lose the class it is scoped to.
+    wrapper.__self__ = getattr(func, '__self__', None)  # type: ignore[attr-defined]  # noqa: E501
+    return wrapper
+
+
 def _authenticate_unless_public(func):
     # The method_decorators entry which makes authentication the
     # default. flask_restful applies these to the bound method at
@@ -1289,6 +1409,7 @@ class Resource(flask_restful.Resource):
     # ahead of every per-method decorator, so an unauthenticated
     # request never reaches an ownership check.
     method_decorators = [
+        validate_request,
         _authenticate_unless_public,
         log_request,
         handle_authorization_exceptions,

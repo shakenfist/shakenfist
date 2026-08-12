@@ -241,12 +241,41 @@ generated rather than sampled. **If you add a way for a parameter to
 arrive, add an axis value here** — a shape the generator does not
 enumerate is a shape nothing checks.
 
+## What validation does with them
+
+The declarations are compiled into marshmallow schemas at startup
+(`shakenfist/external_api/validation.py`) and checked against every
+request. **Nothing is rejected**: `API_VALIDATION_MODE` defaults to
+`warn`, which logs what would have been refused and changes no
+response. Setting it to `enforce` answers `400` in the usual
+`{"error": ..., "status": ...}` shape, and is phase 4's switch to
+throw once the warn log is understood.
+
+A warn record carries the endpoint, the parameter, the reason, the
+offending value's **type** — never its value — and the status the
+request went on to return anyway. That last field is the interesting
+one: a finding on a request which returned 200 is a rejection
+enforcement would introduce, while one on a request which returned 404
+is a status code enforcement would merely change, because validation
+runs ahead of the per-method decorators which produce those.
+
+Reasons are counted separately because they answer different
+questions: `unknown-parameter`, `type-mismatch`, `missing-required`
+and `body-path-collision`.
+
+Two things it deliberately does not do. `required` is recorded but
+never enforced — several parameters are declared required while
+omitting them has always worked, and what to do about that is phase 6.
+And the prose `format` on a type token is documentation: `netblock`,
+`uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
+strings, because semantic validation of them is also phase 6. Only
+`type`, `pattern`, `minimum` and `maximum` constrain anything.
+
 ## What is not checked yet
 
-The declarations are documentation today. Compiling them into
-per-endpoint request validation is phase 3 of the plan; until then a
-correct declaration does not stop a caller sending something else.
-Two known gaps:
+Enforcement is off, so a correct declaration still does not stop a
+caller sending something else. Two known gaps in the derivation
+itself:
 
 (The published specification itself *is* checked:
 `shakenfist/tests/external_api/test_openapi_spec.py` validates the
