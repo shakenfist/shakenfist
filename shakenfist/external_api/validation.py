@@ -39,6 +39,7 @@ cases:
 ``minimum`` and ``maximum`` constrain anything.
 """
 
+import re
 from typing import Any
 from typing import Optional
 
@@ -46,6 +47,8 @@ import marshmallow
 from marshmallow import fields
 from marshmallow import validate
 from shakenfist_utilities import logs
+
+from shakenfist import exceptions
 
 LOG, _ = logs.setup(__name__)
 
@@ -112,7 +115,23 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
         validators.append(validate.Range(min=minimum, max=maximum))
     pattern = spec.get('pattern')
     if pattern is not None:
-        validators.append(validate.Regexp(pattern))
+        # fullmatch rather than validate.Regexp's re.match: Python's $
+        # also matches before a trailing newline, ECMA-262's does not,
+        # so re.match('^...$', 'value\n') accepts what the published
+        # JSON Schema pattern refuses. fullmatch requires the pattern
+        # to consume the whole string, which is the strict reading both
+        # dialects share for a ^...$-anchored pattern -- and anchoring
+        # is required at import time.
+        compiled_pattern = re.compile(pattern)
+
+        def _fullmatch(value: Any,
+                       _re: 're.Pattern[str]' = compiled_pattern) -> Any:
+            if not isinstance(value, str) or _re.fullmatch(value) is None:
+                raise marshmallow.ValidationError(
+                    'String does not match expected pattern.')
+            return value
+
+        validators.append(_fullmatch)
     if validators:
         kwargs['validate'] = validators
 
@@ -218,7 +237,7 @@ def build_registry(app: Any) -> dict[tuple[str, str], CompiledEndpoint]:
         # is refused here, loudly, at mount time.
         seen = compiled_classes.get(cls.__name__)
         if seen is not None and seen is not cls:
-            raise ValueError(
+            raise exceptions.InvalidAPIDeclaration(
                 'two endpoint classes named %s are mounted (%s and %s); '
                 'the validation registry is keyed by class name and '
                 'cannot tell their requests apart'

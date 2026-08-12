@@ -376,11 +376,14 @@ def _validated_constraints(section: str, name: str,
                 % (section, name, ', '.join(dialect)))
         # Anchoring is where the consumers genuinely disagree: JSON
         # Schema pattern is an unanchored search, while the compiled
-        # marshmallow validator uses re.match, which is anchored at the
-        # start only. A declared ^...$ pattern is the one form both
-        # read identically, so it is required rather than documented --
-        # an unanchored pattern would pass here and then wrongly reject
-        # (or wrongly admit) requests once phase 4 enforces.
+        # validator requires the pattern to consume the whole value
+        # (re.fullmatch -- see validation._field(), which uses it
+        # precisely because Python's $ also matches before a trailing
+        # newline and ECMA-262's does not). A declared ^...$ pattern is
+        # the one form both read identically, so it is required rather
+        # than documented -- an unanchored pattern would pass here and
+        # then wrongly reject (or wrongly admit) requests once phase 4
+        # enforces.
         if not (pattern.startswith('^') and pattern.endswith('$')):
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares a pattern which is not '
@@ -388,6 +391,27 @@ def _validated_constraints(section: str, name: str,
                 'compiled validator matches, and full anchoring is the '
                 'only form they read identically'
                 % (section, name, pattern))
+        # A top-level alternation defeats the anchors the check above
+        # just required: '^a|b$' means (^a)|(b$) and is anchored on
+        # neither branch, so the string test alone would bless a
+        # pattern the two consumers still read differently. Wrap the
+        # alternation in a group instead.
+        depth, escaped = 0, False
+        for character in pattern:
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == '(':
+                depth += 1
+            elif character == ')':
+                depth -= 1
+            elif character == '|' and depth == 0:
+                raise exceptions.InvalidAPIDeclaration(
+                    '%s parameter %s declares a pattern with a top '
+                    'level alternation, which escapes the ^...$ '
+                    'anchors: %r. Wrap the alternation in a group'
+                    % (section, name, pattern))
 
     return constraints
 

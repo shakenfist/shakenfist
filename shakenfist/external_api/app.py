@@ -546,8 +546,19 @@ def log_validation_findings(response):
     # /instances/<some uuid> back out of every path is the wrong place
     # to do that work.
     url_rule = flask.request.url_rule
+
+    # On a credential-carrying route the parameter name is dropped like
+    # everything else body-derived: both other body loggers consult
+    # this same predicate and drop the lot, for the reasons on
+    # handles_credentials() -- a buggy caller can put secret-bearing
+    # material in a key position, and /auth is the one place that
+    # would matter. The reason code is what the measurement needs; the
+    # key name is not, there.
+    redact = _handles_credentials()
     for finding in findings:
         fields = finding.fields()
+        if redact:
+            fields['validation-parameter'] = '*****'
         fields.update({
             'request-id': flask.request.environ.get(
                 'FLASK_REQUEST_ID', 'none'),

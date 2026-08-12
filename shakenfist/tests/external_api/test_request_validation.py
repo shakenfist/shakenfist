@@ -11,8 +11,11 @@ recorded and logged; nothing acts on them until phase 4.
 import json
 from unittest import mock
 
+from marshmallow import ValidationError
 import shakenfist_utilities.api as sf_utils_api
+import werkzeug
 
+from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
@@ -318,7 +321,25 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
             view_functions = {'a': view_a, 'b': view_b}
 
         self.assertRaises(
-            ValueError, validation.build_registry, FakeApp())
+            exceptions.InvalidAPIDeclaration,
+            validation.build_registry, FakeApp())
+
+    def test_a_pattern_requires_the_whole_value_to_match(self):
+        """Python's $ also matches before a trailing newline; ECMA-262's
+        does not. The compiled validator uses fullmatch so 'value\\n'
+        fails it exactly as it fails the published JSON Schema
+        pattern."""
+        compiled = validation.compile_parameters([
+            {'in': 'body', 'name': 'payload', 'schema': {
+                'type': 'object', 'properties': {
+                    'thing': {'type': 'string', 'pattern': '^a+$'}}}}])
+
+        self.assertEqual(
+            [], validation.check(compiled, {'thing': 'aaa'}, {}, set()))
+        findings = validation.check(compiled, {'thing': 'aaa\n'}, {}, set())
+        self.assertEqual(
+            [(validation.TYPE_MISMATCH, 'thing')],
+            [(f.reason, f.parameter) for f in findings])
 
     def test_a_body_supplied_query_parameter_is_type_checked(self):
         """The shipped client serialises every request to a JSON body
@@ -380,9 +401,6 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         request-level assertion lives in
         AuthenticatedValidationTestCase.
         """
-        import werkzeug
-        from marshmallow import ValidationError
-
         with external_api.app.test_request_context('/'):
             with self.assertRaises(werkzeug.exceptions.HTTPException) as caught:
                 api_base._webargs_error(
@@ -461,6 +479,26 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(emitted))
         self.assertEqual('enforce', emitted[0]['validation-mode'])
         self.assertEqual(400, emitted[0]['validation-response-status'])
+
+    def test_credential_routes_redact_the_parameter_name(self):
+        """/auth drops everything body-derived from its logs, and the
+        finding line is a third body-reading logger: a buggy caller
+        can put secret-bearing material in a key position, so the
+        parameter name is redacted where the other two loggers drop
+        the whole body. The reason code -- what the measurement needs
+        -- still rides out."""
+        with mock.patch.object(external_api, 'LOG') as log:
+            response, _ = self._post_auth(
+                {'namespace': 'sys', 'key': 'k', 'zzz': 1})
+
+        self.assertEqual(400, response.status_code)
+        emitted = [c.args[0] for c in log.with_fields.call_args_list
+                   if 'validation-reason' in c.args[0]]
+        self.assertEqual(1, len(emitted))
+        self.assertEqual(
+            validation.UNKNOWN_PARAMETER, emitted[0]['validation-reason'])
+        self.assertEqual('*****', emitted[0]['validation-parameter'])
+        self.assertNotIn('zzz', str(emitted[0]))
 
     def test_findings_do_not_leak_between_requests(self):
         """flask.g is request scoped by contract; this pins that a

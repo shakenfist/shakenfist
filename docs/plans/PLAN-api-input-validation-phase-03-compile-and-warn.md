@@ -397,7 +397,13 @@ Two notes for whoever reads the log, both from the review round:
 * Query-declared parameters are checked against the merged,
   body-authoritative view the `json_or_query` loader reads, so the
   shipped client's everything-in-the-body habit is measured rather
-  than a blind spot. A repeated query key (`?tag=a&tag=b`) is still
+  than a blind spot. The merge is applied to every query-declared
+  parameter, but only the `json_or_query` sites actually read the
+  body -- `blob.py`'s data endpoint binds plain `query` -- so a
+  body-supplied `offset`/`limit` there produces a finding about a
+  value the endpoint ignores. Read such findings as caller defects
+  (the value was sent somewhere it does nothing), not as rejections
+  enforcement would introduce. A repeated query key (`?tag=a&tag=b`) is still
   collapsed to its first value before checking; no query parameter
   is array-typed today (arrays are refused outside a body at import
   time), so a finding of that shape would be an artefact of the
@@ -584,6 +590,20 @@ _schema_findings() catches anything a schema raises and reports
 nothing rather than changing a response, and build_registry() refuses
 two endpoint classes sharing a bare name at mount time, since the
 registry key could not tell their requests apart.
+
+**The fourth review round had no fix items and the loop was declared
+converged** (fix trajectory 8, 1, 2, 0). Considers taken because they
+were real: the pattern validator now uses re.fullmatch (Python's $
+matches before a trailing newline, ECMA-262's does not) and the
+import-time check also refuses top-level alternation, which escapes
+the anchors; and the finding line redacts the parameter name on
+credential-carrying routes, because it was a third body-reading
+logger and the other two consult handles_credentials() and drop the
+lot. Declined, with reasons: a HEAD bypass matters only if a HEAD
+route ever takes parameters; CompiledEndpoint.names is recomputed per
+request but is a set-union over tiny sets; and the functional-CI
+self-check remains recorded in the measurement notes above rather
+than in this phase.
 
 **The next step is not code.** Deploy to sfcbr, run functional CI, and
 read the warn log. Success criterion 3 is that every remaining finding
