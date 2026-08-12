@@ -339,6 +339,140 @@ stestr run --serial -- --verbose
 stestr list
 ```
 
+### Running against an installed package (distro matrix)
+
+The make targets above run the suite against the in-tree build
+(`src/target/release/instar`). The distro-matrix CI instead runs it
+against the **installed `.deb`/`.rpm`**, inside a target-distro
+container, using that distro's own `qemu-img` as the differential
+oracle. `tools/test-package-functional.sh` is the per-distro runner:
+
+```bash
+# Full suite, against the .deb installed on Debian 12 (qemu-img 7.2.x)
+tools/test-package-functional.sh src/target/debian/instar_*.deb debian:12
+
+# Fast subset, against the .rpm installed on Rocky 9 (proves the dnf path)
+tools/test-package-functional.sh --smoke \
+    src/target/generate-rpm/instar-*.rpm rockylinux:9
+
+# Dial concurrency down when several matrix containers share one KVM host
+tools/test-package-functional.sh --concurrency 2 \
+    src/target/debian/instar_*.deb ubuntu:22.04
+
+# Replay one failure on one distro without paying for the whole suite
+tools/test-package-functional.sh --select 'test_convert\.' \
+    src/target/debian/instar_*.deb debian:13
+```
+
+To reproduce a **CI matrix entry** exactly as the merge queue runs it —
+same package resolution, same summary line — use the wrapper CI calls
+rather than the runner directly:
+
+```bash
+make package
+PACKAGE_DIR=src/target/debian \
+TESTDATA_PATH=../instar-testdata \
+MATRIX_SELECT='test_map\.' \
+    tools/ci/run-matrix-entry.sh 'Debian 12' debian:12 deb
+```
+
+`MATRIX_SELECT` exists for exactly this and is never set in CI: it
+makes the run partial, and a partial run must not be able to report as
+a green matrix entry. The wrapper prints a warning whenever it is set.
+
+**Classify before you attribute.** Running two matrix containers at
+once — or any other heavy job on the host — starves the suite, and the
+resulting failures do not look like resource problems. The large
+`test_convert` re-encodes fail under load with
+`Error: "convert operation failed"` and `Content mismatch at offset 0!`,
+which reads as data corruption, and they abort early (~26s) rather than
+timing out at the ~110s they need when passing. Nine such failures
+appeared across the 2026-08-09 matrix inventory and **every one passed
+on an idle host**. A failure counts as a divergence only once it
+reproduces with the host otherwise quiet; `--select` gives you that
+replay cheaply. Same discipline as the differential-fuzzing
+spurious-divergence rule.
+
+The design is **tests from the source tree, binary from the package**:
+the whole `tests/` tree is copied into the container and driven by
+`stestr`, while the harness is pointed at the installed
+`/usr/bin/instar` via `INSTAR_BINARY_PATH` (so the packaged binary and
+its packaged guest binaries under `/usr/lib/instar/` are what runs).
+The container runs as root (package + prerequisite install need it) and
+the repo is mounted read-only, so no `.stestr/` artefacts leak into the
+host worktree. `test_info_malicious` and `test_bench` are excluded from
+the matrix run; `--smoke` restricts to a fast version/create/map/info
+subset for local one-distro checks.
+
+`TESTDATA_PATH` (default `../instar-testdata`) must already be git-LFS
+materialised — in CI that is `tools/ci/prepare-testdata.sh`; the script
+canary-checks for pointer files and refuses to run against them. This
+runner is distinct from `tools/test-package-install.sh`, which stays the
+fast packaging smoke check (file layout, `--help`, info/create/map).
+
+Because this exercises instar against **older** qemu-img versions than
+the dev host's, it is the first thing to surface output-format parity
+gaps that single-version CI cannot: any command whose qemu-img output
+changed across versions, where instar hard-codes the newest form, will
+diverge here. See "qemu-img version profiles and the distro matrix"
+below.
+
+### Pull requests versus the merge queue
+
+`functional-tests.yml` runs two different sets of jobs depending on the
+event, and the split is deliberate:
+
+| Event | Jobs |
+|-------|------|
+| `pull_request` | `ci-tooling`, `build-and-test`, `package-smoke`, the three `integration-*` jobs, `snapshot-harnesses`, `oslo-crossval-master`, `automated_reviewer`, `can_enqueue` — all against the **in-tree build** |
+| `merge_group` | `build-and-test`, `package-build`, `package-matrix` (seven distros), `can_merge` |
+| `workflow_dispatch` | everything except `ci-tooling` and `can_merge` — this is how you dry-run the matrix without enqueuing anything. Note `automated_reviewer` also skips here, because it needs `ci-tooling` and a skipped dependency skips its dependents; the two aggregates use `always()` precisely so they report anyway |
+
+The merge queue does **not** re-run the PR integration jobs. That is a
+coverage argument rather than a cost one: each matrix entry runs the
+*full* Python suite against the installed package on its own distro,
+against that distro's `qemu-img`, so the queue's coverage is a superset
+of the PR jobs on seven distros instead of one. `build-and-test` is the
+deliberate exception — it stays in both as the cheap fast-fail, and
+`package-build` depends on it.
+
+`package-build` builds one `.deb` and one `.rpm` and uploads them as a
+single artifact that all seven entries consume. This works only because
+the release binary is built on `debian:bullseye` (symbol floor
+`GLIBC_2.30`), so one artifact set installs everywhere down to Rocky
+9's glibc 2.34. **If a matrix entry fails while *installing* the
+package, that is a glibc-floor regression in the build image, not a
+test failure.**
+
+`can_enqueue` and `can_merge` are the two aggregate gates, and they are
+the names configured as required checks — never the individual jobs or
+matrix entries, whose names change whenever the distro list does.
+`can_enqueue` aggregates the pull-request jobs ("may this PR enter the
+queue?"); `can_merge` aggregates the merge-queue jobs ("is this merge
+group good?"). Both use `always()` plus an event test and a jq
+expression asserting every dependency ended `success` or `skipped`,
+because a required check that never reports leaves the queue waiting
+forever. See [development.md](/components/instar/development/) for the ruleset itself.
+
+Each entry writes a row to the job summary naming the distro, its
+**live** `qemu-img` version, and the test totals. The version is what
+distinguishes "instar broke" from "instar diverges at this qemu version
+boundary", so read it before attributing a red row.
+
+**Flake quarantine.** Every matrix entry carries an explicit
+`allow_failure: false`. An entry that fails twice consecutively for an
+established environmental reason may be flipped to `true` with a linked
+issue, so one flaky distro cannot block every merge; the flag comes off
+when the issue closes. Note the sharp edge: `continue-on-error` makes
+the job report *success* to the `needs` context, so a quarantined entry
+stops gating merges entirely rather than merely tolerating its own
+failure. Never leave a flag behind after its issue is fixed.
+
+Because `merge_group` does not inherit the `pull_request` trigger's
+`paths:` filter, this workflow always runs in the queue — including for
+docs-only changes. That is deliberate (a required check that never runs
+hangs the queue), at the cost of matrix latency on doc merges.
+
 ### CI job layout and the partition guard
 
 On a pull request the integration suite is split across several jobs
@@ -520,6 +654,166 @@ The test suite performs exact string comparison. On failure, it shows:
 - `→` for tabs
 - `↵` for trailing newlines
 - Raw repr() of both outputs for debugging
+
+Before comparing, the harness normalises the fields that legitimately
+vary between runs rather than between qemu versions:
+
+- **Disk size / actual-size** is substituted from the live filesystem
+  (`st_blocks * 512`, `helpers/comparators.get_disk_size`), because it
+  reflects the current file's allocation, not a format decision. instar
+  computes it the same way, so it always matches.
+- **vmdk `cid`/`parent-cid`, the dirty flag, and vhdx log-size** are
+  stripped by `assert_info_equivalent` — a vmdk content-ID is a random
+  nonce written at creation, not a stable output.
+
+This matters for the version matrix: two adjacent baseline profiles
+often differ *only* in these normalised fields (see below), so a profile
+mismatch is invisible to the assertions until a genuinely version-gated
+field changes.
+
+## qemu-img version profiles and the distro matrix
+
+instar emulates the `qemu-img` build installed on the host so its output
+is byte-identical to the real tool. Two mechanisms cooperate:
+
+**Runtime model (`src/vmm/src/version.rs`).** instar runs
+`qemu-img --version`, parses `major.minor.patch`, and derives just two
+booleans: `include_child_node` (qemu ≥ 8.0 adds the `Child node '/file'`
+section) and `include_dirty_flag` (qemu ≥ 6.1 exposes the dirty flag).
+If qemu-img is absent it falls back to the newest profile. `--qemu-version`
+overrides detection.
+
+**Baseline profiles (instar-testdata).** Because qemu changed some output
+*within* stable series, `expected-outputs/<command>/version-map.json`
+records several empirical profiles (e.g. `profile-6-1-0`, `profile-7-2-19`,
+`profile-8-0-0`, `profile-8-1-0`, `profile-10-0-0`, `profile-10-2-0`) and a
+`version_to_profile` map from full version strings to profile names.
+
+**Selecting a profile for the host qemu.** `base.py`
+`get_profile_for_installed_qemu` / `_pick_baseline_version_dir` resolve
+the host version against the map with **full major.minor.patch matching**
+(`_select_version_match`): exact match, else the highest enumerated
+version ≤ the host within the same `major.minor`, else the highest
+version ≤ the host overall. A `{major}.{minor}.` *prefix* match (the
+previous behaviour) could not tell `7.2.0` (profile-6-1-0) from `7.2.22`
+(profile-7-2-19) and mis-selected on any 7.2.19+ host such as Debian 12.
+The single-qemu-version CI never exposed this; the distro matrix does.
+
+**Portable vs version-specific tests.** `test_info_safe` and the
+`--qemu-version` baseline suites (create/resize/amend/commit/bitmap)
+drive instar with an explicit version per profile and compare to the
+stored baseline — they are qemu-version-independent and pass identically
+on every distro. The live-oracle suites (`test_convert`, `test_compare`,
+`test_dd`, `test_check_*`, `test_map`, `test_measure`,
+`test_oslo_crossval`) use the host's real qemu-img as the differential
+oracle and pick their comparison profile from the detected version, so
+they are the ones the matrix actually exercises.
+
+**The CI matrix (`tools/probe-qemu-versions.sh`).** The `qemu-img`
+version each matrix distro ships, and the profile it selects:
+
+| Distro | `qemu-img --version` | Profile |
+|--------|----------------------|---------|
+| Debian 12 (bookworm) | 7.2.22 | `profile-7-2-19` |
+| Debian 13 (trixie)   | 10.0.11 | `profile-10-0-0` |
+| Ubuntu 22.04 (jammy) | 6.2.0  | `profile-6-1-0` |
+| Ubuntu 24.04 (noble) | 8.2.2  | `profile-8-0-0` |
+| Fedora latest        | 10.2.2 | `profile-10-2-0` |
+| Rocky/RHEL 9         | 10.1.0 | `profile-10-0-0` |
+| Rocky/RHEL 10        | 10.1.0 | `profile-10-0-0` |
+
+Run `tools/probe-qemu-versions.sh` to refresh this table (it pulls each
+image and prints its `qemu-img --version`). Rocky 10 is pulled from the
+`rockylinux/rockylinux` org repo — the Docker Official `rockylinux`
+library stops at 9. Regression tests pinning the parser and the selection
+rule against these exact strings live in `tests/test_version_detection.py`
+and `src/vmm/src/version.rs`.
+
+**Profile selection is not the whole story.** Debian 12's 7.2.22 is the
+only distro whose `major.minor` (7.2) transitions profile mid-series (at
+7.2.19), so it is the only one the full-version fix re-points, and the
+profile-6-1-0 vs profile-7-2-19 baselines differ *only* in normalised
+fields (disk size, vmdk cid). Running the live-oracle suites against
+every distro's real qemu-img (via
+`tools/test-package-functional.sh`) then found divergences the baseline
+comparison never could — see below.
+
+**Known divergences (found 2026-08-09, fixed in phase 2b 2026-08-10).**
+instar used to hard-code its newest-qemu behaviour for three things, so
+it diverged on every distro shipping an older qemu. All three are now
+version-gated:
+
+| Divergence | Affected distros | Boundary | Status |
+|------------|------------------|----------|--------|
+| `map --output=json` emitted `compressed` unconditionally | Debian 12 (7.2.22), Ubuntu 22.04 (6.2.0) — 19 tests each | **8.2.0** (absent at 8.1.5) | Fixed: gated on `include_map_compressed` |
+| `map --output=json` emitted `present` unconditionally | none in the matrix (oldest is 6.2.0) | **6.1.0** (absent at 6.0.1) | Fixed: gated on `include_map_present` |
+| `snapshot -l` used the newer column layout unconditionally | Debian 12, Ubuntu 22.04, Ubuntu 24.04 (8.2.2) | **9.0.0** (8.2.2 is old-form) | Fixed: gated on `snapshot_underscored_columns` |
+| Every VHD instar wrote declared a size its CHS geometry did not cover, so qemu < 10.0 read it short and truncated the tail | Debian 12, Ubuntu 22.04, Ubuntu 24.04, RHEL 9 | reader default changed at **10.0.0** | Fixed: the writer now stamps creator app `qem2` |
+
+The third was not an output-format divergence at all but silent data
+loss in the VHD writer, found because the qcow1→vpc test compares a
+flattened round-trip. See `docs/quirks.md` ("VHD Virtual Size
+Calculation") and phase 2b's plan.
+
+One divergence remains documented rather than fixed: instar applies the
+qemu 10.0+ VHD size rule to VHDs with an *unrecognised* creator app,
+where a pre-10.0 qemu-img would use the CHS product. It needs an image
+whose creator app is outside the known table and whose CHS disagrees
+with its disk_size, and no such image exists in the corpus. The rule is
+evaluated guest-side, so gating it would mean widening the guest ABI.
+
+**How the boundaries were measured.** instar-testdata ships 80 static
+per-version `qemu-img` builds at `qemu-img-binaries/x86_64/<version>/`,
+covering 6.0.0 to 10.2.0. Run the real binary rather than reasoning
+from the version map or from qemu source — two of the three boundaries
+above were initially recorded wrongly from indirect evidence:
+
+```bash
+TD=../instar-testdata
+$TD/qemu-img-binaries/x86_64/8.1.5/qemu-img map --output=json image.qcow2
+$TD/qemu-img-binaries/x86_64/9.0.0/qemu-img snapshot -l image.qcow2
+```
+
+Both `map` and `snapshot` accept `--qemu-version` (as `info` already
+did), so both sides of every boundary are exercisable on the dev host
+rather than only inside the matrix.
+
+**Cross-profile baseline tests.** The ordinary baseline tests compare
+only against the profile matching the *installed* qemu-img, so a
+single-version host checks exactly one side of every boundary — which
+is how the `compressed` divergence survived to the distro matrix.
+`TestMapCrossProfile` drives `--qemu-version` for every profile the
+version map declares and compares against that profile's own
+baselines, so a new boundary is caught wherever the suite runs. It
+immediately found one the matrix could not: `map --output=json` gained
+`present` in 6.1.0, and no matrix distro is old enough to notice.
+
+**qemu capability is not the same as qemu version.** Distro qemu builds
+do not all carry the same block drivers, and the version-profile model
+says nothing about this. RHEL-family `qemu-kvm` (Rocky/RHEL 9 and 10) is
+built **without** the `qed`, `qcow` (qcow1), `parallels`, `dmg`, `bochs`
+and `cloop` drivers that Debian's `qemu-utils` carries — so on those
+distros qemu-img cannot act as the differential oracle for those formats
+at all. Tests that need such an oracle call
+`skip_unless_qemu_supports(fmt)` (`tests/base.py`), which probes the
+driver by opening a nonexistent file with an explicit format and looking
+for `Unknown driver`; tests that exercise instar alone (the check-refusal
+and adversarial suites) keep running there. Detect capability this way
+rather than from `qemu-img --help`, whose "Supported formats:" line qemu
+10.x no longer prints.
+
+**A truncated run must never look green.** subunit v2 refuses to write a
+packet larger than ~4MB, so a failing assertion that renders a
+multi-megabyte image buffer raises `ValueError: Length too long` and
+kills the stestr worker. Every test still queued on that worker silently
+never runs, and stestr exits 0 if nothing else failed — a partial run
+that reports as a pass (one Rocky run "passed" having executed 454 of
+3253 tests). Two defences: compare image buffers with
+`assert_bytes_identical` (`tests/base.py`), which reports sizes and the
+first differing offset rather than the buffers, and
+`tools/test-package-functional.sh`, which fails the run outright on the
+crash marker, on any worker reporting `N/A` elapsed time, or on a
+full-suite test count far below the expected ~3250.
 
 ## Environment Variables
 

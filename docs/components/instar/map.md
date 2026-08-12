@@ -26,6 +26,7 @@ Common options:
       --start-offset <OFFSET>     Emit extents starting at OFFSET bytes
       --max-length <LEN>          Stop emission at OFFSET + LEN bytes
       --sector-size <N>           Source sector size (default: 65536)
+      --qemu-version <VERSION>    Emulate this qemu-img version's output
 ```
 
 `--image-opts` is explicitly rejected; the positional `<INPUT>`
@@ -78,6 +79,23 @@ JSON mode. Field semantics:
 | `data`       | The extent contains data (not unconditional zero-fill).   |
 | `compressed` | The extent is backed by a compressed cluster. Always `false` in v1 — see "Known divergences" below. |
 | `offset`     | File offset of the extent's first byte. Omitted (not `null`) when `present == false`. |
+
+#### The `compressed` field is version-dependent
+
+qemu-img added `compressed` in **8.2.0**; before that the key is absent
+entirely rather than emitted as `false`. instar matches whichever
+qemu-img it detects, so on Debian 12 (7.2) or Ubuntu 22.04 (6.2) the
+output above has no `compressed` key at all:
+
+```
+$ instar map --output=json --qemu-version 8.1 fragmented.qcow2
+[{ "start": 0, "length": 65536, "depth": 0, "present": true, "zero": false, "data": true, "offset": 327680},
+{ "start": 65536, "length": 458752, "depth": 0, "present": false, "zero": true, "data": false}]
+```
+
+Use `--qemu-version` to emulate a specific version explicitly; without
+it instar detects the installed qemu-img, exactly as `instar info`
+does.
 
 The combination `(present, zero, data)` distinguishes the three
 underlying states the parser emits:

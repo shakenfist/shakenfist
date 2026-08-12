@@ -411,6 +411,59 @@ regardless of creator application. This prevents truncation for large disks.
 | `CTXS`      | disk_size   | XenConverter |
 | `wa\0\0`    | disk_size   | Microsoft Azure |
 
+### The rule changed in qemu-img 10.0
+
+The table above is the **qemu-img 10.0+** rule, and it is the one instar
+implements. Before 10.0, qemu-img worked from the opposite default: it used
+CHS geometry for *every* creator application except `win ` and `qem2` (or when
+CHS was at maximum). The two rules agree for every creator app in the table
+whose behaviour anyone has documented — `vpc `, `qemu`, `win `, `qem2` and
+`d2v ` all resolve identically on both sides of 10.0 — but they disagree for
+any creator app not on that list.
+
+Measured across qemu-img 6.0.0 to 10.2.0 on a VHD whose CHS addresses less
+than its disk_size field:
+
+| Creator app | qemu-img < 10.0 | qemu-img >= 10.0 | instar |
+|-------------|-----------------|------------------|--------|
+| `vpc `      | CHS             | CHS              | CHS |
+| `win `, `qem2` | disk_size    | disk_size        | disk_size |
+| anything else (e.g. `xen `, `azur`, zeros) | **CHS** | **disk_size** | disk_size |
+
+### Known divergence: unknown creator apps under emulated qemu < 10.0
+
+instar always applies the 10.0+ rule, so when it is emulating an older
+qemu-img (`--qemu-version 7.2`, or running on a distro whose qemu-img predates
+10.0) it reports the disk_size field for an unrecognised creator app where the
+real older qemu-img would report the CHS product.
+
+The exposure is narrow: it needs a VHD whose creator app is outside the table
+*and* whose CHS geometry disagrees with its disk_size field. No such image
+exists in the test corpus — the Virtual PC, Hyper-V and Disk2vhd fixtures all
+resolve identically on every qemu version. instar's own VHD writer cannot
+produce one either, because it stamps `qem2` (see below).
+
+This is documented rather than fixed because the size rule is evaluated
+**guest-side** (`src/operations/info`), so gating it on the output profile
+would mean widening the guest ABI to carry the emulated version. That is a
+disproportionate change for a case with no demonstrated real-world image; see
+`docs/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity.md` (step 2b-F)
+for the measurements and the decision.
+
+### instar's own VHD output uses `qem2`
+
+instar writes `qem2` — qemu's `force_size` marker — as the creator app of
+every VHD it produces, which makes every qemu-img version read the size from
+the disk_size field.
+
+This is deliberate and load-bearing. instar preserves the exact requested
+virtual size rather than rounding it up to a CHS-representable value the way
+`qemu-img create -f vpc` does, so its footers can declare a size the CHS
+geometry does not fully address (for a 2 MiB image, by 8192 bytes). Under any
+creator app that resolves to CHS, every qemu-img before 10.0 would read those
+images short and silently truncate the tail. `qem2` states explicitly that the
+declared size is authoritative, which is what instar means.
+
 ### instar Behavior
 
 **Default behavior**: instar matches qemu-img by checking the creator_app field

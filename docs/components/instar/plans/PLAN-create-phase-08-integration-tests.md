@@ -166,6 +166,17 @@ Recording this as a bug to be fixed as a phase-7 follow-up
 (see "Bugs to fix"). Until the fix lands, the test code
 indexes by target-version-case rather than by profile.
 
+> **Resolved 2026-08-11.** instar-testdata `03c379a08a` and
+> `769e463f7e` fixed the generator and regenerated the
+> corpus: create-info-json profile files are now named
+> `<target>-<case>`, so all 36 files per profile survive
+> instead of 25. `TestCreateBaselineMatrix` reads the
+> profile like every other output type and the raw-bucket
+> workaround is gone. The defect was worse than recorded
+> here — as well as the collisions, every profile carried
+> 10.2.0's output whatever version it claimed, so 855 files
+> disagreed with their own metadata.
+
 ### Three test surfaces
 
 #### Surface 1: per-target baseline comparison
@@ -666,6 +677,7 @@ Total: 5 commits.
   the broken profile dir entirely. File the bug as a
   phase-7 follow-up to be fixed when the
   `instar-testdata` matrix is next regenerated.
+  (Fixed 2026-08-11; the mitigation has been removed.)
 - **Installed qemu-img version not in phase 7's matrix**:
   test host runs qemu-img 5.x. Mitigation: surface 1
   skips with a clear message; surface 2 still runs (uses
@@ -714,6 +726,11 @@ Total: 5 commits.
   Either way, regenerate the profile dir afterward.
   This is a phase-7 follow-up; phase 8 does not block
   on it.
+  **Done 2026-08-11** in instar-testdata `03c379a08a`
+  (prefix on copy, per output type so collision-free
+  types keep their filenames) and `769e463f7e`
+  (regenerate). instar `tests/test_create.py` now reads
+  the profile directly.
 
 ## Back brief
 

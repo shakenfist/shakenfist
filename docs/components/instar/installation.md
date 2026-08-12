@@ -4,11 +4,11 @@ Pre-built x86_64 Linux artifacts are published on every release at
 [GitHub Releases](https://github.com/shakenfist/instar/releases). Pick
 the format that matches your distro.
 
-The published packages require **glibc 2.39 or newer**. Compatible
-distributions include Debian 13 (trixie), Ubuntu 24.04 LTS, Fedora
-40+, and Rocky/RHEL 10. Older releases (Debian 12, Ubuntu 22.04 LTS,
-Rocky/RHEL 9) need to build instar from source until the project
-lowers its glibc baseline.
+The published packages require **glibc 2.31 or newer**. The release
+binary is built on Debian 11 (bullseye), so a single artifact runs
+across Debian 11+, Ubuntu 22.04 LTS and 24.04 LTS, Fedora, and
+Rocky/RHEL 9 and 10. (glibc is forward-compatible: a binary runs on
+any host whose glibc is at least the one it was built against.)
 
 ## Debian / Ubuntu (.deb)
 
