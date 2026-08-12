@@ -6014,6 +6014,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 4: the new base and the login page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -11457,8 +11485,13 @@ mechanics that the CI lanes and real deployments depend on.</p>
 <li>The reference brand treatment: the globe mark beside the
   page heading and <code>--sf-brand</code> confined to the chrome, in
   place of the hardcoded teal navbar.</li>
-<li><code>&lt;sf-tabs&gt;</code> for the Sources / Consoles / Sessions
-  navigation, with the audit page highlighting correctly.</li>
+<li>An sfui tab strip for the Sources / Consoles / Sessions
+  navigation, with the audit page highlighting correctly.
+  <strong>Amended in phase 4:</strong> the navigation is anchors styled by
+  <code>sf.css</code>'s <code>.sf-nav</code>, not <code>&lt;sf-tabs&gt;</code>, because the
+  component's arrow-key selection would navigate and its
+  <code>role="tab"</code> buttons are not links. See phase 4's design
+  decision 1.</li>
 <li>Native <code>&lt;details&gt;</code> disclosures replacing the
   HTML-in-attribute popovers.</li>
 <li>morphdom-based polling replacing the meta-refresh reload,
@@ -11567,12 +11600,12 @@ locally-running kerbside.</p>
 <tr>
 <td>3. sfui canonical additions (shakenfist/sfui repo)</td>
 <td>PLAN-sfui-conversion-phase-03-sfui-canonical.md</td>
-<td>Done (sfui commits unpushed)</td>
+<td>Done</td>
 </tr>
 <tr>
 <td>4. New base + login page</td>
 <td>PLAN-sfui-conversion-phase-04-base-login.md</td>
-<td>Not started</td>
+<td>Done</td>
 </tr>
 <tr>
 <td>5. Consoles page</td>
@@ -11640,16 +11673,20 @@ locally-running kerbside.</p>
    working): correct head (<code>charset</code>, <code>viewport</code>, <code>lang</code>,
    sfui script/stylesheet order), brand header per the
    reference treatment with the sfui globe mark (retiring
-   kerbside's Inkscape <code>logo.svg</code>), <code>&lt;sf-tabs&gt;</code> nav wired
-   to the <code>navitems</code> context (fixing the audit-page
-   highlight and the keyboard-dead logout link),
+   kerbside's Inkscape <code>logo.svg</code>), a nav strip wired to the
+   <code>navitems</code> context (fixing the audit-page highlight and
+   the keyboard-dead logout link),
    <code>&lt;sf-theme-toggle&gt;</code>, and the refresh footer. Convert
    <code>login.html</code> onto it, fixing the mismatched tags,
    <code>&lt;font&gt;</code>, invalid input type, missing autocomplete
    attributes and dead Bootstrap 4 utilities, and dropping
    axios for <code>fetch</code>. Decide here whether the login page
    should stop rendering the nav entirely (it currently
-   shows links to protected pages while unauthenticated).</li>
+   shows links to protected pages while unauthenticated).
+   <strong>Decided in phase 4:</strong> the nav is <code>.sf-nav</code> anchors
+   rather than <code>&lt;sf-tabs&gt;</code>, which adds a small canonical
+   sfui step, and the login page renders no nav and no
+   logout control (the theme toggle stays).</li>
 <li><strong>Consoles page</strong> (plan at high effort — the largest and
    densest page: popover replacement, two dropdown
    button-groups, icons). Convert <code>consoles.html</code> onto the
