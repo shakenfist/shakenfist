@@ -167,6 +167,22 @@ all see the same idle node, all land on it, and only discover the
 overshoot once they booted. Placement is recorded synchronously as
 each create is admitted, so counting it closes that window.
 
+Because that charge only ever removes capacity, an instance is
+counted only while it agrees it is on the node and has not been
+deleted. A placement record can outlive what it describes -- a node
+which dies mid-teardown leaves one behind, and an instance which
+moves can leave one on the node it left -- and charging a node for a
+stale record would take capacity away from it with nothing to give it
+back. A node reporting far more `cpu_committed` than its instance
+list accounts for is the shape of problem to look for.
+
+RAM and disk admission are deliberately unchanged: they still size a
+node from its published measurements alone, and so keep the burst
+window that CPU admission has closed. Closing it for all three is the
+job of the scheduler-reservations work, which replaces this
+per-schedule walk with the maintained counters in
+`scheduler_node_capacity` rather than extending it.
+
 ## Configuration reference
 
 Except for `CPU_OVERCOMMIT_RATIO`, `RAM_OVERCOMMIT_RATIO`,

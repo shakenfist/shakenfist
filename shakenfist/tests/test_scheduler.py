@@ -7,6 +7,8 @@ from shakenfist import scheduler
 from shakenfist.config import SFConfig
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import GiB
+from shakenfist.instance import Instance
+from shakenfist.node import Node
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -689,6 +691,40 @@ class PlacementLedgerAdmissionTestCase(SchedulerTestCase):
         self.assertEqual(
             16.0,
             resources['per_node'][self._node_uuid('node3')]['cpu_available'])
+
+    def test_deleted_instances_are_not_charged(self):
+        # A deleted instance's placement row outlives it whenever the
+        # normal teardown does not reach _delete_globally() -- a node
+        # which died mid-delete is the obvious case. Charging for it
+        # would take capacity away from a node permanently, with no
+        # self-healing path, so the ledger skips deleted instances
+        # exactly as _RECONCILE_USAGE_SQL does.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.create_instance(
+            'gone', cpus=16, place_on_node='node2',
+            set_state=Instance.STATE_DELETED)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
+
+    def test_only_the_authoritative_placement_is_charged(self):
+        # place_instance() removes the old node's reference on a
+        # best-effort basis (it skips a node whose row has gone), so an
+        # instance which has moved can leave a reference behind on the
+        # node it left. The instance's own placement attribute is the
+        # authority for where it actually is, and a node is charged only
+        # for the instances which agree they are on it.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        inst = self.mock_mariadb.create_instance(
+            'moved', cpus=16, place_on_node='node3')
+        Node.from_db(self._node_uuid('node2')).add_instance(inst.uuid)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node4'), set(nodes))
 
 
 class DiskReservationAdmissionTestCase(SchedulerTestCase):

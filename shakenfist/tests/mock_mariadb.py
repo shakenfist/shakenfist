@@ -3341,7 +3341,12 @@ class MockMariaDB():
         inst._state_update(set_state, skip_transition_validation=True)
 
         if place_on_node:
-            inst.place_instance(place_on_node)
+            # Every production caller places by node uuid -- the scheduler's
+            # candidates are uuids, as is config.NODE_UUID -- so an fqdn
+            # passed here for readability is resolved rather than stored as
+            # a placement no real code path would ever write.
+            inst.place_instance(
+                self.node_uuids.get(place_on_node, place_on_node))
 
         return inst
 

@@ -181,13 +181,46 @@ class Scheduler:
 
         exclude_uuid is the instance being scheduled: the preflight path
         reschedules an instance which is already placed here, and it must
-        not be charged for itself twice.
+        not be charged for itself twice. It is the dashed uuid form, which
+        is what object_references stores (see the REPLACE() in
+        _RECONCILE_USAGE_SQL, which joins the two forms) and what
+        str(Instance.uuid) produces.
+
+        Unlike the affinity pass, which only mis-scores a node when it
+        reads a reference which should not be there, this charge is
+        fail-closed: a reference outliving its instance subtracts capacity
+        from a node with nothing to put it back. Two exclusions bound
+        that, both matching the reconciler's usage query
+        (_RECONCILE_USAGE_SQL) so the two ledgers cannot disagree:
+
+        - Deleted instances are skipped. A delete which never reached
+          _delete_globally() -- a node which died mid-teardown is the
+          obvious case -- leaves the reference behind until hard_delete()
+          sweeps it. An instance with no state row at all is charged, as
+          the reconciler's NULL handling does.
+        - Only instances whose own placement attribute names this node
+          are charged. place_instance() removes the old node's reference
+          on a best-effort basis and skips a node whose row has gone, so
+          an instance which moved can leave a reference on the node it
+          left. Placement is the authority for where an instance actually
+          is, which also makes the transition release's union of the
+          legacy node_attributes.instances column harmless here.
         """
         placed = self._placed_instances(node, memo)
         if not placed:
             return 0
-        return sum(i.cpus for instance_uuid, i in placed
-                   if i is not None and instance_uuid != exclude_uuid)
+
+        committed = 0
+        for instance_uuid, i in placed:
+            if i is None or instance_uuid == exclude_uuid:
+                continue
+            state = i.state
+            if state and state.value == instance.Instance.STATE_DELETED:
+                continue
+            if i.placement.get('node') != node:
+                continue
+            committed += i.cpus
+        return committed
 
     def _has_sufficient_cpu(self, log_ctx, inst, node, memo):
         cpu_base, from_fallback = self._schedulable_threads(node)

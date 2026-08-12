@@ -424,7 +424,16 @@ already made that choice for itself, without the reconciler's tables:
 `Scheduler._committed_vcpus()` walks each candidate's
 `INSTANCE_LOCATION` rows and charges the node `max(measured,
 committed)`, because the measurement cannot see an instance which has
-been placed but has not booted (issue 3498). The ledger also reads only
+been placed but has not booted (issue 3498). That walk applies the
+same two exclusions as `_RECONCILE_USAGE_SQL` -- skip deleted
+instances, and count an instance only against the node its own
+placement attribute names -- so the Python and SQL ledgers cannot
+disagree about what "placed" means. It is a stopgap for the CPU stage
+only: phase 3 **replaces** it with the guarded UPDATE against
+`scheduler_node_capacity`, and must delete `_committed_vcpus()` in
+the same change rather than layer the counters on top of it, or
+admission ends up consulting two ledgers which can drift apart. The
+ledger also reads only
 `INSTANCE_LOCATION` rows in `object_references`: during the one
 transition release where `Node.instances` still unions in the legacy
 `node_attributes.instances` JSON column, a placement written by a
