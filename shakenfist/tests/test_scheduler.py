@@ -692,6 +692,38 @@ class PlacementLedgerAdmissionTestCase(SchedulerTestCase):
             16.0,
             resources['per_node'][self._node_uuid('node3')]['cpu_available'])
 
+    def test_a_node_under_its_cap_is_admitted_without_extra_reads(self):
+        # The exclusions cost a state read and an attribute read per
+        # placed instance, neither of which the static object cache
+        # serves. They can only ever lower the charge, so a node admitted
+        # against the unfiltered sum needs none of them -- which on a
+        # cluster that is not near its caps is every node, every schedule.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.create_instance(
+            'placed-1', cpus=2, place_on_node='node2')
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.instance.placement_filter') as pf:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        pf.assert_not_called()
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
+
+    def test_a_node_at_its_cap_pays_for_a_second_look(self):
+        # ... and a node the cheap sum would reject is re-checked before
+        # the rejection stands, because that sum over-counts.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.create_instance(
+            'placed-1', cpus=16, place_on_node='node2')
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.instance.placement_filter',
+                        return_value=True) as pf:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        pf.assert_called()
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
     def test_deleted_instances_are_not_charged(self):
         # A deleted instance's placement row outlives it whenever the
         # normal teardown does not reach _delete_globally() -- a node

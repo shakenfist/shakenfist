@@ -4,6 +4,7 @@ import random
 import time
 import uuid
 from collections import defaultdict
+from typing import Optional
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -164,7 +165,9 @@ class Scheduler:
                     for instance_uuid in n.instances]
         return memo[node]
 
-    def _committed_vcpus(self, node, memo, exclude_uuid=None):
+    def _committed_vcpus(self, node: str, memo: dict,
+                         exclude_uuid: Optional[str] = None,
+                         verified: bool = False) -> int:
         """The vCPUs a node has already been committed to by placement.
 
         A node's metrics count the vCPUs of its *running* libvirt domains
@@ -205,6 +208,17 @@ class Scheduler:
           left. Placement is the authority for where an instance actually
           is, which also makes the transition release's union of the
           legacy node_attributes.instances column harmless here.
+
+        Both exclusions cost a database read per placed instance which
+        the static object cache does not serve -- states and attributes
+        are excluded from it by design -- so without ``verified`` they
+        are skipped and the return value is an *upper bound* computed
+        from cached static values alone. That is the useful shape: an
+        exclusion can only ever lower the charge, so a node which is
+        admitted against the upper bound would be admitted against the
+        exact figure too, and only a node about to be rejected has to
+        pay to find out whether the reason is real. On a cluster whose
+        nodes are not near their caps that is no extra reads at all.
         """
         placed = self._placed_instances(node, memo)
         if not placed:
@@ -214,11 +228,12 @@ class Scheduler:
         for instance_uuid, i in placed:
             if i is None or instance_uuid == exclude_uuid:
                 continue
-            state = i.state
-            if state and state.value == instance.Instance.STATE_DELETED:
-                continue
-            if i.placement.get('node') != node:
-                continue
+            if verified:
+                state = i.state
+                if state and state.value == instance.Instance.STATE_DELETED:
+                    continue
+                if not instance.placement_filter(node, i):
+                    continue
             committed += i.cpus
         return committed
 
@@ -230,6 +245,17 @@ class Scheduler:
             node, memo, exclude_uuid=str(inst.uuid))
         current_cpu = max(measured_cpus, committed_cpus)
         cpus = inst.cpus
+
+        # The cheap ledger over-counts, so a node it would reject gets a
+        # second look at the price of the reads the first pass skipped.
+        # Only worth paying when the ledger is what binds: if the
+        # measurement is already the larger number, excluding placements
+        # cannot lower the total.
+        if (current_cpu + cpus > hard_max_cpus
+                and committed_cpus > measured_cpus):
+            committed_cpus = self._committed_vcpus(
+                node, memo, exclude_uuid=str(inst.uuid), verified=True)
+            current_cpu = max(measured_cpus, committed_cpus)
 
         if current_cpu + cpus > hard_max_cpus:
             reason = {
@@ -701,7 +727,13 @@ class Scheduler:
             resources['per_node'][n]['cpu_schedulable'] = cpu_base
             hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
             measured_cpus = self.metrics[n].get('cpu_total_instance_vcpus', 0)
-            committed_cpus = self._committed_vcpus(n, placements)
+            # Verified, unlike admission's first pass: there is no request
+            # size here to decide whether the difference matters, and a
+            # published headroom which disagrees with what admission would
+            # grant is worse than the reads it costs on a low-frequency
+            # admin endpoint.
+            committed_cpus = self._committed_vcpus(n, placements,
+                                                   verified=True)
             # Both inputs to the admission decision are published, because
             # "this node measures as idle but is refusing work" is only
             # diagnosable if you can see which of the two is binding.

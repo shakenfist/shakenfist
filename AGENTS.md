@@ -428,7 +428,12 @@ been placed but has not booted (issue 3498). That walk applies the
 same two exclusions as `_RECONCILE_USAGE_SQL` -- skip deleted
 instances, and count an instance only against the node its own
 placement attribute names -- so the Python and SQL ledgers cannot
-disagree about what "placed" means. It is a stopgap for the CPU stage
+disagree about what "placed" means. Neither exclusion is served by the
+static object cache (states and attributes are excluded from it), so
+they are applied only on demand: the first pass sums cached static
+values into an *upper bound*, and since an exclusion can only lower
+the charge, only a node that bound would be rejected pays to find out
+whether the reason is real. It is a stopgap for the CPU stage
 only: phase 3 **replaces** it with the guarded UPDATE against
 `scheduler_node_capacity`, and must delete `_committed_vcpus()` in
 the same change rather than layer the counters on top of it, or
