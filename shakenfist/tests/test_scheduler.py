@@ -804,3 +804,129 @@ class AffinityTestCase(SchedulerTestCase):
         nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual(
             self._node_uuids_set('node3'), set(nodes))
+
+
+class AffinityVersusLoadSheddingTestCase(SchedulerTestCase):
+    """Affinity outranks the transient load shedding filters.
+
+    Queue depth and disk bandwidth say a node is momentarily busy, not
+    that it cannot host the instance. If they were allowed to eliminate
+    the winning affinity group the user's placement request would be
+    silently discarded -- which is exactly how the test_affinity
+    functional test flaked under suite concurrency (issue 3565).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb.set_node_metrics_same()
+
+    def _saturate_disk(self, *fqdns):
+        for fqdn in fqdns:
+            self.mock_mariadb.update_node_metrics(
+                fqdn, {DISK_BUSY_PER_SECOND_METRIC: '2000.5'})
+
+    def _saturate_queue(self, *fqdns):
+        for fqdn in fqdns:
+            self.mock_mariadb.update_node_metrics(
+                fqdn, {'node_queue_waiting': 100})
+
+    def test_affinity_survives_saturated_disk(self):
+        # The node we want to be near is the node which just built the
+        # instance we want to be near, so it is precisely the node most
+        # likely to be transiently thrashing its disk.
+        self.mock_mariadb.create_instance('instance-1',
+                                          place_on_node='node3',
+                                          metadata={'tags': ['socialite']})
+        self._saturate_disk('node3')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'socialite': 100}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_affinity_survives_long_queue(self):
+        self.mock_mariadb.create_instance('instance-1',
+                                          place_on_node='node3',
+                                          metadata={'tags': ['socialite']})
+        self._saturate_queue('node3')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'socialite': 100}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_anti_affinity_survives_saturated_disk(self):
+        # The mirror case: every node the instance is allowed to be on is
+        # busy, so the node it was asked to avoid used to be the only
+        # survivor and won by default.
+        self.mock_mariadb.create_instance('instance-1',
+                                          place_on_node='node3',
+                                          metadata={'tags': ['nerd']})
+        self._saturate_disk('node2', 'node4')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'nerd': -100}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node4'), set(nodes))
+
+    def test_load_shedding_still_narrows_within_a_tier(self):
+        # Two nodes score the same affinity, only one of them is busy. The
+        # tier is big enough to absorb the exclusion, so the busy node is
+        # dropped exactly as it always was.
+        self.mock_mariadb.create_instance('instance-1',
+                                          place_on_node='node3',
+                                          metadata={'tags': ['nerd']})
+        self._saturate_disk('node2')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'nerd': -100}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node4'), set(nodes))
+
+    def test_load_shedding_still_applies_without_affinity(self):
+        self._saturate_disk('node2')
+
+        inst = self.mock_mariadb.create_instance('instance-1')
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_all_nodes_saturated_still_fails_with_affinity(self):
+        # Affinity narrows the candidate list, it does not resurrect a
+        # cluster where nothing is willing to take work.
+        self.mock_mariadb.create_instance('instance-1',
+                                          place_on_node='node3',
+                                          metadata={'tags': ['socialite']})
+        self._saturate_disk('node2', 'node3', 'node4')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'socialite': 100}})
+
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_disk',
+            str(exc))
+
+    def test_admission_still_outranks_affinity(self):
+        # A node which cannot fit the instance is not a candidate at all,
+        # however much affinity would like it to be.
+        self.mock_mariadb.create_instance('instance-1',
+                                          place_on_node='node3',
+                                          metadata={'tags': ['socialite']})
+        self.mock_mariadb.update_node_metrics(
+            'node3', {'memory_available': 0})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'socialite': 100}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node4'), set(nodes))
