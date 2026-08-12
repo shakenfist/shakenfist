@@ -610,11 +610,11 @@ groundwork exists, and lives mostly outside this repository.
 | 2. Namespace keys as first-class objects | [PLAN-auth-federation-phase-02-key-objects.md](PLAN-auth-federation-phase-02-key-objects.md) | Complete |
 | 3. Federated exchange and scope enforcement | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Complete |
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
-| 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
+| 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Planned |
 | 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
 | 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
 
-Phase plans for phases 5–7 have not been drafted yet; the
+Phase plans for phases 6–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
 carried into the relevant phase plan) before each phase is
 cut.
@@ -819,12 +819,22 @@ than from the pre-federation codebase:
   trusted-issuer configuration, and the exchange endpoint
   as existing infrastructure, with pointers to the
   glossary's terms.
-* Its tentative phases 1–2 (JWT validation refactor; OIDC
-  validator with discovery/JWKS) are marked superseded by
-  this plan's phase 3, and its remaining phases renumbered
-  around what is genuinely left: interactive CLI flows,
-  claim-driven multi-namespace authorisation, admin-as-a-
-  claim, IdP worked examples, and functional testing.
+* Its tentative phase 1 (JWT validation refactor) and the
+  JWKS half of its tentative phase 2 are marked superseded
+  by this plan's phase 3, and its remaining phases
+  renumbered around what is genuinely left: interactive
+  CLI flows, claim-driven multi-namespace authorisation,
+  admin-as-a-claim, IdP worked examples, and functional
+  testing. Note that the *discovery* half of its phase 2
+  was **not** built and must keep a live row: a trusted
+  issuer carries an operator-supplied `jwks_uri` and
+  nothing fetches `.well-known/openid-configuration`.
+  GitHub Actions never needed discovery because the
+  workflow arrives holding a minted token, but a human
+  client has to start a flow, and the endpoints it needs
+  are exactly what a discovery document publishes. This
+  was found by the phase 5 survey; the phase plan carries
+  the detail.
 * Its open question 1 (issuer trust model) is recorded as
   resolved by the trusted-issuer objects; open question 11
   (service-account rename: UX or schema migration) is
