@@ -322,7 +322,8 @@ because the following statements will be true:
   removed.
 * IPAM remains untouched, with a documented note explaining
   why it is not subsumed.
-* Functional coverage under `deploy/cluster_ci` exercises a
+* Functional coverage under
+  `deploy/shakenfist_ci/cluster_ci_tests` exercises a
   concurrent-allocation case for at least one pool.
 * `pre-commit run --all-files` passes.
 

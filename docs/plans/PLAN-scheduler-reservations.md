@@ -541,7 +541,7 @@ because the following statements will be true:
   documented reason.
 * The new batch-create API exists, is documented, and is used
   end-to-end in at least one functional test under
-  `deploy/cluster_ci`.
+  `deploy/shakenfist_ci/cluster_ci_tests`.
 * The affinity model is either preserved as today, simplified
   to the binary-soft form, or removed — with a clear documented
   rationale and a migration note for the user-facing API.

@@ -231,7 +231,7 @@ coverage:
   have unit test coverage?
 - For anything behavioural (lifecycle transitions, cluster
   operations, REST endpoints), is there functional coverage
-  in `shakenfist/deploy/cluster_ci`? Shakenfist prefers
+  in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests`? Shakenfist prefers
   functional tests to unit tests when we can only have
   one.
 - Do the tests include adversarial cases (malformed input,

@@ -386,8 +386,8 @@ Standard checklist from `PLAN-remove-primary.md`, plus:
       before the failover and confirms the lease survives
       it.
 - [ ] At least one advertisement mode (BGP or L2) is
-      exercised in `deploy/cluster_ci` end-to-end, with a
-      real upstream / switch in the path.
+      exercised in `deploy/shakenfist_ci/cluster_ci_tests`
+      end-to-end, with a real upstream / switch in the path.
 - [ ] Smearing is exercised: a multi-network setup
       confirms different networks end up on different
       carriers and that the locality-scoring heuristic
@@ -424,7 +424,7 @@ because the following statements will be true:
   MariaDB and is rendered into kernel state by the
   carrier.
 * At least one advertisement mode (BGP or L2) ships in v1
-  and is verified end-to-end in `deploy/cluster_ci`.
+  and is verified end-to-end in `deploy/shakenfist_ci/cluster_ci_tests`.
 * Locality-aware placement demonstrably prefers carriers
   where the network's instances run, with documented
   scoring inputs.

@@ -332,8 +332,9 @@ because the following statements will be true:
   change (listening ports on the egress IP), the firewall
   implications, and the per-network port range
   configuration knob.
-* Functional coverage under `deploy/cluster_ci` exercises
-  the allocation primitive end to end.
+* Functional coverage under
+  `deploy/shakenfist_ci/cluster_ci_tests` exercises the allocation
+  primitive end to end.
 * `pre-commit run --all-files` passes.
 
 ### Future work

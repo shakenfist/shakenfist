@@ -72,9 +72,10 @@ basis. Flag any uncertainty explicitly.
 - `shakenfist/config.py` — the Pydantic config; the
   `MARIADB_GATEWAY_HOSTS` / `MARIADB_GATEWAY_PORT` group is the
   BYO-endpoint pattern to mirror for the `LOKI_*` knobs.
-- `shakenfist/deploy/cluster_ci` and `shakenfist/deploy/ansible`
-  — how MariaDB is stood up and how `MARIADB_*` is plumbed into
-  the inner cluster; the template for standing up Loki in CI.
+- `shakenfist/deploy/shakenfist_ci/cluster_ci_tests` and
+  `shakenfist/deploy/ansible` — how MariaDB is stood up and how
+  `MARIADB_*` is plumbed into the inner cluster; the template for
+  standing up Loki in CI.
   Mind the two-layer CI topology (see the project memory: the
   under-cloud hosts the nested test cluster).
 
@@ -287,8 +288,9 @@ semantics, and the seam confirmation.
 
 ### D7 — CI Loki topology and dual-path coverage (OQ7, OQ10)
 
-Design how Loki appears in CI. Read `shakenfist/deploy/cluster_ci`
-and the workflow plumbing for MariaDB (the
+Design how Loki appears in CI. Read
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests` and the
+workflow plumbing for MariaDB (the
 `tools/ci-install-mariadb.sh` + `GETSF_MARIADB_*` pattern from
 `PLAN-byo-mariadb` phase 5) as the template.
 
@@ -335,7 +337,7 @@ every later phase.
 | D4 json/gunicorn/console | high | opus | none | Decide the JSON-only mechanism in `logs.py` (param default vs SF call sites + removing `logs.py:223-231`) with a library-compat note; the handler-attachment seam; research gunicorn's own logging and how it becomes JSON + reaches the handler; ratify `setup_console` stays human-readable. |
 | D5 two-mode behaviour | medium | sonnet | none | Make OQ6 precise: per-mode handler set, the disabled-mode local sink (`/dev/log` vs stdout once rsyslog is gone), and the systemd-stdout residual. |
 | D6 events + echo | medium | sonnet | none | Read `eventlog.py:80-116`; confirm the `'Added event'` echo and the MariaDB enqueue are separable; write the events-stay-in-MariaDB + `LOG_EVENTS_TO_LOKI` semantics (never touches the DB write). |
-| D7 CI topology | high | opus | none | Read `deploy/cluster_ci` + the CI MariaDB plumbing (`tools/ci-install-mariadb.sh`, `GETSF_MARIADB_*`); sketch single-binary Loki placement in the two-layer topology and `LOKI_BASE_URL` plumbing; rule keep-Loki-and-also-collect-local; pick the CI echo mode. |
+| D7 CI topology | high | opus | none | Read `deploy/shakenfist_ci/cluster_ci_tests` + the CI MariaDB plumbing (`tools/ci-install-mariadb.sh`, `GETSF_MARIADB_*`); sketch single-binary Loki placement in the two-layer topology and `LOKI_BASE_URL` plumbing; rule keep-Loki-and-also-collect-local; pick the CI echo mode. |
 | D8 synthesis | high | opus | none | Management session. Assemble D1–D7 into the Decisions section (with both tables), confirm/adjust the phase table, update `index.md` rows if needed. |
 
 ## Step ordering and dependencies

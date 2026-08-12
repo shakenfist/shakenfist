@@ -1031,7 +1031,7 @@ implemented because the following statements will be true:
   stestr unit tests, mypy); new code follows the
   three-layer database pattern and Pydantic schema
   conventions; functional coverage exercises the exchange
-  end-to-end in `shakenfist/deploy/cluster_ci`.
+  end-to-end in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests`.
 * `docs/{developer,operator,user}_guide/authentication.md`
   are updated, and describe the feature without reference
   to the private CI conductor.

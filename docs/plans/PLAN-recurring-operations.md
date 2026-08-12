@@ -304,9 +304,9 @@ When this plan is successfully implemented:
   pauses itself after K failures with an operator-visible
   event, mirroring the network-facade circuit breaker.
 * The code passes `pre-commit run --all-files`.
-* Functional test coverage in `shakenfist/deploy/cluster_ci`
-  exercises both internal consumers and at least one
-  user-driven template.
+* Functional test coverage in
+  `shakenfist/deploy/shakenfist_ci/cluster_ci_tests` exercises
+  both internal consumers and at least one user-driven template.
 
 ### Future work
 

@@ -231,7 +231,7 @@ Use `isolation: "worktree"` for risky steps.
   sourced per-node from a published metric.
 - Unit tests cover the reservation math (CPU threads, RAM, disk floor) and the
   removal of the infra-role branch; functional coverage where practical
-  (`shakenfist/deploy/cluster_ci`).
+  (`shakenfist/deploy/shakenfist_ci/cluster_ci_tests`).
 - Lines wrapped at 120 chars, single quotes for strings, double quotes for
   docstrings. No proto changes are expected; if any are made, regenerate with
   `tox -e genprotos`.
