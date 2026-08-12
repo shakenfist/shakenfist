@@ -157,6 +157,30 @@ metrics endpoint:
 | `logship_push_total{result=...}` | Loki push attempts by outcome. |
 | `logship_push_seconds` | Loki push request latency. |
 
+## API request validation findings
+
+After upgrading you may see `API request validation finding` lines
+from `sf-api` in your log stream. These are **informational**: they
+record a request which did not match its endpoint's published
+parameter declarations, and while `API_VALIDATION_MODE` is `warn`
+(the default) they change no response — the request was answered
+exactly as it always was. Do not set `enforce` yet; that switch is
+phase 4 of the API input validation plan and only makes sense once
+the warn log for your own callers has been read and understood.
+
+Each line carries:
+
+| Field | Meaning |
+|---|---|
+| `validation-reason` | Which rule the request missed: `unknown-parameter` (a body key the endpoint does not declare), `type-mismatch` (a declared parameter with a value of the wrong type), `missing-required` (a declared-required parameter that was not supplied), or `body-path-collision` (a body key with the same name as a URL path parameter). |
+| `validation-parameter` | The parameter concerned, truncated to 64 characters. |
+| `validation-value-type` | The Python type of the offending value. The value itself is never logged. |
+| `validation-response-status` | The status the request went on to return anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change. |
+| `validation-mode` | The active `API_VALIDATION_MODE`. |
+
+The reason codes and the measurement they feed are described in
+`docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md`.
+
 ## Events vs logs
 
 Shaken Fist has two structured-record streams, and they are not

@@ -1553,6 +1553,16 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 # A pattern which does not compile.
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '('})],
+                # Patterns which are not ^...$ anchored. JSON Schema
+                # pattern is an unanchored search while the compiled
+                # marshmallow validator uses re.match, and full
+                # anchoring is the only form the two read identically.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': 'a+'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^a+'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': 'a+$'})],
                 # A sixth element which is not a dictionary, in the
                 # shape that used to be a wrong-arity case.
                 [('thing', 'body', 'string', 'A thing.', False, 1)],

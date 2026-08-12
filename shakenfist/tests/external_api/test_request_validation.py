@@ -8,13 +8,17 @@ differently than it did before this layer existed. The findings are
 recorded and logged; nothing acts on them until phase 4.
 """
 
+import json
 from unittest import mock
+
+import shakenfist_utilities.api as sf_utils_api
 
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import validation
 from shakenfist.tests import base
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class RequestValidationTestCase(base.ShakenFistTestCase):
@@ -151,6 +155,73 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
             [(validation.BODY_PATH_COLLISION, 'thing_ref')],
             [(f.reason, f.parameter) for f in findings])
 
+    def test_check_tolerates_a_non_dict_body(self):
+        """A warn-only layer must never raise from inside itself.
+
+        log_request refuses a non-object body before validation runs,
+        so a dict is what arrives in practice -- but check() is pure
+        and independently callable, and iterating a list body on trust
+        raised from inside the validator.
+        """
+        compiled = validation.CompiledEndpoint(
+            body=None, query=None, path_names=set(),
+            required_names=set(), raw_body=False)
+
+        for body in (['ab', 'cd'], 'abc', 5, None):
+            with self.subTest(body=body):
+                self.assertEqual(
+                    [], validation.check(compiled, body, {}, set()))
+
+    def test_unknown_parameter_findings_are_capped(self):
+        """Unknown body keys are bounded only by what a caller sends,
+        and each finding is a log line shipped to centralised logging.
+        The overflow is one summarising finding carrying the count, so
+        the measurement still learns the request happened."""
+        compiled = validation.CompiledEndpoint(
+            body=None, query=None, path_names=set(),
+            required_names=set(), raw_body=False)
+        body = {'key%03d' % i: i for i in range(50)}
+
+        findings = validation.check(compiled, body, {}, set())
+
+        self.assertEqual(
+            validation.MAX_UNKNOWN_PARAMETER_FINDINGS + 1, len(findings))
+        overflow = findings[-1]
+        self.assertEqual(validation.UNKNOWN_PARAMETER, overflow.reason)
+        self.assertEqual('(overflow)', overflow.parameter)
+        self.assertIn(
+            '%d further undeclared keys'
+            % (50 - validation.MAX_UNKNOWN_PARAMETER_FINDINGS),
+            overflow.detail)
+
+    def test_a_parameter_name_is_truncated(self):
+        """The name is as client-supplied as the value on the
+        unknown-parameter path: without a bound one request could put
+        megabytes into a log line and, in enforce mode, into the
+        response."""
+        finding = validation.Finding(
+            validation.UNKNOWN_PARAMETER, 'x' * 500, 'detail')
+
+        self.assertEqual(
+            validation.MAX_PARAMETER_NAME, len(finding.parameter))
+
+    def test_a_body_supplied_query_parameter_is_type_checked(self):
+        """The shipped client serialises every request to a JSON body
+        and never builds a query string, so a query-declared parameter
+        checked against the query string alone is never checked for
+        the API's dominant caller. check() mirrors the json_or_query
+        loader's merged, body-authoritative view instead."""
+        compiled = validation.REGISTRY[
+            ('InstanceOutstandingOperationsEndpoint', 'get')]
+        self.assertIn('all', compiled.query.fields)
+
+        findings = validation.check(
+            compiled, {'all': 'banana'}, {}, set())
+
+        self.assertEqual(
+            [(validation.TYPE_MISMATCH, 'all')],
+            [(f.reason, f.parameter) for f in findings])
+
     def test_a_raw_body_is_never_reported(self):
         """Upload bodies are bytes. Every key of a JSON body would
         otherwise be undeclared, so an upload would be one long finding
@@ -181,12 +252,18 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
     def test_webargs_failures_use_the_api_error_shape(self):
         """Decision D4, and a defect fixed on the way past.
 
-        No webargs error handler was registered before phase 3, so the
-        four @use_kwargs sites answered a bad query parameter with
-        webargs' default: 422, carrying {"json": {"field": [...]}} --
-        the wrong status, and the only responses in the API which are
-        not {"error": ..., "status": ...}. Nothing about *what* is
-        rejected changes.
+        No webargs error handler was registered before phase 3, and
+        webargs' default 422 abort was swallowed into a 500 by
+        suppress_exceptions_to_client's bare except -- so the four
+        @use_kwargs sites answered a bad query parameter with a server
+        error, a traceback in the log and an exception record on disk.
+        Nothing about *what* is rejected changes.
+
+        This exercises the handler in isolation, which asserts the
+        response it builds and nothing about what a client sees; the
+        first review round proved those are different questions. The
+        request-level assertion lives in
+        AuthenticatedValidationTestCase.
         """
         import werkzeug
         from marshmallow import ValidationError
@@ -202,3 +279,152 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {'error': 'limit: Not a valid integer.', 'status': 400},
             response.get_json())
+
+    def test_a_non_object_body_is_still_a_400(self):
+        """A JSON body which is not an object has always been a 400.
+
+        The per-key merge this phase replaced raised TypeError for one,
+        which handle_authorization_exceptions answers as 400.
+        dict.update would instead raise ValueError for most of these
+        (a 500, since nothing catches ValueError) -- and would silently
+        merge a list of two-character strings as key/value pairs, which
+        is an unintended input path into the kwargs merge. The explicit
+        guard keeps all of them a 400.
+        """
+        for payload in (['a', 'b'], 'abc', ['ab', 'cd'], 5):
+            with self.subTest(payload=payload):
+                response = self.client.post(
+                    '/auth', data=json.dumps(payload),
+                    content_type='application/json')
+
+                self.assertEqual(400, response.status_code)
+                self.assertEqual(
+                    'the request body must be a JSON object',
+                    response.get_json()['error'])
+
+    def test_findings_are_emitted_with_the_response_status(self):
+        """The after_request hook is the deliverable: a finding line
+        carrying what the request returned anyway is what separates a
+        rejection enforcement would introduce from a status code it
+        would merely change."""
+        with mock.patch.object(external_api, 'LOG') as log:
+            response, findings = self._post_auth(
+                {'namespace': 'sys', 'key': 'k', 'zzz': 1})
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(1, len(findings))
+
+        emitted = [c.args[0] for c in log.with_fields.call_args_list
+                   if 'validation-reason' in c.args[0]]
+        self.assertEqual(1, len(emitted))
+        self.assertEqual(
+            validation.UNKNOWN_PARAMETER, emitted[0]['validation-reason'])
+        self.assertEqual(400, emitted[0]['validation-response-status'])
+        self.assertEqual('warn', emitted[0]['validation-mode'])
+
+    def test_findings_do_not_leak_between_requests(self):
+        """flask.g is request scoped by contract; this pins that a
+        clean request after a finding-producing one emits nothing."""
+        _, findings = self._post_auth(
+            {'namespace': 'sys', 'key': 'k', 'zzz': 1})
+        self.assertEqual(1, len(findings))
+
+        with mock.patch.object(external_api, 'LOG') as log:
+            _, findings = self._post_auth({'namespace': 'sys', 'key': 'k'})
+
+        self.assertEqual([], findings)
+        emitted = [c.args[0] for c in log.with_fields.call_args_list
+                   if 'validation-reason' in c.args[0]]
+        self.assertEqual([], emitted)
+
+
+class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
+    """Request-level properties which need the full decorator stack.
+
+    The first review round found the deployed behaviour and the
+    behaviour of a handler tested in isolation were different answers:
+    _webargs_error built a perfect 400 which
+    suppress_exceptions_to_client then swallowed into a 500. Everything
+    here therefore drives a real authenticated request end to end and
+    asserts only what a client sees or what actually reached a spy.
+    """
+
+    def setUp(self):
+        super().setUp()
+        external_api.TESTING = True
+        external_api.app.testing = True
+
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+
+        self.client = external_api.app.test_client()
+        resp = self.client.post(
+            '/auth',
+            data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def test_a_webargs_failure_answers_400_through_the_real_stack(self):
+        """The whole journey: use_kwargs raises, _webargs_error aborts
+        with a crafted response, record_exception declines to record
+        it, and suppress_exceptions_to_client returns it instead of
+        swallowing it into a 500."""
+        with mock.patch.object(
+                api_base.util_exceptions, 'record_exception') as recorded:
+            response = self.client.get(
+                '/blobs/00000000-0000-0000-0000-000000000000/data'
+                '?limit=notanint',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {'error': 'limit: Not a valid integer.', 'status': 400},
+            response.get_json())
+        # A malformed query parameter is a client error, not something
+        # to write under /srv/shakenfist/exceptions/ on every request.
+        recorded.assert_not_called()
+
+    def test_a_raw_body_is_not_parsed_as_json(self):
+        """An upload body is arbitrary binary of arbitrary size, and
+        flask_get_post_body() attempts two full JSON parses of a body
+        which is not JSON. log_request pays that once today; the
+        validator must not pay it again for a result check() would
+        discard anyway."""
+        real = sf_utils_api.flask_get_post_body
+        with mock.patch.object(
+                sf_utils_api, 'flask_get_post_body',
+                mock.Mock(wraps=real)) as spy:
+            self.client.post(
+                '/upload/00000000-0000-0000-0000-000000000000',
+                data=b'\x00\x01\x02 not json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(1, spy.call_count)
+
+    def test_a_body_path_collision_is_recorded_through_the_stack(self):
+        """The log_request -> flask.g -> validate_request hand-off,
+        driven by a real request rather than a hand-constructed
+        CompiledEndpoint: a body key shadowing a path parameter is
+        recorded where the overwrite happens and reported by the
+        validator which runs after it."""
+        findings = []
+        real = validation.check
+
+        def spy(*args, **kwargs):
+            out = real(*args, **kwargs)
+            findings.extend(out)
+            return out
+
+        with mock.patch.object(validation, 'check', spy):
+            response = self.client.delete(
+                '/instances/nosuchinstance',
+                data=json.dumps({'instance_ref': 'adifferentinstance'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertIn(
+            (validation.BODY_PATH_COLLISION, 'instance_ref'),
+            [(f.reason, f.parameter) for f in findings])
+        # And warn mode changed nothing: the handler's own 404 answered.
+        self.assertEqual(404, response.status_code)

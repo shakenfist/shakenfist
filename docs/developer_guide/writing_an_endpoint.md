@@ -111,9 +111,14 @@ exactly that reason, and now reads:
 Constraints are validated at import time in the same style as
 everything else: unknown keys, non-numeric bounds, bounds on
 non-numeric types, contradictory bounds, patterns that do not
-compile, patterns on non-string types, and a constraint restating a
-key its type token already renders (a second `minimum` on
-`unsignedinteger`) all raise `InvalidAPIDeclaration`. Note that
+compile, patterns on non-string types, unanchored patterns, and a
+constraint restating a key its type token already renders (a second
+`minimum` on `unsignedinteger`) all raise `InvalidAPIDeclaration`.
+A pattern must be `^...$` anchored because its two consumers read an
+unanchored one differently: JSON Schema `pattern` is an unanchored
+*search*, while the compiled marshmallow validator uses `re.match`,
+which anchors at the start only. Full anchoring is the one form both
+read identically, so it is required rather than documented. Note that
 declared constraints are *published documentation* until phase 3 of
 [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
 compiles them — a constraint does not reject anything yet.

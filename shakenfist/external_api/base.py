@@ -24,6 +24,7 @@ from jwt.exceptions import DecodeError
 from jwt.exceptions import ExpiredSignatureError
 import requests
 from webargs.flaskparser import parser as webargs_parser
+from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
 
 from shakenfist.external_api import validation
@@ -133,14 +134,19 @@ def _webargs_error(error, req, schema, *, error_status_code, error_headers):
     """Answer a webargs parse failure in this API's error shape.
 
     webargs' default handler aborts 422 carrying its own
-    {"json": {"field": ["message"]}} body. Nothing registered a handler
-    before phase 3, so the four @use_kwargs sites have always answered
-    a bad query parameter that way: the wrong status, and the only
-    responses in the API which are not {"error": ..., "status": ...}.
+    {"json": {"field": ["message"]}} body -- but no client ever saw
+    that. Nothing registered a handler before phase 3, and the abort's
+    HTTPException was swallowed by suppress_exceptions_to_client's bare
+    except Exception, so the four @use_kwargs sites answered a bad
+    query parameter with a 500, a 'Server error' log line and an
+    exception record on disk. This handler and the HTTPException
+    carve-out in suppress_exceptions_to_client are the two halves of
+    the fix: the abort below only reaches a client because that
+    carve-out returns the response it carries.
 
-    Decision D4 fixes the shape without changing what is rejected --
-    every request webargs refused before is still refused, and one it
-    accepted is still accepted. Only the response changes.
+    Decision D4 fixes the status and the shape without changing what
+    is rejected -- every request webargs refused before is still
+    refused, and one it accepted is still accepted.
     """
     # error.messages is keyed by location, then by field. The location
     # is not useful to a caller, and for the custom json_or_query
@@ -369,6 +375,20 @@ def _validated_constraints(section: str, name: str,
                 '%s parameter %s declares a pattern using the Python only '
                 'construct(s) %s; OpenAPI patterns are ECMA-262'
                 % (section, name, ', '.join(dialect)))
+        # Anchoring is where the consumers genuinely disagree: JSON
+        # Schema pattern is an unanchored search, while the compiled
+        # marshmallow validator uses re.match, which is anchored at the
+        # start only. A declared ^...$ pattern is the one form both
+        # read identically, so it is required rather than documented --
+        # an unanchored pattern would pass here and then wrongly reject
+        # (or wrongly admit) requests once phase 4 enforces.
+        if not (pattern.startswith('^') and pattern.endswith('$')):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares a pattern which is not '
+                'anchored with ^...$: %r. JSON Schema searches and the '
+                'compiled validator matches, and full anchoring is the '
+                'only form they read identically'
+                % (section, name, pattern))
 
     return constraints
 
@@ -983,6 +1003,17 @@ def log_request(func):
         j = sf_api.flask_get_post_body()
 
         if j:
+            # Only a JSON object can merge into kwargs. Any other JSON
+            # document -- a list, a string, a number -- has always been
+            # refused as a 400 (previously by the per-key merge raising
+            # TypeError on the lookup), and this guard keeps it that
+            # way: dict.update would raise ValueError for most of them,
+            # which nothing in the decorator chain catches, and would
+            # silently merge a list of two-character strings as key
+            # value pairs.
+            if not isinstance(j, dict):
+                raise TypeError('the request body must be a JSON object')
+
             # A body key with the same name as a URL path parameter
             # overwrites it. Recorded here rather than in the validator
             # because this decorator is applied outside it and so runs
@@ -1160,6 +1191,15 @@ def record_exception(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            # An HTTPException carrying a crafted response is a
+            # deliberate abort -- _webargs_error is the one source in
+            # this tree -- not a server fault. Recording it would write
+            # an exception record for every malformed query parameter.
+            # Mirrors the carve-out on the got_request_exception
+            # handler in app.py.
+            if isinstance(e, HTTPException) and e.response is not None:
+                raise
+
             # suppress_exceptions_to_client wraps this decorator -- it
             # is last in Resource.method_decorators and therefore
             # outermost -- and is guaranteed to log the full detail of
@@ -1196,6 +1236,20 @@ def suppress_exceptions_to_client(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            # A deliberate abort carrying a crafted response is returned
+            # as that response rather than suppressed into a 500.
+            # HTTPException is an Exception subclass, so without this
+            # the 400 _webargs_error aborts with would never reach a
+            # client -- which is exactly what happened to webargs' own
+            # 422 abort for as long as the @use_kwargs sites have
+            # existed. Restricted to response-carrying exceptions so a
+            # bare abort() somewhere cannot start answering werkzeug's
+            # HTML error pages: every response in this API is
+            # {"error": ..., "status": ...}, and an abort which wants
+            # through this gate has to build one.
+            if isinstance(e, HTTPException) and e.response is not None:
+                return e.response
+
             # Attach the exception class, traceback and request context as
             # explicit structured fields. The .exception() call also carries
             # exc_info for the formatter's exception_class / stack_trace
@@ -1339,9 +1393,15 @@ def validate_request(func):
             # not a way for a new endpoint to opt out silently.
             return func(*args, **kwargs)
 
+        # A raw body is bytes of arbitrary size which check() would
+        # ignore anyway, so it is never fetched: flask_get_post_body()
+        # attempts two full JSON parses of a body that is not JSON
+        # before returning nothing, and the upload data path is the
+        # API's bulk transfer route.
+        body = ({} if compiled.raw_body
+                else sf_api.flask_get_post_body() or {})
         findings = validation.check(
-            compiled, sf_api.flask_get_post_body() or {},
-            flask.request.args.to_dict(),
+            compiled, body, flask.request.args.to_dict(),
             getattr(flask.g, validation.BODY_PATH_COLLISIONS, set()))
         if not findings:
             return func(*args, **kwargs)

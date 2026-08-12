@@ -313,10 +313,17 @@ The behaviour-visible PR, and still not a behaviour change.
   per-method decorator.
 * A `@webargs_parser.error_handler` replacing webargs' default
   `abort(422)` with `sf_api.error(400, ...)`, per D4. **This fixes an
-  existing defect as a side effect:** no error handler is registered
-  today, so the three `json_or_query` sites and `blob.py`'s `query`
-  site currently emit a raw 422 in webargs' own shape rather than
-  the API's `{"error": ..., "status": ...}`. Worth a line in the
+  existing defect as a side effect** — though not the one this
+  paragraph first claimed. No error handler is registered today, but
+  no client ever saw webargs' raw 422 either:
+  `suppress_exceptions_to_client`'s bare `except Exception` swallowed
+  the abort's `HTTPException` into a 500 with a traceback and an
+  on-disk exception record per occurrence. The review round proved
+  the handler alone is inert for the same reason, so the fix is two
+  halves: this handler, and an `HTTPException` carve-out in
+  `suppress_exceptions_to_client` (and `record_exception`) restricted
+  to aborts carrying a crafted response, so a bare `abort()` cannot
+  start answering werkzeug's HTML error pages. Worth a line in the
   release notes.
 * Warn-only is the default and is controlled by one config setting,
   `API_VALIDATION_MODE`, with values `warn` and `enforce`. Phase 4
@@ -379,6 +386,22 @@ exercises the ansible collection, which is a second implementation
 of this API's contract and the one most likely to send something the
 declarations do not describe (see #3308, where the collection's
 networkspec parser makes every non-empty value truthy).
+
+Two notes for whoever reads the log, both from the review round:
+
+* Query-declared parameters are checked against the merged,
+  body-authoritative view the `json_or_query` loader reads, so the
+  shipped client's everything-in-the-body habit is measured rather
+  than a blind spot. A repeated query key (`?tag=a&tag=b`) is still
+  collapsed to its first value before checking; no query parameter
+  is array-typed today (arrays are refused outside a body at import
+  time), so a finding of that shape would be an artefact of the
+  collapse rather than a caller defect.
+* The measurement apparatus itself has no functional-CI self-check:
+  nothing in `shakenfist_ci` sends a deliberately-undeclared key and
+  asserts a finding line appears. Verify the apparatus by hand early
+  in the sfcbr window — one malformed request, one grep — before
+  reading seven days of quiet log as seven days of clean callers.
 
 ## Coordination and adjacencies
 
@@ -502,6 +525,29 @@ input this layer will start handling.
 break the derivation and three which break the compiler. 2725 unit
 tests pass. `pre-commit run --all-files` clean. The published
 specification still validates with zero errors.
+
+**The review round found three runtime defects, all fixed.** The
+automated review of the phase 3 PR proved (with a reproduction) that
+the webargs error handler was inert -- its 400 abort was swallowed
+into a 500 by `suppress_exceptions_to_client`, exactly as webargs' own
+422 always had been, so the baseline claim in this plan's first draft
+was wrong and is corrected above. It also caught `kwargs.update(j)`
+turning a non-object JSON body into a 500 (and silently merging a list
+of two-character strings), and the validator re-parsing raw upload
+bodies as JSON. The shape of the first two is worth remembering: both
+were behaviour changes hiding inside refactors of code whose old
+behaviour was itself an accident (`TypeError` from a merge loop,
+caught by a broad `except` two decorators out), and the unit tests
+passed because they tested components in isolation while the defect
+lived in the stack. The fixes ship with request-level tests through
+the real decorator stack, and each fix was mutation-tested. Hardening
+from the same round: unknown-parameter findings are capped per request
+and parameter names truncated (log-amplification), `API_VALIDATION_MODE`
+is a `Literal` so a typo fails at config load instead of silently
+meaning warn, declared patterns must be `^...$` anchored at import
+time so JSON Schema search and marshmallow match semantics provably
+coincide, and query-declared parameters are checked against the
+merged `json_or_query` view.
 
 **The next step is not code.** Deploy to sfcbr, run functional CI, and
 read the warn log. Success criterion 3 is that every remaining finding

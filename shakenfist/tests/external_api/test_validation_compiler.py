@@ -73,8 +73,13 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                 continue
             declared = {d.name for d in declarations.declarations(fn)}
             # The raw body marker names the whole body rather than a
-            # parameter within it, and compiles to a flag.
-            declared.discard(api_base.RAW_BODY_PARAMETER)
+            # parameter within it, and compiles to a flag. Discarded
+            # only where the compiler actually treated it as one:
+            # RAW_BODY_PARAMETER is the literal string 'body', so an
+            # unconditional discard would also hide an ordinary
+            # parameter of that name failing to compile.
+            if self.registry[key].raw_body:
+                declared.discard(api_base.RAW_BODY_PARAMETER)
 
             self.assertEqual(
                 declared, self.registry[key].names,
@@ -240,4 +245,4 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
             ('InstanceConsoleDataEndpoint', 'get')].body.fields['length']
 
         self.assertEqual([], list(length.validators))
-        self.assertEqual([], length.deserialize(-1) and [])
+        self.assertEqual(-1, length.deserialize(-1))

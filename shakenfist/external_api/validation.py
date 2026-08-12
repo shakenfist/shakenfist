@@ -243,19 +243,36 @@ MISSING_REQUIRED = 'missing-required'
 BODY_PATH_COLLISION = 'body-path-collision'
 
 
+# The longest parameter name a finding will carry. Names are client
+# supplied, so without a bound one request could put megabytes -- or
+# control characters -- into a log line and, in enforce mode, into the
+# response. 64 comfortably covers every declared name in the API.
+MAX_PARAMETER_NAME = 64
+
+# The most unknown-parameter findings one request can produce. The
+# other reasons are bounded by the declaration (declared fields, path
+# names), but unknown body keys are bounded only by what a caller
+# sends, and each finding is a log line shipped to centralised
+# logging. The overflow is summarised in one finding carrying the
+# count, so the measurement still learns the request happened.
+MAX_UNKNOWN_PARAMETER_FINDINGS = 20
+
+
 class Finding:
     """One thing validation would have refused.
 
     Carries the offending value's *type* and never its value: decision
     D5, and several of these routes carry credentials, which is why
     log_request drops the whole body on a credential-handling route
-    rather than naming fields.
+    rather than naming fields. The parameter *name* is also client
+    supplied on the unknown-parameter path, so it is truncated rather
+    than trusted.
     """
 
     def __init__(self, reason: str, parameter: str, detail: str,
                  value: Any = None):
         self.reason = reason
-        self.parameter = parameter
+        self.parameter = parameter[:MAX_PARAMETER_NAME]
         self.detail = detail
         self.value_type = type(value).__name__ if value is not None else None
 
@@ -284,14 +301,23 @@ def _schema_findings(schema: Optional[marshmallow.Schema],
     return findings
 
 
-def check(compiled: CompiledEndpoint, body: dict[str, Any],
+def check(compiled: CompiledEndpoint, body: Any,
           query: dict[str, Any], collisions: set[str]) -> list[Finding]:
     """Everything this request would have been refused for.
 
     Pure, so it is testable without a request context, and so the
     decorator is only responsible for deciding what to do with the
     answer.
+
+    ``body`` is whatever the request body parsed to. A non-dict body
+    is refused by log_request before validation runs, so a dict is
+    what arrives in practice -- but a warn-only layer must never raise
+    from inside itself, so anything else is treated as no body at all
+    rather than iterated on trust.
     """
+    if not isinstance(body, dict):
+        body = {}
+
     findings: list[Finding] = []
 
     # An undeclared body key is already fatal when the request reaches
@@ -301,11 +327,16 @@ def check(compiled: CompiledEndpoint, body: dict[str, Any],
     # carrying interpreter text. Counting these is how phase 4 chooses
     # between webargs' EXCLUDE and RAISE (decision D10).
     if not compiled.raw_body:
-        for name in body:
-            if name not in compiled.names:
-                findings.append(Finding(
-                    UNKNOWN_PARAMETER, name,
-                    'not declared by this endpoint', body[name]))
+        unknown = [name for name in body if name not in compiled.names]
+        for name in unknown[:MAX_UNKNOWN_PARAMETER_FINDINGS]:
+            findings.append(Finding(
+                UNKNOWN_PARAMETER, name,
+                'not declared by this endpoint', body[name]))
+        if len(unknown) > MAX_UNKNOWN_PARAMETER_FINDINGS:
+            findings.append(Finding(
+                UNKNOWN_PARAMETER, '(overflow)',
+                '%d further undeclared keys not reported individually'
+                % (len(unknown) - MAX_UNKNOWN_PARAMETER_FINDINGS)))
 
     supplied = dict(body)
     supplied.update(query)
@@ -316,7 +347,22 @@ def check(compiled: CompiledEndpoint, body: dict[str, Any],
 
     if not compiled.raw_body:
         findings.extend(_schema_findings(compiled.body, body))
-    findings.extend(_schema_findings(compiled.query, query))
+
+    # Query-declared parameters are checked against the merged view the
+    # json_or_query loader reads, body authoritative, mirroring
+    # _load_json_or_query's precedence. The shipped client serialises
+    # every request to a JSON body and never builds a query string, so
+    # checking the query string alone would systematically miss type
+    # mismatches from the API's dominant caller -- and a body-supplied
+    # value for a query-declared name is not an unknown parameter
+    # (names is location-agnostic), so nothing else reports it either.
+    if compiled.query is not None:
+        query_supplied = dict(query)
+        if not compiled.raw_body:
+            for name in compiled.query.fields:
+                if name in body:
+                    query_supplied[name] = body[name]
+        findings.extend(_schema_findings(compiled.query, query_supplied))
 
     for name in sorted(collisions):
         findings.append(Finding(

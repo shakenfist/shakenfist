@@ -4,6 +4,7 @@ import os
 import socket
 import sys
 from typing import Annotated
+from typing import Literal
 from typing import NoReturn
 from typing import Optional
 
@@ -166,7 +167,11 @@ class SFConfig(BaseSettings):
         15,
         description='How long in minutes an API token is valid for.'
     )
-    API_VALIDATION_MODE: str = Field(
+    # Literal rather than str so a typo fails at config load. The
+    # setting exists to be flipped, and 'Enforce' or 'enforced'
+    # silently meaning warn is exactly the operator error that would
+    # otherwise go unnoticed until an incident.
+    API_VALIDATION_MODE: Literal['warn', 'enforce'] = Field(
         'warn',
         description=(
             'What the request validation layer does with input which does '
