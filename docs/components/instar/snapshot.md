@@ -49,6 +49,8 @@ Common options:
       --output <FORMAT>    human (default) | json. JSON is an
                            instar extension; qemu-img snapshot -l
                            is human-only.
+      --qemu-version <V>   Emulate this qemu-img version's list
+                           layout (the columns changed at 9.0).
 ```
 
 `--image-opts` is rejected with a clear error (consistent with
@@ -93,10 +95,31 @@ output), 4-digit-hour VM clock, `--` for an absent icount, and
 ID/TAG columns padded by **byte** length so multibyte UTF-8 names
 lay out exactly as qemu's C `printf` does. Names up to the
 255-byte on-disk maximum list in full. A hand-crafted zero
-`date_sec` renders the Unix epoch, exactly like qemu. The
-old (≤ 8.2) column layout is not emitted; the cross-version
-baselines record both families. Details and history for each of
-these behaviours are in [docs/quirks.md](/components/instar/quirks/).
+`date_sec` renders the Unix epoch, exactly like qemu. Details and
+history for each of these behaviours are in
+[docs/quirks.md](/components/instar/quirks/).
+
+### The column layout changed at qemu 9.0
+
+qemu-img reworked the list layout in **9.0.0**, and instar emits
+whichever form matches the qemu-img it detects. The difference is more
+than the column titles: the older layout concatenates its fields with
+no separators at different widths, and its VM clock has 2-digit hours.
+
+```
+$ instar snapshot -l --qemu-version 8.2 image.qcow2      # 6.0 - 8.2
+Snapshot list:
+ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
+1         first                 0 B 2026-01-01 00:00:00 00:00:00.000          0
+
+$ instar snapshot -l --qemu-version 9.0 image.qcow2      # 9.0 and later
+Snapshot list:
+ID      TAG               VM_SIZE                DATE        VM_CLOCK     ICOUNT
+1       first                 0 B 2026-01-01 00:00:00  0000:00:00.000          0
+```
+
+Both forms are byte-identical to the corresponding real qemu-img, and
+the cross-version baselines record both families.
 
 `--output=json` emits a flat array whose key names mirror qemu's
 QMP `SnapshotInfo` (`id`, `name`, `vm-state-size`, `date`,
