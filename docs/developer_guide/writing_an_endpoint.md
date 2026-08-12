@@ -228,6 +228,19 @@ assertions: it breaks each property on purpose and confirms the guard
 fires. Run it if you change the derivation or add an assertion, since
 a guard that passes on a deliberately broken tree is not a guard.
 
+Those assertions compare declarations against the derivation, so they
+are only as good as the derivation itself — and the tree can only
+exercise the source shapes it happens to contain.
+`shakenfist/tests/external_api/test_derivation_generator.py` covers
+the rest: it crosses route form, `@use_kwargs` binding and
+`flask.request.args` read style, builds a synthetic endpoint for each
+of the 225 combinations, and asserts the derivation recovers what that
+case was constructed to mean. Every defect found while building the
+phase 1 audit was a shape absent from the tree, which is why this is
+generated rather than sampled. **If you add a way for a parameter to
+arrive, add an axis value here** — a shape the generator does not
+enumerate is a shape nothing checks.
+
 ## What is not checked yet
 
 The declarations are documentation today. Compiling them into

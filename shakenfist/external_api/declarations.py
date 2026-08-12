@@ -527,13 +527,23 @@ def derived_location(name: str, fn: ast.FunctionDef, tree: ast.Module,
                      cls: ast.ClassDef, routes: dict[str, set[str]],
                      problems: Optional[list[str]] = None) -> str:
     """Where a parameter of this name actually arrives."""
-    if name in routes.get(cls.name, set()):
-        return 'path'
-    # Both sources are always consulted, rather than short-circuiting on
-    # the first hit, so that a problem in the second is collected even
-    # for a name the first already resolved.
+    # Every source is consulted before answering, rather than
+    # short-circuiting on the first hit, so that a problem in a later
+    # source is collected even for a name an earlier one resolved.
+    #
+    # The route check used to return ahead of these two, which made the
+    # rule true of the query pair and false of the path case: a handler
+    # whose declared parameters are all path parameters could read
+    # flask.request.args with a key this cannot name and the audit would
+    # report the tree clean, because the only call which would have
+    # noticed returned before making it. That is the confident wrong
+    # answer request_args_parameters() exists to refuse, reintroduced one
+    # level up. Found by the generated cross product rather than by the
+    # tree, which contains no handler of that shape.
     in_query = name in query_parameters(fn, [cls, tree], problems)
     in_args = name in request_args_parameters(fn, problems)
+    if name in routes.get(cls.name, set()):
+        return 'path'
     if in_query or in_args:
         return 'query'
     return 'body'
