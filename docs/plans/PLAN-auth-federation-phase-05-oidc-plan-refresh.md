@@ -75,7 +75,7 @@ half of an OIDC relying party and none of the client half.
 ### A token with no `scopes` claim is treated as fully privileged
 
 `api_scopes.satisfies()` returns `True` unconditionally when the held
-scope list is `None` (`shakenfist/external_api/scopes.py:138-145`),
+scope list is `None` (`shakenfist/external_api/scopes.py:137-142`),
 and `caller_is_admin` tests the same predicate
 (`shakenfist/external_api/base.py:140-146`). The reasoning is sound
 and is written down at `shakenfist/util/access_tokens.py:30-41`: a
@@ -113,7 +113,7 @@ in its own docstring as "neither read nor written any more"
 
 The trap: `Namespace.keys` still *synthesises* the legacy
 `{'nonced_keys': {...}}` dict from key objects
-(`shakenfist/namespace.py:197-205`), and six live call sites still
+(`shakenfist/namespace.py:197-205`), and five live call sites still
 read that synthetic shape, including `/auth` itself
 (`shakenfist/external_api/auth.py:184-185`). An agent that greps
 `nonced_keys` to check the stub's claim will find plenty of hits and
@@ -147,7 +147,7 @@ answered:
 | Situation 5: inter-node uses `_service_key*` | Still true, and now on the new tables with `sfk_`-format secrets and a 5 minute token (`shakenfist/namespace.py:386-410`). The nonce-check carve-out is only for the exact name `_service_key` (`shakenfist/external_api/base.py:589-597`) |
 | "Outsourcing to a real IdP is currently impossible" | False since phase 3: `POST /auth/federated` (`shakenfist/external_api/app.py:383`) |
 | OQ 1, issuer trust model: "possible resolution: support a list" | Resolved, and as objects rather than config: `TrustedIssuer`, admin-managed under `/auth/issuers` (`shakenfist/trusted_issuer.py:41`) |
-| OQ 3, token shape: "tokens carry `sub` and a `nonce`" | Also `iss` and `scopes` (`shakenfist/util/access_tokens.py:42-47`). The `verify_token` refactor it asks for partly happened: authentication is now universal via `Resource.method_decorators` (`shakenfist/external_api/base.py:1288-1296`) with `@api_base.public` the only way out. `request_namespace()` is still a string split (`shakenfist/util/access_tokens.py:76`) and still used in roughly forty places, so the "per-request authorisation decision" half is untouched |
+| OQ 3, token shape: "tokens carry `sub` and a `nonce`" | Also `iss` and `scopes` (`shakenfist/util/access_tokens.py:42-47`). The `verify_token` refactor it asks for partly happened: authentication is now universal via `Resource.method_decorators` (`shakenfist/external_api/base.py:1288-1296`) with `@api_base.public` the only way out. `request_namespace()` is still a string split (`shakenfist/util/access_tokens.py:76`) and still used at 57 call sites outside the tests, so the "per-request authorisation decision" half is untouched |
 | OQ 4, audience | Per-issuer `audience` field, required, verified with required claims `['exp','iss','aud']` and zero leeway (`shakenfist/federation.py:321-340`) |
 | OQ 5, admin as a claim | Partly resolved by phase 3: `caller_is_admin` now requires the `system` namespace **and** the `cluster-admin` scope (`shakenfist/external_api/base.py:128-148`). What remains is whether the namespace half can be dropped in favour of the claim alone |
 | OQ 7, revocation | The nonce is unchanged for SF tokens. For an externally-issued token there is still no equivalent — but phase 3 established a third option the stub does not consider: exchange the external token for a key, and inherit nonce revocation for free |
@@ -239,7 +239,7 @@ inherits nonce revocation and direct-bearer inherits only the IdP's
 consequence of the choice; the multi-namespace problem, which cuts the
 other way, since a human is typically in several namespaces and every
 credential Shaken Fist mints today names exactly one
-(`shakenfist/util/access_tokens.py:50`, `shakenfist/schema/namespace_key_data.py:60-64`);
+(`shakenfist/util/access_tokens.py:49`, `shakenfist/schema/namespace_key_data.py:60-63`);
 and a statement of what evidence would settle it.
 
 **Decision 5 — multi-namespace access is raised to a first-class open
