@@ -343,16 +343,6 @@ class Scheduler:
             self._log_and_raise_on_error(
                 related_objects, 'is_hypervisor', candidates, dropped=dropped)
 
-            # Don't use nodes which aren't keeping up with queue jobs
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_reasonable_queue_state(log_ctx, c)
-                if not ok:
-                    dropped[c] = reason
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'queue_state', candidates, dropped=dropped)
-
             # Can we host that many vCPUs?
             dropped = {}
             for c in list(candidates):
@@ -401,21 +391,13 @@ class Scheduler:
                 related_objects, 'sufficient_free_disk', candidates,
                 dropped=dropped)
 
-            # Are the disks really busy?
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_idle_disk_bandwidth(log_ctx, inst, c)
-                if not ok:
-                    dropped[c] = reason
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_disk', candidates,
-                dropped=dropped)
-
-            # Filter by affinity, if any has been specified. We record the
-            # full per-candidate scoring breakdown so that incorrect placement
-            # decisions (e.g. a tagged neighbour being invisible) can be
-            # diagnosed from audit events.
+            # Filter by affinity, if any has been specified. This runs on the
+            # set of nodes which can actually fit the instance, but before the
+            # queue depth and disk bandwidth filters below, which describe how
+            # busy a node is right now rather than whether it can host the
+            # instance at all. We record the full per-candidate scoring
+            # breakdown so that incorrect placement decisions (e.g. a tagged
+            # neighbour being invisible) can be diagnosed from audit events.
             by_affinity = defaultdict(list)
             requested_affinity = inst.affinity
             affinity_detail = {}
@@ -483,18 +465,61 @@ class Scheduler:
                 by_affinity[affinity].append(c)
 
             highest_affinity = sorted(by_affinity, reverse=True)[0]
-            candidates = by_affinity[highest_affinity]
+            preferred = by_affinity[highest_affinity]
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule have highest affinity',
                 extra={
-                    'candidates': candidates,
+                    'candidates': preferred,
                     'requested_affinity': requested_affinity,
                     'highest_affinity': highest_affinity,
                     'by_affinity': {
                         str(k): v for k, v in by_affinity.items()},
                     'affinity_detail': affinity_detail,
                 })
+
+            # Don't use nodes which aren't keeping up with queue jobs
+            dropped = {}
+            for c in list(candidates):
+                ok, reason = self._has_reasonable_queue_state(log_ctx, c)
+                if not ok:
+                    dropped[c] = reason
+                    candidates.remove(c)
+            self._log_and_raise_on_error(
+                related_objects, 'queue_state', candidates, dropped=dropped)
+
+            # Are the disks really busy?
+            dropped = {}
+            for c in list(candidates):
+                ok, reason = self._has_idle_disk_bandwidth(log_ctx, inst, c)
+                if not ok:
+                    dropped[c] = reason
+                    candidates.remove(c)
+            self._log_and_raise_on_error(
+                related_objects, 'sufficient_idle_disk', candidates,
+                dropped=dropped)
+
+            # The two filters above are load shedding, not admission: they say
+            # a node is momentarily busy, not that it cannot host the
+            # instance. They may therefore narrow the winning affinity tier,
+            # but must never move placement out of it. Previously they ran
+            # before affinity scoring, so a transient burst on the node an
+            # instance was affine to silently placed it anywhere at all, and
+            # the mirror case left an anti-affinity instance on the single
+            # node it was asked to avoid (issue 3565). If every node is busy
+            # we still refuse to schedule, above.
+            narrowed = [c for c in candidates if c in preferred]
+            if not narrowed:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, related_objects,
+                    'schedule keeping affinity despite transient load',
+                    extra={
+                        'candidates': preferred,
+                        'load_shed_candidates': candidates,
+                        'highest_affinity': highest_affinity,
+                    })
+                narrowed = preferred
+            candidates = narrowed
 
             # Order candidates by current CPU load, normalised by the
             # schedulable thread count so that differently sized machines

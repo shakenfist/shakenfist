@@ -16,6 +16,24 @@ class TestAffinity(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
 
+    def _add_scheduler_detail(self, name, instance_uuid):
+        """Attach the scheduler's audit trail for an instance.
+
+        The scheduler records its candidate set, each filter stage's
+        dropped map and the full per-candidate affinity breakdown as
+        audit events with an "extra" payload. base._log_events() renders
+        only the message column, so the payload is attached here instead:
+        without it a placement assertion failure dies with the ephemeral
+        CI cluster and cannot be diagnosed afterwards.
+        """
+        events = [
+            e for e in self.system_client.get_instance_events(instance_uuid)
+            if str(e.get('message', '')).startswith('schedule')]
+        self.addDetail(
+            '%s scheduler events' % name,
+            content.text_content(json.dumps(
+                events, indent=4, sort_keys=True, default=str)))
+
     def test_affinity(self):
         nodes = self.system_client.get_nodes()
         self.addDetail('nodes', content.text_content(json.dumps(
@@ -97,6 +115,10 @@ class TestAffinity(base.BaseNamespacedTestCase):
             inst2, indent=4, sort_keys=True)))
         self.addDetail('inst3', content.text_content(json.dumps(
             inst3, indent=4, sort_keys=True)))
+
+        for name, inst in [('inst1', inst1), ('inst2', inst2),
+                           ('inst3', inst3)]:
+            self._add_scheduler_detail(name, inst['uuid'])
 
         # inst1 and inst2 should share a node, inst3 should not
         self.assertEqual(

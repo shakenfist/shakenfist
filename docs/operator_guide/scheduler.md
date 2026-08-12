@@ -21,29 +21,47 @@ a placement decision can be reconstructed after the fact (see
    (those in `error` or `missing`) are excluded before this stage,
    so a node whose storage has failed stops receiving instances
    (see [Node resource health](node_health.md)).
-2. **Queue health** -- nodes with more than 20 waiting queue jobs
-   are excluded; they are not keeping up.
-3. **Per-instance vCPU limit** -- the request must fit libvirt's
+2. **Per-instance vCPU limit** -- the request must fit libvirt's
    per-domain vCPU maximum on that node.
-4. **CPU admission** -- allocated vCPUs (including this request)
+3. **CPU admission** -- allocated vCPUs (including this request)
    must stay under `schedulable threads x CPU_OVERCOMMIT_RATIO`.
    See [CPU overcommit](#cpu-overcommit).
-5. **RAM admission** -- the node must retain its published memory
+4. **RAM admission** -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
    under `RAM_OVERCOMMIT_RATIO`.
-6. **Disk capacity** -- requested disk must fit while leaving the
+5. **Disk capacity** -- requested disk must fit while leaving the
    node's `NODE_DISK_RESERVATION_GB` free on the instances/blobs
    filesystems. The candidate node publishes its own reservation as
    the `disk_reservation_gb` metric, so admission honours that
    node's per-host value rather than the evaluator's own config.
-7. **Disk bandwidth** -- nodes whose disks are saturated (busy
-   more than 120% of wall time across spindles) are excluded.
-8. **Affinity** -- surviving nodes are scored against the
+6. **Affinity** -- surviving nodes are scored against the
    instance's affinity tags and only the highest-scoring group
    continues.
+7. **Queue health** -- nodes with more than 20 waiting queue jobs
+   are excluded; they are not keeping up.
+8. **Disk bandwidth** -- nodes whose disks are saturated (busy
+   more than 120% of wall time across spindles) are excluded.
 9. **Load ordering and weighted selection** -- the survivors are
    ranked by load and a weighted-random choice spreads work
    across similar nodes. See below.
+
+Stages 1 to 5 are **admission**: they answer whether a node can
+host the instance at all. Stages 7 and 8 are **load shedding**:
+they answer whether a node is a good idea right now. Affinity sits
+between the two deliberately. A busy node is still a node the user
+asked for, so load shedding may narrow the winning affinity group
+but never moves placement out of it -- if queue health and disk
+bandwidth would eliminate every member of that group, they are
+ignored and an audit event `schedule keeping affinity despite
+transient load` is recorded. Admission is never overridden this
+way: a node that cannot fit the instance is not scored for
+affinity in the first place. If load shedding eliminates *all*
+candidates, the schedule still fails with a 507 as before.
+
+Before this ordering, a momentary IO burst on the node an instance
+was affine to silently placed it anywhere with headroom, and the
+anti-affinity case could leave an instance on the one node it was
+asked to avoid.
 
 ## System reservations
 
@@ -189,6 +207,11 @@ tells the whole story:
   schedulable base used and whether it came from the
   `cpu_schedulable` field or the pre-reservation fallback; for RAM
   it includes the reservation subtracted.
+- `schedule have highest affinity` includes the winning score and
+  a per-candidate `affinity_detail` breakdown of which neighbouring
+  instances contributed what. `schedule keeping affinity despite
+  transient load` follows it when load shedding was ignored to
+  honour that group.
 - `schedule have lowest cpu load` includes per-node `load_detail`:
   raw `cpu_load_1`, the denominator used, the normalised load and
   the bucket.
