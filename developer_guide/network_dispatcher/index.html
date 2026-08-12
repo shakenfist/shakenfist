@@ -12522,19 +12522,25 @@ directions: a stray whose disposition changes is still reported, and a stray
 whose disposition is stable — including one whose devices persistently refuse
 to be deleted — is reported exactly once per episode. No path here logs on a
 per-pass cadence.</p>
-<p>Deciding whether an instance protects its network reads this node's
-<code>INSTANCE_LOCATION</code> references (<code>Node.instances</code>) rather than filtering
-<code>instance.Instances</code> by placement, which is a Python-side predicate and would
-hydrate every active instance in the cluster on every pass — a protected stray
-is deliberately never reaped, so that cost would be permanent. The states which
-protect are <code>Instance.ACTIVE_STATES</code> plus <code>delete-wait-error</code>: the latter is
-not in <code>ACTIVE_STATES</code> but by definition means teardown did not complete, so a
-domain may well still be attached to the bridge. If this node's row cannot be
-read at all, every claimed stray is protected. Note that a claimed stray which
-is protected indefinitely does pay for this lookup on every pass; pushing the
-whole question into a single indexed join (<code>object_references</code> →
-<code>network_interfaces</code> → <code>networks</code>) is a worthwhile follow-up, bounded today by
-one node's instance count.</p>
+<p>Deciding whether an instance protects its network is a single indexed query,
+<code>mariadb.get_node_instance_vxids()</code>: this node's <code>INSTANCE_LOCATION</code> reference
+rows joined to <code>network_interfaces</code> joined to <code>networks</code>, with the instance
+state filter applied in SQL. A protected stray is deliberately never reaped, so
+this runs on every thirty second pass for as long as the stray survives —
+hydrating every instance placed here plus one network per distinct network
+uuid, which is what this used to do, made that permanent cost proportional to
+the node's instance count. The join spans both uuid storage conventions
+(references hold the dashed form, the static tables the undashed one), so it
+transforms the reference side with <code>REPLACE</code>. The states which protect are
+<code>Instance.ACTIVE_STATES</code> plus <code>delete-wait-error</code>: the latter is not in
+<code>ACTIVE_STATES</code> but by definition means teardown did not complete, so a domain
+may well still be attached to the bridge. Interfaces are filtered on <code>active IS
+NOT NULL</code> (NULLed only on delete), which is a superset of the interface active
+states, because erring towards protecting a device is the right direction here.
+If this node's row cannot be read at all, every claimed stray is protected, and
+a database failure propagates rather than presenting as an empty result — an
+empty result is permission to tear devices down, so aborting the pass is the
+safe outcome.</p>
 <p><strong>The host gets a veto.</strong> Everything above this point is the database's view:
 that a networks row is gone, or that no instance record places a user of this
 network here. Both are the correct sources, and both are <em>records</em> rather than
@@ -12590,15 +12596,17 @@ nothing at all was removed.</p>
 getters it deliberately does not swallow database errors: an empty result means
 "nothing claims these vxids" and the caller deletes host devices on the
 strength of it, so a failed query must raise rather than present as an answer.
-<code>shakenfist/tests/test_mariadb_find.py</code> pins that contract on both the direct
-and gRPC paths, and pins the servicer's <code>INTERNAL</code> status on failure — the
-sibling finders in that module all assert the <em>opposite</em> contract, so without
-those tests a refactor which made them consistent would turn a database outage
-into cluster-wide device deletion.</p>
-<p>Because the whole stray check depends on an RPC newer than the rest of the
+<code>mariadb.get_node_instance_vxids()</code> carries the same contract for the same
+reason. <code>shakenfist/tests/test_mariadb_find.py</code> pins both on the direct and
+gRPC paths, and pins the servicer's <code>INTERNAL</code> status on failure — the sibling
+finders in that module all assert the <em>opposite</em> contract, so without those
+tests a refactor which made them consistent would turn a database outage into
+cluster-wide device deletion.</p>
+<p>Because the whole stray check depends on RPCs newer than the rest of the
 daemon, <code>execute()</code> wraps <code>_handle_stray_vxlans()</code> in a <code>try</code>/<code>except</code>. An
-<code>sf-net</code> talking to an <code>sf-database</code> which predates <code>FindNetworkVxids</code> gets
-<code>UNIMPLEMENTED</code>, which <code>_grpc_call()</code> does not retry; without the guard the
+<code>sf-net</code> talking to an <code>sf-database</code> which predates <code>FindNetworkVxids</code> or
+<code>GetNodeInstanceVxids</code> gets <code>UNIMPLEMENTED</code>, which <code>_grpc_call()</code> does not
+retry; without the guard the
 maintain thread would die and be restarted by the monitor every thirty seconds
 for the length of the mixed-version window, losing the rest of the pass with
 it. Stray vxlans are the least urgent thing maintain does, so they fail alone.</p>
