@@ -476,13 +476,113 @@ contract is claim CRUD plus the D9/D16 events.
 is CI's all-or-nothing unit; the batch API is re-scoped to a
 deferred manual-tenant convenience.
 
+## Step 3 addendum: measured claim shapes (2026-08-13)
+
+### Data basis, and why it is one day rather than two weeks
+
+The conductor's 2026-08-12 deploy of per-instance cost
+attribution ("Size runners from the runner, not its
+namespace") bumped the cost-data generation and deliberately
+discarded every generation-1 row: the old samples mixed the
+runner and the nested cloud it built with no way to attribute
+them after the fact. The analysis below therefore rests on 56
+namespace teardowns collected over ~10 hours on 2026-08-12,
+not the planned two weeks. That is enough, because the
+headline empirical result is that **per-job peaks are
+deterministic** — every run of the same job produced
+identical `peak_allocated_*` values, since the peak is a
+function of the job's topology definition, not of runtime
+behaviour. Shape conclusions are therefore robust on a small
+sample; tail and variability questions (and the anti-
+starvation constant) are re-examined in a follow-up pass
+around 2026-08-26 once a fortnight of generation-2 data has
+accumulated.
+
+Cluster context for the numbers below: sfcbr has six
+hypervisors — four 12-thread and two 24-thread nodes, all
+with 62 GB RAM and ~920 GB of `/srv` — so roughly 96
+threads (~288 schedulable vCPUs at `CPU_OVERCOMMIT_RATIO`
+3.0, before per-host reservations), 372 GB RAM and 5.5 TB
+disk cluster-wide.
+
+### Observed claim shapes
+
+| Job (worst observed run) | vCPU | RAM GB | Virtual disk GB | Instances |
+|---|---|---|---|---|
+| kerbside-patches multinode | 35 | 56 | 3360 | 9 |
+| shakenfist collection smoke (xl runner) | 32 | 80 | 1420 | 7 |
+| shakenfist collection smoke (xs runner) | 25 | 66 | 1120 | 7 |
+| kerbside-patches all-in-one | 13 | 18 | 560 | 2 |
+| instar / kerbside single-VM jobs | 8 | 16 | 460 | 1 |
+
+The runner's own allocation is included in the peak (the xl
+vs xs variants of the same smoke job differ by exactly the
+runner-size delta: 7 vCPU / 14 GB), which is correct — the
+claim must cover the runner instance too. Workflow durations
+ranged 3–70 minutes. RAM is the binding dimension for
+concurrency: five concurrent cluster-sized jobs allocate
+300+ GB against the cluster's 372 GB, while the same mix
+uses well under half the vCPU limit.
+
+### Constant revisions
+
+**D4 (claim TTL): unchanged.** Observed workflow durations
+top out at 70 minutes, so the conductor's "roughly twice the
+workflow timeout" expiry and the 24-hour caller default both
+hold comfortably as crash backstops. No revision.
+
+**D14 (cluster-wide claims): upgraded from "simpler" to
+"required".** The two largest observed RAM claims (66 and
+80 GB) exceed any single sfcbr node's 62 GB — a node-pinned
+claim of the most common cluster-CI shape would be
+undeliverable by construction, so cluster-wide is not a
+simplification but the only shape that works. The stranding
+acceptance is confirmed by data: the largest single instance
+in any observed topology is 8 vCPU / 16 GB (an xl runner;
+cluster topologies use 4 vCPU / 12 GB nodes), at most ~26%
+of a node's RAM and ~22% of its vCPU limit, so "fits in
+aggregate but on no single node" requires a node already
+near-full, which the normal no-candidate diagnostic handles.
+
+**D18 (conductor sizing formula): confirmed, with the sizing
+key sharpened.** Because peaks are topology-deterministic, a
+single generation-2 observation is a sufficient seed for
+`worst observed peak_allocated_*`, and the 1.2× headroom is
+retained to absorb what actually varies: runner-size changes
+and topology drift in the job definition, not run-to-run
+noise. The sizing key must be **(repo, job_name)**, not
+workflow name — peaks within one workflow name span 1–32
+vCPU across its jobs, so workflow-level sizing would claim
+the worst job's footprint for every job. The 15-minute
+anti-starvation constant stays provisional; no deferral data
+can exist until claims are enforced.
+
+### New finding for phase 3: disk needs an overcommit ratio
+
+D2 claims disk as virtual size from `disk_spec`, and the
+data shows virtual size over-claims actual usage by 40–140×
+(median ~65×): a single collection-smoke job claims 1.1 TB
+and the multinode job 3.4 TB against a 5.5 TB cluster whose
+worst observed *actual* per-job fill is 49 GB. Claiming
+virtual size against physical disk would reject today's
+routine concurrency outright while the disks sit ~98% empty.
+Phase 3 must therefore admit disk against
+`physical × SCHEDULER_DISK_OVERCOMMIT`, provisional seed
+**5.0** — enough to admit the observed concurrent mix with
+about 2× margin, while still bounding runaway growth two
+orders of magnitude below the virtual sum the guests could
+theoretically write. The physical backstop remains
+`NODE_DISK_RESERVATION_GB` plus the reconciler's drift
+correction; virtual size stays the claimed quantity because
+it is the only number known at admission time.
+
 ## Execution
 
 | Step | Description | Status |
 |------|-------------|--------|
 | 1 | Codebase and conductor research pass; write up current-state findings | Complete — see PLAN-scheduler-reservations-phase-00-findings.md |
 | 2 | Benchmark claim idioms under contention (throwaway harness) | Complete — 96-cell matrix run 2026-07-30 (findings Part 3, "Step 2 benchmark results"): guarded UPDATE 0 deadlocks / 0 violations everywhere and fastest; conditional INSERT silently violates under RC and livelocks under RR; FOR-UPDATE variants wrong or 9× slower |
-| 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Blocked on data — collection deployed 2026-07-30, analyse from ~2026-08-13. Outcome lands as an addendum revising only the *revisit when data lands* constants (D4, D14, D18); it does not gate phases 1-3 |
+| 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Complete — see "Step 3 addendum: measured claim shapes (2026-08-13)". D4 unchanged, D14 upgraded to required, D18 sizing key sharpened to (repo, job_name), and a new disk-overcommit constant flagged for phase 3. Follow-up variability pass ~2026-08-26 on a fortnight of generation-2 data |
 | 4 | Draft decisions for master-plan questions 1-13 | Drafted (Decisions section below) — pending step 7 review |
 | 5 | Draft decisions for questions 14-19 (namespace claims) | Drafted (Decisions section below) — pending step 7 review |
 | 6 | Re-cut the master plan phase table; write scope stubs for phases 1+ | Done — master plan Execution section re-cut with per-phase scope stubs |
