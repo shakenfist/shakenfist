@@ -32,7 +32,7 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phases 0, 1 and 2 complete.**
+**Status: phases 0, 1, 2 and 3 planned; 0, 1 and 2 complete.**
 The open questions at the bottom are answered in the Decisions
 section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
@@ -41,7 +41,10 @@ for the measurements behind them,
 for what the audit found,
 [`PLAN-api-input-validation-phase-02-type-vocabulary.md`](PLAN-api-input-validation-phase-02-type-vocabulary.md)
 for what the vocabulary work shipped and the four deviations it
-recorded. Phases 3 onward are not yet cut into per-phase files.
+recorded, and
+[`PLAN-api-input-validation-phase-03-compile-and-warn.md`](PLAN-api-input-validation-phase-03-compile-and-warn.md)
+for the phase now ready to start. Phases 4 onward are not yet cut
+into per-phase files.
 
 ## Situation
 
@@ -269,6 +272,14 @@ declarations are good enough to compile.
    `log_request` already dodges one instance of this by mapping
    body `uuid` to `passed_uuid`, which shows it is a known
    hazard rather than a feature.
+   *Amended by phase 3:* the decision stands, the supporting
+   evidence does not. `passed_uuid` occurs once in the tree — the
+   assignment itself — so no handler accepts it and the remap
+   dodges nothing; it converts a body `uuid` into a guaranteed 400
+   on every endpoint. The check also cannot live where D3 puts the
+   validator, because `log_request` runs first and has already
+   merged the body. See D11 and D12 in
+   [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md).
 9. **The type vocabulary gains tokens and an optional
    constraints element** (`unsignedinteger`, `macaddr`,
    `base64`, `netblock`; `minimum` / `maximum` / `pattern`).
@@ -283,7 +294,7 @@ declarations are good enough to compile.
 | 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See [phase 0](PLAN-api-input-validation-phase-00-decisions.md) |
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
 | 2: Type vocabulary | Complete | The specification-validation test (#3626) plus `schemes`/`securityDefinitions` template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; `unsignedinteger`/`macaddr`/`base64`/`netblock` tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events `limit` cap are visible to callers. See [phase 2](PLAN-api-input-validation-phase-02-type-vocabulary.md) |
-| 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Opens with the derivation generator below, which is a precondition rather than a step |
+| 3: Compile and warn | Planned, not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Opens with the derivation generator below, which is a precondition rather than a step. Four further decisions (D10-D13) are recorded there, including that an undeclared body key is *already* a 400 carrying interpreter text. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
 | 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the hand-authored `get_args` schemas into the compiled path |
 | 5: Narrow the handlers | Partly overtaken | Narrow `except TypeError` to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
@@ -466,7 +477,8 @@ the mechanism rather than choosing one:
 
 Phase 3 therefore generalises an existing, tested loader to
 every parameter derived `query`, rather than introducing a
-second precedence rule alongside it.
+second precedence rule alongside it. See
+[phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md).
 
 ## Open questions for phase 0
 
