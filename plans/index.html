@@ -11797,8 +11797,8 @@
 <tr>
 <td><a href="PLAN-oidc-authentication/">OIDC authentication</a></td>
 <td>Master plan</td>
-<td>Stub</td>
-<td>OIDC as an authentication option for human users; existing namespace keys re-framed as service-account tokens for automation</td>
+<td>Not started</td>
+<td>Human login with a corporate identity, on top of the federation infrastructure phases 1 to 4 of the auth federation plan built. What remains is OIDC discovery, interactive CLI flows in <code>client-python</code>, claim-driven multi-namespace authorisation, admin as a claim, worked Keycloak and Authentik examples, and functional coverage against a containerised IdP. Its phase 0 must first settle whether a human session is the IdP's own token or a credential exchanged for it</td>
 </tr>
 <tr>
 <td><a href="PLAN-auth-federation/">Auth federation</a></td>
@@ -11826,9 +11826,9 @@
 </tr>
 <tr>
 <td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td>Phase 5: OIDC plan refresh</td>
-<td>Not started</td>
-<td>Rewrite the human-login OIDC stub plan against the as-built federation infrastructure</td>
+<td><a href="PLAN-auth-federation-phase-05-oidc-plan-refresh/">Phase 5: OIDC plan refresh</a></td>
+<td>Complete</td>
+<td>Rewrite the human-login OIDC stub plan against the as-built federation infrastructure. The survey found the stub's phase 2 only half superseded — JWKS handling shipped in phase 3, OIDC discovery was never built and the device-code flow needs it — and that the CLI flow phases land in <code>client-python</code>, not this repository</td>
 </tr>
 <tr>
 <td><a href="PLAN-auth-federation/">Auth federation</a></td>

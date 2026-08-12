@@ -11559,8 +11559,8 @@ isolation, and brief columns.</p>
       before the failover and confirms the lease survives
       it.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> At least one advertisement mode (BGP or L2) is
-      exercised in <code>deploy/cluster_ci</code> end-to-end, with a
-      real upstream / switch in the path.</li>
+      exercised in <code>deploy/shakenfist_ci/cluster_ci_tests</code>
+      end-to-end, with a real upstream / switch in the path.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Smearing is exercised: a multi-network setup
       confirms different networks end up on different
       carriers and that the locality-scoring heuristic
@@ -11595,7 +11595,7 @@ because the following statements will be true:</p>
   MariaDB and is rendered into kernel state by the
   carrier.</li>
 <li>At least one advertisement mode (BGP or L2) ships in v1
-  and is verified end-to-end in <code>deploy/cluster_ci</code>.</li>
+  and is verified end-to-end in <code>deploy/shakenfist_ci/cluster_ci_tests</code>.</li>
 <li>Locality-aware placement demonstrably prefers carriers
   where the network's instances run, with documented
   scoring inputs.</li>

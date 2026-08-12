@@ -11818,9 +11818,10 @@ implemented because the following statements will be true:</p>
   <code>EVENTLOG_METRICS_PORT</code>, <code>EVENTLOG_SUPPRESS_GRPC</code>) are
   removed and any operator-facing renaming or deprecation
   is documented.</li>
-<li>Functional coverage under <code>deploy/cluster_ci</code> exercises
-  the new write path end to end, including a multi-object
-  event and a per-object read.</li>
+<li>Functional coverage under
+  <code>deploy/shakenfist_ci/cluster_ci_tests</code> exercises the new write
+  path end to end, including a multi-object event and a
+  per-object read.</li>
 <li>New code follows existing patterns: MariaDB access via
   the three-layer pattern (direct/gRPC/public), filtering
   pushed down to SQL where indexes can make it faster,

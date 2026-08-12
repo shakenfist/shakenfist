@@ -11209,9 +11209,10 @@ basis. Flag any uncertainty explicitly.</p>
 <li><code>shakenfist/config.py</code> — the Pydantic config; the
   <code>MARIADB_GATEWAY_HOSTS</code> / <code>MARIADB_GATEWAY_PORT</code> group is the
   BYO-endpoint pattern to mirror for the <code>LOKI_*</code> knobs.</li>
-<li><code>shakenfist/deploy/cluster_ci</code> and <code>shakenfist/deploy/ansible</code>
-  — how MariaDB is stood up and how <code>MARIADB_*</code> is plumbed into
-  the inner cluster; the template for standing up Loki in CI.
+<li><code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests</code> and
+  <code>shakenfist/deploy/ansible</code> — how MariaDB is stood up and how
+  <code>MARIADB_*</code> is plumbed into the inner cluster; the template for
+  standing up Loki in CI.
   Mind the two-layer CI topology (see the project memory: the
   under-cloud hosts the nested test cluster).</li>
 </ul>
@@ -11439,8 +11440,9 @@ as committed decisions:</p>
 <p>Output: the events-stay-in-MariaDB ruling, the precise toggle
 semantics, and the seam confirmation.</p>
 <h3 id="d7-ci-loki-topology-and-dual-path-coverage-oq7-oq10">D7 — CI Loki topology and dual-path coverage (OQ7, OQ10)<a class="headerlink" href="#d7-ci-loki-topology-and-dual-path-coverage-oq7-oq10" title="Permanent link">&para;</a></h3>
-<p>Design how Loki appears in CI. Read <code>shakenfist/deploy/cluster_ci</code>
-and the workflow plumbing for MariaDB (the
+<p>Design how Loki appears in CI. Read
+<code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests</code> and the
+workflow plumbing for MariaDB (the
 <code>tools/ci-install-mariadb.sh</code> + <code>GETSF_MARIADB_*</code> pattern from
 <code>PLAN-byo-mariadb</code> phase 5) as the template.</p>
 <p>Recommended decision:
@@ -11530,7 +11532,7 @@ every later phase.</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Read <code>deploy/cluster_ci</code> + the CI MariaDB plumbing (<code>tools/ci-install-mariadb.sh</code>, <code>GETSF_MARIADB_*</code>); sketch single-binary Loki placement in the two-layer topology and <code>LOKI_BASE_URL</code> plumbing; rule keep-Loki-and-also-collect-local; pick the CI echo mode.</td>
+<td>Read <code>deploy/shakenfist_ci/cluster_ci_tests</code> + the CI MariaDB plumbing (<code>tools/ci-install-mariadb.sh</code>, <code>GETSF_MARIADB_*</code>); sketch single-binary Loki placement in the two-layer topology and <code>LOKI_BASE_URL</code> plumbing; rule keep-Loki-and-also-collect-local; pick the CI echo mode.</td>
 </tr>
 <tr>
 <td>D8 synthesis</td>

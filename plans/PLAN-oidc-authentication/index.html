@@ -10946,6 +10946,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Situation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#relationship-to-the-auth-federation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to the auth federation plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -10989,6 +11006,45 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Agent guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#planning-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planning effort
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#management-session-review-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Management session review checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -11105,16 +11161,43 @@ any uncertainty explicitly rather than guessing.</p>
 overview, object types, and daemon structure. Consult
 <code>CLAUDE.md</code> for build commands, project conventions, and
 database access patterns. Consult <code>GOALS.md</code> for current
-development priorities. Key references inside the repo
-include <code>shakenfist/external_api/auth.py</code> (the <code>/auth</code>
-endpoint and namespace-ownership decorators),
-<code>shakenfist/util/access_tokens.py</code> (the JWT issue / parse
-helpers built on <code>flask_jwt_extended</code>),
-<code>shakenfist/namespace.py</code> (the <code>Namespace</code> DBO and the
-nonced-key + trust model), <code>shakenfist/schema/namespace_attributes.py</code>
-(the <code>keys</code> and <code>trust</code> JSON columns), and
-<code>docs/{developer,operator,user}_guide/authentication.md</code>
-(the current authentication user surface).</p>
+development priorities. Key references inside the repo:</p>
+<ul>
+<li><code>docs/glossary.md</code> — the authentication vocabulary, pinned
+  by phase 1 of the auth federation plan. Use these words
+  rather than inventing synonyms for them.</li>
+<li><code>docs/plans/PLAN-auth-federation.md</code> — the sibling plan,
+  which built the machine half of federation. Its phases 1
+  to 4 are the infrastructure this plan builds on.</li>
+<li><code>shakenfist/external_api/auth.py</code> — <code>/auth</code>, the namespace
+  and key CRUD endpoints, the trusted-issuer and
+  mapping-rule endpoints, and <code>POST /auth/federated</code>.</li>
+<li><code>shakenfist/external_api/base.py</code> — <code>verify_token</code>,
+  <code>caller_is_admin</code>, <code>_enforce_scope</code>, and the
+  <code>Resource.method_decorators</code> list that makes
+  authentication universal.</li>
+<li><code>shakenfist/external_api/scopes.py</code> — the scope
+  vocabulary, its derivation from resource class and HTTP
+  method, and <code>satisfies()</code>.</li>
+<li><code>shakenfist/util/access_tokens.py</code> — the JWT issue and
+  parse helpers built on <code>flask_jwt_extended</code>.</li>
+<li><code>shakenfist/namespace_key.py</code> and
+  <code>shakenfist/schema/namespace_key_attributes.py</code> — keys as
+  first-class objects, with expiry, scopes and provenance.</li>
+<li><code>shakenfist/namespace.py</code> — the <code>Namespace</code> DBO, the trust
+  model, and the inter-node <code>_service_key_*</code> path.</li>
+<li><code>shakenfist/trusted_issuer.py</code>,
+  <code>shakenfist/mapping_rule.py</code> and
+  <code>shakenfist/federation.py</code> — external issuer trust, claim
+  matching, and external token validation.</li>
+<li><code>docs/{developer,operator,user}_guide/authentication.md</code>
+  — the current authentication documentation surface.</li>
+</ul>
+<p><code>sf-client</code> is <strong>not</strong> in this repository. It lives in
+<code>client-python</code>; this repo ships only <code>sf-ctl</code> and
+<code>sf-backup</code> (<code>pyproject.toml:157-158</code>). Anything to do with
+client-side login flows or credential caching happens
+there, not here.</p>
 <p>When we get to detailed planning, the convention is a
 separate plan file per detailed phase, named
 <code>PLAN-oidc-authentication-phase-NN-descriptive.md</code> in the
@@ -11125,161 +11208,330 @@ single commit. Each commit should be self-contained: it
 should build, pass tests, and have a clear commit message
 explaining what changed and why.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist authenticates today with a custom namespace-key
-scheme:</p>
+<p>Phases 1 to 4 of <code>PLAN-auth-federation.md</code> rebuilt the
+machinery this plan was originally written against. Every
+numbered item below exists in the tree today; this plan
+builds on it rather than proposing it. The vocabulary is
+the one pinned in <code>docs/glossary.md</code>.</p>
 <ol>
-<li><strong>Namespace-scoped keys.</strong> Each namespace carries a
-   <code>keys</code> JSON attribute (<code>namespace_attributes.keys</code>) that
-   stores one or more bcrypt-hashed keys, each with a name
-   and a nonce. Keys are created via
-   <code>sf-client namespace add-key</code>.</li>
-<li><strong>The <code>/auth</code> endpoint</strong> in
-   <code>shakenfist/external_api/auth.py</code> takes a <code>{namespace,
-   key}</code> body, walks the namespace's keys, bcrypt-compares
-   the supplied key against each stored hash, and on success
-   issues a JWT via <code>flask_jwt_extended.create_access_token</code>.</li>
+<li><strong>Namespace keys are first-class objects.</strong> A
+   <a href="/glossary/#namespace-key">namespace key</a> is a
+   <code>NamespaceKey</code> DBO (<code>shakenfist/namespace_key.py:62</code>)
+   living in the <code>namespace_keys</code> and
+   <code>namespace_key_attributes</code> tables, carrying a bcrypt
+   hash, a <a href="/glossary/#nonce">nonce</a>, an optional expiry,
+   an optional <a href="/glossary/#scope">scope</a> list and an
+   optional provenance dict
+   (<code>shakenfist/schema/namespace_key_attributes.py:24-70</code>).
+   The <code>keys</code> JSON column on <code>namespace_attributes</code> that
+   used to hold them is vestigial — "neither read nor
+   written any more"
+   (<code>shakenfist/namespace.py:187-190</code>). Beware that
+   <code>Namespace.keys</code> still <em>synthesises</em> the legacy
+   <code>{'nonced_keys': ...}</code> shape out of the tables
+   (<code>shakenfist/namespace.py:197-205</code>) for the handful of
+   call sites that still read it, so grepping <code>nonced_keys</code>
+   finds a compatibility view rather than a live column.</li>
+<li><strong><code>/auth</code> mints access tokens from keys.</strong> The endpoint
+   in <code>shakenfist/external_api/auth.py</code> takes a
+   <code>{namespace, key}</code> body, bcrypt-compares the presented
+   secret against the namespace's unexpired keys, and
+   issues an <a href="/glossary/#access-token">access token</a> via
+   <code>flask_jwt_extended.create_access_token</code>. Cluster-minted
+   secrets carry an <code>sfk_</code> prefix and a base62 CRC32
+   checksum so a leak is greppable and a scanner can reject
+   lookalikes offline (<code>shakenfist/util/credentials.py</code>).</li>
 <li><strong>JWT identity is <code>&lt;namespace&gt;:&lt;keyname&gt;</code></strong> — see
-   <code>shakenfist/util/access_tokens.py</code>. The token includes a
-   <code>nonce</code> claim that is verified against the stored nonce
-   on every request; rotating a key bumps the nonce, which
-   invalidates outstanding tokens for that key.</li>
-<li><strong>Trust between namespaces</strong> is a list on
-   <code>namespace_attributes.trust</code> and grants visibility from
-   trusted namespaces into the trusting namespace. <code>system</code>
-   is in every namespace's trust list and cannot be removed.</li>
-<li><strong>Inter-node authentication</strong> reuses the same scheme via
-   short-lived <code>_service_key*</code> keys created per request, as
-   documented in
-   <code>docs/developer_guide/authentication.md</code>.</li>
+   <code>shakenfist/util/access_tokens.py</code>. Alongside it the
+   token carries <code>iss</code>, the minting key's <code>nonce</code>, and a
+   <code>scopes</code> list
+   (<code>shakenfist/util/access_tokens.py:42-47</code>). The nonce is
+   re-verified against the stored key on every request, so
+   rotating or deleting a key immediately invalidates every
+   outstanding token minted from it. The default token
+   lifetime is fifteen minutes
+   (<code>config.API_TOKEN_DURATION</code>).</li>
+<li><strong>Authentication and scope enforcement are universal.</strong>
+   Both run from <code>Resource.method_decorators</code>
+   (<code>shakenfist/external_api/base.py:1291-1298</code>), so a new
+   endpoint is authenticated and scope-checked without
+   anyone remembering to decorate it. <code>@api_base.public</code> is
+   the only way out, and the public set is written down and
+   individually justified. The scope check itself is
+   <code>_enforce_scope</code> (<code>shakenfist/external_api/base.py:1234</code>),
+   comparing the token's <code>scopes</code> claim against a scope
+   derived from the resource class and the HTTP method.</li>
+<li><strong><code>caller_is_admin</code> is two axes, not one.</strong> An
+   administrative endpoint now requires <strong>both</strong> the
+   <code>system</code> namespace and the <code>cluster-admin</code> scope
+   (<code>shakenfist/external_api/base.py:128-148</code>), so a key
+   scoped to, say, <code>blob.read</code> but minted into <code>system</code>
+   cannot escalate. Legacy unscoped keys carry the wildcard
+   and are unaffected.</li>
+<li><strong>Trusted issuers are cluster-level objects.</strong> A
+   <a href="/glossary/#trusted-issuer">trusted issuer</a> is a
+   <code>TrustedIssuer</code> DBO
+   (<code>shakenfist/trusted_issuer.py:41</code>) with exactly three
+   attributes — <code>issuer_url</code>, <code>jwks_uri</code> and <code>audience</code> —
+   managed by an administrator under <code>/auth/issuers</code>. The
+   JWKS location is operator-supplied and required; it is
+   deliberately never taken from the token.</li>
+<li><strong>Mapping rules are namespace-owned objects.</strong> A
+   <a href="/glossary/#mapping-rule">mapping rule</a> is a
+   <code>MappingRule</code> DBO (<code>shakenfist/mapping_rule.py:244</code>)
+   managed under <code>/auth/namespaces/&lt;namespace&gt;/rules</code> and
+   gated by <code>requires_namespace_ownership</code>. It names an
+   issuer, the claims an inbound token must satisfy, the
+   scopes to grant, a key TTL and a key name prefix. Claim
+   matching is <strong>exact only</strong>: an exact string, or
+   membership of a list of exact strings, with no globbing,
+   regular expressions, prefix matching or coercion
+   (<code>shakenfist/federation.py:347-363</code>).</li>
+<li><strong>An external identity can already be exchanged for a
+   credential.</strong> <code>POST /auth/federated</code>
+   (<code>shakenfist/external_api/app.py:383</code>, handler at
+   <code>shakenfist/external_api/auth.py:1258</code>) is
+   unauthenticated by <code>@api_base.public</code> — its
+   authentication <em>is</em> the presented token — takes
+   <code>{token, namespace, rule}</code>, and returns
+   <code>{namespace, key_name, key}</code>. The
+   <a href="/glossary/#identity-token">identity token</a> is
+   validated, the rule's claims matched, and a scoped,
+   time-bounded namespace key minted with provenance
+   recording the rule, the issuer and the claims that were
+   actually satisfied.</li>
+<li><strong>External token validation is written and hardened.</strong>
+   <code>shakenfist/federation.py</code> verifies signatures against a
+   pinned RS/ES/PS algorithm allowlist with HS deliberately
+   absent (<code>shakenfist/federation.py:39-51</code>), requires
+   <code>exp</code>, <code>iss</code> and <code>aud</code>, and allows zero clock skew
+   (<code>shakenfist/federation.py:321-340</code>). JWKS fetching goes
+   through <code>PyJWKClient</code> with per-issuer caching and a
+   per-issuer lock, so a key rotation collapses concurrent
+   misses into one fetch rather than a stampede
+   (<code>shakenfist/federation.py:120-210</code>).</li>
+<li><strong>Trust between namespaces</strong> is unchanged: a list on
+    <code>namespace_attributes.trust</code> granting visibility from
+    trusted namespaces into the trusting namespace, with
+    <code>system</code> in every namespace's list and unremovable. See
+    <a href="/glossary/#trust">trust</a>, which is a different concept
+    from a trusted issuer and must not be conflated with
+    it.</li>
+<li><strong>Inter-node authentication</strong> still reuses the key
+    path, via short-lived <code>_service_key_&lt;rand&gt;</code> keys minted
+    per request (<code>shakenfist/namespace.py:386-410</code>). Those
+    keys now live on the new tables, use <code>sfk_</code>-format
+    secrets, expire after five minutes and mint five-minute
+    tokens.</li>
 </ol>
 <p>What this model gets right:</p>
 <ul>
-<li>Long-lived bearer credentials are great for automation —
-  CI systems, Ansible, the SF Python client all just hold a
-  key in <code>~/.shakenfist</code> and call <code>/auth</code> when needed.</li>
+<li>Bearer credentials remain excellent for automation — CI
+  systems, Ansible and the SF Python client hold a key and
+  call <code>/auth</code> when they need a token — and they are no
+  longer necessarily long-lived or all-powerful, because a
+  key can carry an expiry and a scope list.</li>
 <li>Namespace ownership is unambiguous: the key <em>is</em> a
   capability on that namespace.</li>
 <li>JWT format and <code>Authorization: Bearer ...</code> semantics are
   already in place, so the wire shape will not change much.</li>
+<li>Revocation is immediate and cheap. The nonce check on
+  every request means deleting a key kills its tokens now,
+  rather than after a token lifetime.</li>
+<li>Enforcement is already in exactly one place. Anything
+  this plan adds inherits universal authentication and
+  scope checking rather than having to re-plumb it.</li>
+<li>Half of an OIDC relying party is built and issuer-generic
+  by construction. Trusted issuers and mapping rules are
+  data, so adding an Authentik or Keycloak issuer beside
+  the GitHub Actions one is configuration, not code.</li>
 </ul>
 <p>What it does not give us:</p>
 <ul>
-<li><strong>No human SSO story.</strong> A human operator cannot "log in
-  with their corporate identity" — they have to be issued a
-  shared static key and put it in a file.</li>
-<li><strong>No central account lifecycle.</strong> Disabling a user means
-  rotating keys across every namespace they had access to;
-  there is no notion of "this human" independent of "this
-  namespace key".</li>
-<li><strong>No group-driven namespace access.</strong> A new namespace
-  needs an explicit key minted for every entity that should
-  reach it; there is no "engineering group has access to
-  these N namespaces" primitive.</li>
-<li><strong>The keys are entirely Shaken Fist's problem.</strong> Storage,
-  hashing, rotation, nonce bookkeeping, and audit are all
-  SF code. Outsourcing to a real IdP (Keycloak, Authentik,
-  Okta, Entra ID, Google Workspace, ...) is currently
-  impossible.</li>
+<li><strong>No human SSO story.</strong> A human operator still cannot
+  "log in with their corporate identity". The federated
+  exchange assumes the caller already holds a signed
+  identity token, which is true of a CI job and false of a
+  person at a terminal. A human is still issued a static
+  key and puts it in a file.</li>
+<li><strong>No central account lifecycle.</strong> Disabling a person
+  means finding and deleting keys across every namespace
+  they had access to; there is still no notion of "this
+  human" independent of "this namespace key".</li>
+<li><strong>No group-driven namespace access.</strong> A mapping rule is
+  owned by, and grants into, exactly one namespace, and its
+  claim matching is exact. There is no "engineering group
+  has access to these N namespaces" primitive: a group of
+  twenty namespaces is twenty rules, each written by
+  someone who owns that namespace.</li>
+<li><strong>No OIDC client.</strong> Phase 3 built the <em>verification</em> half
+  of a relying party and none of the <em>client</em> half. Nothing
+  in the tree fetches <code>.well-known/openid-configuration</code> —
+  <code>jwks_uri</code> is operator-supplied and required — so there
+  is no discovery, and there is nothing that <em>initiates</em> a
+  flow. A workload arrives holding a minted token; a human
+  has to start a conversation with the IdP, and the
+  endpoints that conversation needs are exactly what a
+  discovery document publishes.</li>
+<li><strong>One namespace per credential.</strong> Every credential Shaken
+  Fist mints names exactly one namespace, and
+  <code>request_namespace()</code> is a string split returning one
+  name (<code>shakenfist/util/access_tokens.py:76</code>). A human is
+  typically in several namespaces. The open questions below
+  take this up; it is recorded here because it is a fact
+  about the code, not because it is settled.</li>
+<li><strong>Nothing on the client side.</strong> <code>sf-client</code> lives in the
+  separate <code>client-python</code> repository and has no login or
+  OIDC code; this repo ships only <code>sf-ctl</code> and <code>sf-backup</code>
+  (<code>pyproject.toml:157-158</code>). None of phase 3's new route
+  families are wrapped by the client either.</li>
 </ul>
-<p>External design discussion summarised:</p>
-<ul>
-<li><strong>Both Authentik and Keycloak</strong> can act as the OIDC
-  provider. Both support custom claims, group → claim
-  mapping, machine-to-machine via <code>client_credentials</code>, and
-  long-lived service-account tokens. Either is acceptable
-  upstream; SF should validate JWTs against whatever IdP
-  the operator runs, not bind to a specific implementation.</li>
-<li><strong>Mapping SSO users to namespaces.</strong> Standard pattern is
-  a group claim in the JWT (e.g. <code>groups</code> or a
-  custom-named claim) that lists the namespaces the bearer
-  is permitted to act on. SF then authorises per-request
-  against that claim. Most humans will be members of
-  several namespaces, so we hand the full list in the
-  token rather than asking the user to pick one at
-  exchange time.</li>
-<li><strong>Existing namespace keys are not going away.</strong> Machine
-  credentials (CI, Ansible, the agent inside SF VMs) are a
-  genuine need; GitHub and GitLab keep PATs alongside SSO
-  for the same reason. The right outcome is for the current
-  key model to be renamed and re-scoped as "service account
-  tokens" — kept for non-human callers, with humans pushed
-  through OIDC.</li>
-<li><strong>Outsourcing token issuance does not outsource
-  authorisation.</strong> Even with IdP-issued machine tokens,
-  Shaken Fist still has to validate the JWT (via JWKS) and
-  still has to map claims onto namespaces. We can shed
-  token <em>storage and issuance</em> by leaning on the IdP, but
-  not authorisation policy — that is irreducibly SF's job.</li>
-</ul>
+<h3 id="relationship-to-the-auth-federation-plan">Relationship to the auth federation plan<a class="headerlink" href="#relationship-to-the-auth-federation-plan" title="Permanent link">&para;</a></h3>
+<p><code>PLAN-auth-federation.md</code> is the <em>machine</em> half of
+federation and has been largely built: a workload exchanges
+an IdP-issued identity token for a scoped namespace key.
+This plan is the <em>human</em> half. The two share everything up
+to and including token validation — trusted issuers, JWKS
+fetch and rotation, signature and claim verification — and
+this plan should add no second copy of any of it.</p>
+<p>Where they may diverge is what happens after validation.
+The federation plan mints a key and lets every existing
+consumer carry on unchanged. This plan's original design
+authorised requests directly off the external token. Whether
+human login should follow the exchange pattern instead is
+the central unresolved question below, and the auth
+federation plan explicitly reserves it for this plan's own
+phase 0 decisions pass rather than answering it in passing.</p>
+<p>Two things the federation plan settled are worth restating
+because they constrain this one. Outsourcing token issuance
+does not outsource authorisation: Shaken Fist still has to
+map an external identity onto namespaces and scopes, and
+that policy is irreducibly its own. And namespace keys are
+not going away — machine credentials are a genuine need,
+which is why GitHub and GitLab keep personal access tokens
+alongside SSO.</p>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Add OIDC as an authentication option for Shaken Fist so
-that:</p>
+<p>Give Shaken Fist a human login story: let a person
+authenticate to the REST API with their corporate identity,
+have their namespace access follow from their group
+membership in the identity provider, and keep every existing
+credential path working while that happens.</p>
+<p>Concretely:</p>
 <ul>
 <li><strong>Humans</strong> can authenticate to the SF REST API using
   their corporate identity, via an OIDC flow appropriate to
-  the client (auth code + PKCE for browser-driven clients,
-  device code for the CLI on headless boxes, etc.). The
-  resulting JWT is what <code>sf-client</code> and other clients carry
-  in <code>Authorization: Bearer ...</code> exactly as today.</li>
+  the client — device code for a CLI on a headless box,
+  authorisation code with PKCE where a browser is
+  available. This needs the client half of a relying party
+  that does not exist yet: discovery to learn the issuer's
+  endpoints, and flow initiation to use them.</li>
 <li><strong>Namespace access for humans</strong> is driven by claims in
-  the OIDC-issued JWT, typically derived from group
-  membership in the IdP. A user gains and loses access by
-  being added to or removed from groups in the IdP, with
-  no SF-side per-user bookkeeping.</li>
-<li><strong>Machines</strong> continue to use long-lived bearer credentials
-  for automation. The existing namespace-key mechanism is
-  renamed and re-scoped to "service account tokens" but
-  remains supported and is the default for non-human
-  callers. Operators who prefer to outsource even machine
-  tokens to their IdP (e.g. Keycloak service accounts via
-  <code>client_credentials</code>) can do so, and SF treats those
-  tokens identically to its own.</li>
-<li><strong>Authorisation lives in one place</strong> in the SF code,
-  keyed on the namespace claim(s) in the token, regardless
-  of which issuer minted the token.</li>
-<li><strong>Existing deployments keep working.</strong> OIDC is opt-in,
-  configured per cluster. Clusters that never enable it
-  behave exactly as before. Clusters that enable it gain a
-  second issuer alongside the built-in one and both kinds
-  of token are accepted in parallel during the transition.</li>
+  the IdP-issued token, typically derived from group
+  membership. A person gains and loses access by being
+  added to or removed from groups in the IdP, with no
+  SF-side per-user bookkeeping. Since a person is usually
+  in several namespaces, and every credential today names
+  exactly one, this is a change to the shape of
+  authorisation rather than a new claim reader.</li>
+<li><strong>Machines</strong> keep the credential model they have. Keys
+  are already first-class objects with expiry, scopes and
+  provenance; what remains here is whether they are
+  re-presented to users as service-account credentials, and
+  under what names. Operators who prefer to outsource
+  machine credentials to their IdP already can, through the
+  federated exchange.</li>
+<li><strong>Authorisation lives in one place.</strong> It already does —
+  universal authentication and scope enforcement on
+  <code>Resource.method_decorators</code> — and nothing this plan adds
+  may create a second path. In particular, no phase may
+  quietly weaken <code>satisfies()</code>'s treatment of a missing
+  <code>scopes</code> claim as a wildcard, which is safe for tokens
+  Shaken Fist minted and is not obviously safe for tokens
+  it did not.</li>
+<li><strong>Inter-node authentication never depends on the IdP.</strong>
+  Cluster nodes already have a trust relationship that
+  gains nothing from federating through an external
+  provider, and making the IdP a hard dependency of cluster
+  operation is a reliability regression, not a security
+  improvement.</li>
+<li><strong>Existing deployments keep working.</strong> OIDC is opt-in and
+  configured per cluster. A cluster that never enables it
+  behaves exactly as it does today.</li>
 </ul>
-<p>Scope boundaries (preliminary — to be refined when this
-plan moves out of stub status):</p>
+<p>Scope boundaries:</p>
 <ul>
-<li><strong>In scope:</strong> OIDC discovery + JWKS-backed JWT
-  validation; the SF-side claim → namespace mapping; the
-  rename / re-framing of existing namespace keys as
-  service-account tokens; the CLI flows needed for humans
-  to obtain an OIDC token from <code>sf-client</code>; documentation
-  of how to configure Keycloak and Authentik against SF.</li>
+<li><strong>In scope:</strong> OIDC discovery, which was not built;
+  interactive flow initiation and whatever client-side
+  login command drives it; claim-driven namespace
+  authorisation for humans, including the multi-namespace
+  question; whether <code>caller_is_admin</code> can drop its
+  namespace half now that a <code>cluster-admin</code> scope exists;
+  the naming and framing of namespace keys as
+  service-account credentials; worked operator
+  documentation for configuring Keycloak and Authentik;
+  and functional coverage against a containerised IdP.</li>
+<li><strong>Out of scope:</strong> rebuilding JWT signature validation,
+  JWKS fetch, caching or rotation. <code>shakenfist/federation.py</code>
+  does this and any new work extends it.</li>
+<li><strong>Out of scope:</strong> the workload exchange itself, which is
+  <code>PLAN-auth-federation.md</code>'s subject and is built.</li>
 <li><strong>Out of scope:</strong> running an IdP inside SF. SF is the
   <em>relying party</em>; operators bring their own IdP.</li>
 <li><strong>Out of scope:</strong> SAML, LDAP-direct, or other non-OIDC
   identity protocols. OIDC is the lingua franca and is the
   one we will support.</li>
-<li><strong>Out of scope (initially):</strong> per-resource (not
-  per-namespace) RBAC. The unit of authorisation is still
-  the namespace. Finer-grained roles are deferred to
-  future work.</li>
+<li><strong>Out of scope:</strong> changing inter-node authentication.</li>
+<li><strong>Out of scope (initially):</strong> extending the scope
+  vocabulary beyond what phase 3 of the auth federation
+  plan shipped. Scopes already give a verb-level axis; the
+  unit of <em>identity</em> remains the namespace, and
+  finer-grained roles are future work.</li>
 <li><strong>Out of scope (initially):</strong> UI / web console for
   login. SF does not ship a web UI; the OIDC flows are
   driven by the CLI client.</li>
 </ul>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These are preliminary sketches. Each will be tightened
-significantly when this plan moves out of stub status.</p>
 <ol>
-<li>
-<p><strong>Issuer trust model.</strong> How many IdPs can a cluster
+<li><strong>Issuer trust model.</strong> How many IdPs can a cluster
    trust at once? One feels limiting (you might want
    "internal IdP for staff, partner IdP for contractors").
    Many means SF carries a list of trusted issuers and
    JWKS URLs in config. Possible resolution: support a
    list, validate the token's <code>iss</code> against the list, and
-   pick the matching JWKS for signature verification.</p>
-</li>
-<li>
-<p><strong>Claim → namespace mapping.</strong> The simplest design is a
+   pick the matching JWKS for signature verification.</li>
+</ol>
+<p><strong>Resolved by auth federation phase 3 (2026-08-12).</strong>
+   Many, and as objects rather than as configuration. A
+   <a href="/glossary/#trusted-issuer">trusted issuer</a> is a
+   <code>TrustedIssuer</code> DBO (<code>shakenfist/trusted_issuer.py:41</code>)
+   carrying exactly <code>issuer_url</code>, <code>jwks_uri</code> and <code>audience</code>
+   (<code>shakenfist/schema/trusted_issuer_attributes.py:45-53</code>),
+   created and deleted by an administrator under
+   <code>/auth/issuers</code> (<code>shakenfist/external_api/app.py:376-378</code>).
+   A cluster trusts as many issuers as it has rows, so
+   "internal IdP for staff, partner IdP for contractors" is
+   two API calls rather than a config edit and a restart.
+   The unverified <code>iss</code> is checked against the allowlist
+   before any network fetch, and the JWKS comes from the
+   issuer's configured <code>jwks_uri</code> and never from the token.</p>
+<p>The question guessed at a config list, and the difference
+   is worth naming: objects have events, states, an API and
+   a lifecycle, so "who may vouch for identities here" is
+   auditable and changeable at runtime rather than being a
+   file an operator has to remember to keep in sync across
+   nodes.</p>
+<p>One consequence the federation plan records, and which
+   this plan inherits rather than gets to re-decide: mapping
+   rules reference their issuer <strong>by name</strong>, not by uuid, so
+   deleting an issuer and recreating it under the same name
+   silently rebinds every rule that named it. Storing the
+   uuid would fail loudly instead. The name was kept because
+   it is what an operator writes and reads, and the
+   behaviour is called out in the operator guide. Any
+   human-facing issuer management this plan adds has exactly
+   the same property.</p>
+<ol>
+<li><strong>Claim → namespace mapping.</strong> The simplest design is a
    single claim (configurable name, e.g. <code>sf_namespaces</code>)
    that carries a list of namespace names. Alternatively,
    group names in the IdP can be mapped to namespaces via
@@ -11287,10 +11539,37 @@ significantly when this plan moves out of stub status.</p>
    <code>platform</code>, <code>platform-ci</code>). The first is cleaner but
    pushes the mapping problem entirely onto IdP admins;
    the second keeps the policy in SF but adds config
-   surface. Need to pick one (or support both).</p>
-</li>
-<li>
-<p><strong>Token shape interop.</strong> Today SF's tokens carry
+   surface. Need to pick one (or support both).</li>
+</ol>
+<p><strong>Half answered by auth federation phase 3; the human
+   half is still open (2026-08-12).</strong> For workloads this is
+   settled, and neither of the two options won outright. A
+   <a href="/glossary/#mapping-rule">mapping rule</a> is a
+   <code>MappingRule</code> DBO (<code>shakenfist/mapping_rule.py:244</code>)
+   owned by one namespace, managed under
+   <code>/auth/namespaces/&lt;namespace&gt;/rules</code>, which binds a set
+   of exact claims and grants into exactly that one
+   namespace. Claim matching is exact only — an exact
+   string, or membership of a list of exact strings, with no
+   globbing, regular expressions, prefix matching or
+   coercion (<code>shakenfist/federation.py:347-363</code>). So the
+   policy lives in Shaken Fist, as the second option wanted,
+   but it is expressed as one object per grant, owned by the
+   namespace being granted into, rather than as a
+   cluster-level group-to-namespace table an administrator
+   maintains.</p>
+<p>The human half is what remains, and it is harder than
+   this question realised. A person is typically in several
+   namespaces, so the first option — a single claim carrying
+   a list of namespace names — cannot be served by minting
+   one credential per exchange, because every credential
+   Shaken Fist mints names exactly one namespace. That
+   collision is now open question 14, and this question
+   cannot close ahead of it: for humans, "which namespaces
+   does this claim grant" and "can one credential name more
+   than one namespace" are the same question asked twice.</p>
+<ol>
+<li><strong>Token shape interop.</strong> Today SF's tokens carry
    <code>sub: '&lt;namespace&gt;:&lt;keyname&gt;'</code> and a <code>nonce</code> claim.
    OIDC tokens carry standard claims (<code>sub</code>, <code>iss</code>,
    <code>aud</code>, <code>exp</code>, group claims) and no SF nonce. The
@@ -11301,19 +11580,66 @@ significantly when this plan moves out of stub status.</p>
    <code>util/access_tokens.py</code> need a refactor; the
    request-side <code>request_namespace()</code> becomes a
    per-request authorisation decision rather than a
-   string split.</p>
-</li>
-<li>
-<p><strong>Audience and multi-tenant clusters.</strong> OIDC tokens
+   string split.</li>
+</ol>
+<p><strong>Partly resolved by auth federation phase 3
+   (2026-08-12).</strong> The refactor this question asks for
+   happened, but for a different reason and only on one
+   side. Authentication is now universal: it runs from
+   <code>Resource.method_decorators</code>
+   (<code>shakenfist/external_api/base.py:1291-1298</code>) rather than
+   from 120 hand-applied decorators, with <code>@api_base.public</code>
+   the only exemption. That was done as step 3a of the auth
+   federation plan so that scope enforcement could be added
+   to an already-universal path, not to make room for a
+   second token shape — but it has the effect this question
+   wanted, which is that there is now exactly one place
+   where a request's credential is examined, and
+   discriminating between shapes is a change to one function
+   rather than to a decorator stack.</p>
+<p>The description of the token is also stale. A Shaken Fist
+   access token carries <code>iss</code>, the minting key's <code>nonce</code> and
+   a <code>scopes</code> list alongside <code>sub</code>
+   (<code>shakenfist/util/access_tokens.py:42-47</code>). <code>scopes</code> is
+   the interesting one, because it is precisely the claim an
+   IdP-issued token will not have — see open question 13.</p>
+<p>What has <strong>not</strong> happened is the second half.
+   <code>request_namespace()</code> is still a string split over a
+   two-component identity
+   (<code>shakenfist/util/access_tokens.py:68-76</code>), called from
+   fifty-seven sites outside the tests. Turning it into "a
+   per-request authorisation decision" is entirely
+   untouched, and is large enough that it is now open
+   question 14 in its own right rather than a clause here.</p>
+<ol>
+<li><strong>Audience and multi-tenant clusters.</strong> OIDC tokens
    are issued to an <code>aud</code> (audience). SF should validate
    that the token's audience matches the cluster's
    configured audience identifier so that a token minted
    for some other service is not accepted as an SF
    token. What is the right default audience name?
-   Configurable per cluster.</p>
-</li>
-<li>
-<p><strong>What about the <code>system</code> namespace?</strong> Today <code>system</code>
+   Configurable per cluster.</li>
+</ol>
+<p><strong>Resolved by auth federation phase 3 (2026-08-12).</strong> The
+   validation is built, and the answer to "what is the right
+   default audience name" turned out to be that there is no
+   default and there should not be one. Each trusted issuer
+   carries its own mandatory <code>audience</code>
+   (<code>shakenfist/schema/trusted_issuer_attributes.py:52-53</code>),
+   and validation requires <code>exp</code>, <code>iss</code> and <code>aud</code> to be
+   present, verifies all three, and allows zero clock leeway
+   (<code>shakenfist/federation.py:321-340</code>, with
+   <code>LEEWAY_SECONDS = 0</code> at <code>shakenfist/federation.py:68</code>).</p>
+<p>Per-issuer rather than per-cluster because the audience
+   an IdP stamps is the IdP's decision, not ours. It is a
+   property of how that provider and its clients are
+   configured, and a cluster trusting two providers cannot
+   name one string that both will emit. A cluster-wide
+   default would have been overridden by the first operator
+   who added a second issuer, which is the case this
+   question was worried about in the first place.</p>
+<ol>
+<li><strong>What about the <code>system</code> namespace?</strong> Today <code>system</code>
    is the bootstrap superuser and is in every namespace's
    trust list. Under OIDC, "is this caller a cluster
    admin" should be driven by a claim (e.g. a group
@@ -11321,10 +11647,40 @@ significantly when this plan moves out of stub status.</p>
    <code>system</code>. The <code>system</code> namespace stays as the
    bootstrap / system-key holder; the admin <em>role</em> is
    what becomes a claim. Need to decide how the existing
-   <code>caller_is_admin</code> decorator changes.</p>
-</li>
-<li>
-<p><strong>Service account tokens vs IdP service accounts.</strong>
+   <code>caller_is_admin</code> decorator changes.</li>
+</ol>
+<p><strong>Partly resolved by auth federation phase 3
+   (2026-08-12).</strong> Half of the change is built.
+   <code>caller_is_admin</code> now requires <strong>both</strong> the <code>system</code>
+   namespace and a <code>cluster-admin</code> scope
+   (<code>shakenfist/external_api/base.py:128-148</code>), so the
+   administrative role already exists as something a token
+   carries rather than as something a namespace name
+   implies. Legacy unscoped keys hold the wildcard and are
+   unaffected, so existing administrative automation was not
+   disturbed.</p>
+<p>One design detail constrains anything further, and is
+   recorded here so it is not undone by accident:
+   <code>cluster-admin</code> is hyphenated rather than dotted
+   precisely so that it names no family and therefore no
+   family wildcard can synthesise it
+   (<code>shakenfist/external_api/scopes.py:31-47</code>). Of the
+   twenty methods <code>caller_is_admin</code> guards, only two derive
+   an <code>admin.*</code> scope; the rest derive <code>node.*</code>, <code>issuer.*</code>,
+   <code>auth.*</code> and <code>blob.read</code>. A dotted <code>admin.*</code> would have
+   been both too narrow for what the marker gates and too
+   broad for what it grants.</p>
+<p>What remains is exactly this question's own framing:
+   whether the namespace half can now be dropped, so that
+   holding <code>cluster-admin</code> is sufficient and <code>system</code>
+   becomes only the bootstrap key holder. The mechanism is
+   in place, so that is a decision rather than an
+   implementation — and it should be taken alongside open
+   question 13, because an administrator arriving from an
+   IdP with no <code>scopes</code> claim at all is the case that makes
+   it matter.</p>
+<ol>
+<li><strong>Service account tokens vs IdP service accounts.</strong>
    Operators may want to outsource even machine tokens
    to their IdP (Keycloak service accounts +
    <code>client_credentials</code>, Authentik service-account tokens).
@@ -11333,10 +11689,39 @@ significantly when this plan moves out of stub status.</p>
    service-account tokens too, for the small-cluster
    operator who doesn't want to run an IdP at all. The
    current namespace-key code becomes that path,
-   renamed.</p>
-</li>
-<li>
-<p><strong>Nonce / revocation semantics for OIDC tokens.</strong> Our
+   renamed.</li>
+</ol>
+<p><strong>Partly resolved by auth federation phase 3, and
+   reframed (2026-08-12).</strong> The question assumes two options
+   and phase 3 supplied a third it did not consider. It
+   assumes Shaken Fist would have to <em>accept</em> an IdP-issued
+   machine token directly as a bearer credential — "SF will
+   accept them like any other OIDC token". What was built
+   instead is exchange: a service account presents its
+   IdP-issued token to <code>POST /auth/federated</code> and receives a
+   scoped, expiring namespace key, which it then uses
+   exactly as any other key. The machinery is issuer-generic
+   by construction — anything publishing a JWKS works — and
+   an Authentik service account is named as a supported
+   source in both the operator and developer guides
+   (<code>docs/operator_guide/authentication.md:142</code>,
+   <code>docs/developer_guide/authentication.md:418</code>). Keycloak
+   is expected to work identically, since no code is
+   issuer-specific, but nothing in the tree or the
+   documentation exercises it yet.</p>
+<p>So both halves of what the question actually wants are
+   already met. The small-cluster operator who runs no IdP
+   keeps namespace keys, which are unchanged and are the
+   documented choice for machine credentials. The operator
+   who does run one has a path today, and gets it without
+   Shaken Fist accepting a foreign token as a bearer
+   credential anywhere in the request path.</p>
+<p>What remains is only whether direct acceptance is <em>also</em>
+   wanted, which is much narrower than the question as
+   asked, and is subsumed by open question 13. The rename
+   half of the question is open question 11.</p>
+<ol>
+<li><strong>Nonce / revocation semantics for OIDC tokens.</strong> Our
    nonce mechanism gives us immediate revocation of
    currently-issued tokens when a key is rotated. OIDC
    has no equivalent at the token level — revocation is
@@ -11345,10 +11730,30 @@ significantly when this plan moves out of stub status.</p>
    the IdP's <code>exp</code> and accept that revocation has a
    bounded delay equal to the token lifetime". Need to
    pick a recommended lifetime and document the
-   tradeoff.</p>
-</li>
-<li>
-<p><strong>Inter-node auth.</strong> Today inter-node calls use the
+   tradeoff.</li>
+</ol>
+<p><strong>Reframed by auth federation phase 3 (2026-08-12).</strong> The
+   premise is now a false dichotomy. The question offers a
+   choice between Shaken Fist's nonce and the IdP's <code>exp</code>,
+   and phase 3 established a third answer: exchange the
+   external token for a namespace key and inherit nonce
+   revocation for free. That is what the workload half does
+   today, and it is why the federated path needed no
+   revocation design of its own — deleting the minted key
+   invalidates every token derived from it on the next
+   request, exactly as for any other key
+   (<code>docs/developer_guide/authentication.md:411-413</code>).</p>
+<p>So this stops being an independent decision and becomes a
+   consequence of one. If human login follows the exchange
+   pattern, revocation is already solved and there is
+   nothing here to pick. If it authorises directly off the
+   IdP's token, then bounded-delay revocation is what the
+   choice buys and the recommended lifetime has to be picked
+   and documented as this question asks. Open question 13 is
+   where that is settled, and it is deliberately not settled
+   here.</p>
+<ol>
+<li><strong>Inter-node auth.</strong> Today inter-node calls use the
    namespace-key path with short-lived <code>_service_key*</code>
    keys. Should inter-node calls move to OIDC?
    Probably not in v1 — SF nodes already have a
@@ -11358,31 +11763,92 @@ significantly when this plan moves out of stub status.</p>
    IdP a hard dependency on cluster operation. Likely
    resolution: inter-node stays on the renamed
    service-account-token path; OIDC is opt-in for
-   external callers only.</p>
-</li>
-<li>
-<p><strong>CLI flow choice.</strong> The SF CLI today is purely
+   external callers only.</li>
+</ol>
+<p><strong>Still open, but close to settled (2026-08-12).</strong> The
+   premise was re-checked and holds. Inter-node calls still
+   mint a short-lived <code>_service_key_&lt;rand&gt;</code> key per request
+   (<code>shakenfist/namespace.py:386-410</code>). Phase 2 moved those
+   keys onto the <code>namespace_keys</code> tables and gave them
+   <code>sfk_</code>-format secrets, a five minute key expiry and a
+   five minute token, but the mechanism is the one this
+   question describes and its likely resolution is now also
+   written into this plan's Mission as a constraint and into
+   its Agent guidance review checklist.</p>
+<p>The reasoning has if anything strengthened: making an
+   external IdP a hard dependency of cluster operation is a
+   reliability regression sold as a security improvement,
+   and cluster nodes already have a trust relationship that
+   federating adds nothing to.</p>
+<p>It is left open rather than closed because closing it
+   would foreclose the one thing that would reopen it — a
+   deployment where node identity itself comes from
+   somewhere else, such as SPIFFE or a cloud provider's
+   instance identity document, or an operator who requires
+   that every credential in the cluster have a single
+   issuer. Note that in that case the answer is a <em>different</em>
+   issuer for node identity, not the corporate IdP, which is
+   a different question from the one asked here.</p>
+<ol>
+<li><strong>CLI flow choice.</strong> The SF CLI today is purely
    non-interactive: read a key from a config file, POST
-   to <code>/auth</code>. OIDC for the CLI means either:</p>
-</li>
+   to <code>/auth</code>. OIDC for the CLI means either:</li>
 <li><strong>Device code flow</strong> — the CLI prints a URL and a
      code, the user opens it in a browser, comes back,
      CLI now has a refresh token. Works on headless
      boxes. Most natural fit.</li>
-<li>
-<p><strong>Auth code + PKCE with loopback</strong> — CLI opens a
+<li><strong>Auth code + PKCE with loopback</strong> — CLI opens a
      browser and listens on a random localhost port for
      the redirect. Faster but requires a graphical
      session.
    Likely both, with device code as the default since
-   it works everywhere.</p>
-</li>
+   it works everywhere.</li>
+</ol>
+<p><strong>Still open, and now known to be blocked on something
+   the question did not know it needed (2026-08-12).</strong> Both
+   flows require the issuer's endpoints — a
+   <code>device_authorization_endpoint</code> and a <code>token_endpoint</code> —
+   and a relying party is supposed to learn those from the
+   issuer's discovery document. <strong>Discovery was not built.</strong>
+   Nothing in the tree fetches
+   <code>.well-known/openid-configuration</code>; <code>jwks_uri</code> is
+   operator-supplied and required
+   (<code>shakenfist/schema/trusted_issuer_attributes.py:48-50</code>),
+   which is exactly the right property for validation — the
+   key location is never taken from the token being
+   validated — and no help at all to a client that has to
+   <em>start</em> a conversation. Phase 3 built the verification
+   half of an OIDC relying party and none of the client
+   half. Discovery is therefore a prerequisite of this
+   question rather than a detail of it, and has its own row
+   in the Execution table.</p>
+<p>The second constraint is where the work lands.
+   <code>sf-client</code> is in the separate <code>client-python</code>
+   repository; this repository ships only <code>sf-ctl</code> and
+   <code>sf-backup</code> (<code>pyproject.toml:157-158</code>). Neither flow can
+   be implemented in this checkout, and the Execution table
+   says so per row.</p>
+<p>The lean is unchanged: both, with device code as the
+   default because it works on a headless box.</p>
+<ol>
 <li>
 <p><strong>Token caching on the client.</strong> Where does
     <code>sf-client</code> cache the OIDC refresh token and access
     token? <code>~/.shakenfist/oidc-cache</code> is the obvious
     answer, with file mode 0600. Need to define the
     cache format and invalidation rules.</p>
+<p><strong>Still open, unchanged in substance (2026-08-12).</strong>
+Nothing built since has touched it. Two things narrow
+it. It is a <code>client-python</code> change and cannot be done in
+this repository. And whatever is cached must not defeat
+revocation, which is the property Shaken Fist's
+credential model is built around: a cached refresh token
+is a credential at rest and must be protected like the
+namespace key it replaces, and a cached access token
+must respect its <code>exp</code> and must not survive a logout the
+client itself initiated. A cache that quietly extends
+the life of a credential the server considers dead
+undoes the one thing the nonce buys.</p>
 </li>
 <li>
 <p><strong>Migration of existing namespace keys.</strong> The
@@ -11393,6 +11859,33 @@ significantly when this plan moves out of stub status.</p>
     may want to evolve. Need to decide whether the
     rename is a pure UX layer over the existing
     storage or an actual schema migration.</p>
+<p><strong>Partly resolved by auth federation phase 2, and
+inverted (2026-08-12).</strong> The question asks whether the
+rename is a UX layer or a schema migration. The schema
+migration already happened, for reasons that had nothing
+to do with the rename: keys are first-class objects in
+the <code>namespace_keys</code> and <code>namespace_key_attributes</code>
+tables (<code>shakenfist/namespace_key.py:62</code>), carrying
+expiry, scopes and provenance, and the <code>keys</code> JSON
+column on <code>namespace_attributes</code> is neither read nor
+written any more (<code>shakenfist/namespace.py:187-190</code>).
+The migration is one-shot and idempotent, run by
+<code>sf-ctl ensure-mariadb-schema</code>.</p>
+<p>So the expensive half is done and the cheap half is what
+is left. That half is genuinely still open — nothing has
+been renamed — but it is now a question about words and
+command names rather than about storage, and its cost is
+a documentation pass and a deprecation window rather
+than a migration. <code>sf-client namespace add-key</code> lives in
+<code>client-python</code>, so the CLI surface of any rename lands
+there and not here.</p>
+<p>One clause of the question no longer describes anything
+live. There is no JSON shape of <code>keys</code> in
+<code>namespace_attributes</code> to evolve; what a caller sees
+comes from <code>Namespace.keys</code>, which synthesises the
+legacy <code>{'nonced_keys': ...}</code> dict out of the tables for
+the handful of call sites that still read it
+(<code>shakenfist/namespace.py:197-205</code>).</p>
 </li>
 <li>
 <p><strong>Documentation surface.</strong> Three audiences:</p>
@@ -11408,16 +11901,219 @@ significantly when this plan moves out of stub status.</p>
   service-account tokens, why authorisation stays
   in SF.</li>
 </ul>
+<p><strong>Still open, and substantially narrowed by auth
+federation phase 4 (2026-08-12).</strong> All three audiences
+now have a document, and all three documents were
+brought current against the as-built code:
+<code>docs/{developer,operator,user}_guide/authentication.md</code>,
+plus <code>docs/glossary.md</code> and the API reference at
+<code>docs/developer_guide/api_reference/authentication.md</code>.
+So this is no longer "write three documents", it is
+"extend five current ones", and it should be planned at
+that size.</p>
+<p>Two of the three audiences are largely served already.
+The architects' view the question names — the trust
+model, why service-account credentials were kept, why
+authorisation stays in Shaken Fist — is covered by the
+glossary and by the developer guide's federated identity
+section. The users' view exists except for the login
+flow that does not exist yet, which is not a
+documentation gap.</p>
+<p>The operators' half is what is genuinely missing, and
+specifically the worked examples. The guides name
+Authentik as a supported issuer but do not walk an
+operator through configuring one, and Keycloak appears
+in the documentation only as an example of a service
+likely to present a private CA certificate
+(<code>docs/operator_guide/authentication.md:330</code>).
+End-to-end worked examples for both, including how a
+group claim reaches a namespace grant, remain to be
+written — and they are the part that cannot be written
+until open questions 13 and 14 are settled, because what
+an operator configures depends on which of the two
+session shapes is chosen.</p>
+</li>
+<li>
+<p><strong>Direct-bearer or exchange-based human sessions?</strong>
+    This plan's central unresolved question, and the one
+    <code>PLAN-auth-federation.md</code> explicitly reserves for this
+    plan's own phase 0 decisions pass rather than answering
+    in passing. It is posed here with the evidence that has
+    accumulated; it is deliberately not answered.</p>
+<p>Two shapes. Under <strong>direct-bearer</strong>, a human completes
+an OIDC flow and the IdP's token becomes the
+<code>Authorization: Bearer</code> credential presented to the
+Shaken Fist API; Shaken Fist validates it per request
+and authorises off its claims. This was this plan's
+original design. Under <strong>exchange</strong>, the IdP's token is
+presented once — to <code>POST /auth/federated</code> or a
+human-shaped sibling of it — and what the client then
+holds and presents is an ordinary namespace key and the
+access tokens minted from it. That is what the workload
+half already does.</p>
+<p>Four things bear on the choice and they do not all point
+the same way.</p>
+<p><em>The missing-<code>scopes</code> default is a constraint on
+direct-bearer.</em> <code>api_scopes.satisfies()</code> returns <code>True</code>
+unconditionally when the held scope list is <code>None</code>
+(<code>shakenfist/external_api/scopes.py:137-142</code>), and
+<code>caller_is_admin</code> tests the same predicate
+(<code>shakenfist/external_api/base.py:140-145</code>). That
+default is correct and deliberate: a token minted before
+the claim existed carries no <code>scopes</code>, and refusing
+those would have invalidated every token in flight
+across an upgrade — the reasoning is written down at
+<code>shakenfist/util/access_tokens.py:31-34</code>. But an
+IdP-issued token also carries no <code>scopes</code> claim, and no
+IdP is ever going to mint one, so under direct-bearer
+such a token would reach <code>_enforce_scope</code>
+(<code>shakenfist/external_api/base.py:1234</code>) holding <code>None</code>
+and satisfy every scope, including <code>cluster-admin</code>.</p>
+<p><strong>This is not a bug and must not be filed as one.</strong> No
+externally-issued token can reach that path today: the
+only way to obtain a Shaken Fist access token is
+<code>/auth</code>, which mints its own. It is a constraint the
+direct-bearer option has to answer, and the answer is
+that the missing-claim default would have to become
+issuer-dependent — wildcard for tokens this cluster
+minted, deny for tokens it did not — which is a change
+to the most safety-critical default in the whole
+authorisation path. The backward-compatibility argument
+that justifies the current default applies only to
+tokens Shaken Fist itself minted, because only those
+have a history. Exchange does not have to answer this at
+all: what reaches <code>_enforce_scope</code> is always a token
+Shaken Fist minted, carrying the scopes the mapping rule
+granted.</p>
+<p><em>Revocation favours exchange.</em> This is open question 7
+reappearing as a consequence of the choice rather than
+as an independent decision. Exchange inherits the nonce,
+so deleting the minted key invalidates its tokens on the
+next request. Direct-bearer inherits only the IdP's
+<code>exp</code>, so revocation acquires a bounded delay equal to
+the token lifetime, the recommendation becomes "keep
+lifetimes short", and token introspection becomes the
+escape hatch if that proves operationally unacceptable.</p>
+<p><em>Multi-namespace favours direct-bearer, and cuts the
+other way from everything above.</em> A human is typically
+in several namespaces. An IdP token can carry a list of
+them in one claim and be authorised against whichever
+namespace each request touches. Every credential Shaken
+Fist mints names exactly one: the JWT identity is
+<code>&lt;namespace&gt;:&lt;keyname&gt;</code>
+(<code>shakenfist/util/access_tokens.py:49</code>) and a namespace
+key belongs to a single namespace
+(<code>shakenfist/schema/namespace_key_data.py:60-63</code>). So
+exchange for a person in five namespaces means five
+exchanges and a client that knows which credential to
+present for which request. Exchange makes the
+multi-namespace problem a client-side one, direct-bearer
+makes it a server-side one, and neither makes it go
+away — see open question 14.</p>
+<p><em>Cost is ordinary and mildly favours exchange.</em>
+Direct-bearer puts signature verification, and a
+possible JWKS refetch, on every request against an
+external dependency; exchange puts one round trip at
+login and afterwards uses a path that is already an
+indexed point read.</p>
+<p><strong>What would settle it:</strong> two pieces of evidence a phase
+0 pass can actually go and get. First, the real
+multi-namespace distribution — how many namespaces the
+people at a handful of real deployments are actually in
+— because if the answer is usually one then exchange
+wins outright and open question 14 shrinks to a
+convenience, and if it is routinely several then the
+cost of an issuer-dependent missing-claim default has to
+be weighed rather than dodged. Second, a prototype of
+that issuer-dependent default carried far enough to show
+whether it can be expressed <em>inside</em> the single existing
+enforcement path rather than beside it, because
+"authorisation lives in one place" is a constraint this
+plan will not trade away.</p>
+</li>
+<li>
+<p><strong>Multi-namespace authorisation.</strong> Promoted from a
+    settled-sounding sentence in an earlier draft of this
+    plan to a question of its own, because it is the single
+    largest piece of unbuilt work here and was being treated
+    as a detail of claim mapping.</p>
+<p>Shaken Fist's authorisation is one namespace deep, by
+construction and everywhere. <code>parse_jwt_identity()</code>
+requires exactly two colon-separated components and
+raises otherwise
+(<code>shakenfist/util/access_tokens.py:68-73</code>),
+<code>request_namespace()</code> returns the first of them as a
+single string
+(<code>shakenfist/util/access_tokens.py:76</code>), and fifty-seven
+call sites outside the tests compare that string against
+an object's namespace — seventeen in
+<code>shakenfist/external_api/artifact.py</code> alone. Letting a
+caller hold several namespaces at once is not a change
+to a claim reader; it is a change to the shape of every
+authorisation check in the codebase, and each of those
+sites has to be re-read to decide whether it means "the
+caller's namespace", "any namespace the caller holds",
+or "the namespace this object is in".</p>
+<p>There is a second mechanism already in the tree which
+partly answers the same need, and the boundary between
+the two has not been worked through by anybody.
+Namespace <a href="/glossary/#trust">trust</a> grants visibility
+from trusted namespaces into the trusting namespace
+(<code>namespace_is_trusted()</code>,
+<code>shakenfist/namespace.py:413</code>), and auth federation
+phase 3 established that scopes compose with trust
+rather than being escaped by it. So a caller holding one
+namespace can already reach objects in another, under an
+explicitly granted relationship, without holding two
+credentials. But trust is administered by the target
+namespace and is a standing property of the deployment,
+whereas a multi-namespace credential would be
+administered in the IdP and would be a property of the
+person. Those are different answers to overlapping
+questions, and shipping both without deciding where the
+line sits gives operators two ways to express one intent
+and no guidance about which to reach for.</p>
+<p>The sub-questions a decisions pass has to answer:
+whether the two-component identity grows a third form or
+is replaced outright; whether a request names its target
+namespace explicitly, as <code>POST /auth/federated</code> already
+does, or infers it from the object being touched; what
+<code>request_namespace()</code> becomes when there is no single
+answer, and whether it survives at all; and what happens
+to listing endpoints, which today filter by one
+namespace plus its trust relationships.</p>
+<p><strong>What would settle it:</strong> a mechanical audit of those
+fifty-seven call sites, classifying each into "the
+caller's own namespace", "any namespace the caller
+holds" and "the object's namespace". The classification
+<em>is</em> the evidence — if the great majority fall into one
+bucket then the change is a mechanical rename with a
+handful of hand-written exceptions, and if they are
+spread evenly then it is a redesign of the authorisation
+model and has to be sequenced as one. That audit is
+cheap, it is independent of open question 13, and it
+should be done before either question is decided.</p>
 </li>
 </ol>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>(Detailed phase plans will be drafted when this plan moves
-out of stub status. Phases are tentatively expected to look
-like:)</p>
+<p>No phase plan has been cut yet, and phase 0 must run before
+any of the others can be. It settles open questions 13 and
+14, and what most of the rows below actually <em>are</em> depends
+on which way 13 goes.</p>
+<p>The <strong>Repo</strong> column is not decoration. <code>sf-client</code> lives in
+the separate <code>client-python</code> repository; this repository
+ships only <code>sf-ctl</code> and <code>sf-backup</code>
+(<code>pyproject.toml:157-158</code>). A phase that adds a login
+command therefore cannot be executed in this checkout at
+all, and an agent handed such a brief in the wrong tree
+finds that out only after it has read the codebase. Every
+row names the repository its work lands in, and work does
+not land anywhere else.</p>
 <table>
 <thead>
 <tr>
 <th>Phase</th>
+<th>Repo</th>
 <th>Plan</th>
 <th>Status</th>
 </tr>
@@ -11425,119 +12121,390 @@ like:)</p>
 <tbody>
 <tr>
 <td>0. Research and decisions</td>
+<td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
 <td>1. JWT validation refactor (split issuance from validation; introduce per-issuer validators)</td>
-<td>TBD</td>
-<td>Not started</td>
+<td>shakenfist</td>
+<td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
+<td>Superseded</td>
 </tr>
 <tr>
 <td>2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification)</td>
+<td>shakenfist</td>
+<td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
+<td>Superseded</td>
+</tr>
+<tr>
+<td>3. OIDC discovery</td>
+<td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>3. Claim → namespace authorisation (replace <code>request_namespace()</code> with a per-request decision)</td>
+<td>4. Claim-driven namespace authorisation, including multi-namespace</td>
+<td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>4. Admin-claim model and <code>caller_is_admin</code> rework</td>
+<td>5. Admin as a claim</td>
+<td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>5. Service-account-token rename of the existing namespace-key surface</td>
+<td>6. Service-account framing of namespace keys</td>
+<td>shakenfist, client-python</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>6. CLI OIDC flows (device code, optionally auth-code-with-PKCE) and token cache</td>
+<td>7. Interactive CLI flows and token cache</td>
+<td>client-python</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>7. Worked-example operator docs for Keycloak and Authentik</td>
+<td>8. Worked operator examples for Keycloak and Authentik</td>
+<td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>8. Functional test coverage with an in-CI IdP (Keycloak in a container)</td>
+<td>9. Functional coverage against a containerised IdP</td>
+<td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
 </tbody>
 </table>
-<p>This plan is currently in placeholder form. It exists to
-record the design direction discussed and to give us a
-shared artefact to point at when work begins. None of the
-phase plans have been drafted; the open questions above
-must be resolved in a phase 0 decisions pass before any
-implementation phase is cut.</p>
+<p><strong>Phase 0 — research and decisions.</strong> Settles open question
+13, direct-bearer versus exchange-based human sessions, and
+open question 14, multi-namespace authorisation. Both are
+posed above with the evidence that would settle them, and
+neither is answered anywhere in this document. The call-site
+audit open question 14 asks for is the cheapest useful work
+in the plan and is independent of 13, so it happens here
+regardless of how 13 is argued. Question 13 in turn gates
+questions 5, 6, 7 and 12, because what an administrator
+holds, what a machine presents, how a credential is revoked
+and what an operator configures all differ between the two
+shapes.</p>
+<p><strong>Phases 1 and 2 — superseded, and kept on purpose.</strong> Both
+were built as auth federation phase 3, in
+<code>shakenfist/federation.py</code>. Phase 1's split of issuance from
+validation is there in the form of a separate module with a
+pinned RS/ES/PS algorithm allowlist and HS deliberately
+absent (<code>shakenfist/federation.py:39-51</code>); phase 2's JWKS
+fetch, caching and rotation are <code>JWKSCache</code>
+(<code>shakenfist/federation.py:120-210</code>), and its signature and
+claim verification is the decode call that requires <code>exp</code>,
+<code>iss</code> and <code>aud</code> and allows zero clock leeway
+(<code>shakenfist/federation.py:321-340</code>). The rows are struck
+rather than deleted so that a reader six months from now
+can see that this work was done and where, instead of
+concluding from a shorter table that it is still to do.</p>
+<p>One half of phase 2 was <strong>not</strong> built. Nothing in the tree
+fetches <code>.well-known/openid-configuration</code>; <code>jwks_uri</code> is
+operator-supplied and required. That half survives as phase
+3 below rather than dying with the row it was written in.</p>
+<p><strong>Phase 3 — OIDC discovery.</strong> New, and a prerequisite rather
+than a convenience. Phase 3 of the federation plan built the
+verification half of a relying party and none of the client
+half: a workload arrives already holding a minted token, so
+nothing ever needed to <em>start</em> a conversation with an
+issuer. A human client does, and the endpoints that
+conversation needs — <code>device_authorization_endpoint</code>,
+<code>token_endpoint</code> — are exactly what a discovery document
+publishes. Open question 9 is blocked on this, and so
+therefore is phase 7. The security property that the JWKS
+location is never taken from the token being validated is
+not up for discussion here: discovery populates a
+<code>TrustedIssuer</code>'s fields at configuration time, and
+validation keeps reading them from the object.</p>
+<p><strong>Phase 4 — claim-driven namespace authorisation.</strong> This is
+where <code>request_namespace()</code> stops being a string split
+(<code>shakenfist/util/access_tokens.py:76</code>). Blocked on open
+question 14, and it cannot be planned before that question's
+call-site audit exists, because the audit is what decides
+whether this phase is a mechanical rename with a handful of
+hand-written exceptions or a redesign of the authorisation
+model. Open question 2's human half closes here.</p>
+<p><strong>Phase 5 — admin as a claim.</strong> Half done already:
+<code>caller_is_admin</code> requires the <code>cluster-admin</code> scope as well
+as the <code>system</code> namespace
+(<code>shakenfist/external_api/base.py:128-148</code>), so the
+administrative role is already something a token carries.
+What remains is the decision in open question 5 — whether
+the namespace half can be dropped so that holding
+<code>cluster-admin</code> is sufficient — which should be taken
+alongside question 13, since an administrator arriving from
+an IdP with no <code>scopes</code> claim at all is the case that makes
+it matter.</p>
+<p><strong>Phase 6 — service-account framing of namespace keys.</strong>
+Naming and CLI surface only. Phase 2 of the federation plan
+already made keys first-class objects with expiry, scopes
+and provenance (<code>shakenfist/namespace_key.py:62</code>), so the
+storage migration open question 11 worried about has
+happened for unrelated reasons. What is left is words,
+command names, a documentation pass and a deprecation
+window — and the command names are <code>client-python</code>'s, which
+is why the row names two repositories. Open question 11
+must be answered before this is cut; it may be answered
+"no", in which case the row disappears rather than shrinks.</p>
+<p><strong>Phase 7 — interactive CLI flows and token cache.</strong> Device
+code, and authorisation code with PKCE where a browser is
+available, plus the credential cache open question 10
+describes. Entirely <code>client-python</code>: none of it can be
+implemented in this repository. Depends on phase 3, because
+neither flow can begin without the issuer's endpoints, and
+on question 13, because what the client caches and presents
+after the flow completes is precisely what 13 decides.</p>
+<p><strong>Phase 8 — worked operator examples.</strong> Care is needed about
+what is genuinely new here. The operator guide already has
+an issuer-configuration section and a worked GitHub Actions
+example (<code>docs/operator_guide/authentication.md:201</code>), and
+Authentik is named in both the operator and developer guides
+as a supported source for the <em>workload exchange</em>
+(<code>docs/operator_guide/authentication.md:142</code>,
+<code>docs/developer_guide/authentication.md:418</code>). Keycloak
+appears in the documentation exactly once, as an example of
+a service likely to present a private CA certificate
+(<code>docs/operator_guide/authentication.md:330</code>), and nothing
+in the tree exercises it. So what this phase owes is: a
+first end-to-end walkthrough of configuring either provider,
+for a <em>human</em> login rather than a workload exchange, for
+both Keycloak and Authentik, including how a group claim
+reaches a namespace grant. It cannot be written before
+questions 13 and 14 are settled, because what an operator
+configures depends on which session shape was chosen.</p>
+<p><strong>Phase 9 — functional coverage against a containerised
+IdP.</strong> The federation exchange already has functional
+coverage in <code>test_federation.py</code> under
+<code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code>, but
+against a throwaway in-process JWKS server rather than a
+real provider — which is the right trade for testing
+validation and no use at all for testing a flow. This phase
+stands up a real IdP in a container and drives a login
+through it headlessly, which is also the only honest test of
+phase 3's discovery and of phase 8's worked examples.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<p>(To be filled in when this plan moves out of stub status.
-The structure will mirror <code>PLAN-network-facade.md</code>'s
-<em>Agent guidance</em> section: execution model, planning
-effort, step-level guidance table with effort / model /
-isolation / brief columns, and the management session
-review checklist.)</p>
+<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
+<p>All implementation work is done by sub-agents, never in the
+management session. The management session is reserved for
+planning, review, and decision-making. The workflow, effort
+levels, model choice guidance, and review checklist follow
+<code>PLAN-TEMPLATE.md</code> exactly; each phase plan carries its own
+step-level table (Step / Effort / Model / Isolation /
+Brief).</p>
+<p>Two things are specific to this plan. First, a brief must
+state which repository its work lands in, matching the
+Execution table's Repo column, and a sub-agent working on a
+<code>client-python</code> phase is given a checkout of that repository
+rather than this one. A brief that names a file this
+repository does not contain is a defect in the brief, not a
+puzzle for the agent to solve.</p>
+<p>Second, phase 0 is a decisions pass and produces no code at
+all. Its output is answers to open questions 13 and 14
+written back into this document, with the evidence that
+produced them. A phase 0 that arrives with an implementation
+attached has skipped the part that mattered.</p>
+<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Phase 0 (research and decisions): <strong>high</strong> — it settles a
+  security-architecture question that every later phase is
+  shaped by, and the evidence it needs (a real
+  multi-namespace distribution, a call-site audit, a
+  prototype of an issuer-dependent missing-claim default)
+  has to be gathered rather than reasoned about.</li>
+<li>Phase 3 (discovery): <strong>medium</strong> — a well-specified
+  protocol and one new fetch path, with the security
+  properties already settled by the existing issuer model.
+  Review at high effort anyway: it adds a network fetch
+  driven by operator-supplied URLs.</li>
+<li>Phase 4 (claim-driven authorisation): <strong>high</strong> — it
+  changes the shape of every authorisation check in the
+  codebase, and each call site has to be read to decide
+  which of three things it meant. The size is known only
+  after phase 0's audit.</li>
+<li>Phase 5 (admin as a claim): <strong>medium</strong> — the mechanism
+  exists and the change is small. Review at high effort: it
+  is the cluster's privilege boundary, and the failure mode
+  is silent.</li>
+<li>Phase 6 (service-account framing): <strong>medium</strong> — naming,
+  documentation and a deprecation window across two
+  repositories. No storage work; that already happened.</li>
+<li>Phase 7 (CLI flows and token cache): <strong>high</strong> — two OAuth
+  flows, a credential at rest, and a cache whose
+  invalidation rules must not outlive the server's view of
+  the credential.</li>
+<li>Phase 8 (worked operator examples): <strong>medium</strong>, reviewed
+  at <strong>high</strong> — the examples must be produced by actually
+  configuring the two providers, not written from memory of
+  how they work. A plausible-looking walkthrough that does
+  not run is worse than no walkthrough.</li>
+<li>Phase 9 (functional coverage): <strong>high</strong> — CI topology,
+  a containerised provider, and driving an interactive flow
+  headlessly.</li>
+</ul>
+<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
+<p>As per <code>PLAN-TEMPLATE.md</code>, plus for this plan specifically:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No phase weakens <code>api_scopes.satisfies()</code>'s treatment
+      of a missing <code>scopes</code> claim as a wildcard
+      (<code>shakenfist/external_api/scopes.py:137-142</code>) without
+      saying so explicitly and justifying it. That default
+      is safe for tokens Shaken Fist minted, because only
+      those have a history, and is not obviously safe for
+      tokens it did not — see open question 13.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Inter-node authentication is never put behind an
+      external IdP (<code>shakenfist/namespace.py:386-410</code>).
+      Making the IdP a hard dependency of cluster operation
+      is a reliability regression, not a security
+      improvement.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Authorisation still happens in exactly one place. No
+      phase adds a second path beside
+      <code>Resource.method_decorators</code>
+      (<code>shakenfist/external_api/base.py:1291</code>), whatever
+      open question 13 decides.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No second copy of JWT validation, JWKS fetching or
+      caching. Anything new extends
+      <code>shakenfist/federation.py</code> rather than sitting beside
+      it.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>jwks_uri</code> is still never taken from the token being
+      validated. Discovery populates a <code>TrustedIssuer</code>'s
+      fields at configuration time; validation keeps reading
+      them from the object.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No credential material — identity tokens, refresh
+      tokens, minted secrets — is written to events, logs,
+      fixtures or a client-side cache in the clear. The
+      token cache of phase 7 is a new place for this to go
+      wrong and the federation plan's experience says it
+      will be tried.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Claim matching is still exact: an exact string, or
+      membership of a list of exact strings, with no
+      globbing, regular expressions, prefix matching or
+      coercion (<code>shakenfist/federation.py:347-363</code>). If a
+      phase wants pattern matching it argues for it in the
+      open, because a claim matcher that is nearly right is
+      an authorisation bypass.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A cluster with no trusted issuers configured behaves
+      exactly as it does today, proven by tests that
+      pre-date the change.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The diff lands in the repository the phase's Execution
+      row names. A <code>shakenfist</code> row whose diff touches
+      <code>client-python</code>, or the reverse, is a failed step
+      rather than a bonus.</li>
+</ul>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>When this plan is successfully implemented:</p>
 <ul>
-<li>An operator can configure a cluster to trust one or
-  more OIDC issuers (Keycloak and Authentik both work
-  with worked examples in <code>docs/operator_guide/</code>).</li>
-<li>A human user can <code>sf-client login</code> (or equivalent),
-  complete an OIDC flow, and from then on <code>sf-client</code>
-  calls authenticate using the IdP-issued JWT.</li>
-<li>Namespace access for OIDC-authenticated callers is
-  driven by claims in the token, with no SF-side
-  per-user state required.</li>
-<li>The existing namespace-key mechanism is renamed to
-  "service account tokens", still works for automation,
-  and is the documented choice for machine credentials.</li>
-<li>The <code>caller_is_admin</code> decorator and the privileged
-  status of the <code>system</code> namespace are driven by a
-  claim, not by namespace name alone.</li>
+<li>An operator can take a Keycloak or an Authentik
+  deployment from nothing to a human logging in, by
+  following a worked example in
+  <code>docs/operator_guide/authentication.md</code>. Trusting an
+  issuer is already configuration rather than code
+  (<code>shakenfist/trusted_issuer.py:41</code>); what is new is the
+  end-to-end walkthrough for a <em>human</em> login, which today
+  exists only for the GitHub Actions workload path.</li>
+<li>A human user can run a login command in <code>sf-client</code>,
+  complete an OIDC flow, and thereafter make API calls
+  without holding a static key in a file. Whether what the
+  client presents afterwards is the IdP's own token or a
+  credential exchanged for it is open question 13's to
+  settle, and this criterion does not pre-judge it. The
+  command itself lands in <code>client-python</code>.</li>
+<li>Namespace access for OIDC-authenticated humans is driven
+  by claims in the token, with no per-person state in
+  Shaken Fist — mapping rules are per-grant, not per-user —
+  and the multi-namespace case of open question 14 is
+  answered rather than deferred again.</li>
+<li>Namespace keys still work for automation and are the
+  documented choice for machine credentials on a cluster
+  that runs no IdP. Whether they are re-presented to users
+  as service-account credentials, and under what command
+  names, is open question 11's to settle; this criterion
+  does not presume the rename happens.</li>
+<li>The privileged status of the <code>system</code> namespace is
+  settled one way or the other: either <code>caller_is_admin</code>
+  drops its namespace half so that holding <code>cluster-admin</code>
+  is sufficient, or this plan records why the two-axis
+  check (<code>shakenfist/external_api/base.py:128-148</code>) is
+  kept. The mechanism already exists; what is missing is
+  the decision.</li>
 <li>Inter-node authentication continues to work without
   requiring an external IdP — the IdP is opt-in for
   external callers.</li>
-<li>OIDC validation handles JWKS rotation gracefully
-  (cache + refetch on unknown <code>kid</code>).</li>
-<li>Audit events (<code>EVENT_TYPE_AUDIT</code>) cover OIDC logins
-  with at least: issuer, subject, mapped namespaces,
-  token id (<code>jti</code>).</li>
+<li>JWKS caching and rotation still work as auth federation
+  phase 3 built them
+  (<code>shakenfist/federation.py:120-210</code>): cached per issuer,
+  refetched once on an unknown <code>kid</code>, with concurrent
+  misses collapsed into one fetch. This is a constraint
+  rather than a deliverable — it is done, and no phase of
+  this plan may regress it or duplicate it.</li>
+<li>Audit events (<code>EVENT_TYPE_AUDIT</code>) cover human logins with
+  at least: issuer, subject, the rule or claim that granted
+  access, the namespaces granted, and the token id (<code>jti</code>)
+  where the issuer supplies one.</li>
 <li>The code passes <code>pre-commit run --all-files</code>.</li>
-<li>Functional test coverage in <code>shakenfist/deploy/cluster_ci</code>
-  exercises an end-to-end OIDC login against a
-  containerised Keycloak.</li>
-<li><code>docs/{developer,operator,user}_guide/authentication.md</code>
-  are updated to describe both the OIDC and
-  service-account-token paths and when to use each.</li>
+<li>Functional coverage in
+  <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code>
+  exercises an end-to-end human OIDC login against a
+  containerised provider, alongside the existing
+  <code>test_federation.py</code> exchange coverage.</li>
+<li><code>docs/{developer,operator,user}_guide/authentication.md</code>,
+  <code>docs/glossary.md</code> and
+  <code>docs/developer_guide/api_reference/authentication.md</code>
+  are updated to describe the human login path alongside
+  the existing workload exchange, and when to reach for
+  each. All five are current as of auth federation phase 4,
+  so this is an extension of live documents rather than a
+  rewrite.</li>
+<li>A cluster that never configures an issuer behaves exactly
+  as it does today.</li>
 </ul>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Per-resource RBAC.</strong> Roles like "read-only on
   namespace X" or "may create instances but not
-  networks". Out of scope here; the unit of
-  authorisation stays the namespace.</li>
+  networks". The gap is narrower than it was when this
+  bullet was written: <a href="/glossary/#scope">scopes</a> now
+  provide a family-and-verb axis, so "may write instances
+  but not networks" and "read-only on everything" are both
+  expressible today as a scope list on a key. What is still
+  missing is a <em>per-object</em> axis — "this instance but not
+  that one" — a verb vocabulary finer than read / write /
+  delete, and a way to name a bundle of scopes as a role
+  rather than enumerating them on every key. The unit of
+  identity stays the namespace.</li>
 <li><strong>Federated trust.</strong> Mapping a single human across
   several IdPs (e.g. internal IdP + partner IdP for
   contractors) onto one logical SF identity. Speculative.</li>
 <li><strong>Inter-node OIDC.</strong> Move inter-node auth onto OIDC
   too. Deferred because of the IdP-dependency concern
-  noted in open question 8.</li>
+  noted in open question 8, and if it is ever revisited the
+  issuer is a node-identity one — SPIFFE, or a cloud
+  provider's instance identity document — rather than the
+  corporate IdP humans log in through.</li>
 <li><strong>Web console.</strong> A browser UI for SF would naturally
   use the same OIDC flow with auth-code + PKCE. Not in
   scope here, but the auth design should not preclude it.</li>
 <li><strong>Token introspection / online revocation.</strong> RFC 7662
-  introspection or an SF-side revocation list. The v1
-  design accepts bounded-delay revocation via short
-  token lifetimes; if that proves unacceptable
-  operationally, introspection is the next step.</li>
+  introspection or an SF-side revocation list. Whether this
+  matters at all is a consequence of open question 13
+  rather than an independent choice. If exchange wins, what
+  reaches the request path is a Shaken Fist access token
+  bound to a namespace key's nonce, revocation is immediate
+  and inherited, and there is nothing here to build. If
+  direct-bearer wins, revocation acquires a bounded delay
+  equal to the IdP's token lifetime, the recommendation
+  becomes "keep lifetimes short", and introspection is the
+  escape hatch when that proves operationally
+  unacceptable.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>(none yet)</p>
