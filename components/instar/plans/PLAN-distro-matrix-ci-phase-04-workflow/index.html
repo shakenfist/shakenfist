@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-create-phase-08-integration-tests/">
+        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 8: integration tests against the cross-version create baselines - Shaken Fist</title>
+        <title>Phase 4: Workflow integration (merge_group package-matrix job) - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-8-integration-tests-against-the-cross-version-create-baselines" class="md-skip">
+        <a href="#phase-4-workflow-integration-merge_group-package-matrix-job" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 8: integration tests against the cross-version create baselines
+              Phase 4: Workflow integration (merge_group package-matrix job)
             
           </span>
         </div>
@@ -10927,10 +10927,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#objective" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Objective
       
     </span>
   </a>
@@ -10938,10 +10938,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#status-not-started" class="md-nav__link">
+  <a href="#grounding-facts-verified-2026-08-11" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Not started
+        Grounding facts (verified 2026-08-11)
       
     </span>
   </a>
@@ -10949,10 +10949,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission" class="md-nav__link">
+  <a href="#corrections-to-the-original-sketch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission
+        Corrections to the original sketch
       
     </span>
   </a>
@@ -10960,33 +10960,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#why-this-is-its-own-phase" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why this is its own phase
+        Decisions
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-the-survey-turned-up" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the survey turned up
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What the survey turned up">
+    <nav class="md-nav" aria-label="Decisions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#teststest_createpy-shape-today" class="md-nav__link">
+  <a href="#d1-trigger-and-gating-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        tests/test_create.py shape today
+        D1. Trigger and gating shape
       
     </span>
   </a>
@@ -10994,10 +10983,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#testsbasepy-and-the-command_output_dirs-mechanism" class="md-nav__link">
+  <a href="#d2-what-the-queue-runs-recommendation-matrix-a-fast-build-gate-only" class="md-nav__link">
     <span class="md-ellipsis">
       
-        tests/base.py and the COMMAND_OUTPUT_DIRS mechanism
+        D2. What the queue runs — recommendation: matrix + a fast build gate only
       
     </span>
   </a>
@@ -11005,10 +10994,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-7-baseline-layout-recap" class="md-nav__link">
+  <a href="#d3-build-once-consume-seven-times" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 7 baseline layout (recap)
+        D3. Build once, consume seven times
       
     </span>
   </a>
@@ -11016,10 +11005,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#latent-profile-dir-collision-bug" class="md-nav__link">
+  <a href="#d4-docs-only-changes-in-the-queue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Latent profile-dir-collision bug
+        D4. Docs-only changes in the queue
       
     </span>
   </a>
@@ -11027,115 +11016,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#three-test-surfaces" class="md-nav__link">
+  <a href="#d5-fan-out-control-full-seven-wide-no-max-parallel" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Three test surfaces
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Three test surfaces">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#surface-1-per-target-baseline-comparison" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Surface 1: per-target baseline comparison
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#surface-2-instar-create-qemu-create-cross-validation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Surface 2: instar-create / qemu-create cross-validation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#surface-3-round-trip-via-instar-check" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Surface 3: round-trip via instar check
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#divergence-whitelist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Divergence whitelist
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create_cases-mirror" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CREATE_CASES mirror
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#test-class-organisation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test-class organisation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#edge-case-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Edge-case handling
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#running-cross-validation-against-the-system-qemu-img" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running cross-validation against the system qemu-img
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#test-runtime-budget" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test runtime budget
+        D5. Fan-out control — full seven-wide, no max-parallel
       
     </span>
   </a>
@@ -11148,10 +11032,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
+  <a href="#steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open questions
+        Steps
       
     </span>
   </a>
@@ -11159,10 +11043,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#public-surface-added-in-phase-8" class="md-nav__link">
+  <a href="#execution-results-2026-08-11" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Public surface added in phase 8
+        Execution results (2026-08-11)
       
     </span>
   </a>
@@ -11170,10 +11054,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
+  <a href="#first-live-fan-out-run-31533536833-2026-08-11" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution
+        First live fan-out (run 31533536833, 2026-08-11)
       
     </span>
   </a>
@@ -11181,10 +11065,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#out-of-scope-for-phase-8" class="md-nav__link">
+  <a href="#acceptance" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Out of scope for phase 8
+        Acceptance
       
     </span>
   </a>
@@ -11192,10 +11076,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#risks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        Risks
       
     </span>
   </a>
@@ -11203,32 +11087,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#risks-and-mitigations" class="md-nav__link">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Risks and mitigations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bugs-to-fix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs to fix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Out of scope
       
     </span>
   </a>
@@ -11256,556 +11118,165 @@
   
 
 
-<h1 id="phase-8-integration-tests-against-the-cross-version-create-baselines">Phase 8: integration tests against the cross-version create baselines<a class="headerlink" href="#phase-8-integration-tests-against-the-cross-version-create-baselines" title="Permanent link">&para;</a></h1>
-<p>Master plan: <a href="/components/instar/plans/PLAN-create/">PLAN-create.md</a> ·
-Previous phase: <a href="/components/instar/plans/PLAN-create-phase-07-baselines/">PLAN-create-phase-07-baselines.md</a></p>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the instar codebase thoroughly. Read relevant
-source files, understand existing patterns (<code>tests/base.py</code>'s
-<code>get_output_profiles</code> / <code>get_expected_output</code> helpers,
-<code>tests/test_measure.py</code>'s phase-7 baseline-comparison classes,
-<code>tests/test_create.py</code>'s phase-3 through phase-6 smoke tests,
-the create-info-json layout under
-<code>instar-testdata/expected-outputs/create-info-json/</code>), and
-ground answers in what the code actually does today. Where a
-question touches on external concepts (<code>qemu-img info --output=
-json</code> schema per format, qcow2 / vmdk / vhd / vhdx info-JSON
-field semantics, the divergence whitelist motivated by random
-UUIDs / CIDs / header IDs), research as needed. Flag uncertainty
-explicitly rather than guessing.</p>
-<h2 id="status-not-started">Status: Not started<a class="headerlink" href="#status-not-started" title="Permanent link">&para;</a></h2>
-<h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
-<p>Wire <code>tests/test_create.py</code> up to the cross-version baselines
-that phase 7 committed in <code>instar-testdata</code>. After phase 8,
-every case in the create matrix (36 cases × 5 target formats:
-19 qcow2 + 5 vmdk + 5 vhd + 5 vhdx + 2 raw) is validated
-against its version-matched <code>qemu-img info</code> baseline, and a
-parallel cross-validation surface confirms that for any given
-<code>(target, options, size)</code> triple, the bytes <code>instar create</code>
-produces are info-equivalent to the bytes <code>qemu-img create</code>
-produces (modulo a documented divergence whitelist for random
-or path-dependent fields).</p>
-<p>Phase 8 closes the loop the master plan opened: every prior
-phase says "the writer works for the cases I tested";
-phase 8 says "the writer matches qemu-img field-for-field
-on every case in the matrix, against the same qemu-img
-version installed on the test host".</p>
-<h2 id="why-this-is-its-own-phase">Why this is its own phase<a class="headerlink" href="#why-this-is-its-own-phase" title="Permanent link">&para;</a></h2>
-<p>Decomposes cleanly into:</p>
-<ol>
-<li>Phase 7 stored bytes on disk. Phase 8 turns them into
-   assertions. Separating the two keeps the cross-repo work
-   (<code>instar-testdata</code> script edits + multi-minute baseline
-   regeneration) out of the test-iteration loop in
-   <code>instar</code>.</li>
-<li>The fan-out is large (~36 cases × per-target option
-   sweeps + cross-validation + round-trips ≈ 100 tests).
-   Bundling phase 7's data generation with the test code
-   would mean one giant commit that's hard to review.</li>
-<li>Phase 8 surfaces the latent profile-dir-collision bug
-   from phase 7 (see "What the survey turned up" below)
-   without blocking on its fix — by reading the intact raw
-   bucket directly.</li>
-</ol>
-<h2 id="what-the-survey-turned-up">What the survey turned up<a class="headerlink" href="#what-the-survey-turned-up" title="Permanent link">&para;</a></h2>
-<h3 id="teststest_createpy-shape-today"><code>tests/test_create.py</code> shape today<a class="headerlink" href="#teststest_createpy-shape-today" title="Permanent link">&para;</a></h3>
-<p>686 lines, four classes:</p>
+<h1 id="phase-4-workflow-integration-merge_group-package-matrix-job">Phase 4: Workflow integration (merge_group package-matrix job)<a class="headerlink" href="#phase-4-workflow-integration-merge_group-package-matrix-job" title="Permanent link">&para;</a></h1>
+<p>Master plan: <a href="/components/instar/plans/PLAN-distro-matrix-ci/">PLAN-distro-matrix-ci.md</a>.
+Planning effort: <strong>medium</strong>. Isolation: none. Depends on phases 1, 2,
+2b, 3 — all complete as of 2026-08-11.</p>
+<p>Rewritten 2026-08-11 from the original sketch. The sketch was written
+before phases 2b and 3 executed and before anyone had read the sibling
+repo's merge-queue implementation; it contained one instruction that
+would have broken PR CI (see "Corrections" below).</p>
+<h2 id="objective">Objective<a class="headerlink" href="#objective" title="Permanent link">&para;</a></h2>
+<p>Add a <code>package-matrix</code> job to
+<code>.github/workflows/functional-tests.yml</code>, gated to <code>merge_group</code>
+events, that fans out over the seven matrix distros and runs
+<code>tools/test-package-functional.sh</code> for each against a single shared
+pair of build artifacts. Add the aggregate <code>can_merge</code> gate the queue
+will require. PR events keep today's jobs; the matrix runs only in the
+merge queue and on <code>workflow_dispatch</code>.</p>
+<h2 id="grounding-facts-verified-2026-08-11">Grounding facts (verified 2026-08-11)<a class="headerlink" href="#grounding-facts-verified-2026-08-11" title="Permanent link">&para;</a></h2>
+<p>Read before changing anything; these were checked against the tree and
+the sibling repo, not recalled.</p>
 <ul>
-<li><code>TestCreateSmoke</code> (phase 3) — happy-path end-to-end per
-  target format, plus a couple of error / option / JSON
-  output tests.</li>
-<li><code>TestCreateOOptions</code> (phase 4) — <code>-o key=value,...</code>
-  parsing happy and error paths.</li>
-<li><code>TestCreateBackingChain</code> (phase 5) — vhdx-as-backing,
-  vmdk-from-vmdk CID round-trip, three-level chain non-
-  recursion, format-mismatch auto-detect, size-too-large.</li>
-<li><code>TestCreatePreallocation</code> (phase 6) — accept-set
-  coverage for raw + falloc/full and qcow2 + metadata /
-  falloc / full, plus the deferred-format rejections.</li>
+<li><strong><code>functional-tests.yml</code> has no <code>merge_group</code> trigger today.</strong> It
+  fires on <code>pull_request</code> (with a <code>paths:</code> filter over <code>src/**</code>,
+  <code>crates/**</code>, <code>tests/**</code>, <code>scripts/**</code>, <code>tools/**</code>, <code>Makefile</code>, and
+  the workflow itself) and <code>workflow_dispatch</code>. 807 lines, 9 jobs.</li>
+<li><strong>Job graph.</strong> <code>test-partition</code> (gated <code>pull_request</code>, <code>s</code> runner) ·
+  <code>build-and-test</code> (<code>s</code>, ungated) · <code>package-smoke</code>, <code>integration-core</code>,
+  <code>integration-convert-qcow2</code>, <code>integration-convert-vhd</code>,
+  <code>snapshot-harnesses</code>, <code>oslo-crossval-master</code> (all <code>needs:
+  build-and-test</code>, all <code>[self-hosted, debian-12, xl]</code>) ·
+  <code>automated_reviewer</code>.</li>
+<li><strong>Only <code>test-partition</code> carries an event gate.</strong> Every other job runs
+  on whatever the workflow triggers on. Adding <code>merge_group:</code> to the
+  trigger list therefore re-runs the entire PR suite inside the queue
+  unless each job is gated. This is the single largest decision in the
+  phase (D2).</li>
+<li><strong><code>package-smoke</code> (line 260) is the artifact-producing precedent</strong>:
+  <code>make instar &amp;&amp; make deb</code>, then <code>tools/test-package-install.sh</code> on
+  <code>debian:trixie</code>. It builds the <code>.deb</code> in-job and does not upload it.</li>
+<li><strong>Testdata prep is a solved step.</strong> <code>tools/ci/prepare-testdata.sh</code>
+  clones with <code>secrets.GITLAB_TESTDATA_TOKEN</code>, materialises LFS,
+  canary-verifies, and writes <code>TESTDATA_PATH=&lt;path&gt;</code> to <code>$GITHUB_ENV</code>.
+  <code>integration-core</code> (line 311) is the pattern to copy verbatim,
+  including the resparsify step that follows it.</li>
+<li><strong>The runner's interface</strong> (<code>tools/test-package-functional.sh</code>):
+  <code>[--smoke] [--select REGEX] [--concurrency N] &lt;package&gt; &lt;distro-image&gt;</code>,
+  reads <code>TESTDATA_PATH</code> from the environment, needs docker and
+  <code>/dev/kvm</code>, prints a <code>--- Versions under test ---</code> block containing
+  <code>qemu-img --version</code>, and ends with <code>PASS:</code>/<code>FAIL: &lt;pkg&gt; functional
+  suite on &lt;distro&gt;</code>. It already fails loudly on a truncated run (the
+  subunit-4MB worker death, a worker reporting <code>N/A</code> elapsed, and a
+  full run executing fewer than 2500 tests).</li>
+<li><strong>Package output paths.</strong> <code>make deb</code> → <code>src/target/debian/instar_*.deb</code>;
+  <code>make rpm</code> → <code>src/target/generate-rpm/instar-*.rpm</code>; <code>make package</code>
+  does both. Both are compile-free repackaging of what <code>make instar</code>
+  produced.</li>
+<li><strong>Sibling pattern of record</strong> — <code>shakenfist/shakenfist</code>'s
+  <code>functional-tests.yml</code>:</li>
+<li>trigger is a bare <code>merge_group:</code> alongside <code>pull_request:</code> with a
+    <code>branches:</code> (not <code>paths:</code>) filter;</li>
+<li>matrix jobs gate on
+    <code>(github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')</code>,
+    which is what makes a dispatch dry run possible;</li>
+<li>the required check is an aggregate job, <strong><code>can_merge</code></strong>, with
+    <code>if: always() &amp;&amp; github.event_name == 'merge_group'</code>, <code>needs:</code> the
+    matrix jobs, and a jq expression over <code>toJSON(needs)</code> asserting
+    every dependency is <code>success</code> or <code>skipped</code>. <code>can_enqueue</code> is its
+    PR-side twin;</li>
+<li>docs-only changes are handled by a <code>check_paths</code> job using
+    <code>dorny/paths-filter@v4</code> with <code>predicate-quantifier: 'every'</code>, whose
+    <code>code_changed</code> output gates the heavy jobs — <strong>not</strong> by a trigger
+    <code>paths:</code> filter.</li>
 </ul>
-<p>Helpers established: each class defines its own
-<code>run_instar_create</code> and <code>run_instar_info</code> wrappers; the
-phase-3 class has a <code>_assert_info_reports()</code> field-checker
-that runs <code>instar info --output=json</code> and asserts a small
-set of fields (<code>format</code>, <code>virtual-size</code>,
-<code>cluster-size?</code>, <code>backing-filename?</code>). Phase 8 generalises
-this into a shared field-extractor + comparator.</p>
-<h3 id="testsbasepy-and-the-command_output_dirs-mechanism"><code>tests/base.py</code> and the COMMAND_OUTPUT_DIRS mechanism<a class="headerlink" href="#testsbasepy-and-the-command_output_dirs-mechanism" title="Permanent link">&para;</a></h3>
-<p><code>COMMAND_OUTPUT_DIRS</code> maps <code>command_name</code> → directory
-prefix. Composition is <code>f'{prefix}-{output_type}'</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">COMMAND_OUTPUT_DIRS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s1">&#39;info&#39;</span><span class="p">:</span>    <span class="s1">&#39;qemu-img&#39;</span><span class="p">,</span>   <span class="c1"># qemu-img-human / qemu-img-json</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s1">&#39;check&#39;</span><span class="p">:</span>   <span class="s1">&#39;check&#39;</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s1">&#39;compare&#39;</span><span class="p">:</span> <span class="s1">&#39;compare&#39;</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s1">&#39;measure&#39;</span><span class="p">:</span> <span class="s1">&#39;measure&#39;</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">}</span>
-</code></pre></div>
-<p>For create the bucket is <code>create-info-json</code> (the
-<code>-info-json</code> suffix is part of the bucket name — there is
-no human variant for create). The natural extension is
-<code>'create': 'create-info'</code> so <code>f'{create-info}-{json}' =
-'create-info-json'</code>. <code>output_type='json'</code> is the only
-valid option for create.</p>
-<p><code>get_output_profiles(output_type, command)</code> reads
-<code>expected-outputs/&lt;dir&gt;/version-map.json</code> and returns
-<code>{'profiles': {profile_name: representative_version},
-'version_to_profile': {version: profile_name}}</code>.</p>
-<p><code>get_expected_output(image_id, profile, output_type,
-command)</code> reads
-<code>expected-outputs/&lt;dir&gt;/profiles/&lt;profile&gt;/&lt;image_id&gt;.stdout.txt</code>
-with the <code>$TESTDATA_ROOT</code> placeholder substituted.</p>
-<h3 id="phase-7-baseline-layout-recap">Phase 7 baseline layout (recap)<a class="headerlink" href="#phase-7-baseline-layout-recap" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>instar-testdata/expected-outputs/create-info-json/
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── qcow2/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── vmdk/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── vhd/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── vhdx/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── raw/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── profiles/profile-NN/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── version-map.json
-</code></pre></div>
-<p>Where <code>&lt;case&gt;.stdout.txt</code> carries the <code>qemu-img info
---output=json</code> output (after the absolute tmp path is
-replaced with the <code>$FILENAME</code> placeholder).</p>
-<p>80 qemu versions × ~36 cases = ~8 640 baselines per file
-type. Dedup ratio is 1:1 (every version is its own profile)
-because vmdk's per-invocation random <code>cid</code> and <code>parent-cid</code>
-break per-version dedup.</p>
-<h3 id="latent-profile-dir-collision-bug">Latent profile-dir-collision bug<a class="headerlink" href="#latent-profile-dir-collision-bug" title="Permanent link">&para;</a></h3>
-<p><code>detect-profiles.py:225-241</code> copies all of a version's
-<code>*.stdout.txt</code> files <strong>flat</strong> into <code>profiles/profile-NN/</code>,
-on the assumption (line 231) that <em>"within a bucket,
-filenames are unique because the case-name or image-id
-encodes the format/target"</em>. For <code>measure</code>, case names like
-<code>1G-qcow2-cs-64k</code> and image-ids like <code>cirros-qcow2__qcow2</code>
-do encode the target. For <code>create</code>, case names like
-<code>1M-default</code> exist independently under qcow2, vmdk, vhd,
-vhdx, and raw — they collide silently. As-shipped,
-<code>profiles/profile-10-2-0/1M-default.stdout.txt</code> carries
-<strong>only vmdk's content</strong>; qcow2/vhd/vhdx/raw 1M-default
-were overwritten without warning. The same applies to
-<code>64M-default</code> (4 collisions) and <code>1G-default</code> (5
-collisions).</p>
-<p>Phase 8's tests <strong>must not</strong> read from the <code>profiles/</code>
-bucket for create. The intact ground truth is the
-per-target raw bucket
-(<code>create-info-json/&lt;target&gt;/&lt;version&gt;/&lt;case&gt;.stdout.txt</code>),
-which has no collisions because the target is encoded in
-the directory path. Use that directly.</p>
-<p>Recording this as a bug to be fixed as a phase-7 follow-up
-(see "Bugs to fix"). Until the fix lands, the test code
-indexes by target-version-case rather than by profile.</p>
-<blockquote>
-<p><strong>Resolved 2026-08-11.</strong> instar-testdata <code>03c379a08a</code> and
-<code>769e463f7e</code> fixed the generator and regenerated the
-corpus: create-info-json profile files are now named
-<code>&lt;target&gt;-&lt;case&gt;</code>, so all 36 files per profile survive
-instead of 25. <code>TestCreateBaselineMatrix</code> reads the
-profile like every other output type and the raw-bucket
-workaround is gone. The defect was worse than recorded
-here — as well as the collisions, every profile carried
-10.2.0's output whatever version it claimed, so 855 files
-disagreed with their own metadata.</p>
-</blockquote>
-<h3 id="three-test-surfaces">Three test surfaces<a class="headerlink" href="#three-test-surfaces" title="Permanent link">&para;</a></h3>
-<h4 id="surface-1-per-target-baseline-comparison">Surface 1: per-target baseline comparison<a class="headerlink" href="#surface-1-per-target-baseline-comparison" title="Permanent link">&para;</a></h4>
-<p>For each <code>(target, case)</code> pair in the canonical
-<code>CREATE_CASES</code> mirror (35-36 entries depending on whether
-the <code>1G-zstd</code> qcow2 case is included — phase 7 included
-it, so 19 qcow2 cases):</p>
-<ol>
-<li>Determine the installed qemu-img version via the
-   existing <code>_detect_qemu_version()</code> helper.</li>
-<li>Locate the version-matched baseline at
-   <code>create-info-json/&lt;target&gt;/&lt;version_str&gt;/&lt;case&gt;.stdout.txt</code>.
-   Skip if absent (e.g. test host runs qemu 5.2 — outside
-   the phase-7 matrix floor of 6.0.0).</li>
-<li>Skip if the baseline's <code>meta.json</code> reports
-   <code>create_return_code != 0</code> (qemu-img rejected the
-   option set on this version — there is no successful
-   output to compare against).</li>
-<li>Translate the case's <code>(size_str, target, options_list)</code>
-   tuple to <code>instar create</code> CLI flags
-   (mirroring measure's <code>_args_for_case</code>).</li>
-<li>Run <code>instar create &lt;flags&gt; &lt;tmpfile&gt;</code> against a temp
-   directory.</li>
-<li>Run <code>qemu-img info --output=json &lt;tmpfile&gt;</code> (using the
-   <em>system</em> <code>qemu-img</code>, not one of the matrix binaries —
-   the comparison is against the matching baseline, which
-   was recorded by the same version).</li>
-<li>Normalise both sides:</li>
-<li>Replace the absolute tmpfile path with <code>$FILENAME</code>
-     (matching the baseline's pre-recorded placeholder).</li>
-<li>Strip divergence-whitelist fields (see below) from
-     both the produced and the baseline JSON.</li>
-<li>Assert the normalised dicts are equal. On failure,
-   <code>assertEqual</code> on the normalised JSON pretty-prints both
-   sides so the diff is readable.</li>
-</ol>
-<p>Fan-out: 36 cases × 1 (one test per case, using the
-matching baseline). The version axis is the installed
-host's qemu — we don't sweep across versions inside the
-test loop (that would require launching the matrix
-binaries, which is phase-7's job).</p>
-<h4 id="surface-2-instar-create-qemu-create-cross-validation">Surface 2: instar-create / qemu-create cross-validation<a class="headerlink" href="#surface-2-instar-create-qemu-create-cross-validation" title="Permanent link">&para;</a></h4>
-<p>The master plan's primary contract: "<code>instar create |
-instar info</code> and <code>qemu-img create | instar info</code> produce
-identical info output (modulo divergence whitelist)".
-Phase 8 implements this as a runtime comparison rather
-than a baseline lookup:</p>
-<p>For each <code>(target, case)</code> in a curated subset (~12
-representative cases, not the full matrix — this surface
-is slower because each test runs <em>two</em> create
-invocations and <em>two</em> info invocations):</p>
-<ol>
-<li>Translate the case to CLI flags.</li>
-<li>Create the same image twice: once with <code>instar create</code>,
-   once with the system <code>qemu-img create</code>.</li>
-<li>Run <code>instar info --output=json</code> on both outputs.</li>
-<li>Normalise both JSON outputs (strip divergence
-   whitelist + absolute paths).</li>
-<li>Assert the normalised dicts are equal.</li>
-</ol>
-<p>This surface is independent of phase 7's baselines and
-exercises the instar info parser as the comparison tool
-— validates that <em>given matched inputs</em>, instar's
-writer + parser combination agrees with qemu-img's
-writer (via instar's parser). The baseline surface
-above validates <em>given matched inputs</em>, instar's writer
-agrees with qemu-img's writer (via qemu-img's parser).</p>
-<p>These are complementary: surface 1 catches writer
-divergences from qemu-img's contract; surface 2 catches
-divergences between instar's writer and instar's own
-parser (an internal self-consistency check that costs
-nothing extra to set up).</p>
-<h4 id="surface-3-round-trip-via-instar-check">Surface 3: round-trip via <code>instar check</code><a class="headerlink" href="#surface-3-round-trip-via-instar-check" title="Permanent link">&para;</a></h4>
-<p>For each successful create case, run <code>instar check</code> on
-the produced file and assert it reports clean. This is
-the lightest-weight write-then-read sanity check
-already validated for individual cases in
-<code>tests/test_check_formats.py</code> — phase 8 extends it
-across the matrix to catch any case-specific writer
-bug that produces a file <code>qemu-img info</code> accepts but
-<code>instar check</code> flags.</p>
-<p>Fan-out: 36 cases × 1 check call. Each is fast (~0.3 s).</p>
-<h3 id="divergence-whitelist">Divergence whitelist<a class="headerlink" href="#divergence-whitelist" title="Permanent link">&para;</a></h3>
-<p>Fields excluded from cross-format JSON comparison
-(phase 7's "What <code>qemu-img info --output=json</code> reports
-per format" section already enumerates these; phase 8
-codifies them as the whitelist):</p>
-<p>Universal (every target):</p>
+<h2 id="corrections-to-the-original-sketch">Corrections to the original sketch<a class="headerlink" href="#corrections-to-the-original-sketch" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>filename</code> — absolute path differs between runs; replace
-  with <code>$FILENAME</code> in both sides before comparison.</li>
-<li><code>actual-size</code> — filesystem-dependent block accounting.
-  Compare with a relative tolerance, or exclude entirely.
-  Recommendation: <strong>exclude entirely</strong> for phase 8 (the
-  test doesn't care whether the host runs ext4 vs xfs).</li>
-<li><code>children[*].info.filename</code>, <code>children[*].info.actual-size</code>
-  — same as above, for the nested file-level info.</li>
-<li><code>format-specific.data.refcount-block-cache-size</code>,
-  <code>format-specific.data.l2-cache-size</code>, and other cache-
-  hint fields — qemu may report these on some versions
-  and not others; not part of the metadata contract.</li>
+<li><strong>Step 4e was wrong and would have broken PR CI.</strong> It said to add the
+  matrix to "the aggregate gate (the <code>needs:</code> list that the
+  branch-protection required check depends on — see the <code>package-smoke</code>
+  entry at <code>functional-tests.yml:783</code>)". Line 783 is inside
+  <code>automated_reviewer</code>, which is the PR auto-review job, not a gate. Its
+  <code>needs:</code> list exists to hold the reviewer back until CI passes. Adding
+  a merge_group-only job to it would make the reviewer <strong>skip on every
+  PR</strong>, because a job whose dependency is skipped is itself skipped by
+  default. This repo has no aggregate gate at all today; phase 4 must
+  create one (<code>can_merge</code>, per the sibling), and <code>automated_reviewer</code>
+  must not be touched beyond an explicit <code>pull_request</code> gate.</li>
+<li><strong><code>merge_group</code> does not honour the trigger's <code>paths:</code> filter.</strong> The
+  filter on <code>pull_request</code> is not inherited, so the workflow always runs
+  in the queue. That is the safe direction — a required check that never
+  runs would hang the queue forever — but it means a docs-only PR pays
+  for the full matrix unless a <code>check_paths</code>-style job is added (D4).</li>
+<li><strong>The matrix table's qemu estimates are stale.</strong> Phase 3 measured
+  Rocky 9 shipping <strong>qemu 10.1.0</strong>, not the 8.2 the master plan
+  estimated. Phase 2c/2b measured all seven. Take versions from those
+  measurements, and let the job report the live version (4c) rather than
+  asserting a table.</li>
 </ul>
-<p>vmdk:</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<h3 id="d1-trigger-and-gating-shape">D1. Trigger and gating shape<a class="headerlink" href="#d1-trigger-and-gating-shape" title="Permanent link">&para;</a></h3>
+<p>Add a bare <code>merge_group:</code> to the trigger list. Gate the new matrix and
+its build job on
+<code>(github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')</code>,
+matching the sibling exactly. The dispatch arm is what makes the phase
+acceptance runnable without enqueuing anything.</p>
+<h3 id="d2-what-the-queue-runs-recommendation-matrix-a-fast-build-gate-only">D2. What the queue runs — recommendation: matrix + a fast build gate only<a class="headerlink" href="#d2-what-the-queue-runs-recommendation-matrix-a-fast-build-gate-only" title="Permanent link">&para;</a></h3>
+<p>Because only <code>test-partition</code> is gated today, the naive change makes
+the queue run seven <code>xl</code> integration jobs <em>plus</em> seven matrix
+containers. Recommendation:</p>
 <ul>
-<li><code>format-specific.data.cid</code> — random per
-  <code>qemu-img create</code> invocation. Cannot match across runs.</li>
-<li><code>format-specific.data.parent-cid</code> — random; in the
-  no-backing case both sides emit a sentinel, but in the
-  backing case (phase-5 vmdk-from-vmdk) each invocation
-  reads a fresh parent CID. Exclude.</li>
-<li><code>format-specific.data.create-type</code> — should match; do
-  not exclude.</li>
-<li><code>format-specific.data.extents[*].cluster-size</code> and
-  related — should match; do not exclude.</li>
+<li>Keep <strong><code>build-and-test</code></strong> ungated so it also runs in the queue — it
+  is the cheap <code>s</code>-runner fast-fail, and the package build depends on a
+  working build anyway.</li>
+<li>Gate <code>package-smoke</code>, <code>integration-core</code>,
+  <code>integration-convert-qcow2</code>, <code>integration-convert-vhd</code>,
+  <code>snapshot-harnesses</code>, <code>oslo-crossval-master</code>, and
+  <code>automated_reviewer</code> to <code>github.event_name != 'merge_group'</code>.</li>
 </ul>
-<p>vhdx:</p>
-<ul>
-<li><code>format-specific.data.log-size</code> — qemu defaults to 1
-  MiB; instar may use a different default. Compare only if
-  both sides report the same value, otherwise exclude.
-  (To be confirmed during 8b; if instar matches qemu's 1
-  MiB default, this field stays in the comparison.)</li>
-<li>Any UUID-like field in the vhdx metadata (page-83 GUID,
-  logical sector GUID, data write GUID, file write GUID,
-  metadata GUID) — exclude. qemu-img info may not surface
-  these at all in older versions; treat their presence as
-  best-effort.</li>
-</ul>
-<p>vhd / vpc:</p>
-<ul>
-<li>No known random fields. The fixed-subformat detection
-  divergence noted in phase 7 (<code>format=raw</code> for
-  <code>1M-fixed</code>) is an artefact of qemu-img-without-<code>-f</code>
-  auto-detection; phase 8 invokes <code>qemu-img info</code> <em>with
-  <code>-f vpc</code></em> explicitly on the produced files to bypass
-  the auto-detect path and get the canonical
-  <code>format=vpc</code> result. (Phase 7's baselines were
-  captured <em>without</em> <code>-f</code> to match qemu-img's default;
-  phase 8 either: (a) invokes phase-8 info with no <code>-f</code>
-  and accepts the same auto-detection result, or
-  (b) strips the <code>format</code> field from the comparison
-  when target is vhd-fixed. Decide during 8b; option (a)
-  is simpler if it works.)</li>
-</ul>
-<p>qcow2:</p>
-<ul>
-<li>No known random fields. <code>format-specific.data.compat</code>,
-  <code>lazy-refcounts</code>, <code>refcount-bits</code>, <code>extended-l2</code>,
-  <code>compression-type</code> all match deterministically when
-  the create-time options match.</li>
-</ul>
-<p>raw:</p>
-<ul>
-<li>The raw info JSON is mostly file-level — <code>format</code>,
-  <code>virtual-size</code>, <code>filename</code>, <code>actual-size</code>. The
-  comparison is nearly trivial once <code>filename</code> and
-  <code>actual-size</code> are excluded.</li>
-</ul>
-<p>The whitelist is implemented as a small helper in
-<code>tests/helpers/info_json.py</code> (new file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">DIVERGENCE_FIELDS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s1">&#39;filename&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="s1">&#39;actual-size&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="c1"># ... and a nested-path version for children[*].info.*</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">}</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">VMDK_DIVERGENCE</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="s1">&#39;cid&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="s1">&#39;parent-cid&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">}</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">VHDX_DIVERGENCE</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="s1">&#39;log-size&#39;</span><span class="p">,</span>  <span class="c1"># tentative; remove if instar matches qemu&#39;s default</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="c1"># plus any UUID-like fields surfaced by the comparison</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="p">}</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">normalise_info_json</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>                        <span class="n">tmp_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Recursively strip divergence fields and substitute</span>
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="sd">    $FILENAME for any absolute path matching tmp_path.&quot;&quot;&quot;</span>
-</code></pre></div>
-<p>The helper is pure-Python, no I/O. Unit-test it in
-<code>tests/test_helpers.py</code> (if such a file exists; create
-otherwise) with a couple of fixture dicts.</p>
-<h3 id="create_cases-mirror"><code>CREATE_CASES</code> mirror<a class="headerlink" href="#create_cases-mirror" title="Permanent link">&para;</a></h3>
-<p>Following measure's precedent (<code>MEASURE_SIZE_CASES</code>
-mirrored from the generator), define a module-level
-<code>CREATE_CASES</code> dict in <code>tests/test_create.py</code> mirroring
-phase 7's <code>CREATE_CASES</code> from
-<code>instar-testdata/scripts/generate-baselines.py</code>. Same
-shape: <code>{target: [(case_name, size_str, options_list),
-...]}</code>. Add a one-line cross-check
-<code>test_create_cases_match_baselines()</code> that walks
-<code>expected-outputs/create-info-json/&lt;target&gt;/&lt;version&gt;/</code>
-for each target and asserts every <code>*.stdout.txt</code>
-corresponds to a <code>CREATE_CASES</code> entry — catching drift
-between the two mirrors.</p>
-<p>Drift risk is real (the two repos evolve independently),
-but the cross-check makes any divergence a loud test
-failure rather than a silent miss. Same trade-off measure
-made in its phase 7.</p>
-<h3 id="test-class-organisation">Test-class organisation<a class="headerlink" href="#test-class-organisation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tests/test_create.py
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── TestCreateSmoke              (phase 3)  — unchanged
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├── TestCreateOOptions           (phase 4)  — unchanged
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├── TestCreateBackingChain       (phase 5)  — unchanged
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>├── TestCreatePreallocation      (phase 6)  — unchanged
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>├── TestCreateBaselineMatrix     (phase 8)  — ~36 tests
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>├── TestCreateCrossValidation    (phase 8)  — ~12 tests
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>└── TestCreateRoundTripCheck     (phase 8)  — ~36 tests
-</code></pre></div>
-<p>Total ≈ 110 tests. Each <code>instar create</code> run takes
-~0.5–1 s (guest launch cost dominates); the matrix and
-round-trip surfaces together fan out to ~72 tests so
-~60 s wall-clock serially, less under stestr's
-parallel execution. The cross-validation surface runs
-two creates + two info calls so ~3 s × 12 = ~36 s.
-Total runtime in the 90–120 s ballpark — acceptable
-given test_measure.py's surface already runs longer
-in the same suite.</p>
-<h3 id="edge-case-handling">Edge-case handling<a class="headerlink" href="#edge-case-handling" title="Permanent link">&para;</a></h3>
-<p><strong>Falloc / full preallocation cases</strong> (1M-prealloc-
-falloc, 1M-prealloc-full): the baseline records the
-<code>actual-size</code> for the version that generated it. Both
-will report <code>actual-size = 1 MiB + metadata</code> — but the
-exact value depends on the underlying filesystem.
-Excluding <code>actual-size</code> from the whitelist solves this
-without losing coverage (the <em>format-specific</em> fields
-are what matter for create correctness).</p>
-<p><strong>vmdk monolithicSparse vs streamOptimized</strong>: baselines
-for <code>1G-stream-optimized</code> carry <code>"create-type":
-"streamOptimized"</code>; instar emits the same on its
-output. Cross-check.</p>
-<p><strong>vhd <code>1M-fixed</code> / <code>16M-fixed</code></strong>: phase 7's baselines
-report <code>"format": "raw"</code> because qemu-img info auto-
-detects on file start (fixed VHDs have only a 512-byte
-footer at end of file, no leading magic). instar's
-fixed VHD output has the same property. The phase-8
-test for these cases invokes <code>qemu-img info</code> with no
-<code>-f</code> flag (matching the baseline-recording invocation)
-and the comparison naturally agrees.</p>
-<p><strong><code>1G-zstd</code> qcow2 case</strong>: instar accept-ignores
-<code>compression_type=zstd</code> and emits zstd metadata
-(matching qemu-img's behaviour from 5.1+). The
-baseline carries <code>"compression-type": "zstd"</code>; instar
-should match.</p>
-<p><strong><code>1G-cs-512</code> qcow2 case</strong>: 512-byte cluster size,
-~2 MiB L2 table at 1 GiB virtual. Phase 1's emitter
-handles this; phase 8 confirms via the baseline match.</p>
-<p><strong>Backing-file cases</strong>: not in phase 7's matrix (out of
-scope per phase 7's plan). Phase 5's existing
-<code>TestCreateBackingChain</code> already covers backing
-behaviour with runtime fixture construction. Phase 8
-adds <em>no</em> backing tests to the matrix surface; the
-runtime fixtures stay in <code>TestCreateBackingChain</code>.</p>
-<h3 id="running-cross-validation-against-the-system-qemu-img">Running cross-validation against the system qemu-img<a class="headerlink" href="#running-cross-validation-against-the-system-qemu-img" title="Permanent link">&para;</a></h3>
-<p>Surface 2 calls the system <code>qemu-img create</code> and
-compares its output (via <code>instar info</code>) against
-instar's output (also via <code>instar info</code>). The
-installed qemu-img may be any version 6.0.0+; the
-comparison only requires that both writers agree on
-the metadata at runtime, which they do if both
-implement the same format spec.</p>
-<p>If the system qemu-img is missing (<code>which qemu-img</code>
-returns nothing) or runs an unsupported version,
-surface-2 tests <code>skipTest</code> with a clear message.</p>
-<h3 id="test-runtime-budget">Test runtime budget<a class="headerlink" href="#test-runtime-budget" title="Permanent link">&para;</a></h3>
-<p>Worst case (serial, cold caches): 110 tests × ~1 s
-avg = 110 s. Under stestr's default parallel
-execution (<code>--concurrency=auto</code>, typically 4-8
-workers on a developer laptop) drop to 20-40 s.
-CI machines with fewer cores may take 60-90 s.
-Acceptable. If a developer wants to skip phase-8
-surfaces during fast inner-loop iteration, the
-existing <code>INSTAR_TEST_TIER</code> filter (if it exists —
-verify during 8a; if not, document a <code>-k</code> pytest
-filter as the workaround) covers them.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These should be answered during execution; escalate to
-the operator rather than guessing.</p>
-<ol>
-<li>
-<p><strong>Should <code>TestCreateBaselineMatrix</code> and
-   <code>TestCreateCrossValidation</code> inherit from
-   <code>TestCreateSmoke</code> (matching measure's pattern of
-   inheriting from <code>TestMeasureSmoke</code>) or stand alone</strong>?
-   Inheritance gives free access to <code>run_instar_create</code>
-   /  <code>run_instar_info</code> helpers. Recommendation: inherit
-   from <code>TestCreateSmoke</code> for the same DRY reason.</p>
-</li>
-<li>
-<p><strong><code>-O</code> vs <code>-f</code></strong>. qemu-img uses <code>-f</code> for <em>create</em>'s
-   target format (different from <code>convert</code>'s <code>-O</code>).
-   Phase 7's generator uses <code>-f</code>. instar's CLI also uses
-   <code>-f</code> for create. No conflict; just don't accidentally
-   write <code>-O</code> in the test args.</p>
-</li>
-<li>
-<p><strong>Profile lookup vs raw bucket lookup</strong>. The phase-7
-   profile-dir-collision bug (see "Latent profile-dir-
-   collision bug" above) means <code>get_expected_output()</code>
-   silently returns the wrong content for non-vmdk
-   <code>1M-default</code> / <code>64M-default</code> / <code>1G-default</code> cases.
-   Recommendation: phase 8 reads
-   <code>expected-outputs/create-info-json/&lt;target&gt;/&lt;version&gt;/&lt;case&gt;.stdout.txt</code>
-   directly via a new helper rather than going through
-   <code>get_expected_output()</code>. This sidesteps the bug. File
-   the bug fix as a follow-up in instar-testdata; do not
-   block phase 8 on it.</p>
-</li>
-<li>
-<p><strong>What if the installed qemu-img version is older
-   than the matrix floor (6.0.0)</strong>? Surface 1 tests
-   <code>skipTest</code> per case with a message naming the missing
-   baseline; surface 2 still runs (the system qemu-img
-   is the comparator, not a baseline lookup). Surface 3
-   (instar check round-trip) is also unaffected.</p>
-</li>
-<li>
-<p><strong>Does qemu-img info on a fixed-VHD without <code>-f</code>
-   return <code>format=raw</code> consistently across qemu
-   versions</strong>? Phase 7's baselines from 10.2.0 do.
-   Verify during 8b that older qemu versions also do
-   (relevant because surface 1 uses the <em>installed</em>
-   qemu-img, which may be 6.x on some CI hosts). If
-   any version reports differently, add <code>format</code> to
-   the divergence whitelist when target is vhd and the
-   case includes <code>subformat=fixed</code>.</p>
-</li>
-<li>
-<p><strong>Should the test compare meta.json as well as
-   stdout</strong>? Phase 7's <code>meta.json</code> carries
-   <code>create_return_code</code> and <code>info_return_code</code> per
-   case, which the test already reads to decide skip.
-   Beyond that, no — the meta.json is generator
-   bookkeeping, not part of the comparison contract.</p>
-</li>
-<li>
-<p><strong>Cross-validation curated subset selection</strong>.
-   ~12 representative cases for surface 2. Suggested
-   set: 5 × <code>1M-default</code> (one per target), 4 × <code>1G-
-   default</code> (excluding raw — already covered),
-   <code>1G-cs-64k</code> (qcow2 option exercise),
-   <code>1G-extended-l2</code> (qcow2 option), <code>1G-zstd</code> (qcow2
-   option), <code>1G-stream-optimized</code> (vmdk), <code>1M-fixed</code>
-   (vhd). 12-13 cases.</p>
-</li>
-<li>
-<p><strong>Tolerance on the cross-validation comparison</strong>.
-   Surface 2 compares instar info on two files
-   created by different writers (instar vs qemu-img).
-   Divergence whitelist is the same as surface 1.
-   If a field disagrees outside the whitelist, that's
-   a real divergence — file as a bug, don't widen
-   the whitelist to paper over it.</p>
-</li>
-<li>
-<p><strong>Time budget for the qemu-img matrix binaries</strong>.
-   Phase 8 does NOT iterate <code>qemu-img-binaries/x86_64/
-   &lt;version&gt;/</code> — that's phase 7's job. Phase 8 uses
-   only the system qemu-img + the recorded baselines.
-   This keeps the phase-8 runtime bounded.</p>
-</li>
-<li>
-<p><strong>What if <code>instar info</code> doesn't surface a field
-    that qemu-img info does</strong> (e.g. <code>format-specific.
-    data.lazy-refcounts</code>)? Surface 1's comparison is
-    against qemu-img info on both sides, so this is
-    a non-issue for surface 1. For surface 2, both
-    sides are instar info; if instar info doesn't
-    surface a field, it's missing from both sides
-    and the comparison still passes. The case where
-    instar info reports a field qemu-img doesn't is
-    handled by the divergence whitelist (extend if
-    needed during 8c).</p>
-</li>
-</ol>
-<h2 id="public-surface-added-in-phase-8">Public surface added in phase 8<a class="headerlink" href="#public-surface-added-in-phase-8" title="Permanent link">&para;</a></h2>
-<p>In <code>tests/base.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">COMMAND_OUTPUT_DIRS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="o">...</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="s1">&#39;create&#39;</span><span class="p">:</span> <span class="s1">&#39;create-info&#39;</span><span class="p">,</span>   <span class="c1"># NEW — only output_type=&#39;json&#39; valid</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">}</span>
-</code></pre></div>
-<p>In <code>tests/helpers/info_json.py</code> (new file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">normalise_info_json</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">tmp_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">assert_info_equivalent</span><span class="p">(</span><span class="n">actual</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span> <span class="o">...</span>
-</code></pre></div>
-<p>In <code>tests/test_create.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">CREATE_CASES</span> <span class="o">=</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span>  <span class="c1"># mirror of phase-7&#39;s generator</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestCreateBaselineMatrix</span><span class="p">(</span><span class="n">TestCreateSmoke</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestCreateCrossValidation</span><span class="p">(</span><span class="n">TestCreateSmoke</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestCreateRoundTripCheck</span><span class="p">(</span><span class="n">TestCreateSmoke</span><span class="p">):</span> <span class="o">...</span>
-</code></pre></div>
-<p>Two factory functions (<code>_make_baseline_test</code>,
-<code>_make_round_trip_test</code>) registered via <code>setattr</code> on
-the new classes, one per <code>(target, case)</code>.</p>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>The justification is coverage, not cost alone: each matrix entry runs
+the <strong>full</strong> suite (D3 of the master plan) against the packaged binary,
+so the queue's coverage is a superset of the PR integration jobs on
+seven distros rather than one. Re-running the PR jobs in the queue buys
+a second copy of a strictly weaker signal. Record this reasoning in the
+workflow as a comment — the next reader will otherwise "fix" the gates.</p>
+<h3 id="d3-build-once-consume-seven-times">D3. Build once, consume seven times<a class="headerlink" href="#d3-build-once-consume-seven-times" title="Permanent link">&para;</a></h3>
+<p>Add a <code>package-build</code> job (<code>needs: build-and-test</code>, merge_group-gated)
+that runs <code>make instar &amp;&amp; make package</code> and uploads
+<code>src/target/debian/instar_*.deb</code> and
+<code>src/target/generate-rpm/instar-*.rpm</code> as one artifact. Each matrix
+entry downloads it and picks the file its <code>pkg_kind</code> names.</p>
+<p>This is only valid because phase 1 lowered the build floor to bullseye
+(<code>GLIBC_2.30</code>), making one artifact set installable on all seven
+distros — it is the concrete payoff of decision D1 in the master plan,
+and phase 1's completion is what unlocks it. Assert it rather than
+assume it: if a matrix entry ever fails at <em>install</em> time, that is a
+floor regression, not a test failure.</p>
+<h3 id="d4-docs-only-changes-in-the-queue">D4. Docs-only changes in the queue<a class="headerlink" href="#d4-docs-only-changes-in-the-queue" title="Permanent link">&para;</a></h3>
+<p>Recommendation: <strong>defer</strong>. Adopting the sibling's <code>check_paths</code> job is
+the right long-term shape, but it is a change to how <em>every</em> job in
+this workflow is gated and it is not needed for the matrix to work.
+Ship the matrix first; revisit if docs-only merges prove painful. Note
+it explicitly in the phase-5 handover so the operator knows a docs-only
+PR currently pays full matrix latency.</p>
+<h3 id="d5-fan-out-control-full-seven-wide-no-max-parallel">D5. Fan-out control — full seven-wide, no <code>max-parallel</code><a class="headerlink" href="#d5-fan-out-control-full-seven-wide-no-max-parallel" title="Permanent link">&para;</a></h3>
+<p><code>fail-fast: false</code> always: one distro's failure must not mask the other
+six.</p>
+<p><strong>Do not set <code>max-parallel</code>.</strong> An earlier draft of this plan proposed
+capping it, reasoning from seven containers at <code>--concurrency 4</code> as "28
+concurrent KVM workloads". That framing was wrong. The <code>xl</code> runners are
+<strong>started on demand</strong> (confirmed with Michael 2026-08-11; the repo
+distinguishes on-demand <code>s</code>/<code>xl</code> from the always-up <code>[self-hosted,
+static]</code> pool, which it already uses in five places). Each matrix entry
+therefore lands on its <strong>own</strong> VM: 4 concurrent KVM workloads per
+runner, seven runners, no cross-entry contention. The phase-2c load
+artifacts that motivated the cap came from running all seven <em>on the
+dev host simultaneously</em>, which is not what CI does.</p>
+<p>Capping the fan-out would serialise on-demand VMs that never compete
+for anything, multiplying merge-queue wall clock for no benefit. Since
+the matrix gates merges rather than pushes, one-entry-plus-runner-start
+latency is the right trade.</p>
+<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -11818,162 +11289,271 @@ the new classes, one per <code>(target, case)</code>.</p>
 </thead>
 <tbody>
 <tr>
-<td>8a</td>
+<td>4a</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Extend <code>tests/base.py</code>: add <code>'create': 'create-info'</code> to <code>COMMAND_OUTPUT_DIRS</code>. Create <code>tests/helpers/info_json.py</code> with <code>normalise_info_json(obj, target, tmp_path=None)</code> that recursively (a) substitutes <code>$FILENAME</code> for any absolute path equalling <code>tmp_path</code> in <code>filename</code> and <code>children[*].info.filename</code>, (b) deletes the divergence-whitelist keys per target as documented in the plan, (c) returns the cleaned dict. Add a small <code>assert_info_equivalent(actual_json_str, expected_json_str, target, msg='')</code> wrapper that parses both, normalises both, and <code>assertEqual</code>s. Add a one-line smoke test in the existing <code>TestCreateSmoke</code> class: <code>def test_create_baselines_present(self): profiles = self.get_output_profiles(output_type='json', command='create'); self.assertNotEqual(profiles['profiles'], {})</code>. If <code>tests/test_helpers.py</code> exists, add a couple of unit tests for <code>normalise_info_json</code> covering qcow2, vmdk (cid stripping), vhdx (log-size stripping). If not, add them as static methods on a new helper test class. Touch only <code>tests/base.py</code>, <code>tests/helpers/info_json.py</code>, and <code>tests/test_create.py</code>. Run <code>make test-integration</code> to confirm the smoke test passes.</td>
+<td><strong>Triggers and gates (D1, D2).</strong> Add bare <code>merge_group:</code> to <code>on:</code>. Add <code>if: github.event_name != 'merge_group'</code> to <code>package-smoke</code>, <code>integration-core</code>, <code>integration-convert-qcow2</code>, <code>integration-convert-vhd</code>, <code>snapshot-harnesses</code>, <code>oslo-crossval-master</code>, <code>automated_reviewer</code>; leave <code>build-and-test</code> ungated and <code>test-partition</code> as it is. Comment the <em>why</em> (D2's coverage argument) at the top of the job list. Verify with <code>actionlint</code> and by reading each job's resulting effective condition — do not add the matrix yet.</td>
 </tr>
 <tr>
-<td>8b</td>
+<td>4b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong><code>package-build</code> job (D3).</strong> <code>needs: build-and-test</code>, gated <code>merge_group \|\| workflow_dispatch</code>, <code>[self-hosted, debian-12, xl]</code>. Copy <code>package-smoke</code>'s docker install + <code>docker image rm -f instar-build instar-release</code> preamble. Run <code>make instar &amp;&amp; make package</code>. <code>actions/upload-artifact@v4</code> with a single named artifact containing both <code>src/target/debian/instar_*.deb</code> and <code>src/target/generate-rpm/instar-*.rpm</code>; <code>if-no-files-found: error</code> so a missing <code>.rpm</code> fails here rather than in seven confusing places.</td>
+</tr>
+<tr>
+<td>4c</td>
 <td>high</td>
-<td>sonnet</td>
+<td>opus</td>
 <td>none</td>
-<td>Add <code>CREATE_CASES</code> module-level dict to <code>tests/test_create.py</code> mirroring <code>instar-testdata/scripts/generate-baselines.py:CREATE_CASES</code> (35 cases: 19 qcow2 + 5 vmdk + 5 vhd + 5 vhdx + 2 raw). Add <code>TestCreateBaselineMatrix(TestCreateSmoke)</code> with: (i) a <code>_baseline_path(target, case_name)</code> helper that reads <code>expected-outputs/create-info-json/&lt;target&gt;/&lt;installed_qemu_version&gt;/&lt;case&gt;.stdout.txt</code> directly (NOT through <code>get_expected_output</code> — see plan's open question 3 re profile-dir collision bug); falls back to the most recent version dir if the installed version isn't in the matrix, with a logged warning; returns None if no baseline at all. (ii) a <code>_baseline_meta(target, case_name)</code> parallel helper for the meta.json. (iii) a <code>_args_for_case(target, case)</code> translator that emits <code>['-f', target, '-o', 'k=v,k=v', '&lt;file&gt;', size_str]</code>, handling the empty options_list case. (iv) a factory <code>_make_baseline_test(target, case)</code> that returns a test method which: creates a temp dir, runs <code>instar create</code>, asserts rc==0 (skipTest if baseline rc != 0), runs system <code>qemu-img info --output=json &lt;tmpfile&gt;</code> (NOT instar info — the comparison tool must match the baseline-generating tool), reads the matching baseline, calls <code>assert_info_equivalent(produced, baseline, target, msg=f'{target}/{case[0]}')</code>. (v) the loop that <code>setattr</code>s one test per <code>(target, case)</code> onto the class. (vi) a <code>test_create_cases_match_baselines()</code> cross-check that walks each <code>&lt;target&gt;/&lt;latest-version&gt;/</code> dir and asserts every <code>*.stdout.txt</code> corresponds to a <code>CREATE_CASES[target]</code> entry. <strong>Skip rules</strong>: skip if baseline file missing, skip if baseline <code>create_return_code != 0</code>, skip if installed qemu-img &lt; 6.0 or unavailable. Run <code>make test-integration</code> and report pass/skip/fail counts per target. <strong>High effort because</strong>: 35 test cases, divergence-whitelist tuning may need iteration on real failures, and the vhd-fixed <code>format=raw</code> quirk needs careful handling (verify that the system qemu-img without <code>-f</code> matches the baseline; if not, special-case in the comparator).</td>
+<td><strong><code>package-matrix</code> job.</strong> <code>needs: package-build</code>, same gate, <code>[self-hosted, debian-12, xl]</code>, <code>strategy: {fail-fast: false}</code> with <strong>no <code>max-parallel</code></strong> (D5 — on-demand runners, one VM per entry), <code>matrix.distro</code> as a list of objects <code>{name, image, pkg_kind}</code> over the seven entries in the master-plan table (<code>debian:12</code>, <code>debian:13</code>, <code>ubuntu:22.04</code>, <code>ubuntu:24.04</code>, <code>fedora:latest</code>, <code>rockylinux:9</code>, <code>rockylinux/rockylinux:10</code>). <code>name: "${{ matrix.distro.name }}"</code>. Steps: checkout into <code>instar/</code> (mirror <code>integration-core</code>'s two-checkout layout), <code>prepare-testdata.sh</code> with <code>TESTDATA_TOKEN</code>, the resparsify loop, docker install, <code>download-artifact</code>, then <code>tools/test-package-functional.sh &lt;resolved package&gt; &lt;image&gt;</code>. Resolve the package path by <code>pkg_kind</code> in a <strong>script, not inline YAML</strong> (per the no-large-scripts-in-workflow-steps rule) — extend <code>tools/ci/</code> with a small resolver or add a <code>--pkg-kind</code> mode to the runner; decide and document which. <code>timeout-minutes</code> per R3.</td>
 </tr>
 <tr>
-<td>8c</td>
+<td>4d</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add <code>TestCreateCrossValidation(TestCreateSmoke)</code> with a curated subset (~12 cases — see plan's open question 7 for the suggested set). Factory <code>_make_xval_test(target, case)</code>: creates two temp files in two temp dirs, runs <code>instar create &lt;flags&gt; file_a</code> and the system <code>qemu-img create &lt;flags&gt; file_b</code> with translated args, runs <code>instar info --output=json</code> on both, normalises both via <code>normalise_info_json(..., target, tmp_path=...)</code>, asserts dict equality. Skip if system qemu-img unavailable or older than 6.0 or rejects the option set (capture qemu-img's exit code; skipTest with the stderr message). The whitelist used here may diverge slightly from 8b's (8b compared qemu-img info on both sides; 8c compares instar info on both sides). Tune by running the tests and treating any non-whitelist divergence as a bug to file rather than as a whitelist extension. Run <code>make test-integration</code> and confirm ~10 pass, ~2 skip-with-message.</td>
+<td><strong>Result surfacing.</strong> Tee the runner output; on completion append a row to <code>$GITHUB_STEP_SUMMARY</code> with distro name, image, the live qemu-img version parsed from the runner's <code>--- Versions under test ---</code> block, the <code>Ran:/Passed/Skipped/Failed</code> totals, and PASS/FAIL. Use <code>if: always()</code> so failures report too. Put the parsing in a <code>tools/ci/</code> script, not inline YAML. The qemu version in the summary is what makes a red row attributable to a version boundary rather than a packaging bug (phase 2/2b lineage).</td>
 </tr>
 <tr>
-<td>8d</td>
+<td>4e</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Flake quarantine (master-plan policy).</strong> Support an optional <code>allow_failure: true</code> key on a matrix entry, consumed as <code>continue-on-error: ${{ matrix.distro.allow_failure \|\| false }}</code>. Default <strong>no entry</strong> to it. Document in the workflow comment and <code>docs/testing.md</code>: an entry that fails twice consecutively for a reason established as environmental gets the flag with a linked issue, and the flag is removed when the issue closes. Note the sharp edge — a <code>continue-on-error</code> job reports <code>success</code> to the <code>needs</code> context, so a quarantined entry genuinely stops gating.</td>
+</tr>
+<tr>
+<td>4f</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong><code>can_merge</code> aggregate gate (corrects sketch 4e).</strong> New job: <code>needs: [package-build, package-matrix]</code>, <code>if: always() &amp;&amp; github.event_name == 'merge_group'</code>, <code>runs-on: [self-hosted, static]</code> (it is a five-second jq check — do not boot an on-demand VM for it; the sibling's <code>can_merge</code>/<code>can_enqueue</code> use <code>static</code> for the same reason, and this repo already uses that label in five places), <code>permissions: {actions: read}</code>, and the sibling's jq body — <code>ALL_SUCCESS=$(echo "$NEEDS_JSON" \| jq '. \| to_entries \| map([.value.result == "success", .value.result == "skipped"] \| any) \| all')</code> then <code>[ $ALL_SUCCESS == true ]</code>. Do <strong>not</strong> touch <code>automated_reviewer</code>'s <code>needs:</code>. This job's name is what phase 5 makes the queue's required check.</td>
+</tr>
+<tr>
+<td>4g</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add <code>TestCreateRoundTripCheck(TestCreateSmoke)</code> iterating the full <code>CREATE_CASES</code> matrix: per <code>(target, case)</code>, create + run <code>instar check</code> + assert rc==0. Skip if create itself failed (e.g. unsupported option set rejected by instar). One test per case = ~35 tests. Factory <code>_make_check_test(target, case)</code> registered via <code>setattr</code> mirroring the prior surfaces. Run <code>make test-integration</code> and confirm all pass. This surface catches any case-specific writer bug that produces a file qemu-img info reads but instar check rejects.</td>
-</tr>
-<tr>
-<td>8e</td>
-<td>low</td>
-<td>sonnet</td>
-<td>none</td>
-<td>Update <code>ARCHITECTURE.md</code>: in the existing <code>operations/create/</code> paragraph, append a sentence: "Integration tests in <code>tests/test_create.py</code> cross-validate <code>instar create</code> against the <code>qemu-img create</code> baselines in <code>instar-testdata/expected-outputs/create-info-json/&lt;target&gt;/</code> for every case in the create matrix, plus a direct instar-vs-qemu-img cross-validation surface (both info-read via <code>instar info</code>) and a <code>instar check</code> round-trip surface for writer self-consistency." Add to <code>CHANGELOG.md</code> Unreleased / Added: "Comprehensive integration tests for <code>instar create</code>: cross-version baseline comparison via <code>qemu-img info</code> against the create-info-json matrix, runtime cross-validation against the system <code>qemu-img create</code>, and <code>instar check</code> round-trip coverage for every case in the matrix. (PLAN-create-phase-08-integration-tests.md)". Mark phase 8 of PLAN-create.md as Complete in the execution table. Run <code>pre-commit run --all-files</code>.</td>
+<td><strong>Docs.</strong> <code>docs/testing.md</code>: the PR-vs-merge-queue job split, the seven entries, the quarantine policy, and how to reproduce one entry locally (<code>tools/test-package-functional.sh</code> with <code>--select</code>). <code>AGENTS.md</code>/<code>ARCHITECTURE.md</code>: a pointer only, no duplication. CHANGELOG <code>[Unreleased]</code>. Update the master plan's phase-4 row and its stale qemu-version estimates against the phase-2c/2b measurements.</td>
 </tr>
 </tbody>
 </table>
-<p>Total: 5 commits.</p>
-<h2 id="out-of-scope-for-phase-8">Out of scope for phase 8<a class="headerlink" href="#out-of-scope-for-phase-8" title="Permanent link">&para;</a></h2>
+<h2 id="execution-results-2026-08-11">Execution results (2026-08-11)<a class="headerlink" href="#execution-results-2026-08-11" title="Permanent link">&para;</a></h2>
+<p>Implemented 4a-4g. Three new scripts keep the workflow declarative, per
+the no-large-scripts-in-CI-steps rule: <code>tools/ci/resolve-package.sh</code>
+(glob one package of a kind, failing loudly on zero or two matches),
+<code>tools/ci/summarise-matrix-entry.sh</code> (parse the runner's log into a
+job-summary row), and <code>tools/ci/run-matrix-entry.sh</code> (the per-entry
+wrapper CI calls).</p>
+<p><strong>Verified locally:</strong></p>
 <ul>
-<li>Updating <code>instar-testdata</code> (phase 7 already covered the
-  baseline regeneration; the profile-dir-collision bug fix
-  is a phase-7 follow-up).</li>
-<li>Backing-file matrix coverage — phase 5's existing
-  <code>TestCreateBackingChain</code> already handles backing
-  semantics with runtime fixtures.</li>
-<li>Preallocation matrix coverage beyond what's in the
-  baseline list — phase 6's <code>TestCreatePreallocation</code> covers
-  the accept set.</li>
-<li>Encrypted-create coverage (master-plan future work).</li>
-<li>Multi-file vmdk subformats (<code>monolithicFlat</code>,
-  <code>twoGbMaxExtent*</code>) — instar doesn't emit these.</li>
-<li>vhdx fixed subformat — neither qemu-img nor instar emits
-  it.</li>
-<li>Coverage-guided fuzz coverage (phase 9).</li>
-<li>Differential fuzz extension (phase 10).</li>
-<li><code>docs/create.md</code> user guide (phase 11).</li>
-<li>Performance benchmarking (separate effort).</li>
+<li>Job graph simulated per event. <code>pull_request</code> runs exactly today's
+  nine jobs — no matrix, no <code>can_merge</code>, no added latency.
+  <code>merge_group</code> runs only <code>build-and-test</code>, <code>package-build</code>,
+  <code>package-matrix</code>, <code>can_merge</code>. <code>workflow_dispatch</code> runs everything
+  except <code>test-partition</code> and <code>can_merge</code>, which is the dry-run path.</li>
+<li>Both package families end-to-end through the real wrapper: <code>Debian 13</code>
+  / <code>.deb</code> / apt reported <code>qemu-img 10.0.11</code>, and <code>Rocky 9</code> / <code>.rpm</code> /
+  dnf reported <code>qemu-img 10.1.0</code>, each producing a correct summary row.
+  (Run with <code>MATRIX_SELECT</code> to bound cost; the full-suite behaviour is
+  phase 3's, unchanged.)</li>
+<li>The summariser degrades correctly: a run that dies before the
+  versions block reports <code>qemu-img unknown</code> and <code>?</code> totals rather than
+  failing, and a missing log warns instead of crashing.</li>
+<li><code>resolve-package.sh</code> rejects both the no-match and multi-match cases.</li>
+<li><code>actionlint</code> and <code>shellcheck</code> clean.</li>
 </ul>
-<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<p><strong>One design change from the plan.</strong> <code>allow_failure</code> is declared
+explicitly as <code>false</code> on all seven entries rather than being an
+optional key: actionlint types the matrix object from its literal
+entries, so an absent property is an error even behind <code>|| false</code>.
+Declaring it per entry is better anyway — quarantine state is visible
+per row, and flipping one is a one-word diff.</p>
+<h2 id="first-live-fan-out-run-31533536833-2026-08-11">First live fan-out (run 31533536833, 2026-08-11)<a class="headerlink" href="#first-live-fan-out-run-31533536833-2026-08-11" title="Permanent link">&para;</a></h2>
+<p><code>workflow_dispatch</code> on <code>matrix-ci</code>. <strong>All seven entries PASS, 0
+failures</strong>, spanning six qemu-img versions from 6.2.0 to 10.2.2:</p>
+<table>
+<thead>
+<tr>
+<th>Distro</th>
+<th>qemu-img</th>
+<th>Ran</th>
+<th>Passed</th>
+<th>Skipped</th>
+<th>Failed</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ubuntu 22.04</td>
+<td>6.2.0</td>
+<td>3262</td>
+<td>2477</td>
+<td>785</td>
+<td>0</td>
+<td>34 min</td>
+</tr>
+<tr>
+<td>Debian 12</td>
+<td>7.2.22</td>
+<td>3262</td>
+<td>2477</td>
+<td>785</td>
+<td>0</td>
+<td>23 min</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04</td>
+<td>8.2.2</td>
+<td>3262</td>
+<td>2477</td>
+<td>785</td>
+<td>0</td>
+<td>39 min</td>
+</tr>
+<tr>
+<td>Debian 13</td>
+<td>10.0.11</td>
+<td>3262</td>
+<td>2477</td>
+<td>785</td>
+<td>0</td>
+<td>35 min</td>
+</tr>
+<tr>
+<td>Rocky 9</td>
+<td>10.1.0</td>
+<td>3262</td>
+<td>2415</td>
+<td>847</td>
+<td>0</td>
+<td>25 min</td>
+</tr>
+<tr>
+<td>Rocky 10</td>
+<td>10.1.0</td>
+<td>3262</td>
+<td>2415</td>
+<td>847</td>
+<td>0</td>
+<td>48 min</td>
+</tr>
+<tr>
+<td>Fedora latest</td>
+<td>10.2.2</td>
+<td>3262</td>
+<td>2477</td>
+<td>785</td>
+<td>0</td>
+<td>28 min</td>
+</tr>
+</tbody>
+</table>
+<p>Every entry ran the same 3262 tests. The two RHEL rows skip exactly 62
+more than the rest, which is <code>skip_unless_qemu_supports()</code> handling
+RHEL's qemu omitting the qed/qcow/parallels/dmg/bochs/cloop drivers
+(phase 2) — a consistent, explained difference, not drift.</p>
+<p>This also confirms phase 2b against <strong>live</strong> old qemu rather than the
+static per-version binaries it was measured with: Ubuntu 22.04 (6.2.0)
+and Debian 12 (7.2.22) were 21 failures each before 2b, and Ubuntu
+24.04 was 2.</p>
+<p><strong>Timings (R1/R3 answered).</strong> Per-entry suite runtime is 23-48 min,
+median ~34 — well inside the 120-minute timeout, which can stay as
+headroom. The whole matrix took <strong>89 minutes</strong> wall-clock (01:14 →
+02:43) in two waves, so the effective <code>xl</code> concurrency was about four
+then three, not seven. Provisioning, not the cap we declined to set, is
+what serialises the fan-out; <code>max-parallel</code> would only have made this
+worse, so D5 stands even though its "one entry plus boot" latency
+estimate was optimistic.</p>
+<p>Note this dispatch is the <strong>worst case</strong> for scheduling: it runs the PR
+jobs <em>and</em> the matrix, and it competed with a concurrent PR run
+(31533917315) for the same pool. <code>package-build</code> sat queued 2h20m as a
+result. A real <code>merge_group</code> event runs only <code>build-and-test</code>,
+<code>package-build</code> and the matrix, so it should schedule better than this.</p>
+<p><strong>Still outstanding:</strong></p>
 <ul>
-<li><code>tests/test_create.py</code> has ~110 total tests
-  (existing smoke + options + backing + preallocation</li>
-<li>~35 baseline + ~12 cross-validation + ~35 check).</li>
-<li><code>make test-integration</code> runs them all; the new
-  surfaces pass-or-skip-with-message — no
-  unexpected failures.</li>
-<li><code>make instar</code> builds; <code>make lint</code> clean;
-  <code>pre-commit run --all-files</code> clean.</li>
-<li>One end-to-end demonstration: <code>instar create -f qcow2
-  -o cluster_size=64k tmp.qcow2 1G</code> produces a file whose
-  <code>qemu-img info --output=json</code> matches the baseline at
-  <code>instar-testdata/expected-outputs/create-info-json/qcow2/
-  &lt;installed-version&gt;/1G-cs-64k.stdout.txt</code> after the
-  divergence whitelist is applied.</li>
-<li>ARCHITECTURE.md, CHANGELOG.md, and PLAN-create.md
-  execution row updated.</li>
+<li><code>GITLAB_TESTDATA_TOKEN</code> on a <code>merge_group</code> event specifically. The
+  token demonstrably works on <code>workflow_dispatch</code>, which is strong
+  evidence (secrets are exposed the same way to non-fork events) but
+  not the same event class. First queue run confirms it.</li>
+<li><code>can_merge</code> has never reported — it is <code>merge_group</code>-only, so its
+  check context does not yet exist in this repository. That matters for
+  phase 5: requiring a context GitHub has never seen is the one way to
+  jam every merge.</li>
 </ul>
-<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<h2 id="acceptance">Acceptance<a class="headerlink" href="#acceptance" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Divergence whitelist drift</strong>: the whitelist is a
-  living artefact — new qemu-img versions may add fields
-  instar doesn't emit (or vice-versa). Mitigation: on
-  test failure, the diff output makes the offending field
-  visible; whitelist updates are a one-line code change
-  with a comment explaining the field's randomness or
-  format-version origin.</li>
-<li><strong>Profile-dir-collision bug from phase 7</strong>: surfaces
-  silently as wrong-baseline-content. Mitigation: phase
-  8 reads the per-target raw bucket directly, bypassing
-  the broken profile dir entirely. File the bug as a
-  phase-7 follow-up to be fixed when the
-  <code>instar-testdata</code> matrix is next regenerated.
-  (Fixed 2026-08-11; the mitigation has been removed.)</li>
-<li><strong>Installed qemu-img version not in phase 7's matrix</strong>:
-  test host runs qemu-img 5.x. Mitigation: surface 1
-  skips with a clear message; surface 2 still runs (uses
-  the installed qemu-img as live comparator); surface 3
-  is qemu-agnostic.</li>
-<li><strong>Cross-validation surface flakiness from
-  non-deterministic qemu-img output</strong>: if qemu-img
-  embeds a timestamp in some field the whitelist
-  missed, surface 2 will fail. Mitigation: 8c's
-  brief explicitly says treat unexpected divergences
-  as bugs to file rather than as whitelist extensions
-  — surface them so a real fix happens.</li>
-<li><strong>vhd-fixed <code>format=raw</code> auto-detection quirk</strong>: if
-  the installed qemu-img doesn't behave like 10.2.0
-  (auto-detects fixed as raw), the comparison
-  fails. Mitigation: 8b's brief calls this out; the
-  fallback is to strip <code>format</code> from the comparator
-  when target is vhd and case includes
-  <code>subformat=fixed</code>.</li>
-<li><strong>Test runtime budget exceeded under serial
-  execution</strong>: ~110 tests × ~1 s each = ~110 s. If
-  the CI runner is single-core and that's too long,
-  drop the cross-validation surface to ~6 cases or
-  guard it behind an environment variable.
-  Mitigation: stestr's parallel execution already
-  amortises this; revisit only if CI complains.</li>
-<li><strong><code>instar info</code> parser bug on instar's own
-  output</strong>: surface 2 would catch this immediately —
-  it's the test surface designed to catch
-  writer/parser asymmetry within instar.</li>
+<li>A <code>workflow_dispatch</code> dry run fans out over all seven distros, each
+  installing the shared artifact and running the full suite.</li>
+<li>Build-once/consume-many confirmed: one <code>.deb</code> and one <code>.rpm</code> feed all
+  seven entries, and no entry rebuilds instar (D3, the phase-1 payoff).</li>
+<li>The job summary names each distro, its live qemu-img version, its
+  test totals, and its result.</li>
+<li><code>pull_request</code> runs are unchanged: same jobs, no matrix, no added
+  latency. Verify by reading a real PR run, not by reasoning.</li>
+<li><code>can_merge</code> exists, aggregates the matrix, and reports only on
+  <code>merge_group</code>. <code>automated_reviewer</code> still runs on PRs.</li>
+<li>Measured wall-clock recorded in this file, split into runner
+  boot + image pull versus suite runtime, so phase 5 can size the queue
+  (R1, R3).</li>
+<li><code>actionlint</code> and <code>shellcheck</code> clean via <code>pre-commit run --all-files</code>.</li>
 </ul>
-<h2 id="bugs-to-fix">Bugs to fix<a class="headerlink" href="#bugs-to-fix" title="Permanent link">&para;</a></h2>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>detect-profiles.py</code> flat-copy collision for create
-  output type</strong> (phase 7). The script's
-  <code>copy_multi_bucket_version_to_profile()</code> flattens all
-  per-bucket files into <code>profiles/profile-NN/</code>,
-  assuming case names encode the target. For
-  <code>create-info-json</code>, case names like <code>1M-default</code>
-  collide across qcow2/vmdk/vhd/vhdx/raw — the last
-  bucket processed wins. Fix: prefix the destination
-  filename with the bucket name when copying, or have
-  the create generator emit case names that include
-  the target prefix from the start. The latter is
-  preferable for symmetry with measure's convention.
-  Either way, regenerate the profile dir afterward.
-  This is a phase-7 follow-up; phase 8 does not block
-  on it.
-  <strong>Done 2026-08-11</strong> in instar-testdata <code>03c379a08a</code>
-  (prefix on copy, per output type so collision-free
-  types keep their filenames) and <code>769e463f7e</code>
-  (regenerate). instar <code>tests/test_create.py</code> now reads
-  the profile directly.</li>
+<li><strong>R1 — RESOLVED 2026-08-11: runner pool elasticity.</strong> The <code>xl</code>
+  runners are started on demand, so seven concurrent entries do not
+  starve a fixed pool and <code>max-parallel</code> is unnecessary (D5). What
+  remains is <em>cost</em>, not contention: each entry boots a VM and pulls a
+  distro image before any test runs, and the queue pays that seven
+  times per merge. Measure the boot+pull overhead separately from suite
+  wall-clock in 4c's dispatch run, so phase 5 can size the queue
+  honestly.</li>
+<li><strong>R2 — KVM contention within an entry.</strong> Cross-entry contention is
+  not a risk (D5: one VM per entry). Within an entry, the container
+  still runs at <code>--concurrency 4</code>, which is the setting phase 3 made
+  tunable for exactly this reason. Phase 2c's nine load-artifact
+  failures came from co-located runs on the dev host, so they do not
+  predict CI behaviour — but the failure <em>mode</em> is still live at any
+  concurrency, and any first-run divergence must be classified by
+  isolated <code>--select</code> replay before being called a regression (memory:
+  diffuzz_spurious_divergence_contention).</li>
+<li><strong>R3 — timeouts are unmeasured.</strong> The suite is ~3250 tests; the dev
+  host does ~15 min across 16 workers, and phase 3 flagged that
+  <code>--concurrency 4</code> in one container is materially longer without
+  recording the number. Set generous <code>timeout-minutes</code> (90 as a
+  starting point), measure on the first dispatch run, then tighten. A
+  timeout that fires mid-suite in the queue looks like a flaky distro.</li>
+<li><strong>R4 — <code>GITLAB_TESTDATA_TOKEN</code> in <code>merge_group</code>. Downgraded
+  2026-08-11</strong>: Michael is confident the token is available to merge CI,
+  so this is no longer a design risk and needs no contingency. It stays
+  listed only because the failure mode is deceptive — a queue run that
+  cannot fetch testdata mounts LFS pointer files and produces a mass
+  "file format: unknown" result that reads as an instar regression
+  rather than a credentials problem (memory:
+  testdata_lfs_pointer_drift). <code>prepare-testdata.sh</code> canary-checks for
+  exactly this, so it will fail loudly and early; no separate
+  verification step is needed.</li>
+<li><strong>R5 — a skipped dependency skips its dependents.</strong> The mechanism
+  behind the sketch's broken 4e. Any <code>needs:</code> edge crossing the
+  PR/merge_group boundary must use <code>if: always() &amp;&amp; &lt;event test&gt;</code>, as
+  <code>can_merge</code> does. Re-check every <code>needs:</code> after 4a's gating changes.</li>
+<li><strong>R6 — <code>continue-on-error</code> reports success.</strong> A quarantined entry
+  (4e) does not merely tolerate failure; it becomes invisible to
+  <code>can_merge</code>. That is the intent, but it means a forgotten flag
+  silently drops a distro from the gate. Tie each flag to an open issue.</li>
 </ul>
-<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>Before executing any step, the executing agent should
-back-brief: which test class is being added (or
-extended), which baselines it reads (and by what
-path-construction logic, since phase 8 deliberately
-bypasses <code>get_expected_output</code> for create due to the
-collision bug), and how skip / fail are distinguished.
-The reviewer should verify no step bleeds into phase 9
-(fuzz), phase 10 (differential), or phase 11 (docs).</p>
+<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Enabling the merge queue itself and the verification merge — phase 5.</li>
+<li>Adopting <code>check_paths</code>/<code>dorny/paths-filter</code> for docs-only skipping
+  (D4) — deferred, noted for phase 5.</li>
+<li>Any change to instar behaviour or to the runner script's semantics.
+  If a matrix entry finds a real parity gap, it is a new phase, not a
+  fix folded in here (this is how phase 2b came to exist).</li>
+<li>Publishing the built packages anywhere — they are CI artifacts only.</li>
+</ul>
 
 
 
@@ -11994,7 +11574,7 @@ The reviewer should verify no step bleeds into phase 9
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-create-phase-08-integration-tests.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-create-phase-08-integration-tests.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-create-phase-08-integration-tests/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

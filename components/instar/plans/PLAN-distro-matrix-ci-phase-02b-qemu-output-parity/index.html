@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-create-phase-08-integration-tests/">
+        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 8: integration tests against the cross-version create baselines - Shaken Fist</title>
+        <title>Phase 2b: qemu output-parity widen (map/snapshot/vpc on older qemu) - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-8-integration-tests-against-the-cross-version-create-baselines" class="md-skip">
+        <a href="#phase-2b-qemu-output-parity-widen-mapsnapshotvpc-on-older-qemu" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 8: integration tests against the cross-version create baselines
+              Phase 2b: qemu output-parity widen (map/snapshot/vpc on older qemu)
             
           </span>
         </div>
@@ -10927,10 +10927,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#why-this-phase-exists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Why this phase exists
       
     </span>
   </a>
@@ -10938,10 +10938,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#status-not-started" class="md-nav__link">
+  <a href="#the-inventory-phase-2c-full-runs-2026-08-09" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Not started
+        The inventory (phase-2c full runs, 2026-08-09)
       
     </span>
   </a>
@@ -10949,44 +10949,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission" class="md-nav__link">
+  <a href="#grounding-facts-measured-2026-08-10" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission
+        Grounding facts (measured 2026-08-10)
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#why-this-is-its-own-phase" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why this is its own phase
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-the-survey-turned-up" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the survey turned up
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What the survey turned up">
+    <nav class="md-nav" aria-label="Grounding facts (measured 2026-08-10)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#teststest_createpy-shape-today" class="md-nav__link">
+  <a href="#map-json-compressed-boundary-820-confirmed-both-ways" class="md-nav__link">
     <span class="md-ellipsis">
       
-        tests/test_create.py shape today
+        map-json compressed — boundary 8.2.0, confirmed both ways
       
     </span>
   </a>
@@ -10994,10 +10972,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#testsbasepy-and-the-command_output_dirs-mechanism" class="md-nav__link">
+  <a href="#snapshot-l-layout-boundary-exactly-900" class="md-nav__link">
     <span class="md-ellipsis">
       
-        tests/base.py and the COMMAND_OUTPUT_DIRS mechanism
+        snapshot -l layout — boundary exactly 9.0.0
       
     </span>
   </a>
@@ -11005,10 +10983,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-7-baseline-layout-recap" class="md-nav__link">
+  <a href="#the-snapshot-list-human-testdata-baselines-are-wrong" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 7 baseline layout (recap)
+        The snapshot-list-human testdata baselines are wrong
       
     </span>
   </a>
@@ -11016,10 +10994,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#latent-profile-dir-collision-bug" class="md-nav__link">
+  <a href="#the-vpc-case-is-a-writer-defect-not-a-version-quirk" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Latent profile-dir-collision bug
+        The vpc case is a writer defect, not a version quirk
       
     </span>
   </a>
@@ -11027,22 +11005,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#three-test-surfaces" class="md-nav__link">
+  <a href="#the-vhd-reader-rule-is-version-dependent-too" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Three test surfaces
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Three test surfaces">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#surface-1-per-target-baseline-comparison" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Surface 1: per-target baseline comparison
+        The VHD reader rule is version-dependent too
       
     </span>
   </a>
@@ -11050,92 +11016,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#surface-2-instar-create-qemu-create-cross-validation" class="md-nav__link">
+  <a href="#plumbing-qemu-version-is-info-only" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Surface 2: instar-create / qemu-create cross-validation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#surface-3-round-trip-via-instar-check" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Surface 3: round-trip via instar check
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#divergence-whitelist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Divergence whitelist
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create_cases-mirror" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CREATE_CASES mirror
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#test-class-organisation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test-class organisation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#edge-case-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Edge-case handling
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#running-cross-validation-against-the-system-qemu-img" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running cross-validation against the system qemu-img
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#test-runtime-budget" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test runtime budget
+        Plumbing: --qemu-version is info-only
       
     </span>
   </a>
@@ -11148,10 +11032,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
+  <a href="#steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open questions
+        Steps
       
     </span>
   </a>
@@ -11159,10 +11043,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#public-surface-added-in-phase-8" class="md-nav__link">
+  <a href="#acceptance" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Public surface added in phase 8
+        Acceptance
       
     </span>
   </a>
@@ -11170,10 +11054,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
+  <a href="#execution-results-2026-08-10" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution
+        Execution results (2026-08-10)
       
     </span>
   </a>
@@ -11181,54 +11065,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#out-of-scope-for-phase-8" class="md-nav__link">
+  <a href="#risks-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Out of scope for phase 8
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risks-and-mitigations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risks and mitigations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bugs-to-fix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs to fix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Risks / notes
       
     </span>
   </a>
@@ -11256,556 +11096,265 @@
   
 
 
-<h1 id="phase-8-integration-tests-against-the-cross-version-create-baselines">Phase 8: integration tests against the cross-version create baselines<a class="headerlink" href="#phase-8-integration-tests-against-the-cross-version-create-baselines" title="Permanent link">&para;</a></h1>
-<p>Master plan: <a href="/components/instar/plans/PLAN-create/">PLAN-create.md</a> ·
-Previous phase: <a href="/components/instar/plans/PLAN-create-phase-07-baselines/">PLAN-create-phase-07-baselines.md</a></p>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the instar codebase thoroughly. Read relevant
-source files, understand existing patterns (<code>tests/base.py</code>'s
-<code>get_output_profiles</code> / <code>get_expected_output</code> helpers,
-<code>tests/test_measure.py</code>'s phase-7 baseline-comparison classes,
-<code>tests/test_create.py</code>'s phase-3 through phase-6 smoke tests,
-the create-info-json layout under
-<code>instar-testdata/expected-outputs/create-info-json/</code>), and
-ground answers in what the code actually does today. Where a
-question touches on external concepts (<code>qemu-img info --output=
-json</code> schema per format, qcow2 / vmdk / vhd / vhdx info-JSON
-field semantics, the divergence whitelist motivated by random
-UUIDs / CIDs / header IDs), research as needed. Flag uncertainty
-explicitly rather than guessing.</p>
-<h2 id="status-not-started">Status: Not started<a class="headerlink" href="#status-not-started" title="Permanent link">&para;</a></h2>
-<h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
-<p>Wire <code>tests/test_create.py</code> up to the cross-version baselines
-that phase 7 committed in <code>instar-testdata</code>. After phase 8,
-every case in the create matrix (36 cases × 5 target formats:
-19 qcow2 + 5 vmdk + 5 vhd + 5 vhdx + 2 raw) is validated
-against its version-matched <code>qemu-img info</code> baseline, and a
-parallel cross-validation surface confirms that for any given
-<code>(target, options, size)</code> triple, the bytes <code>instar create</code>
-produces are info-equivalent to the bytes <code>qemu-img create</code>
-produces (modulo a documented divergence whitelist for random
-or path-dependent fields).</p>
-<p>Phase 8 closes the loop the master plan opened: every prior
-phase says "the writer works for the cases I tested";
-phase 8 says "the writer matches qemu-img field-for-field
-on every case in the matrix, against the same qemu-img
-version installed on the test host".</p>
-<h2 id="why-this-is-its-own-phase">Why this is its own phase<a class="headerlink" href="#why-this-is-its-own-phase" title="Permanent link">&para;</a></h2>
-<p>Decomposes cleanly into:</p>
-<ol>
-<li>Phase 7 stored bytes on disk. Phase 8 turns them into
-   assertions. Separating the two keeps the cross-repo work
-   (<code>instar-testdata</code> script edits + multi-minute baseline
-   regeneration) out of the test-iteration loop in
-   <code>instar</code>.</li>
-<li>The fan-out is large (~36 cases × per-target option
-   sweeps + cross-validation + round-trips ≈ 100 tests).
-   Bundling phase 7's data generation with the test code
-   would mean one giant commit that's hard to review.</li>
-<li>Phase 8 surfaces the latent profile-dir-collision bug
-   from phase 7 (see "What the survey turned up" below)
-   without blocking on its fix — by reading the intact raw
-   bucket directly.</li>
-</ol>
-<h2 id="what-the-survey-turned-up">What the survey turned up<a class="headerlink" href="#what-the-survey-turned-up" title="Permanent link">&para;</a></h2>
-<h3 id="teststest_createpy-shape-today"><code>tests/test_create.py</code> shape today<a class="headerlink" href="#teststest_createpy-shape-today" title="Permanent link">&para;</a></h3>
-<p>686 lines, four classes:</p>
-<ul>
-<li><code>TestCreateSmoke</code> (phase 3) — happy-path end-to-end per
-  target format, plus a couple of error / option / JSON
-  output tests.</li>
-<li><code>TestCreateOOptions</code> (phase 4) — <code>-o key=value,...</code>
-  parsing happy and error paths.</li>
-<li><code>TestCreateBackingChain</code> (phase 5) — vhdx-as-backing,
-  vmdk-from-vmdk CID round-trip, three-level chain non-
-  recursion, format-mismatch auto-detect, size-too-large.</li>
-<li><code>TestCreatePreallocation</code> (phase 6) — accept-set
-  coverage for raw + falloc/full and qcow2 + metadata /
-  falloc / full, plus the deferred-format rejections.</li>
-</ul>
-<p>Helpers established: each class defines its own
-<code>run_instar_create</code> and <code>run_instar_info</code> wrappers; the
-phase-3 class has a <code>_assert_info_reports()</code> field-checker
-that runs <code>instar info --output=json</code> and asserts a small
-set of fields (<code>format</code>, <code>virtual-size</code>,
-<code>cluster-size?</code>, <code>backing-filename?</code>). Phase 8 generalises
-this into a shared field-extractor + comparator.</p>
-<h3 id="testsbasepy-and-the-command_output_dirs-mechanism"><code>tests/base.py</code> and the COMMAND_OUTPUT_DIRS mechanism<a class="headerlink" href="#testsbasepy-and-the-command_output_dirs-mechanism" title="Permanent link">&para;</a></h3>
-<p><code>COMMAND_OUTPUT_DIRS</code> maps <code>command_name</code> → directory
-prefix. Composition is <code>f'{prefix}-{output_type}'</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">COMMAND_OUTPUT_DIRS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s1">&#39;info&#39;</span><span class="p">:</span>    <span class="s1">&#39;qemu-img&#39;</span><span class="p">,</span>   <span class="c1"># qemu-img-human / qemu-img-json</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s1">&#39;check&#39;</span><span class="p">:</span>   <span class="s1">&#39;check&#39;</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s1">&#39;compare&#39;</span><span class="p">:</span> <span class="s1">&#39;compare&#39;</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s1">&#39;measure&#39;</span><span class="p">:</span> <span class="s1">&#39;measure&#39;</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">}</span>
+<h1 id="phase-2b-qemu-output-parity-widen-mapsnapshotvpc-on-older-qemu">Phase 2b: qemu output-parity widen (map/snapshot/vpc on older qemu)<a class="headerlink" href="#phase-2b-qemu-output-parity-widen-mapsnapshotvpc-on-older-qemu" title="Permanent link">&para;</a></h1>
+<p>Master plan: <a href="/components/instar/plans/PLAN-distro-matrix-ci/">PLAN-distro-matrix-ci.md</a>.
+Planning effort: <strong>high</strong> (touches instar's core output emitters, the
+VHD writer, and the version model). Isolation: none for the code;
+instar-testdata baseline work lands via its own <code>--no-commit</code>-audited
+PR. <strong>Phase 4 (the merge-queue matrix) depends on this</strong> — without it
+the matrix is red on every distro shipping qemu &lt; 9.0.</p>
+<h2 id="why-this-phase-exists">Why this phase exists<a class="headerlink" href="#why-this-phase-exists" title="Permanent link">&para;</a></h2>
+<p>Phase 2 concluded, from the <code>info</code> baselines alone, that instar's
+two-boolean output model (<code>include_child_node</code> ≥8.0, <code>include_dirty_flag</code>
+≥6.1) needed no widening. Phase 2c then ran the <strong>full</strong> suite against
+every matrix distro's own qemu-img and disproved that for three other
+commands: instar hard-codes its newest-qemu behaviour for <code>map</code>,
+<code>snapshot -l</code>, and the <code>vpc</code> writer, so it diverges on any qemu older
+than the dev host's 10.x. This is the widen-vs-document decision phase
+2d reserved for management; Michael chose <strong>inventory, then widen</strong>
+(2026-08-09).</p>
+<p>One of the three turned out not to be an output-formatting divergence
+at all. See 2b-E: instar writes VHD footers that every qemu before
+10.0 reads as <strong>short</strong>, silently truncating the tail of the disk.
+That is a data-loss defect on Debian 12, Ubuntu 22.04, Ubuntu 24.04 and
+any RHEL 9 carrying its original qemu, and it is the highest-priority
+item in this phase.</p>
+<h2 id="the-inventory-phase-2c-full-runs-2026-08-09">The inventory (phase-2c full runs, 2026-08-09)<a class="headerlink" href="#the-inventory-phase-2c-full-runs-2026-08-09" title="Permanent link">&para;</a></h2>
+<p>Full suite via <code>tools/test-package-functional.sh</code>, all seven matrix
+distros, 3253 tests each:</p>
+<table>
+<thead>
+<tr>
+<th>Distro (qemu)</th>
+<th>Failed</th>
+<th>map-json <code>compressed</code></th>
+<th>snapshot <code>-l</code></th>
+<th>qcow1→vpc</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>debian:12 (7.2.22)</td>
+<td>21</td>
+<td>19</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>ubuntu:22.04 (6.2.0)</td>
+<td>21</td>
+<td>19</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>ubuntu:24.04 (8.2.2)</td>
+<td>2</td>
+<td><strong>0</strong></td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>debian:13 (10.0.11)</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>fedora (10.2.2)</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>rockylinux:9 (10.1.0)</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>rockylinux/rockylinux:10 (10.1.0)</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The set is bounded and reduces to the same three classes everywhere;
+6.2.0 surfaces nothing 7.2.22 does not. Ubuntu 24.04 is the row that
+separates them: at 8.2.2 the map failures are already gone while
+snapshot and vpc still fail, so the three boundaries are distinct.</p>
+<h2 id="grounding-facts-measured-2026-08-10">Grounding facts (measured 2026-08-10)<a class="headerlink" href="#grounding-facts-measured-2026-08-10" title="Permanent link">&para;</a></h2>
+<p><strong>instar-testdata ships 80 static per-version <code>qemu-img</code> builds</strong> at
+<code>qemu-img-binaries/x86_64/&lt;version&gt;/qemu-img</code> (6.0.0 → 10.2.0,
+static-pie, run directly on this host). Every boundary below was
+measured with them in seconds. The earlier draft of this plan proposed
+building qemu from git tags to find the snapshot boundary; that is
+unnecessary. <strong>Measure with these binaries; do not reason from the
+version-map, and do not reason from qemu source.</strong></p>
+<h3 id="map-json-compressed-boundary-820-confirmed-both-ways">map-json <code>compressed</code> — boundary 8.2.0, confirmed both ways<a class="headerlink" href="#map-json-compressed-boundary-820-confirmed-both-ways" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>8.1.5:  { ... &quot;data&quot;: true, &quot;offset&quot;: 589824}
+8.2.0:  { ... &quot;data&quot;: true, &quot;compressed&quot;: false, &quot;offset&quot;: 589824}
 </code></pre></div>
-<p>For create the bucket is <code>create-info-json</code> (the
-<code>-info-json</code> suffix is part of the bucket name — there is
-no human variant for create). The natural extension is
-<code>'create': 'create-info'</code> so <code>f'{create-info}-{json}' =
-'create-info-json'</code>. <code>output_type='json'</code> is the only
-valid option for create.</p>
-<p><code>get_output_profiles(output_type, command)</code> reads
-<code>expected-outputs/&lt;dir&gt;/version-map.json</code> and returns
-<code>{'profiles': {profile_name: representative_version},
-'version_to_profile': {version: profile_name}}</code>.</p>
-<p><code>get_expected_output(image_id, profile, output_type,
-command)</code> reads
-<code>expected-outputs/&lt;dir&gt;/profiles/&lt;profile&gt;/&lt;image_id&gt;.stdout.txt</code>
-with the <code>$TESTDATA_ROOT</code> placeholder substituted.</p>
-<h3 id="phase-7-baseline-layout-recap">Phase 7 baseline layout (recap)<a class="headerlink" href="#phase-7-baseline-layout-recap" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>instar-testdata/expected-outputs/create-info-json/
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── qcow2/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── vmdk/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── vhd/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── vhdx/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── raw/&lt;version&gt;/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── profiles/profile-NN/&lt;case&gt;.{stdout.txt,stderr.txt,meta.json}
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── version-map.json
+<p>Absent at 8.1.5, present at 8.2.0, and the live suite agrees (Ubuntu
+24.04 at 8.2.2 has zero map failures). The field sits between <code>data</code>
+and <code>offset</code>. instar emits it unconditionally at
+<code>src/vmm/src/main.rs:15141</code> and <code>:15149</code>.</p>
+<h3 id="snapshot-l-layout-boundary-exactly-900">snapshot <code>-l</code> layout — boundary exactly 9.0.0<a class="headerlink" href="#snapshot-l-layout-boundary-exactly-900" title="Permanent link">&para;</a></h3>
+<p>Measured on <code>custom/snapshots/snap-qcow2-longname.qcow2</code> across
+6.0.0 / 7.2.22 / 8.0.0 / 8.1.0 / 8.2.0 / 8.2.2 / 9.0.0 / 9.1.0 /
+9.2.0 / 9.2.4 / 10.0.0 / 10.2.0. Every version ≤ 8.2.2 emits the old
+layout; every version ≥ 9.0.0 emits the new one. Both header lines
+verbatim (old is 79 chars, new is 80):</p>
+<div class="highlight"><pre><span></span><code>ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
+ID      TAG               VM_SIZE                DATE        VM_CLOCK     ICOUNT
 </code></pre></div>
-<p>Where <code>&lt;case&gt;.stdout.txt</code> carries the <code>qemu-img info
---output=json</code> output (after the absolute tmp path is
-replaced with the <code>$FILENAME</code> placeholder).</p>
-<p>80 qemu versions × ~36 cases = ~8 640 baselines per file
-type. Dedup ratio is 1:1 (every version is its own profile)
-because vmdk's per-invocation random <code>cid</code> and <code>parent-cid</code>
-break per-version dedup.</p>
-<h3 id="latent-profile-dir-collision-bug">Latent profile-dir-collision bug<a class="headerlink" href="#latent-profile-dir-collision-bug" title="Permanent link">&para;</a></h3>
-<p><code>detect-profiles.py:225-241</code> copies all of a version's
-<code>*.stdout.txt</code> files <strong>flat</strong> into <code>profiles/profile-NN/</code>,
-on the assumption (line 231) that <em>"within a bucket,
-filenames are unique because the case-name or image-id
-encodes the format/target"</em>. For <code>measure</code>, case names like
-<code>1G-qcow2-cs-64k</code> and image-ids like <code>cirros-qcow2__qcow2</code>
-do encode the target. For <code>create</code>, case names like
-<code>1M-default</code> exist independently under qcow2, vmdk, vhd,
-vhdx, and raw — they collide silently. As-shipped,
-<code>profiles/profile-10-2-0/1M-default.stdout.txt</code> carries
-<strong>only vmdk's content</strong>; qcow2/vhd/vhdx/raw 1M-default
-were overwritten without warning. The same applies to
-<code>64M-default</code> (4 collisions) and <code>1G-default</code> (5
-collisions).</p>
-<p>Phase 8's tests <strong>must not</strong> read from the <code>profiles/</code>
-bucket for create. The intact ground truth is the
-per-target raw bucket
-(<code>create-info-json/&lt;target&gt;/&lt;version&gt;/&lt;case&gt;.stdout.txt</code>),
-which has no collisions because the target is encoded in
-the directory path. Use that directly.</p>
-<p>Recording this as a bug to be fixed as a phase-7 follow-up
-(see "Bugs to fix"). Until the fix lands, the test code
-indexes by target-version-case rather than by profile.</p>
-<blockquote>
-<p><strong>Resolved 2026-08-11.</strong> instar-testdata <code>03c379a08a</code> and
-<code>769e463f7e</code> fixed the generator and regenerated the
-corpus: create-info-json profile files are now named
-<code>&lt;target&gt;-&lt;case&gt;</code>, so all 36 files per profile survive
-instead of 25. <code>TestCreateBaselineMatrix</code> reads the
-profile like every other output type and the raw-bucket
-workaround is gone. The defect was worse than recorded
-here — as well as the collisions, every profile carried
-10.2.0's output whatever version it claimed, so 855 files
-disagreed with their own metadata.</p>
-</blockquote>
-<h3 id="three-test-surfaces">Three test surfaces<a class="headerlink" href="#three-test-surfaces" title="Permanent link">&para;</a></h3>
-<h4 id="surface-1-per-target-baseline-comparison">Surface 1: per-target baseline comparison<a class="headerlink" href="#surface-1-per-target-baseline-comparison" title="Permanent link">&para;</a></h4>
-<p>For each <code>(target, case)</code> pair in the canonical
-<code>CREATE_CASES</code> mirror (35-36 entries depending on whether
-the <code>1G-zstd</code> qcow2 case is included — phase 7 included
-it, so 19 qcow2 cases):</p>
-<ol>
-<li>Determine the installed qemu-img version via the
-   existing <code>_detect_qemu_version()</code> helper.</li>
-<li>Locate the version-matched baseline at
-   <code>create-info-json/&lt;target&gt;/&lt;version_str&gt;/&lt;case&gt;.stdout.txt</code>.
-   Skip if absent (e.g. test host runs qemu 5.2 — outside
-   the phase-7 matrix floor of 6.0.0).</li>
-<li>Skip if the baseline's <code>meta.json</code> reports
-   <code>create_return_code != 0</code> (qemu-img rejected the
-   option set on this version — there is no successful
-   output to compare against).</li>
-<li>Translate the case's <code>(size_str, target, options_list)</code>
-   tuple to <code>instar create</code> CLI flags
-   (mirroring measure's <code>_args_for_case</code>).</li>
-<li>Run <code>instar create &lt;flags&gt; &lt;tmpfile&gt;</code> against a temp
-   directory.</li>
-<li>Run <code>qemu-img info --output=json &lt;tmpfile&gt;</code> (using the
-   <em>system</em> <code>qemu-img</code>, not one of the matrix binaries —
-   the comparison is against the matching baseline, which
-   was recorded by the same version).</li>
-<li>Normalise both sides:</li>
-<li>Replace the absolute tmpfile path with <code>$FILENAME</code>
-     (matching the baseline's pre-recorded placeholder).</li>
-<li>Strip divergence-whitelist fields (see below) from
-     both the produced and the baseline JSON.</li>
-<li>Assert the normalised dicts are equal. On failure,
-   <code>assertEqual</code> on the normalised JSON pretty-prints both
-   sides so the diff is readable.</li>
-</ol>
-<p>Fan-out: 36 cases × 1 (one test per case, using the
-matching baseline). The version axis is the installed
-host's qemu — we don't sweep across versions inside the
-test loop (that would require launching the matrix
-binaries, which is phase-7's job).</p>
-<h4 id="surface-2-instar-create-qemu-create-cross-validation">Surface 2: instar-create / qemu-create cross-validation<a class="headerlink" href="#surface-2-instar-create-qemu-create-cross-validation" title="Permanent link">&para;</a></h4>
-<p>The master plan's primary contract: "<code>instar create |
-instar info</code> and <code>qemu-img create | instar info</code> produce
-identical info output (modulo divergence whitelist)".
-Phase 8 implements this as a runtime comparison rather
-than a baseline lookup:</p>
-<p>For each <code>(target, case)</code> in a curated subset (~12
-representative cases, not the full matrix — this surface
-is slower because each test runs <em>two</em> create
-invocations and <em>two</em> info invocations):</p>
-<ol>
-<li>Translate the case to CLI flags.</li>
-<li>Create the same image twice: once with <code>instar create</code>,
-   once with the system <code>qemu-img create</code>.</li>
-<li>Run <code>instar info --output=json</code> on both outputs.</li>
-<li>Normalise both JSON outputs (strip divergence
-   whitelist + absolute paths).</li>
-<li>Assert the normalised dicts are equal.</li>
-</ol>
-<p>This surface is independent of phase 7's baselines and
-exercises the instar info parser as the comparison tool
-— validates that <em>given matched inputs</em>, instar's
-writer + parser combination agrees with qemu-img's
-writer (via instar's parser). The baseline surface
-above validates <em>given matched inputs</em>, instar's writer
-agrees with qemu-img's writer (via qemu-img's parser).</p>
-<p>These are complementary: surface 1 catches writer
-divergences from qemu-img's contract; surface 2 catches
-divergences between instar's writer and instar's own
-parser (an internal self-consistency check that costs
-nothing extra to set up).</p>
-<h4 id="surface-3-round-trip-via-instar-check">Surface 3: round-trip via <code>instar check</code><a class="headerlink" href="#surface-3-round-trip-via-instar-check" title="Permanent link">&para;</a></h4>
-<p>For each successful create case, run <code>instar check</code> on
-the produced file and assert it reports clean. This is
-the lightest-weight write-then-read sanity check
-already validated for individual cases in
-<code>tests/test_check_formats.py</code> — phase 8 extends it
-across the matrix to catch any case-specific writer
-bug that produces a file <code>qemu-img info</code> accepts but
-<code>instar check</code> flags.</p>
-<p>Fan-out: 36 cases × 1 check call. Each is fast (~0.3 s).</p>
-<h3 id="divergence-whitelist">Divergence whitelist<a class="headerlink" href="#divergence-whitelist" title="Permanent link">&para;</a></h3>
-<p>Fields excluded from cross-format JSON comparison
-(phase 7's "What <code>qemu-img info --output=json</code> reports
-per format" section already enumerates these; phase 8
-codifies them as the whitelist):</p>
-<p>Universal (every target):</p>
-<ul>
-<li><code>filename</code> — absolute path differs between runs; replace
-  with <code>$FILENAME</code> in both sides before comparison.</li>
-<li><code>actual-size</code> — filesystem-dependent block accounting.
-  Compare with a relative tolerance, or exclude entirely.
-  Recommendation: <strong>exclude entirely</strong> for phase 8 (the
-  test doesn't care whether the host runs ext4 vs xfs).</li>
-<li><code>children[*].info.filename</code>, <code>children[*].info.actual-size</code>
-  — same as above, for the nested file-level info.</li>
-<li><code>format-specific.data.refcount-block-cache-size</code>,
-  <code>format-specific.data.l2-cache-size</code>, and other cache-
-  hint fields — qemu may report these on some versions
-  and not others; not part of the metadata contract.</li>
-</ul>
-<p>vmdk:</p>
-<ul>
-<li><code>format-specific.data.cid</code> — random per
-  <code>qemu-img create</code> invocation. Cannot match across runs.</li>
-<li><code>format-specific.data.parent-cid</code> — random; in the
-  no-backing case both sides emit a sentinel, but in the
-  backing case (phase-5 vmdk-from-vmdk) each invocation
-  reads a fresh parent CID. Exclude.</li>
-<li><code>format-specific.data.create-type</code> — should match; do
-  not exclude.</li>
-<li><code>format-specific.data.extents[*].cluster-size</code> and
-  related — should match; do not exclude.</li>
-</ul>
-<p>vhdx:</p>
-<ul>
-<li><code>format-specific.data.log-size</code> — qemu defaults to 1
-  MiB; instar may use a different default. Compare only if
-  both sides report the same value, otherwise exclude.
-  (To be confirmed during 8b; if instar matches qemu's 1
-  MiB default, this field stays in the comparison.)</li>
-<li>Any UUID-like field in the vhdx metadata (page-83 GUID,
-  logical sector GUID, data write GUID, file write GUID,
-  metadata GUID) — exclude. qemu-img info may not surface
-  these at all in older versions; treat their presence as
-  best-effort.</li>
-</ul>
-<p>vhd / vpc:</p>
-<ul>
-<li>No known random fields. The fixed-subformat detection
-  divergence noted in phase 7 (<code>format=raw</code> for
-  <code>1M-fixed</code>) is an artefact of qemu-img-without-<code>-f</code>
-  auto-detection; phase 8 invokes <code>qemu-img info</code> <em>with
-  <code>-f vpc</code></em> explicitly on the produced files to bypass
-  the auto-detect path and get the canonical
-  <code>format=vpc</code> result. (Phase 7's baselines were
-  captured <em>without</em> <code>-f</code> to match qemu-img's default;
-  phase 8 either: (a) invokes phase-8 info with no <code>-f</code>
-  and accepts the same auto-detection result, or
-  (b) strips the <code>format</code> field from the comparison
-  when target is vhd-fixed. Decide during 8b; option (a)
-  is simpler if it works.)</li>
-</ul>
-<p>qcow2:</p>
-<ul>
-<li>No known random fields. <code>format-specific.data.compat</code>,
-  <code>lazy-refcounts</code>, <code>refcount-bits</code>, <code>extended-l2</code>,
-  <code>compression-type</code> all match deterministically when
-  the create-time options match.</li>
-</ul>
-<p>raw:</p>
-<ul>
-<li>The raw info JSON is mostly file-level — <code>format</code>,
-  <code>virtual-size</code>, <code>filename</code>, <code>actual-size</code>. The
-  comparison is nearly trivial once <code>filename</code> and
-  <code>actual-size</code> are excluded.</li>
-</ul>
-<p>The whitelist is implemented as a small helper in
-<code>tests/helpers/info_json.py</code> (new file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">DIVERGENCE_FIELDS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s1">&#39;filename&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="s1">&#39;actual-size&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="c1"># ... and a nested-path version for children[*].info.*</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">}</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">VMDK_DIVERGENCE</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="s1">&#39;cid&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="s1">&#39;parent-cid&#39;</span><span class="p">,</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">}</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">VHDX_DIVERGENCE</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="s1">&#39;log-size&#39;</span><span class="p">,</span>  <span class="c1"># tentative; remove if instar matches qemu&#39;s default</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="c1"># plus any UUID-like fields surfaced by the comparison</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="p">}</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">normalise_info_json</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>                        <span class="n">tmp_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Recursively strip divergence fields and substitute</span>
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="sd">    $FILENAME for any absolute path matching tmp_path.&quot;&quot;&quot;</span>
+<p>The old layout is a single concatenated printf with <strong>no separators</strong>
+and different widths — <code>%-10s%-16s%9s%20s%13s%11s</code> (the 18/7 split
+recorded when this plan was drafted is indistinguishable for any tag
+that fits its field; see the execution notes) — where the current
+(≥9.0) emitter at <code>main.rs:16177</code> uses space-separated
+<code>{:&lt;7} {:&lt;16} {:&gt;8} {:&gt;19} {:&gt;15} {:&gt;10}</code>. The clock also narrows:
+<code>%02d:%02d:%02d.%03d</code> (12 chars) below 9.0 versus the 4-digit-hour
+<code>{:04}:{:02}:{:02}.{:03}</code> (14 chars) at and above it. So this is a
+second rendering branch, not a title swap. Verify the reconstruction
+byte-for-byte against the static builds before writing code:</p>
+<div class="highlight"><pre><span></span><code>ID %-10s | TAG %-16s | VM SIZE %9s | DATE %20s | VM CLOCK %13s | ICOUNT %11s
 </code></pre></div>
-<p>The helper is pure-Python, no I/O. Unit-test it in
-<code>tests/test_helpers.py</code> (if such a file exists; create
-otherwise) with a couple of fixture dicts.</p>
-<h3 id="create_cases-mirror"><code>CREATE_CASES</code> mirror<a class="headerlink" href="#create_cases-mirror" title="Permanent link">&para;</a></h3>
-<p>Following measure's precedent (<code>MEASURE_SIZE_CASES</code>
-mirrored from the generator), define a module-level
-<code>CREATE_CASES</code> dict in <code>tests/test_create.py</code> mirroring
-phase 7's <code>CREATE_CASES</code> from
-<code>instar-testdata/scripts/generate-baselines.py</code>. Same
-shape: <code>{target: [(case_name, size_str, options_list),
-...]}</code>. Add a one-line cross-check
-<code>test_create_cases_match_baselines()</code> that walks
-<code>expected-outputs/create-info-json/&lt;target&gt;/&lt;version&gt;/</code>
-for each target and asserts every <code>*.stdout.txt</code>
-corresponds to a <code>CREATE_CASES</code> entry — catching drift
-between the two mirrors.</p>
-<p>Drift risk is real (the two repos evolve independently),
-but the cross-check makes any divergence a loud test
-failure rather than a silent miss. Same trade-off measure
-made in its phase 7.</p>
-<h3 id="test-class-organisation">Test-class organisation<a class="headerlink" href="#test-class-organisation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tests/test_create.py
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── TestCreateSmoke              (phase 3)  — unchanged
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├── TestCreateOOptions           (phase 4)  — unchanged
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├── TestCreateBackingChain       (phase 5)  — unchanged
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>├── TestCreatePreallocation      (phase 6)  — unchanged
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>├── TestCreateBaselineMatrix     (phase 8)  — ~36 tests
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>├── TestCreateCrossValidation    (phase 8)  — ~12 tests
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>└── TestCreateRoundTripCheck     (phase 8)  — ~36 tests
+<p>Derive field widths by growing an input past the field boundary, not by
+reading a single row: adjacent (pad, width) pairs that sum the same are
+indistinguishable until something overflows.</p>
+<h3 id="the-snapshot-list-human-testdata-baselines-are-wrong">The <code>snapshot-list-human</code> testdata baselines are wrong<a class="headerlink" href="#the-snapshot-list-human-testdata-baselines-are-wrong" title="Permanent link">&para;</a></h3>
+<p><code>profiles/profile-6-0-0/*.stdout.txt</code> are <strong>byte-identical</strong> to
+<code>profiles/profile-10-0-0/*.stdout.txt</code> and carry the new underscored
+form, so the pre-9.0 profile does not match what real pre-9.0 qemu
+emits. The defect is in the profile <em>derivation</em>, not the capture: each
+baseline's own <code>.meta.json</code> records the correct <code>stdout_bytes</code> (255 for
+the old form) while the file beside it is 258 bytes. The version-map
+itself is right — it already splits at 9.0.0, matching the measurement
+above.</p>
+<p>An audit of every profile-bearing output type (<code>stdout</code> set hashed per
+profile, plus a size-versus-<code>meta.stdout_bytes</code> check) found this in
+<strong><code>snapshot-list-human</code> only</strong>: 11 mismatched files, 2 profiles with
+identical stdout. <code>map-json</code>'s 3 profiles are sound. <code>create-info-json</code>
+has 80 identical-stdout profiles, which is redundant but not wrong (the
+output genuinely does not vary). Re-run that audit as the acceptance
+check for 2b-D; the script is trivial and belongs in instar-testdata.</p>
+<h3 id="the-vpc-case-is-a-writer-defect-not-a-version-quirk">The vpc case is a writer defect, not a version quirk<a class="headerlink" href="#the-vpc-case-is-a-writer-defect-not-a-version-quirk" title="Permanent link">&para;</a></h3>
+<p>The stub plan hypothesised that instar was faithfully emulating an old
+qemu that truncates. It is not — <strong>real qemu never truncates, at any
+version.</strong> <code>qemu-img convert -O vpc</code> then back to raw, on the same
+qcow1 source, at 7.2.22 / 8.2.2 / 9.0.0 / 10.0.0: every version yields
+2123776 bytes from a 2097152-byte source (qemu rounds <em>up</em> to CHS).</p>
+<p>Reading instar's own vpc output tells the real story:</p>
+<table>
+<thead>
+<tr>
+<th>Reader</th>
+<th><code>instar convert -O vpc</code> output</th>
+<th>qemu's own vpc output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>qemu 7.2.22 / 8.2.2 / 9.0.0 / 9.2.4</td>
+<td>2088960</td>
+<td>2123776</td>
+</tr>
+<tr>
+<td>qemu 10.0.0 / 10.0.7 / 10.2.0</td>
+<td>2097152</td>
+<td>2123776</td>
+</tr>
+<tr>
+<td><code>instar info</code></td>
+<td>2097152</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The footers explain it:</p>
+<div class="highlight"><pre><span></span><code>instar  app=&#39;imgo&#39; current=2097152  CHS=60/4/17 -&gt; 2088960   MISMATCH
+qemu    app=&#39;qemu&#39; current=2123776  CHS=61/4/17 -&gt; 2123776   consistent
 </code></pre></div>
-<p>Total ≈ 110 tests. Each <code>instar create</code> run takes
-~0.5–1 s (guest launch cost dominates); the matrix and
-round-trip surfaces together fan out to ~72 tests so
-~60 s wall-clock serially, less under stestr's
-parallel execution. The cross-validation surface runs
-two creates + two info calls so ~3 s × 12 = ~36 s.
-Total runtime in the 90–120 s ballpark — acceptable
-given test_measure.py's surface already runs longer
-in the same suite.</p>
-<h3 id="edge-case-handling">Edge-case handling<a class="headerlink" href="#edge-case-handling" title="Permanent link">&para;</a></h3>
-<p><strong>Falloc / full preallocation cases</strong> (1M-prealloc-
-falloc, 1M-prealloc-full): the baseline records the
-<code>actual-size</code> for the version that generated it. Both
-will report <code>actual-size = 1 MiB + metadata</code> — but the
-exact value depends on the underlying filesystem.
-Excluding <code>actual-size</code> from the whitelist solves this
-without losing coverage (the <em>format-specific</em> fields
-are what matter for create correctness).</p>
-<p><strong>vmdk monolithicSparse vs streamOptimized</strong>: baselines
-for <code>1G-stream-optimized</code> carry <code>"create-type":
-"streamOptimized"</code>; instar emits the same on its
-output. Cross-check.</p>
-<p><strong>vhd <code>1M-fixed</code> / <code>16M-fixed</code></strong>: phase 7's baselines
-report <code>"format": "raw"</code> because qemu-img info auto-
-detects on file start (fixed VHDs have only a 512-byte
-footer at end of file, no leading magic). instar's
-fixed VHD output has the same property. The phase-8
-test for these cases invokes <code>qemu-img info</code> with no
-<code>-f</code> flag (matching the baseline-recording invocation)
-and the comparison naturally agrees.</p>
-<p><strong><code>1G-zstd</code> qcow2 case</strong>: instar accept-ignores
-<code>compression_type=zstd</code> and emits zstd metadata
-(matching qemu-img's behaviour from 5.1+). The
-baseline carries <code>"compression-type": "zstd"</code>; instar
-should match.</p>
-<p><strong><code>1G-cs-512</code> qcow2 case</strong>: 512-byte cluster size,
-~2 MiB L2 table at 1 GiB virtual. Phase 1's emitter
-handles this; phase 8 confirms via the baseline match.</p>
-<p><strong>Backing-file cases</strong>: not in phase 7's matrix (out of
-scope per phase 7's plan). Phase 5's existing
-<code>TestCreateBackingChain</code> already covers backing
-behaviour with runtime fixture construction. Phase 8
-adds <em>no</em> backing tests to the matrix surface; the
-runtime fixtures stay in <code>TestCreateBackingChain</code>.</p>
-<h3 id="running-cross-validation-against-the-system-qemu-img">Running cross-validation against the system qemu-img<a class="headerlink" href="#running-cross-validation-against-the-system-qemu-img" title="Permanent link">&para;</a></h3>
-<p>Surface 2 calls the system <code>qemu-img create</code> and
-compares its output (via <code>instar info</code>) against
-instar's output (also via <code>instar info</code>). The
-installed qemu-img may be any version 6.0.0+; the
-comparison only requires that both writers agree on
-the metadata at runtime, which they do if both
-implement the same format spec.</p>
-<p>If the system qemu-img is missing (<code>which qemu-img</code>
-returns nothing) or runs an unsupported version,
-surface-2 tests <code>skipTest</code> with a clear message.</p>
-<h3 id="test-runtime-budget">Test runtime budget<a class="headerlink" href="#test-runtime-budget" title="Permanent link">&para;</a></h3>
-<p>Worst case (serial, cold caches): 110 tests × ~1 s
-avg = 110 s. Under stestr's default parallel
-execution (<code>--concurrency=auto</code>, typically 4-8
-workers on a developer laptop) drop to 20-40 s.
-CI machines with fewer cores may take 60-90 s.
-Acceptable. If a developer wants to skip phase-8
-surfaces during fast inner-loop iteration, the
-existing <code>INSTAR_TEST_TIER</code> filter (if it exists —
-verify during 8a; if not, document a <code>-k</code> pytest
-filter as the workaround) covers them.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These should be answered during execution; escalate to
-the operator rather than guessing.</p>
-<ol>
-<li>
-<p><strong>Should <code>TestCreateBaselineMatrix</code> and
-   <code>TestCreateCrossValidation</code> inherit from
-   <code>TestCreateSmoke</code> (matching measure's pattern of
-   inheriting from <code>TestMeasureSmoke</code>) or stand alone</strong>?
-   Inheritance gives free access to <code>run_instar_create</code>
-   /  <code>run_instar_info</code> helpers. Recommendation: inherit
-   from <code>TestCreateSmoke</code> for the same DRY reason.</p>
-</li>
-<li>
-<p><strong><code>-O</code> vs <code>-f</code></strong>. qemu-img uses <code>-f</code> for <em>create</em>'s
-   target format (different from <code>convert</code>'s <code>-O</code>).
-   Phase 7's generator uses <code>-f</code>. instar's CLI also uses
-   <code>-f</code> for create. No conflict; just don't accidentally
-   write <code>-O</code> in the test args.</p>
-</li>
-<li>
-<p><strong>Profile lookup vs raw bucket lookup</strong>. The phase-7
-   profile-dir-collision bug (see "Latent profile-dir-
-   collision bug" above) means <code>get_expected_output()</code>
-   silently returns the wrong content for non-vmdk
-   <code>1M-default</code> / <code>64M-default</code> / <code>1G-default</code> cases.
-   Recommendation: phase 8 reads
-   <code>expected-outputs/create-info-json/&lt;target&gt;/&lt;version&gt;/&lt;case&gt;.stdout.txt</code>
-   directly via a new helper rather than going through
-   <code>get_expected_output()</code>. This sidesteps the bug. File
-   the bug fix as a follow-up in instar-testdata; do not
-   block phase 8 on it.</p>
-</li>
-<li>
-<p><strong>What if the installed qemu-img version is older
-   than the matrix floor (6.0.0)</strong>? Surface 1 tests
-   <code>skipTest</code> per case with a message naming the missing
-   baseline; surface 2 still runs (the system qemu-img
-   is the comparator, not a baseline lookup). Surface 3
-   (instar check round-trip) is also unaffected.</p>
-</li>
-<li>
-<p><strong>Does qemu-img info on a fixed-VHD without <code>-f</code>
-   return <code>format=raw</code> consistently across qemu
-   versions</strong>? Phase 7's baselines from 10.2.0 do.
-   Verify during 8b that older qemu versions also do
-   (relevant because surface 1 uses the <em>installed</em>
-   qemu-img, which may be 6.x on some CI hosts). If
-   any version reports differently, add <code>format</code> to
-   the divergence whitelist when target is vhd and the
-   case includes <code>subformat=fixed</code>.</p>
-</li>
-<li>
-<p><strong>Should the test compare meta.json as well as
-   stdout</strong>? Phase 7's <code>meta.json</code> carries
-   <code>create_return_code</code> and <code>info_return_code</code> per
-   case, which the test already reads to decide skip.
-   Beyond that, no — the meta.json is generator
-   bookkeeping, not part of the comparison contract.</p>
-</li>
-<li>
-<p><strong>Cross-validation curated subset selection</strong>.
-   ~12 representative cases for surface 2. Suggested
-   set: 5 × <code>1M-default</code> (one per target), 4 × <code>1G-
-   default</code> (excluding raw — already covered),
-   <code>1G-cs-64k</code> (qcow2 option exercise),
-   <code>1G-extended-l2</code> (qcow2 option), <code>1G-zstd</code> (qcow2
-   option), <code>1G-stream-optimized</code> (vmdk), <code>1M-fixed</code>
-   (vhd). 12-13 cases.</p>
-</li>
-<li>
-<p><strong>Tolerance on the cross-validation comparison</strong>.
-   Surface 2 compares instar info on two files
-   created by different writers (instar vs qemu-img).
-   Divergence whitelist is the same as surface 1.
-   If a field disagrees outside the whitelist, that's
-   a real divergence — file as a bug, don't widen
-   the whitelist to paper over it.</p>
-</li>
-<li>
-<p><strong>Time budget for the qemu-img matrix binaries</strong>.
-   Phase 8 does NOT iterate <code>qemu-img-binaries/x86_64/
-   &lt;version&gt;/</code> — that's phase 7's job. Phase 8 uses
-   only the system qemu-img + the recorded baselines.
-   This keeps the phase-8 runtime bounded.</p>
-</li>
-<li>
-<p><strong>What if <code>instar info</code> doesn't surface a field
-    that qemu-img info does</strong> (e.g. <code>format-specific.
-    data.lazy-refcounts</code>)? Surface 1's comparison is
-    against qemu-img info on both sides, so this is
-    a non-issue for surface 1. For surface 2, both
-    sides are instar info; if instar info doesn't
-    surface a field, it's missing from both sides
-    and the comparison still passes. The case where
-    instar info reports a field qemu-img doesn't is
-    handled by the divergence whitelist (extend if
-    needed during 8c).</p>
-</li>
-</ol>
-<h2 id="public-surface-added-in-phase-8">Public surface added in phase 8<a class="headerlink" href="#public-surface-added-in-phase-8" title="Permanent link">&para;</a></h2>
-<p>In <code>tests/base.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">COMMAND_OUTPUT_DIRS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="o">...</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="s1">&#39;create&#39;</span><span class="p">:</span> <span class="s1">&#39;create-info&#39;</span><span class="p">,</span>   <span class="c1"># NEW — only output_type=&#39;json&#39; valid</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">}</span>
+<p>qemu's writer always rounds the declared size up so CHS and
+<code>current_size</code> agree. instar keeps the size verbatim and writes the
+VHD-spec <strong>floor</strong> geometry, so its CHS addresses 8192 bytes less than
+the disk it declares. This is deliberate:
+<code>src/crates/vhd/src/lib.rs:397</code> <code>footer_geometry()</code> documents the
+choice as "matching Hyper-V/disk2vhd-style writers (current_size
+authoritative, CHS a floor approximation)". The assumption is wrong for
+the creator app instar actually writes. qemu's <code>vpc_open</code> trusts
+<code>current_size</code> only for creator <code>win</code> (Hyper-V) or <code>qem2</code> (qemu's
+<code>force_size</code> marker), or when CHS is at its 65535/16/255 maximum;
+everything else — including <code>imgo</code> — gets the CHS product. qemu 10.0
+changed that default, which is why the dev host never noticed. <strong>The
+code's stated intent and the bytes it writes disagree.</strong></p>
+<p>It is not convert-specific. <code>instar create -f vpc</code> is equally affected:</p>
+<div class="highlight"><pre><span></span><code>2M    instar 2088960     / qemu 2123776
+100M  instar 104761344   / qemu 104865792
+1G    instar 1073479680  / qemu 1073995776
 </code></pre></div>
-<p>In <code>tests/helpers/info_json.py</code> (new file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">normalise_info_json</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">tmp_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">assert_info_equivalent</span><span class="p">(</span><span class="n">actual</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span> <span class="o">...</span>
-</code></pre></div>
-<p>In <code>tests/test_create.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">CREATE_CASES</span> <span class="o">=</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span>  <span class="c1"># mirror of phase-7&#39;s generator</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestCreateBaselineMatrix</span><span class="p">(</span><span class="n">TestCreateSmoke</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestCreateCrossValidation</span><span class="p">(</span><span class="n">TestCreateSmoke</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestCreateRoundTripCheck</span><span class="p">(</span><span class="n">TestCreateSmoke</span><span class="p">):</span> <span class="o">...</span>
-</code></pre></div>
-<p>Two factory functions (<code>_make_baseline_test</code>,
-<code>_make_round_trip_test</code>) registered via <code>setattr</code> on
-the new classes, one per <code>(target, case)</code>.</p>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>So every VHD instar has ever written declares more disk than its
+geometry addresses, and any consumer on qemu &lt; 10.0 — Debian 12,
+Ubuntu 22.04, Ubuntu 24.04, RHEL 9 — silently loses the tail.</p>
+<p>The fix chosen for 2b-E (creator app <code>qem2</code>) was validated before
+being written down. Rewriting only the creator app in instar's
+existing output — no geometry or size change, footer checksums
+recomputed in both footer copies — gives:</p>
+<table>
+<thead>
+<tr>
+<th>Reader</th>
+<th><code>imgo</code> (today)</th>
+<th><code>qem2</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6.0.0 / 6.2.0 / 7.2.22 / 8.2.2 / 9.0.0 / 9.2.4</td>
+<td>2088960</td>
+<td>2097152</td>
+</tr>
+<tr>
+<td>10.0.0 / 10.2.0</td>
+<td>2097152</td>
+<td>2097152</td>
+</tr>
+</tbody>
+</table>
+<p>and the qcow1→vpc flatten becomes <strong>byte-identical to the reference
+raw</strong> on 6.2.0, 7.2.22, 8.2.2 and 10.0.0 (2097152 bytes on all four,
+versus 2088960 today on the first three). <code>win</code> behaves identically
+but claims to be Hyper-V; <code>qem2</code> is the honest marker, and instar's own
+reader already resolves it to <code>current_size</code>.</p>
+<h3 id="the-vhd-reader-rule-is-version-dependent-too">The VHD <em>reader</em> rule is version-dependent too<a class="headerlink" href="#the-vhd-reader-rule-is-version-dependent-too" title="Permanent link">&para;</a></h3>
+<p><code>src/operations/info/src/main.rs:747</code> decides virtual size with
+<code>use_chs = (creator == "vpc " || creator == "qemu") &amp;&amp; !chs_at_max</code> —
+an allowlist. Real qemu &lt; 10.0 uses the complement (a <em>denylist</em>:
+CHS unless <code>win</code>/<code>qem2</code>/max-CHS), so the two rules differ for every
+other creator app. Measured on the four CHS-mismatched fixtures in
+testdata, no real-world fixture is affected: <code>virtualpc-dynamic.vhd</code>
+(<code>vpc</code>) reads as CHS on all versions, <code>hyperv2012r2-dynamic.vhd</code>
+(<code>win</code>) and <code>d2v-zerofilled.vhd</code> (max CHS) read as <code>current_size</code> on
+all versions. The only file that splits by version is one instar wrote
+itself. The exposure is therefore latent, and 2b-E may close it at the
+source — see 2b-F. Note this rule lives <strong>guest-side</strong>, unlike map and
+snapshot.</p>
+<h3 id="plumbing-qemu-version-is-info-only">Plumbing: <code>--qemu-version</code> is <code>info</code>-only<a class="headerlink" href="#plumbing-qemu-version-is-info-only" title="Permanent link">&para;</a></h3>
+<p><code>qemu_version</code> is a field of <code>InfoArgs</code> (<code>main.rs:3466</code>) and the
+profile is resolved inline inside <code>run_info</code> (<code>main.rs:10097-10118</code>).
+<code>MapArgs</code> and <code>SnapshotArgs</code> have no such flag and never touch
+<code>version::get_profile()</code>. Both renderers are host-side
+(<code>MapRenderer::emit_extent</code>, <code>SnapshotRenderer::emit_snapshot</code>), so
+their gates need no guest-ABI change — but they do need the profile
+plumbed in, and without the flag the fixes can only be exercised on a
+pre-boundary distro rather than on the dev host. 2b-A does that first.</p>
+<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -11813,167 +11362,291 @@ the new classes, one per <code>(target, case)</code>.</p>
 <th>Effort</th>
 <th>Model</th>
 <th>Isolation</th>
-<th>Brief for sub-agent</th>
+<th>Brief</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>8a</td>
+<td>2b-A</td>
 <td>medium</td>
-<td>sonnet</td>
+<td>opus</td>
 <td>none</td>
-<td>Extend <code>tests/base.py</code>: add <code>'create': 'create-info'</code> to <code>COMMAND_OUTPUT_DIRS</code>. Create <code>tests/helpers/info_json.py</code> with <code>normalise_info_json(obj, target, tmp_path=None)</code> that recursively (a) substitutes <code>$FILENAME</code> for any absolute path equalling <code>tmp_path</code> in <code>filename</code> and <code>children[*].info.filename</code>, (b) deletes the divergence-whitelist keys per target as documented in the plan, (c) returns the cleaned dict. Add a small <code>assert_info_equivalent(actual_json_str, expected_json_str, target, msg='')</code> wrapper that parses both, normalises both, and <code>assertEqual</code>s. Add a one-line smoke test in the existing <code>TestCreateSmoke</code> class: <code>def test_create_baselines_present(self): profiles = self.get_output_profiles(output_type='json', command='create'); self.assertNotEqual(profiles['profiles'], {})</code>. If <code>tests/test_helpers.py</code> exists, add a couple of unit tests for <code>normalise_info_json</code> covering qcow2, vmdk (cid stripping), vhdx (log-size stripping). If not, add them as static methods on a new helper test class. Touch only <code>tests/base.py</code>, <code>tests/helpers/info_json.py</code>, and <code>tests/test_create.py</code>. Run <code>make test-integration</code> to confirm the smoke test passes.</td>
+<td><strong>Profile plumbing for map and snapshot (do this first).</strong> Lift the profile resolution at <code>main.rs:10097-10118</code> into one helper (<code>fn resolve_output_profile(flag: Option&lt;&amp;str&gt;) -&gt; Result&lt;OutputProfile, …&gt;</code>) and call it from <code>run_info</code>, <code>run_map</code> and <code>run_snapshot</code> rather than copying it a third and fourth time. Add <code>--qemu-version VERSION</code> to <code>MapArgs</code> and <code>SnapshotArgs</code> with the same help text and the same "invalid qemu version" error. Pass the resolved <code>&amp;OutputProfile</code> into <code>MapRenderer::new</code> and <code>SnapshotRenderer::new</code>. No behaviour change in this step — the renderers ignore the profile until 2b-B/2b-C — so it lands green everywhere and keeps those two diffs small. Add the flag to <code>docs/map.md</code> / <code>docs/snapshot.md</code> alongside the existing <code>info</code> documentation.</td>
 </tr>
 <tr>
-<td>8b</td>
+<td>2b-B</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>map-json <code>compressed</code> gate (boundary certain).</strong> Add <code>include_map_compressed</code> to <code>version::OutputProfile</code> with <code>for_version</code> = <code>v.major &gt; 8 \|\| (v.major == 8 &amp;&amp; v.minor &gt;= 2)</code>, plus unit tests pinning 8.1/8.2 either side. In <code>MapRenderer::emit_extent</code> (<code>main.rs:15136-15152</code>) emit the key only when set — both the has-offset and no-offset arms. <strong>Field order is load-bearing</strong>: <code>start, length, depth, present, zero, data, compressed, offset</code>, pinned by the ordering test at <code>main.rs:18883</code>; dropping <code>compressed</code> must close the gap, not reorder anything. Make <code>json_compressed_false_emitted_for_every_state</code> (<code>main.rs:18867</code>) profile-aware and add its below-boundary twin. On the Python side, extend the map baseline tests to iterate profiles with <code>--qemu-version</code> the way the info tests do, so the dev host covers both sides of 8.2 instead of only its own. Validate with <code>tools/test-package-functional.sh --select 'test_map'</code> on debian:12 and ubuntu:22.04 (19 → 0) and confirm ubuntu:24.04 and the 10.x distros are unchanged.</td>
+</tr>
+<tr>
+<td>2b-C</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>snapshot <code>-l</code> pre-9.0 layout.</strong> Add <code>snapshot_underscored_columns</code> (or similar) to <code>OutputProfile</code>, true for ≥ 9.0. Give <code>SnapshotRenderer::emit_snapshot</code> a second human branch emitting the measured old layout — <code>%-10s%-18s%7s%20s%13s%11s</code>, titles <code>VM SIZE</code>/<code>VM CLOCK</code>, and a 2-digit-hour clock helper beside <code>format_qemu_snapshot_clock</code>. Keep the byte-width padding trick (<code>" ".repeat(N.saturating_sub(len))</code>) in the old branch too: it exists because Rust's <code>{:&lt;N}</code> counts chars where C counts bytes, and that reasoning is width-independent. JSON mode is an instar extension and does not change. Make the snapshot-format tests at <code>main.rs:~18959</code>, <code>~19042</code>, <code>~19204</code> profile-aware and add old-layout cases asserting the exact header string above. Depends on 2b-D landing in testdata first. Validate with <code>--select 'test_snapshot'</code> on debian:12 (and ubuntu:24.04, which fails today at 8.2.2).</td>
+</tr>
+<tr>
+<td>2b-D</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Fix the <code>snapshot-list-human</code> baselines in instar-testdata.</strong> Regenerate that output type's profile dirs from the raw per-version captures so <code>profile-6-0-0</code> carries the real pre-9.0 bytes; the version-map's 9.0.0 split is already correct and must not move. Add two invariants to the generator (<code>scripts/</code>, see the testdata_baseline_generator memory note): every <code>.stdout.txt</code> length equals its <code>.meta.json</code> <code>stdout_bytes</code>, and no two profiles of one output type may have identical stdout sets unless the type declares itself version-invariant. Re-run the full audit across all output types to confirm <code>snapshot-list-human</code> was the only casualty. Separate PR on instar-testdata, <code>--no-commit</code> audited, Maintainer-role token (testdata_push_token). <strong>Land this before 2b-C</strong> and re-point instar at the updated testdata in the same change, or the suite flips red in between.</td>
+</tr>
+<tr>
+<td>2b-E</td>
 <td>high</td>
-<td>sonnet</td>
-<td>none</td>
-<td>Add <code>CREATE_CASES</code> module-level dict to <code>tests/test_create.py</code> mirroring <code>instar-testdata/scripts/generate-baselines.py:CREATE_CASES</code> (35 cases: 19 qcow2 + 5 vmdk + 5 vhd + 5 vhdx + 2 raw). Add <code>TestCreateBaselineMatrix(TestCreateSmoke)</code> with: (i) a <code>_baseline_path(target, case_name)</code> helper that reads <code>expected-outputs/create-info-json/&lt;target&gt;/&lt;installed_qemu_version&gt;/&lt;case&gt;.stdout.txt</code> directly (NOT through <code>get_expected_output</code> — see plan's open question 3 re profile-dir collision bug); falls back to the most recent version dir if the installed version isn't in the matrix, with a logged warning; returns None if no baseline at all. (ii) a <code>_baseline_meta(target, case_name)</code> parallel helper for the meta.json. (iii) a <code>_args_for_case(target, case)</code> translator that emits <code>['-f', target, '-o', 'k=v,k=v', '&lt;file&gt;', size_str]</code>, handling the empty options_list case. (iv) a factory <code>_make_baseline_test(target, case)</code> that returns a test method which: creates a temp dir, runs <code>instar create</code>, asserts rc==0 (skipTest if baseline rc != 0), runs system <code>qemu-img info --output=json &lt;tmpfile&gt;</code> (NOT instar info — the comparison tool must match the baseline-generating tool), reads the matching baseline, calls <code>assert_info_equivalent(produced, baseline, target, msg=f'{target}/{case[0]}')</code>. (v) the loop that <code>setattr</code>s one test per <code>(target, case)</code> onto the class. (vi) a <code>test_create_cases_match_baselines()</code> cross-check that walks each <code>&lt;target&gt;/&lt;latest-version&gt;/</code> dir and asserts every <code>*.stdout.txt</code> corresponds to a <code>CREATE_CASES[target]</code> entry. <strong>Skip rules</strong>: skip if baseline file missing, skip if baseline <code>create_return_code != 0</code>, skip if installed qemu-img &lt; 6.0 or unavailable. Run <code>make test-integration</code> and report pass/skip/fail counts per target. <strong>High effort because</strong>: 35 test cases, divergence-whitelist tuning may need iteration on real failures, and the vhd-fixed <code>format=raw</code> quirk needs careful handling (verify that the system qemu-img without <code>-f</code> matches the baseline; if not, special-case in the comparator).</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>vpc footer CHS under-addressing — data loss on qemu &lt; 10.0. DECIDED: option (1), Michael, 2026-08-10.</strong> Every VHD instar writes declares a <code>current_size</code> its CHS geometry does not cover, so pre-10.0 readers truncate (2 MiB image → 8192 bytes lost; the numbers generalise to create, convert and resize). <strong>Write creator app <code>qem2</code></strong> — qemu's own <code>force_size</code> marker — in <code>build_footer</code> (<code>src/crates/vhd/src/lib.rs:1067</code>), leaving <code>footer_geometry()</code>'s verbatim-size behaviour and every declared size untouched. This is exactly the intent <code>footer_geometry()</code> already documents, and it is the only option that changes no size on any reader. Pre-validated (see the grounding facts): with <code>qem2</code>, all of 6.0.0/6.2.0/7.2.22/8.2.2/9.0.0/9.2.4/10.0.0/10.2.0 report the declared size and the qcow1→vpc flatten is byte-identical to the reference raw on every one. Rejected: (2) a covering geometry, which makes old readers over-report instead of truncating; (3) rounding the declared size up like qemu, which abandons verbatim-size convert semantics; (4) document only, which leaves silent data loss on three of seven matrix distros. Implementation notes: the creator app appears in <strong>both</strong> footer copies of a dynamic VHD (offset 0 and EOF) and the footer checksum must be recomputed for each. Add a permanent regression test reading an instar-written VHD with the oldest and newest static <code>qemu-img</code> builds, asserting they agree on virtual size and that a flatten round-trip preserves every byte. Keep the zero-tail assertion in <code>_test_qcow1_output_format</code> — it is what caught this. Expect fallout in vpc baselines/hashes and in the <code>vhd-fixed</code> fixture (<code>scripts/create-vhd-testdata.sh</code>, creator <code>imgo</code>), and check <code>docs/quirks.md</code>'s VHD sections for text this invalidates.</td>
 </tr>
 <tr>
-<td>8c</td>
+<td>2b-F</td>
 <td>medium</td>
-<td>sonnet</td>
+<td>opus</td>
 <td>none</td>
-<td>Add <code>TestCreateCrossValidation(TestCreateSmoke)</code> with a curated subset (~12 cases — see plan's open question 7 for the suggested set). Factory <code>_make_xval_test(target, case)</code>: creates two temp files in two temp dirs, runs <code>instar create &lt;flags&gt; file_a</code> and the system <code>qemu-img create &lt;flags&gt; file_b</code> with translated args, runs <code>instar info --output=json</code> on both, normalises both via <code>normalise_info_json(..., target, tmp_path=...)</code>, asserts dict equality. Skip if system qemu-img unavailable or older than 6.0 or rejects the option set (capture qemu-img's exit code; skipTest with the stderr message). The whitelist used here may diverge slightly from 8b's (8b compared qemu-img info on both sides; 8c compares instar info on both sides). Tune by running the tests and treating any non-whitelist divergence as a bug to file rather than as a whitelist extension. Run <code>make test-integration</code> and confirm ~10 pass, ~2 skip-with-message.</td>
+<td><strong>VHD reader rule: gate or document (decide after 2b-E).</strong> instar implements qemu ≥10.0's allowlist; pre-10.0 qemu uses a denylist, so the two disagree for any creator app outside <code>vpc</code>/<code>qemu</code>/<code>win</code>/<code>d2v</code>/<code>qem2</code> whose CHS ≠ <code>current_size</code>. No third-party fixture in testdata is affected and 2b-E removes the only file that was, so the live exposure may fall to zero. This one is <strong>guest-side</strong> (<code>src/operations/info/src/main.rs:747</code>), so gating it means getting the profile across the guest ABI — materially more expensive than 2b-B/2b-C. Therefore: first add a fixture with an unknown creator app and CHS &lt; <code>current_size</code>, drop its <code>skip_qemu_img</code>, and see whether real pre-10.0 qemu-img and instar actually disagree on it. If they do, either widen the ABI or record it as a documented, per-image known divergence with the reason; if they do not, document the rule's version dependence in <code>docs/quirks.md</code> and stop. Do not widen the ABI speculatively.</td>
 </tr>
 <tr>
-<td>8d</td>
+<td>2b-G</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add <code>TestCreateRoundTripCheck(TestCreateSmoke)</code> iterating the full <code>CREATE_CASES</code> matrix: per <code>(target, case)</code>, create + run <code>instar check</code> + assert rc==0. Skip if create itself failed (e.g. unsupported option set rejected by instar). One test per case = ~35 tests. Factory <code>_make_check_test(target, case)</code> registered via <code>setattr</code> mirroring the prior surfaces. Run <code>make test-integration</code> and confirm all pass. This surface catches any case-specific writer bug that produces a file qemu-img info reads but instar check rejects.</td>
+<td><strong>bitmap oracle on the RPM family.</strong> The deb family installs <code>qemu-storage-daemon</code> via <code>qemu-system-common</code> (commit 01bef5a). Confirm the provider on Fedora/Rocky; if it is genuinely unavailable, make the bitmap differential helpers <code>skipTest</code> when <code>shutil.which('qemu-storage-daemon')</code> is None — the same absent-oracle discipline <code>skip_unless_qemu_supports()</code> established in phase 2c — so those tests skip cleanly rather than erroring.</td>
 </tr>
 <tr>
-<td>8e</td>
-<td>low</td>
-<td>sonnet</td>
+<td>2b-H</td>
+<td>medium</td>
+<td>opus</td>
 <td>none</td>
-<td>Update <code>ARCHITECTURE.md</code>: in the existing <code>operations/create/</code> paragraph, append a sentence: "Integration tests in <code>tests/test_create.py</code> cross-validate <code>instar create</code> against the <code>qemu-img create</code> baselines in <code>instar-testdata/expected-outputs/create-info-json/&lt;target&gt;/</code> for every case in the create matrix, plus a direct instar-vs-qemu-img cross-validation surface (both info-read via <code>instar info</code>) and a <code>instar check</code> round-trip surface for writer self-consistency." Add to <code>CHANGELOG.md</code> Unreleased / Added: "Comprehensive integration tests for <code>instar create</code>: cross-version baseline comparison via <code>qemu-img info</code> against the create-info-json matrix, runtime cross-validation against the system <code>qemu-img create</code>, and <code>instar check</code> round-trip coverage for every case in the matrix. (PLAN-create-phase-08-integration-tests.md)". Mark phase 8 of PLAN-create.md as Complete in the execution table. Run <code>pre-commit run --all-files</code>.</td>
+<td><strong>Full-matrix validation + docs.</strong> Re-run the full (not <code>--smoke</code>) suite on all seven distros and confirm green modulo anything documented in 2b-F. Run them <strong>serially or with a bounded concurrency</strong>: nine failures in the phase-2c inventory were host-load artifacts that read as data corruption, so a parallel re-run will manufacture its own failures (see Risks). Update <code>docs/testing.md</code> with the three measured boundaries and the static-binary measurement recipe, <code>docs/format-coverage.md</code> with the vpc outcome, and <code>docs/quirks.md</code> for whatever 2b-E and 2b-F settle. Refresh the memory note that still records the info-only "no widen" conclusion.</td>
 </tr>
 </tbody>
 </table>
-<p>Total: 5 commits.</p>
-<h2 id="out-of-scope-for-phase-8">Out of scope for phase 8<a class="headerlink" href="#out-of-scope-for-phase-8" title="Permanent link">&para;</a></h2>
+<h2 id="acceptance">Acceptance<a class="headerlink" href="#acceptance" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Updating <code>instar-testdata</code> (phase 7 already covered the
-  baseline regeneration; the profile-dir-collision bug fix
-  is a phase-7 follow-up).</li>
-<li>Backing-file matrix coverage — phase 5's existing
-  <code>TestCreateBackingChain</code> already handles backing
-  semantics with runtime fixtures.</li>
-<li>Preallocation matrix coverage beyond what's in the
-  baseline list — phase 6's <code>TestCreatePreallocation</code> covers
-  the accept set.</li>
-<li>Encrypted-create coverage (master-plan future work).</li>
-<li>Multi-file vmdk subformats (<code>monolithicFlat</code>,
-  <code>twoGbMaxExtent*</code>) — instar doesn't emit these.</li>
-<li>vhdx fixed subformat — neither qemu-img nor instar emits
-  it.</li>
-<li>Coverage-guided fuzz coverage (phase 9).</li>
-<li>Differential fuzz extension (phase 10).</li>
-<li><code>docs/create.md</code> user guide (phase 11).</li>
-<li>Performance benchmarking (separate effort).</li>
+<li>map-json emits <code>compressed</code> iff the effective profile is ≥ 8.2; the
+  19 map failures clear on debian:12 and ubuntu:22.04; the ≥8.2 distros
+  are unchanged (2b-B).</li>
+<li><code>snapshot -l</code> reproduces the measured pre-9.0 layout byte-for-byte
+  below the boundary and the current layout at and above it;
+  <code>test_create_list_agreement</code> passes on debian:12, ubuntu:22.04 and
+  ubuntu:24.04 (2b-C).</li>
+<li><code>snapshot-list-human/profile-6-0-0</code> matches real pre-9.0 qemu; every
+  baseline's size matches its meta; the audit is clean across all
+  output types and the size invariant is enforced in the generator
+  (2b-D).</li>
+<li>An instar-written VHD reads back with identical virtual size on
+  every static qemu-img build from 6.0.0 to 10.2.0, and a
+  convert→flatten round-trip loses no bytes on a pre-10.0 reader
+  (2b-E).</li>
+<li>The VHD reader-rule exposure is either gated or documented against a
+  fixture that demonstrates it, not against reasoning (2b-F).</li>
+<li>Both map and snapshot accept <code>--qemu-version</code>, and the dev host's
+  <code>make test-integration</code> exercises both sides of every boundary this
+  phase introduces (2b-A/2b-B/2b-C).</li>
+<li>Full functional suite green on all seven matrix distros (2b-H);
+  <code>make test</code> green; <code>pre-commit</code> clean.</li>
 </ul>
-<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<h2 id="execution-results-2026-08-10">Execution results (2026-08-10)<a class="headerlink" href="#execution-results-2026-08-10" title="Permanent link">&para;</a></h2>
+<p>All steps implemented on the <code>matrix-ci</code> branch. Each fix was verified
+against the real per-version <code>qemu-img</code> binaries, not just against the
+test suite.</p>
+<p><strong>2b-A.</strong> <code>resolve_output_profile()</code> replaces the inline resolution in
+<code>run_info</code>; <code>map</code> and <code>snapshot</code> now accept <code>--qemu-version</code> and pass
+the profile into their renderers. <code>run_snapshot</code> resolves the profile
+before dispatch, so a bogus version is refused in the mutating modes
+too rather than silently ignored.</p>
+<p><strong>2b-B.</strong> <code>include_map_compressed</code> (≥8.2) gates the key, which is now
+omitted rather than emitted false. Verified emulating 8.1.5, 8.2.0 and
+10.0.0: instar's output matches the corresponding real binary
+byte-for-byte, including the separators either side of the gap.</p>
+<p>2b-B also added <code>TestMapCrossProfile</code>, which drives <code>--qemu-version</code>
+for every profile the version map declares instead of only the
+installed one — the coverage gap that let <code>compressed</code> reach the distro
+matrix undetected. <strong>It immediately found a fourth boundary the matrix
+could never have found:</strong> <code>map --output=json</code> gained <code>present</code> in
+6.1.0 (absent at 6.0.1, the same release that exposed the dirty flag),
+and the oldest matrix distro is Ubuntu 22.04 at 6.2.0. Gated on
+<code>include_map_present</code>. Both keys are now built as complete fragments so
+the surrounding separators and field order cannot drift.</p>
+<p><strong>2b-C.</strong> <code>snapshot_underscored_columns</code> (≥9.0) selects between the two
+layouts, with <code>format_qemu_snapshot_clock_legacy</code> for the 2-digit hour.
+Verified against 8.2.2 and 9.0.0: byte-identical on both sides.</p>
+<p>The pre-9.0 widths in the grounding facts above were <strong>wrong</strong>, and the
+error survived every short-tag comparison. <code>%-18s%7s</code> and <code>%-16s%9s</code>
+render identically for any tag that fits its field — 18+7 == 16+9 — and
+diverge only once the tag overflows and its padding disappears. The
+real widths are <strong>10/16/9/20/13/11</strong>, derived by growing a tag from 1
+to 40 characters against real qemu 8.2.2 and watching where the VM SIZE
+column lands, rather than by reading a sample row. A regression test
+pins the overflow case for both layouts.</p>
+<p>Two process points from this. First, it was caught only because
+removing a stale skip (below) let the 200-character-tag fixture run
+against a real 7.2.22 oracle; deriving a format from one sample row is
+not measurement. Second, <code>TestSnapshotListHuman</code> had skipped entirely
+on any pre-9.0 host since the layout was introduced — "instar targets
+the modern ≥9.0 format" — so Debian 12 and Ubuntu 22.04 were asserting
+nothing there. That skip is now removed, which is what turned the
+matrix run into a real check.</p>
+<p><strong>2b-D.</strong> The raw per-version captures were correct all along — only
+the derived <code>profiles/</code> were stale, so <code>detect-profiles.py</code> regenerated
+them cleanly and the version map (already split at 9.0.0) did not move.
+Added <code>validate_profiles()</code> to that script, which now refuses to commit
+a profile tree whose <code>.stdout.txt</code> sizes contradict their <code>.meta.json</code>
+<code>stdout_bytes</code>, or where two profiles of one output type have identical
+stdout. Confirmed it flags the original defect (12 errors) and passes
+on the fixed tree. The audit across every output type is clean;
+<code>create-info-json</code>'s 80 identical profiles are redundant but legitimate
+and are exempted by the "more than one profile" condition.</p>
+<p><strong>2b-E.</strong> <code>build_footer</code> stamps <code>qem2</code>. Every version from 6.0.0 to
+10.2.0 now reports the declared size for an instar-written VHD, and the
+qcow1→vpc flatten is byte-identical to the reference raw on 6.2.0,
+7.2.22, 8.2.2 and 10.0.0 (previously 8192 bytes short on the first
+three). <code>test_convert_qcow1_to_vpc</code> passes. Two unit tests pin the
+creator app and, more importantly, the <em>reason</em>: the second asserts
+that any size whose CHS product under-addresses <code>current_size</code> is
+accompanied by <code>qem2</code>.</p>
+<p><strong>2b-F. Decided: document, do not widen the ABI.</strong> The fixture the plan
+asked for was built by restamping the creator app on instar's own vpc
+output and reading it with eight qemu versions:</p>
+<table>
+<thead>
+<tr>
+<th>Creator app</th>
+<th>qemu &lt; 10.0</th>
+<th>qemu ≥ 10.0</th>
+<th>instar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vpc</code></td>
+<td>CHS</td>
+<td>CHS</td>
+<td>CHS (agrees)</td>
+</tr>
+<tr>
+<td><code>win</code>, <code>qem2</code></td>
+<td>current_size</td>
+<td>current_size</td>
+<td>current_size (agrees)</td>
+</tr>
+<tr>
+<td><code>xen</code>, <code>azur</code>, zeros</td>
+<td><strong>CHS</strong></td>
+<td>current_size</td>
+<td>current_size (<strong>diverges below 10.0</strong>)</td>
+</tr>
+</tbody>
+</table>
+<p>So the divergence is real, but only for a creator app outside the known
+table whose CHS disagrees with its <code>current_size</code>. No such image exists
+in the corpus, and after 2b-E instar cannot produce one. The rule is
+evaluated guest-side (<code>src/operations/info/src/main.rs:747</code>), so gating
+it means widening the guest ABI to carry the emulated version — which
+the plan explicitly says not to do speculatively. Recorded as a known
+divergence in <code>docs/quirks.md</code> with the measurements. <strong>If a real image
+in this class ever turns up, the fix is an additive
+<code>InfoResultMessage</code> field carrying the CHS product so the host can
+apply the version rule without the guest needing to know the version.</strong></p>
+<p><strong>2b-G.</strong> The dnf branch of the runner never installed
+<code>qemu-storage-daemon</code>. Measured on rockylinux:9: the <em>package</em> of that
+name does not exist on EL9 (<code>Unable to find a match</code>), but the binary
+is shipped by <code>qemu-img</code> itself, which the runner already installs. So
+the oracle was available all along and the 53 <code>test_bitmap</code> tests —
+including the <code>TestBitmapMergeBits</code> and <code>TestBitmapCrossValidation</code>
+cases that actually drive it — run and pass on Rocky exactly as they
+do on the .deb distros. The runner now asks for the binary by path
+(<code>dnf install /usr/bin/qemu-storage-daemon</code>) so the dependency is
+explicit rather than incidental, and <code>_bitmap_dirty_extents</code> skips if
+it is ever genuinely missing. The skip is a safety net that correctly
+did not fire, not a workaround: no bitmap coverage is lost on the RPM
+family.</p>
+<p><strong>2b-H.</strong> Dev host: Rust unit tests 0-fail; the full integration suite
+runs 3344 tests 0-fail (up from 3335 — the cross-profile tests). Full
+matrix, each row run <strong>sequentially</strong> on an idle host so no result is a
+load artifact, 3262 tests per row (the runner also excludes
+<code>test_bench</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Distro (qemu)</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>debian:12 (7.2.22)</td>
+<td>21 failed</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>ubuntu:22.04 (6.2.0)</td>
+<td>21 failed</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>ubuntu:24.04 (8.2.2)</td>
+<td>2 failed</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>debian:13 (10.0.11)</td>
+<td>0</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>fedora (10.2.2)</td>
+<td>0</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>rockylinux:9 (10.1.0)</td>
+<td>0</td>
+<td><strong>0</strong> (847 skipped: 785 baseline + 62 no-oracle)</td>
+</tr>
+<tr>
+<td>rockylinux/rockylinux:10 (10.1.0)</td>
+<td>0</td>
+<td><strong>0</strong> (847 skipped)</td>
+</tr>
+</tbody>
+</table>
+<p>The three ≥10.0 rows are not a formality: 2b-E changes the footer bytes
+of every VHD instar writes, on every distro.</p>
+<h2 id="risks-notes">Risks / notes<a class="headerlink" href="#risks-notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>tests/test_create.py</code> has ~110 total tests
-  (existing smoke + options + backing + preallocation</li>
-<li>~35 baseline + ~12 cross-validation + ~35 check).</li>
-<li><code>make test-integration</code> runs them all; the new
-  surfaces pass-or-skip-with-message — no
-  unexpected failures.</li>
-<li><code>make instar</code> builds; <code>make lint</code> clean;
-  <code>pre-commit run --all-files</code> clean.</li>
-<li>One end-to-end demonstration: <code>instar create -f qcow2
-  -o cluster_size=64k tmp.qcow2 1G</code> produces a file whose
-  <code>qemu-img info --output=json</code> matches the baseline at
-  <code>instar-testdata/expected-outputs/create-info-json/qcow2/
-  &lt;installed-version&gt;/1G-cs-64k.stdout.txt</code> after the
-  divergence whitelist is applied.</li>
-<li>ARCHITECTURE.md, CHANGELOG.md, and PLAN-create.md
-  execution row updated.</li>
+<li><strong>Measure with the static binaries, per command.</strong> Two of this
+  phase's three "known" facts were wrong when it was first drafted: the
+  snapshot boundary was unknowable from the testdata (whose pre-9.0
+  baselines are the <em>new</em> form), and the vpc case was assumed to be
+  faithful old-qemu emulation when real qemu never truncates at all.
+  Both took under a minute to settle against
+  <code>qemu-img-binaries/x86_64/</code>. Treat any remaining claim about old-qemu
+  behaviour as unverified until it has been run.</li>
+<li><strong>Host load fabricates corruption-looking failures.</strong> The large
+  <code>test_convert</code> re-encodes fail under contention as <code>convert operation
+  failed</code> and <code>Content mismatch at offset 0!</code>, aborting at ~26s instead
+  of passing at ~110s. Replay with <code>--select</code> on an idle host before
+  attributing any matrix failure (memory:
+  diffuzz_spurious_divergence_contention).</li>
+<li><strong>testdata coupling.</strong> 2b-D must land and instar must be re-pointed
+  at it in the same change as 2b-C.</li>
+<li><strong>2b-E moves output bytes.</strong> Any change to the VHD footer invalidates
+  vpc baselines, fixture hashes and possibly <code>docs/quirks.md</code> prose.
+  Budget for the fixture regeneration; it is not a one-line fix even
+  though the code edit is small.</li>
+<li><strong>Distro backports.</strong> The boundaries here are upstream-derived. A
+  distro can carry an output change at a version number upstream did
+  not; the runner validates against the actual distro qemu, which is
+  the check that matters.</li>
+<li><strong>Scope creep.</strong> Only <code>map</code>, <code>snapshot -l</code>, the vpc writer and the
+  VHD reader rule are in evidence. Add a gate only where a runner
+  failure or a static-binary measurement proves a real divergence.</li>
 </ul>
-<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Divergence whitelist drift</strong>: the whitelist is a
-  living artefact — new qemu-img versions may add fields
-  instar doesn't emit (or vice-versa). Mitigation: on
-  test failure, the diff output makes the offending field
-  visible; whitelist updates are a one-line code change
-  with a comment explaining the field's randomness or
-  format-version origin.</li>
-<li><strong>Profile-dir-collision bug from phase 7</strong>: surfaces
-  silently as wrong-baseline-content. Mitigation: phase
-  8 reads the per-target raw bucket directly, bypassing
-  the broken profile dir entirely. File the bug as a
-  phase-7 follow-up to be fixed when the
-  <code>instar-testdata</code> matrix is next regenerated.
-  (Fixed 2026-08-11; the mitigation has been removed.)</li>
-<li><strong>Installed qemu-img version not in phase 7's matrix</strong>:
-  test host runs qemu-img 5.x. Mitigation: surface 1
-  skips with a clear message; surface 2 still runs (uses
-  the installed qemu-img as live comparator); surface 3
-  is qemu-agnostic.</li>
-<li><strong>Cross-validation surface flakiness from
-  non-deterministic qemu-img output</strong>: if qemu-img
-  embeds a timestamp in some field the whitelist
-  missed, surface 2 will fail. Mitigation: 8c's
-  brief explicitly says treat unexpected divergences
-  as bugs to file rather than as whitelist extensions
-  — surface them so a real fix happens.</li>
-<li><strong>vhd-fixed <code>format=raw</code> auto-detection quirk</strong>: if
-  the installed qemu-img doesn't behave like 10.2.0
-  (auto-detects fixed as raw), the comparison
-  fails. Mitigation: 8b's brief calls this out; the
-  fallback is to strip <code>format</code> from the comparator
-  when target is vhd and case includes
-  <code>subformat=fixed</code>.</li>
-<li><strong>Test runtime budget exceeded under serial
-  execution</strong>: ~110 tests × ~1 s each = ~110 s. If
-  the CI runner is single-core and that's too long,
-  drop the cross-validation surface to ~6 cases or
-  guard it behind an environment variable.
-  Mitigation: stestr's parallel execution already
-  amortises this; revisit only if CI complains.</li>
-<li><strong><code>instar info</code> parser bug on instar's own
-  output</strong>: surface 2 would catch this immediately —
-  it's the test surface designed to catch
-  writer/parser asymmetry within instar.</li>
-</ul>
-<h2 id="bugs-to-fix">Bugs to fix<a class="headerlink" href="#bugs-to-fix" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong><code>detect-profiles.py</code> flat-copy collision for create
-  output type</strong> (phase 7). The script's
-  <code>copy_multi_bucket_version_to_profile()</code> flattens all
-  per-bucket files into <code>profiles/profile-NN/</code>,
-  assuming case names encode the target. For
-  <code>create-info-json</code>, case names like <code>1M-default</code>
-  collide across qcow2/vmdk/vhd/vhdx/raw — the last
-  bucket processed wins. Fix: prefix the destination
-  filename with the bucket name when copying, or have
-  the create generator emit case names that include
-  the target prefix from the start. The latter is
-  preferable for symmetry with measure's convention.
-  Either way, regenerate the profile dir afterward.
-  This is a phase-7 follow-up; phase 8 does not block
-  on it.
-  <strong>Done 2026-08-11</strong> in instar-testdata <code>03c379a08a</code>
-  (prefix on copy, per output type so collision-free
-  types keep their filenames) and <code>769e463f7e</code>
-  (regenerate). instar <code>tests/test_create.py</code> now reads
-  the profile directly.</li>
-</ul>
-<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>Before executing any step, the executing agent should
-back-brief: which test class is being added (or
-extended), which baselines it reads (and by what
-path-construction logic, since phase 8 deliberately
-bypasses <code>get_expected_output</code> for create due to the
-collision bug), and how skip / fail are distinguished.
-The reviewer should verify no step bleeds into phase 9
-(fuzz), phase 10 (differential), or phase 11 (docs).</p>
 
 
 
@@ -11994,7 +11667,7 @@ The reviewer should verify no step bleeds into phase 9
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-create-phase-08-integration-tests.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-create-phase-08-integration-tests.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-create-phase-08-integration-tests/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

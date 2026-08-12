@@ -2426,6 +2426,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#running-against-an-installed-package-distro-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running against an installed package (distro matrix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pull-requests-versus-the-merge-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull requests versus the merge queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#ci-job-layout-and-the-partition-guard" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2546,6 +2568,17 @@
     <span class="md-ellipsis">
       
         Output Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qemu-img-version-profiles-and-the-distro-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img version profiles and the distro matrix
       
     </span>
   </a>
@@ -11658,6 +11691,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#running-against-an-installed-package-distro-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running against an installed package (distro matrix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pull-requests-versus-the-merge-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull requests versus the merge queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#ci-job-layout-and-the-partition-guard" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11778,6 +11833,17 @@
     <span class="md-ellipsis">
       
         Output Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qemu-img-version-profiles-and-the-distro-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img version profiles and the distro matrix
       
     </span>
   </a>
@@ -12293,6 +12359,136 @@ must always be placed in <code>instar-testdata</code>, never in the public <code
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># List available tests</span>
 <a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>stestr<span class="w"> </span>list
 </code></pre></div>
+<h3 id="running-against-an-installed-package-distro-matrix">Running against an installed package (distro matrix)<a class="headerlink" href="#running-against-an-installed-package-distro-matrix" title="Permanent link">&para;</a></h3>
+<p>The make targets above run the suite against the in-tree build
+(<code>src/target/release/instar</code>). The distro-matrix CI instead runs it
+against the <strong>installed <code>.deb</code>/<code>.rpm</code></strong>, inside a target-distro
+container, using that distro's own <code>qemu-img</code> as the differential
+oracle. <code>tools/test-package-functional.sh</code> is the per-distro runner:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Full suite, against the .deb installed on Debian 12 (qemu-img 7.2.x)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>tools/test-package-functional.sh<span class="w"> </span>src/target/debian/instar_*.deb<span class="w"> </span>debian:12
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Fast subset, against the .rpm installed on Rocky 9 (proves the dnf path)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>tools/test-package-functional.sh<span class="w"> </span>--smoke<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>src/target/generate-rpm/instar-*.rpm<span class="w"> </span>rockylinux:9
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Dial concurrency down when several matrix containers share one KVM host</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>tools/test-package-functional.sh<span class="w"> </span>--concurrency<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span>src/target/debian/instar_*.deb<span class="w"> </span>ubuntu:22.04
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># Replay one failure on one distro without paying for the whole suite</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>tools/test-package-functional.sh<span class="w"> </span>--select<span class="w"> </span><span class="s1">&#39;test_convert\.&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span>src/target/debian/instar_*.deb<span class="w"> </span>debian:13
+</code></pre></div>
+<p>To reproduce a <strong>CI matrix entry</strong> exactly as the merge queue runs it —
+same package resolution, same summary line — use the wrapper CI calls
+rather than the runner directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>package
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">PACKAGE_DIR</span><span class="o">=</span>src/target/debian<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nv">TESTDATA_PATH</span><span class="o">=</span>../instar-testdata<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nv">MATRIX_SELECT</span><span class="o">=</span><span class="s1">&#39;test_map\.&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span>tools/ci/run-matrix-entry.sh<span class="w"> </span><span class="s1">&#39;Debian 12&#39;</span><span class="w"> </span>debian:12<span class="w"> </span>deb
+</code></pre></div>
+<p><code>MATRIX_SELECT</code> exists for exactly this and is never set in CI: it
+makes the run partial, and a partial run must not be able to report as
+a green matrix entry. The wrapper prints a warning whenever it is set.</p>
+<p><strong>Classify before you attribute.</strong> Running two matrix containers at
+once — or any other heavy job on the host — starves the suite, and the
+resulting failures do not look like resource problems. The large
+<code>test_convert</code> re-encodes fail under load with
+<code>Error: "convert operation failed"</code> and <code>Content mismatch at offset 0!</code>,
+which reads as data corruption, and they abort early (~26s) rather than
+timing out at the ~110s they need when passing. Nine such failures
+appeared across the 2026-08-09 matrix inventory and <strong>every one passed
+on an idle host</strong>. A failure counts as a divergence only once it
+reproduces with the host otherwise quiet; <code>--select</code> gives you that
+replay cheaply. Same discipline as the differential-fuzzing
+spurious-divergence rule.</p>
+<p>The design is <strong>tests from the source tree, binary from the package</strong>:
+the whole <code>tests/</code> tree is copied into the container and driven by
+<code>stestr</code>, while the harness is pointed at the installed
+<code>/usr/bin/instar</code> via <code>INSTAR_BINARY_PATH</code> (so the packaged binary and
+its packaged guest binaries under <code>/usr/lib/instar/</code> are what runs).
+The container runs as root (package + prerequisite install need it) and
+the repo is mounted read-only, so no <code>.stestr/</code> artefacts leak into the
+host worktree. <code>test_info_malicious</code> and <code>test_bench</code> are excluded from
+the matrix run; <code>--smoke</code> restricts to a fast version/create/map/info
+subset for local one-distro checks.</p>
+<p><code>TESTDATA_PATH</code> (default <code>../instar-testdata</code>) must already be git-LFS
+materialised — in CI that is <code>tools/ci/prepare-testdata.sh</code>; the script
+canary-checks for pointer files and refuses to run against them. This
+runner is distinct from <code>tools/test-package-install.sh</code>, which stays the
+fast packaging smoke check (file layout, <code>--help</code>, info/create/map).</p>
+<p>Because this exercises instar against <strong>older</strong> qemu-img versions than
+the dev host's, it is the first thing to surface output-format parity
+gaps that single-version CI cannot: any command whose qemu-img output
+changed across versions, where instar hard-codes the newest form, will
+diverge here. See "qemu-img version profiles and the distro matrix"
+below.</p>
+<h3 id="pull-requests-versus-the-merge-queue">Pull requests versus the merge queue<a class="headerlink" href="#pull-requests-versus-the-merge-queue" title="Permanent link">&para;</a></h3>
+<p><code>functional-tests.yml</code> runs two different sets of jobs depending on the
+event, and the split is deliberate:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Jobs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pull_request</code></td>
+<td><code>ci-tooling</code>, <code>build-and-test</code>, <code>package-smoke</code>, the three <code>integration-*</code> jobs, <code>snapshot-harnesses</code>, <code>oslo-crossval-master</code>, <code>automated_reviewer</code>, <code>can_enqueue</code> — all against the <strong>in-tree build</strong></td>
+</tr>
+<tr>
+<td><code>merge_group</code></td>
+<td><code>build-and-test</code>, <code>package-build</code>, <code>package-matrix</code> (seven distros), <code>can_merge</code></td>
+</tr>
+<tr>
+<td><code>workflow_dispatch</code></td>
+<td>everything except <code>ci-tooling</code> and <code>can_merge</code> — this is how you dry-run the matrix without enqueuing anything. Note <code>automated_reviewer</code> also skips here, because it needs <code>ci-tooling</code> and a skipped dependency skips its dependents; the two aggregates use <code>always()</code> precisely so they report anyway</td>
+</tr>
+</tbody>
+</table>
+<p>The merge queue does <strong>not</strong> re-run the PR integration jobs. That is a
+coverage argument rather than a cost one: each matrix entry runs the
+<em>full</em> Python suite against the installed package on its own distro,
+against that distro's <code>qemu-img</code>, so the queue's coverage is a superset
+of the PR jobs on seven distros instead of one. <code>build-and-test</code> is the
+deliberate exception — it stays in both as the cheap fast-fail, and
+<code>package-build</code> depends on it.</p>
+<p><code>package-build</code> builds one <code>.deb</code> and one <code>.rpm</code> and uploads them as a
+single artifact that all seven entries consume. This works only because
+the release binary is built on <code>debian:bullseye</code> (symbol floor
+<code>GLIBC_2.30</code>), so one artifact set installs everywhere down to Rocky
+9's glibc 2.34. <strong>If a matrix entry fails while <em>installing</em> the
+package, that is a glibc-floor regression in the build image, not a
+test failure.</strong></p>
+<p><code>can_enqueue</code> and <code>can_merge</code> are the two aggregate gates, and they are
+the names configured as required checks — never the individual jobs or
+matrix entries, whose names change whenever the distro list does.
+<code>can_enqueue</code> aggregates the pull-request jobs ("may this PR enter the
+queue?"); <code>can_merge</code> aggregates the merge-queue jobs ("is this merge
+group good?"). Both use <code>always()</code> plus an event test and a jq
+expression asserting every dependency ended <code>success</code> or <code>skipped</code>,
+because a required check that never reports leaves the queue waiting
+forever. See <a href="/components/instar/development/">development.md</a> for the ruleset itself.</p>
+<p>Each entry writes a row to the job summary naming the distro, its
+<strong>live</strong> <code>qemu-img</code> version, and the test totals. The version is what
+distinguishes "instar broke" from "instar diverges at this qemu version
+boundary", so read it before attributing a red row.</p>
+<p><strong>Flake quarantine.</strong> Every matrix entry carries an explicit
+<code>allow_failure: false</code>. An entry that fails twice consecutively for an
+established environmental reason may be flipped to <code>true</code> with a linked
+issue, so one flaky distro cannot block every merge; the flag comes off
+when the issue closes. Note the sharp edge: <code>continue-on-error</code> makes
+the job report <em>success</em> to the <code>needs</code> context, so a quarantined entry
+stops gating merges entirely rather than merely tolerating its own
+failure. Never leave a flag behind after its issue is fixed.</p>
+<p>Because <code>merge_group</code> does not inherit the <code>pull_request</code> trigger's
+<code>paths:</code> filter, this workflow always runs in the queue — including for
+docs-only changes. That is deliberate (a required check that never runs
+hangs the queue), at the cost of matrix latency on doc merges.</p>
 <h3 id="ci-job-layout-and-the-partition-guard">CI job layout and the partition guard<a class="headerlink" href="#ci-job-layout-and-the-partition-guard" title="Permanent link">&para;</a></h3>
 <p>On a pull request the integration suite is split across several jobs
 (in <code>.github/workflows/functional-tests.yml</code>) so the long-running
@@ -12346,10 +12542,10 @@ by zero jobs. The only hand-maintained input is the allowlist of
 intentional exclusions in <code>tools/ci/check-test-partition.py</code>
 (currently just the malicious suite); each entry carries a documented
 reason. Run it locally with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tools/ci/check-test-partition.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tools/ci/check-test-partition.sh
 </code></pre></div>
 <p>Its own logic is unit-tested (stdlib only, no venv) via:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tools/ci<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;test_*.py&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tools/ci<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;test_*.py&#39;</span>
 </code></pre></div>
 <p>When you add a new integration job or change a test-container
 selector, the guard validates the new partition automatically; if it
@@ -12357,15 +12553,15 @@ reports an orphan, either add the test to a job or (rarely) to the
 documented allowlist.</p>
 <h2 id="test-image-manifest">Test Image Manifest<a class="headerlink" href="#test-image-manifest" title="Permanent link">&para;</a></h2>
 <p>Test images are defined in <code>tests/manifest.json</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cirros-qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;downloaded/cirros/cirros-0.6.3-x86_64-disk.img&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">&quot;safety&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;safe&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">&quot;run_in_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CirrOS minimal cloud image&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;cloud-image&quot;</span><span class="p">]</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cirros-qcow2&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;downloaded/cirros/cirros-0.6.3-x86_64-disk.img&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">&quot;safety&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;safe&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="nt">&quot;run_in_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CirrOS minimal cloud image&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;cloud-image&quot;</span><span class="p">]</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="manifest-fields">Manifest Fields<a class="headerlink" href="#manifest-fields" title="Permanent link">&para;</a></h3>
 <table>
@@ -12419,13 +12615,13 @@ documented allowlist.</p>
 headers or partition tables. In default (secure) mode, instar rejects these
 files as "unknown format" rather than accepting them as raw images.</p>
 <p>To test qemu-img compatibility for these images, use <code>--unsafe-quirks</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Default mode: rejects files without valid structure</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar<span class="w"> </span>info<span class="w"> </span>random-garbage.raw
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Error: Unknown format (no valid disk image header or partition table)</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Unsafe quirks mode: matches qemu-img behavior</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>instar<span class="w"> </span>info<span class="w"> </span>--unsafe-quirks<span class="w"> </span>random-garbage.raw
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># file format: raw</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Default mode: rejects files without valid structure</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>instar<span class="w"> </span>info<span class="w"> </span>random-garbage.raw
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># Error: Unknown format (no valid disk image header or partition table)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Unsafe quirks mode: matches qemu-img behavior</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>instar<span class="w"> </span>info<span class="w"> </span>--unsafe-quirks<span class="w"> </span>random-garbage.raw
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># file format: raw</span>
 </code></pre></div>
 <p>See <a href="/components/instar/configuration/">configuration.md</a> and <a href="/components/instar/quirks/">quirks.md</a> for details
 on safe vs unsafe quirks.</p>
@@ -12457,14 +12653,14 @@ instar (see GitHub issue #451 for the incident this guards against).</p>
 <h2 id="expected-output-overrides">Expected Output Overrides<a class="headerlink" href="#expected-output-overrides" title="Permanent link">&para;</a></h2>
 <p>For malicious images where running <code>qemu-img</code> would be dangerous, store the
 expected output in <code>tests/expected_outputs/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tests/expected_outputs/
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>└── qcow2_backing_etc_passwd.txt
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tests/expected_outputs/
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>└── qcow2_backing_etc_passwd.txt
 </code></pre></div>
 <p>Reference this file in the manifest:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2-backing-passwd&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">&quot;expected_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;expected_outputs/qcow2_backing_etc_passwd.txt&quot;</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2-backing-passwd&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">&quot;expected_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;expected_outputs/qcow2_backing_etc_passwd.txt&quot;</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="image-notes">Image Notes<a class="headerlink" href="#image-notes" title="Permanent link">&para;</a></h2>
 <p>The <code>docs/image_notes/</code> directory documents which test images exposed
@@ -12497,6 +12693,211 @@ markdown file documenting:</p>
 <li><code>↵</code> for trailing newlines</li>
 <li>Raw repr() of both outputs for debugging</li>
 </ul>
+<p>Before comparing, the harness normalises the fields that legitimately
+vary between runs rather than between qemu versions:</p>
+<ul>
+<li><strong>Disk size / actual-size</strong> is substituted from the live filesystem
+  (<code>st_blocks * 512</code>, <code>helpers/comparators.get_disk_size</code>), because it
+  reflects the current file's allocation, not a format decision. instar
+  computes it the same way, so it always matches.</li>
+<li><strong>vmdk <code>cid</code>/<code>parent-cid</code>, the dirty flag, and vhdx log-size</strong> are
+  stripped by <code>assert_info_equivalent</code> — a vmdk content-ID is a random
+  nonce written at creation, not a stable output.</li>
+</ul>
+<p>This matters for the version matrix: two adjacent baseline profiles
+often differ <em>only</em> in these normalised fields (see below), so a profile
+mismatch is invisible to the assertions until a genuinely version-gated
+field changes.</p>
+<h2 id="qemu-img-version-profiles-and-the-distro-matrix">qemu-img version profiles and the distro matrix<a class="headerlink" href="#qemu-img-version-profiles-and-the-distro-matrix" title="Permanent link">&para;</a></h2>
+<p>instar emulates the <code>qemu-img</code> build installed on the host so its output
+is byte-identical to the real tool. Two mechanisms cooperate:</p>
+<p><strong>Runtime model (<code>src/vmm/src/version.rs</code>).</strong> instar runs
+<code>qemu-img --version</code>, parses <code>major.minor.patch</code>, and derives just two
+booleans: <code>include_child_node</code> (qemu ≥ 8.0 adds the <code>Child node '/file'</code>
+section) and <code>include_dirty_flag</code> (qemu ≥ 6.1 exposes the dirty flag).
+If qemu-img is absent it falls back to the newest profile. <code>--qemu-version</code>
+overrides detection.</p>
+<p><strong>Baseline profiles (instar-testdata).</strong> Because qemu changed some output
+<em>within</em> stable series, <code>expected-outputs/&lt;command&gt;/version-map.json</code>
+records several empirical profiles (e.g. <code>profile-6-1-0</code>, <code>profile-7-2-19</code>,
+<code>profile-8-0-0</code>, <code>profile-8-1-0</code>, <code>profile-10-0-0</code>, <code>profile-10-2-0</code>) and a
+<code>version_to_profile</code> map from full version strings to profile names.</p>
+<p><strong>Selecting a profile for the host qemu.</strong> <code>base.py</code>
+<code>get_profile_for_installed_qemu</code> / <code>_pick_baseline_version_dir</code> resolve
+the host version against the map with <strong>full major.minor.patch matching</strong>
+(<code>_select_version_match</code>): exact match, else the highest enumerated
+version ≤ the host within the same <code>major.minor</code>, else the highest
+version ≤ the host overall. A <code>{major}.{minor}.</code> <em>prefix</em> match (the
+previous behaviour) could not tell <code>7.2.0</code> (profile-6-1-0) from <code>7.2.22</code>
+(profile-7-2-19) and mis-selected on any 7.2.19+ host such as Debian 12.
+The single-qemu-version CI never exposed this; the distro matrix does.</p>
+<p><strong>Portable vs version-specific tests.</strong> <code>test_info_safe</code> and the
+<code>--qemu-version</code> baseline suites (create/resize/amend/commit/bitmap)
+drive instar with an explicit version per profile and compare to the
+stored baseline — they are qemu-version-independent and pass identically
+on every distro. The live-oracle suites (<code>test_convert</code>, <code>test_compare</code>,
+<code>test_dd</code>, <code>test_check_*</code>, <code>test_map</code>, <code>test_measure</code>,
+<code>test_oslo_crossval</code>) use the host's real qemu-img as the differential
+oracle and pick their comparison profile from the detected version, so
+they are the ones the matrix actually exercises.</p>
+<p><strong>The CI matrix (<code>tools/probe-qemu-versions.sh</code>).</strong> The <code>qemu-img</code>
+version each matrix distro ships, and the profile it selects:</p>
+<table>
+<thead>
+<tr>
+<th>Distro</th>
+<th><code>qemu-img --version</code></th>
+<th>Profile</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debian 12 (bookworm)</td>
+<td>7.2.22</td>
+<td><code>profile-7-2-19</code></td>
+</tr>
+<tr>
+<td>Debian 13 (trixie)</td>
+<td>10.0.11</td>
+<td><code>profile-10-0-0</code></td>
+</tr>
+<tr>
+<td>Ubuntu 22.04 (jammy)</td>
+<td>6.2.0</td>
+<td><code>profile-6-1-0</code></td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 (noble)</td>
+<td>8.2.2</td>
+<td><code>profile-8-0-0</code></td>
+</tr>
+<tr>
+<td>Fedora latest</td>
+<td>10.2.2</td>
+<td><code>profile-10-2-0</code></td>
+</tr>
+<tr>
+<td>Rocky/RHEL 9</td>
+<td>10.1.0</td>
+<td><code>profile-10-0-0</code></td>
+</tr>
+<tr>
+<td>Rocky/RHEL 10</td>
+<td>10.1.0</td>
+<td><code>profile-10-0-0</code></td>
+</tr>
+</tbody>
+</table>
+<p>Run <code>tools/probe-qemu-versions.sh</code> to refresh this table (it pulls each
+image and prints its <code>qemu-img --version</code>). Rocky 10 is pulled from the
+<code>rockylinux/rockylinux</code> org repo — the Docker Official <code>rockylinux</code>
+library stops at 9. Regression tests pinning the parser and the selection
+rule against these exact strings live in <code>tests/test_version_detection.py</code>
+and <code>src/vmm/src/version.rs</code>.</p>
+<p><strong>Profile selection is not the whole story.</strong> Debian 12's 7.2.22 is the
+only distro whose <code>major.minor</code> (7.2) transitions profile mid-series (at
+7.2.19), so it is the only one the full-version fix re-points, and the
+profile-6-1-0 vs profile-7-2-19 baselines differ <em>only</em> in normalised
+fields (disk size, vmdk cid). Running the live-oracle suites against
+every distro's real qemu-img (via
+<code>tools/test-package-functional.sh</code>) then found divergences the baseline
+comparison never could — see below.</p>
+<p><strong>Known divergences (found 2026-08-09, fixed in phase 2b 2026-08-10).</strong>
+instar used to hard-code its newest-qemu behaviour for three things, so
+it diverged on every distro shipping an older qemu. All three are now
+version-gated:</p>
+<table>
+<thead>
+<tr>
+<th>Divergence</th>
+<th>Affected distros</th>
+<th>Boundary</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>map --output=json</code> emitted <code>compressed</code> unconditionally</td>
+<td>Debian 12 (7.2.22), Ubuntu 22.04 (6.2.0) — 19 tests each</td>
+<td><strong>8.2.0</strong> (absent at 8.1.5)</td>
+<td>Fixed: gated on <code>include_map_compressed</code></td>
+</tr>
+<tr>
+<td><code>map --output=json</code> emitted <code>present</code> unconditionally</td>
+<td>none in the matrix (oldest is 6.2.0)</td>
+<td><strong>6.1.0</strong> (absent at 6.0.1)</td>
+<td>Fixed: gated on <code>include_map_present</code></td>
+</tr>
+<tr>
+<td><code>snapshot -l</code> used the newer column layout unconditionally</td>
+<td>Debian 12, Ubuntu 22.04, Ubuntu 24.04 (8.2.2)</td>
+<td><strong>9.0.0</strong> (8.2.2 is old-form)</td>
+<td>Fixed: gated on <code>snapshot_underscored_columns</code></td>
+</tr>
+<tr>
+<td>Every VHD instar wrote declared a size its CHS geometry did not cover, so qemu &lt; 10.0 read it short and truncated the tail</td>
+<td>Debian 12, Ubuntu 22.04, Ubuntu 24.04, RHEL 9</td>
+<td>reader default changed at <strong>10.0.0</strong></td>
+<td>Fixed: the writer now stamps creator app <code>qem2</code></td>
+</tr>
+</tbody>
+</table>
+<p>The third was not an output-format divergence at all but silent data
+loss in the VHD writer, found because the qcow1→vpc test compares a
+flattened round-trip. See <code>docs/quirks.md</code> ("VHD Virtual Size
+Calculation") and phase 2b's plan.</p>
+<p>One divergence remains documented rather than fixed: instar applies the
+qemu 10.0+ VHD size rule to VHDs with an <em>unrecognised</em> creator app,
+where a pre-10.0 qemu-img would use the CHS product. It needs an image
+whose creator app is outside the known table and whose CHS disagrees
+with its disk_size, and no such image exists in the corpus. The rule is
+evaluated guest-side, so gating it would mean widening the guest ABI.</p>
+<p><strong>How the boundaries were measured.</strong> instar-testdata ships 80 static
+per-version <code>qemu-img</code> builds at <code>qemu-img-binaries/x86_64/&lt;version&gt;/</code>,
+covering 6.0.0 to 10.2.0. Run the real binary rather than reasoning
+from the version map or from qemu source — two of the three boundaries
+above were initially recorded wrongly from indirect evidence:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">TD</span><span class="o">=</span>../instar-testdata
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/8.1.5/qemu-img<span class="w"> </span>map<span class="w"> </span>--output<span class="o">=</span>json<span class="w"> </span>image.qcow2
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/9.0.0/qemu-img<span class="w"> </span>snapshot<span class="w"> </span>-l<span class="w"> </span>image.qcow2
+</code></pre></div>
+<p>Both <code>map</code> and <code>snapshot</code> accept <code>--qemu-version</code> (as <code>info</code> already
+did), so both sides of every boundary are exercisable on the dev host
+rather than only inside the matrix.</p>
+<p><strong>Cross-profile baseline tests.</strong> The ordinary baseline tests compare
+only against the profile matching the <em>installed</em> qemu-img, so a
+single-version host checks exactly one side of every boundary — which
+is how the <code>compressed</code> divergence survived to the distro matrix.
+<code>TestMapCrossProfile</code> drives <code>--qemu-version</code> for every profile the
+version map declares and compares against that profile's own
+baselines, so a new boundary is caught wherever the suite runs. It
+immediately found one the matrix could not: <code>map --output=json</code> gained
+<code>present</code> in 6.1.0, and no matrix distro is old enough to notice.</p>
+<p><strong>qemu capability is not the same as qemu version.</strong> Distro qemu builds
+do not all carry the same block drivers, and the version-profile model
+says nothing about this. RHEL-family <code>qemu-kvm</code> (Rocky/RHEL 9 and 10) is
+built <strong>without</strong> the <code>qed</code>, <code>qcow</code> (qcow1), <code>parallels</code>, <code>dmg</code>, <code>bochs</code>
+and <code>cloop</code> drivers that Debian's <code>qemu-utils</code> carries — so on those
+distros qemu-img cannot act as the differential oracle for those formats
+at all. Tests that need such an oracle call
+<code>skip_unless_qemu_supports(fmt)</code> (<code>tests/base.py</code>), which probes the
+driver by opening a nonexistent file with an explicit format and looking
+for <code>Unknown driver</code>; tests that exercise instar alone (the check-refusal
+and adversarial suites) keep running there. Detect capability this way
+rather than from <code>qemu-img --help</code>, whose "Supported formats:" line qemu
+10.x no longer prints.</p>
+<p><strong>A truncated run must never look green.</strong> subunit v2 refuses to write a
+packet larger than ~4MB, so a failing assertion that renders a
+multi-megabyte image buffer raises <code>ValueError: Length too long</code> and
+kills the stestr worker. Every test still queued on that worker silently
+never runs, and stestr exits 0 if nothing else failed — a partial run
+that reports as a pass (one Rocky run "passed" having executed 454 of
+3253 tests). Two defences: compare image buffers with
+<code>assert_bytes_identical</code> (<code>tests/base.py</code>), which reports sizes and the
+first differing offset rather than the buffers, and
+<code>tools/test-package-functional.sh</code>, which fails the run outright on the
+crash marker, on any worker reporting <code>N/A</code> elapsed time, or on a
+full-suite test count far below the expected ~3250.</p>
 <h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12593,11 +12994,11 @@ for <code>check</code> validation (qemu-img check only supports QCOW2), and
 provides a third independent opinion for QCOW2. libyal tools are
 optional — the fuzzer degrades gracefully when they are unavailable.</p>
 <h3 id="running-locally">Running locally<a class="headerlink" href="#running-locally" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
 </code></pre></div>
 <h3 id="ci-integration">CI integration<a class="headerlink" href="#ci-integration" title="Permanent link">&para;</a></h3>
 <p>The fuzzer runs automatically via <code>.github/workflows/differential-fuzz.yml</code>
@@ -12639,11 +13040,11 @@ image attributes, and a reproduction command.</p>
 <h3 id="reproducing-a-divergence">Reproducing a divergence<a class="headerlink" href="#reproducing-a-divergence" title="Permanent link">&para;</a></h3>
 <p>Each divergence report includes the seed and iteration number. To
 reproduce:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span>--fail-fast
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span>--fail-fast
 </code></pre></div>
 <h2 id="phase-6-coverage-guided-fuzzing">Phase 6: Coverage-Guided Fuzzing<a class="headerlink" href="#phase-6-coverage-guided-fuzzing" title="Permanent link">&para;</a></h2>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
@@ -12913,24 +13314,24 @@ returns <code>GrowthOverflow</code> gracefully, and production only passes bound
 geometry — softening that guard to always return overflow is a recorded
 follow-up, not a bug.)</p>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Run a single target for 60 seconds</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Run with specific corpus</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># Minimize a crash</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># Generate coverage report</span>
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Run a single target for 60 seconds</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Run with specific corpus</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="c1"># Minimize a crash</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="c1"># Generate coverage report</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
 </code></pre></div>
 <h3 id="corpus-seeding">Corpus seeding<a class="headerlink" href="#corpus-seeding" title="Permanent link">&para;</a></h3>
 <p>The seed corpus is extracted from <code>instar-testdata</code> using:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>This copies test images into per-target corpus directories under
 <code>src/fuzz/corpus/</code>, filtered by format. Header-only targets receive
@@ -13054,9 +13455,9 @@ new issue every night. Issues filed before <code>dedup_key</code> existed are
 still matched on their <code>signature</code>.</p>
 <p>Run the reporter by hand against a downloaded <code>coverage-fuzz-logs</code>
 artifact to check what an issue would say, without filing anything:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tools/ci/report-fuzz-crash.sh<span class="w"> </span>fuzz_rebase_planners<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span>src/fuzz/artifacts/fuzz_rebase_planners/crash-&lt;hash&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span>coverage-fuzz-logs/fuzz_rebase_planners.log<span class="w"> </span>--dry-run
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>tools/ci/report-fuzz-crash.sh<span class="w"> </span>fuzz_rebase_planners<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span>src/fuzz/artifacts/fuzz_rebase_planners/crash-&lt;hash&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span>coverage-fuzz-logs/fuzz_rebase_planners.log<span class="w"> </span>--dry-run
 </code></pre></div>
 <p><code>tools/ci/test-report-fuzz-crash.sh</code> exercises the reporter against
 synthetic logs — the 370KB single line, raw mutated bytes, a missing
@@ -13068,8 +13469,8 @@ earlier ten-line fixture let a tail-anchored excerpt look correct while
 on a real log it captured 28 stack frames and no panic.</p>
 <p>Both suites run on pull requests in the <code>ci-tooling</code> job, and need only
 bash and <code>jq</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>tools/ci/test-report-fuzz-crash.sh
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>tools/ci/test-pick-fuzz-artifact.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>tools/ci/test-report-fuzz-crash.sh
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>tools/ci/test-pick-fuzz-artifact.sh
 </code></pre></div>
 <h4 id="choosing-which-artifact-to-report">Choosing which artifact to report<a class="headerlink" href="#choosing-which-artifact-to-report" title="Permanent link">&para;</a></h4>
 <p><code>tools/ci/pick-fuzz-artifact.sh</code> decides which file in

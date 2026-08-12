@@ -11116,11 +11116,11 @@
 <p>Pre-built x86_64 Linux artifacts are published on every release at
 <a href="https://github.com/shakenfist/instar/releases">GitHub Releases</a>. Pick
 the format that matches your distro.</p>
-<p>The published packages require <strong>glibc 2.39 or newer</strong>. Compatible
-distributions include Debian 13 (trixie), Ubuntu 24.04 LTS, Fedora
-40+, and Rocky/RHEL 10. Older releases (Debian 12, Ubuntu 22.04 LTS,
-Rocky/RHEL 9) need to build instar from source until the project
-lowers its glibc baseline.</p>
+<p>The published packages require <strong>glibc 2.31 or newer</strong>. The release
+binary is built on Debian 11 (bullseye), so a single artifact runs
+across Debian 11+, Ubuntu 22.04 LTS and 24.04 LTS, Fedora, and
+Rocky/RHEL 9 and 10. (glibc is forward-compatible: a binary runs on
+any host whose glibc is at least the one it was built against.)</p>
 <h2 id="debian-ubuntu-deb">Debian / Ubuntu (.deb)<a class="headerlink" href="#debian-ubuntu-deb" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.3.0
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>curl<span class="w"> </span>-sLO<span class="w"> </span><span class="s2">&quot;https://github.com/shakenfist/instar/releases/download/v</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/instar_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">-1_amd64.deb&quot;</span>

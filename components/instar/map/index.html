@@ -1764,6 +1764,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="JSON (--output=json)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compressed-field-is-version-dependent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The compressed field is version-dependent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -11179,6 +11196,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="JSON (--output=json)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compressed-field-is-version-dependent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The compressed field is version-dependent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -11332,6 +11366,7 @@ O(1) regardless of how fragmented the source is.</p>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>      --start-offset &lt;OFFSET&gt;     Emit extents starting at OFFSET bytes
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>      --max-length &lt;LEN&gt;          Stop emission at OFFSET + LEN bytes
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>      --sector-size &lt;N&gt;           Source sector size (default: 65536)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>      --qemu-version &lt;VERSION&gt;    Emulate this qemu-img version&#39;s output
 </code></pre></div>
 <p><code>--image-opts</code> is explicitly rejected; the positional <code>&lt;INPUT&gt;</code>
 filename is the only supported source specification.</p>
@@ -11403,6 +11438,18 @@ JSON mode. Field semantics:</p>
 </tr>
 </tbody>
 </table>
+<h4 id="the-compressed-field-is-version-dependent">The <code>compressed</code> field is version-dependent<a class="headerlink" href="#the-compressed-field-is-version-dependent" title="Permanent link">&para;</a></h4>
+<p>qemu-img added <code>compressed</code> in <strong>8.2.0</strong>; before that the key is absent
+entirely rather than emitted as <code>false</code>. instar matches whichever
+qemu-img it detects, so on Debian 12 (7.2) or Ubuntu 22.04 (6.2) the
+output above has no <code>compressed</code> key at all:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>$ instar map --output=json --qemu-version 8.1 fragmented.qcow2
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>[{ &quot;start&quot;: 0, &quot;length&quot;: 65536, &quot;depth&quot;: 0, &quot;present&quot;: true, &quot;zero&quot;: false, &quot;data&quot;: true, &quot;offset&quot;: 327680},
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>{ &quot;start&quot;: 65536, &quot;length&quot;: 458752, &quot;depth&quot;: 0, &quot;present&quot;: false, &quot;zero&quot;: true, &quot;data&quot;: false}]
+</code></pre></div>
+<p>Use <code>--qemu-version</code> to emulate a specific version explicitly; without
+it instar detects the installed qemu-img, exactly as <code>instar info</code>
+does.</p>
 <p>The combination <code>(present, zero, data)</code> distinguishes the three
 underlying states the parser emits:</p>
 <table>
@@ -11570,19 +11617,19 @@ sources for the same VHD-unallocated reason.</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Default human output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>instar map disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar map disk.qcow2
 </code></pre></div>
 <p>JSON for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar map --output=json disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar map --output=json disk.qcow2
 </code></pre></div>
 <p>Window slice — emit only the extents covering bytes <code>[1 MiB, 5 MiB)</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
 </code></pre></div>
 <p>Format hint (skip auto-detection):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar map -f vmdk disk.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map -f vmdk disk.vmdk
 </code></pre></div>
 <p>Stream into <code>jq</code> to extract just the data extents:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map --output=json disk.qcow2 | jq &#39;.[] | select(.data == true)&#39;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map --output=json disk.qcow2 | jq &#39;.[] | select(.data == true)&#39;
 </code></pre></div>
 
 

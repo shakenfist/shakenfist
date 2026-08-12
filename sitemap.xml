@@ -605,6 +605,30 @@
          <lastmod>2026-08-12</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-01-glibc-build/</loc>
+         <lastmod>2026-08-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-02-qemu-profiles/</loc>
+         <lastmod>2026-08-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity/</loc>
+         <lastmod>2026-08-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-03-runner/</loc>
+         <lastmod>2026-08-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow/</loc>
+         <lastmod>2026-08-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-05-merge-queue/</loc>
+         <lastmod>2026-08-12</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci/</loc>
          <lastmod>2026-08-12</lastmod>
     </url>

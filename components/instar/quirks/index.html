@@ -2782,6 +2782,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-rule-changed-in-qemu-img-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rule changed in qemu-img 10.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-divergence-unknown-creator-apps-under-emulated-qemu-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known divergence: unknown creator apps under emulated qemu &lt; 10.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instars-own-vhd-output-uses-qem2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        instar's own VHD output uses qem2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#instar-behavior_4" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15337,6 +15370,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-rule-changed-in-qemu-img-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rule changed in qemu-img 10.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-divergence-unknown-creator-apps-under-emulated-qemu-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known divergence: unknown creator apps under emulated qemu &lt; 10.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instars-own-vhd-output-uses-qem2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        instar's own VHD output uses qem2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#instar-behavior_4" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -19149,6 +19215,73 @@ regardless of creator application. This prevents truncation for large disks.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="the-rule-changed-in-qemu-img-100">The rule changed in qemu-img 10.0<a class="headerlink" href="#the-rule-changed-in-qemu-img-100" title="Permanent link">&para;</a></h3>
+<p>The table above is the <strong>qemu-img 10.0+</strong> rule, and it is the one instar
+implements. Before 10.0, qemu-img worked from the opposite default: it used
+CHS geometry for <em>every</em> creator application except <code>win</code> and <code>qem2</code> (or when
+CHS was at maximum). The two rules agree for every creator app in the table
+whose behaviour anyone has documented — <code>vpc</code>, <code>qemu</code>, <code>win</code>, <code>qem2</code> and
+<code>d2v</code> all resolve identically on both sides of 10.0 — but they disagree for
+any creator app not on that list.</p>
+<p>Measured across qemu-img 6.0.0 to 10.2.0 on a VHD whose CHS addresses less
+than its disk_size field:</p>
+<table>
+<thead>
+<tr>
+<th>Creator app</th>
+<th>qemu-img &lt; 10.0</th>
+<th>qemu-img &gt;= 10.0</th>
+<th>instar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vpc</code></td>
+<td>CHS</td>
+<td>CHS</td>
+<td>CHS</td>
+</tr>
+<tr>
+<td><code>win</code>, <code>qem2</code></td>
+<td>disk_size</td>
+<td>disk_size</td>
+<td>disk_size</td>
+</tr>
+<tr>
+<td>anything else (e.g. <code>xen</code>, <code>azur</code>, zeros)</td>
+<td><strong>CHS</strong></td>
+<td><strong>disk_size</strong></td>
+<td>disk_size</td>
+</tr>
+</tbody>
+</table>
+<h3 id="known-divergence-unknown-creator-apps-under-emulated-qemu-100">Known divergence: unknown creator apps under emulated qemu &lt; 10.0<a class="headerlink" href="#known-divergence-unknown-creator-apps-under-emulated-qemu-100" title="Permanent link">&para;</a></h3>
+<p>instar always applies the 10.0+ rule, so when it is emulating an older
+qemu-img (<code>--qemu-version 7.2</code>, or running on a distro whose qemu-img predates
+10.0) it reports the disk_size field for an unrecognised creator app where the
+real older qemu-img would report the CHS product.</p>
+<p>The exposure is narrow: it needs a VHD whose creator app is outside the table
+<em>and</em> whose CHS geometry disagrees with its disk_size field. No such image
+exists in the test corpus — the Virtual PC, Hyper-V and Disk2vhd fixtures all
+resolve identically on every qemu version. instar's own VHD writer cannot
+produce one either, because it stamps <code>qem2</code> (see below).</p>
+<p>This is documented rather than fixed because the size rule is evaluated
+<strong>guest-side</strong> (<code>src/operations/info</code>), so gating it on the output profile
+would mean widening the guest ABI to carry the emulated version. That is a
+disproportionate change for a case with no demonstrated real-world image; see
+<code>docs/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity.md</code> (step 2b-F)
+for the measurements and the decision.</p>
+<h3 id="instars-own-vhd-output-uses-qem2">instar's own VHD output uses <code>qem2</code><a class="headerlink" href="#instars-own-vhd-output-uses-qem2" title="Permanent link">&para;</a></h3>
+<p>instar writes <code>qem2</code> — qemu's <code>force_size</code> marker — as the creator app of
+every VHD it produces, which makes every qemu-img version read the size from
+the disk_size field.</p>
+<p>This is deliberate and load-bearing. instar preserves the exact requested
+virtual size rather than rounding it up to a CHS-representable value the way
+<code>qemu-img create -f vpc</code> does, so its footers can declare a size the CHS
+geometry does not fully address (for a 2 MiB image, by 8192 bytes). Under any
+creator app that resolves to CHS, every qemu-img before 10.0 would read those
+images short and silently truncate the tail. <code>qem2</code> states explicitly that the
+declared size is authoritative, which is what instar means.</p>
 <h3 id="instar-behavior_4">instar Behavior<a class="headerlink" href="#instar-behavior_4" title="Permanent link">&para;</a></h3>
 <p><strong>Default behavior</strong>: instar matches qemu-img by checking the creator_app field
 and using CHS calculation for "vpc " and "qemu" creators (unless CHS is at

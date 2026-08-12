@@ -1864,6 +1864,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="List mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-column-layout-changed-at-qemu-90" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The column layout changed at qemu 9.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11139,6 +11156,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="List mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-column-layout-changed-at-qemu-90" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The column layout changed at qemu 9.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11296,6 +11330,8 @@ list, like qemu-img):</p>
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>      --output &lt;FORMAT&gt;    human (default) | json. JSON is an
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>                           instar extension; qemu-img snapshot -l
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>                           is human-only.
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>      --qemu-version &lt;V&gt;   Emulate this qemu-img version&#39;s list
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>                           layout (the columns changed at 9.0).
 </code></pre></div>
 <p><code>--image-opts</code> is rejected with a clear error (consistent with
 <code>measure</code>, <code>map</code>, etc.). The full flag surface is reported by
@@ -11348,19 +11384,35 @@ output), 4-digit-hour VM clock, <code>--</code> for an absent icount, and
 ID/TAG columns padded by <strong>byte</strong> length so multibyte UTF-8 names
 lay out exactly as qemu's C <code>printf</code> does. Names up to the
 255-byte on-disk maximum list in full. A hand-crafted zero
-<code>date_sec</code> renders the Unix epoch, exactly like qemu. The
-old (≤ 8.2) column layout is not emitted; the cross-version
-baselines record both families. Details and history for each of
-these behaviours are in <a href="/components/instar/quirks/">docs/quirks.md</a>.</p>
+<code>date_sec</code> renders the Unix epoch, exactly like qemu. Details and
+history for each of these behaviours are in
+<a href="/components/instar/quirks/">docs/quirks.md</a>.</p>
+<h3 id="the-column-layout-changed-at-qemu-90">The column layout changed at qemu 9.0<a class="headerlink" href="#the-column-layout-changed-at-qemu-90" title="Permanent link">&para;</a></h3>
+<p>qemu-img reworked the list layout in <strong>9.0.0</strong>, and instar emits
+whichever form matches the qemu-img it detects. The difference is more
+than the column titles: the older layout concatenates its fields with
+no separators at different widths, and its VM clock has 2-digit hours.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>$ instar snapshot -l --qemu-version 8.2 image.qcow2      # 6.0 - 8.2
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Snapshot list:
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>1         first                 0 B 2026-01-01 00:00:00 00:00:00.000          0
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>$ instar snapshot -l --qemu-version 9.0 image.qcow2      # 9.0 and later
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Snapshot list:
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>ID      TAG               VM_SIZE                DATE        VM_CLOCK     ICOUNT
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>1       first                 0 B 2026-01-01 00:00:00  0000:00:00.000          0
+</code></pre></div>
+<p>Both forms are byte-identical to the corresponding real qemu-img, and
+the cross-version baselines record both families.</p>
 <p><code>--output=json</code> emits a flat array whose key names mirror qemu's
 QMP <code>SnapshotInfo</code> (<code>id</code>, <code>name</code>, <code>vm-state-size</code>, <code>date</code>,
 <code>vm-clock</code>, <code>icount</code> — <code>null</code> when absent), so QMP consumers can
 reuse their parsers. The <code>date</code> object carries the raw numeric
 seconds/nanoseconds, independent of TZ.</p>
 <h2 id="mutating-modes">Mutating modes<a class="headerlink" href="#mutating-modes" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>instar snapshot -c before-upgrade image.qcow2
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>instar snapshot -a before-upgrade image.qcow2
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>instar snapshot -d before-upgrade image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar snapshot -c before-upgrade image.qcow2
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar snapshot -a before-upgrade image.qcow2
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>instar snapshot -d before-upgrade image.qcow2
 </code></pre></div>
 <p>All three modes are qcow2 v2/v3 only and run entirely in the
 guest. Success is silent (exit 0); failures print to stderr and
@@ -11495,21 +11547,21 @@ truncate), refcount-structure growth on create, and
 <code>fsync_input</code> rollout to commit.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>List (deterministic dates for diffing against qemu-img):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>TZ=UTC instar snapshot -l image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>TZ=UTC instar snapshot -l image.qcow2
 </code></pre></div>
 <p>JSON for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar snapshot -l --output=json image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar snapshot -l --output=json image.qcow2
 </code></pre></div>
 <p>Snapshot before a risky change, then roll back:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar snapshot -c pre-change image.qcow2
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>...
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>instar snapshot -a pre-change image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar snapshot -c pre-change image.qcow2
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>...
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>instar snapshot -a pre-change image.qcow2
 </code></pre></div>
 <p>Clean up an old snapshot before transferring an image:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar snapshot -d pre-change image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar snapshot -d pre-change image.qcow2
 </code></pre></div>
 <p>Bare filename defaults to list, like qemu-img:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar snapshot image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar snapshot image.qcow2
 </code></pre></div>
 
 

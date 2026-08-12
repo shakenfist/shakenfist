@@ -2066,6 +2066,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Building instar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build-and-dev-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and dev containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2173,6 +2190,17 @@
     <span class="md-ellipsis">
       
         Self-hosted runners and Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-queue-and-the-develop-ruleset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge queue and the develop ruleset
       
     </span>
   </a>
@@ -11139,6 +11167,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Building instar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build-and-dev-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and dev containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11253,6 +11298,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#merge-queue-and-the-develop-ruleset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge queue and the develop ruleset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#differential-fuzzing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11313,6 +11369,30 @@ for conventions and the Claude Code skills, and
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>sudo<span class="w"> </span>src/target/release/instar<span class="w"> </span>info<span class="w"> </span>&lt;IMAGE&gt;
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>sudo<span class="w"> </span>src/target/release/instar<span class="w"> </span>copy<span class="w"> </span>&lt;INPUT&gt;<span class="w"> </span>&lt;OUTPUT&gt;
 </code></pre></div>
+<h3 id="build-and-dev-containers">Build and dev containers<a class="headerlink" href="#build-and-dev-containers" title="Permanent link">&para;</a></h3>
+<p>The build runs in Docker, and there are <strong>two</strong> devcontainer images:</p>
+<ul>
+<li><strong><code>instar-release</code></strong> — a minimal <code>debian:bullseye</code> image
+  (<code>src/.devcontainer/build/Dockerfile</code>) carrying only the toolchain
+  that produces the release artifacts: the C linker,
+  <code>protobuf-compiler</code>, the pinned Rust nightly with <code>rust-src</code> +
+  <code>llvm-tools</code>, <code>cargo-binutils</code>, <code>cargo-deb</code>, <code>cargo-generate-rpm</code>.
+  Used by <code>make instar</code>, <code>make deb</code>, <code>make rpm</code>. It is built on
+  bullseye deliberately: glibc is forward-compatible, so building the
+  host binary against glibc 2.31 lets one artifact run on every distro
+  down to Rocky/RHEL 9 and Ubuntu 22.04 (see
+  <a href="/components/instar/installation/">installation.md</a>).</li>
+<li><strong><code>instar-build</code></strong> — the full Debian dev/test image
+  (<code>src/.devcontainer/Dockerfile</code>, base pinned by digest) with
+  <code>qemu-utils</code>, the libyal parsers, <code>cargo-fuzz</code>, <code>cargo-audit</code>, and
+  <code>gh</code>. Used by everything else: <code>make test</code>, <code>make test-rust</code>, the
+  <code>make test-container*</code> targets, <code>make audit</code>, the fuzz targets, and
+  the VS Code devcontainer.</li>
+</ul>
+<p><code>make clean-devcontainers</code> removes both. To prove the release binary's
+glibc floor empirically, <code>tools/verify-glibc-floor.sh &lt;deb&gt; &lt;rpm&gt;</code>
+installs the packages on every target distribution and runs
+<code>info</code>/<code>create</code>/<code>map</code> under KVM.</p>
 <h2 id="pre-commit-hooks">Pre-commit hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>This project uses pre-commit hooks for Rust code quality:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Install pre-commit (if not already installed)</span>
@@ -11602,19 +11682,96 @@ or any other container-backed Makefile target must install it first:</p>
 <p>Omitting the step does not fail at job start -- it fails part way through
 with <code>docker: command not found</code>, whenever the first container command is
 reached.</p>
+<h3 id="merge-queue-and-the-develop-ruleset">Merge queue and the <code>develop</code> ruleset<a class="headerlink" href="#merge-queue-and-the-develop-ruleset" title="Permanent link">&para;</a></h3>
+<p><code>develop</code> is gated by a repository <strong>ruleset</strong> named "Develop branch"
+(not classic branch protection — the whole Shaken Fist fleet uses
+rulesets). It requires merges to go through GitHub's merge queue, which
+is what runs the seven-distro package matrix; see
+<a href="/components/instar/testing/">testing.md</a> for what runs on a pull request versus in the
+queue.</p>
+<p>The configuration is recorded here so it can be recreated if the
+repository ever is. It mirrors <code>shakenfist/shakenfist</code>'s ruleset of the
+same name:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Target</td>
+<td><code>refs/heads/develop</code></td>
+</tr>
+<tr>
+<td>Enforcement</td>
+<td>active</td>
+</tr>
+<tr>
+<td>Bypass</td>
+<td>team <code>shakenfist/sf-can-skip-merge-queue</code>, mode <code>always</code></td>
+</tr>
+<tr>
+<td>Rules</td>
+<td><code>deletion</code>, <code>non_fast_forward</code>, <code>merge_queue</code>, <code>pull_request</code>, <code>required_status_checks</code></td>
+</tr>
+<tr>
+<td>Required checks</td>
+<td><code>Can enqueue</code>, <code>Can merge</code> (both GitHub Actions, integration 15368)</td>
+</tr>
+<tr>
+<td>Queue grouping</td>
+<td><code>ALLGREEN</code>, <code>max_entries_to_build: 1</code>, <code>max_entries_to_merge: 5</code></td>
+</tr>
+<tr>
+<td>Queue merge method</td>
+<td><code>MERGE</code>, min 1 entry, 5 minute wait</td>
+</tr>
+<tr>
+<td>Check timeout</td>
+<td>360 minutes</td>
+</tr>
+<tr>
+<td>Required approvals</td>
+<td>0 (<code>dismiss_stale_reviews_on_push: true</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Two of those deserve explanation:</p>
+<ul>
+<li><strong><code>max_entries_to_build: 1</code></strong> bounds the cost of the matrix. Only one
+  merge group builds at a time, so the seven-wide fan-out is seven
+  on-demand runners for one PR, not seven per queued PR.</li>
+<li><strong>The required checks are the two aggregate jobs, never the individual
+  matrix entries.</strong> Entry names change whenever the distro list does,
+  and a required check whose name no longer exists blocks every merge
+  permanently. <code>can_enqueue</code> aggregates the pull-request jobs;
+  <code>can_merge</code> aggregates the merge-queue jobs. Both use <code>always()</code> plus
+  an event test so they always report, because a required check that
+  never reports leaves the queue waiting forever.</li>
+</ul>
+<p>To inspect or recreate it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">&#39;.[] | &quot;\(.id) \(.name) \(.enforcement)&quot;&#39;</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
+</code></pre></div>
+<p><code>.github/exported-config/</code> carries the nightly export of the live
+ruleset state, which is the machine-readable companion to the table
+above; the export proposes its updates as pull requests rather than
+committing directly.</p>
 <h3 id="differential-fuzzing">Differential fuzzing<a class="headerlink" href="#differential-fuzzing" title="Permanent link">&para;</a></h3>
 <p>On-demand differential fuzzing compares instar against qemu-img on randomly
 generated images to find behavioral divergences:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
 </code></pre></div>
 <p>The fuzzer generates random images (varying format, size, cluster size,
 compression, data patterns), runs chains of operations (info, check, convert)
@@ -11627,9 +11784,9 @@ fills the gap for VMDK/VHD/VHDX where qemu-img check is unavailable.</p>
 <h3 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h3>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
 parser crates directly without the VMM/KVM stack:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
 </code></pre></div>
 <p>40 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
@@ -11644,7 +11801,7 @@ refcount mutators (<code>fuzz_snapshot_refcount</code>), the dd window math
 which drives the write/copy-on-write planner through the crate's
 <code>sim</code> harness asserting the <code>max_rc &lt; 3</code> COW invariant oracle, and
 <code>fuzz_qcow2_write_growth</code>). Seed the corpus from <code>instar-testdata</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>The CI workflow runs nightly at 04:00 UTC. Crashes are minimized and
 filed as GitHub Issues with the <code>security-audit</code> label immediately.
