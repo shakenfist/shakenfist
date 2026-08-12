@@ -150,3 +150,66 @@ consistency audit compares `.sfui-commit` against canonical
 `develop` and reports a copy that is behind it, so a stamp naming a
 feature branch commit -- or an ancestor of a merge commit -- is
 flagged even when every vendored file is byte for byte correct.
+
+## Previewing templates
+
+sfui has no CI of its own, and nothing in kerbside's tox lanes lints
+templates or CSS -- flake8 and the unit tests cover Python, and the
+HTML smoke tests deliberately assert on fixture data, never on
+markup. The only safety net for a converted page's chrome is a human
+looking at rendered pixels, in both palettes, without having to stand
+up a deployed kerbside first.
+
+`tools/preview-templates.py` renders a converted page through
+`kerbside.api`'s own Flask test client -- so routing, context and
+Jinja rendering are exactly what a real request would produce -- and
+writes it next to a symlink of the real static tree, because the
+templates reference their assets as root-relative absolute paths
+(`/static/sfui/...`). Only pages that have actually been converted
+onto `base-sfui.html` are supported; today that is `login`, which
+needs neither authentication nor the database.
+
+The script imports `kerbside.api`, so it needs an interpreter with
+kerbside's dependencies installed. The tox environment already has
+them, which makes `.tox/py3/bin/python` the interpreter to reach for
+after any `tox -epy3` run; a virtualenv with `pip install -e .` works
+just as well. A bare system `python3` will not.
+
+```shell
+tox -epy3  # only if .tox/py3 does not exist yet
+.tox/py3/bin/python tools/preview-templates.py login /tmp/preview
+(cd /tmp/preview && python3 -m http.server 8099) &
+
+chromium --headless --disable-gpu --no-sandbox \
+    --hide-scrollbars --window-size=1280,1000 \
+    --virtual-time-budget=4000 \
+    --screenshot=/tmp/login-dark.png \
+    http://localhost:8099/login.html
+
+chromium --headless --disable-gpu --no-sandbox \
+    --hide-scrollbars --window-size=1280,1000 \
+    --virtual-time-budget=4000 \
+    --blink-settings=preferredColorScheme=2 \
+    --screenshot=/tmp/login-light.png \
+    http://localhost:8099/login.html
+```
+
+Three details are easy to get wrong:
+
+* Pick a port nothing else is using. 8099 is only an example, and a
+  stale server left running from an earlier preview will happily
+  serve 404s from a directory that no longer exists.
+* Headless Chromium reports `prefers-color-scheme: dark` by default,
+  so the plain run above exercises the dark palette;
+  `--blink-settings=preferredColorScheme=2` is the only value that
+  gives the light one.
+* Serve the directory over HTTP, not `file://` -- the theme toggle
+  is an ES module, and modules do not load from the `file://`
+  scheme.
+
+Then actually look at both PNGs.
+
+This only covers what renders. The interactive paths -- submitting
+a form, a wrong password, the theme toggle, logout -- still need a
+browser against a running kerbside, or a hand-check of the relevant
+`fetch` calls.
