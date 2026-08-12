@@ -26,6 +26,13 @@
 #   workflow has no path to merging code.
 #
 # NOTES:
+# - Both jobs are told to consider docs/plans/. Triage skims
+#   docs/plans/index.md and deprioritises issues a not-yet-landed
+#   plan already owns; the fix job reads the relevant plan files
+#   from the checkout before writing code, and declines with
+#   NO_FIX when an outstanding phase is the proper home for the
+#   fix. The plans are read at run time rather than summarised
+#   into this prompt, because they change constantly.
 # - The fix attempt runs through tools/claude-model-fallback.sh, which
 #   tries each model in the `models` input in order and moves on when one
 #   reports its subscription credit is exhausted (an HTTP 429 that the
@@ -171,13 +178,20 @@ jobs:
              the root cause without major refactoring, and you
              estimate the fix at under 100 changed lines excluding
              tests. The fix must be coverable by unit tests.
-          2. Important: among achievable issues, prefer the most
-             important (data loss > correctness > reliability >
-             usability > cosmetic).
+          2. Not already owned by a plan: this repository plans
+             significant work in advance as plan documents in
+             docs/plans/. Skim docs/plans/index.md. If an issue is
+             plainly the subject of a plan whose phases have not
+             landed yet, prefer a different issue -- that fix
+             belongs to the plan, not to an automated one-off.
+          3. Important: among the issues which survive the first two
+             criteria, prefer the most important (data loss >
+             correctness > reliability > usability > cosmetic).
 
           The repository is checked out in the current directory.
           You may inspect the code to judge achievability, but keep
-          it brief -- this is triage, not diagnosis.
+          it brief -- this is triage, not diagnosis. The index skim
+          is a skim: the fix job does the real plan reading.
 
           Be conservative: selecting nothing is better than
           selecting an issue that needs deep design work.
@@ -412,6 +426,54 @@ jobs:
 
             cat << 'TASK_EOF'
 
+          ## Before you start: check the design intent
+
+          This project plans significant work in advance, as master
+          plans and per-phase plans in docs/plans/, indexed by
+          docs/plans/index.md. Many of those plans are only
+          partially implemented. That matters to you in two ways: a
+          plan whose early phases have landed has already
+          established how code in its scope is expected to be
+          written, and a plan whose later phases are outstanding
+          often already describes the correct fix for a whole class
+          of defect -- including, quite possibly, this issue.
+
+          A fix which cuts across that intent is worse than no fix,
+          because it has to be unpicked before the plan can
+          proceed. So before you write any code:
+
+          1. Read docs/plans/index.md: the sequencing narrative and
+             the plan status table. Do not rely on any summary of
+             it you may have seen elsewhere -- the plans change,
+             and the file in this checkout is the current truth.
+          2. Work out which plans, if any, have scope covering the
+             code you expect to change or the class of defect this
+             issue belongs to. Grep docs/plans/ for the modules,
+             functions, tables and config options involved. Titles
+             and the status table alone are not enough to judge
+             this.
+          3. READ those plan files, in full -- the master plan and
+             the phase plans, both the phases which have landed and
+             the phases which have not.
+
+          Then decide, and state the decision in one sentence
+          before you start work. If you are not declining, do not
+          begin any line of that sentence with "NO_FIX:" -- the
+          workflow treats such a line as a decision to stop:
+
+          - No plan covers this: fix the issue normally.
+          - A plan covers this and its landed phases established a
+            pattern the fix should follow: follow that pattern,
+            even where a smaller ad-hoc fix would also work.
+          - A plan covers this and an outstanding phase would fix
+            it properly: do NOT hand-roll a workaround now. Output
+            "NO_FIX: owned by <plan file>, <which phase>" and stop.
+            This is a good outcome, not a failure -- it is the
+            reason this check exists.
+          - A plan covers this and a small fix moves toward it
+            without doing the plan's work: that is fine. Say which
+            plan and why in the commit summary.
+
           ## Your task
 
           1. Diagnose the root cause of the issue. Fix the root
@@ -446,6 +508,12 @@ jobs:
           <Body: Wrap at 72 chars. Explain WHAT changed and WHY.>
           COMMIT_SUMMARY_END
           ```
+
+          If any plan in docs/plans/ was relevant, end the body
+          with a line of the form:
+
+          Plan alignment: <plan file> -- <one sentence on how this
+          change fits it>
 
           Do not include a "Fixes #NNNN" line in the summary -- the
           workflow adds that itself.

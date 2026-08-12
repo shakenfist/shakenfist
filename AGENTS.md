@@ -98,6 +98,19 @@ Authorized users can trigger automation by commenting on PRs:
   unit test failures (`tox -ecover`). Uses `test-drift-fix.yml` with
   structured commit summaries.
 
+`issue-fix.yml` is required to check a proposed fix against the plans
+in `docs/plans/` before writing any code. Triage skims
+`docs/plans/index.md` and deprioritises issues an unlanded plan
+already owns; the fix job reads the plan files covering the code it
+means to change, follows the pattern established by phases which have
+landed, and declines with `NO_FIX` when an outstanding phase is the
+proper home for the fix. The plans are read from the checkout at run
+time rather than summarised into the workflow, because they change
+constantly. This exists because one-off automated fixes had been
+landing across partially implemented plans and having to be unpicked
+(see the step 3 note in
+`docs/plans/PLAN-scheduler-reservations-phase-01-node-metrics-columns.md`).
+
 `issue-fix.yml` runs its fix attempt through
 `tools/claude-model-fallback.sh`, which takes a comma-separated
 preference list (`--models`, default `claude-fable-5,claude-opus-5`) and
