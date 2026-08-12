@@ -364,7 +364,7 @@ class-level convert split has a subtler gap: a `test_convert` class
 containing `Vhd` but not matching `TestConvert.*Vhd` would be excluded
 by the qcow2 job and missed by the vhd job.
 
-The **`test-partition` CI job** guards against both. It runs
+The **`ci-tooling` CI job** guards against both. It runs
 `tools/ci/check-test-partition.sh`, which enumerates the suite with
 `stestr list`, reads the *actual* job selectors from the Makefile and
 workflow (no duplicated copy to drift), and fails if any test is run
@@ -832,11 +832,150 @@ if the self-hosted runner pool has spare physical cores during the
 nightly window, since each libFuzzer target pins a core — confirm core
 availability before adding jobs.
 
+#### Crash reporting
+
 Crashes are minimized with `cargo fuzz tmin` and filed as GitHub
-Issues with the `security-audit` label immediately when found. New
-corpus entries are pushed to `instar-testdata/custom/fuzz-corpus/`
-after nightly runs, and restored by target name on the next run so
-coverage compounds.
+Issues with the `security-audit` label immediately when found, by
+`tools/ci/report-fuzz-crash.sh`. New corpus entries are pushed to
+`instar-testdata/custom/fuzz-corpus/` after nightly runs, and restored
+by target name on the next run so coverage compounds.
+
+These rules make that reporting safe, most of them learned from a month
+of silently broken nightlies:
+
+- **The log excerpt is bounded in bytes, and never travels on a command
+  line.** `cargo fuzz` prints the failing input as a `std::fmt::Debug`
+  dump on a *single* line, so with `-max_len=4194304` one crash can
+  produce a 370KB log line. The excerpt is therefore clipped per line
+  (`cut -b`), then per line count, then per byte, scrubbed to valid
+  UTF-8, and handed to `jq` with `--rawfile`. The original code passed a
+  `tail -30` through `jq --arg`, and an 81KB crash input in
+  `fuzz_rebase_planners` made that a 371KB argv entry — over Linux's
+  128KiB `MAX_ARG_STRLEN`, so `jq` exited with "Argument list too long".
+- **A reporting failure is never fatal to the run.** The fuzz step runs
+  under `bash -e`, so that `jq` failure aborted the whole step at the
+  first crash: 21 of the 40 targets were never fuzzed, no issue was
+  filed, and the corpus push was skipped — every night from 2026-07-16
+  to 2026-08-11. Reporting failures are now counted and warned about
+  per target, and the loop continues to the remaining targets. The
+  failure is raised by a final `Fail on unreported crashes` step that
+  runs with `if: always()` *after* the corpus push and the log upload,
+  so an unreportable crash still turns the run red without costing the
+  night's corpus — and without hiding the artifacts that are the only
+  remaining way for that crash to reach a human.
+- **Anything read out of a fuzz log is treated as hostile bytes.** Both
+  the excerpt and the signature are NUL-stripped, length-bounded and
+  re-encoded with `iconv -c`, because a panic message can itself carry
+  fuzz data and `jq` — like the GitHub API — rejects invalid UTF-8. Log
+  scraping uses `grep -a`: without it `grep` decides a log containing
+  raw mutated bytes is binary, prints nothing, and every such crash
+  silently degrades to a signature of `unknown crash`.
+- **The excerpt is windowed on the crash, not on the end of the log.**
+  A real `cargo fuzz run` failure prints the panic, then ~30 stack
+  frames, the `SUMMARY`, the artifact path, the Debug dump and
+  cargo-fuzz's reproduction block. In the 379KB log that motivated this
+  change the panic is line 30 of 91, so a `tail -n 30` window starts at
+  line 62 and contains no panic line and no panic message at all. The
+  window is five lines before the first `panicked at`/`SUMMARY:` and 25
+  after, trimmed from the *end* so the panic survives the byte cap; with
+  no such line to anchor on — a build failure, a truncated log — it
+  falls back to the tail.
+- **The same crash is not refiled every night.** Since the run no longer
+  stops at the first crash, a recurring crash would otherwise file one
+  issue per target per night, and `fuzz-autofix.yml` only drains one
+  issue per day. An open `security-audit` issue whose title matches the
+  target *and* whose body carries the same `dedup_key` gets a comment
+  instead of a duplicate. A lookup that fails falls through to filing,
+  because a duplicate issue is a much smaller problem than an unreported
+  crash; `--no-dedup` forces that behaviour by hand.
+
+The signature is the first `panicked at`/`SUMMARY:` line *and the line
+after it*: Rust prints the location and the message separately, and
+`panicked at fuzz_rebase_planners.rs:278:17` on its own does not
+identify a crash.
+
+Dedup matches on `dedup_key` rather than on that signature, because a
+panic message interpolates the fuzz-derived values that provoked it —
+the real crash behind this change reads `Write patch 0
+(72057594037927944..72057594037928200) exceeds total_file_size
+(281076066929798)`. Two inputs hitting one assertion produce two
+different signatures, so exact matching would file a fresh issue every
+night for a single bug. The key is the location plus the
+message with standalone numbers collapsed to `N`. Digits *inside*
+identifiers are left alone, so `qcow2` and `qcow3` do not merge: a
+duplicate issue is only noise, whereas two different bugs sharing one
+issue loses a crash. For the same reason the `file:line:col` is never
+normalized — two assertion sites in one file stay two issues — but the
+thread id in `thread '<unnamed>' (47) panicked at …` is dropped, since
+it varies run to run.
+
+Not every fuzz failure is a Rust panic. An OOM, a timeout or a deadly
+signal anchors on libFuzzer's `SUMMARY:` line instead, and the line
+after *that* is the `MS:` mutation line, which ends in a per-input
+`base unit: <hex>`. Hex survives digit collapsing, so for a
+SUMMARY-anchored failure the key is the `SUMMARY:` line alone;
+including the `MS:` line would give every recurring OOM a new key and a
+new issue every night. Issues filed before `dedup_key` existed are
+still matched on their `signature`.
+
+Run the reporter by hand against a downloaded `coverage-fuzz-logs`
+artifact to check what an issue would say, without filing anything:
+
+```bash
+tools/ci/report-fuzz-crash.sh fuzz_rebase_planners \
+    src/fuzz/artifacts/fuzz_rebase_planners/crash-<hash> \
+    coverage-fuzz-logs/fuzz_rebase_planners.log --dry-run
+```
+
+`tools/ci/test-report-fuzz-crash.sh` exercises the reporter against
+synthetic logs — the 370KB single line, raw mutated bytes, a missing
+log, a missing crash file, and the dedup decisions with a stubbed `gh`
+— and asserts the emitted body still satisfies the field predicate
+`fuzz-autofix.yml` validates against. Its fixture reproduces the
+*layout* of a real libFuzzer log, not just its content, because an
+earlier ten-line fixture let a tail-anchored excerpt look correct while
+on a real log it captured 28 stack frames and no panic.
+
+Both suites run on pull requests in the `ci-tooling` job, and need only
+bash and `jq`:
+
+```bash
+tools/ci/test-report-fuzz-crash.sh
+tools/ci/test-pick-fuzz-artifact.sh
+```
+
+#### Choosing which artifact to report
+
+`tools/ci/pick-fuzz-artifact.sh` decides which file in
+`src/fuzz/artifacts/<target>/` is the reproducer. It used to be inline
+YAML in the workflow, which is where two of the three bugs behind the
+broken month were hiding, so it is a script with tests now.
+
+Do not pass `-max_len` to `cargo fuzz tmin`: it supplies its own, and a
+second one trips libFuzzer's `assert(MaxInputLen == 0)`, so
+minimization fails and leaves a 0-byte `minimized-from-*` artifact
+behind — which an unsorted `find | head -1` would then happily report as
+the reproducer for a later crash. The picker therefore skips
+`minimized-from-*` when choosing what to minimize, and afterwards is
+asked separately for the non-empty `minimized-from-*` that `tmin`
+produced; without that second step the issue would quote the size of,
+and the reproducer point at, the original large artifact, and
+minimization would cost CI time without improving anything.
+
+The empty-file filter applies *only* to `minimized-from-*`, where an
+empty file means `tmin` failed. A 0-byte `crash-*` is a real crash —
+libFuzzer writes one when a target panics on the empty input — and
+filtering it out would send the workflow down its no-artifact branch,
+filing nothing and telling the reader to go and check the build.
+
+Artifacts are taken in an explicit order of preference — `crash-`,
+`oom-`, `leak-`, `timeout-`, `slow-unit-`, then anything else — rather
+than by sorting the names. Lexicographic order happens to put crashes
+first, but it also puts `slow-unit-` ahead of `timeout-`, and libFuzzer
+writes a `slow-unit-` file for any input over 10s (its default
+`-report_slow_units`). Since these targets run against 4MB inputs, a
+slow unit can easily be sitting in the directory when a real timeout
+arrives, and the reported reproducer would then be the wrong file.
 
 ### Automated bug fixes
 
