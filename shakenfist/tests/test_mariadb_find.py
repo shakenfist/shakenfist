@@ -1223,6 +1223,269 @@ class ServicerFindNetworkVxidsTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
+# get_node_instance_vxids — the stray vxlan reaper's protection lookup
+# ---------------------------------------------------------------------------
+
+class DirectGetNodeInstanceVxidsTestCase(base.ShakenFistTestCase):
+    """Run ``_direct_get_node_instance_vxids`` against in-memory SQLite.
+
+    This one is worth executing rather than mocking: it is a four table
+    join which spans both uuid storage conventions (object_references
+    holds dashed uuids, network_interfaces and networks hold undashed
+    ones), so a mocked test would happily pass a query that matches
+    nothing. Matching nothing here means "no instance on this node uses
+    that network", which is permission to tear down its devices.
+    """
+
+    def _build_engine(self):
+        import sqlalchemy as sa
+
+        for attr in (
+                '_object_states_table',
+                '_artifacts_table',
+                '_instances_table',
+                '_networks_table',
+                '_network_interfaces_table',
+                '_object_references_table'):
+            setattr(mariadb, attr, None)
+        mariadb._metadata = None
+
+        engine = sa.create_engine('sqlite:///:memory:')
+        states = mariadb._get_object_states_table()
+        nis = mariadb._get_network_interfaces_table()
+        networks = mariadb._get_networks_table()
+        refs = mariadb._get_object_references_table()
+        states.metadata.create_all(
+            engine, tables=[states, nis, networks, refs])
+        return engine, states, nis, networks, refs
+
+    def _populate(self, conn, *, node_uuid, instance_uuid, vxid,
+                  instance_state='created', active=True):
+        """Place an instance on a node, attached to a fresh network."""
+        import sqlalchemy as sa
+        from shakenfist.schema.object_types import ObjectType
+        from shakenfist.schema.relationship_types import RelationshipType
+
+        _, states, nis, networks, refs = self._tables
+        network_uuid = uuid.uuid4()
+
+        conn.execute(sa.insert(networks).values(
+            uuid=network_uuid, name='net-%d' % vxid, namespace='ns',
+            netblock='10.0.0.0/24', provide_dhcp=True, provide_nat=True,
+            provide_dns=False, vxid=vxid, version=1))
+        conn.execute(sa.insert(nis).values(
+            uuid=uuid.uuid4(), network_uuid=network_uuid,
+            instance_uuid=instance_uuid, macaddr='02:00:00:00:00:%02x' % vxid,
+            ipv4='10.0.0.5', order=0, model='virtio', version=1,
+            active=True if active else None))
+        # State rows are written with the dashed uuid form, and
+        # object_type is a native enum which persists the member name.
+        conn.execute(sa.insert(states).values(
+            object_uuid=str(instance_uuid), object_type=ObjectType.INSTANCE,
+            state_value=instance_state, update_time=0.0, message=None))
+        # Reference rows hold dashed uuids and enum *values*.
+        conn.execute(sa.insert(refs).values(
+            source_object_type=ObjectType.NODE.value,
+            source_uuid=str(node_uuid),
+            relationship=RelationshipType.INSTANCE_LOCATION.value,
+            relationship_value=None,
+            target_object_type=ObjectType.INSTANCE.value,
+            target_uuid=str(instance_uuid),
+            created=0.0, last_active=0.0))
+
+    def _query(self, engine, node_uuid, states=None):
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            return mariadb._direct_get_node_instance_vxids(
+                str(node_uuid), states or ['created', 'error'])
+
+    def test_placed_instance_protects_its_vxid(self):
+        """The dashed/undashed uuid transformation actually joins."""
+        engine, *tables = self._build_engine()
+        self._tables = (engine, *tables)
+        node_uuid = uuid.uuid4()
+
+        with engine.connect() as conn:
+            self._populate(
+                conn, node_uuid=node_uuid, instance_uuid=uuid.uuid4(),
+                vxid=42)
+            conn.commit()
+
+        self.assertEqual({42}, self._query(engine, node_uuid))
+
+    def test_state_filter_is_applied_in_sql(self):
+        """A deleted instance's placement row must not protect a vxid
+        forever."""
+        engine, *tables = self._build_engine()
+        self._tables = (engine, *tables)
+        node_uuid = uuid.uuid4()
+
+        with engine.connect() as conn:
+            self._populate(
+                conn, node_uuid=node_uuid, instance_uuid=uuid.uuid4(),
+                vxid=42, instance_state='deleted')
+            self._populate(
+                conn, node_uuid=node_uuid, instance_uuid=uuid.uuid4(),
+                vxid=43, instance_state='error')
+            conn.commit()
+
+        self.assertEqual({43}, self._query(engine, node_uuid))
+
+    def test_other_nodes_placements_are_excluded(self):
+        """The whole point is that only this node's placements count."""
+        engine, *tables = self._build_engine()
+        self._tables = (engine, *tables)
+        node_uuid = uuid.uuid4()
+
+        with engine.connect() as conn:
+            self._populate(
+                conn, node_uuid=node_uuid, instance_uuid=uuid.uuid4(),
+                vxid=42)
+            self._populate(
+                conn, node_uuid=uuid.uuid4(), instance_uuid=uuid.uuid4(),
+                vxid=43)
+            conn.commit()
+
+        self.assertEqual({42}, self._query(engine, node_uuid))
+
+    def test_deleted_interface_does_not_protect(self):
+        """``active`` is NULLed when an interface is deleted, and a
+        detached interface must not pin its network's devices."""
+        engine, *tables = self._build_engine()
+        self._tables = (engine, *tables)
+        node_uuid = uuid.uuid4()
+
+        with engine.connect() as conn:
+            self._populate(
+                conn, node_uuid=node_uuid, instance_uuid=uuid.uuid4(),
+                vxid=42, active=False)
+            conn.commit()
+
+        self.assertEqual(set(), self._query(engine, node_uuid))
+
+    def test_empty_states_does_not_touch_the_database(self):
+        """No protecting states means no query."""
+        with mock.patch('shakenfist.mariadb._get_engine') as mock_engine:
+            self.assertEqual(
+                set(),
+                mariadb._direct_get_node_instance_vxids(str(uuid.uuid4()), []))
+            mock_engine.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_propagates(self, mock_get_engine):
+        """As with _direct_find_network_vxids, a database failure must
+        NOT be swallowed into an empty result -- an empty result here
+        authorises device teardown."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = OperationalError(
+            'statement', {}, Exception('DB gone'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        self.assertRaises(
+            OperationalError, mariadb._direct_get_node_instance_vxids,
+            str(uuid.uuid4()), ['created'])
+
+
+class GetNodeInstanceVxidsRoutingTestCase(base.ShakenFistTestCase):
+    """Public wrapper routing, gRPC conversion and servicer behaviour."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_instance_vxids')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct(self, _mock_uds, mock_direct):
+        mock_direct.return_value = {42}
+        self.assertEqual(
+            {42}, mariadb.get_node_instance_vxids('node', ['created']))
+        mock_direct.assert_called_once_with('node', ['created'])
+
+    @mock.patch('shakenfist.mariadb._grpc_get_node_instance_vxids')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc(self, _mock_uds, mock_grpc):
+        mock_grpc.return_value = {42}
+        self.assertEqual(
+            {42}, mariadb.get_node_instance_vxids('node', ['created']))
+        mock_grpc.assert_called_once_with('node', ['created'])
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    def test_empty_states_short_circuits(self, mock_uds):
+        self.assertEqual(set(), mariadb.get_node_instance_vxids('node', []))
+        mock_uds.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_grpc_conversion(self, mock_stub, mock_grpc_call):
+        from shakenfist.protos import database_pb2
+
+        mock_grpc_call.return_value = database_pb2.GetNodeInstanceVxidsReply(
+            vxids=[42, 43])
+        result = mariadb._grpc_get_node_instance_vxids(
+            'node', ['created', 'error'])
+
+        self.assertEqual({42, 43}, result)
+        request = mock_grpc_call.call_args[0][1]
+        self.assertIsInstance(
+            request, database_pb2.GetNodeInstanceVxidsRequest)
+        self.assertEqual('node', request.node_uuid)
+        self.assertEqual(['created', 'error'], list(request.states))
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_grpc_error_propagates(self, mock_stub, mock_grpc_call):
+        """An RPC failure must not present as "nothing protects this"."""
+        mock_grpc_call.side_effect = Exception('UNIMPLEMENTED')
+        self.assertRaises(
+            Exception, mariadb._grpc_get_node_instance_vxids,
+            'node', ['created'])
+
+    def _servicer(self):
+        from shakenfist.daemons.database.main import DatabaseService
+        monitor = mock.MagicMock()
+        monitor.counters = collections.defaultdict(mock.MagicMock)
+        return DatabaseService(monitor)
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_instance_vxids')
+    def test_servicer_returns_vxids(self, mock_direct):
+        from shakenfist.protos import database_pb2
+
+        mock_direct.return_value = {43, 42}
+        context = mock.MagicMock()
+        reply = self._servicer().GetNodeInstanceVxids(
+            database_pb2.GetNodeInstanceVxidsRequest(
+                node_uuid='node', states=['created']), context)
+
+        mock_direct.assert_called_once_with('node', ['created'])
+        self.assertEqual([42, 43], list(reply.vxids))
+        context.set_code.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_node_instance_vxids')
+    def test_servicer_failure_sets_internal_status(self, mock_direct):
+        """An empty reply is a meaningful answer, so the failure path
+        must be signalled out of band."""
+        from shakenfist.protos import database_pb2
+
+        mock_direct.side_effect = OperationalError(
+            'statement', {}, Exception('DB gone'))
+        context = mock.MagicMock()
+        reply = self._servicer().GetNodeInstanceVxids(
+            database_pb2.GetNodeInstanceVxidsRequest(
+                node_uuid='node', states=['created']), context)
+
+        self.assertEqual([], list(reply.vxids))
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        context.set_details.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
 # End-to-end JOIN regression — runs the actual SQL against in-memory SQLite.
 # ---------------------------------------------------------------------------
 
