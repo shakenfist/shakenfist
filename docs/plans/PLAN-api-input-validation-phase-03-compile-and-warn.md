@@ -569,6 +569,22 @@ the validator reads the body `log_request` stashed on `flask.g` rather
 than re-fetching it, so it reports on exactly what the handler
 receives and a non-JSON body is not parsed twice.
 
+**The third review round found the round-two fix had a defect of its
+own** -- the restructured enforce branch returned before stashing its
+findings, so an enforced rejection would have emitted no warn line:
+the measurement going dark at the exact moment phase 4 flips the
+switch. Findings are now stashed before the enforce decision, and the
+round's other real gap is closed too: nothing had pinned that a
+finding on a *successful* request leaves the response untouched,
+which is the phase's central promise and the population D10 sizes.
+Both ship with request-level tests. Defensive hardening from the same
+round: an unrecognised type token now drops its published bounds
+(Range on a Raw field raises TypeError through schema.validate()),
+_schema_findings() catches anything a schema raises and reports
+nothing rather than changing a response, and build_registry() refuses
+two endpoint classes sharing a bare name at mount time, since the
+registry key could not tell their requests apart.
+
 **The next step is not code.** Deploy to sfcbr, run functional CI, and
 read the warn log. Success criterion 3 is that every remaining finding
 is explained, not that there are none.

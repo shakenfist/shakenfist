@@ -26,8 +26,6 @@ import requests
 from webargs.flaskparser import parser as webargs_parser
 from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
-
-from shakenfist.external_api import validation
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
@@ -38,6 +36,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import scopes as api_scopes
+from shakenfist.external_api import validation
 from shakenfist.instance import Instance
 from shakenfist.namespace import get_api_token
 from shakenfist.node import Node
@@ -1006,15 +1005,16 @@ def log_request(func):
         # reading it back means validation reports on exactly the body
         # merged into the handler's kwargs below, and a body which
         # failed to parse as JSON is not re-parsed to find that out a
-        # second time. Stashed before the type guard so the empty
-        # default is stashed too -- the fallback in validate_request
-        # distinguishes "log_request saw no object" from "log_request
-        # never ran" by None.
-        if isinstance(j, dict):
-            try:
-                setattr(flask.g, validation.PARSED_BODY, j)
-            except RuntimeError:
-                pass
+        # second time. Stashed unconditionally -- check() already
+        # normalises a non-dict body -- so the fallback fetch in
+        # validate_request only runs when log_request never ran. The
+        # one body it cannot distinguish is a JSON null, which stashes
+        # the same None as "unset"; the fallback re-fetch is answered
+        # from flask's parse cache in that case.
+        try:
+            setattr(flask.g, validation.PARSED_BODY, j)
+        except RuntimeError:
+            pass
 
         if j:
             # Only a JSON object can merge into kwargs. Any other JSON
@@ -1432,6 +1432,17 @@ def validate_request(func):
         if not findings:
             return func(*args, **kwargs)
 
+        # Stashed before the enforce decision, so a rejected request
+        # still emits its finding lines from the after_request hook --
+        # carrying mode=enforce and the 400. Rejecting silently would
+        # turn the measurement apparatus off at the exact moment phase
+        # 4 flips the switch, which is when an operator most needs to
+        # see which parameter a refused request was refused for.
+        try:
+            setattr(flask.g, validation.VALIDATION_FINDINGS, findings)
+        except RuntimeError:
+            pass
+
         if config.API_VALIDATION_MODE == 'enforce':
             # required is recorded and never enforced, even here:
             # several parameters are declared required while omitting
@@ -1445,10 +1456,6 @@ def validate_request(func):
                 return sf_api.error(
                     400, '%s: %s' % (first.parameter, first.detail))
 
-        try:
-            setattr(flask.g, validation.VALIDATION_FINDINGS, findings)
-        except RuntimeError:
-            pass
         return func(*args, **kwargs)
 
     # Being first in method_decorators means every entry after this one

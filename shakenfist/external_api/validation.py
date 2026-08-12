@@ -129,10 +129,15 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
         # A type this does not know is documented rather than enforced.
         # Raw accepts anything, which keeps an unrecognised token from
         # silently becoming a rejection -- the failure mode phase 2's
-        # netblock reasoning is about.
+        # netblock reasoning is about. Its bounds are dropped too: Raw
+        # deserialises without coercing, so a Range or Regexp validator
+        # would raise TypeError from inside schema.validate() the
+        # moment it met a value of the wrong Python type, and an
+        # unrecognised type cannot meaningfully carry a bound anyway.
         LOG.with_fields({'type': declared}).warning(
             'Unrecognised parameter type in the published specification; '
             'compiled as unvalidated')
+        kwargs.pop('validate', None)
         return fields.Raw(**kwargs)
     return field_class(**kwargs)
 
@@ -199,10 +204,26 @@ def build_registry(app: Any) -> dict[tuple[str, str], CompiledEndpoint]:
     that question entirely.
     """
     out: dict[tuple[str, str], CompiledEndpoint] = {}
+    compiled_classes: dict[str, type] = {}
     for view in app.view_functions.values():
         cls = getattr(view, 'view_class', None)
         if cls is None:
             continue
+        # The key is the bare class name, because that is all the
+        # validating decorator can reconstruct at dispatch. Two
+        # endpoint classes sharing a name in different modules would
+        # therefore silently validate one endpoint's requests against
+        # the other's schema, and the completeness test collapses the
+        # duplicate on both sides of its comparison -- so the collision
+        # is refused here, loudly, at mount time.
+        seen = compiled_classes.get(cls.__name__)
+        if seen is not None and seen is not cls:
+            raise ValueError(
+                'two endpoint classes named %s are mounted (%s and %s); '
+                'the validation registry is keyed by class name and '
+                'cannot tell their requests apart'
+                % (cls.__name__, seen.__module__, cls.__module__))
+        compiled_classes[cls.__name__] = cls
         for method in ('get', 'post', 'put', 'delete', 'patch'):
             handler = getattr(cls, method, None)
             if handler is None:
@@ -303,7 +324,20 @@ def _schema_findings(schema: Optional[marshmallow.Schema],
     known = {name: value for name, value in supplied.items()
              if name in schema.fields}
     findings = []
-    for parameter, messages in schema.validate(known).items():
+    try:
+        mismatches = schema.validate(known)
+    except Exception:
+        # A warn-only layer must never raise from inside itself, and
+        # marshmallow does not catch everything a validator can throw
+        # (a Range validator meeting a value of an uncoercible Python
+        # type raises TypeError straight through validate()). No
+        # findings is the honest answer when the check itself failed;
+        # the log line is what stops a compiler defect hiding forever.
+        LOG.with_fields({
+            'parameters': sorted(known)}).exception(
+            'Request validation raised internally; no findings reported')
+        return []
+    for parameter, messages in mismatches.items():
         findings.append(Finding(
             TYPE_MISMATCH, str(parameter),
             '; '.join(messages) if isinstance(messages, list)

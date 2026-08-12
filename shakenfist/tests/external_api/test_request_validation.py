@@ -266,6 +266,60 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
 
         self.assertEqual('afake-field=xb', finding.parameter)
 
+    def test_an_unrecognised_type_drops_its_bounds(self):
+        """A Range validator on a Raw field raises TypeError from
+        inside schema.validate() the moment it meets a value of an
+        uncoercible Python type -- out through check() and out of the
+        warn-only layer. An unrecognised type cannot meaningfully
+        carry a bound, so the bound is dropped with the type."""
+        compiled = validation.compile_parameters([
+            {'in': 'body', 'name': 'payload', 'schema': {
+                'type': 'object', 'properties': {
+                    'thing': {'type': 'wibble', 'minimum': 1,
+                              'maximum': 10}}}}])
+
+        self.assertEqual([], list(
+            compiled.body.fields['thing'].validators))
+        # And the whole path is exercised: a value no Range could
+        # compare against produces no findings and no exception.
+        self.assertEqual(
+            [], validation.check(
+                compiled, {'thing': 'abc'}, {}, set()))
+
+    def test_check_never_raises_even_if_a_schema_does(self):
+        """The class-closing guarantee behind the instance above: if
+        schema.validate() itself raises, the layer logs and reports
+        nothing rather than changing the response."""
+        compiled = validation.REGISTRY[('AuthEndpoint', 'post')]
+
+        with mock.patch.object(
+                type(compiled.body), 'validate',
+                side_effect=TypeError('validator exploded')):
+            self.assertEqual(
+                [], validation.check(
+                    compiled, {'namespace': 'sys', 'key': 'k'}, {}, set()))
+
+    def test_two_endpoint_classes_with_one_name_are_refused(self):
+        """The registry is keyed by bare class name, so a collision
+        would silently validate one endpoint's requests against the
+        other's schema -- and the completeness test collapses the
+        duplicate on both sides of its comparison. Refused loudly at
+        mount time instead."""
+        first = type('CollidingEndpoint', (), {})
+        second = type('CollidingEndpoint', (), {})
+
+        class FakeView:
+            pass
+
+        view_a, view_b = FakeView(), FakeView()
+        view_a.view_class, view_b.view_class = first, second
+
+        class FakeApp:
+            view_functions = {'a': view_a, 'b': view_b}
+
+        self.assertRaises(
+            ValueError, validation.build_registry, FakeApp())
+
     def test_a_body_supplied_query_parameter_is_type_checked(self):
         """The shipped client serialises every request to a JSON body
         and never builds a query string, so a query-declared parameter
@@ -383,6 +437,31 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, emitted[0]['validation-response-status'])
         self.assertEqual('warn', emitted[0]['validation-mode'])
 
+    def test_enforced_rejections_still_emit_their_findings(self):
+        """An enforced rejection must not be silent in the log.
+
+        The third review round caught the enforce branch returning
+        before the findings were stashed, which would have turned the
+        measurement apparatus off at the exact moment phase 4 flips
+        the switch -- when an operator most needs to see which
+        parameter a refused request was refused for.
+        """
+        config.API_VALIDATION_MODE = 'enforce'
+
+        with mock.patch.object(external_api, 'LOG') as log:
+            response, _ = self._post_auth(
+                {'namespace': 'sys', 'key': 'k', 'zzz': 1})
+
+        self.assertEqual(400, response.status_code)
+        self.assertTrue(
+            response.get_json()['error'].startswith('zzz: '))
+
+        emitted = [c.args[0] for c in log.with_fields.call_args_list
+                   if 'validation-reason' in c.args[0]]
+        self.assertEqual(1, len(emitted))
+        self.assertEqual('enforce', emitted[0]['validation-mode'])
+        self.assertEqual(400, emitted[0]['validation-response-status'])
+
     def test_findings_do_not_leak_between_requests(self):
         """flask.g is request scoped by contract; this pins that a
         clean request after a finding-producing one emits nothing."""
@@ -462,6 +541,42 @@ class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
                 headers={'Authorization': self.token})
 
         self.assertEqual(1, spy.call_count)
+
+    def test_a_finding_on_a_successful_request_changes_nothing(self):
+        """The phase's central promise, pinned on a 2xx.
+
+        Every other warn-mode test lands on a request that was already
+        failing, so none of them could catch the warn layer breaking
+        traffic that works today -- and a finding on a 200 is exactly
+        the population decision D10 is trying to size. A body key
+        shadowing its own path parameter with the same value is a
+        finding by construction and a no-op by construction, so the
+        response must be byte for byte the response of the same
+        request without the body.
+        """
+        findings = []
+        real = validation.check
+
+        def spy(*args, **kwargs):
+            out = real(*args, **kwargs)
+            findings.extend(out)
+            return out
+
+        headers = {'Authorization': self.token}
+        clean = self.client.get('/auth/namespaces/system', headers=headers)
+        self.assertEqual(200, clean.status_code)
+
+        with mock.patch.object(validation, 'check', spy):
+            response = self.client.get(
+                '/auth/namespaces/system',
+                data=json.dumps({'namespace': 'system'}),
+                content_type='application/json', headers=headers)
+
+        self.assertEqual(
+            [(validation.BODY_PATH_COLLISION, 'namespace')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(clean.get_data(), response.get_data())
 
     def test_a_body_path_collision_is_recorded_through_the_stack(self):
         """The log_request -> flask.g -> validate_request hand-off,
