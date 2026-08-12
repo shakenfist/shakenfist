@@ -18,8 +18,9 @@ it wraps (`shakenfist/mariadb.py` — especially
 `TABLE_CREATION_LOCK` pattern), and the CI deployment
 harness (`.github/workflows/`,
 `shakenfist/deploy/shakenfist_ci/`,
-`shakenfist/deploy/cluster_ci/`). Ground your answers in
-what the code actually does today rather than guessing.
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`). Ground
+your answers in what the code actually does today rather than
+guessing.
 
 Where a question touches external concepts (gRPC client-
 side load balancing policies, MariaDB / Galera clustering

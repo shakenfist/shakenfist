@@ -1187,9 +1187,10 @@ because the following statements will be true:
   `shakenfist/schema/`.
 * There are unit tests for the enqueue-and-wait helper and
   for the exception whitelist serialisation, and functional
-  test coverage in `shakenfist/deploy/cluster_ci` exercising
-  the migrated paths (instance create, floating IP attach,
-  network maintenance reconciliation).
+  test coverage in
+  `shakenfist/deploy/shakenfist_ci/cluster_ci_tests` exercising the
+  migrated paths (instance create, floating IP attach, network
+  maintenance reconciliation).
 * Lines are wrapped at 120 characters, single quotes for
   strings, double quotes for docstrings.
 * `ARCHITECTURE.md`, `README.md`, and `AGENTS.md` describe

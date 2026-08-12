@@ -43,7 +43,8 @@ this plan:
 * `docs/{developer,operator,user}_guide/authentication.md`
   — the current authentication documentation surface.
 * `docs/plans/PLAN-oidc-authentication.md` — the sibling
-  (stub) plan for *human* OIDC login. This plan is the
+  plan for *human* OIDC login, rewritten by phase 5 against
+  the as-built infrastructure. This plan is the
   machine/workload half; see "Relationship to the OIDC
   authentication plan" below.
 
@@ -121,21 +122,28 @@ service accounts) with only configuration.
 
 ### Relationship to the OIDC authentication plan
 
-`PLAN-oidc-authentication.md` (stub) covers *humans* logging
-in with corporate identity, where IdP-issued JWTs are used
-directly as bearer tokens and namespace access is derived
-from group claims. This plan covers *workloads* exchanging an
+`PLAN-oidc-authentication.md` covers *humans* logging in
+with corporate identity, with namespace access derived from
+group claims. This plan covers *workloads* exchanging an
 IdP-issued JWT for a scoped namespace key. They share
 infrastructure this plan builds first: trusted-issuer
 configuration, JWKS fetch/cache/rotation, and JWT signature +
-claim validation. They differ after validation: this plan
-mints a key; the human plan authorises requests directly off
-the external token. Phase 2 here (keys as first-class
-objects) is also the groundwork for that plan's
-"service-account token" re-framing of namespace keys (its
-open question 11). Decisions here should be taken with that
-plan on the desk; phase 5 of this plan exists to rewrite
-that stub against whatever phases 1–4 actually build.
+claim validation.
+
+Where they may diverge is what happens after validation.
+This plan mints a key. The human plan's *original* design
+authorised requests directly off the external token, using
+IdP-issued JWTs as bearer credentials — but that is no
+longer a settled part of it. Phase 5 re-posed direct-bearer
+versus exchange as that plan's own open question 13, to be
+decided by its phase 0 rather than assumed here, so nothing
+in this plan should be read as having already chosen for the
+human half. Phase 2 here (keys as first-class objects) is
+also the groundwork for that plan's "service-account token"
+re-framing of namespace keys (its open question 11).
+Decisions here should be taken with that plan on the desk;
+phase 5 of this plan rewrote it against what phases 1–4
+actually built.
 
 ### Design principles (from the design discussion, 2026-07-14)
 
@@ -610,11 +618,11 @@ groundwork exists, and lives mostly outside this repository.
 | 2. Namespace keys as first-class objects | [PLAN-auth-federation-phase-02-key-objects.md](PLAN-auth-federation-phase-02-key-objects.md) | Complete |
 | 3. Federated exchange and scope enforcement | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Complete |
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
-| 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
+| 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Complete |
 | 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
 | 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
 
-Phase plans for phases 5–7 have not been drafted yet; the
+Phase plans for phases 6–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
 carried into the relevant phase plan) before each phase is
 cut.
@@ -811,20 +819,30 @@ plan's *What the survey found*.
 ### Phase 5: OIDC plan refresh
 
 Rewrite `PLAN-oidc-authentication.md` (the human-login
-sibling, currently a stub) against the as-built reality of
-phases 1–4, so it plans forward from what exists rather
-than from the pre-federation codebase:
+sibling, a stub when this phase was planned) against the
+as-built reality of phases 1–4, so it plans forward from
+what exists rather than from the pre-federation codebase:
 
 * Its Situation section describes key objects, scopes, the
   trusted-issuer configuration, and the exchange endpoint
   as existing infrastructure, with pointers to the
   glossary's terms.
-* Its tentative phases 1–2 (JWT validation refactor; OIDC
-  validator with discovery/JWKS) are marked superseded by
-  this plan's phase 3, and its remaining phases renumbered
-  around what is genuinely left: interactive CLI flows,
-  claim-driven multi-namespace authorisation, admin-as-a-
-  claim, IdP worked examples, and functional testing.
+* Its tentative phase 1 (JWT validation refactor) and the
+  JWKS half of its tentative phase 2 are marked superseded
+  by this plan's phase 3, and its remaining phases
+  renumbered around what is genuinely left: interactive
+  CLI flows, claim-driven multi-namespace authorisation,
+  admin-as-a-claim, IdP worked examples, and functional
+  testing. Note that the *discovery* half of its phase 2
+  was **not** built and must keep a live row: a trusted
+  issuer carries an operator-supplied `jwks_uri` and
+  nothing fetches `.well-known/openid-configuration`.
+  GitHub Actions never needed discovery because the
+  workflow arrives holding a minted token, but a human
+  client has to start a flow, and the endpoints it needs
+  are exactly what a discovery document publishes. This
+  was found by the phase 5 survey; the phase plan carries
+  the detail.
 * Its open question 1 (issuer trust model) is recorded as
   resolved by the trusted-issuer objects; open question 11
   (service-account rename: UX or schema migration) is
@@ -1013,7 +1031,7 @@ implemented because the following statements will be true:
   stestr unit tests, mypy); new code follows the
   three-layer database pattern and Pydantic schema
   conventions; functional coverage exercises the exchange
-  end-to-end in `shakenfist/deploy/cluster_ci`.
+  end-to-end in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests`.
 * `docs/{developer,operator,user}_guide/authentication.md`
   are updated, and describe the feature without reference
   to the private CI conductor.

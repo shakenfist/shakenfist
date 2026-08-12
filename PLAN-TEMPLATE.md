@@ -239,7 +239,7 @@ because the following statements will be true:
   than materialising everything and filtering in Python.
 * There are unit tests for core logic and preferably
   functional test coverage as well (see
-  `shakenfist/deploy/cluster_ci`).
+  `shakenfist/deploy/shakenfist_ci/cluster_ci_tests`).
 * Lines are wrapped at 120 characters, single quotes for
   strings, double quotes for docstrings.
 * gRPC proto changes (if any) have been regenerated with
