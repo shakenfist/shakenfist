@@ -11208,8 +11208,6 @@ a placement decision can be reconstructed after the fact (see
    (those in <code>error</code> or <code>missing</code>) are excluded before this stage,
    so a node whose storage has failed stops receiving instances
    (see <a href="../node_health/">Node resource health</a>).</li>
-<li><strong>Queue health</strong> -- nodes with more than 20 waiting queue jobs
-   are excluded; they are not keeping up.</li>
 <li><strong>Per-instance vCPU limit</strong> -- the request must fit libvirt's
    per-domain vCPU maximum on that node.</li>
 <li><strong>CPU admission</strong> -- allocated vCPUs (including this request)
@@ -11223,15 +11221,33 @@ a placement decision can be reconstructed after the fact (see
    filesystems. The candidate node publishes its own reservation as
    the <code>disk_reservation_gb</code> metric, so admission honours that
    node's per-host value rather than the evaluator's own config.</li>
-<li><strong>Disk bandwidth</strong> -- nodes whose disks are saturated (busy
-   more than 120% of wall time across spindles) are excluded.</li>
 <li><strong>Affinity</strong> -- surviving nodes are scored against the
    instance's affinity tags and only the highest-scoring group
    continues.</li>
+<li><strong>Queue health</strong> -- nodes with more than 20 waiting queue jobs
+   are excluded; they are not keeping up.</li>
+<li><strong>Disk bandwidth</strong> -- nodes whose disks are saturated (busy
+   more than 120% of wall time across spindles) are excluded.</li>
 <li><strong>Load ordering and weighted selection</strong> -- the survivors are
    ranked by load and a weighted-random choice spreads work
    across similar nodes. See below.</li>
 </ol>
+<p>Stages 1 to 5 are <strong>admission</strong>: they answer whether a node can
+host the instance at all. Stages 7 and 8 are <strong>load shedding</strong>:
+they answer whether a node is a good idea right now. Affinity sits
+between the two deliberately. A busy node is still a node the user
+asked for, so load shedding may narrow the winning affinity group
+but never moves placement out of it -- if queue health and disk
+bandwidth would eliminate every member of that group, they are
+ignored and an audit event <code>schedule keeping affinity despite
+transient load</code> is recorded. Admission is never overridden this
+way: a node that cannot fit the instance is not scored for
+affinity in the first place. If load shedding eliminates <em>all</em>
+candidates, the schedule still fails with a 507 as before.</p>
+<p>Before this ordering, a momentary IO burst on the node an instance
+was affine to silently placed it anywhere with headroom, and the
+anti-affinity case could leave an instance on the one node it was
+asked to avoid.</p>
 <h2 id="system-reservations">System reservations<a class="headerlink" href="#system-reservations" title="Permanent link">&para;</a></h2>
 <p>Some of a machine's capacity is never offered to instances. Each
 node carries three <strong>per-node</strong> reservation values -- RAM, CPU and
@@ -11398,6 +11414,11 @@ tells the whole story:</p>
   schedulable base used and whether it came from the
   <code>cpu_schedulable</code> field or the pre-reservation fallback; for RAM
   it includes the reservation subtracted.</li>
+<li><code>schedule have highest affinity</code> includes the winning score and
+  a per-candidate <code>affinity_detail</code> breakdown of which neighbouring
+  instances contributed what. <code>schedule keeping affinity despite
+  transient load</code> follows it when load shedding was ignored to
+  honour that group.</li>
 <li><code>schedule have lowest cpu load</code> includes per-node <code>load_detail</code>:
   raw <code>cpu_load_1</code>, the denominator used, the normalised load and
   the bucket.</li>
