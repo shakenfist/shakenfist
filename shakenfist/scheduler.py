@@ -146,15 +146,64 @@ class Scheduler:
         return self.metrics[node].get(
             'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
 
-    def _has_sufficient_cpu(self, log_ctx, cpus, node):
+    def _placed_instances(self, node, memo):
+        """The instances placed on a node, as (uuid, Instance or None) pairs.
+
+        Memoised into the caller's dict, because CPU admission and the
+        affinity pass both walk a candidate's placements and a scheduling
+        decision should only fetch them once. Returns None if the node's
+        row has gone away.
+        """
+        if node not in memo:
+            n = Node.from_db(node)
+            if n is None:
+                memo[node] = None
+            else:
+                memo[node] = [
+                    (instance_uuid, instance.Instance.from_db(instance_uuid))
+                    for instance_uuid in n.instances]
+        return memo[node]
+
+    def _committed_vcpus(self, node, memo, exclude_uuid=None):
+        """The vCPUs a node has already been committed to by placement.
+
+        A node's metrics count the vCPUs of its *running* libvirt domains
+        and are republished only once a minute, so an instance which has
+        been placed but has not booted yet -- in practice the whole time
+        it spends fetching its image -- is invisible to
+        cpu_total_instance_vcpus. Every create in a burst therefore sees
+        the same idle node, all of them are admitted onto it, and it ends
+        up well past its hard maximum once they do start, at which point
+        every later request naming that node is refused (issue 3498).
+        place_instance() writes the placement row synchronously as each
+        create is admitted, so counting placements closes the window that
+        the measurement alone leaves open.
+
+        exclude_uuid is the instance being scheduled: the preflight path
+        reschedules an instance which is already placed here, and it must
+        not be charged for itself twice.
+        """
+        placed = self._placed_instances(node, memo)
+        if not placed:
+            return 0
+        return sum(i.cpus for instance_uuid, i in placed
+                   if i is not None and instance_uuid != exclude_uuid)
+
+    def _has_sufficient_cpu(self, log_ctx, inst, node, memo):
         cpu_base, from_fallback = self._schedulable_threads(node)
         hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
-        current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
+        measured_cpus = self.metrics[node].get('cpu_total_instance_vcpus', 0)
+        committed_cpus = self._committed_vcpus(
+            node, memo, exclude_uuid=str(inst.uuid))
+        current_cpu = max(measured_cpus, committed_cpus)
+        cpus = inst.cpus
 
         if current_cpu + cpus > hard_max_cpus:
             reason = {
                 'reason': 'would exceed hard max CPUs',
                 'current_cpus': current_cpu,
+                'measured_cpus': measured_cpus,
+                'committed_cpus': committed_cpus,
                 'requested_cpus': cpus,
                 'hard_max_cpus': hard_max_cpus,
                 'cpu_schedulable': cpu_base,
@@ -358,10 +407,13 @@ class Scheduler:
                 related_objects, 'cpu_max_per_instance', candidates,
                 dropped=dropped)
 
-            # Do we have enough idle CPU?
+            # Do we have enough idle CPU? Placements are memoised here and
+            # reused by the affinity pass below, which walks the same lists.
+            placements = {}
             dropped = {}
             for c in list(candidates):
-                ok, reason = self._has_sufficient_cpu(log_ctx, inst.cpus, c)
+                ok, reason = self._has_sufficient_cpu(
+                    log_ctx, inst, c, placements)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
@@ -403,10 +455,10 @@ class Scheduler:
             affinity_detail = {}
 
             for c in list(candidates):
-                n = Node.from_db(c)
+                node_instances = self._placed_instances(c, placements)
                 affinity = 0
                 considered = []
-                if n is None:
+                if node_instances is None:
                     affinity_detail[c] = {
                         'score': 0,
                         'reason': 'node row not found',
@@ -414,9 +466,7 @@ class Scheduler:
                     by_affinity[affinity].append(c)
                     continue
 
-                node_instances = n.instances
-                for instance_uuid in node_instances:
-                    i = instance.Instance.from_db(instance_uuid)
+                for instance_uuid, i in node_instances:
                     if not i:
                         considered.append({
                             'instance_uuid': instance_uuid,
@@ -589,6 +639,7 @@ class Scheduler:
             self.refresh_metrics()
 
         # Only hypervisors with reasonable queue lengths are candidates
+        placements = {}
         resources = {
             'total': {
                 'cpu_available': 0,
@@ -616,7 +667,15 @@ class Scheduler:
             cpu_base, _ = self._schedulable_threads(n)
             resources['per_node'][n]['cpu_schedulable'] = cpu_base
             hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
-            current_cpu = self.metrics[n].get('cpu_total_instance_vcpus', 0)
+            measured_cpus = self.metrics[n].get('cpu_total_instance_vcpus', 0)
+            committed_cpus = self._committed_vcpus(n, placements)
+            # Both inputs to the admission decision are published, because
+            # "this node measures as idle but is refusing work" is only
+            # diagnosable if you can see which of the two is binding.
+            resources['per_node'][n]['cpu_hard_max'] = hard_max_cpus
+            resources['per_node'][n]['cpu_measured'] = measured_cpus
+            resources['per_node'][n]['cpu_committed'] = committed_cpus
+            current_cpu = max(measured_cpus, committed_cpus)
             resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
             # A node packed beyond the cap (for example after the cap was
             # lowered) reports negative per-node headroom, which is honest,

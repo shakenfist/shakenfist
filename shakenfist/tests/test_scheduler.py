@@ -591,6 +591,106 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
                 per_node['ram_max_per_instance'])
 
 
+class PlacementLedgerAdmissionTestCase(SchedulerTestCase):
+    """Test admission against vCPUs committed by placement (issue 3498).
+
+    cpu_total_instance_vcpus only counts *running* libvirt domains and is
+    republished once a minute, so a node which has just been given work
+    still measures as idle. Admission must charge a node for what it has
+    been placed with, or a burst of creates all land on the same node and
+    push it past its hard maximum.
+    """
+
+    def _baseline(self, **overrides):
+        # cpu_schedulable=1 and the fake config's ratio of 16 cap each
+        # node at 16 vCPUs, and the measurement claims none are in use.
+        metrics = {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'cpu_schedulable': 1,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*GiB,
+            'cpu_total_instance_vcpus': 0,
+            'cpu_available': 12,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def test_unbooted_placements_are_charged_to_their_node(self):
+        # node2 has been placed with 16 vCPUs which have not booted yet,
+        # so the measurement still reads zero. It must not be a candidate.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.create_instance(
+            'placed-1', cpus=8, place_on_node='node2')
+        self.mock_mariadb.create_instance(
+            'placed-2', cpus=8, place_on_node='node2')
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_unbooted_placements_can_exhaust_the_cluster(self):
+        # The same, on every hypervisor: a targeted or untargeted create
+        # is refused at the CPU stage rather than overfilling a node.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.create_instance(
+                'placed-%s' % node, cpus=16, place_on_node=node)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_cpu',
+            str(exc))
+
+    def test_measurement_still_wins_when_it_is_higher(self):
+        # The ledger misses nothing the measurement sees, but the
+        # measurement can be higher (a domain a node started for itself,
+        # or a placement row already removed), so admission takes the
+        # larger of the two.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.update_node_metrics(
+            'node2', {'cpu_total_instance_vcpus': 16})
+        self.mock_mariadb.create_instance(
+            'placed-1', cpus=1, place_on_node='node2')
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_instance_is_not_charged_for_itself(self):
+        # The preflight path reschedules an instance which is already
+        # placed on the node being considered. Charging it for its own
+        # vCPUs as well as the request would reject a node which fits.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', cpus=9, place_on_node='node2')
+
+        nodes = scheduler.Scheduler().find_candidates(
+            fake_inst, candidates=[self._node_uuid('node2')])
+        self.assertSetEqual(self._node_uuids_set('node2'), set(nodes))
+
+    def test_summarize_resources_reports_committed_capacity(self):
+        # The admin resources API must not advertise headroom that
+        # admission will refuse to use.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.create_instance(
+            'placed-1', cpus=5, place_on_node='node2')
+
+        resources = scheduler.Scheduler().summarize_resources()
+        self.assertEqual(
+            16.0 - 5,
+            resources['per_node'][self._node_uuid('node2')]['cpu_available'])
+        self.assertEqual(
+            16.0,
+            resources['per_node'][self._node_uuid('node3')]['cpu_available'])
+
+
 class DiskReservationAdmissionTestCase(SchedulerTestCase):
     """Test disk admission against the candidate node's published reservation."""
 

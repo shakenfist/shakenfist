@@ -419,7 +419,12 @@ placed, non-deleted instance, whereas the resources daemon's
 only active libvirt domains. A powered-off instance holds its
 reservation in the ledger and is absent from the measurement, so the
 two legitimately disagree and phase 3 has to choose between them
-explicitly rather than assume parity. The ledger also reads only
+explicitly rather than assume parity. Today's CPU admission has
+already made that choice for itself, without the reconciler's tables:
+`Scheduler._committed_vcpus()` walks each candidate's
+`INSTANCE_LOCATION` rows and charges the node `max(measured,
+committed)`, because the measurement cannot see an instance which has
+been placed but has not booted (issue 3498). The ledger also reads only
 `INSTANCE_LOCATION` rows in `object_references`: during the one
 transition release where `Node.instances` still unions in the legacy
 `node_attributes.instances` JSON column, a placement written by a
