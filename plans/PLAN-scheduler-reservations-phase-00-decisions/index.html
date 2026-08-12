@@ -11021,6 +11021,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#step-3-addendum-measured-claim-shapes-2026-08-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 addendum: measured claim shapes (2026-08-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 3 addendum: measured claim shapes (2026-08-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-basis-and-why-it-is-one-day-rather-than-two-weeks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data basis, and why it is one day rather than two weeks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#observed-claim-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observed claim shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constant-revisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constant revisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-finding-for-phase-3-disk-needs-an-overcommit-ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New finding for phase 3: disk needs an overcommit ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#execution" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11536,6 +11597,134 @@ contract is claim CRUD plus the D9/D16 events.</p>
 <p><strong>D19 (batch create rescope):</strong> folded into D8 — the claim
 is CI's all-or-nothing unit; the batch API is re-scoped to a
 deferred manual-tenant convenience.</p>
+<h2 id="step-3-addendum-measured-claim-shapes-2026-08-13">Step 3 addendum: measured claim shapes (2026-08-13)<a class="headerlink" href="#step-3-addendum-measured-claim-shapes-2026-08-13" title="Permanent link">&para;</a></h2>
+<h3 id="data-basis-and-why-it-is-one-day-rather-than-two-weeks">Data basis, and why it is one day rather than two weeks<a class="headerlink" href="#data-basis-and-why-it-is-one-day-rather-than-two-weeks" title="Permanent link">&para;</a></h3>
+<p>The conductor's 2026-08-12 deploy of per-instance cost
+attribution ("Size runners from the runner, not its
+namespace") bumped the cost-data generation and deliberately
+discarded every generation-1 row: the old samples mixed the
+runner and the nested cloud it built with no way to attribute
+them after the fact. The analysis below therefore rests on 56
+namespace teardowns collected over ~10 hours on 2026-08-12,
+not the planned two weeks. That is enough, because the
+headline empirical result is that <strong>per-job peaks are
+deterministic</strong> — every run of the same job produced
+identical <code>peak_allocated_*</code> values, since the peak is a
+function of the job's topology definition, not of runtime
+behaviour. Shape conclusions are therefore robust on a small
+sample; tail and variability questions (and the anti-
+starvation constant) are re-examined in a follow-up pass
+around 2026-08-26 once a fortnight of generation-2 data has
+accumulated.</p>
+<p>Cluster context for the numbers below: sfcbr has six
+hypervisors — four 12-thread and two 24-thread nodes, all
+with 62 GB RAM and ~920 GB of <code>/srv</code> — so roughly 96
+threads (~288 schedulable vCPUs at <code>CPU_OVERCOMMIT_RATIO</code>
+3.0, before per-host reservations), 372 GB RAM and 5.5 TB
+disk cluster-wide.</p>
+<h3 id="observed-claim-shapes">Observed claim shapes<a class="headerlink" href="#observed-claim-shapes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Job (worst observed run)</th>
+<th>vCPU</th>
+<th>RAM GB</th>
+<th>Virtual disk GB</th>
+<th>Instances</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kerbside-patches multinode</td>
+<td>35</td>
+<td>56</td>
+<td>3360</td>
+<td>9</td>
+</tr>
+<tr>
+<td>shakenfist collection smoke (xl runner)</td>
+<td>32</td>
+<td>80</td>
+<td>1420</td>
+<td>7</td>
+</tr>
+<tr>
+<td>shakenfist collection smoke (xs runner)</td>
+<td>25</td>
+<td>66</td>
+<td>1120</td>
+<td>7</td>
+</tr>
+<tr>
+<td>kerbside-patches all-in-one</td>
+<td>13</td>
+<td>18</td>
+<td>560</td>
+<td>2</td>
+</tr>
+<tr>
+<td>instar / kerbside single-VM jobs</td>
+<td>8</td>
+<td>16</td>
+<td>460</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>The runner's own allocation is included in the peak (the xl
+vs xs variants of the same smoke job differ by exactly the
+runner-size delta: 7 vCPU / 14 GB), which is correct — the
+claim must cover the runner instance too. Workflow durations
+ranged 3–70 minutes. RAM is the binding dimension for
+concurrency: five concurrent cluster-sized jobs allocate
+300+ GB against the cluster's 372 GB, while the same mix
+uses well under half the vCPU limit.</p>
+<h3 id="constant-revisions">Constant revisions<a class="headerlink" href="#constant-revisions" title="Permanent link">&para;</a></h3>
+<p><strong>D4 (claim TTL): unchanged.</strong> Observed workflow durations
+top out at 70 minutes, so the conductor's "roughly twice the
+workflow timeout" expiry and the 24-hour caller default both
+hold comfortably as crash backstops. No revision.</p>
+<p><strong>D14 (cluster-wide claims): upgraded from "simpler" to
+"required".</strong> The two largest observed RAM claims (66 and
+80 GB) exceed any single sfcbr node's 62 GB — a node-pinned
+claim of the most common cluster-CI shape would be
+undeliverable by construction, so cluster-wide is not a
+simplification but the only shape that works. The stranding
+acceptance is confirmed by data: the largest single instance
+in any observed topology is 8 vCPU / 16 GB (an xl runner;
+cluster topologies use 4 vCPU / 12 GB nodes), at most ~26%
+of a node's RAM and ~22% of its vCPU limit, so "fits in
+aggregate but on no single node" requires a node already
+near-full, which the normal no-candidate diagnostic handles.</p>
+<p><strong>D18 (conductor sizing formula): confirmed, with the sizing
+key sharpened.</strong> Because peaks are topology-deterministic, a
+single generation-2 observation is a sufficient seed for
+<code>worst observed peak_allocated_*</code>, and the 1.2× headroom is
+retained to absorb what actually varies: runner-size changes
+and topology drift in the job definition, not run-to-run
+noise. The sizing key must be <strong>(repo, job_name)</strong>, not
+workflow name — peaks within one workflow name span 1–32
+vCPU across its jobs, so workflow-level sizing would claim
+the worst job's footprint for every job. The 15-minute
+anti-starvation constant stays provisional; no deferral data
+can exist until claims are enforced.</p>
+<h3 id="new-finding-for-phase-3-disk-needs-an-overcommit-ratio">New finding for phase 3: disk needs an overcommit ratio<a class="headerlink" href="#new-finding-for-phase-3-disk-needs-an-overcommit-ratio" title="Permanent link">&para;</a></h3>
+<p>D2 claims disk as virtual size from <code>disk_spec</code>, and the
+data shows virtual size over-claims actual usage by 40–140×
+(median ~65×): a single collection-smoke job claims 1.1 TB
+and the multinode job 3.4 TB against a 5.5 TB cluster whose
+worst observed <em>actual</em> per-job fill is 49 GB. Claiming
+virtual size against physical disk would reject today's
+routine concurrency outright while the disks sit ~98% empty.
+Phase 3 must therefore admit disk against
+<code>physical × SCHEDULER_DISK_OVERCOMMIT</code>, provisional seed
+<strong>5.0</strong> — enough to admit the observed concurrent mix with
+about 2× margin, while still bounding runaway growth two
+orders of magnitude below the virtual sum the guests could
+theoretically write. The physical backstop remains
+<code>NODE_DISK_RESERVATION_GB</code> plus the reconciler's drift
+correction; virtual size stays the claimed quantity because
+it is the only number known at admission time.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -11559,7 +11748,7 @@ deferred manual-tenant convenience.</p>
 <tr>
 <td>3</td>
 <td>Analyse accumulated <code>peak_allocated_*</code> data from sfcbr for realistic claim shapes</td>
-<td>Blocked on data — collection deployed 2026-07-30, analyse from ~2026-08-13. Outcome lands as an addendum revising only the <em>revisit when data lands</em> constants (D4, D14, D18); it does not gate phases 1-3</td>
+<td>Complete — see "Step 3 addendum: measured claim shapes (2026-08-13)". D4 unchanged, D14 upgraded to required, D18 sizing key sharpened to (repo, job_name), and a new disk-overcommit constant flagged for phase 3. Follow-up variability pass ~2026-08-26 on a fortnight of generation-2 data</td>
 </tr>
 <tr>
 <td>4</td>
