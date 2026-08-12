@@ -85,18 +85,19 @@ trap 'rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; rm -rf "${BACKUP}
 total=0
 failures=0
 
-# All three modules, because the guard surface spans them: the
+# All four modules, because the guard surface spans them: the
 # import-time checks are asserted by test_parameter_declarations;
 # whether a declaration describes the shape the handler actually
 # accepts can only be seen in the generated specification, which is
-# test_openapi_spec's subject; and whether the *derivation* those two
+# test_openapi_spec's subject; whether the *derivation* those two
 # compare against is itself right belongs to test_derivation_generator,
-# which is the only one building sources the tree does not contain. A
-# mutation caught by none of them is a gap in the guards, not in the
-# mutation.
+# the only one building sources the tree does not contain; and whether
+# the declarations compile into the schemas phase 4 will enforce is
+# test_validation_compiler's. A mutation caught by none of them is a
+# gap in the guards, not in the mutation.
 run() {
     "${PYTHON}" -m stestr run \
-        '(test_parameter_declarations|test_openapi_spec|test_derivation_generator)' \
+        '(test_parameter_declarations|test_openapi_spec|test_derivation_generator|test_validation_compiler)' \
         2>&1
 }
 
@@ -428,6 +429,32 @@ check 'empty defining scope falls through'
 sed -i "s/names = {segment.split(':')\[-1\]/names = {segment.split(':')[0]/" \
     shakenfist/external_api/declarations.py
 check 'route converter prefix taken as the name'
+
+# 29-31 mutate the compiler. Phase 3 compiles the declarations into
+# marshmallow schemas, so from here a misreading is not a wrong line of
+# documentation but a rejected request the moment phase 4 enforces.
+
+# 29. required compiled as a constraint rather than recorded as
+# metadata. `mode` on the agent-put endpoint is declared required while
+# omitting it has always been accepted, so this would reject working
+# requests.
+sed -i "s/kwargs: dict\[str, Any\] = {'required': False, 'allow_none': True}/kwargs: dict[str, Any] = {'required': True, 'allow_none': True}/" \
+    shakenfist/external_api/validation.py
+check 'required compiled as a constraint'
+
+# 30. The raw upload body parsed as JSON. Upload bodies are bytes, so
+# every upload would fail validation.
+sed -i "s/if schema.get('type') != 'object':/if False:/" \
+    shakenfist/external_api/validation.py
+check 'raw body compiled as JSON'
+
+# 31. A handler with no declaration compiled as an empty schema instead
+# of being left out of the registry. Absence and success would then be
+# indistinguishable: a route mounted without a declaration would simply
+# not be validated, and nothing would say so.
+sed -i "s/            if specs is None:/            if False:/" \
+    shakenfist/external_api/validation.py
+check 'undocumented handler compiled as empty'
 
 echo
 if [ "${failures}" -ne 0 ]; then
