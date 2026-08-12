@@ -334,12 +334,17 @@ The behaviour-visible PR, and still not a behaviour change.
 
 **What a warn record contains.** One structured log line per
 request that would have been rejected, at `info`, with:
-`request-id` (already threaded), endpoint class and method, route,
-parameter name, declared location and type, the reason, and the
-offending value's **type**. Never its value — D5, and several of
-these routes carry credentials, which is why `log_request` drops the
-whole body on `handles_credentials()` routes rather than naming
-fields.
+`request-id` (already threaded), method, the concrete path and the
+route template (so findings aggregate by endpoint), the parameter
+name (truncated and stripped of non-printables — it is client
+supplied), the reason, the validation detail, the active mode, the
+status the request returned anyway, and the offending value's
+**type**. Never its value — D5, and several of these routes carry
+credentials, which is why `log_request` drops the whole body on
+`handles_credentials()` routes rather than naming fields. (The first
+draft promised the declared location and type as fields; the
+declaration is recoverable from route + parameter, so they are not
+carried on every line.)
 
 Rejection reasons must be counted separately, because they answer
 different questions:
@@ -548,6 +553,21 @@ meaning warn, declared patterns must be `^...$` anchored at import
 time so JSON Schema search and marshmallow match semantics provably
 coincide, and query-declared parameters are checked against the
 merged `json_or_query` view.
+
+**The second review round found one more contradiction, fixed.**
+`enforce` rejected on *any* finding, including `missing-required` --
+while three documents said required is recorded and never enforced,
+and the unit test asserting that only checked the compiled marshmallow
+field (the missing-required path bypasses marshmallow entirely). The
+enforcement decision now filters `missing-required` findings out, with
+a request-level test that `enforce` plus an omitted required parameter
+still reaches the handler. From the same round: `API_VALIDATION_MODE`
+gained `off` as an operator safety valve against log volume; parameter
+names are stripped of non-printables as well as truncated; the warn
+line carries the route template so findings aggregate by endpoint; and
+the validator reads the body `log_request` stashed on `flask.g` rather
+than re-fetching it, so it reports on exactly what the handler
+receives and a non-JSON body is not parsed twice.
 
 **The next step is not code.** Deploy to sfcbr, run functional CI, and
 read the warn log. Success criterion 3 is that every remaining finding

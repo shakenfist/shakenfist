@@ -1002,6 +1002,20 @@ def log_request(func):
     def wrapper(*args, **kwargs):
         j = sf_api.flask_get_post_body()
 
+        # Stashed for the validator, which runs two decorators later:
+        # reading it back means validation reports on exactly the body
+        # merged into the handler's kwargs below, and a body which
+        # failed to parse as JSON is not re-parsed to find that out a
+        # second time. Stashed before the type guard so the empty
+        # default is stashed too -- the fallback in validate_request
+        # distinguishes "log_request saw no object" from "log_request
+        # never ran" by None.
+        if isinstance(j, dict):
+            try:
+                setattr(flask.g, validation.PARSED_BODY, j)
+            except RuntimeError:
+                pass
+
         if j:
             # Only a JSON object can merge into kwargs. Any other JSON
             # document -- a list, a string, a number -- has always been
@@ -1381,6 +1395,12 @@ def validate_request(func):
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        # The operator's safety valve: if the layer itself is the
+        # problem -- log volume from a chatty caller being the
+        # foreseeable case -- it can be turned off without a downgrade.
+        if config.API_VALIDATION_MODE == 'off':
+            return func(*args, **kwargs)
+
         resource = getattr(func, '__self__', None)
         if resource is None:
             return func(*args, **kwargs)
@@ -1397,9 +1417,15 @@ def validate_request(func):
         # ignore anyway, so it is never fetched: flask_get_post_body()
         # attempts two full JSON parses of a body that is not JSON
         # before returning nothing, and the upload data path is the
-        # API's bulk transfer route.
-        body = ({} if compiled.raw_body
-                else sf_api.flask_get_post_body() or {})
+        # API's bulk transfer route. Everything else reads the body
+        # log_request already parsed and merged, so validation reports
+        # on exactly what the handler receives; the fallback fetch only
+        # runs if log_request somehow did not stash one.
+        body: dict[str, Any] = {}
+        if not compiled.raw_body:
+            stashed = getattr(flask.g, validation.PARSED_BODY, None)
+            body = (stashed if stashed is not None
+                    else sf_api.flask_get_post_body() or {})
         findings = validation.check(
             compiled, body, flask.request.args.to_dict(),
             getattr(flask.g, validation.BODY_PATH_COLLISIONS, set()))
@@ -1407,9 +1433,17 @@ def validate_request(func):
             return func(*args, **kwargs)
 
         if config.API_VALIDATION_MODE == 'enforce':
-            first = findings[0]
-            return sf_api.error(
-                400, '%s: %s' % (first.parameter, first.detail))
+            # required is recorded and never enforced, even here:
+            # several parameters are declared required while omitting
+            # them has always worked (CompiledEndpoint's docstring has
+            # the example), so a missing-required finding is telemetry
+            # for phase 6's decision, not grounds for rejection.
+            enforceable = [f for f in findings
+                           if f.reason != validation.MISSING_REQUIRED]
+            if enforceable:
+                first = enforceable[0]
+                return sf_api.error(
+                    400, '%s: %s' % (first.parameter, first.detail))
 
         try:
             setattr(flask.g, validation.VALIDATION_FINDINGS, findings)

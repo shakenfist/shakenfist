@@ -269,8 +269,10 @@ questions: `unknown-parameter`, `type-mismatch`, `missing-required`
 and `body-path-collision`.
 
 Two things it deliberately does not do. `required` is recorded but
-never enforced — several parameters are declared required while
-omitting them has always worked, and what to do about that is phase 6.
+never enforced — not even in `enforce` mode, where missing-required
+findings are filtered out of the rejection decision. Several
+parameters are declared required while omitting them has always
+worked, and what to do about that is phase 6.
 And the prose `format` on a type token is documentation: `netblock`,
 `uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
 strings, because semantic validation of them is also phase 6. Only

@@ -141,6 +141,58 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertTrue(body['error'].startswith('zzz: '), body['error'])
         self.assertNotIn('unexpected keyword argument', body['error'])
 
+    def test_enforce_mode_never_rejects_missing_required(self):
+        """required is recorded and never enforced -- even in enforce
+        mode. Several parameters are declared required while omitting
+        them has always worked, so a missing-required finding is
+        telemetry for phase 6's decision, not grounds for rejection.
+        The second review round proved the first cut of the enforce
+        branch rejected on any finding, contradicting this three times
+        over in the documentation.
+        """
+        config.API_VALIDATION_MODE = 'enforce'
+
+        response, findings = self._post_auth({'namespace': 'sys'})
+
+        self.assertIn(
+            validation.MISSING_REQUIRED, [f.reason for f in findings])
+        # The handler's own guard answered, in its own words --
+        # validation did not preempt it.
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            'missing key in request', response.get_json()['error'])
+
+    def test_off_mode_disables_the_layer(self):
+        """The operator's safety valve: if the layer itself becomes the
+        problem -- log volume being the foreseeable case -- it can be
+        turned off without a downgrade. Off means check() never runs,
+        not merely that findings are discarded."""
+        config.API_VALIDATION_MODE = 'off'
+
+        response, findings = self._post_auth(
+            {'namespace': 'sys', 'key': 'k', 'zzz': 1})
+
+        self.assertEqual([], findings)
+        # And the request itself behaved exactly as it always did.
+        self.assertEqual(400, response.status_code)
+        self.assertIn(
+            'unexpected keyword argument', response.get_json()['error'])
+
+    def test_the_validator_does_not_refetch_the_body(self):
+        """The validator reads the body log_request stashed, so it
+        reports on exactly what the handler receives and a body which
+        is not JSON is not paid for twice."""
+        real = sf_utils_api.flask_get_post_body
+        with mock.patch.object(
+                sf_utils_api, 'flask_get_post_body',
+                mock.Mock(wraps=real)) as spy, \
+                mock.patch('shakenfist.namespace.Namespace.from_db',
+                           return_value=self.namespace):
+            self.client.post(
+                '/auth', json={'namespace': 'sys', 'key': 'k'})
+
+        self.assertEqual(1, spy.call_count)
+
     def test_check_is_pure(self):
         """The decision is separable from the request context, which is
         what lets the interesting cases be tested without one."""
@@ -204,6 +256,15 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(
             validation.MAX_PARAMETER_NAME, len(finding.parameter))
+
+    def test_control_characters_are_stripped_from_names(self):
+        """The length bound alone would still let a newline in a key
+        forge extra fields in a log line or, in enforce mode, in the
+        response."""
+        finding = validation.Finding(
+            validation.UNKNOWN_PARAMETER, 'a\nfake-field=x\tb', 'detail')
+
+        self.assertEqual('afake-field=xb', finding.parameter)
 
     def test_a_body_supplied_query_parameter_is_type_checked(self):
         """The shipped client serialises every request to a JSON body

@@ -166,7 +166,11 @@ parameter declarations, and while `API_VALIDATION_MODE` is `warn`
 (the default) they change no response — the request was answered
 exactly as it always was. Do not set `enforce` yet; that switch is
 phase 4 of the API input validation plan and only makes sense once
-the warn log for your own callers has been read and understood.
+the warn log for your own callers has been read and understood. If
+the lines themselves become a problem — a chatty caller sending an
+undeclared key on every request is an extra line per request —
+`API_VALIDATION_MODE` can be set to `off`, which disables the layer
+entirely.
 
 Each line carries:
 
@@ -174,7 +178,9 @@ Each line carries:
 |---|---|
 | `validation-reason` | Which rule the request missed: `unknown-parameter` (a body key the endpoint does not declare), `type-mismatch` (a declared parameter with a value of the wrong type), `missing-required` (a declared-required parameter that was not supplied), or `body-path-collision` (a body key with the same name as a URL path parameter). |
 | `validation-parameter` | The parameter concerned, truncated to 64 characters. |
+| `validation-detail` | The specific rule that was missed — for a `type-mismatch`, the validation message (for example `Not a valid integer.`). |
 | `validation-value-type` | The Python type of the offending value. The value itself is never logged. |
+| `route` | The route template (for example `/instances/<instance_ref>`), so findings aggregate by endpoint; `path` carries the concrete request path. |
 | `validation-response-status` | The status the request went on to return anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change. |
 | `validation-mode` | The active `API_VALIDATION_MODE`. |
 

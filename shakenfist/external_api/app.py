@@ -541,6 +541,11 @@ def log_validation_findings(response):
     if not findings:
         return response
 
+    # The route template as well as the concrete path, because the
+    # measurement groups findings by endpoint and re-templating
+    # /instances/<some uuid> back out of every path is the wrong place
+    # to do that work.
+    url_rule = flask.request.url_rule
     for finding in findings:
         fields = finding.fields()
         fields.update({
@@ -548,6 +553,7 @@ def log_validation_findings(response):
                 'FLASK_REQUEST_ID', 'none'),
             'method': flask.request.method,
             'path': flask.request.path,
+            'route': url_rule.rule if url_rule is not None else None,
             'validation-mode': config.API_VALIDATION_MODE,
             'validation-response-status': response.status_code,
         })

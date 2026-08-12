@@ -230,10 +230,15 @@ def build_registry(app: Any) -> dict[tuple[str, str], CompiledEndpoint]:
 # rejection enforcement would introduce from a status code it would
 # merely change -- and at validation time that is not yet known.
 
-# The request-scoped hand-off, named like base.py's
-# _RECORDED_EXCEPTION_FIELDS because it is the same pattern.
+# The request-scoped hand-offs, named like base.py's
+# _RECORDED_EXCEPTION_FIELDS because they are the same pattern.
+# PARSED_BODY carries the body log_request parsed and merged, so the
+# validator reports on exactly what the handler will receive rather
+# than on a re-read of the request -- and so a body which is not JSON
+# is not paid for twice.
 VALIDATION_FINDINGS = 'sf_validation_findings'
 BODY_PATH_COLLISIONS = 'sf_body_path_collisions'
+PARSED_BODY = 'sf_parsed_body'
 
 # Reason codes. Counted separately because they answer different
 # questions: see the table in the phase 3 plan.
@@ -272,7 +277,13 @@ class Finding:
     def __init__(self, reason: str, parameter: str, detail: str,
                  value: Any = None):
         self.reason = reason
-        self.parameter = parameter[:MAX_PARAMETER_NAME]
+        # Truncated *and* stripped of non-printables: the length bound
+        # alone would still let a newline in a key forge extra fields
+        # in a log line or, in enforce mode, in the response. The JSON
+        # formatter escapes these anyway, so this is defence in depth
+        # rather than the only wall.
+        self.parameter = ''.join(
+            c for c in parameter if c.isprintable())[:MAX_PARAMETER_NAME]
         self.detail = detail
         self.value_type = type(value).__name__ if value is not None else None
 
