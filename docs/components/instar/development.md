@@ -317,6 +317,31 @@ across the Shaken Fist projects.
 
 See `.github/workflows/` for implementation details.
 
+### Self-hosted runners and Docker
+
+Almost every job in this repository runs on the self-hosted runner pool
+(`[self-hosted, debian-12, ...]`), and those runners do **not** ship
+Docker. Since instar is built and tested inside the devcontainer image,
+any job that runs `docker`, `make instar`, `make test-rust`, `make lint`
+or any other container-backed Makefile target must install it first:
+
+```yaml
+    env:
+      DOCKER_BUILDKIT: 1
+
+    steps:
+      - name: Install Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo chmod 666 /var/run/docker.sock
+```
+
+Omitting the step does not fail at job start -- it fails part way through
+with `docker: command not found`, whenever the first container command is
+reached.
+
 ### Differential fuzzing
 
 On-demand differential fuzzing compares instar against qemu-img on randomly
