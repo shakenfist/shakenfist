@@ -4,6 +4,8 @@ import re
 import sys
 import traceback
 from typing import Any
+from typing import NoReturn
+from typing import Optional
 
 import flask
 import flask_restful
@@ -562,6 +564,49 @@ def swagger_helper(section, description, parameters, responses,
     return out
 
 
+def _token_request_fields(ns_name: Optional[str] = None,
+                          key_name: Optional[str] = None) -> dict[str, Any]:
+    """The attribution a rejected token needs.
+
+    The keyname, method, path and remote address log_token_use()
+    records on the success path, plus the namespace, so that a
+    rejection can be read the same way an acceptance is. The presented
+    token and the key's nonce are never included: both are replayable
+    by anyone who can read the log.
+    """
+    return {
+        'namespace': ns_name,
+        'keyname': key_name,
+        'method': flask.request.environ.get('REQUEST_METHOD'),
+        'path': flask.request.environ.get('PATH_INFO'),
+        'remote-address': flask.request.remote_addr
+    }
+
+
+def _reject_token(message: str, ns_name: Optional[str] = None,
+                  key_name: Optional[str] = None,
+                  ns: Optional[Namespace] = None) -> NoReturn:
+    """Record a rejected token and raise the 401.
+
+    NOTE(mikal): these are logged at INFO, not ERROR. Every rejection
+    reachable from here is caused by the credential the client
+    presented -- most commonly a token minted before its key was
+    rotated or deleted, which is an entirely expected client condition
+    and is exactly what the nonce exists to cause. None of them are
+    cluster faults, so none of them should be paging anyone (issue
+    3606). The message alone was also unattributable, so the request
+    context travels with it and, where the namespace still exists, is
+    recorded as an audit event as well. Getting here requires a token
+    signed by this cluster, so an unauthenticated caller cannot use
+    that event write as an amplifier.
+    """
+    fields = _token_request_fields(ns_name, key_name)
+    LOG.with_fields(fields).info(message)
+    if ns:
+        ns.add_event(EVENT_TYPE_AUDIT, message, extra=fields)
+    raise NoAuthorizationError()
+
+
 def verify_token(func):
     def wrapper(*args, **kwargs):
         # Ensure there is a valid JWT with a correct signature
@@ -572,19 +617,22 @@ def verify_token(func):
         try:
             ns_name, key_name = parse_jwt_identity()
         except (TypeError, ValueError):
-            LOG.error('JWT token does not contain a namespace and key name in '
-                      'the subject field')
+            # Unlike the rejections below this one is ours, not the
+            # client's: only this cluster can sign a token, so a valid
+            # signature over an unparseable subject means we minted it
+            # that way. That is worth an ERROR.
+            LOG.with_fields(_token_request_fields()).error(
+                'JWT token does not contain a namespace and key name in '
+                'the subject field')
             raise NoAuthorizationError()
 
         ns = Namespace.from_db(ns_name)
         if not ns:
-            LOG.with_fields({'namespace', ns_name}).error(
-                'JWT token is for non-existent namespace')
-            raise NoAuthorizationError()
+            _reject_token('JWT token is for non-existent namespace',
+                          ns_name=ns_name, key_name=key_name)
         if ns.state.value == dbo.STATE_DELETED:
-            LOG.with_fields({'namespace', ns_name}).error(
-                'JWT token is for deleted namespace')
-            raise NoAuthorizationError()
+            _reject_token('JWT token is for deleted namespace',
+                          ns_name=ns_name, key_name=key_name, ns=ns)
 
         # NOTE(mikal): the exact name '_service_key' skips the nonce
         # check entirely. This predates nonced keys and some deployment
@@ -602,19 +650,16 @@ def verify_token(func):
             # point of the mechanism.
             key = ns.lookup_key(key_name)
             if not key:
-                LOG.with_fields({'namespace', ns_name}).error(
-                    'JWT token uses non-existent key')
-                raise NoAuthorizationError()
+                _reject_token('JWT token uses non-existent key',
+                              ns_name=ns_name, key_name=key_name, ns=ns)
 
             nonce = key.nonce
             if 'nonce' not in jwt_data:
-                LOG.with_fields({'namespace', ns_name}).error(
-                    'JWT token lacks nonce')
-                raise NoAuthorizationError()
+                _reject_token('JWT token lacks nonce', ns_name=ns_name,
+                              key_name=key_name, ns=ns)
             if jwt_data['nonce'] != nonce:
-                LOG.with_fields({'namespace', ns_name}).error(
-                    'JWT token has incorrect nonce')
-                raise NoAuthorizationError()
+                _reject_token('JWT token has incorrect nonce',
+                              ns_name=ns_name, key_name=key_name, ns=ns)
 
         return func(*args, **kwargs)
     return wrapper
