@@ -349,9 +349,9 @@ table entirely (decision D8).
 | Phase | Plan | Status |
 |-------|------|--------|
 | 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum due ~2026-08-13 (revises sizing constants only, does not gate phases 1-3) |
-| 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Implemented (awaiting operator review and PR) |
-| 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Implemented (awaiting operator review and PR) |
+| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3) |
+| 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
+| 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
 | 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Not started |
 | 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
@@ -391,7 +391,12 @@ write (D3), release on `hard_delete()` and failed create,
 preflight-redirect and cleaner placement-rewrite paths moved
 onto the primitive, the demand feedforward term (D13), and
 the scheduler's pick-then-claim loop (D7). The concurrent-
-scheduling test from the review checklist lands here.
+scheduling test from the review checklist lands here. Disk
+admission uses `physical × SCHEDULER_DISK_OVERCOMMIT`
+(provisional 5.0): the step 3 addendum measured virtual
+disk claims at 40–140× actual usage, so admitting virtual
+size against raw physical capacity would reject routine CI
+concurrency (see the phase 0 decisions document's addendum).
 
 **Phase 4 — namespace claims API.** The claim as a
 first-class object with REST CRUD and client verbs (D15),
