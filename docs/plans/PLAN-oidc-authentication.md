@@ -118,7 +118,7 @@ the one pinned in `docs/glossary.md`.
    (`config.API_TOKEN_DURATION`).
 4. **Authentication and scope enforcement are universal.**
    Both run from `Resource.method_decorators`
-   (`shakenfist/external_api/base.py:1288-1296`), so a new
+   (`shakenfist/external_api/base.py:1291-1298`), so a new
    endpoint is authenticated and scope-checked without
    anyone remembering to decorate it. `@api_base.public` is
    the only way out, and the public set is written down and
