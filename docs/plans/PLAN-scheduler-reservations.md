@@ -352,7 +352,7 @@ table entirely (decision D8).
 | 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3) |
 | 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
 | 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
-| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Not started |
+| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Planned — phase plan drafted 2026-08-13, awaiting operator review |
 | 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
@@ -392,11 +392,14 @@ preflight-redirect and cleaner placement-rewrite paths moved
 onto the primitive, the demand feedforward term (D13), and
 the scheduler's pick-then-claim loop (D7). The concurrent-
 scheduling test from the review checklist lands here. Disk
-admission uses `physical × SCHEDULER_DISK_OVERCOMMIT`
-(provisional 5.0): the step 3 addendum measured virtual
-disk claims at 40–140× actual usage, so admitting virtual
-size against raw physical capacity would reject routine CI
-concurrency (see the phase 0 decisions document's addendum).
+admission is overcommitted by `SCHEDULER_DISK_OVERCOMMIT`
+(provisional 5.0), applied to the free-space headroom term of
+phase 2's `_derive_disk_limit_gb()` — there is no
+total-physical-disk metric to multiply: the step 3 addendum
+measured virtual disk claims at 40–140× actual usage, so
+admitting a burst's summed virtual size against unscaled
+free space would reject routine CI concurrency (see the
+addendum and phase 3 decision P3).
 
 Phase 3 also **inherits and removes** the CPU stopgap landed
 for issue 3498 (PR 3724): `Scheduler._committed_vcpus()`
@@ -407,12 +410,17 @@ tables. It closed the burst window on sfcbr while phase 3 was
 unwritten, and it must be deleted by the change which
 introduces the guarded UPDATE, not left underneath it: two
 ledgers over the same ground truth will eventually disagree,
-and the Python one is the unmaintained one. Its exclusions
-(skip deleted instances; charge an instance only to the node
-its own placement attribute names) were written to match
-`_RECONCILE_USAGE_SQL`, so they are also the working answer
-to the phase 4 obligation to de-duplicate usage by instance
-uuid. Two smaller consequences to pick up: RAM and disk
+and the Python one is the unmaintained one. Of its two
+exclusions, only the first (skip deleted instances) matches
+`_RECONCILE_USAGE_SQL`; the second (charge an instance only
+to the node its own placement attribute names) has no
+reconciler counterpart — the usage query charges every node
+holding an `INSTANCE_LOCATION` row, and documents duplicate
+counting as an open hazard. The phase 4 de-duplication
+obligation is therefore answered by phase 3 making duplicate
+placement rows unproducible (the atomic move deletes all
+prior rows), not by the stopgap's filter, which dies with the
+stopgap. Two smaller consequences to pick up: RAM and disk
 admission were knowingly left measurement-denominated, so
 phase 3 closes their burst window for the first time; and
 `summarize_resources()` gained the same walk, unconditionally,

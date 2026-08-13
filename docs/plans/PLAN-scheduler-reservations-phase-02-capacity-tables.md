@@ -384,7 +384,7 @@ surface yet: the admin capacity view migrates in phase 5.
 | 4 | Local validation: run the reconciler against a docker MariaDB seeded with realistic rows (incl. a multi-disk `disk_spec` and both uuid forms); record results in the Validation section | medium | management session | none | Complete — 36/36 checks, 42 ms at 32 nodes / 1,205 instances; see Validation |
 | 5 | Docs: `docs/operator_guide/database.md` (three tables), CLAUDE.md MariaDB-storage list, correct CLAUDE.md's stale `shakenfist/deploy/` collection paths, ARCHITECTURE/AGENTS if warranted, master plan phase row | low | sub-agent | worktree | Complete — all four docs updated; verification showed the collection and `shakenfist_ci` still live in-repo at `shakenfist/deploy/`, so only CLAUDE.md's directory tree (which drew `deploy/` at the repo root) needed correcting |
 | 6 | Management-session code review against the checklist | medium | management session | none | Complete — checklist verified 2026-08-02 |
-| 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | In progress — PR #3614 open |
+| 7 | Operator review and PR; deploy to sfcbr and confirm gauges/rows during soak | — | operator | — | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
 | 8 | Address automated review of PR #3614 | medium | management session | none | Complete — see Review response |
 | 9 | Address second automated review of PR #3614 | medium | management session | none | Complete — see Second review response |
 | 10 | Address third automated review of PR #3614 | medium | management session | none | Complete — see Third review response |
