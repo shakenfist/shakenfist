@@ -31,6 +31,11 @@ from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
+from shakenfist.schema.operations.artifact_fetch_op \
+    import create_and_enqueue as afo_create_and_enqueue
+from shakenfist.schema.operations.artifact_fetch_op \
+    import model_tasks as afo_tasks
+from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
@@ -987,6 +992,48 @@ class Instance(dbowo):
                 n = Node.from_db(location)
                 if n:
                     n.add_instance(self.uuid)
+
+    def enqueue_disk_fetches(self, target_node, priority, request_id=None,
+                             artifact_event=None):
+        """Enqueue an artifact fetch onto target_node for each disk image.
+
+        Instance create assumes the image for every disk is already in the
+        node-local image cache, so each placement decision must be paired
+        with fetches targeting the chosen node. Returns the enqueued
+        operations as a dependency list for the subsequent start operation.
+        """
+        # TODO(mikal): I would really like the target_node not to be set
+        # here so that any node in the cluster could start downloading
+        # this image ASAP. Unfortunately, image download is also comingled
+        # with populating the local image cache for instance start at the
+        # moment and I need to tease that apart first.
+        fetch_dependencies = []
+        for disk in self.disk_spec:
+            disk_base = disk.get('base')
+            if disk.get('blob_uuid'):
+                url = f'{artifact.BLOB_URL}{disk["blob_uuid"]}'
+            elif not util_general.noneish(disk_base):
+                url = disk_base
+            else:
+                # Empty disk with no base image, no artifact fetch needed
+                continue
+
+            # By ownership, because the fetch this enqueues ends in
+            # add_index: url is either a blob we already resolved, or a URL
+            # this instance's namespace was entitled to fetch.
+            a = artifact.Artifact.owned_from_url_or_new(
+                artifact.Artifact.TYPE_IMAGE, url, namespace=self.namespace)
+            if artifact_event:
+                a.add_event(EVENT_TYPE_AUDIT, artifact_event)
+
+            op_type, op_uuid = afo_create_and_enqueue(
+                self.namespace, url, self.uuid, [afo_tasks.image_fetch],
+                priority, artifact_uuid=a.uuid, request_id=request_id,
+                target_node=target_node)
+            fetch_dependencies.append(
+                dependency(op_type=op_type, op_uuid=op_uuid))
+
+        return fetch_dependencies
 
     def enforced_deletes_increment(self):
         with self.get_lock_attr('enforced_deletes',

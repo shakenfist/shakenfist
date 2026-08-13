@@ -179,12 +179,22 @@ class NodeInstNetdescOp(BaseClusterOperation):
             candidates = s.find_candidates(inst, candidates=candidates)
             inst.place_instance(candidates[0])
 
+            # The artifact fetches minted at create time targeted the
+            # original placement, so the redirect target's image cache has
+            # never been asked for this instance's images. Enqueue fetches
+            # for the new node and make the redirected start depend on
+            # them, exactly as create time does.
+            fetch_dependencies = inst.enqueue_disk_fetches(
+                candidates[0], self.priority, request_id=self.request_id,
+                artifact_event='fetch requested by instance start redirect')
+
             # Cluster operations are created in database transactions and
             # do not have .new() methods; the schema-layer helper is the
             # only way to mint one.
             schema.create_and_enqueue(
                 candidates[0], self.instance_uuid, self.net_desc,
-                self.tasks, self.priority, self.request_id)
+                self.tasks, self.priority, self.request_id,
+                depends_on=fetch_dependencies or None)
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, inst],
                 'instance start redirected to another node',
