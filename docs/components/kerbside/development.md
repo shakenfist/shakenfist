@@ -167,7 +167,10 @@ writes it next to a symlink of the real static tree, because the
 templates reference their assets as root-relative absolute paths
 (`/static/sfui/...`). Only pages that have actually been converted
 onto `base-sfui.html` are supported; today that is `login`, which
-needs neither authentication nor the database.
+needs neither authentication nor the database, and `consoles`, whose
+fixtures render two consoles -- one with sessions and active tokens,
+one with neither -- so a single screenshot shows both terminate
+states (the two-step disclosure and the dim zero badge).
 
 The script imports `kerbside.api`, so it needs an interpreter with
 kerbside's dependencies installed. The tox environment already has

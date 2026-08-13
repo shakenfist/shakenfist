@@ -239,7 +239,7 @@ locally-running kerbside.
 | 2. Vendor sfui + static plumbing | PLAN-sfui-conversion-phase-02-vendoring.md | Done |
 | 3. sfui canonical additions (shakenfist/sfui repo) | PLAN-sfui-conversion-phase-03-sfui-canonical.md | Done |
 | 4. New base + login page | PLAN-sfui-conversion-phase-04-base-login.md | Done |
-| 5. Consoles page | PLAN-sfui-conversion-phase-05-consoles.md | Not started |
+| 5. Consoles page | PLAN-sfui-conversion-phase-05-consoles.md | Done |
 | 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Not started |
 | 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Not started |
 | 8. Terminate actions to POST (#133) | PLAN-sfui-conversion-phase-08-terminate-post.md | Not started |
@@ -309,6 +309,16 @@ Phase notes, dependencies and recommended planning effort:
    `fill="currentColor"` so they follow the theme (updating
    `static/icons/README.md` provenance notes; delete the
    two dead icons).
+   **Amended in phase 5 planning:** an SVG loaded via
+   `<img>` resolves `currentColor` in its own isolated
+   document and can never follow the page theme, so the
+   icons become inline Jinja includes under
+   `templates/icons/` and `static/icons/` retires; and the
+   connect dropdown flattens to two visible anchor-buttons
+   rather than being rebuilt (sfui deliberately has no
+   dropdown primitive), which pulls one small canonical
+   sfui addition — `.sf-btn` suppressing the base-layer
+   link underline so anchors can be buttons.
 6. **Sessions, sources and audit** (plan at medium effort —
    the patterns are established by now). Native `<details>`
    accordion for sessions (fixing the duplicate ids),
