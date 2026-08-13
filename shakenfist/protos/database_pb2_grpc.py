@@ -1159,6 +1159,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.ReleaseInstancePlacementRequest.SerializeToString,
                 response_deserializer=database__pb2.ReleaseInstancePlacementReply.FromString,
                 _registered_method=True)
+        self.GetSchedulerNodeCapacity = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetSchedulerNodeCapacity',
+                request_serializer=database__pb2.GetSchedulerNodeCapacityRequest.SerializeToString,
+                response_deserializer=database__pb2.GetSchedulerNodeCapacityReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer:
@@ -2636,6 +2641,16 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetSchedulerNodeCapacity(self, request, context):
+        """Read the materialised per-node capacity counters. The admin resources
+        summary must publish what admission would actually allow, and since
+        phase 3 that is these counters rather than a Python walk over
+        placement rows.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -3763,6 +3778,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.ReleaseInstancePlacement,
                     request_deserializer=database__pb2.ReleaseInstancePlacementRequest.FromString,
                     response_serializer=database__pb2.ReleaseInstancePlacementReply.SerializeToString,
+            ),
+            'GetSchedulerNodeCapacity': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSchedulerNodeCapacity,
+                    request_deserializer=database__pb2.GetSchedulerNodeCapacityRequest.FromString,
+                    response_serializer=database__pb2.GetSchedulerNodeCapacityReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -9840,6 +9860,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/ReleaseInstancePlacement',
             database__pb2.ReleaseInstancePlacementRequest.SerializeToString,
             database__pb2.ReleaseInstancePlacementReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSchedulerNodeCapacity(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetSchedulerNodeCapacity',
+            database__pb2.GetSchedulerNodeCapacityRequest.SerializeToString,
+            database__pb2.GetSchedulerNodeCapacityReply.FromString,
             options,
             channel_credentials,
             insecure,

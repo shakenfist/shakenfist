@@ -411,6 +411,12 @@ class DatabaseServiceStub:
     docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
     """
     ReleaseInstancePlacement: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseInstancePlacementRequest, _database_pb2.ReleaseInstancePlacementReply]
+    GetSchedulerNodeCapacity: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetSchedulerNodeCapacityRequest, _database_pb2.GetSchedulerNodeCapacityReply]
+    """Read the materialised per-node capacity counters. The admin resources
+    summary must publish what admission would actually allow, and since
+    phase 3 that is these counters rather than a Python walk over
+    placement rows.
+    """
 
 @_typing.type_check_only
 class DatabaseServiceAsyncStub(DatabaseServiceStub):
@@ -795,6 +801,12 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
     """
     ReleaseInstancePlacement: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseInstancePlacementRequest, _database_pb2.ReleaseInstancePlacementReply]  # type: ignore[assignment]
+    GetSchedulerNodeCapacity: _aio.UnaryUnaryMultiCallable[_database_pb2.GetSchedulerNodeCapacityRequest, _database_pb2.GetSchedulerNodeCapacityReply]  # type: ignore[assignment]
+    """Read the materialised per-node capacity counters. The admin resources
+    summary must publish what admission would actually allow, and since
+    phase 3 that is these counters rather than a Python walk over
+    placement rows.
+    """
 
 class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -2526,5 +2538,17 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.ReleaseInstancePlacementRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.ReleaseInstancePlacementReply, _abc.Awaitable[_database_pb2.ReleaseInstancePlacementReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetSchedulerNodeCapacity(
+        self,
+        request: _database_pb2.GetSchedulerNodeCapacityRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetSchedulerNodeCapacityReply, _abc.Awaitable[_database_pb2.GetSchedulerNodeCapacityReply]]:
+        """Read the materialised per-node capacity counters. The admin resources
+        summary must publish what admission would actually allow, and since
+        phase 3 that is these counters rather than a Python walk over
+        placement rows.
+        """
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

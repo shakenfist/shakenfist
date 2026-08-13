@@ -870,6 +870,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_release_instance_placement.stop)
 
+        self.mariadb_get_scheduler_node_capacity = mock.patch(
+            'shakenfist.mariadb.get_scheduler_node_capacity',
+            side_effect=self._mariadb_get_scheduler_node_capacity)
+        self.mariadb_get_scheduler_node_capacity.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_scheduler_node_capacity.stop)
+
         # Mock MariaDB functions for object metadata
         self.mariadb_get_object_metadata = mock.patch(
             'shakenfist.mariadb.get_object_metadata',
@@ -2687,6 +2694,16 @@ class MockMariaDB():
             'expected_demand': expected_demand,
         }
         return self.node_capacity[str(node_uuid)]
+
+    def _mariadb_get_scheduler_node_capacity(self):
+        """Mock implementation of mariadb.get_scheduler_node_capacity()
+
+        Only nodes seeded with set_node_capacity() have a row, which is
+        what the real table looks like too: the reconciler writes a row
+        per schedulable hypervisor and declines to guess for the rest.
+        """
+        return [dict(row, node_uuid=node_uuid)
+                for node_uuid, row in self.node_capacity.items()]
 
     def _decrement_node_capacity(self, node_uuid, cpus, memory_mb, disk_gb):
         """Floored decrement of one node's counters, as the RPC does (P6).

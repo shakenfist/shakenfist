@@ -18,6 +18,7 @@ from unittest import mock
 from uuid import uuid4
 
 from shakenfist import exceptions
+from shakenfist.operations.node_inst_netdesc_op import AbortInstanceStart
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -32,9 +33,13 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class FakeInstance:
     """An instance double with a state machine we control."""
 
-    def __init__(self, state_value, reject=(), fetch_dependencies=None):
+    def __init__(self, state_value, reject=(), deny=(),
+                 fetch_dependencies=None):
         self._state_value = state_value
         self._reject = reject
+        # Nodes whose capacity guard refuses this instance, as the
+        # admission RPC would (P2/D7).
+        self._deny = set(deny)
         self.state_sets = []
         self.delete_errors = []
         self.placement = {'placement_attempts': 0}
@@ -42,6 +47,7 @@ class FakeInstance:
         self.placed_on = []
         self.fetch_dependencies = fetch_dependencies or []
         self.disk_fetch_calls = []
+        self.placement_attempts = []
 
     @property
     def state(self):
@@ -63,6 +69,11 @@ class FakeInstance:
         self.delete_errors.append(message)
 
     def place_instance(self, node):
+        self.placement_attempts.append(node)
+        if node in self._deny:
+            raise exceptions.CapacityAdmissionDenied(
+                'node', [{'dimension': 'cpus', 'limit': 16.0, 'used': 16.0,
+                          'requested': 1.0, 'exceeded': True}])
         self.placed_on.append(node)
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
@@ -92,15 +103,16 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         op.state = NodeInstNetdescOp.STATE_EXECUTING
         return op
 
-    def _redirect(self, inst, target_node):
+    def _redirect(self, inst, candidates):
+        """Run a preflight whose local placement fails, over `candidates`."""
+        op = self._make_op()
         fake_scheduler = mock.MagicMock()
         fake_scheduler.find_candidates.side_effect = [
             exceptions.LowResourceException('full here'),
-            [target_node],
+            list(candidates),
         ]
-        fake_scheduler.metrics = {target_node: {}}
+        fake_scheduler.metrics = {c: {} for c in candidates}
 
-        op = self._make_op()
         with mock.patch(
                 'shakenfist.operations.node_inst_netdesc_op.scheduler.'
                 'Scheduler', return_value=fake_scheduler):
@@ -110,15 +122,20 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
                 with mock.patch(
                         'shakenfist.operations.node_inst_netdesc_op.'
                         'add_event_multi'):
-                    op._instance_preflight(inst)
-        return op, mock_enqueue
+                    try:
+                        op._instance_preflight(inst)
+                        raised = None
+                    except AbortInstanceStart as e:
+                        raised = e
+        return op, mock_enqueue, raised
 
     def test_redirect_uses_schema_create_and_enqueue(self):
         inst = FakeInstance('created')
         target_node = str(uuid4())
 
-        op, mock_enqueue = self._redirect(inst, target_node)
+        op, mock_enqueue, raised = self._redirect(inst, [target_node])
 
+        self.assertIsNone(raised)
         mock_enqueue.assert_called_once_with(
             target_node, op.instance_uuid, op.net_desc, op.tasks,
             op.priority, op.request_id, depends_on=None)
@@ -130,21 +147,62 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         # placement, so a redirect must mint fresh fetches against the new
         # node and gate the redirected start on them -- otherwise the new
         # node's image cache is never populated and instance create raises
-        # ImageMissingFromCache (issue 3720).
+        # ImageMissingFromCache (issue 3720). Since the pick-then-claim
+        # walk, the fetches must target the node the capacity guard
+        # actually admitted, not merely the scheduler's first preference.
         fetch_deps = [dependency(op_type=ObjectType.ARTIFACT_FETCH_OP,
                                  op_uuid=str(uuid4()))]
-        inst = FakeInstance('created', fetch_dependencies=fetch_deps)
-        target_node = str(uuid4())
+        denied = str(uuid4())
+        admitted = str(uuid4())
+        inst = FakeInstance('created', deny=[denied],
+                            fetch_dependencies=fetch_deps)
 
-        op, mock_enqueue = self._redirect(inst, target_node)
+        op, mock_enqueue, raised = self._redirect(inst, [denied, admitted])
 
+        self.assertIsNone(raised)
         self.assertEqual(
-            [(target_node, op.priority, op.request_id,
+            [(admitted, op.priority, op.request_id,
               'fetch requested by instance start redirect')],
             inst.disk_fetch_calls)
         mock_enqueue.assert_called_once_with(
-            target_node, op.instance_uuid, op.net_desc, op.tasks,
+            admitted, op.instance_uuid, op.net_desc, op.tasks,
             op.priority, op.request_id, depends_on=fetch_deps)
+
+    def test_redirect_walks_past_a_denied_candidate(self):
+        # The scheduler's candidate list is ordered by preference, but
+        # the capacity guard is what admits: a refusal from the head of
+        # the list is a genuine reschedule onto the next candidate, not
+        # a failure (D7).
+        first = str(uuid4())
+        second = str(uuid4())
+        inst = FakeInstance('created', deny=[first])
+
+        op, mock_enqueue, raised = self._redirect(inst, [first, second])
+
+        self.assertIsNone(raised)
+        self.assertEqual([first, second], inst.placement_attempts)
+        self.assertEqual([second], inst.placed_on)
+        mock_enqueue.assert_called_once_with(
+            second, op.instance_uuid, op.net_desc, op.tasks,
+            op.priority, op.request_id, depends_on=None)
+        self.assertEqual(NodeInstNetdescOp.STATE_ABORT, op.state.value)
+
+    def test_every_candidate_denied_aborts_the_start(self):
+        # An exhausted candidate list means the cluster really is full,
+        # which is the same outcome as the scheduler finding no
+        # candidates at all -- and it must not enqueue work anywhere.
+        first = str(uuid4())
+        second = str(uuid4())
+        inst = FakeInstance('created', deny=[first, second])
+
+        _, mock_enqueue, raised = self._redirect(inst, [first, second])
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Unable to find suitable node', str(raised))
+        self.assertEqual([first, second], inst.placement_attempts)
+        self.assertEqual([], inst.placed_on)
+        mock_enqueue.assert_not_called()
+        self.assertEqual([], inst.disk_fetch_calls)
 
     def _dispatch_failing_preflight(self, op):
         inst = FakeInstance('created')

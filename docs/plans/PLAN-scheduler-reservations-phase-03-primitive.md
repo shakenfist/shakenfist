@@ -359,7 +359,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 2 | Add `SCHEDULER_DISK_OVERCOMMIT` (float, default 5.0) to `config.py` beside the other overcommit ratios; apply it to the headroom term in `_derive_disk_limit_gb()` per P3; thread it through the reconcile RPC request like the demand constants; unit tests for the scaled limit incl. zero-free and reservation-exceeds-free edges; document in `docs/operator_guide/database.md` | medium | sonnet | worktree | Not started |
 | 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Complete — see step 3 notes |
 | 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Complete — see step 4 notes |
-| 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Not started |
+| 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Complete — see step 5 notes |
 | 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Not started |
 | 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Not started |
 | 8 | Management-session code review against the checklist below | medium | management session | none | Not started |
@@ -477,6 +477,41 @@ now reflected in the code's docstrings:
 - Stale prose found for step 7: `ARCHITECTURE.md` ~825-838,
   `AGENTS.md` ~437-461 and `docs/operator_guide/database.md` ~756
   still describe the legacy dual-write and/or the stopgap.
+
+### Step 5: implementation notes (2026-08-14)
+
+- **The walk needed a read API the plan had not scoped.**
+  `summarize_resources()` had no way to read the counters, so this step
+  adds `GetSchedulerNodeCapacity` (empty request, repeated row reply) and
+  its tri-layer wrappers. It is an unfiltered `SELECT` of a table with
+  one row per schedulable hypervisor; an error or an unreadable table
+  reads as no rows, because a node without a row is charged nothing and
+  guarded by nothing anyway (P7).
+- **`cpu_committed_row_present` was added to the per-node summary.** A
+  zero `cpu_committed` now has two meanings — a node holding nothing, or
+  a node the reconciler has not sized — and only the second one also
+  means "and this node is admitting unguarded". The cluster CI
+  assertion in `cluster_ci_tests/test_nodes.py` skips on the second.
+- **`_has_sufficient_cpu()` lost its `memo` parameter** along with the
+  stopgap; nothing else in it wanted the placements. `placements` is
+  still built in `find_candidates()`, moved down to the affinity pass
+  which is now its only consumer, and `_placed_instances()` stays.
+- **`instance.placement_filter()` stays.** After the deletion its
+  remaining callers are `this_node_filter()`,
+  `healthy_instances_on_node()` and `instance_blob_usage()`, all
+  production, so neither it nor its tests were removed.
+- **The requested-placement branch now walks the returned list** rather
+  than reusing `placed_on`. It is a one-element list by construction, so
+  the behaviour is unchanged, but there is now exactly one walk to
+  reason about.
+- The create path deliberately does not catch `WriteException`: an
+  unreachable database is not a full cluster, and asking the next
+  candidate would only ask it the same question. A unit test pins that a
+  write failure surfaces as a 500 rather than as the 507.
+- Stale prose remaining for step 7: `docs/operator_guide/scheduler.md`
+  ~176, ~235 (names the retired `committed_cpus` rejection-reason field)
+  and ~258, plus `ARCHITECTURE.md` ~825-838 and
+  `docs/operator_guide/database.md` ~756 carried over from step 4.
 
 *(Step 6's docker-MariaDB results are recorded here when the
 step runs: the harness, the seed shape, each check's outcome,

@@ -845,11 +845,9 @@ class InstancesEndpoint(api_base.Resource):
             # Have we been placed?
             if not placed_on:
                 candidates = SCHEDULER.find_candidates(inst)
-                placement = candidates[0]
-
             else:
-                SCHEDULER.find_candidates(inst, candidates=[placed_on])
-                placement = placed_on
+                candidates = SCHEDULER.find_candidates(
+                    inst, candidates=[placed_on])
 
         except exceptions.LowResourceException as e:
             inst.add_event(
@@ -864,8 +862,47 @@ class InstancesEndpoint(api_base.Resource):
             inst.enqueue_delete_due_error('scheduling failed')
             return sf_api.error(404, 'node not found: %s' % e, suppress_traceback=True)
 
-        # Record placement
-        inst.place_instance(placement)
+        # Record placement, by claiming the capacity to do so. The
+        # scheduler's filters run against a metrics snapshot up to a
+        # minute stale, so its ordered candidate list is a preference,
+        # not a decision: the guarded capacity claim inside
+        # place_instance() is what actually admits the instance, and a
+        # refusal means some other create took the slot between the two.
+        # So walk the list (D7). A WriteException is deliberately not
+        # caught -- an unreachable database is not a full cluster, and
+        # trying the next node would only ask it the same question.
+        placement = None
+        denials = {}
+        for candidate in candidates:
+            try:
+                inst.place_instance(candidate)
+                placement = candidate
+                break
+            except exceptions.CapacityAdmissionDenied as e:
+                denials[candidate] = {
+                    'failing_stage': e.failing_stage,
+                    'dimensions': e.dimensions,
+                }
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'schedule candidate refused by capacity guard',
+                    extra={
+                        'node': candidate,
+                        'failing_stage': e.failing_stage,
+                        'dimensions': e.dimensions,
+                    })
+
+        if placement is None:
+            inst.add_event(
+                EVENT_TYPE_AUDIT,
+                'schedule failed, every candidate refused by capacity guard',
+                extra={'candidates': candidates, 'denials': denials})
+            inst.enqueue_delete_due_error('scheduling failed')
+            return sf_api.error(
+                507,
+                'no node had capacity for this instance, %d candidates '
+                'refused it' % len(denials),
+                suppress_traceback=True)
 
         # Request the artifact fetches immediately, then the instance start
         instance_start_dependencies = inst.enqueue_disk_fetches(

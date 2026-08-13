@@ -24508,6 +24508,19 @@ class ReleasePlacementResult(TypedDict):
     clamped: bool
 
 
+class SchedulerNodeCapacityRow(TypedDict):
+    """One scheduler_node_capacity row, as readers of the counters see it."""
+
+    node_uuid: str
+    limit_cpus: int
+    limit_memory_mb: int
+    limit_disk_gb: int
+    used_cpus: int
+    used_memory_mb: int
+    used_disk_gb: int
+    expected_demand: float
+
+
 class _AdmissionDenied(Exception):
     """A guarded UPDATE matched no row, so the transaction must abort.
 
@@ -25271,6 +25284,39 @@ def _direct_release_instance_placement(
         return result
 
 
+def _direct_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
+    """Read every scheduler_node_capacity row.
+
+    A plain unfiltered SELECT: the table has one row per schedulable
+    hypervisor, so it is small by construction and every caller so far
+    wants all of it. Read outside a transaction -- a caller summarising
+    cluster capacity is describing a moving target whatever it does, and
+    holding a snapshot would only serialise it against admission.
+    """
+    engine = _get_engine()
+    capacity = _get_scheduler_node_capacity_table()
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(sa.select(capacity)).fetchall()
+        return [
+            {
+                'node_uuid': str(row.node_uuid),
+                'limit_cpus': int(row.limit_cpus),
+                'limit_memory_mb': int(row.limit_memory_mb),
+                'limit_disk_gb': int(row.limit_disk_gb),
+                'used_cpus': int(row.used_cpus),
+                'used_memory_mb': int(row.used_memory_mb),
+                'used_disk_gb': int(row.used_disk_gb),
+                'expected_demand': float(row.expected_demand),
+            }
+            for row in rows
+        ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for scheduler_node_capacity: {e}')
+        return []
+
+
 def _grpc_admit_instance_placement(
         instance_uuid: str, namespace: str, node_uuid: str,
         old_node_uuid: str, cpus: int, memory_mb: int, disk_gb: int,
@@ -25365,6 +25411,30 @@ def _grpc_release_instance_placement(
         return result
 
 
+def _grpc_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
+    """Read the per-node capacity counters via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetSchedulerNodeCapacityRequest()
+        reply = _grpc_call(stub.GetSchedulerNodeCapacity, request)
+        return [
+            {
+                'node_uuid': row.node_uuid,
+                'limit_cpus': int(row.limit_cpus),
+                'limit_memory_mb': int(row.limit_memory_mb),
+                'limit_disk_gb': int(row.limit_disk_gb),
+                'used_cpus': int(row.used_cpus),
+                'used_memory_mb': int(row.used_memory_mb),
+                'used_disk_gb': int(row.used_disk_gb),
+                'expected_demand': float(row.expected_demand),
+            }
+            for row in reply.rows
+        ]
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.warning(f'gRPC GetSchedulerNodeCapacity failed: {e}')
+        return []
+
+
 def admit_instance_placement(
         instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
         memory_mb: int, disk_gb: int, placement_json: str,
@@ -25426,3 +25496,20 @@ def release_instance_placement(
             instance_uuid, namespace, node_uuid, cpus, memory_mb, disk_gb)
     return _direct_release_instance_placement(
         instance_uuid, namespace, node_uuid, cpus, memory_mb, disk_gb)
+
+
+def get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
+    """The materialised per-node capacity counters, one dict per row.
+
+    These are the numbers admission actually draws down, so a reader
+    which wants to publish "what would this cluster admit?" must read
+    them rather than recompute a second ledger of its own.
+
+    Returns an empty list if the table is empty or unreadable. Only
+    hypervisors the reconciler considers schedulable have a row, so an
+    absent node is not an error: it is a node whose capacity the
+    reconciler declined to guess (P7), which admits unguarded.
+    """
+    if _use_database_service():
+        return _grpc_get_scheduler_node_capacity()
+    return _direct_get_scheduler_node_capacity()

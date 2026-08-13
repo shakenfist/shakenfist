@@ -13,6 +13,7 @@ from shakenfist.artifact import BLOB_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import NoopLock
 from shakenfist.baseobject import State
+from shakenfist import exceptions
 from shakenfist.config import BaseSettings
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
@@ -680,6 +681,98 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(
             'multiple networks have the name "betsy" in namespace "two"',
             resp.get_json().get('error'))
+
+
+class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
+    """The create path claims capacity by walking the candidate list (D7).
+
+    ``find_candidates()`` filters against a metrics snapshot up to a
+    minute stale, so its ordered list is a preference. The decision is
+    the guarded capacity claim inside ``place_instance()``, and a
+    refusal there means another create took the slot in between -- so
+    the create walks on rather than failing.
+    """
+
+    NODE_A = 'aaaaaaaa-1111-4111-8111-111111111111'
+    NODE_B = 'bbbbbbbb-2222-4222-8222-222222222222'
+    NODE_C = 'cccccccc-3333-4333-8333-333333333333'
+
+    def _candidates(self, *nodes):
+        fake = mock.MagicMock()
+        fake.find_candidates.return_value = list(nodes)
+        return mock.patch(
+            'shakenfist.external_api.instance.SCHEDULER', fake)
+
+    def _full(self, node):
+        # Every limit at zero, so any request at all is refused.
+        self.mock_mariadb.set_node_capacity(node)
+
+    def _roomy(self, node):
+        self.mock_mariadb.set_node_capacity(
+            node, limit_cpus=16, limit_memory_mb=65536, limit_disk_gb=500)
+
+    def _post(self, name):
+        # A sizeless-base disk, so no artifact fetch is enqueued and the
+        # create is entirely about placement.
+        return self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({
+                'name': name,
+                'cpus': 1,
+                'memory': 1024,
+                'network': [],
+                'disk': [{'size': 8}],
+                'namespace': 'system',
+            }))
+
+    def test_a_denied_candidate_is_skipped_for_the_next(self):
+        self._full(self.NODE_A)
+        self._roomy(self.NODE_B)
+
+        with self._candidates(self.NODE_A, self.NODE_B):
+            resp = self._post('walks-on')
+
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(self.NODE_B, resp.get_json()['node'])
+        # ... and only the admitting node was charged.
+        self.assertEqual(
+            0, self.mock_mariadb.node_capacity[self.NODE_A]['used_cpus'])
+        self.assertEqual(
+            1, self.mock_mariadb.node_capacity[self.NODE_B]['used_cpus'])
+
+    def test_a_node_with_no_capacity_row_still_admits(self):
+        # P7: mid-upgrade a node the reconciler has not sized admits
+        # unguarded rather than the cluster refusing every create.
+        self._full(self.NODE_A)
+
+        with self._candidates(self.NODE_A, self.NODE_C):
+            resp = self._post('unguarded')
+
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(self.NODE_C, resp.get_json()['node'])
+
+    def test_every_candidate_denied_is_a_507(self):
+        self._full(self.NODE_A)
+        self._full(self.NODE_B)
+
+        with self._candidates(self.NODE_A, self.NODE_B):
+            resp = self._post('nowhere-to-go')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertIn('2 candidates refused it', resp.get_json()['error'])
+
+    def test_a_database_failure_is_not_a_full_cluster(self):
+        # A WriteException means the database could not be reached, not
+        # that the cluster is full: asking the next node would only get
+        # the same answer, so it must not be caught by the walk.
+        with self._candidates(self.NODE_A, self.NODE_B):
+            with mock.patch(
+                    'shakenfist.instance.Instance.place_instance',
+                    side_effect=exceptions.WriteException('database gone')):
+                resp = self._post('database-down')
+
+        self.assertEqual(500, resp.status_code)
 
 
 class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):

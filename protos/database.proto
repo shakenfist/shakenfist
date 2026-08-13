@@ -396,6 +396,12 @@ service DatabaseService {
   // docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
   rpc AdmitInstancePlacement (AdmitInstancePlacementRequest) returns (AdmitInstancePlacementReply) {}
   rpc ReleaseInstancePlacement (ReleaseInstancePlacementRequest) returns (ReleaseInstancePlacementReply) {}
+
+  // Read the materialised per-node capacity counters. The admin resources
+  // summary must publish what admission would actually allow, and since
+  // phase 3 that is these counters rather than a Python walk over
+  // placement rows.
+  rpc GetSchedulerNodeCapacity (GetSchedulerNodeCapacityRequest) returns (GetSchedulerNodeCapacityReply) {}
 }
 
 // Generic status reply
@@ -2720,4 +2726,25 @@ message ReleaseInstancePlacementReply {
   bool released = 2;
   bool clamped = 3;
   string error = 4;
+}
+
+message GetSchedulerNodeCapacityRequest {}
+
+// One scheduler_node_capacity row as the admin resources summary reads
+// it. Deliberately not the reconciler's NodeCapacity message: the
+// delta_used_* fields there describe one reconcile pass and mean nothing
+// to a reader of the current counters.
+message SchedulerNodeCapacityRow {
+  string node_uuid = 1;  // Dashed uuid form
+  int64 limit_cpus = 2;
+  int64 limit_memory_mb = 3;
+  int64 limit_disk_gb = 4;
+  int64 used_cpus = 5;
+  int64 used_memory_mb = 6;
+  int64 used_disk_gb = 7;
+  double expected_demand = 8;
+}
+
+message GetSchedulerNodeCapacityReply {
+  repeated SchedulerNodeCapacityRow rows = 1;
 }

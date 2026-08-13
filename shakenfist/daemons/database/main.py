@@ -2581,6 +2581,28 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.ReleaseInstancePlacementReply(
                 success=False, error=str(e))
 
+    def GetSchedulerNodeCapacity(
+        self,
+        request: database_pb2.GetSchedulerNodeCapacityRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetSchedulerNodeCapacityReply:
+        """Read the materialised per-node capacity counters (phase 3).
+
+        A read of a small table with no filtering, so an error is an
+        empty reply: the caller is an admin summary which reports a
+        node with no row as uncounted rather than as full.
+        """
+        try:
+            self.monitor.counters['get_scheduler_node_capacity'].inc()
+            reply = database_pb2.GetSchedulerNodeCapacityReply()
+            for row in mariadb._direct_get_scheduler_node_capacity():
+                reply.rows.add(**row)
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetSchedulerNodeCapacity failed', e)
+            return database_pb2.GetSchedulerNodeCapacityReply()
+
     # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
@@ -6115,6 +6137,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB scheduler capacity operations
             'reconcile_scheduler_capacity',
             'admit_instance_placement', 'release_instance_placement',
+            'get_scheduler_node_capacity',
         ]
         for op in operations:
             self.counters[op] = Counter(

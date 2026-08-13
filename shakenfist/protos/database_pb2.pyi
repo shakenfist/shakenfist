@@ -9277,3 +9277,85 @@ class ReleaseInstancePlacementReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ReleaseInstancePlacementReply: _TypeAlias = ReleaseInstancePlacementReply  # noqa: Y015
+
+@_typing.final
+class GetSchedulerNodeCapacityRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetSchedulerNodeCapacityRequest: _TypeAlias = GetSchedulerNodeCapacityRequest  # noqa: Y015
+
+@_typing.final
+class SchedulerNodeCapacityRow(_message.Message):
+    """One scheduler_node_capacity row as the admin resources summary reads
+    it. Deliberately not the reconciler's NodeCapacity message: the
+    delta_used_* fields there describe one reconcile pass and mean nothing
+    to a reader of the current counters.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    LIMIT_CPUS_FIELD_NUMBER: _builtins.int
+    LIMIT_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    LIMIT_DISK_GB_FIELD_NUMBER: _builtins.int
+    USED_CPUS_FIELD_NUMBER: _builtins.int
+    USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    node_uuid: _builtins.str
+    """Dashed uuid form"""
+    limit_cpus: _builtins.int
+    limit_memory_mb: _builtins.int
+    limit_disk_gb: _builtins.int
+    used_cpus: _builtins.int
+    used_memory_mb: _builtins.int
+    used_disk_gb: _builtins.int
+    expected_demand: _builtins.float
+    def __init__(
+        self,
+        *,
+        node_uuid: _builtins.str = ...,
+        limit_cpus: _builtins.int = ...,
+        limit_memory_mb: _builtins.int = ...,
+        limit_disk_gb: _builtins.int = ...,
+        used_cpus: _builtins.int = ...,
+        used_memory_mb: _builtins.int = ...,
+        used_disk_gb: _builtins.int = ...,
+        expected_demand: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expected_demand", b"expected_demand", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "node_uuid", b"node_uuid", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___SchedulerNodeCapacityRow: _TypeAlias = SchedulerNodeCapacityRow  # noqa: Y015
+
+@_typing.final
+class GetSchedulerNodeCapacityReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ROWS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def rows(self) -> _containers.RepeatedCompositeFieldContainer[Global___SchedulerNodeCapacityRow]: ...
+    def __init__(
+        self,
+        *,
+        rows: _abc.Iterable[Global___SchedulerNodeCapacityRow] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["rows", b"rows"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetSchedulerNodeCapacityReply: _TypeAlias = GetSchedulerNodeCapacityReply  # noqa: Y015

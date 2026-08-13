@@ -1058,3 +1058,111 @@ class PublicRoutingTestCase(base.ShakenFistTestCase):
             str(INST1), 'ci-1', 4, 4096, 20, node_uuid=str(NODE1))
         mock_direct.assert_called_once_with(
             str(INST1), 'ci-1', str(NODE1), 4, 4096, 20)
+
+    @mock.patch('shakenfist.mariadb._grpc_get_scheduler_node_capacity')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_get_capacity_routes_to_grpc(self, _use, mock_grpc):
+        mock_grpc.return_value = []
+        self.assertEqual([], mariadb.get_scheduler_node_capacity())
+        mock_grpc.assert_called_once_with()
+
+    @mock.patch('shakenfist.mariadb._direct_get_scheduler_node_capacity')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_get_capacity_routes_to_direct(self, _use, mock_direct):
+        mock_direct.return_value = []
+        self.assertEqual([], mariadb.get_scheduler_node_capacity())
+        mock_direct.assert_called_once_with()
+
+
+class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
+    """Reading the counters back, which is what admission drew down.
+
+    summarize_resources() publishes these numbers, so a reader which
+    silently dropped or retyped a column would advertise headroom that
+    admission does not agree with -- the exact disagreement deleting the
+    issue-3498 stopgap was supposed to make impossible.
+    """
+
+    EXPECTED = {
+        'node_uuid': str(NODE1),
+        'limit_cpus': 48,
+        'limit_memory_mb': 196608,
+        'limit_disk_gb': 500,
+        'used_cpus': 6,
+        'used_memory_mb': 6144,
+        'used_disk_gb': 33,
+        'expected_demand': 8.5,
+    }
+
+    def _run_direct(self, rows=None, error=None):
+        engine = mock.MagicMock()
+        conn = mock.MagicMock()
+        if error is not None:
+            conn.execute.side_effect = error
+        else:
+            conn.execute.return_value.fetchall.return_value = rows or []
+        engine.connect.return_value.__enter__.return_value = conn
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            return mariadb._direct_get_scheduler_node_capacity(), conn
+
+    def test_every_column_is_read_and_typed(self):
+        rows, conn = self._run_direct(rows=[_capacity_row()])
+        self.assertEqual([self.EXPECTED], rows)
+        text, _ = _compiled(conn.execute.call_args.args[0])
+        self.assertTrue(text.startswith('SELECT'))
+        self.assertIn('FROM scheduler_node_capacity', text)
+        # No filtering: the table is one row per schedulable hypervisor.
+        self.assertNotIn('WHERE', text)
+
+    def test_an_empty_table_reads_as_no_rows(self):
+        rows, _ = self._run_direct(rows=[])
+        self.assertEqual([], rows)
+
+    def test_a_database_error_reads_as_no_rows(self):
+        # A node with no row is charged nothing and guarded by nothing,
+        # so an unreadable table degrades to "nothing is counted" rather
+        # than to an exception out of an admin endpoint.
+        rows, _ = self._run_direct(error=_operational_error(2006))
+        self.assertEqual([], rows)
+
+    def _servicer(self):
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        return servicer
+
+    def test_round_trip_through_the_rpc(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_scheduler_node_capacity',
+                return_value=[self.EXPECTED]):
+            reply = self._servicer().GetSchedulerNodeCapacity(
+                database_pb2.GetSchedulerNodeCapacityRequest(),
+                mock.MagicMock())
+
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            unpacked = mariadb._grpc_get_scheduler_node_capacity()
+        self.assertEqual([self.EXPECTED], unpacked)
+
+    def test_servicer_swallows_an_unexpected_exception(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_scheduler_node_capacity',
+                side_effect=ValueError('boom')):
+            reply = self._servicer().GetSchedulerNodeCapacity(
+                database_pb2.GetSchedulerNodeCapacityRequest(),
+                mock.MagicMock())
+        self.assertEqual(0, len(reply.rows))
+
+    def test_the_rpc_has_a_prometheus_counter(self):
+        with mock.patch.object(database_main.daemon.WorkerPoolDaemon,
+                               '__init__', return_value=None), \
+                mock.patch.object(database_main, 'start_http_server'), \
+                mock.patch.object(database_main, 'Gauge'), \
+                mock.patch.object(database_main, 'Counter'):
+            monitor = database_main.Monitor('test')
+        self.assertIn('get_scheduler_node_capacity', monitor.counters)
