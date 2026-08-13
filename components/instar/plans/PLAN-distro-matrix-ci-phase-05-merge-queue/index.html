@@ -11174,7 +11174,7 @@ wants the gate complete from the first merge.</p>
 <td>low</td>
 <td>(agent, on operator approval)</td>
 <td>none</td>
-<td>Create the "Develop branch" ruleset via <code>POST /repos/shakenfist/instar/rulesets</code> with the body recorded in <code>docs/development.md</code>, then read it back and diff against intent. Reversible with <code>DELETE</code>. Must come <strong>after</strong> step 2 of the ordering above.</td>
+<td><strong>Done 2026-08-12.</strong> Ruleset "Develop branch" created (id <code>20783686</code>, enforcement <code>active</code>) via <code>POST /repos/shakenfist/instar/rulesets</code>, read back and diffed against intent — all five rules, queue parameters and bypass actor match. Required checks are <code>Can enqueue</code> <strong>only</strong>, per the safer of the two options below; <code>Can merge</code> is added in 5c once a merge group has made that context exist.</td>
 </tr>
 <tr>
 <td>5b</td>
@@ -11188,7 +11188,7 @@ wants the gate complete from the first merge.</p>
 <td>low</td>
 <td>(operator)</td>
 <td>none</td>
-<td>Verification merge: take a trivial no-op PR through the queue end-to-end. Confirm the matrix runs in the <code>merge_group</code> context, gates the merge, and the seven distros report. Confirm a <code>pull_request</code> push does NOT run the matrix (PR latency unchanged).</td>
+<td>Verification merge: take a trivial no-op PR through the queue end-to-end. Confirm the matrix runs in the <code>merge_group</code> context and the seven distros report, and that a <code>pull_request</code> push does NOT run the matrix (PR latency unchanged). <strong>Then add <code>Can merge</code> to the ruleset's required checks</strong> (recipe in <code>docs/development.md</code>) — until that is done the matrix runs in the queue but does not gate it, so this step is not finished when the first queue run goes green.</td>
 </tr>
 <tr>
 <td>5d</td>

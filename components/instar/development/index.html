@@ -11729,6 +11729,10 @@ same name:</p>
 </thead>
 <tbody>
 <tr>
+<td>Ruleset</td>
+<td>"Develop branch", id <code>20783686</code> (created 2026-08-12)</td>
+</tr>
+<tr>
 <td>Target</td>
 <td><code>refs/heads/develop</code></td>
 </tr>
@@ -11746,7 +11750,7 @@ same name:</p>
 </tr>
 <tr>
 <td>Required checks</td>
-<td><code>Can enqueue</code>, <code>Can merge</code> (both GitHub Actions, integration 15368)</td>
+<td><code>Can enqueue</code> (GitHub Actions, integration 15368). <code>Can merge</code> is <strong>not yet required</strong> — see below</td>
 </tr>
 <tr>
 <td>Queue grouping</td>
@@ -11766,7 +11770,21 @@ same name:</p>
 </tr>
 </tbody>
 </table>
-<p>Two of those deserve explanation:</p>
+<p><strong><code>Can merge</code> is deliberately not required yet.</strong> It only runs on
+<code>merge_group</code> events, so until a real merge group has executed, GitHub
+has never seen that check context — and requiring a context that has
+never reported blocks every merge, on a branch that had no protection
+to fall back to. The ruleset therefore shipped requiring <code>Can enqueue</code>
+alone. Once a PR has gone through the queue and <code>Can merge</code> has
+reported, add it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Read the current ruleset, append the context, PUT it back.</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1"># add {&quot;context&quot;: &quot;Can merge&quot;, &quot;integration_id&quot;: 15368} to the</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># required_status_checks rule, then:</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
+</code></pre></div>
+<p>Until that is done the matrix runs in the queue but does not <em>gate</em> it.</p>
+<p>Two other settings deserve explanation:</p>
 <ul>
 <li><strong><code>max_entries_to_build: 1</code></strong> bounds the cost of the matrix. Only one
   merge group builds at a time, so the seven-wide fan-out is seven
@@ -11780,8 +11798,8 @@ same name:</p>
   never reports leaves the queue waiting forever.</li>
 </ul>
 <p>To inspect or recreate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">&#39;.[] | &quot;\(.id) \(.name) \(.enforcement)&quot;&#39;</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">&#39;.[] | &quot;\(.id) \(.name) \(.enforcement)&quot;&#39;</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
 </code></pre></div>
 <p><code>.github/exported-config/</code> carries the nightly export of the live
 ruleset state, which is the machine-readable companion to the table
@@ -11790,16 +11808,16 @@ committing directly.</p>
 <h3 id="differential-fuzzing">Differential fuzzing<a class="headerlink" href="#differential-fuzzing" title="Permanent link">&para;</a></h3>
 <p>On-demand differential fuzzing compares instar against qemu-img on randomly
 generated images to find behavioral divergences:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
 </code></pre></div>
 <p>The fuzzer generates random images (varying format, size, cluster size,
 compression, data patterns), runs chains of operations (info, check, convert)
@@ -11812,9 +11830,9 @@ fills the gap for VMDK/VHD/VHDX where qemu-img check is unavailable.</p>
 <h3 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h3>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
 parser crates directly without the VMM/KVM stack:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
 </code></pre></div>
 <p>40 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
@@ -11829,7 +11847,7 @@ refcount mutators (<code>fuzz_snapshot_refcount</code>), the dd window math
 which drives the write/copy-on-write planner through the crate's
 <code>sim</code> harness asserting the <code>max_rc &lt; 3</code> COW invariant oracle, and
 <code>fuzz_qcow2_write_growth</code>). Seed the corpus from <code>instar-testdata</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>The CI workflow runs nightly at 04:00 UTC. Crashes are minimized and
 filed as GitHub Issues with the <code>security-audit</code> label immediately.
