@@ -103,7 +103,7 @@ class NetIfaceIPOp(BaseClusterOperation):
             raise NoSuchNetwork(self)
 
         ni = NetworkInterface.from_db(self.interface_uuid)
-        if not n:
+        if not ni:
             self.log.warning(
                 f'Network interface {self.interface_uuid} missing')
             raise NoSuchNetworkInterface(self)

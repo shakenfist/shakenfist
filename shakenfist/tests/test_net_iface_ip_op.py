@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from shakenfist.exceptions import RemoveFloatingIPFailed
 from shakenfist.operations.net_iface_ip_op import NetIfaceIPOp
+from shakenfist.operations.net_iface_ip_op import NoSuchNetworkInterface
 from shakenfist.schema.operations.net_iface_ip_op import create_and_enqueue
 from shakenfist.schema.operations.net_iface_ip_op import model_tasks
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -91,6 +92,21 @@ class InterfaceDefloatTaskDispatchTestCase(base.ShakenFistTestCase):
         targets = args[1]
         self.assertIn(ni, targets)
         self.assertIn(('instance', ni.instance_uuid), targets)
+
+    @mock.patch('shakenfist.operations.net_iface_ip_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.net_iface_ip_op.Network.from_db')
+    def test_missing_interface_raises_no_such_network_interface(
+            self, mock_network_from_db, mock_iface_from_db):
+        """A hard-deleted interface raises NoSuchNetworkInterface, not AttributeError."""
+        mock_network_from_db.return_value = _make_network_mock()
+        mock_iface_from_db.return_value = None
+
+        op, _, _ = _make_net_iface_ip_op(
+            self, [model_tasks.interface_defloat])
+        op.state = NetIfaceIPOp.STATE_EXECUTING
+        self.assertRaises(
+            NoSuchNetworkInterface, op.dispatch_task,
+            model_tasks.interface_defloat)
 
 
 class InterfaceDefloatExceptionTestCase(base.ShakenFistTestCase):

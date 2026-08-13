@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from shakenfist.exceptions import AddFloatingIPFailed
 from shakenfist.operations.net_iface_op import NetIfaceOp
+from shakenfist.operations.net_iface_op import NoSuchNetworkInterface
 from shakenfist.schema.operations.net_iface_op import create_and_enqueue
 from shakenfist.schema.operations.net_iface_op import model_tasks
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -91,6 +92,56 @@ class InterfaceFloatTaskDispatchTestCase(base.ShakenFistTestCase):
         self.assertIn(op, targets)
         self.assertIn(network, targets)
         self.assertIn(ni, targets)
+
+    @mock.patch('shakenfist.operations.net_iface_op.add_event_multi')
+    @mock.patch('shakenfist.operations.net_iface_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_add_floating_ip')
+    @mock.patch('shakenfist.operations.net_iface_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.net_iface_op.Network.from_db')
+    def test_interface_float_skipped_when_address_released(
+            self, mock_network_from_db, mock_iface_from_db, mock_apply,
+            mock_set_error, mock_add_event_multi):
+        """A float whose address was released by a concurrent defloat or delete is skipped cleanly."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+        ni = _make_interface_mock(floating_address=None)
+        mock_iface_from_db.return_value = ni
+
+        op, _, _ = _make_net_iface_op(self, [model_tasks.interface_float])
+        op.state = NetIfaceOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.interface_float)
+
+        # No plumbing, no error report, and the op is not in an error state.
+        mock_apply.assert_not_called()
+        mock_set_error.assert_not_called()
+        self.assertEqual(NetIfaceOp.STATE_EXECUTING, op.state.value)
+
+        # A single audit event records the skip against the op, network,
+        # interface and instance.
+        mock_add_event_multi.assert_called_once()
+        args, kwargs = mock_add_event_multi.call_args
+        targets = args[1]
+        self.assertIn(op, targets)
+        self.assertIn(network, targets)
+        self.assertIn(ni, targets)
+        self.assertIn(('instance', ni.instance_uuid), targets)
+        self.assertEqual(
+            'add floating IP superseded by defloat or delete, skipped',
+            args[2])
+
+    @mock.patch('shakenfist.operations.net_iface_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.net_iface_op.Network.from_db')
+    def test_missing_interface_raises_no_such_network_interface(
+            self, mock_network_from_db, mock_iface_from_db):
+        """A hard-deleted interface raises NoSuchNetworkInterface, not AttributeError."""
+        mock_network_from_db.return_value = _make_network_mock()
+        mock_iface_from_db.return_value = None
+
+        op, _, _ = _make_net_iface_op(self, [model_tasks.interface_float])
+        op.state = NetIfaceOp.STATE_EXECUTING
+        self.assertRaises(
+            NoSuchNetworkInterface, op.dispatch_task,
+            model_tasks.interface_float)
 
 
 class InterfaceFloatExceptionTestCase(base.ShakenFistTestCase):
