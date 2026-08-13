@@ -398,6 +398,34 @@ disk claims at 40–140× actual usage, so admitting virtual
 size against raw physical capacity would reject routine CI
 concurrency (see the phase 0 decisions document's addendum).
 
+Phase 3 also **inherits and removes** the CPU stopgap landed
+for issue 3498 (PR 3724): `Scheduler._committed_vcpus()`
+walks each candidate's `INSTANCE_LOCATION` rows in Python and
+admits on `max(measured, committed)`, which is this plan's
+allocation-denominated answer reached without this plan's
+tables. It closed the burst window on sfcbr while phase 3 was
+unwritten, and it must be deleted by the change which
+introduces the guarded UPDATE, not left underneath it: two
+ledgers over the same ground truth will eventually disagree,
+and the Python one is the unmaintained one. Its exclusions
+(skip deleted instances; charge an instance only to the node
+its own placement attribute names) were written to match
+`_RECONCILE_USAGE_SQL`, so they are also the working answer
+to the phase 4 obligation to de-duplicate usage by instance
+uuid. Two smaller consequences to pick up: RAM and disk
+admission were knowingly left measurement-denominated, so
+phase 3 closes their burst window for the first time; and
+`summarize_resources()` gained the same walk, unconditionally,
+where admission pays for it only on a node it would otherwise
+reject -- the counters remove both rather than optimise them.
+
+That conditional shape is the concession this stopgap makes
+to `PLAN-database-load-reduction`, whose phase 2 cache
+deliberately excludes the states and attributes the
+exclusions read. It is a workaround for not having the
+counters, not a pattern to carry forward: phase 3 reads one
+maintained row per node and needs no such trick.
+
 **Phase 4 — namespace claims API.** The claim as a
 first-class object with REST CRUD and client verbs (D15),
 advisory-mode ceiling enforcement with structured events

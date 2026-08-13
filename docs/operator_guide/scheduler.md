@@ -157,6 +157,32 @@ Note that on a cluster already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes are
 refused until they drain.
 
+What a node is charged for is the larger of two numbers: the
+`cpu_total_instance_vcpus` its resources daemon measured from
+*running* libvirt domains, and the vCPUs of every instance placed on
+it. The measurement alone lags reality badly -- it is republished
+once a minute, and an instance which is still fetching its image has
+no domain to measure at all -- so a burst of creates would otherwise
+all see the same idle node, all land on it, and only discover the
+overshoot once they booted. Placement is recorded synchronously as
+each create is admitted, so counting it closes that window.
+
+Because that charge only ever removes capacity, an instance is
+counted only while it agrees it is on the node and has not been
+deleted. A placement record can outlive what it describes -- a node
+which dies mid-teardown leaves one behind, and an instance which
+moves can leave one on the node it left -- and charging a node for a
+stale record would take capacity away from it with nothing to give it
+back. A node reporting far more `cpu_committed` than its instance
+list accounts for is the shape of problem to look for.
+
+RAM and disk admission are deliberately unchanged: they still size a
+node from its published measurements alone, and so keep the burst
+window that CPU admission has closed. Closing it for all three is the
+job of the scheduler-reservations work, which replaces this
+per-schedule walk with the maintained counters in
+`scheduler_node_capacity` rather than extending it.
+
 ## Configuration reference
 
 Except for `CPU_OVERCOMMIT_RATIO`, `RAM_OVERCOMMIT_RATIO`,
@@ -204,9 +230,10 @@ tells the whole story:
 - Each filter stage emits `schedule at stage <name>` with the
   surviving candidates and a `dropped` map giving each excluded
   node's reason dict -- for CPU admission that includes the
-  schedulable base used and whether it came from the
-  `cpu_schedulable` field or the pre-reservation fallback; for RAM
-  it includes the reservation subtracted.
+  schedulable base used, whether it came from the `cpu_schedulable`
+  field or the pre-reservation fallback, and both `measured_cpus`
+  and `committed_cpus` so it is clear which of the two bound; for
+  RAM it includes the reservation subtracted.
 - `schedule have highest affinity` includes the winning score and
   a per-candidate `affinity_detail` breakdown of which neighbouring
   instances contributed what. `schedule keeping affinity despite
@@ -226,7 +253,11 @@ The admin resources API (`/admin/resources`, surfaced by
 `get_cluster_resources()` in the client) reports per-node
 `cpu_schedulable`, `memory_reserved_mb`, `cpu_available` and RAM
 headroom using the same arithmetic as admission, so what it
-reports as available is what the scheduler would actually admit.
+reports as available is what the scheduler would actually admit. It
+also breaks the CPU decision out into `cpu_hard_max`,
+`cpu_measured` and `cpu_committed`, which is how you tell a node
+that is genuinely busy from one that has simply been placed with
+work it has not started yet.
 
 ## Mixed-version clusters
 

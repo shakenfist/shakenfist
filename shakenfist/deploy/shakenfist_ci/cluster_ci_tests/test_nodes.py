@@ -89,3 +89,56 @@ class TestNodes(base.BaseNamespacedTestCase):
         if infra_schedulable and plain_schedulable:
             self.assertLessEqual(
                 max(infra_schedulable), min(plain_schedulable))
+
+    def test_cluster_resources_charges_unbooted_placements(self):
+        # A node's cpu_total_instance_vcpus metric counts only *running*
+        # libvirt domains and is republished once a minute, so an instance
+        # which has been placed but has not booted is invisible to it. If
+        # admission trusted that measurement alone, a burst of creates
+        # would all see the same idle node, all land on it, and push it
+        # well past its hard maximum -- after which every later request
+        # naming that node is refused with a 507 (issue 3498). Placement
+        # must be charged immediately, which /admin/resources exposes as
+        # cpu_committed.
+        resources = self.system_client.get_cluster_resources()
+        candidates = [
+            n for n in self._hypervisor_nodes()
+            if resources['per_node'].get(n['uuid'], {}).get(
+                'cpu_available', 0) >= 2]
+        if not candidates:
+            self.skipTest('No hypervisor with two vCPUs of headroom')
+        node = max(
+            candidates,
+            key=lambda n: resources['per_node'][n['uuid']]['cpu_available'])
+
+        # A one vCPU instance with an empty disk and no base image: nothing
+        # is downloaded, so this costs the cluster almost nothing, and we
+        # deliberately do not wait for it -- the whole point is to read the
+        # cluster's view of the node before any domain exists.
+        inst = self.test_client.create_instance(
+            'unbooted', 1, 128, None, [{'size': 1, 'type': 'disk'}],
+            None, None, force_placement=node['name'])
+        self.addDetail('instance', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
+        self.assertEqual(node['uuid'], inst['node'])
+
+        try:
+            resources = self.system_client.get_cluster_resources()
+            self.addDetail('resources after', content.text_content(json.dumps(
+                resources, indent=4, sort_keys=True)))
+            per_node = resources['per_node'][node['uuid']]
+
+            # Our instance is placed here and not deleted, so the node's
+            # committed total must account for at least its one vCPU
+            # whatever else the rest of the suite is doing concurrently.
+            self.assertGreaterEqual(per_node['cpu_committed'], 1)
+
+            # The published headroom is what admission will actually
+            # honour: the hard maximum less whichever of the measurement
+            # and the placement ledger is binding.
+            self.assertEqual(
+                per_node['cpu_hard_max'] - max(
+                    per_node['cpu_measured'], per_node['cpu_committed']),
+                per_node['cpu_available'])
+        finally:
+            self.test_client.delete_instance(inst['uuid'])
