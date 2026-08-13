@@ -11309,53 +11309,84 @@
 <h1 id="database-schema">Database Schema<a class="headerlink" href="#database-schema" title="Permanent link">&para;</a></h1>
 <p>This document describes the Kerbside MySQL/MariaDB database schema.</p>
 <h2 id="entity-relationship-diagram">Entity Relationship Diagram<a class="headerlink" href="#entity-relationship-diagram" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+------------------+          +------------------+
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|     sources      |          |     consoles     |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>+------------------+          +------------------+
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>| name (PK)        |---+      | uuid (PK)        |
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>| type             |   |      | source (FK)      |------+
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>| last_seen        |   +-----&gt;| discovered       |      |
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>| seen_by          |          | hypervisor       |      |
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>| errored          |          | hypervisor_ip    |      |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>| url              |          | insecure_port    |      |
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>| ca_cert          |          | secure_port      |      |
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>| username         |          | name             |      |
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>| password         |          | host_subject     |      |
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>| project_name     |          | ticket           |      |
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>| user_domain_id   |          +------------------+      |
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>| project_domain_id|                 |                  |
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>| deleted          |                 |                  |
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>+------------------+                 |                  |
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        |                            |                  |
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        |    +------------------+    |                  |
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        |    |  consoletokens   |    |                  |
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        |    +------------------+    |                  |
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        +---&gt;| token (PK)       |&lt;---+                  |
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>             | session_id       |                       |
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>             | uuid (FK)        |                       |
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>             | source (FK)      |                       |
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>             | created          |                       |
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>             | expires          |                       |
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>             +------------------+                       |
-<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>                    |                                   |
-<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>                    |                                   |
-<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>                    v                                   |
-<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>          +------------------+          +------------------+
-<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>          |  proxychannels   |          |   auditevents    |
-<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>          +------------------+          +------------------+
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>          | node (PK)        |          | source (PK)      |
-<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>          | pid (PK)         |          | uuid (PK)        |
-<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>          | created          |          | session_id       |
-<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>          | client_ip        |          | channel          |
-<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>          | client_port      |          | timestamp (PK)   |
-<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>          | connection_id    |          | node             |
-<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>          | channel_type     |          | pid              |
-<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>          | channel_id       |          | message          |
-<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>          | session_id (FK)  |          +------------------+
-<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>          +------------------+                  ^
-<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>                                                |
-<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>                                                +----------+
-</code></pre></div>
+<pre class="mermaid"><code>erDiagram
+    sources {
+        string name PK
+        string type
+        datetime last_seen
+        string seen_by
+        boolean errored
+        string url
+        text ca_cert
+        string username
+        string password
+        string project_name "OpenStack only"
+        string user_domain_id "OpenStack only"
+        string project_domain_id "OpenStack only"
+        boolean deleted
+    }
+
+    sources ||--o{ consoles : "sources provide consoles"
+    consoles {
+        string uuid PK
+        string source FK
+        datetime discovered
+        string hypervisor
+        string hypervisor_ip
+        integer insecure_port
+        integer secure_port
+        string name
+        string host_subject
+        string ticket
+    }
+
+    sources ||--o{ consoletokens: "sources enable consoletokens"
+    consoles ||--o{ consoletokens: "consoles own consoletokens"
+    consoletokens {
+        string token PK
+        string session_id
+        string uuid FK
+        string source FK
+        integer created "epoch seconds"
+        integer expires "epoch seconds"
+    }
+
+    consoletokens ||--o{ proxychannels: "consoletokens authenticate proxychannels"
+    proxychannels {
+        string node PK
+        string pid PK
+        datetime created
+        string client_ip
+        integer client_port
+        integer connection_id
+        string channel_type
+        integer channel_id
+        string session_id "No FK; dropped in migration f7b2e9c4a1d8"
+    }
+
+    consoles ||--o{ auditevents: "consoles create auditevents"
+    auditevents {
+        string source PK "No FK to avoid cascading delete"
+        string uuid PK "No FK to avoid cascading delete"
+        string session_id "No FK to avoid cascading delete"
+        string channel
+        datetime timestamp PK "microsecond precision"
+        string node
+        string pid
+        text message
+    }
+
+    sf_token_jtis {
+        string jti PK "uuid4 hex, from the token's jti claim"
+        float expiry "epoch seconds, matches the exp claim"
+    }
+
+    sources ||--o{ sf_token_keys: "No FK; sources reloaded from YAML"
+    sf_token_keys {
+        string source PK "No FK; sources reloaded from YAML"
+        text keys_json "Shaken Fist's public_view payload, verbatim JSON"
+        float fetched_at "epoch seconds"
+    }</code></pre>
 <h2 id="table-descriptions">Table Descriptions<a class="headerlink" href="#table-descriptions" title="Permanent link">&para;</a></h2>
 <h3 id="sources">sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h3>
 <p>Console sources (cloud platforms) that provide virtual machines.</p>
@@ -11595,7 +11626,7 @@
 <tr>
 <td>session_id</td>
 <td>string</td>
-<td>Foreign key to consoletokens.session_id</td>
+<td>Matches consoletokens.session_id (no FK; dropped in migration f7b2e9c4a1d8)</td>
 </tr>
 </tbody>
 </table>

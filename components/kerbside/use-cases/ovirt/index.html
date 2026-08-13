@@ -11286,7 +11286,11 @@ sending anything the hypervisor will accept.</p>
   <a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a>.</li>
 <li><strong>Sessions are objects, not TCP flows.</strong> Every proxied console
   is a row you can list over the REST API, with an audit trail,
-  and can terminate in flight.</li>
+  and can terminate in flight. This is especially important because
+  SPICE console sessions produce multiple flows, but the multiplier
+  varies based on the client's capabilities and usage -- so you can't
+  simply divide the number of observed flows by a constant to
+  determine the number of connected clients.</li>
 <li><strong>The hypervisor is never reachable from the client network.</strong>
   Clients reach kerbside; kerbside reaches oVirt. The SPICE
   ports do not need a route to users at all.</li>
@@ -11307,29 +11311,19 @@ audio, and adaptive compression.</p>
 It talks to the engine API to find consoles and to acquire
 tickets, then connects to the hypervisor's SPICE port directly.
 It never reads an engine-generated <code>.vv</code> file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+------------------+                +-----------------+                  +----------------+
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|  Broker          |  1. request    |                 |  A. discovery    |                |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|  (your portal,   +---------------&gt;|                 |     (per minute) |  oVirt engine  |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>|   or Kerbside&#39;s  |                |    Kerbside     +&lt;----------------&gt;+                |
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>|   own web UI)    |&lt;---------------+                 |  B. ticket, per  |                |
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>+--------+---------+  2. .vv file   |                 |     .vv request  +----------------+
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>         |                          |                 |
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>         | 3. deliver               |                 |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>         v                          |                 |
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>+------------------+  4. connect,   |                 |
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>|  SPICE client    |     token as   |                 |
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>|  (remote-viewer, +---------------&gt;|                 |
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>|   ryll)          |     password   |                 |
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>+------------------+                +--------+--------+
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                                             |
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                                             | 5. 5900 -&gt; NEED_SECURED -&gt;
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                                             |    5901 TLS: engine CA
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                             |    verified, subject pinned
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                                             v
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                                    +-----------------+
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                                    | Hypervisor QEMU |
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                                    +-----------------+
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TD
+    broker["Broker&lt;br/&gt;(your portal, or&lt;br/&gt;Kerbside's own web UI)"]
+    client["SPICE client&lt;br/&gt;(remote-viewer, ryll)"]
+    kerbside["Kerbside"]
+    engine["oVirt engine"]
+    hypervisor["Hypervisor QEMU"]
+
+    broker -- "1. request" --&gt; kerbside
+    kerbside -- "2. .vv file" --&gt; broker
+    broker -- "3. deliver" --&gt; client
+    client -- "4. connect, token as password" --&gt; kerbside
+    kerbside &lt;-- "A. discovery (per minute)&lt;br/&gt;B. ticket, per .vv request" --&gt; engine
+    kerbside -- "5. 5900 → NEED_SECURED → 5901 TLS:&lt;br/&gt;engine CA verified, subject pinned" --&gt; hypervisor</code></pre>
 <p><strong>Discovery (A).</strong> Once a minute the <code>type: ovirt</code> source driver
 (<code>kerbside/sources/ovirt.py</code>) walks the engine:</p>
 <table>
@@ -11449,15 +11443,15 @@ that name and it must resolve — an IP address URL fails
 certificate verification.</p>
 <h3 id="kerbside-side">Kerbside side<a class="headerlink" href="#kerbside-side" title="Permanent link">&para;</a></h3>
 <p>Add an oVirt source to <code>sources.yaml</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ovirt.example.org/ovirt-engine</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin@ovirt@internalsso</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">ca_cert</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="no">-----BEGIN CERTIFICATE-----</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="no">...the engine CA...</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="no">-----END CERTIFICATE-----</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ovirt.example.org/ovirt-engine</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin@ovirt@internalsso</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">ca_cert</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="no">-----BEGIN CERTIFICATE-----</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="no">...the engine CA...</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="no">-----END CERTIFICATE-----</span>
 </code></pre></div>
 <p>Two things bite people, both worth checking first when a source
 comes up errored:</p>
@@ -11494,9 +11488,7 @@ because the oVirt node is Rocky 8 with a Python 3.6 interpreter
 and kerbside requires 3.11 or newer. That is a CI expedient. The
 topology it produces — kerbside off-box from oVirt, reaching the
 engine by name and the hypervisor by address — is the shape a
-real deployment has anyway. See
-<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</a>
-for the bring-up detail.</p>
+real deployment has anyway.</p>
 <h2 id="user-interaction-model">User interaction model<a class="headerlink" href="#user-interaction-model" title="Permanent link">&para;</a></h2>
 <p>Kerbside is a proxy, not a portal. Something has to ask it for a
 console on the user's behalf and deliver the resulting <code>.vv</code>

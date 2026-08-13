@@ -11663,7 +11663,10 @@ the following steps need to occur:</p>
 </li>
 <li>
 <p>The cloud boots the instance that runs the desktop. The Broker waits for the
-   instance to be booted.</p>
+   instance to be booted. In some cases the broker needs to perform additional
+   configuration on the instance once it has booted -- for example for OpenStack
+   the broker must request a console access token that is then provided to
+   Kerbside as proof of the right to connect to that specific instance.</p>
 </li>
 <li>
 <p>The Broker requests a <code>.vv</code> virt-viewer compatible ini file from Kerbside,
@@ -11671,8 +11674,9 @@ the following steps need to occur:</p>
    connection to Kerbside, along with short lived access token.</p>
 </li>
 <li>
-<p>The user opens the <code>.vv</code> file with a SPICE client such as <code>remote-viewer</code>.
-   <code>remote-viewer</code> connects to Kerbside.</p>
+<p>The user opens the <code>.vv</code> file with a SPICE client such as <code>remote-viewer</code> or
+   <a href="https://shakenfist.com/components/ryll/"><code>ryll</code></a>. This client connects to
+   Kerbside.</p>
 </li>
 <li>
 <p>Kerbside uses the access token to determine which instance in the cloud is
@@ -11682,26 +11686,34 @@ the following steps need to occur:</p>
 <p>The user then happily uses their SPICE console, largely unaware of these
    various steps.</p>
 </li>
+<li>
+<p>Kerbside monitors the SPICE protocol traffic as it flows between the client
+   and the hypervisor and enforces simple packet validity and security rules
+   on the traffic. This stops the client from attempting to exploit the
+   hypervisor by sending deliberately malformed requests.</p>
+</li>
+<li>
+<p>A Kerbside administrator may choose to terminate a session for various
+   business reasons. If requested, Kerbside will tear down the channel between
+   the client and the hypervisor, and the hypervisor will detect a client
+   disconnect.</p>
+</li>
 </ol>
 <h3 id="connection-flow-diagram">Connection Flow Diagram<a class="headerlink" href="#connection-flow-diagram" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+------------------+              +-------------------+              +------------------+
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|                  |              |                   |              |                  |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|  External Broker |  1. Request  |     Kerbside      |  5. Connect  |   Hypervisor     |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>|  (SF/Horizon)    +-------------&gt;|   SPICE Proxy     +-------------&gt;|   (QEMU/KVM)     |
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>|                  |   .vv file   |                   |   to console |                  |
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>+--------+---------+              +---------+---------+              +------------------+
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>         |                                  ^
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>         | 2. Return                        |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>         |    .vv file                      | 4. Connect with
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>         v                                  |    access token
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>+--------+---------+                        |
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>|                  |                        |
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>|   User&#39;s SPICE   +------------------------+
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>|   Client         |  3. User opens .vv file
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>|  (remote-viewer) |
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>|                  |
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>+------------------+
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TD
+    broker["External Broker&lt;br/&gt;(SF/Horizon)"]
+    client["User's SPICE Client&lt;br/&gt;(remote-viewer, ryll)"]
+    kerbside["Kerbside&lt;br/&gt;SPICE Proxy"]
+    hypervisor["Hypervisor&lt;br/&gt;(QEMU/KVM)"]
+
+    broker -- "3. Request .vv file" --&gt; kerbside
+    broker -- "3. Deliver .vv file" --&gt; client
+    client -- "4. Open .vv file, connect&lt;br/&gt;with access token" --&gt; kerbside
+    kerbside -- "5. Connect to console" --&gt; hypervisor</code></pre>
+<p>Edge numbers match the steps above. Steps 1, 2, and 6 happen outside
+the components shown, and steps 7 and 8 happen inside Kerbside on the
+established client to hypervisor path, so they have no arrow of their
+own.</p>
 <h3 id="implementation-in-openstack">Implementation in OpenStack<a class="headerlink" href="#implementation-in-openstack" title="Permanent link">&para;</a></h3>
 <p>OpenStack Nova now supports native SPICE direct consoles as of the 2025.1 Epoxy
 release. The
@@ -11719,7 +11731,13 @@ unwilling to provide direct network connectivity from a client network to TCP
 ports on the hypervisor, and so Kerbside acts as an intermediary to protect
 those hypervisors. There is a sample implementation of Kerbside deployment using
 Kolla-Ansible in the
-<a href="https://github.com/shakenfist/kerbside-patches">Kerbside Patches repository</a>.</p>
+<a href="https://github.com/shakenfist/kerbside-patches">Kerbside Patches repository</a>.
+At the time of last update to this document, the Kolla OpenStack project had
+merged the OCI build portion of the proposed Kerbside support into the Kolla
+project, but had not yet merged the deployment code into Kolla-Ansible. That
+deployment code is tracked on
+<a href="https://review.opendev.org/q/topic:%22spice-direct-consoles%22">the OpenStack gerrit review system</a>
+if you are curious as to its current state.</p>
 <h3 id="what-about-bumblebee">What About Bumblebee?<a class="headerlink" href="#what-about-bumblebee" title="Permanent link">&para;</a></h3>
 <p>The folks over at the NECTAR research cloud developed
 <a href="https://github.com/NeCTAR-RC/bumblebee">Bumblebee VDI</a>, which is superficially
@@ -11733,16 +11751,62 @@ of a HTML5 desktop environment.</p>
 <h2 id="documentation-index">Documentation Index<a class="headerlink" href="#documentation-index" title="Permanent link">&para;</a></h2>
 <h3 id="use-cases">Use Cases<a class="headerlink" href="#use-cases" title="Permanent link">&para;</a></h3>
 <p>One page per deployment permutation: what Kerbside is worth in that
-setting, how the pieces fit together, and how to set it up.</p>
-<ul>
-<li><a href="/components/kerbside/use-cases/ovirt/">Kerbside for oVirt</a> - Replacing oVirt's SPICE
-  proxy (squid) with a protocol-aware front door: discovery via the
-  engine API, host-subject pinned TLS to the hypervisor, and the
-  engine, network, and account prerequisites</li>
-</ul>
-<p>Pages for Shaken Fist, OpenStack, multi-cloud aggregation, placement
-topologies, and the standalone static source are planned; see
+setting, how the pieces fit together, and how to set it up. The last
+column names the CI lane that exercises the scenario end to end; see
+<a href="/components/kerbside/testing/">testing.md</a> for what the lanes do and what the tiers mean.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Description</th>
+<th>Tested in Kerbside CI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Multi-cloud aggregation</td>
+<td>One Kerbside brokering several sources at once, so users keep a single console entry point as workloads move between providers</td>
+<td>Not covered</td>
+</tr>
+<tr>
+<td>OpenStack</td>
+<td>Nova 2025.1 spice-direct consoles, deployed alongside the cluster with Kolla-Ansible via kerbside-patches</td>
+<td><code>openstack_matrix</code>, merge tier</td>
+</tr>
+<tr>
+<td><a href="/components/kerbside/use-cases/ovirt/">oVirt</a></td>
+<td>Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, host-subject pinned TLS to the hypervisor, and the engine, network, and account prerequisites</td>
+<td><code>ovirt_matrix</code>, merge tier</td>
+</tr>
+<tr>
+<td>Placement topologies</td>
+<td>Kerbside instances placed by user population rather than by cloud — one per regional office, close to its users, with the WAN hop as the inspected backend leg</td>
+<td>Not covered</td>
+</tr>
+<tr>
+<td>Proxmox</td>
+<td>Deferred until a Proxmox source driver exists</td>
+<td>No source yet</td>
+</tr>
+<tr>
+<td>Shaken Fist</td>
+<td>Broker embedded in Shaken Fist itself; Ed25519 VDI console tokens exchanged offline at <code>/sf-console.vv</code></td>
+<td><code>sf-e2e</code>, smoke tier and nightly</td>
+</tr>
+<tr>
+<td>Standalone / static source</td>
+<td>The static driver (<code>kerbside/sources/static.py</code>) for labs, demos, and direct-qemu style fleets</td>
+<td><code>direct-qemu</code>, smoke tier and nightly</td>
+</tr>
+</tbody>
+</table>
+<p>Scenarios without a link are planned rather than written; see
 <a href="/components/kerbside/plans/PLAN-use-case-docs/">plans/PLAN-use-case-docs.md</a>.</p>
+<p>The <code>direct-qemu</code> lane runs the full daemon + API + MariaDB stack
+against a local qemu SPICE server via the static source, so it is the
+end-to-end exercise of the standalone scenario. See
+<a href="/components/kerbside/direct-qemu-harness/">direct-qemu-harness.md</a> for the lane and its
+standalone mock-control-plane sibling, <code>verify-rust-proxy.sh</code>.</p>
 <h3 id="operator-documentation">Operator Documentation<a class="headerlink" href="#operator-documentation" title="Permanent link">&para;</a></h3>
 <p>Guides for deploying and configuring Kerbside:</p>
 <ul>

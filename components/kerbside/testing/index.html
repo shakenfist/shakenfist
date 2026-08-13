@@ -11335,8 +11335,8 @@
 oVirt console probe, the Tempest plugin, and the load-test container
 images.</p>
 <h2 id="ci-tiers">CI tiers<a class="headerlink" href="#ci-tiers" title="Permanent link">&para;</a></h2>
-<p>Since two-tier CI phase 3, develop is protected by a GitHub merge
-queue and the lanes are split into two tiers.</p>
+<p>Develop is protected by a GitHub merge queue and the lanes are split
+into two tiers.</p>
 <ul>
 <li><strong>The smoke tier</strong> runs on every pull request push: unit tests and
   lint, the direct-qemu lane, and the Shaken Fist end-to-end lane.
@@ -11484,8 +11484,7 @@ branch. <strong>Raising <code>max_entries_to_build</code> above 1 would make thi
 on <code>merge_group</code> but skip their heavy jobs there, so a piled-up run
 costs seconds and no cloud capacity.</p>
 <p>For the design rationale see
-<a href="/components/kerbside/plans/PLAN-two-tier-ci/">plans/PLAN-two-tier-ci.md</a> and
-<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">plans/PLAN-two-tier-ci-phase-03-merge-queue.md</a>.</p>
+<a href="/components/kerbside/plans/PLAN-two-tier-ci/">plans/PLAN-two-tier-ci.md</a>.</p>
 <h2 id="end-to-end-ci-coverage">End-to-end CI coverage<a class="headerlink" href="#end-to-end-ci-coverage" title="Permanent link">&para;</a></h2>
 <p>The proxy is exercised end to end in CI: the direct-qemu functional
 lane boots a real qemu/SPICE guest, drives it with the ryll headless
@@ -11504,15 +11503,13 @@ loadtest image builds the Ryll binary from source (stage 1 of
 <code>loadtests/latency/Dockerfile</code>) and ships it in the runtime stage. A
 Python orchestrator at <code>loadtests/latency/orchestrator.py</code> drives
 Ryll's control socket and writes a CSV of latency samples.</p>
-<p>The latency metric currently measured is SPICE PING/PONG round-trip
-time (the v1 control-socket <code>latency</code> event). This is a temporary
-regression from the legacy keypress-to-screen measurement — phase 6 of
-the test-harness plan will restore the original metric via a
-<code>surface_drawn</code> event in the control socket. The CSV shape is
-unchanged from the legacy loadtest: one float per line, seconds, no
-header. See
-<a href="/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/">plans/PLAN-test-harness-phase-04-port-latency.md</a>
-for the full rationale.</p>
+<p>The metric measured is keypress-to-screen latency: the time between
+the orchestrator sending a <code>send_key down</code> and the first
+<code>surface_drawn</code> event that follows it, paired FIFO. The orchestrator
+hard-fails if the client does not advertise and accept a
+<code>surface_drawn</code> subscription (control socket v1.1 or newer), rather
+than silently falling back to a different metric under the same column
+name. The CSV is one float per line, seconds, no header.</p>
 <h2 id="testing-the-spice-console-of-an-ovirt-vm">Testing the SPICE console of an oVirt VM<a class="headerlink" href="#testing-the-spice-console-of-an-ovirt-vm" title="Permanent link">&para;</a></h2>
 <p><code>tools/test-ovirt-console.py</code> is Kerbside's oVirt SPICE console probe.
 It connects to the oVirt engine API, finds the booted test VM (by
@@ -11559,8 +11556,8 @@ expiry, wrong audience, unknown kid, and cross-namespace mint.</p>
 <code>tools/sf-e2e/README.md</code>). It is a smoke-tier PR gate, and also runs
 nightly and on dispatch.</p>
 <h2 id="the-ovirt-end-to-end-kerbside-lane">The oVirt end-to-end kerbside lane<a class="headerlink" href="#the-ovirt-end-to-end-kerbside-lane" title="Permanent link">&para;</a></h2>
-<p>Since two-tier CI phase 1, the <code>ovirt_matrix</code> job in
-<code>.github/workflows/functional-tests.yml</code> does more than build and
+<p>The <code>ovirt_matrix</code> job in <code>.github/workflows/functional-tests.yml</code>
+does more than build and
 probe the oVirt environment: it also deploys the PR's own kerbside
 (package plus the manylinux Rust proxy wheel) on the CI runner,
 registers a live <code>type: ovirt</code> source against the engine it just
@@ -11592,9 +11589,7 @@ cluster that will host the VM, which is the constraint the engine
 actually enforces; <code>_resolve_vnic_profile</code> is covered by
 <code>kerbside/tests/unit/test_create_ovirt_vnc_vm.py</code>.</p>
 <p>The runner-side scripts live in <code>tools/ovirt-e2e/</code> and are
-documented in <code>tools/ovirt-e2e/README.md</code>; the architecture decision
-and bring-up history are in
-<a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md</a>.
+documented in <code>tools/ovirt-e2e/README.md</code>.
 The lane is a worked example of the deployment described in
 <a href="/components/kerbside/use-cases/ovirt/">use-cases/ovirt.md</a>, which is the operator-facing
 version of what it proves.</p>
@@ -11607,9 +11602,8 @@ against a running Kolla-Ansible deployment. It is invoked
 automatically by the <code>openstack_matrix</code> job in
 <code>.github/workflows/functional-tests.yml</code> after the <code>test-console</code>
 smoke check, so the GitHub Actions CI iterates on the plugin's tests
-on every merge-queue entry (the cloud matrices moved from per-PR to
-the merge tier in two-tier CI phase 3) rather than relying on
-upstream Zuul as the first signal.
+on every merge-queue entry (the cloud matrices run in the merge tier,
+not per-PR) rather than relying on upstream Zuul as the first signal.
 The script:</p>
 <ol>
 <li>Creates a Python venv at <code>/srv/kerbside-tempest/venv</code>.</li>

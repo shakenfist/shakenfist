@@ -12893,38 +12893,20 @@ version and capabilities.</p>
 - Host resets ID on <code>_start_*</code> messages</p>
 <h2 id="connection-flow">Connection Flow<a class="headerlink" href="#connection-flow" title="Permanent link">&para;</a></h2>
 <p>A typical USB redirection session follows this flow:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>    Client                                     Server (VM)
-<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>      |                                            |
-<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>      |  usb_redir_hello (version + caps)          |
-<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>      |-------------------------------------------&gt;|
-<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>      |                                            |
-<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>      |  usb_redir_hello (version + caps)          |
-<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>      |&lt;-------------------------------------------|
-<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>      |                                            |
-<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a>      |  usb_redir_device_connect                  |
-<a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a>      |-------------------------------------------&gt;|
-<a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a>      |                                            |
-<a id="__codelineno-30-12" name="__codelineno-30-12" href="#__codelineno-30-12"></a>      |  usb_redir_interface_info                  |
-<a id="__codelineno-30-13" name="__codelineno-30-13" href="#__codelineno-30-13"></a>      |-------------------------------------------&gt;|
-<a id="__codelineno-30-14" name="__codelineno-30-14" href="#__codelineno-30-14"></a>      |                                            |
-<a id="__codelineno-30-15" name="__codelineno-30-15" href="#__codelineno-30-15"></a>      |  usb_redir_ep_info                         |
-<a id="__codelineno-30-16" name="__codelineno-30-16" href="#__codelineno-30-16"></a>      |-------------------------------------------&gt;|
-<a id="__codelineno-30-17" name="__codelineno-30-17" href="#__codelineno-30-17"></a>      |                                            |
-<a id="__codelineno-30-18" name="__codelineno-30-18" href="#__codelineno-30-18"></a>      |  usb_redir_set_configuration               |
-<a id="__codelineno-30-19" name="__codelineno-30-19" href="#__codelineno-30-19"></a>      |&lt;-------------------------------------------|
-<a id="__codelineno-30-20" name="__codelineno-30-20" href="#__codelineno-30-20"></a>      |                                            |
-<a id="__codelineno-30-21" name="__codelineno-30-21" href="#__codelineno-30-21"></a>      |  usb_redir_configuration_status            |
-<a id="__codelineno-30-22" name="__codelineno-30-22" href="#__codelineno-30-22"></a>      |-------------------------------------------&gt;|
-<a id="__codelineno-30-23" name="__codelineno-30-23" href="#__codelineno-30-23"></a>      |                                            |
-<a id="__codelineno-30-24" name="__codelineno-30-24" href="#__codelineno-30-24"></a>      |  [ Data transfers: bulk, interrupt, etc ]  |
-<a id="__codelineno-30-25" name="__codelineno-30-25" href="#__codelineno-30-25"></a>      |&lt;------------------------------------------&gt;|
-<a id="__codelineno-30-26" name="__codelineno-30-26" href="#__codelineno-30-26"></a>      |                                            |
-<a id="__codelineno-30-27" name="__codelineno-30-27" href="#__codelineno-30-27"></a>      |  usb_redir_device_disconnect               |
-<a id="__codelineno-30-28" name="__codelineno-30-28" href="#__codelineno-30-28"></a>      |-------------------------------------------&gt;|
-<a id="__codelineno-30-29" name="__codelineno-30-29" href="#__codelineno-30-29"></a>      |                                            |
-<a id="__codelineno-30-30" name="__codelineno-30-30" href="#__codelineno-30-30"></a>      |  usb_redir_device_disconnect_ack           |
-<a id="__codelineno-30-31" name="__codelineno-30-31" href="#__codelineno-30-31"></a>      |&lt;-------------------------------------------|
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Server as Server (VM)
+
+    Client-&gt;&gt;Server: usb_redir_hello (version + caps)
+    Server-&gt;&gt;Client: usb_redir_hello (version + caps)
+    Client-&gt;&gt;Server: usb_redir_device_connect
+    Client-&gt;&gt;Server: usb_redir_interface_info
+    Client-&gt;&gt;Server: usb_redir_ep_info
+    Server-&gt;&gt;Client: usb_redir_set_configuration
+    Client-&gt;&gt;Server: usb_redir_configuration_status
+    Note over Client,Server: Data transfers: bulk, interrupt, etc
+    Client-&gt;&gt;Server: usb_redir_device_disconnect
+    Server-&gt;&gt;Client: usb_redir_device_disconnect_ack</code></pre>
 <h2 id="kerbside-implementation">Kerbside Implementation<a class="headerlink" href="#kerbside-implementation" title="Permanent link">&para;</a></h2>
 <p>The Rust proxy relays the USB redirection (<code>usbredir</code>) channel between client
 and server, subject to the L0+L1 firewall: message types are checked against

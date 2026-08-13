@@ -11426,7 +11426,7 @@ entry.  No external API calls are made and no control plane is needed.</p>
 <p><strong>Intended use-cases:</strong></p>
 <ul>
 <li><strong>CI pipelines</strong> that boot a QEMU guest directly and need kerbside
-  to front it.  The phase 5 direct-qemu CI workflow uses this driver.</li>
+  to front it.  The direct-qemu CI workflow uses this driver.</li>
 <li><strong>Ad-hoc debugging</strong> where you want to point kerbside at a hand-
   rolled QEMU without spinning up a full Shaken Fist or oVirt
   deployment.</li>
@@ -11533,9 +11533,7 @@ source, and then drives the SPICE session through Ryll's
 <code>--control-socket</code> interface — sending keystrokes, pasting text,
 and capturing screenshots without a GUI. The control-socket protocol
 is the bridge between the test driver and the SPICE session it
-asserts against. See phase 3 of the test-harness plan for the full
-design:
-<code>docs/plans/PLAN-test-harness-phase-03-control-socket.md</code>.</p>
+asserts against.</p>
 <p>The direct-qemu lane's final step runs the Sextant scenario tempest
 test (<code>tests/scenario/test_sextant_scenario.py</code>), which drives the
 full Awaiting → Booting → bootloader-ignore → paste → Parked →

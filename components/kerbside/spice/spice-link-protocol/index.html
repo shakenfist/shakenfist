@@ -11744,39 +11744,31 @@ Where implementations differ in robustness (see
 that is called out explicitly.</p>
 <h2 id="connection-handshake-overview">Connection Handshake Overview<a class="headerlink" href="#connection-handshake-overview" title="Permanent link">&para;</a></h2>
 <p>The SPICE connection handshake follows this sequence:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>    Client                                          Server
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      |                                               |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>      |  1. SpiceLinkMess (client hello)              |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      |----------------------------------------------&gt;|
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>      |                                               |
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>      |  2. SpiceLinkReply (server hello + pubkey)    |
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>      |&lt;----------------------------------------------|
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>      |                                               |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>      |  3. ClientAuthPacket (encrypted password)     |
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      |----------------------------------------------&gt;|
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      |                                               |
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      |  4. ServerAuthPacket (result code)            |
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>      |&lt;----------------------------------------------|
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>      |                                               |
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>      |  5. Bidirectional channel communication       |
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>      |&lt;---------------------------------------------&gt;|
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Server
+
+    Client-&gt;&gt;Server: 1. SpiceLinkMess (client hello)
+    Server-&gt;&gt;Client: 2. SpiceLinkReply (server hello + pubkey)
+    Client-&gt;&gt;Server: 3. ClientAuthPacket (encrypted password)
+    Server-&gt;&gt;Client: 4. ServerAuthPacket (result code)
+    Note over Client,Server: 5. Bidirectional channel communication</code></pre>
 <h2 id="spicelinkmess-client-hello">SpiceLinkMess (Client Hello)<a class="headerlink" href="#spicelinkmess-client-hello" title="Permanent link">&para;</a></h2>
 <p>The client initiates the connection by sending a <code>SpiceLinkMess</code> packet:</p>
 <h3 id="binary-format">Binary Format<a class="headerlink" href="#binary-format" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Offset  Size  Type    Field
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>------  ----  ------  -----------
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>0       4     bytes   magic (REDQ = 0x51444552)
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>4       4     uint32  major_version
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>8       4     uint32  minor_version
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>12      4     uint32  size (bytes following this field)
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>16      4     uint32  connection_id
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>20      1     uint8   channel_type
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>21      1     uint8   channel_id
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>22      4     uint32  num_common_caps
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>26      4     uint32  num_channel_caps
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>30      4     uint32  caps_offset
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>34+     var   uint32  capabilities (variable length)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>------  ----  ------  -----------
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>0       4     bytes   magic (REDQ = 0x51444552)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>4       4     uint32  major_version
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>8       4     uint32  minor_version
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>12      4     uint32  size (bytes following this field)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>16      4     uint32  connection_id
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>20      1     uint8   channel_type
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>21      1     uint8   channel_id
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>22      4     uint32  num_common_caps
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>26      4     uint32  num_channel_caps
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>30      4     uint32  caps_offset
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>34+     var   uint32  capabilities (variable length)
 </code></pre></div>
 <h3 id="field-details">Field Details<a class="headerlink" href="#field-details" title="Permanent link">&para;</a></h3>
 <dl>
@@ -11818,18 +11810,18 @@ that is called out explicitly.</p>
 <h2 id="spicelinkreply-server-hello">SpiceLinkReply (Server Hello)<a class="headerlink" href="#spicelinkreply-server-hello" title="Permanent link">&para;</a></h2>
 <p>The server responds with a <code>SpiceLinkReply</code> packet:</p>
 <h3 id="binary-format_1">Binary Format<a class="headerlink" href="#binary-format_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Offset  Size  Type    Field
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>------  ----  ------  -----------
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>0       4     bytes   magic (REDQ = 0x51444552)
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>4       4     uint32  major_version
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>8       4     uint32  minor_version
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>12      4     uint32  size (bytes following this field)
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>16      4     uint32  error
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>20      162   bytes   pubkey (RSA public key in DER format)
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>182     4     uint32  num_common_caps
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>186     4     uint32  num_channel_caps
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>190     4     uint32  caps_offset
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>194+    var   uint32  capabilities (variable length)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>------  ----  ------  -----------
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>0       4     bytes   magic (REDQ = 0x51444552)
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>4       4     uint32  major_version
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>8       4     uint32  minor_version
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>12      4     uint32  size (bytes following this field)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>16      4     uint32  error
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>20      162   bytes   pubkey (RSA public key in DER format)
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>182     4     uint32  num_common_caps
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>186     4     uint32  num_channel_caps
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>190     4     uint32  caps_offset
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>194+    var   uint32  capabilities (variable length)
 </code></pre></div>
 <h3 id="field-details_1">Field Details<a class="headerlink" href="#field-details_1" title="Permanent link">&para;</a></h3>
 <dl>
@@ -11869,10 +11861,10 @@ error 5) has a fixed degenerate shape rather than a truncated one:</p>
 <h2 id="client-authentication-packet">Client Authentication Packet<a class="headerlink" href="#client-authentication-packet" title="Permanent link">&para;</a></h2>
 <p>After receiving the server hello, the client sends an authentication packet:</p>
 <h3 id="binary-format_2">Binary Format<a class="headerlink" href="#binary-format_2" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Offset  Size  Type    Field
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>------  ----  ------  -----------
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>0       4     uint32  mechanism
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>4       128   bytes   encrypted_password
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>------  ----  ------  -----------
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>0       4     uint32  mechanism
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>4       128   bytes   encrypted_password
 </code></pre></div>
 <h3 id="field-details_2">Field Details<a class="headerlink" href="#field-details_2" title="Permanent link">&para;</a></h3>
 <dl>
@@ -11895,24 +11887,24 @@ error 5) has a fixed degenerate shape rather than a truncated one:</p>
 - Hash Algorithm: SHA-1
 - Key Size: 1024 bits (produces 128-byte ciphertext)</p>
 <p>Python example (using cryptography library):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.asymmetric</span><span class="w"> </span><span class="kn">import</span> <span class="n">padding</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives</span><span class="w"> </span><span class="kn">import</span> <span class="n">hashes</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">encrypted_password</span> <span class="o">=</span> <span class="n">public_key</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">password</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span> <span class="o">+</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span><span class="p">,</span>  <span class="c1"># Null-terminate</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">padding</span><span class="o">.</span><span class="n">OAEP</span><span class="p">(</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">mgf</span><span class="o">=</span><span class="n">padding</span><span class="o">.</span><span class="n">MGF1</span><span class="p">(</span><span class="n">algorithm</span><span class="o">=</span><span class="n">hashes</span><span class="o">.</span><span class="n">SHA1</span><span class="p">()),</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">algorithm</span><span class="o">=</span><span class="n">hashes</span><span class="o">.</span><span class="n">SHA1</span><span class="p">(),</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="n">label</span><span class="o">=</span><span class="kc">None</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="p">)</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.asymmetric</span><span class="w"> </span><span class="kn">import</span> <span class="n">padding</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives</span><span class="w"> </span><span class="kn">import</span> <span class="n">hashes</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">encrypted_password</span> <span class="o">=</span> <span class="n">public_key</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">password</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span> <span class="o">+</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span><span class="p">,</span>  <span class="c1"># Null-terminate</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">padding</span><span class="o">.</span><span class="n">OAEP</span><span class="p">(</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">mgf</span><span class="o">=</span><span class="n">padding</span><span class="o">.</span><span class="n">MGF1</span><span class="p">(</span><span class="n">algorithm</span><span class="o">=</span><span class="n">hashes</span><span class="o">.</span><span class="n">SHA1</span><span class="p">()),</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">algorithm</span><span class="o">=</span><span class="n">hashes</span><span class="o">.</span><span class="n">SHA1</span><span class="p">(),</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="n">label</span><span class="o">=</span><span class="kc">None</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="p">)</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="p">)</span>
 </code></pre></div>
 <h2 id="server-authentication-response">Server Authentication Response<a class="headerlink" href="#server-authentication-response" title="Permanent link">&para;</a></h2>
 <p>The server responds with a simple result code:</p>
 <h3 id="binary-format_3">Binary Format<a class="headerlink" href="#binary-format_3" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Offset  Size  Type    Field
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>------  ----  ------  -----------
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>0       4     uint32  error
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>------  ----  ------  -----------
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>0       4     uint32  error
 </code></pre></div>
 <h3 id="field-details_3">Field Details<a class="headerlink" href="#field-details_3" title="Permanent link">&para;</a></h3>
 <dl>
@@ -11952,12 +11944,12 @@ instead of static VM passwords:</p>
 <p>The SPICE server validates the authentication ticket on <strong>every
 channel link establishment</strong>, not just the first. From the
 reference implementation (<code>spice/server/reds.cpp:2098</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">ltime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">spice_get_monotonic_time_ns</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">NSEC_PER_SEC</span><span class="p">;</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">expired</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">reds</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">taTicket</span><span class="p">.</span><span class="n">expiration_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">ltime</span><span class="p">);</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">expired</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="n">spice_warning</span><span class="p">(</span><span class="s">&quot;Ticket has expired&quot;</span><span class="p">);</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="k">goto</span><span class="w"> </span><span class="n">error</span><span class="p">;</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">ltime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">spice_get_monotonic_time_ns</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">NSEC_PER_SEC</span><span class="p">;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">expired</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">reds</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">taTicket</span><span class="p">.</span><span class="n">expiration_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">ltime</span><span class="p">);</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">expired</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="n">spice_warning</span><span class="p">(</span><span class="s">&quot;Ticket has expired&quot;</span><span class="p">);</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="k">goto</span><span class="w"> </span><span class="n">error</span><span class="p">;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
 </code></pre></div>
 <p>Combined with Kerbside's one-time-use, time-limited token model,
 this has an important consequence:</p>
@@ -12001,25 +11993,15 @@ that capability for the rest of the session.</p>
 </ul>
 <h2 id="connection-state-machine">Connection State Machine<a class="headerlink" href="#connection-state-machine" title="Permanent link">&para;</a></h2>
 <p>Kerbside's proxy implements the following state machine for TLS connections:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>+-------------------+
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>|  ClientSpiceLinkMess  |  &lt;-- Initial state
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>+---------+---------+
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>          |
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>          | Parse client hello, generate RSA keypair,
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>          | send server hello with public key
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>          v
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>+-------------------+
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>|   ClientPassword   |
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>+---------+---------+
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>          |
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>          | Decrypt token, validate, lookup console,
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>          | connect to hypervisor, send auth result
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>          v
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>+-------------------+
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>|    ClientProxy     |  &lt;-- Bidirectional relay mode
-<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>|    ServerProxy     |
-<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>+-------------------+
-</code></pre></div>
+<pre class="mermaid"><code>stateDiagram-v2
+    direction TB
+
+    ClientSpiceLinkMess: ClientSpiceLinkMess (initial state)
+    Proxy: ClientProxy / ServerProxy (bidirectional relay mode)
+
+    [*] --&gt; ClientSpiceLinkMess
+    ClientSpiceLinkMess --&gt; ClientPassword: Parse client hello, generate RSA keypair, send server hello with public key
+    ClientPassword --&gt; Proxy: Decrypt token, validate, lookup console, connect to hypervisor, send auth result</code></pre>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <h3 id="protocol-errors">Protocol Errors<a class="headerlink" href="#protocol-errors" title="Permanent link">&para;</a></h3>
 <table>
@@ -12083,18 +12065,18 @@ that capability for the rest of the session.</p>
 <h3 id="rsa-key-generation">RSA Key Generation<a class="headerlink" href="#rsa-key-generation" title="Permanent link">&para;</a></h3>
 <p>Kerbside generates a fresh RSA key pair for each connection to ensure forward
 secrecy:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.asymmetric</span><span class="w"> </span><span class="kn">import</span> <span class="n">rsa</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">Encoding</span><span class="p">,</span> <span class="n">PublicFormat</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">private_key</span> <span class="o">=</span> <span class="n">rsa</span><span class="o">.</span><span class="n">generate_private_key</span><span class="p">(</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">public_exponent</span><span class="o">=</span><span class="mi">65537</span><span class="p">,</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">key_size</span><span class="o">=</span><span class="mi">1024</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">public_key_der</span> <span class="o">=</span> <span class="n">private_key</span><span class="o">.</span><span class="n">public_key</span><span class="p">()</span><span class="o">.</span><span class="n">public_bytes</span><span class="p">(</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="n">Encoding</span><span class="o">.</span><span class="n">DER</span><span class="p">,</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="n">PublicFormat</span><span class="o">.</span><span class="n">SubjectPublicKeyInfo</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.asymmetric</span><span class="w"> </span><span class="kn">import</span> <span class="n">rsa</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">Encoding</span><span class="p">,</span> <span class="n">PublicFormat</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">private_key</span> <span class="o">=</span> <span class="n">rsa</span><span class="o">.</span><span class="n">generate_private_key</span><span class="p">(</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">public_exponent</span><span class="o">=</span><span class="mi">65537</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">key_size</span><span class="o">=</span><span class="mi">1024</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">public_key_der</span> <span class="o">=</span> <span class="n">private_key</span><span class="o">.</span><span class="n">public_key</span><span class="p">()</span><span class="o">.</span><span class="n">public_bytes</span><span class="p">(</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">Encoding</span><span class="o">.</span><span class="n">DER</span><span class="p">,</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">PublicFormat</span><span class="o">.</span><span class="n">SubjectPublicKeyInfo</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">)</span>
 </code></pre></div>
 <h3 id="capability-handling">Capability Handling<a class="headerlink" href="#capability-handling" title="Permanent link">&para;</a></h3>
 <p>Kerbside uses hardcoded default capabilities based on observed behavior:

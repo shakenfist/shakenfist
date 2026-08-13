@@ -12231,44 +12231,31 @@ Common keys: <code>name</code>, <code>size</code></p>
 </code></pre></div>
 <h2 id="protocol-flow">Protocol Flow<a class="headerlink" href="#protocol-flow" title="Permanent link">&para;</a></h2>
 <h3 id="initialization">Initialization<a class="headerlink" href="#initialization" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>    Client                Agent               Server
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>      |                     |                    |
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>      |  ANNOUNCE_CAPABILITIES (request=1)       |
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>      |--------------------&gt;|                    |
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>      |                     |                    |
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>      |  ANNOUNCE_CAPABILITIES (request=0)       |
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>      |&lt;--------------------|                    |
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>      |                     |                    |
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>      |  MONITORS_CONFIG                         |
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>      |--------------------&gt;|                    |
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Agent
+
+    Client-&gt;&gt;Agent: ANNOUNCE_CAPABILITIES (request=1)
+    Agent-&gt;&gt;Client: ANNOUNCE_CAPABILITIES (request=0)
+    Client-&gt;&gt;Agent: MONITORS_CONFIG</code></pre>
 <h3 id="clipboard-copy-client-to-guest">Clipboard Copy (Client to Guest)<a class="headerlink" href="#clipboard-copy-client-to-guest" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>    Client                Agent
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>      |                     |
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>      |  CLIPBOARD_GRAB     |
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>      |--------------------&gt;|
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>      |                     |
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>      |  CLIPBOARD_REQUEST  |
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>      |&lt;--------------------|
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>      |                     |
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>      |  CLIPBOARD (data)   |
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>      |--------------------&gt;|
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Agent
+
+    Client-&gt;&gt;Agent: CLIPBOARD_GRAB
+    Agent-&gt;&gt;Client: CLIPBOARD_REQUEST
+    Client-&gt;&gt;Agent: CLIPBOARD (data)</code></pre>
 <h3 id="file-transfer_1">File Transfer<a class="headerlink" href="#file-transfer_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>    Client                Agent
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>      |                     |
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>      |  FILE_XFER_START    |
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>      |--------------------&gt;|
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>      |                     |
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>      |  FILE_XFER_DATA     |
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>      |--------------------&gt;|
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>      |  FILE_XFER_DATA     |
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>      |--------------------&gt;|
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>      |  ...                |
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>      |                     |
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>      |  FILE_XFER_STATUS   |
-<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>      |&lt;--------------------|
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Agent
+
+    Client-&gt;&gt;Agent: FILE_XFER_START
+    loop until the whole file has been sent
+        Client-&gt;&gt;Agent: FILE_XFER_DATA
+    end
+    Agent-&gt;&gt;Client: FILE_XFER_STATUS</code></pre>
 <h2 id="security-considerations">Security Considerations<a class="headerlink" href="#security-considerations" title="Permanent link">&para;</a></h2>
 <ol>
 <li>

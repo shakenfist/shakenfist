@@ -4981,17 +4981,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#historical-verification-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Historical verification records
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -11230,17 +11219,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#historical-verification-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Historical verification records
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -11287,8 +11265,7 @@ is CI. This standalone harness is for local verification.</p>
   ryll, and asserts the full <code>run-scenario.sh</code> Sextant scenario plus a
   live API-terminate test and a non-gating loadtest. Bring one up
   locally with <code>tools/direct-qemu/lane-up.sh</code> (the <code>kerbside-proxy</code>
-  wheel installed, or <code>KERBSIDE_PROXY_BIN</code> set); see
-  <a href="/components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/">plans/PLAN-rust-proxy-phase-07-ci.md</a>.</li>
+  wheel installed, or <code>KERBSIDE_PROXY_BIN</code> set).</li>
 </ul>
 <h2 id="pieces">Pieces<a class="headerlink" href="#pieces" title="Permanent link">&para;</a></h2>
 <ul>
@@ -11449,20 +11426,6 @@ than SUN_LEN</code>. Keep the socket path short — <code>verify-rust-proxy.sh</
 defaults it under <code>$XDG_RUNTIME_DIR</code> (or <code>/tmp</code>), not under the
 (possibly deep) workdir, and errors early if a <code>GRPC_SOCKET</code> override
 is too long.</p>
-<h2 id="historical-verification-records">Historical verification records<a class="headerlink" href="#historical-verification-records" title="Permanent link">&para;</a></h2>
-<p>The dated live-capture records from the Rust proxy bring-up are
-preserved in the plan Outcome sections:</p>
-<ul>
-<li>End-to-end relay through the proxy (2026-07-06):
-  <a href="/components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/">plans/PLAN-rust-proxy-phase-03-proxy-skeleton.md</a>,
-  step 3h.</li>
-<li>Firewall warn-only capture and deny path (2026-07-07):
-  <a href="/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/">plans/PLAN-rust-proxy-phase-04-firewall.md</a>,
-  step 4f.</li>
-<li>Live session termination (2026-07-08):
-  <a href="/components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/">plans/PLAN-rust-proxy-phase-05-daemon-integration.md</a>,
-  step 5f.</li>
-</ul>
 
 
 
