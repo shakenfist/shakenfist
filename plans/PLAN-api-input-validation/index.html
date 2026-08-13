@@ -11504,8 +11504,8 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>3: Compile and warn</td>
-<td>Planned, not started</td>
-<td>Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Opens with the derivation generator below, which is a precondition rather than a step. Four further decisions (D10-D13) are recorded there, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
+<td>In progress (measurement)</td>
+<td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day — sfcbr deployed, apparatus hand-verified, a full functional CI run covered — and exits when every finding is explained, no earlier than 2026-08-20. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
 </tr>
 <tr>
 <td>4: Enforce</td>

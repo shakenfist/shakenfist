@@ -11151,6 +11151,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#measurement-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement log
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -11667,8 +11684,8 @@ networkspec parser makes every non-empty value truthy).</p>
    because validation preempts a per-method decorator.</li>
 </ol>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>The three PRs have landed. The measurement has not: warn-only is
-deployed nowhere yet, so the phase is code-complete and evidence-empty.</p>
+<p>The three PRs have landed, and the measurement window is open: see
+the measurement log at the end of this section.</p>
 <p><strong>Four deviations from this plan, all recorded because each was a
 better answer than the one planned.</strong></p>
 <ol>
@@ -11787,6 +11804,86 @@ than in this phase.</p>
 <p><strong>The next step is not code.</strong> Deploy to sfcbr, run functional CI, and
 read the warn log. Success criterion 3 is that every remaining finding
 is explained, not that there are none.</p>
+<h3 id="measurement-log">Measurement log<a class="headerlink" href="#measurement-log" title="Permanent link">&para;</a></h3>
+<p><strong>2026-08-13 — window opened.</strong> sfcbr deployed from develop at
+<code>0ea77f0d4</code> (the first deploy containing this phase; previously at
+<code>dddc4745f</code>) via 33fl's <code>sfcbr.yml</code>, all six nodes in,
+<code>API_VALIDATION_MODE</code> at its <code>warn</code> default. The apparatus was
+hand-verified the same hour, per the note above: <code>GET /instances</code>
+with an undeclared body key answered 400 with the byte-identical
+interpreter-text body it produced before this phase, and the finding
+line arrived in the sfcbr Loki tenant carrying
+<code>validation-reason=unknown-parameter</code>,
+<code>validation-response-status=400</code> and <code>route=/instances</code>. A quiet log
+is therefore evidence, not a broken pipeline. The reading for the
+window is:</p>
+<div class="highlight"><pre><span></span><code>loki-query &#39;{job=&quot;shakenfist&quot;} |= &quot;API request validation finding&quot;&#39; \
+    --tenant sfcbr --since 7d --limit 1000
+</code></pre></div>
+<p>First reading: no findings from real traffic in the first hour, only
+the probe itself. The window exits when every finding across a full
+functional CI run plus seven days of sfcbr is explained — so no
+earlier than 2026-08-20 — and the exit deliverable is the
+classified list plus the D10 recommendation of success criterion 5.</p>
+<p><strong>2026-08-13 — the functional CI run, graded.</strong> A <code>workflow_dispatch</code>
+of the full suite on develop (<a href="https://github.com/shakenfist/shakenfist/actions/runs/31691743944">run 31691743944</a>)
+produced 42 findings, all recovered from the per-node journals in the
+bundle artifacts. The compiled-registry startup line appears in every
+bundle, so the layer was live in every nested cluster; two jobs
+failed on known non-validation signatures (the agent-await wedge
+family and the test_affinity flake #3565 plus a 507 under-cloud
+capacity rejection). The 42 findings collapse to five signatures,
+every one explained:</p>
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>signature</th>
+<th>classification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>21</td>
+<td>missing-required, <code>POST /auth/federated</code>, 400</td>
+<td>Intended rejection: the federation suite's deliberately malformed bodies (<code>test_missing_fields_are_refused</code> and friends). <code>required</code> is recorded-never-enforced, so phase 4 changes nothing here.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>unknown-parameter <code>namespace</code>, <code>GET /artifacts/&lt;artifact_ref&gt;</code>, <strong>200/404</strong></td>
+<td><strong>Declaration bug — issue #3739.</strong> Three decorator families (<code>_resolve_artifact_ref</code>, <code>arg_is_instance_ref</code>, <code>arg_is_network_ref</code>) pop a functional, undeclared <code>namespace</code> body key before the handler; phase 1's audit cannot see decorator-consumed kwargs. Must be declared before phase 4 or enforcement breaks the shared-artifact lookup path.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>type-mismatch <code>length</code>, consoledata, 400</td>
+<td>Intended rejection: <code>test_console_log.py</code>'s deliberate <code>'banana'</code>.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>type-mismatch key_ttl outside 1..86400, rules create, 400</td>
+<td>Intended rejection: <code>test_rule_validation_is_enforced_by_the_api</code>'s zero and negative TTLs. The published bound and the server agree, which is what phase 2 promised.</td>
+</tr>
+<tr>
+<td>—</td>
+<td>(the 404 variants of the artifact signature are the same population)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The apparatus fought back once, exactly as predicted: the central
+Loki dump in every bundle was <strong>zero bytes</strong> (<code>curl</code> to
+<code>localhost:3100</code> refused, swallowed by <code>|| true</code> +
+<code>failed_when: false</code> — actions repo issue #16), so the first grep
+said "no findings" through a broken pipeline. The per-node
+journalctl captures in the same bundles are the authoritative
+fallback and carried all 42.</p>
+<p>For D10, this run puts real numbers on the two populations: the
+reaches-handler unknown-parameter population is empty and the
+answered-first population is the nine <code>namespace</code> findings — i.e.
+every unknown-parameter observation so far is a working caller using
+an undeclared feature, evidence that leans <code>RAISE</code>-with-declarations
+rather than <code>EXCLUDE</code>. Seven days of sfcbr traffic may still move
+this.</p>
 
 
 
