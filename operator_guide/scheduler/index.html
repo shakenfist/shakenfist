@@ -11330,6 +11330,29 @@ zero per node.</p>
 <p>Note that on a cluster already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes are
 refused until they drain.</p>
+<p>What a node is charged for is the larger of two numbers: the
+<code>cpu_total_instance_vcpus</code> its resources daemon measured from
+<em>running</em> libvirt domains, and the vCPUs of every instance placed on
+it. The measurement alone lags reality badly -- it is republished
+once a minute, and an instance which is still fetching its image has
+no domain to measure at all -- so a burst of creates would otherwise
+all see the same idle node, all land on it, and only discover the
+overshoot once they booted. Placement is recorded synchronously as
+each create is admitted, so counting it closes that window.</p>
+<p>Because that charge only ever removes capacity, an instance is
+counted only while it agrees it is on the node and has not been
+deleted. A placement record can outlive what it describes -- a node
+which dies mid-teardown leaves one behind, and an instance which
+moves can leave one on the node it left -- and charging a node for a
+stale record would take capacity away from it with nothing to give it
+back. A node reporting far more <code>cpu_committed</code> than its instance
+list accounts for is the shape of problem to look for.</p>
+<p>RAM and disk admission are deliberately unchanged: they still size a
+node from its published measurements alone, and so keep the burst
+window that CPU admission has closed. Closing it for all three is the
+job of the scheduler-reservations work, which replaces this
+per-schedule walk with the maintained counters in
+<code>scheduler_node_capacity</code> rather than extending it.</p>
 <h2 id="configuration-reference">Configuration reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h2>
 <p>Except for <code>CPU_OVERCOMMIT_RATIO</code>, <code>RAM_OVERCOMMIT_RATIO</code>,
 <code>SCHEDULER_TARGET_LOAD</code>, <code>SCHEDULER_CACHE_TIMEOUT</code> and the two
@@ -11411,9 +11434,10 @@ tells the whole story:</p>
 <li>Each filter stage emits <code>schedule at stage &lt;name&gt;</code> with the
   surviving candidates and a <code>dropped</code> map giving each excluded
   node's reason dict -- for CPU admission that includes the
-  schedulable base used and whether it came from the
-  <code>cpu_schedulable</code> field or the pre-reservation fallback; for RAM
-  it includes the reservation subtracted.</li>
+  schedulable base used, whether it came from the <code>cpu_schedulable</code>
+  field or the pre-reservation fallback, and both <code>measured_cpus</code>
+  and <code>committed_cpus</code> so it is clear which of the two bound; for
+  RAM it includes the reservation subtracted.</li>
 <li><code>schedule have highest affinity</code> includes the winning score and
   a per-candidate <code>affinity_detail</code> breakdown of which neighbouring
   instances contributed what. <code>schedule keeping affinity despite
@@ -11433,7 +11457,11 @@ tells the whole story:</p>
 <code>get_cluster_resources()</code> in the client) reports per-node
 <code>cpu_schedulable</code>, <code>memory_reserved_mb</code>, <code>cpu_available</code> and RAM
 headroom using the same arithmetic as admission, so what it
-reports as available is what the scheduler would actually admit.</p>
+reports as available is what the scheduler would actually admit. It
+also breaks the CPU decision out into <code>cpu_hard_max</code>,
+<code>cpu_measured</code> and <code>cpu_committed</code>, which is how you tell a node
+that is genuinely busy from one that has simply been placed with
+work it has not started yet.</p>
 <h2 id="mixed-version-clusters">Mixed-version clusters<a class="headerlink" href="#mixed-version-clusters" title="Permanent link">&para;</a></h2>
 <p>Metrics rows written by a resources daemon older than the
 reservation scheme lack the new fields. For exactly those rows the
