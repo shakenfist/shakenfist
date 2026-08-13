@@ -480,8 +480,8 @@ Two notes for whoever reads the log, both from the review round:
 
 ## Outcome
 
-The three PRs have landed. The measurement has not: warn-only is
-deployed nowhere yet, so the phase is code-complete and evidence-empty.
+The three PRs have landed, and the measurement window is open: see
+the measurement log at the end of this section.
 
 **Four deviations from this plan, all recorded because each was a
 better answer than the one planned.**
@@ -608,3 +608,62 @@ than in this phase.
 **The next step is not code.** Deploy to sfcbr, run functional CI, and
 read the warn log. Success criterion 3 is that every remaining finding
 is explained, not that there are none.
+
+### Measurement log
+
+**2026-08-13 — window opened.** sfcbr deployed from develop at
+`0ea77f0d4` (the first deploy containing this phase; previously at
+`dddc4745f`) via 33fl's `sfcbr.yml`, all six nodes in,
+`API_VALIDATION_MODE` at its `warn` default. The apparatus was
+hand-verified the same hour, per the note above: `GET /instances`
+with an undeclared body key answered 400 with the byte-identical
+interpreter-text body it produced before this phase, and the finding
+line arrived in the sfcbr Loki tenant carrying
+`validation-reason=unknown-parameter`,
+`validation-response-status=400` and `route=/instances`. A quiet log
+is therefore evidence, not a broken pipeline. The reading for the
+window is:
+
+    loki-query '{job="shakenfist"} |= "API request validation finding"' \
+        --tenant sfcbr --since 7d --limit 1000
+
+First reading: no findings from real traffic in the first hour, only
+the probe itself. The window exits when every finding across a full
+functional CI run plus seven days of sfcbr is explained — so no
+earlier than 2026-08-20 — and the exit deliverable is the
+classified list plus the D10 recommendation of success criterion 5.
+
+**2026-08-13 — the functional CI run, graded.** A `workflow_dispatch`
+of the full suite on develop ([run 31691743944](
+https://github.com/shakenfist/shakenfist/actions/runs/31691743944))
+produced 42 findings, all recovered from the per-node journals in the
+bundle artifacts. The compiled-registry startup line appears in every
+bundle, so the layer was live in every nested cluster; two jobs
+failed on known non-validation signatures (the agent-await wedge
+family and the test_affinity flake #3565 plus a 507 under-cloud
+capacity rejection). The 42 findings collapse to five signatures,
+every one explained:
+
+| n | signature | classification |
+|---|-----------|----------------|
+| 21 | missing-required, `POST /auth/federated`, 400 | Intended rejection: the federation suite's deliberately malformed bodies (`test_missing_fields_are_refused` and friends). `required` is recorded-never-enforced, so phase 4 changes nothing here. |
+| 9 | unknown-parameter `namespace`, `GET /artifacts/<artifact_ref>`, **200/404** | **Declaration bug — issue #3739.** Three decorator families (`_resolve_artifact_ref`, `arg_is_instance_ref`, `arg_is_network_ref`) pop a functional, undeclared `namespace` body key before the handler; phase 1's audit cannot see decorator-consumed kwargs. Must be declared before phase 4 or enforcement breaks the shared-artifact lookup path. |
+| 6 | type-mismatch `length`, consoledata, 400 | Intended rejection: `test_console_log.py`'s deliberate `'banana'`. |
+| 6 | type-mismatch key_ttl outside 1..86400, rules create, 400 | Intended rejection: `test_rule_validation_is_enforced_by_the_api`'s zero and negative TTLs. The published bound and the server agree, which is what phase 2 promised. |
+| — | (the 404 variants of the artifact signature are the same population) | — |
+
+The apparatus fought back once, exactly as predicted: the central
+Loki dump in every bundle was **zero bytes** (`curl` to
+`localhost:3100` refused, swallowed by `|| true` +
+`failed_when: false` — actions repo issue #16), so the first grep
+said "no findings" through a broken pipeline. The per-node
+journalctl captures in the same bundles are the authoritative
+fallback and carried all 42.
+
+For D10, this run puts real numbers on the two populations: the
+reaches-handler unknown-parameter population is empty and the
+answered-first population is the nine `namespace` findings — i.e.
+every unknown-parameter observation so far is a working caller using
+an undeclared feature, evidence that leans `RAISE`-with-declarations
+rather than `EXCLUDE`. Seven days of sfcbr traffic may still move
+this.
