@@ -32,13 +32,19 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phases 0 and 1 complete.** The open questions at the
-bottom are answered in the Decisions section; see
+**Status: phases 0, 1, 2 and 3 planned; 0, 1 and 2 complete.**
+The open questions at the bottom are answered in the Decisions
+section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
-for the measurements behind them and
+for the measurements behind them,
 [`PLAN-api-input-validation-phase-01-declaration-audit.md`](PLAN-api-input-validation-phase-01-declaration-audit.md)
-for what the audit found. Phases 2 onward are not yet cut into
-per-phase files.
+for what the audit found,
+[`PLAN-api-input-validation-phase-02-type-vocabulary.md`](PLAN-api-input-validation-phase-02-type-vocabulary.md)
+for what the vocabulary work shipped and the four deviations it
+recorded, and
+[`PLAN-api-input-validation-phase-03-compile-and-warn.md`](PLAN-api-input-validation-phase-03-compile-and-warn.md)
+for the phase now ready to start. Phases 4 onward are not yet cut
+into per-phase files.
 
 ## Situation
 
@@ -118,9 +124,11 @@ generator.
 Making it load-bearing is the cheap path to closing #528: no new
 per-endpoint schemas need to be authored for the 96% that already
 declare, and webargs is already a dependency doing exactly this
-job at four sites (`blob.py:187`, `network.py:796`,
-`artifact.py:871`, `instance.py:1784`) — all of them
-`location='query'`, none on request bodies.
+job at four sites (`blob.py`, `network.py`, `artifact.py`,
+`instance.py`) — none of them on request bodies. All four were
+`location='query'` when this was written; three are now
+`location='json_or_query'`, the custom loader #3629 introduced
+(see D6 below).
 
 ### The catch, stated up front
 
@@ -264,6 +272,14 @@ declarations are good enough to compile.
    `log_request` already dodges one instance of this by mapping
    body `uuid` to `passed_uuid`, which shows it is a known
    hazard rather than a feature.
+   *Amended by phase 3:* the decision stands, the supporting
+   evidence does not. `passed_uuid` occurs once in the tree — the
+   assignment itself — so no handler accepts it and the remap
+   dodges nothing; it converts a body `uuid` into a guaranteed 400
+   on every endpoint. The check also cannot live where D3 puts the
+   validator, because `log_request` runs first and has already
+   merged the body. See D11 and D12 in
+   [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md).
 9. **The type vocabulary gains tokens and an optional
    constraints element** (`unsignedinteger`, `macaddr`,
    `base64`, `netblock`; `minimum` / `maximum` / `pattern`).
@@ -278,11 +294,39 @@ declarations are good enough to compile.
 | 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See [phase 0](PLAN-api-input-validation-phase-00-decisions.md) |
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
 | 2: Type vocabulary | Complete | The specification-validation test (#3626) plus `schemes`/`securityDefinitions` template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; `unsignedinteger`/`macaddr`/`base64`/`netblock` tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events `limit` cap are visible to callers. See [phase 2](PLAN-api-input-validation-phase-02-type-vocabulary.md) |
-| 3: Compile and warn | Not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Precondition: generate the derivation's input space rather than sampling it — see below |
-| 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the four hand-authored `get_args` schemas into the compiled path |
-| 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors; fix the attribution issues (#3523, #3371, #3606, #3615) |
+| 3: Compile and warn | Planned, not started | Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Opens with the derivation generator below, which is a precondition rather than a step. Four further decisions (D10-D13) are recorded there, including that an undeclared body key is *already* a 400 carrying interpreter text. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
+| 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the hand-authored `get_args` schemas into the compiled path |
+| 5: Narrow the handlers | Partly overtaken | Narrow `except TypeError` to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
 
+### Where the tracked issues stand
+
+Recorded here rather than by editing the tables above, so there
+is one place to maintain and the tables stay a record of what
+the plan was scoped against.
+
+**Closed since the plan was written:** #3609 (the trigger,
+2026-08-07), #3626 (specification validation in CI), #3616
+(`base.py` under mypy), #3642 (variadic handlers in the audit),
+#3629 (body-supplied `all`, see D6 below), #3615 (`log_request`
+discarding headers).
+
+**Still open and still owned by this plan:** #528 (parent), #3612
+(the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;
+#3606 is in flight as PR #3714.
+
+**Phase 5 is being overtaken from outside.** Two of its four
+attribution issues have been picked up by the automated issue
+fixer rather than by this plan. That is fine — they are genuinely
+independent of phases 3 and 4, which is why they were grouped
+rather than sequenced. It is recorded because it changes what
+phase 5 *is*: by the time phases 3 and 4 land, phase 5 is likely
+to be the single item that actually depends on them — narrowing
+`except TypeError` to JWT errors, which cannot happen until a
+validation layer is rejecting the malformed input that broad
+catch currently absorbs. Nobody picks that up incidentally,
+because on its own it looks like a regression risk with no
+visible benefit.
 
 ### Carried into phase 2 from phase 1
 
@@ -402,22 +446,39 @@ mutates the real tree to prove the *guards* fire, which is a
 different question from whether the *derivation* is right, and
 the two are complementary.
 
-**D6's query-string fallback has a caller waiting on it.**
+**D6's query-string fallback shipped early, at three sites.**
 [Issue #3629](https://github.com/shakenfist/shakenfist/issues/3629):
-`all` on the four outstanding-operations endpoints is bound with
+`all` on the outstanding-operations endpoints was bound with
 `@use_kwargs(get_args, location='query')`, and webargs finishes
 with `kwargs.update(parsed_args)`, so the `load_default=False`
-from an absent query string overwrites the `all=True` that
+from an absent query string overwrote the `all=True` that
 `log_request` merged in from the JSON body. The shipped client
-only ever sends a body, so the parameter has never worked
-through it.
+only ever sends a body, so the parameter never worked through
+it.
 
-Phase 1 declared these `query`, which is accurate about where
-the code parses them from. Making the declaration *true of the
-client* is what D6 is for, so #3629 closes when phase 3 lands
-the fallback — or sooner, with `location=('query', 'json')` at
-those four sites, if the two are kept in agreement about
-precedence.
+This was predicted here to close with phase 3, "or sooner". It
+closed sooner, in `0de6c3b5c` (2026-08-09), and phase 3 inherits
+the mechanism rather than choosing one:
+
+* `base.py` registers a **`json_or_query` webargs location
+  loader** which merges `req.args` and the JSON body with the
+  body authoritative, then drops keys the schema does not name
+  (mirroring webargs' `unknown=EXCLUDE` default for the query
+  location). The instance, artifact and network
+  outstanding-operations endpoints are bound to it.
+* **A `('query', 'json')` tuple location was tried and
+  rejected.** webargs keys validation failures by location, and
+  a tuple key is not JSON-serialisable, so a 422 becomes a 500.
+  Phase 3 must not re-derive this: the custom loader is the
+  supported shape.
+* `declarations.py` derives a schema bound to `json_or_query`
+  as a **`query`** location, so the published declaration is
+  unchanged and phase 1's audit still holds.
+
+Phase 3 therefore generalises an existing, tested loader to
+every parameter derived `query`, rather than introducing a
+second precedence rule alongside it. See
+[phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md).
 
 ## Open questions for phase 0
 

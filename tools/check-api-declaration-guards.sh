@@ -85,15 +85,20 @@ trap 'rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; rm -rf "${BACKUP}
 total=0
 failures=0
 
-# Both modules, because the guard surface spans both: the import-time
-# checks are asserted by test_parameter_declarations, but whether a
-# declaration describes the shape the handler actually accepts can only
-# be seen in the generated specification, which is
-# test_openapi_spec's subject. A mutation caught by neither is a gap in
-# the guards, not in the mutation.
+# All four modules, because the guard surface spans them: the
+# import-time checks are asserted by test_parameter_declarations;
+# whether a declaration describes the shape the handler actually
+# accepts can only be seen in the generated specification, which is
+# test_openapi_spec's subject; whether the *derivation* those two
+# compare against is itself right belongs to test_derivation_generator,
+# the only one building sources the tree does not contain; and whether
+# the declarations compile into the schemas phase 4 will enforce is
+# test_validation_compiler's. A mutation caught by none of them is a
+# gap in the guards, not in the mutation.
 run() {
     "${PYTHON}" -m stestr run \
-        '(test_parameter_declarations|test_openapi_spec)' 2>&1
+        '(test_parameter_declarations|test_openapi_spec|test_derivation_generator|test_validation_compiler)' \
+        2>&1
 }
 
 restore() { rsync -a --delete "${BACKUP}"/ shakenfist/external_api/; }
@@ -380,6 +385,88 @@ check 'spurious maximum on a registered parameter'
 sed -i "s/def get(self, instance_ref=None, instance_from_db=None):/def get(self, instance_ref=None, instance_from_db=None, **kwargs):/" \
     shakenfist/external_api/snapshot.py
 check 'variadic handler signature'
+
+# 26-28 mutate the derivation itself rather than a declaration. Every
+# mutation above asks "does a guard notice a wrong declaration?", which
+# takes the derivation those guards compare against on trust. These ask
+# whether that trust is earned. They are caught only by
+# test_derivation_generator, because each breaks a source shape the
+# tree does not contain -- which is exactly why the tree could not have
+# found them and why the generator exists.
+
+# 26. The route check answering before the query sources are consulted.
+# This was the state of the code until the generator found it: a
+# handler whose declared parameters are all path parameters could read
+# flask.request.args with a key the walk cannot name, and the audit
+# reported the tree clean because the call which would have noticed
+# returned first.
+python3 - <<'PY'
+p = 'shakenfist/external_api/declarations.py'
+s = open(p).read()
+s = s.replace("""    in_query = name in query_parameters(fn, [cls, tree], problems)
+    in_args = name in request_args_parameters(fn, problems)
+    if name in routes.get(cls.name, set()):
+        return 'path'""", """    if name in routes.get(cls.name, set()):
+        return 'path'
+    in_query = name in query_parameters(fn, [cls, tree], problems)
+    in_args = name in request_args_parameters(fn, problems)""")
+open(p, 'w').write(s)
+PY
+check 'path derived before the query sources are consulted'
+
+# 27. A defining scope whose dict is empty falling through to the next
+# scope. The cross-scope leak with an extra step: a class-level
+# `get_args = {}` would pick up a same-named module-level dict, and the
+# fixer would rewrite a correct body declaration to query.
+sed -i "s/^        if defined:/        if defined and out:/" \
+    shakenfist/external_api/declarations.py
+check 'empty defining scope falls through'
+
+# 28. Werkzeug converters dropped from route parameter names, so
+# <path:x> yields 'path' rather than 'x'. This one is a regression of a
+# defect the tree *did* have -- three LabelEndpoint declarations -- and
+# is here because the generator covers it more cheaply than the tree.
+sed -i "s/names = {segment.split(':')\[-1\]/names = {segment.split(':')[0]/" \
+    shakenfist/external_api/declarations.py
+check 'route converter prefix taken as the name'
+
+# 29-31 mutate the compiler. Phase 3 compiles the declarations into
+# marshmallow schemas, so from here a misreading is not a wrong line of
+# documentation but a rejected request the moment phase 4 enforces.
+
+# 29. required compiled as a constraint rather than recorded as
+# metadata. `mode` on the agent-put endpoint is declared required while
+# omitting it has always been accepted, so this would reject working
+# requests.
+sed -i "s/kwargs: dict\[str, Any\] = {'required': False, 'allow_none': True}/kwargs: dict[str, Any] = {'required': True, 'allow_none': True}/" \
+    shakenfist/external_api/validation.py
+check 'required compiled as a constraint'
+
+# 30. The raw upload body parsed as JSON. Upload bodies are bytes, so
+# every upload would fail validation.
+sed -i "s/if schema.get('type') != 'object':/if False:/" \
+    shakenfist/external_api/validation.py
+check 'raw body compiled as JSON'
+
+# 31. A handler with no declaration compiled as an empty schema instead
+# of being left out of the registry. Absence and success would then be
+# indistinguishable: a route mounted without a declaration would simply
+# not be validated, and nothing would say so.
+#
+# Compiled as empty rather than "stop skipping it", which was the first
+# attempt: the registry is built at import time, so letting None reach
+# specs.get() raised AttributeError before any test ran and the harness
+# correctly reported HARNESS BROKEN rather than a catch. A mutation
+# which prevents the run says nothing about the guards.
+python3 - <<'PY'
+p = 'shakenfist/external_api/validation.py'
+s = open(p).read()
+s = s.replace("""                # quietly arriving here.
+                continue""", """                # quietly arriving here.
+                specs = {}""")
+open(p, 'w').write(s)
+PY
+check 'undocumented handler compiled as empty'
 
 echo
 if [ "${failures}" -ne 0 ]; then

@@ -1553,6 +1553,21 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 # A pattern which does not compile.
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '('})],
+                # Patterns which are not ^...$ anchored. JSON Schema
+                # pattern is an unanchored search while the compiled
+                # validator requires the whole value to match, and full
+                # anchoring is the only form the two read identically.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': 'a+'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^a+'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': 'a+$'})],
+                # A top-level alternation escapes the anchors: ^a|b$ is
+                # (^a)|(b$), anchored on neither branch. A grouped
+                # alternation like ^(a|b)$ is fine.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^a|b$'})],
                 # A sixth element which is not a dictionary, in the
                 # shape that used to be a wrong-arity case.
                 [('thing', 'body', 'string', 'A thing.', False, 1)],

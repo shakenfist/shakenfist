@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class HTTPError(Exception):
     ...
 
@@ -416,10 +419,6 @@ class LocklessUpdateFailed(Exception):
     ...
 
 
-class LocklessUpdateFailed(LocklessUpdateFailed):
-    ...
-
-
 # gRPC call failures
 class gRPCException(Exception):
     ...
@@ -514,16 +513,17 @@ class NetworkOperationFailed(Exception):
     reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as
     an attribute so callers can branch on its stable ``code`` field."""
 
-    def __init__(self, error_report):
+    def __init__(self, error_report: Any) -> None:
         super().__init__()
         self.error_report = error_report
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.error_report.code}: {self.error_report.message}'
 
 
 class ProcessExecutionError(Exception):
-    def __init__(self, stdout=None, stderr=None, exit_code=None, cmd=None):
+    def __init__(self, stdout: Any = None, stderr: Any = None,
+                 exit_code: Any = None, cmd: Any = None) -> None:
         super().__init__(stdout, stderr, exit_code, cmd)
         self.exit_code = exit_code
         self.stderr = stderr

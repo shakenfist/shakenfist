@@ -111,9 +111,17 @@ exactly that reason, and now reads:
 Constraints are validated at import time in the same style as
 everything else: unknown keys, non-numeric bounds, bounds on
 non-numeric types, contradictory bounds, patterns that do not
-compile, patterns on non-string types, and a constraint restating a
-key its type token already renders (a second `minimum` on
-`unsignedinteger`) all raise `InvalidAPIDeclaration`. Note that
+compile, patterns on non-string types, unanchored patterns, and a
+constraint restating a key its type token already renders (a second
+`minimum` on `unsignedinteger`) all raise `InvalidAPIDeclaration`.
+A pattern must be `^...$` anchored, with no top-level alternation
+(`^a|b$` is anchored on neither branch — wrap it in a group), because
+its two consumers read anything looser differently: JSON Schema
+`pattern` is an unanchored *search*, while the compiled validator
+requires the whole value to match (`re.fullmatch`, chosen because
+Python's `$` also matches before a trailing newline and ECMA-262's
+does not). Fully anchored and group-wrapped is the one form both read
+identically, so it is required rather than documented. Note that
 declared constraints are *published documentation* until phase 3 of
 [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
 compiles them — a constraint does not reject anything yet.
@@ -228,12 +236,56 @@ assertions: it breaks each property on purpose and confirms the guard
 fires. Run it if you change the derivation or add an assertion, since
 a guard that passes on a deliberately broken tree is not a guard.
 
+Those assertions compare declarations against the derivation, so they
+are only as good as the derivation itself — and the tree can only
+exercise the source shapes it happens to contain.
+`shakenfist/tests/external_api/test_derivation_generator.py` covers
+the rest: it crosses route form, `@use_kwargs` binding and
+`flask.request.args` read style, builds a synthetic endpoint for each
+of the 225 combinations, and asserts the derivation recovers what that
+case was constructed to mean. Every defect found while building the
+phase 1 audit was a shape absent from the tree, which is why this is
+generated rather than sampled. **If you add a way for a parameter to
+arrive, add an axis value here** — a shape the generator does not
+enumerate is a shape nothing checks.
+
+## What validation does with them
+
+The declarations are compiled into marshmallow schemas at startup
+(`shakenfist/external_api/validation.py`) and checked against every
+request. **Nothing is rejected**: `API_VALIDATION_MODE` defaults to
+`warn`, which logs what would have been refused and changes no
+response. Setting it to `enforce` answers `400` in the usual
+`{"error": ..., "status": ...}` shape, and is phase 4's switch to
+throw once the warn log is understood.
+
+A warn record carries the endpoint, the parameter, the reason, the
+offending value's **type** — never its value — and the status the
+request went on to return anyway. That last field is the interesting
+one: a finding on a request which returned 200 is a rejection
+enforcement would introduce, while one on a request which returned 404
+is a status code enforcement would merely change, because validation
+runs ahead of the per-method decorators which produce those.
+
+Reasons are counted separately because they answer different
+questions: `unknown-parameter`, `type-mismatch`, `missing-required`
+and `body-path-collision`.
+
+Two things it deliberately does not do. `required` is recorded but
+never enforced — not even in `enforce` mode, where missing-required
+findings are filtered out of the rejection decision. Several
+parameters are declared required while omitting them has always
+worked, and what to do about that is phase 6.
+And the prose `format` on a type token is documentation: `netblock`,
+`uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
+strings, because semantic validation of them is also phase 6. Only
+`type`, `pattern`, `minimum` and `maximum` constrain anything.
+
 ## What is not checked yet
 
-The declarations are documentation today. Compiling them into
-per-endpoint request validation is phase 3 of the plan; until then a
-correct declaration does not stop a caller sending something else.
-Two known gaps:
+Enforcement is off, so a correct declaration still does not stop a
+caller sending something else. Two known gaps in the derivation
+itself:
 
 (The published specification itself *is* checked:
 `shakenfist/tests/external_api/test_openapi_spec.py` validates the

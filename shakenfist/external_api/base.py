@@ -1,4 +1,5 @@
 import copy
+import functools
 import json
 import re
 import sys
@@ -25,6 +26,7 @@ from jwt.exceptions import DecodeError
 from jwt.exceptions import ExpiredSignatureError
 import requests
 from webargs.flaskparser import parser as webargs_parser
+from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -36,6 +38,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import scopes as api_scopes
+from shakenfist.external_api import validation
 from shakenfist.instance import Instance
 from shakenfist.namespace import get_api_token
 from shakenfist.node import Node
@@ -125,6 +128,39 @@ def _load_json_or_query(req, schema):
     if isinstance(json_body, dict):
         data.update(json_body)
     return {key: value for key, value in data.items() if key in schema.fields}
+
+
+@webargs_parser.error_handler
+def _webargs_error(error, req, schema, *, error_status_code, error_headers):
+    """Answer a webargs parse failure in this API's error shape.
+
+    webargs' default handler aborts 422 carrying its own
+    {"json": {"field": ["message"]}} body -- but no client ever saw
+    that. Nothing registered a handler before phase 3, and the abort's
+    HTTPException was swallowed by suppress_exceptions_to_client's bare
+    except Exception, so the four @use_kwargs sites answered a bad
+    query parameter with a 500, a 'Server error' log line and an
+    exception record on disk. This handler and the HTTPException
+    carve-out in suppress_exceptions_to_client are the two halves of
+    the fix: the abort below only reaches a client because that
+    carve-out returns the response it carries.
+
+    Decision D4 fixes the status and the shape without changing what
+    is rejected -- every request webargs refused before is still
+    refused, and one it accepted is still accepted.
+    """
+    # error.messages is keyed by location, then by field. The location
+    # is not useful to a caller, and for the custom json_or_query
+    # loader it would name a location no caller can address.
+    parameters = []
+    for by_field in error.messages.values():
+        if isinstance(by_field, dict):
+            for field, messages in by_field.items():
+                detail = ('; '.join(messages)
+                          if isinstance(messages, list) else str(messages))
+                parameters.append('%s: %s' % (field, detail))
+    flask.abort(sf_api.error(
+        400, parameters[0] if parameters else 'invalid request parameter'))
 
 
 def caller_is_admin(func):
@@ -340,6 +376,44 @@ def _validated_constraints(section: str, name: str,
                 '%s parameter %s declares a pattern using the Python only '
                 'construct(s) %s; OpenAPI patterns are ECMA-262'
                 % (section, name, ', '.join(dialect)))
+        # Anchoring is where the consumers genuinely disagree: JSON
+        # Schema pattern is an unanchored search, while the compiled
+        # validator requires the pattern to consume the whole value
+        # (re.fullmatch -- see validation._field(), which uses it
+        # precisely because Python's $ also matches before a trailing
+        # newline and ECMA-262's does not). A declared ^...$ pattern is
+        # the one form both read identically, so it is required rather
+        # than documented -- an unanchored pattern would pass here and
+        # then wrongly reject (or wrongly admit) requests once phase 4
+        # enforces.
+        if not (pattern.startswith('^') and pattern.endswith('$')):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s parameter %s declares a pattern which is not '
+                'anchored with ^...$: %r. JSON Schema searches and the '
+                'compiled validator matches, and full anchoring is the '
+                'only form they read identically'
+                % (section, name, pattern))
+        # A top-level alternation defeats the anchors the check above
+        # just required: '^a|b$' means (^a)|(b$) and is anchored on
+        # neither branch, so the string test alone would bless a
+        # pattern the two consumers still read differently. Wrap the
+        # alternation in a group instead.
+        depth, escaped = 0, False
+        for character in pattern:
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == '(':
+                depth += 1
+            elif character == ')':
+                depth -= 1
+            elif character == '|' and depth == 0:
+                raise exceptions.InvalidAPIDeclaration(
+                    '%s parameter %s declares a pattern with a top '
+                    'level alternation, which escapes the ^...$ '
+                    'anchors: %r. Wrap the alternation in a group'
+                    % (section, name, pattern))
 
     return constraints
 
@@ -996,13 +1070,57 @@ def log_request(func):
     def wrapper(*args, **kwargs):
         j = sf_api.flask_get_post_body()
 
+        # Stashed for the validator, which runs two decorators later:
+        # reading it back means validation reports on exactly the body
+        # merged into the handler's kwargs below, and a body which
+        # failed to parse as JSON is not re-parsed to find that out a
+        # second time. Stashed unconditionally -- check() already
+        # normalises a non-dict body -- so the fallback fetch in
+        # validate_request only runs when log_request never ran. The
+        # one body it cannot distinguish is a JSON null, which stashes
+        # the same None as "unset"; the fallback re-fetch is answered
+        # from flask's parse cache in that case.
+        try:
+            setattr(flask.g, validation.PARSED_BODY, j)
+        except RuntimeError:
+            pass
+
         if j:
-            for key in j:
-                if key == 'uuid':
-                    destkey = 'passed_uuid'
-                else:
-                    destkey = key
-                kwargs[destkey] = j[key]
+            # Only a JSON object can merge into kwargs. Any other JSON
+            # document -- a list, a string, a number -- has always been
+            # refused as a 400 (previously by the per-key merge raising
+            # TypeError on the lookup), and this guard keeps it that
+            # way: dict.update would raise ValueError for most of them,
+            # which nothing in the decorator chain catches, and would
+            # silently merge a list of two-character strings as key
+            # value pairs.
+            if not isinstance(j, dict):
+                raise TypeError('the request body must be a JSON object')
+
+            # A body key with the same name as a URL path parameter
+            # overwrites it. Recorded here rather than in the validator
+            # because this decorator is applied outside it and so runs
+            # first: by the time the validator sees kwargs the overwrite
+            # has happened and is indistinguishable from a path
+            # parameter which simply had that value (decision D12).
+            #
+            # The 'uuid' -> 'passed_uuid' remap which used to live here
+            # was not the dodge decision D8 cites it as. 'passed_uuid'
+            # occurred nowhere else in the tree, so no handler accepted
+            # it and a body 'uuid' was a guaranteed 400 carrying
+            # interpreter text on every endpoint in the API. Dropped, so
+            # a body 'uuid' is now an undeclared parameter like any
+            # other and is reported as one (decision D11).
+            collisions = set(j) & set(kwargs)
+            if collisions:
+                try:
+                    setattr(flask.g, validation.BODY_PATH_COLLISIONS,
+                            collisions)
+                except RuntimeError:
+                    # No application context. Losing the record is
+                    # survivable; replacing the request is not.
+                    pass
+            kwargs.update(j)
 
         formatted_headers = []
         for header in flask.request.headers:
@@ -1156,6 +1274,15 @@ def record_exception(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            # An HTTPException carrying a crafted response is a
+            # deliberate abort -- _webargs_error is the one source in
+            # this tree -- not a server fault. Recording it would write
+            # an exception record for every malformed query parameter.
+            # Mirrors the carve-out on the got_request_exception
+            # handler in app.py.
+            if isinstance(e, HTTPException) and e.response is not None:
+                raise
+
             # suppress_exceptions_to_client wraps this decorator -- it
             # is last in Resource.method_decorators and therefore
             # outermost -- and is guaranteed to log the full detail of
@@ -1192,6 +1319,20 @@ def suppress_exceptions_to_client(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            # A deliberate abort carrying a crafted response is returned
+            # as that response rather than suppressed into a 500.
+            # HTTPException is an Exception subclass, so without this
+            # the 400 _webargs_error aborts with would never reach a
+            # client -- which is exactly what happened to webargs' own
+            # 422 abort for as long as the @use_kwargs sites have
+            # existed. Restricted to response-carrying exceptions so a
+            # bare abort() somewhere cannot start answering werkzeug's
+            # HTML error pages: every response in this API is
+            # {"error": ..., "status": ...}, and an abort which wants
+            # through this gate has to build one.
+            if isinstance(e, HTTPException) and e.response is not None:
+                return e.response
+
             # Attach the exception class, traceback and request context as
             # explicit structured fields. The .exception() call also carries
             # exc_info for the formatter's exception_class / stack_trace
@@ -1297,6 +1438,110 @@ def _enforce_scope(func, resource_class, override):
     return wrapper
 
 
+def validate_request(func):
+    """Check a request against its published parameter declarations.
+
+    Phase 3 of PLAN-api-input-validation. While API_VALIDATION_MODE is
+    'warn' -- the default, and what phase 3 ships -- this changes
+    nothing about any request: it records what it would have refused
+    and calls through. app.py emits those records once the response
+    status is known, because whether a finding represents a rejection
+    enforcement would *introduce* or a status code it would merely
+    *change* depends on what the request returned anyway.
+
+    First in Resource.method_decorators and so innermost, which puts it
+    after authentication (an unauthenticated caller cannot probe the
+    schema) and before every per-method decorator. That ordering is
+    also why enforcement is a contract change beyond the obvious: a
+    request which is both malformed and refers to a missing object is
+    answered here rather than by the 404 an arg_is_* decorator would
+    have returned.
+
+    Being innermost is also what makes func a bound method, so the
+    endpoint class is readable from it without depending on attribute
+    propagation through the decorators in this file which predate
+    functools.wraps.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # The operator's safety valve: if the layer itself is the
+        # problem -- log volume from a chatty caller being the
+        # foreseeable case -- it can be turned off without a downgrade.
+        if config.API_VALIDATION_MODE == 'off':
+            return func(*args, **kwargs)
+
+        resource = getattr(func, '__self__', None)
+        if resource is None:
+            return func(*args, **kwargs)
+
+        compiled = validation.REGISTRY.get(
+            (type(resource).__name__, flask.request.method.lower()))
+        if compiled is None:
+            # Undocumented by design: Root, Livez and Readyz. The list is
+            # held closed by test_parameter_declarations.py, so this is
+            # not a way for a new endpoint to opt out silently.
+            return func(*args, **kwargs)
+
+        # A raw body is bytes of arbitrary size which check() would
+        # ignore anyway, so it is never fetched: flask_get_post_body()
+        # attempts two full JSON parses of a body that is not JSON
+        # before returning nothing, and the upload data path is the
+        # API's bulk transfer route. Everything else reads the body
+        # log_request already parsed and merged, so validation reports
+        # on exactly what the handler receives; the fallback fetch only
+        # runs if log_request somehow did not stash one.
+        body: dict[str, Any] = {}
+        if not compiled.raw_body:
+            stashed = getattr(flask.g, validation.PARSED_BODY, None)
+            body = (stashed if stashed is not None
+                    else sf_api.flask_get_post_body() or {})
+        findings = validation.check(
+            compiled, body, flask.request.args.to_dict(),
+            getattr(flask.g, validation.BODY_PATH_COLLISIONS, set()))
+        if not findings:
+            return func(*args, **kwargs)
+
+        # Stashed before the enforce decision, so a rejected request
+        # still emits its finding lines from the after_request hook --
+        # carrying mode=enforce and the 400. Rejecting silently would
+        # turn the measurement apparatus off at the exact moment phase
+        # 4 flips the switch, which is when an operator most needs to
+        # see which parameter a refused request was refused for.
+        try:
+            setattr(flask.g, validation.VALIDATION_FINDINGS, findings)
+        except RuntimeError:
+            pass
+
+        if config.API_VALIDATION_MODE == 'enforce':
+            # required is recorded and never enforced, even here:
+            # several parameters are declared required while omitting
+            # them has always worked (CompiledEndpoint's docstring has
+            # the example), so a missing-required finding is telemetry
+            # for phase 6's decision, not grounds for rejection.
+            enforceable = [f for f in findings
+                           if f.reason != validation.MISSING_REQUIRED]
+            if enforceable:
+                first = enforceable[0]
+                return sf_api.error(
+                    400, '%s: %s' % (first.parameter, first.detail))
+
+        return func(*args, **kwargs)
+
+    # Being first in method_decorators means every entry after this one
+    # sees this wrapper rather than the bound method.
+    # _authenticate_unless_public reads __self__ for the resource class
+    # and _sf_public / _sf_scope for the policy markers, and this file
+    # already documents that several of its decorators predate
+    # functools.wraps and swallow attributes. functools.wraps above
+    # carries the function __dict__, which is where _sf_public,
+    # _sf_scope and flasgger's specs_dict live; __self__ is a bound
+    # method attribute rather than a dict entry, so it is copied here.
+    # Without both, every @public endpoint would start demanding a token
+    # and every scope check would lose the class it is scoped to.
+    wrapper.__self__ = getattr(func, '__self__', None)  # type: ignore[attr-defined]  # noqa: E501
+    return wrapper
+
+
 def _authenticate_unless_public(func):
     # The method_decorators entry which makes authentication the
     # default. flask_restful applies these to the bound method at
@@ -1334,6 +1579,7 @@ class Resource(flask_restful.Resource):
     # ahead of every per-method decorator, so an unauthenticated
     # request never reaches an ownership check.
     method_decorators = [
+        validate_request,
         _authenticate_unless_public,
         log_request,
         handle_authorization_exceptions,

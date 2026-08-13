@@ -4,6 +4,7 @@ import os
 import socket
 import sys
 from typing import Annotated
+from typing import Literal
 from typing import NoReturn
 from typing import Optional
 
@@ -165,6 +166,24 @@ class SFConfig(BaseSettings):
     API_TOKEN_DURATION: int = Field(
         15,
         description='How long in minutes an API token is valid for.'
+    )
+    # Literal rather than str so a typo fails at config load. The
+    # setting exists to be flipped, and 'Enforce' or 'enforced'
+    # silently meaning warn is exactly the operator error that would
+    # otherwise go unnoticed until an incident.
+    API_VALIDATION_MODE: Literal['off', 'warn', 'enforce'] = Field(
+        'warn',
+        description=(
+            'What the request validation layer does with input which does '
+            'not match an endpoint\'s published parameter declarations. '
+            '"warn" logs what it would have rejected and changes nothing, '
+            'which is phase 3 of PLAN-api-input-validation; "enforce" '
+            'answers 400 (except for missing-required findings, which are '
+            'recorded and never enforced); "off" disables the layer '
+            'entirely, as a safety valve against unexpected log volume. '
+            'Leave this at "warn" until the warn log is understood -- see '
+            'docs/developer_guide/writing_an_endpoint.md.'
+        )
     )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(
         16384,

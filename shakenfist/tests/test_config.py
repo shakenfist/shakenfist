@@ -34,3 +34,18 @@ class ConfigTestCase(base.ShakenFistTestCase):
                      {'SHAKENFIST_NODE_RAM_RESERVATION_GB': 'banana'})
     def test_bogus_override(self):
         self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_API_VALIDATION_MODE': 'enforced'})
+    def test_bogus_validation_mode_fails_at_load(self):
+        # The setting exists to be flipped to 'enforce' in phase 4 of
+        # PLAN-api-input-validation. A typo silently meaning warn is no
+        # validation and no signal anything is wrong, so anything other
+        # than the two literals must refuse to load.
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_API_VALIDATION_MODE': 'enforce'})
+    def test_valid_validation_mode_loads(self):
+        conf = SFConfig()
+        self.assertEqual('enforce', conf.API_VALIDATION_MODE)
