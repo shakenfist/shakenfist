@@ -310,50 +310,40 @@ Offset  Size  Type    Field
 
 ### Initialization
 
-```
-    Client                Agent               Server
-      |                     |                    |
-      |  ANNOUNCE_CAPABILITIES (request=1)       |
-      |-------------------->|                    |
-      |                     |                    |
-      |  ANNOUNCE_CAPABILITIES (request=0)       |
-      |<--------------------|                    |
-      |                     |                    |
-      |  MONITORS_CONFIG                         |
-      |-------------------->|                    |
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Agent
+
+    Client->>Agent: ANNOUNCE_CAPABILITIES (request=1)
+    Agent->>Client: ANNOUNCE_CAPABILITIES (request=0)
+    Client->>Agent: MONITORS_CONFIG
 ```
 
 ### Clipboard Copy (Client to Guest)
 
-```
-    Client                Agent
-      |                     |
-      |  CLIPBOARD_GRAB     |
-      |-------------------->|
-      |                     |
-      |  CLIPBOARD_REQUEST  |
-      |<--------------------|
-      |                     |
-      |  CLIPBOARD (data)   |
-      |-------------------->|
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Agent
+
+    Client->>Agent: CLIPBOARD_GRAB
+    Agent->>Client: CLIPBOARD_REQUEST
+    Client->>Agent: CLIPBOARD (data)
 ```
 
 ### File Transfer
 
-```
-    Client                Agent
-      |                     |
-      |  FILE_XFER_START    |
-      |-------------------->|
-      |                     |
-      |  FILE_XFER_DATA     |
-      |-------------------->|
-      |  FILE_XFER_DATA     |
-      |-------------------->|
-      |  ...                |
-      |                     |
-      |  FILE_XFER_STATUS   |
-      |<--------------------|
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Agent
+
+    Client->>Agent: FILE_XFER_START
+    loop until the whole file has been sent
+        Client->>Agent: FILE_XFER_DATA
+    end
+    Agent->>Client: FILE_XFER_STATUS
 ```
 
 ## Security Considerations

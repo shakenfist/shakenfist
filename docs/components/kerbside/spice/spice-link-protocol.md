@@ -14,23 +14,16 @@ that is called out explicitly.
 
 The SPICE connection handshake follows this sequence:
 
-```
-    Client                                          Server
-      |                                               |
-      |  1. SpiceLinkMess (client hello)              |
-      |---------------------------------------------->|
-      |                                               |
-      |  2. SpiceLinkReply (server hello + pubkey)    |
-      |<----------------------------------------------|
-      |                                               |
-      |  3. ClientAuthPacket (encrypted password)     |
-      |---------------------------------------------->|
-      |                                               |
-      |  4. ServerAuthPacket (result code)            |
-      |<----------------------------------------------|
-      |                                               |
-      |  5. Bidirectional channel communication       |
-      |<--------------------------------------------->|
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Client->>Server: 1. SpiceLinkMess (client hello)
+    Server->>Client: 2. SpiceLinkReply (server hello + pubkey)
+    Client->>Server: 3. ClientAuthPacket (encrypted password)
+    Server->>Client: 4. ServerAuthPacket (result code)
+    Note over Client,Server: 5. Bidirectional channel communication
 ```
 
 ## SpiceLinkMess (Client Hello)
@@ -324,25 +317,16 @@ Kerbside enforces TLS for all client connections:
 
 Kerbside's proxy implements the following state machine for TLS connections:
 
-```
-+-------------------+
-|  ClientSpiceLinkMess  |  <-- Initial state
-+---------+---------+
-          |
-          | Parse client hello, generate RSA keypair,
-          | send server hello with public key
-          v
-+-------------------+
-|   ClientPassword   |
-+---------+---------+
-          |
-          | Decrypt token, validate, lookup console,
-          | connect to hypervisor, send auth result
-          v
-+-------------------+
-|    ClientProxy     |  <-- Bidirectional relay mode
-|    ServerProxy     |
-+-------------------+
+```mermaid
+stateDiagram-v2
+    direction TB
+
+    ClientSpiceLinkMess: ClientSpiceLinkMess (initial state)
+    Proxy: ClientProxy / ServerProxy (bidirectional relay mode)
+
+    [*] --> ClientSpiceLinkMess
+    ClientSpiceLinkMess --> ClientPassword: Parse client hello, generate RSA keypair, send server hello with public key
+    ClientPassword --> Proxy: Decrypt token, validate, lookup console, connect to hypervisor, send auth result
 ```
 
 ## Error Handling

@@ -27,8 +27,7 @@ There are two distinct paths, for two purposes:
   ryll, and asserts the full `run-scenario.sh` Sextant scenario plus a
   live API-terminate test and a non-gating loadtest. Bring one up
   locally with `tools/direct-qemu/lane-up.sh` (the `kerbside-proxy`
-  wheel installed, or `KERBSIDE_PROXY_BIN` set); see
-  [plans/PLAN-rust-proxy-phase-07-ci.md](/components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/).
+  wheel installed, or `KERBSIDE_PROXY_BIN` set).
 
 ## Pieces
 
@@ -218,18 +217,3 @@ than SUN_LEN`. Keep the socket path short — `verify-rust-proxy.sh`
 defaults it under `$XDG_RUNTIME_DIR` (or `/tmp`), not under the
 (possibly deep) workdir, and errors early if a `GRPC_SOCKET` override
 is too long.
-
-## Historical verification records
-
-The dated live-capture records from the Rust proxy bring-up are
-preserved in the plan Outcome sections:
-
-- End-to-end relay through the proxy (2026-07-06):
-  [plans/PLAN-rust-proxy-phase-03-proxy-skeleton.md](/components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/),
-  step 3h.
-- Firewall warn-only capture and deny path (2026-07-07):
-  [plans/PLAN-rust-proxy-phase-04-firewall.md](/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/),
-  step 4f.
-- Live session termination (2026-07-08):
-  [plans/PLAN-rust-proxy-phase-05-daemon-integration.md](/components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/),
-  step 5f.

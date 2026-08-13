@@ -6,8 +6,8 @@ images.
 
 ## CI tiers
 
-Since two-tier CI phase 3, develop is protected by a GitHub merge
-queue and the lanes are split into two tiers.
+Develop is protected by a GitHub merge queue and the lanes are split
+into two tiers.
 
 - **The smoke tier** runs on every pull request push: unit tests and
   lint, the direct-qemu lane, and the Shaken Fist end-to-end lane.
@@ -104,8 +104,7 @@ on `merge_group` but skip their heavy jobs there, so a piled-up run
 costs seconds and no cloud capacity.
 
 For the design rationale see
-[plans/PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/) and
-[plans/PLAN-two-tier-ci-phase-03-merge-queue.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/).
+[plans/PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/).
 
 ## End-to-end CI coverage
 
@@ -129,15 +128,13 @@ loadtest image builds the Ryll binary from source (stage 1 of
 Python orchestrator at `loadtests/latency/orchestrator.py` drives
 Ryll's control socket and writes a CSV of latency samples.
 
-The latency metric currently measured is SPICE PING/PONG round-trip
-time (the v1 control-socket `latency` event). This is a temporary
-regression from the legacy keypress-to-screen measurement — phase 6 of
-the test-harness plan will restore the original metric via a
-`surface_drawn` event in the control socket. The CSV shape is
-unchanged from the legacy loadtest: one float per line, seconds, no
-header. See
-[plans/PLAN-test-harness-phase-04-port-latency.md](/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/)
-for the full rationale.
+The metric measured is keypress-to-screen latency: the time between
+the orchestrator sending a `send_key down` and the first
+`surface_drawn` event that follows it, paired FIFO. The orchestrator
+hard-fails if the client does not advertise and accept a
+`surface_drawn` subscription (control socket v1.1 or newer), rather
+than silently falling back to a different metric under the same column
+name. The CSV is one float per line, seconds, no header.
 
 ## Testing the SPICE console of an oVirt VM
 
@@ -193,8 +190,8 @@ nightly and on dispatch.
 
 ## The oVirt end-to-end kerbside lane
 
-Since two-tier CI phase 1, the `ovirt_matrix` job in
-`.github/workflows/functional-tests.yml` does more than build and
+The `ovirt_matrix` job in `.github/workflows/functional-tests.yml`
+does more than build and
 probe the oVirt environment: it also deploys the PR's own kerbside
 (package plus the manylinux Rust proxy wheel) on the CI runner,
 registers a live `type: ovirt` source against the engine it just
@@ -229,9 +226,7 @@ actually enforces; `_resolve_vnic_profile` is covered by
 `kerbside/tests/unit/test_create_ovirt_vnc_vm.py`.
 
 The runner-side scripts live in `tools/ovirt-e2e/` and are
-documented in `tools/ovirt-e2e/README.md`; the architecture decision
-and bring-up history are in
-[plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/).
+documented in `tools/ovirt-e2e/README.md`.
 The lane is a worked example of the deployment described in
 [use-cases/ovirt.md](/components/kerbside/use-cases/ovirt/), which is the operator-facing
 version of what it proves.
@@ -247,9 +242,8 @@ against a running Kolla-Ansible deployment. It is invoked
 automatically by the `openstack_matrix` job in
 `.github/workflows/functional-tests.yml` after the `test-console`
 smoke check, so the GitHub Actions CI iterates on the plugin's tests
-on every merge-queue entry (the cloud matrices moved from per-PR to
-the merge tier in two-tier CI phase 3) rather than relying on
-upstream Zuul as the first signal.
+on every merge-queue entry (the cloud matrices run in the merge tier,
+not per-PR) rather than relying on upstream Zuul as the first signal.
 The script:
 
 1. Creates a Python venv at `/srv/kerbside-tempest/venv`.

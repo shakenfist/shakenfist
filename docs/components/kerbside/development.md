@@ -49,6 +49,38 @@ alembic downgrade -1
 kerbside configuration, so ensure your kerbside config is properly set
 up before running migrations.
 
+## Diagrams in the documentation
+
+Diagrams in `docs/` are [mermaid](https://mermaid.js.org/) fenced
+blocks, which GitHub renders natively -- not ASCII art. Prefer a
+vertical flow (`flowchart TD`, `stateDiagram-v2`, `erDiagram`) so a
+diagram stays readable on a narrow page; `sequenceDiagram` is the
+right choice for a message exchange between two peers.
+
+Two kinds of fenced block in `docs/spice/` are deliberately *not*
+diagrams and stay as plain text: the `Offset Size Type Field` byte
+tables that document a wire structure field by field, and the
+byte-layout boxes in
+[spice/protocol-overview.md](/components/kerbside/spice/protocol-overview/). Mermaid's
+`packet` diagram is the only construct that fits the latter, and
+GitHub's mermaid version does not reliably support it yet, so the
+ASCII survives until that changes.
+
+The database entity relationship diagram exists twice: in
+[schema.md](/components/kerbside/schema/) and, for standalone viewing, in
+`docs/schema.html`. Keep the two in sync -- the `add-database-migration`
+skill says to update both.
+
+No CI lane validates the diagrams -- a syntax error renders as an
+inline error box on GitHub rather than failing a check. To check a
+diagram before pushing, run mermaid-cli over the markdown file that
+contains it; mmdc renders each fenced mermaid block and exits non-zero
+on a syntax error, which is the actual check:
+
+```shell
+npx -p @mermaid-js/mermaid-cli mmdc -i docs/index.md -o /tmp/index-rendered.md
+```
+
 ## Review tracking
 
 Kerbside receives periodic whole-file human review in addition to the

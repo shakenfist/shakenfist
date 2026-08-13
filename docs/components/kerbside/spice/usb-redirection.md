@@ -527,38 +527,21 @@ For isochronous and buffered bulk streams:
 
 A typical USB redirection session follows this flow:
 
-```
-    Client                                     Server (VM)
-      |                                            |
-      |  usb_redir_hello (version + caps)          |
-      |------------------------------------------->|
-      |                                            |
-      |  usb_redir_hello (version + caps)          |
-      |<-------------------------------------------|
-      |                                            |
-      |  usb_redir_device_connect                  |
-      |------------------------------------------->|
-      |                                            |
-      |  usb_redir_interface_info                  |
-      |------------------------------------------->|
-      |                                            |
-      |  usb_redir_ep_info                         |
-      |------------------------------------------->|
-      |                                            |
-      |  usb_redir_set_configuration               |
-      |<-------------------------------------------|
-      |                                            |
-      |  usb_redir_configuration_status            |
-      |------------------------------------------->|
-      |                                            |
-      |  [ Data transfers: bulk, interrupt, etc ]  |
-      |<------------------------------------------>|
-      |                                            |
-      |  usb_redir_device_disconnect               |
-      |------------------------------------------->|
-      |                                            |
-      |  usb_redir_device_disconnect_ack           |
-      |<-------------------------------------------|
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server as Server (VM)
+
+    Client->>Server: usb_redir_hello (version + caps)
+    Server->>Client: usb_redir_hello (version + caps)
+    Client->>Server: usb_redir_device_connect
+    Client->>Server: usb_redir_interface_info
+    Client->>Server: usb_redir_ep_info
+    Server->>Client: usb_redir_set_configuration
+    Client->>Server: usb_redir_configuration_status
+    Note over Client,Server: Data transfers: bulk, interrupt, etc
+    Client->>Server: usb_redir_device_disconnect
+    Server->>Client: usb_redir_device_disconnect_ack
 ```
 
 ## Kerbside Implementation
