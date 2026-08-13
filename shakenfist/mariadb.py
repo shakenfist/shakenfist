@@ -23642,7 +23642,8 @@ def _derive_cpu_memory_limits(
 def _derive_disk_limit_gb(
         used_disk_gb: int,
         disk_free_instances: Optional[int],
-        disk_reservation_gb: Optional[int]) -> Optional[int]:
+        disk_reservation_gb: Optional[int],
+        disk_overcommit: float) -> Optional[int]:
     """Derive limit_disk_gb from recomputed usage and node_metrics values.
 
     ``disk_free_instances`` is in bytes (as published by the resources
@@ -23651,16 +23652,28 @@ def _derive_disk_limit_gb(
     is the only ground truth that survives qcow2 growth, so the limit is
     "current virtual drawdown plus what the filesystem says still fits":
     ``used_disk_gb + max(0, floor(disk_free_instances/GiB) -
-    disk_reservation_gb)``. The phase 3 guard ``used + x <= limit`` is
-    then exactly today's free-space check, while accounting virtual size.
+    disk_reservation_gb) x disk_overcommit``. The phase 3 guard
+    ``used + x <= limit`` is then today's free-space check scaled by
+    ``disk_overcommit`` on the headroom term only, while accounting
+    virtual size (decision P3,
+    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md).
+    ``disk_overcommit`` of 1.0 reproduces the pre-ratio arithmetic
+    exactly.
 
     Returns None when the metrics inputs are NULL, so the caller keeps
     the previous limit rather than zeroing it.
     """
     if disk_free_instances is None or disk_reservation_gb is None:
         return None
-    return used_disk_gb + max(
-        0, math.floor(disk_free_instances / GiB) - disk_reservation_gb)
+    if disk_overcommit <= 0:
+        # A caller mid-upgrade (an unset proto3 double field reads as
+        # 0.0) must not silently zero every node's headroom; 1.0 is the
+        # pre-ratio behaviour.
+        disk_overcommit = 1.0
+    headroom = math.floor(max(
+        0, math.floor(disk_free_instances / GiB) - disk_reservation_gb) *
+        disk_overcommit)
+    return used_disk_gb + headroom
 
 
 def _decayed_demand_contribution(
@@ -23949,7 +23962,8 @@ def _reconcile_fetch_demand(
 
 def _direct_reconcile_scheduler_capacity(
         demand_per_vcpu: float,
-        demand_decay_seconds: int) -> Optional[dict[str, Any]]:
+        demand_decay_seconds: int,
+        disk_overcommit: float) -> Optional[dict[str, Any]]:
     """Run one full capacity reconcile pass directly against MariaDB.
 
     One pass, in order (D5): expire stale namespace claims; refresh node
@@ -23960,7 +23974,8 @@ def _direct_reconcile_scheduler_capacity(
 
     CPU_OVERCOMMIT_RATIO and RAM_OVERCOMMIT_RATIO come from this
     process's config: they are cluster-wide settings the database daemon
-    shares, unlike the demand parameters which ride in from the caller.
+    shares, unlike the demand parameters and ``disk_overcommit`` which
+    ride in from the caller.
 
     Nothing else writes these tables until phase 3, so the
     per-statement writes need no enclosing transaction; the single
@@ -24152,7 +24167,8 @@ def _direct_reconcile_scheduler_capacity(
                     limit_disk_gb = _derive_disk_limit_gb(
                         used[2],
                         metrics_row.disk_free_instances,
-                        metrics_row.disk_reservation_gb)
+                        metrics_row.disk_reservation_gb,
+                        disk_overcommit)
                 if prev_row is not None:
                     if limit_cpus is None:
                         limit_cpus = prev_row.limit_cpus
@@ -24305,7 +24321,8 @@ def _direct_reconcile_scheduler_capacity(
 
 def _grpc_reconcile_scheduler_capacity(
         demand_per_vcpu: float,
-        demand_decay_seconds: int) -> Optional[dict[str, Any]]:
+        demand_decay_seconds: int,
+        disk_overcommit: float) -> Optional[dict[str, Any]]:
     """Run a capacity reconcile pass via the database microservice.
 
     The only caller is the cluster daemon's elected loop, which pets the
@@ -24322,7 +24339,8 @@ def _grpc_reconcile_scheduler_capacity(
         stub = _get_database_stub()
         request = database_pb2.ReconcileSchedulerCapacityRequest(
             demand_per_vcpu=demand_per_vcpu,
-            demand_decay_seconds=demand_decay_seconds)
+            demand_decay_seconds=demand_decay_seconds,
+            disk_overcommit=disk_overcommit)
         reply = _grpc_call(
             stub.ReconcileSchedulerCapacity, request,
             timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
@@ -24383,8 +24401,9 @@ def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
     """Run one scheduler capacity reconcile pass.
 
     Called from the cluster daemon's elected-leader loop. The demand
-    parameters come from this process's config so the database daemon
-    needs no copy of the scheduler configuration.
+    parameters and SCHEDULER_DISK_OVERCOMMIT come from this process's
+    config so the database daemon needs no copy of the scheduler
+    configuration.
 
     Returns a summary dict:
 
@@ -24408,7 +24427,9 @@ def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
     if _use_database_service():
         return _grpc_reconcile_scheduler_capacity(
             config.SCHEDULER_DEMAND_PER_VCPU,
-            config.SCHEDULER_DEMAND_DECAY_SECONDS)
+            config.SCHEDULER_DEMAND_DECAY_SECONDS,
+            config.SCHEDULER_DISK_OVERCOMMIT)
     return _direct_reconcile_scheduler_capacity(
         config.SCHEDULER_DEMAND_PER_VCPU,
-        config.SCHEDULER_DEMAND_DECAY_SECONDS)
+        config.SCHEDULER_DEMAND_DECAY_SECONDS,
+        config.SCHEDULER_DISK_OVERCOMMIT)

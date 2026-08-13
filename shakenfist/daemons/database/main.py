@@ -2492,7 +2492,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 return database_pb2.ReconcileSchedulerCapacityReply(
                     success=False)
             result = mariadb._direct_reconcile_scheduler_capacity(
-                request.demand_per_vcpu, request.demand_decay_seconds)
+                request.demand_per_vcpu, request.demand_decay_seconds,
+                request.disk_overcommit)
             if result is None:
                 return database_pb2.ReconcileSchedulerCapacityReply(
                     success=False)

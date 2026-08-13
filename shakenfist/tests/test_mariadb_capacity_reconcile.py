@@ -112,7 +112,14 @@ class LimitDerivationTestCase(base.ShakenFistTestCase):
 
 
 class DiskLimitTestCase(base.ShakenFistTestCase):
-    """_derive_disk_limit_gb() mirrors _has_sufficient_disk."""
+    """_derive_disk_limit_gb() mirrors _has_sufficient_disk.
+
+    disk_overcommit=1.0 is passed throughout unless the case is
+    specifically about the ratio (decision P3,
+    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md), so
+    it reproduces the pre-ratio arithmetic these cases were written
+    against.
+    """
 
     def test_matches_scheduler_free_space_check(self):
         # scheduler.py _has_sufficient_disk admits while
@@ -123,7 +130,8 @@ class DiskLimitTestCase(base.ShakenFistTestCase):
         disk_free = 803469852672  # bytes; 748.28... GiB
         reservation = 20
         used = 100
-        limit = mariadb._derive_disk_limit_gb(used, disk_free, reservation)
+        limit = mariadb._derive_disk_limit_gb(
+            used, disk_free, reservation, 1.0)
         self.assertEqual(used + 728, limit)
 
         scheduler_headroom = disk_free / GiB - reservation
@@ -135,17 +143,68 @@ class DiskLimitTestCase(base.ShakenFistTestCase):
 
     def test_exact_gib_conversion(self):
         self.assertEqual(
-            1, mariadb._derive_disk_limit_gb(0, GiB, 0))
+            1, mariadb._derive_disk_limit_gb(0, GiB, 0, 1.0))
 
     def test_clamps_negative_headroom(self):
         # Free space below the reservation must clamp to zero headroom,
         # not shrink the limit below current drawdown.
         self.assertEqual(
-            100, mariadb._derive_disk_limit_gb(100, 10 * GiB, 20))
+            100, mariadb._derive_disk_limit_gb(100, 10 * GiB, 20, 1.0))
 
     def test_null_inputs_derive_none(self):
-        self.assertIsNone(mariadb._derive_disk_limit_gb(100, None, 20))
-        self.assertIsNone(mariadb._derive_disk_limit_gb(100, GiB, None))
+        self.assertIsNone(mariadb._derive_disk_limit_gb(100, None, 20, 1.0))
+        self.assertIsNone(mariadb._derive_disk_limit_gb(100, GiB, None, 1.0))
+
+    def test_overcommit_scales_headroom_only(self):
+        # used stays untouched; only the free-space headroom term is
+        # multiplied by the ratio.
+        used = 100
+        disk_free = 10 * GiB
+        reservation = 2
+        headroom = math.floor(disk_free / GiB) - reservation
+        limit = mariadb._derive_disk_limit_gb(
+            used, disk_free, reservation, 4.0)
+        self.assertEqual(used + math.floor(headroom * 4.0), limit)
+        self.assertEqual(used + 32, limit)
+
+    def test_overcommit_one_reproduces_previous_arithmetic(self):
+        disk_free = 803469852672  # bytes; 748.28... GiB
+        reservation = 20
+        used = 100
+        self.assertEqual(
+            mariadb._derive_disk_limit_gb(used, disk_free, reservation, 1.0),
+            used + max(0, math.floor(disk_free / GiB) - reservation))
+
+    def test_non_positive_overcommit_falls_back_to_one(self):
+        # An unset proto3 double field reads as 0.0; a negative value
+        # should never reach here, but both must not silently zero
+        # every node's headroom.
+        used = 100
+        disk_free = 10 * GiB
+        reservation = 2
+        expected = mariadb._derive_disk_limit_gb(
+            used, disk_free, reservation, 1.0)
+        for overcommit in (0.0, -1.0):
+            self.assertEqual(
+                expected,
+                mariadb._derive_disk_limit_gb(
+                    used, disk_free, reservation, overcommit))
+
+    def test_zero_free_space_yields_used_regardless_of_ratio(self):
+        used = 100
+        for overcommit in (1.0, 5.0, 0.0):
+            self.assertEqual(
+                used,
+                mariadb._derive_disk_limit_gb(used, 0, 0, overcommit))
+
+    def test_reservation_exceeds_free_space_regardless_of_ratio(self):
+        # Negative headroom clamps to zero before the ratio is
+        # applied, so the ratio cannot rescue a genuinely full disk.
+        used = 100
+        for overcommit in (1.0, 5.0, 100.0):
+            self.assertEqual(
+                used,
+                mariadb._derive_disk_limit_gb(used, 10 * GiB, 20, overcommit))
 
 
 class DemandDecayTestCase(base.ShakenFistTestCase):
@@ -353,7 +412,7 @@ class ReconcileEmptyClusterTestCase(base.ShakenFistTestCase):
         conn.execute.return_value.rowcount = 0
         with mock.patch('shakenfist.mariadb._get_engine',
                         return_value=mock_engine):
-            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
         return result, conn
 
     def test_empty_cluster_returns_zero_counts(self):
@@ -400,7 +459,7 @@ class ReconcileEmptyClusterTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.mariadb._get_engine',
                         return_value=mock_engine):
             self.assertIsNone(
-                mariadb._direct_reconcile_scheduler_capacity(2.5, 600))
+                mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0))
 
 
 NODE1 = UUID('11111111-1111-1111-1111-111111111111')
@@ -589,7 +648,7 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
                                   'CPU_OVERCOMMIT_RATIO', 3.0), \
                 mock.patch.object(mariadb.config,
                                   'RAM_OVERCOMMIT_RATIO', 3.0):
-            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
         return result, conn
 
     def test_counts_and_reply_rows(self):
@@ -723,7 +782,7 @@ class ReconcileHypervisorFilterTestCase(
                                   'CPU_OVERCOMMIT_RATIO', 3.0), \
                 mock.patch.object(mariadb.config,
                                   'RAM_OVERCOMMIT_RATIO', 3.0):
-            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
         return result, conn
 
     def test_metrics_select_filters_on_is_hypervisor(self):
@@ -1022,7 +1081,8 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
             database_main.DatabaseService)
         servicer.monitor = mock.MagicMock()
         request = database_pb2.ReconcileSchedulerCapacityRequest(
-            demand_per_vcpu=2.5, demand_decay_seconds=600)
+            demand_per_vcpu=2.5, demand_decay_seconds=600,
+            disk_overcommit=5.0)
         with mock.patch(
                 'shakenfist.mariadb._direct_reconcile_scheduler_capacity',
                 return_value=direct_result):
@@ -1038,7 +1098,8 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
                         return_value=stub), \
                 mock.patch('shakenfist.mariadb._grpc_call',
                            return_value=reply):
-            unpacked = mariadb._grpc_reconcile_scheduler_capacity(2.5, 600)
+            unpacked = mariadb._grpc_reconcile_scheduler_capacity(
+                2.5, 600, 5.0)
 
         self.assertEqual(self.SUMMARY, unpacked)
 
@@ -1052,7 +1113,7 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
                         return_value=stub), \
                 mock.patch('shakenfist.mariadb._grpc_call',
                            return_value=reply) as mock_call:
-            mariadb._grpc_reconcile_scheduler_capacity(2.5, 600)
+            mariadb._grpc_reconcile_scheduler_capacity(2.5, 600, 5.0)
         self.assertEqual(mariadb.BOUNDED_QUERY_TIMEOUT,
                          mock_call.call_args.kwargs['timeout'])
         self.assertEqual(1, mock_call.call_args.kwargs['max_slow_failures'])
@@ -1073,7 +1134,7 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
                                'no gateways')), \
                 mock.patch.object(mariadb, 'LOG') as mock_log:
             self.assertIsNone(
-                mariadb._grpc_reconcile_scheduler_capacity(2.5, 600))
+                mariadb._grpc_reconcile_scheduler_capacity(2.5, 600, 5.0))
 
         mock_log.warning.assert_called_once()
         mock_log.error.assert_not_called()
@@ -1088,7 +1149,7 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
                 mock.patch('shakenfist.mariadb._grpc_call',
                            return_value=reply):
             self.assertIsNone(
-                mariadb._grpc_reconcile_scheduler_capacity(2.5, 600))
+                mariadb._grpc_reconcile_scheduler_capacity(2.5, 600, 5.0))
 
     def test_servicer_swallows_an_unexpected_exception(self):
         # _direct_ only converts OperationalError and IntegrityError to
@@ -1097,7 +1158,8 @@ class ReconcileReplyRoundTripTestCase(base.ShakenFistTestCase):
             database_main.DatabaseService)
         servicer.monitor = mock.MagicMock()
         request = database_pb2.ReconcileSchedulerCapacityRequest(
-            demand_per_vcpu=2.5, demand_decay_seconds=600)
+            demand_per_vcpu=2.5, demand_decay_seconds=600,
+            disk_overcommit=5.0)
         with mock.patch(
                 'shakenfist.mariadb._direct_reconcile_scheduler_capacity',
                 side_effect=ValueError('boom')):
@@ -1116,9 +1178,11 @@ class ReconcilePublicRoutingTestCase(base.ShakenFistTestCase):
         with mock.patch.object(mariadb.config,
                                'SCHEDULER_DEMAND_PER_VCPU', 2.5), \
                 mock.patch.object(mariadb.config,
-                                  'SCHEDULER_DEMAND_DECAY_SECONDS', 600):
+                                  'SCHEDULER_DEMAND_DECAY_SECONDS', 600), \
+                mock.patch.object(mariadb.config,
+                                  'SCHEDULER_DISK_OVERCOMMIT', 5.0):
             mariadb.reconcile_scheduler_capacity()
-        mock_grpc.assert_called_once_with(2.5, 600)
+        mock_grpc.assert_called_once_with(2.5, 600, 5.0)
 
     @mock.patch('shakenfist.mariadb._direct_reconcile_scheduler_capacity')
     @mock.patch('shakenfist.mariadb._use_database_service',
@@ -1127,6 +1191,8 @@ class ReconcilePublicRoutingTestCase(base.ShakenFistTestCase):
         with mock.patch.object(mariadb.config,
                                'SCHEDULER_DEMAND_PER_VCPU', 2.5), \
                 mock.patch.object(mariadb.config,
-                                  'SCHEDULER_DEMAND_DECAY_SECONDS', 600):
+                                  'SCHEDULER_DEMAND_DECAY_SECONDS', 600), \
+                mock.patch.object(mariadb.config,
+                                  'SCHEDULER_DISK_OVERCOMMIT', 5.0):
             mariadb.reconcile_scheduler_capacity()
-        mock_direct.assert_called_once_with(2.5, 600)
+        mock_direct.assert_called_once_with(2.5, 600, 5.0)

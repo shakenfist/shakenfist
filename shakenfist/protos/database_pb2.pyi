@@ -8864,19 +8864,23 @@ class ReconcileSchedulerCapacityRequest(_message.Message):
 
     DEMAND_PER_VCPU_FIELD_NUMBER: _builtins.int
     DEMAND_DECAY_SECONDS_FIELD_NUMBER: _builtins.int
+    DISK_OVERCOMMIT_FIELD_NUMBER: _builtins.int
     demand_per_vcpu: _builtins.float
     """Expected load per placed vCPU"""
     demand_decay_seconds: _builtins.int
     """Linear decay window for placements"""
+    disk_overcommit: _builtins.float
+    """Multiplier on the disk limit's free-space headroom term (P3)"""
     def __init__(
         self,
         *,
         demand_per_vcpu: _builtins.float = ...,
         demand_decay_seconds: _builtins.int = ...,
+        disk_overcommit: _builtins.float = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["demand_decay_seconds", b"demand_decay_seconds", "demand_per_vcpu", b"demand_per_vcpu"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["demand_decay_seconds", b"demand_decay_seconds", "demand_per_vcpu", b"demand_per_vcpu", "disk_overcommit", b"disk_overcommit"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

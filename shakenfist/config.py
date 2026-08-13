@@ -398,6 +398,16 @@ class SFConfig(BaseSettings):
             'of shared pages.'
         )
     )
+    SCHEDULER_DISK_OVERCOMMIT: float = Field(
+        5.0,
+        description=(
+            'Disk capacity claims are virtual disk sizes, which heavily '
+            'over-claim actual usage for sparse images. This ratio '
+            'multiplies the free-space headroom term of the node disk '
+            'limit derivation, so admission can overcommit empty space '
+            'while a genuinely full disk still admits nothing.'
+        )
+    )
     NODE_RAM_RESERVATION_GB: float = Field(
         2.0,
         description=(

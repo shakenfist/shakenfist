@@ -557,6 +557,19 @@ reconcile pass/failure counters, last-success timestamp and duration)
 exported from the cluster daemon's metrics port (`CLUSTER_METRICS_PORT`,
 default `13007`), plus one structured log line per reconcile pass.
 
+Disk capacity is claimed at virtual size, which the phase 0 step 3
+addendum measured at 40-140x actual usage (median ~65x) for sparse
+qcow2 images, so a within-period burst of virtual claims would be
+rejected against last-observed actual free space.
+`SCHEDULER_DISK_OVERCOMMIT` (default 5.0) multiplies the free-space
+headroom term of each node's derived disk limit — `used + max(0,
+floor(free/GiB) - reservation) x SCHEDULER_DISK_OVERCOMMIT` — never
+the used (drawdown) term and never a physical-disk total, since no
+such metric exists. A genuinely full disk still admits nothing:
+headroom goes to zero with free space regardless of the ratio. A
+value at or below zero (including an unset field from a mid-upgrade
+caller) falls back to 1.0, the pre-ratio arithmetic.
+
 A node only has a capacity row while it could actually be scheduled
 onto, so expect rows to appear and disappear as nodes change state. A
 node loses its row when it stops being a hypervisor, when it leaves the

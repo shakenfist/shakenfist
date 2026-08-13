@@ -312,7 +312,7 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
             conn.commit()
 
     def _reconcile(self):
-        result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+        result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
         self.assertIsNotNone(result, 'reconcile pass failed')
         return result
 

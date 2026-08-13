@@ -2563,6 +2563,7 @@ message ReapFederationReply {
 message ReconcileSchedulerCapacityRequest {
   double demand_per_vcpu = 1;      // Expected load per placed vCPU
   int64 demand_decay_seconds = 2;  // Linear decay window for placements
+  double disk_overcommit = 3;      // Multiplier on the disk limit's free-space headroom term (P3)
 }
 
 // One scheduler_node_capacity row after the pass. The delta_used_*
