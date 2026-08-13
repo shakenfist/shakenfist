@@ -54,14 +54,18 @@ the following steps need to occur:
    implemented.
 
 2. The cloud boots the instance that runs the desktop. The Broker waits for the
-   instance to be booted.
+   instance to be booted. In some cases the broker needs to perform additional
+   configuration on the instance once it has booted -- for example for OpenStack
+   the broker must request a console access token that is then provided to
+   Kerbside as proof of the right to connect to that specific instance.
 
 3. The Broker requests a `.vv` virt-viewer compatible ini file from Kerbside,
    and delivers that to the requesting user. The configuration file describes a
    connection to Kerbside, along with short lived access token.
 
-4. The user opens the `.vv` file with a SPICE client such as `remote-viewer`.
-   `remote-viewer` connects to Kerbside.
+4. The user opens the `.vv` file with a SPICE client such as `remote-viewer` or
+   [`ryll`](https://shakenfist.com/components/ryll/). This client connects to
+   Kerbside.
 
 5. Kerbside uses the access token to determine which instance in the cloud is
    the requested desktop and initiates a proxied connection to the hypervisor.
@@ -69,27 +73,35 @@ the following steps need to occur:
 6. The user then happily uses their SPICE console, largely unaware of these
    various steps.
 
+7. Kerbside monitors the SPICE protocol traffic as it flows between the client
+   and the hypervisor and enforces simple packet validity and security rules
+   on the traffic. This stops the client from attempting to exploit the
+   hypervisor by sending deliberately malformed requests.
+
+8. A Kerbside administrator may choose to terminate a session for various
+   business reasons. If requested, Kerbside will tear down the channel between
+   the client and the hypervisor, and the hypervisor will detect a client
+   disconnect.
+
 ### Connection Flow Diagram
 
+```mermaid
+flowchart TD
+    broker["External Broker<br/>(SF/Horizon)"]
+    client["User's SPICE Client<br/>(remote-viewer, ryll)"]
+    kerbside["Kerbside<br/>SPICE Proxy"]
+    hypervisor["Hypervisor<br/>(QEMU/KVM)"]
+
+    broker -- "3. Request .vv file" --> kerbside
+    broker -- "3. Deliver .vv file" --> client
+    client -- "4. Open .vv file, connect<br/>with access token" --> kerbside
+    kerbside -- "5. Connect to console" --> hypervisor
 ```
-+------------------+              +-------------------+              +------------------+
-|                  |              |                   |              |                  |
-|  External Broker |  1. Request  |     Kerbside      |  5. Connect  |   Hypervisor     |
-|  (SF/Horizon)    +------------->|   SPICE Proxy     +------------->|   (QEMU/KVM)     |
-|                  |   .vv file   |                   |   to console |                  |
-+--------+---------+              +---------+---------+              +------------------+
-         |                                  ^
-         | 2. Return                        |
-         |    .vv file                      | 4. Connect with
-         v                                  |    access token
-+--------+---------+                        |
-|                  |                        |
-|   User's SPICE   +------------------------+
-|   Client         |  3. User opens .vv file
-|  (remote-viewer) |
-|                  |
-+------------------+
-```
+
+Edge numbers match the steps above. Steps 1, 2, and 6 happen outside
+the components shown, and steps 7 and 8 happen inside Kerbside on the
+established client to hypervisor path, so they have no arrow of their
+own.
 
 ### Implementation in OpenStack
 
@@ -112,6 +124,12 @@ ports on the hypervisor, and so Kerbside acts as an intermediary to protect
 those hypervisors. There is a sample implementation of Kerbside deployment using
 Kolla-Ansible in the
 [Kerbside Patches repository](https://github.com/shakenfist/kerbside-patches).
+At the time of last update to this document, the Kolla OpenStack project had
+merged the OCI build portion of the proposed Kerbside support into the Kolla
+project, but had not yet merged the deployment code into Kolla-Ansible. That
+deployment code is tracked on
+[the OpenStack gerrit review system](https://review.opendev.org/q/topic:%22spice-direct-consoles%22)
+if you are curious as to its current state.
 
 ### What About Bumblebee?
 
@@ -130,16 +148,28 @@ of a HTML5 desktop environment.
 ### Use Cases
 
 One page per deployment permutation: what Kerbside is worth in that
-setting, how the pieces fit together, and how to set it up.
+setting, how the pieces fit together, and how to set it up. The last
+column names the CI lane that exercises the scenario end to end; see
+[testing.md](/components/kerbside/testing/) for what the lanes do and what the tiers mean.
 
-- [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/) - Replacing oVirt's SPICE
-  proxy (squid) with a protocol-aware front door: discovery via the
-  engine API, host-subject pinned TLS to the hypervisor, and the
-  engine, network, and account prerequisites
+| Scenario | Description | Tested in Kerbside CI |
+|----------|-------------|-----------------------|
+| Multi-cloud aggregation | One Kerbside brokering several sources at once, so users keep a single console entry point as workloads move between providers | Not covered |
+| OpenStack | Nova 2025.1 spice-direct consoles, deployed alongside the cluster with Kolla-Ansible via kerbside-patches | `openstack_matrix`, merge tier |
+| [oVirt](/components/kerbside/use-cases/ovirt/) | Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, host-subject pinned TLS to the hypervisor, and the engine, network, and account prerequisites | `ovirt_matrix`, merge tier |
+| Placement topologies | Kerbside instances placed by user population rather than by cloud — one per regional office, close to its users, with the WAN hop as the inspected backend leg | Not covered |
+| Proxmox | Deferred until a Proxmox source driver exists | No source yet |
+| Shaken Fist | Broker embedded in Shaken Fist itself; Ed25519 VDI console tokens exchanged offline at `/sf-console.vv` | `sf-e2e`, smoke tier and nightly |
+| Standalone / static source | The static driver (`kerbside/sources/static.py`) for labs, demos, and direct-qemu style fleets | `direct-qemu`, smoke tier and nightly |
 
-Pages for Shaken Fist, OpenStack, multi-cloud aggregation, placement
-topologies, and the standalone static source are planned; see
+Scenarios without a link are planned rather than written; see
 [plans/PLAN-use-case-docs.md](/components/kerbside/plans/PLAN-use-case-docs/).
+
+The `direct-qemu` lane runs the full daemon + API + MariaDB stack
+against a local qemu SPICE server via the static source, so it is the
+end-to-end exercise of the standalone scenario. See
+[direct-qemu-harness.md](/components/kerbside/direct-qemu-harness/) for the lane and its
+standalone mock-control-plane sibling, `verify-rust-proxy.sh`.
 
 ### Operator Documentation
 

@@ -4,53 +4,85 @@ This document describes the Kerbside MySQL/MariaDB database schema.
 
 ## Entity Relationship Diagram
 
-```
-+------------------+          +------------------+
-|     sources      |          |     consoles     |
-+------------------+          +------------------+
-| name (PK)        |---+      | uuid (PK)        |
-| type             |   |      | source (FK)      |------+
-| last_seen        |   +----->| discovered       |      |
-| seen_by          |          | hypervisor       |      |
-| errored          |          | hypervisor_ip    |      |
-| url              |          | insecure_port    |      |
-| ca_cert          |          | secure_port      |      |
-| username         |          | name             |      |
-| password         |          | host_subject     |      |
-| project_name     |          | ticket           |      |
-| user_domain_id   |          +------------------+      |
-| project_domain_id|                 |                  |
-| deleted          |                 |                  |
-+------------------+                 |                  |
-        |                            |                  |
-        |    +------------------+    |                  |
-        |    |  consoletokens   |    |                  |
-        |    +------------------+    |                  |
-        +--->| token (PK)       |<---+                  |
-             | session_id       |                       |
-             | uuid (FK)        |                       |
-             | source (FK)      |                       |
-             | created          |                       |
-             | expires          |                       |
-             +------------------+                       |
-                    |                                   |
-                    |                                   |
-                    v                                   |
-          +------------------+          +------------------+
-          |  proxychannels   |          |   auditevents    |
-          +------------------+          +------------------+
-          | node (PK)        |          | source (PK)      |
-          | pid (PK)         |          | uuid (PK)        |
-          | created          |          | session_id       |
-          | client_ip        |          | channel          |
-          | client_port      |          | timestamp (PK)   |
-          | connection_id    |          | node             |
-          | channel_type     |          | pid              |
-          | channel_id       |          | message          |
-          | session_id (FK)  |          +------------------+
-          +------------------+                  ^
-                                                |
-                                                +----------+
+```mermaid
+erDiagram
+    sources {
+        string name PK
+        string type
+        datetime last_seen
+        string seen_by
+        boolean errored
+        string url
+        text ca_cert
+        string username
+        string password
+        string project_name "OpenStack only"
+        string user_domain_id "OpenStack only"
+        string project_domain_id "OpenStack only"
+        boolean deleted
+    }
+
+    sources ||--o{ consoles : "sources provide consoles"
+    consoles {
+        string uuid PK
+        string source FK
+        datetime discovered
+        string hypervisor
+        string hypervisor_ip
+        integer insecure_port
+        integer secure_port
+        string name
+        string host_subject
+        string ticket
+    }
+
+    sources ||--o{ consoletokens: "sources enable consoletokens"
+    consoles ||--o{ consoletokens: "consoles own consoletokens"
+    consoletokens {
+        string token PK
+        string session_id
+        string uuid FK
+        string source FK
+        integer created "epoch seconds"
+        integer expires "epoch seconds"
+    }
+
+    consoletokens ||--o{ proxychannels: "consoletokens authenticate proxychannels"
+    proxychannels {
+        string node PK
+        string pid PK
+        datetime created
+        string client_ip
+        integer client_port
+        integer connection_id
+        string channel_type
+        integer channel_id
+        string session_id "No FK; dropped in migration f7b2e9c4a1d8"
+    }
+
+    consoles ||--o{ auditevents: "consoles create auditevents"
+    auditevents {
+        string source PK "No FK to avoid cascading delete"
+        string uuid PK "No FK to avoid cascading delete"
+        string session_id "No FK to avoid cascading delete"
+        string channel
+        datetime timestamp PK "microsecond precision"
+        string node
+        string pid
+        text message
+    }
+
+    sf_token_jtis {
+        string jti PK "uuid4 hex, from the token's jti claim"
+        float expiry "epoch seconds, matches the exp claim"
+    }
+
+    sources ||--o{ sf_token_keys: "No FK; sources reloaded from YAML"
+    sf_token_keys {
+        string source PK "No FK; sources reloaded from YAML"
+        text keys_json "Shaken Fist's public_view payload, verbatim JSON"
+        float fetched_at "epoch seconds"
+    }
 ```
 
 ## Table Descriptions
@@ -119,7 +151,7 @@ Active SPICE channel connections being proxied.
 | connection_id | integer | SPICE connection ID |
 | channel_type | string | Channel type name (main, display, etc.) |
 | channel_id | integer | Channel instance ID |
-| session_id | string | Foreign key to consoletokens.session_id |
+| session_id | string | Matches consoletokens.session_id (no FK; dropped in migration f7b2e9c4a1d8) |
 
 ### auditevents
 
