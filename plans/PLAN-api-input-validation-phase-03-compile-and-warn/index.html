@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-api-input-validation/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-api-input-validation-phase-03-compile-and-warn/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Declarative validation and a consistent error contract for the REST API - Shaken Fist</title>
+        <title>Phase 3: Compile the declarations, and warn - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#declarative-validation-and-a-consistent-error-contract-for-the-rest-api" class="md-skip">
+        <a href="#phase-3-compile-the-declarations-and-warn" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Declarative validation and a consistent error contract for the REST API
+              Phase 3: Compile the declarations, and warn
             
           </span>
         </div>
@@ -10927,10 +10927,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Context
       
     </span>
   </a>
@@ -10938,22 +10938,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#what-this-phase-inherits-rather-than-decides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        What this phase inherits rather than decides
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Situation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-phase-3-must-decide-that-phase-0-did-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What phase 3 must decide that phase 0 did not
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What phase 3 must decide that phase 0 did not">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#why-the-per-endpoint-fix-was-abandoned" class="md-nav__link">
+  <a href="#d10-what-happens-to-a-body-key-nothing-declares" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why the per-endpoint fix was abandoned
+        D10. What happens to a body key nothing declares
       
     </span>
   </a>
@@ -10961,10 +10972,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-asset-nobody-is-using" class="md-nav__link">
+  <a href="#d11-the-uuid-passed_uuid-remap-is-dead-and-d8-rests-on-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The asset nobody is using
+        D11. The uuid → passed_uuid remap is dead, and D8 rests on it
       
     </span>
   </a>
@@ -10972,10 +10983,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-catch-stated-up-front" class="md-nav__link">
+  <a href="#d12-collision-detection-cannot-live-in-the-validator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The catch, stated up front
+        D12. Collision detection cannot live in the validator
       
     </span>
   </a>
@@ -10983,10 +10994,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#type-vocabulary-gaps" class="md-nav__link">
+  <a href="#d13-how-the-compiled-schema-reaches-the-handler" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Type vocabulary gaps
+        D13. How the compiled schema reaches the handler
       
     </span>
   </a>
@@ -10999,22 +11010,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reported-issues-this-plan-addresses" class="md-nav__link">
+  <a href="#shape-of-the-work-three-prs-and-a-measurement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reported issues this plan addresses
+        Shape of the work: three PRs and a measurement
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Reported issues this plan addresses">
+    <nav class="md-nav" aria-label="Shape of the work: three PRs and a measurement">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#core-declarative-validation" class="md-nav__link">
+  <a href="#pr-1-generate-the-derivations-input-space" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Core: declarative validation
+        PR 1 — Generate the derivation's input space
       
     </span>
   </a>
@@ -11022,10 +11033,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#error-contract-and-attribution" class="md-nav__link">
+  <a href="#pr-2-compile-wired-but-inert" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error contract and attribution
+        PR 2 — Compile, wired but inert
       
     </span>
   </a>
@@ -11033,10 +11044,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#enabling" class="md-nav__link">
+  <a href="#pr-3-validate-and-warn" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enabling
+        PR 3 — Validate, and warn
       
     </span>
   </a>
@@ -11044,10 +11055,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#adjacent-related-deliberately-not-absorbed" class="md-nav__link">
+  <a href="#then-measure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adjacent — related, deliberately not absorbed
+        Then: measure
       
     </span>
   </a>
@@ -11060,41 +11071,57 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decisions" class="md-nav__link">
+  <a href="#coordination-and-adjacencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Decisions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Decisions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#phases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phases
+        Coordination and adjacencies
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#where-the-tracked-issues-stand" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#what-this-phase-does-not-do" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where the tracked issues stand
+        What this phase does not do
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#verification-phase-wide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification, phase-wide
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
   
 </li>
       
@@ -11119,495 +11146,227 @@
   
 
 
-<h1 id="declarative-validation-and-a-consistent-error-contract-for-the-rest-api">Declarative validation and a consistent error contract for the REST API<a class="headerlink" href="#declarative-validation-and-a-consistent-error-contract-for-the-rest-api" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (the
-decorator chain in <code>shakenfist/external_api/base.py</code>, especially
-<code>Resource.method_decorators</code>, <code>log_request</code>,
-<code>handle_authorization_exceptions</code>, <code>record_exception</code> and
-<code>suppress_exceptions_to_client</code>; the <code>swagger_helper()</code>
-declarations on every endpoint; the four existing
-<code>use_kwargs</code> sites; <code>shakenfist/util/exceptions.py</code>). Ground
-your answers in what the code does today. Do not speculate when
-you could read it instead. Where a question touches on external
-concepts (webargs / marshmallow schema composition, Flask-RESTful
-dispatch, OpenAPI 2.0 parameter locations, HTTP status code
-semantics for malformed input), research as needed to give a
-confident answer. Flag any uncertainty explicitly rather than
-guessing.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the component inventory and
-<code>CLAUDE.md</code> for build commands, project conventions, and the
-warning about decorator ordering in <code>external_api/app.py</code>.</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase, named with <code>-phase-NN-descriptive</code>
-appended.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Each commit should be self-contained.</p>
-<p><strong>Status: phases 0, 1, 2 and 3 planned; 0, 1 and 2 complete.</strong>
-The open questions at the bottom are answered in the Decisions
-section; see
-<a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>
-for the measurements behind them,
-<a href="../PLAN-api-input-validation-phase-01-declaration-audit/"><code>PLAN-api-input-validation-phase-01-declaration-audit.md</code></a>
-for what the audit found,
-<a href="../PLAN-api-input-validation-phase-02-type-vocabulary/"><code>PLAN-api-input-validation-phase-02-type-vocabulary.md</code></a>
-for what the vocabulary work shipped and the four deviations it
-recorded, and
-<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/"><code>PLAN-api-input-validation-phase-03-compile-and-warn.md</code></a>
-for the phase now ready to start. Phases 4 onward are not yet cut
-into per-phase files.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The REST API does not validate its inputs. A request body value
-of any JSON type reaches the handler that reads it, and what
-happens next depends entirely on whether that particular handler
-happened to guard the conversion.</p>
-<p>The mechanism is two decorators in
-<code>shakenfist/external_api/base.py</code>, both applied to every endpoint
-through <code>Resource.method_decorators</code>:</p>
-<ul>
-<li><code>log_request</code> merges <strong>every key of the JSON request body</strong>
-  into the handler's kwargs verbatim, with no type checking and
-  no schema (<code>base.py:588-598</code>). A body key also silently
-  overwrites a same-named URL path parameter.</li>
-<li><code>handle_authorization_exceptions</code> catches <strong>any</strong> <code>TypeError</code>
-  raised anywhere below it and returns
-  <code>400 &lt;str(exception)&gt;</code>. So a <code>TypeError</code> raised arbitrarily
-  deep in the stack is handed to the client as the interpreter's
-  own error text.</li>
-</ul>
-<p>Anything that escapes both — a <code>ValueError</code>, an <code>OverflowError</code>,
-an <code>OSError</code> — falls through to <code>suppress_exceptions_to_client</code>
-and becomes a 500 with an exception repr in the body and a
-recorded server exception on disk.</p>
-<p>Issue #3609 is one instance: <code>{"limit": "5"}</code> on the events
-endpoints produced
-<code>400 "'&lt;=' not supported between instances of 'str' and 'int'"</code>.</p>
-<h3 id="why-the-per-endpoint-fix-was-abandoned">Why the per-endpoint fix was abandoned<a class="headerlink" href="#why-the-per-endpoint-fix-was-abandoned" title="Permanent link">&para;</a></h3>
-<p>PR #3610 fixed #3609 by adding a shared <code>coerce_int()</code> helper and
-routing seven call sites through it. It was closed unmerged after
-six rounds of review. Two findings from that attempt matter here,
-because they are the argument for doing this declaratively:</p>
-<ol>
-<li><strong>Hand-rolled guards get written wrong.</strong> Of seven guards
-   written by hand, two were wrong on the first attempt: one
-   caught <code>(TypeError, ValueError)</code> and missed <code>OverflowError</code>
-   (reachable because Python's JSON parser accepts the
-   non-standard <code>Infinity</code> literal, and <code>int(float('inf'))</code>
-   raises <code>OverflowError</code>), and one type-checked
-   <code>max_versions</code> without range-checking it, leaving a
-   silently destructive negative value.</li>
-<li><strong>The class was still not covered when the PR was
-   abandoned.</strong> Of the 13 parameters this API <em>declares</em> as
-   <code>integer</code>, 6 were still read unconverted, including <code>cpus</code>
-   and <code>memory</code> on <code>POST /instances</code>, which are passed to
-   <code>Instance.new()</code> as received.</li>
-</ol>
-<p>Every endpoint added in future inherits the defect by default,
-because the default is no validation.</p>
-<h3 id="the-asset-nobody-is-using">The asset nobody is using<a class="headerlink" href="#the-asset-nobody-is-using" title="Permanent link">&para;</a></h3>
-<p><strong>124 of the 129 handler methods (96%) already declare their
-parameters.</strong> Every <code>swag_from(api_base.swagger_helper(...))</code>
-call passes a list of</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>(name, location, type, description, required)
+<h1 id="phase-3-compile-the-declarations-and-warn">Phase 3: Compile the declarations, and warn<a class="headerlink" href="#phase-3-compile-the-declarations-and-warn" title="Permanent link">&para;</a></h1>
+<p>Phase 3 of <a href="../PLAN-api-input-validation/"><code>PLAN-api-input-validation.md</code></a>,
+following <a href="../PLAN-api-input-validation-phase-02-type-vocabulary/">phase 2</a>.</p>
+<p>It turns 271 parameter declarations into marshmallow schemas, runs
+them against every request, and <strong>rejects nothing</strong>. The output of
+the phase is not a behaviour change; it is evidence about whether
+the declarations can safely become one in phase 4.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Phases 1 and 2 made the declarations correct and made them render
+into a valid specification. Nothing yet reads them at request time.</p>
+<p>The baseline, measured on <code>057e24c1a</code> rather than carried over from
+phase 0:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Phase 0</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Handler methods</td>
+<td>129</td>
+<td><strong>135</strong></td>
+</tr>
+<tr>
+<td>Carrying a declaration</td>
+<td>124 (96%)</td>
+<td><strong>132 (98%)</strong></td>
+</tr>
+<tr>
+<td>Declared parameters</td>
+<td>254</td>
+<td><strong>271</strong></td>
+</tr>
+<tr>
+<td>...<code>path</code> / <code>body</code> / <code>query</code></td>
+<td>3 / 113 / 118</td>
+<td><strong>136 / 128 / 7</strong></td>
+</tr>
+<tr>
+<td>Declarations carrying constraints</td>
+<td>n/a</td>
+<td><strong>5</strong></td>
+</tr>
+<tr>
+<td><code>audit()</code> drift / underivable / problems</td>
+<td>116 / — / —</td>
+<td><strong>0 / 0 / 0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The location column is the phase 1 result: <code>query</code> was never right
+for 116 of those parameters, and only 7 parameters in the whole API
+genuinely arrive in a query string. That matters below, because D6's
+query-string fallback turns out to be a seven-parameter feature
+rather than a general one.</p>
+<p>Type tokens in use, which is what has to be compiled:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>string 109   uuidorname 55   uuid 26   boolean 19   namespace 13
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>node 11      unsignedinteger 9   integer 6   url 5   dict 5
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>arrayofstring 3   number 2   arrayofdict 2   base64 1   netblock 1
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>ipv4 1
 </code></pre></div>
-<p>tuples — 254 parameters in total across 20 files, with 113
-declared <code>body</code> and 118 declared <code>query</code>. <code>swagger_helper()</code>
-already maps the type token through an <code>argtypes</code> table
-(<code>base.py:141-160</code>) covering <code>string</code>, <code>integer</code>, <code>number</code>,
-<code>boolean</code>, <code>uuid</code>, <code>uuidorname</code>, <code>namespace</code>, <code>node</code>, <code>url</code>,
-<code>ipv4</code>, <code>dict</code>, <code>arrayofdict</code>, <code>arrayofstring</code>, <code>binary</code>,
-<code>bearer</code>.</p>
-<p>That is a schema. It is read by nothing except the documentation
-generator.</p>
-<p>Making it load-bearing is the cheap path to closing #528: no new
-per-endpoint schemas need to be authored for the 96% that already
-declare, and webargs is already a dependency doing exactly this
-job at four sites (<code>blob.py</code>, <code>network.py</code>, <code>artifact.py</code>,
-<code>instance.py</code>) — none of them on request bodies. All four were
-<code>location='query'</code> when this was written; three are now
-<code>location='json_or_query'</code>, the custom loader #3629 introduced
-(see D6 below).</p>
-<h3 id="the-catch-stated-up-front">The catch, stated up front<a class="headerlink" href="#the-catch-stated-up-front" title="Permanent link">&para;</a></h3>
-<p>Because nothing has ever read these declarations, nothing has
-ever checked them. Phase 0 measured the damage: parameter
-<em>names</em> are 97% accurate, but parameter <em>locations</em> are not.</p>
-<p><strong>116 of the 119 parameters that appear in a URL path are
-declared as something other than <code>path</code></strong> — 104 as <code>query</code>, 11
-as <code>body</code>, and one as <code>'qeury'</code>, a typo. Only 3 are correct. A
-second declaration says <code>'post'</code>, which is not an OpenAPI
-location at all. Since location is exactly what a parser uses to
-decide <em>where to look for a value</em>, compiling these as written
-would look for <code>artifact_ref</code> in the query string of a request
-that carries it in the path.</p>
-<p>This is less alarming than it sounds, because the mounted routes
-in <code>app.py</code> are ground truth: which names are path parameters is
-derivable, not a matter of judgement, so the fix is mechanical
-rather than an audit. But it makes the declaration audit a
-<strong>precondition</strong> for compiling, not a tidy-up that can follow it.</p>
-<p><code>required</code> is a separate and probably worse problem: <code>mode</code> on
-<code>POST /instances/&lt;ref&gt;/agent/put</code> is declared required while
-omitting it has always been accepted, so enforcing required-ness
-naively would break working clients.</p>
-<p><strong>The plan must therefore treat "the declarations are accurate"
-as a hypothesis to be tested, not an assumption.</strong> The mechanism
-for testing it is a warn-only mode that validates, logs what it
-<em>would</em> have rejected, and changes nothing — deployed to sfcbr,
-which carries real traffic and ships logs to Loki.</p>
-<h3 id="type-vocabulary-gaps">Type vocabulary gaps<a class="headerlink" href="#type-vocabulary-gaps" title="Permanent link">&para;</a></h3>
-<p>The existing vocabulary is too coarse in at least these ways,
-each of which is a real defect in the issue list:</p>
+<h2 id="what-this-phase-inherits-rather-than-decides">What this phase inherits rather than decides<a class="headerlink" href="#what-this-phase-inherits-rather-than-decides" title="Permanent link">&para;</a></h2>
+<p>Three things landed outside the phase and are now constraints on it.</p>
+<p><strong>The query fallback exists.</strong> <code>0de6c3b5c</code> registered a
+<code>json_or_query</code> webargs location loader in <code>base.py</code>: query string
+and JSON body merged, body authoritative, keys the schema does not
+name dropped. Three endpoints are bound to it. Phase 3 generalises
+that loader; it does not choose a precedence rule. It must also not
+retry the <code>('query', 'json')</code> tuple location — webargs keys
+validation failures by location, a tuple key is not
+JSON-serialisable, and the 422 becomes a 500. That was already
+tried.</p>
+<p><strong><code>declarations.py</code> derives <code>json_or_query</code> as <code>query</code>,</strong> so
+published declarations are unchanged and phase 1's audit still
+holds.</p>
+<p><strong><code>base.py</code> is under mypy</strong> (#3616), and the pre-commit hook matches
+it. The validation layer lands in a type-checked file, which is what
+that issue was for.</p>
+<h2 id="what-phase-3-must-decide-that-phase-0-did-not">What phase 3 must decide that phase 0 did not<a class="headerlink" href="#what-phase-3-must-decide-that-phase-0-did-not" title="Permanent link">&para;</a></h2>
+<p>Phase 0 answered nine questions. Reading the code for this plan
+turned up four more, three of which are only visible from the
+runtime side and so could not have been seen when the plan was
+written against the declarations.</p>
+<h3 id="d10-what-happens-to-a-body-key-nothing-declares">D10. What happens to a body key nothing declares<a class="headerlink" href="#d10-what-happens-to-a-body-key-nothing-declares" title="Permanent link">&para;</a></h3>
+<p><strong>This is the central decision of the phase, and today's behaviour
+is not what the master plan assumes.</strong></p>
+<p>Verified against the running app rather than reasoned about, on a
+declared endpoint (<code>POST /auth</code>, which is <code>@public</code> and so reachable
+without a token) with the namespace lookup mocked so the request
+reaches the handler:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>{&quot;namespace&quot;: .., &quot;key&quot;: ..}                -&gt; 401 unauthorized
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{&quot;namespace&quot;: .., &quot;key&quot;: .., &quot;zzz&quot;: 1}      -&gt; 400 {&quot;error&quot;: &quot;AuthEndpoint.post()
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                                                got an unexpected keyword
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                                                argument &#39;zzz&#39;&quot;, &quot;status&quot;: 400}
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>{&quot;namespace&quot;: .., &quot;key&quot;: .., &quot;uuid&quot;: &quot;x&quot;}   -&gt; 400 {&quot;error&quot;: &quot;AuthEndpoint.post()
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>                                                got an unexpected keyword
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>                                                argument &#39;passed_uuid&#39;&quot;, ...}
+</code></pre></div>
+<p><code>log_request</code> merges every body key into <code>kwargs</code> and calls onward.
+No handler in the tree is variadic (#3642 guarantees it and the
+audit enforces it), so <strong>an undeclared body key on a request that
+reaches its handler is already a 400 carrying interpreter text.</strong>
+That is #3612 in its most general form, and it is a de-facto
+<code>unknown=RAISE</code> policy with the worst possible message.</p>
+<p><strong>But "reaches its handler" is load-bearing, and it is what makes
+this decision harder than it first looks.</strong> The same probe without
+the mock returns <code>404 namespace not found</code>, undeclared key and all:
+<code>arg_is_namespace</code> is a <em>per-method</em> decorator, so it runs after
+index 0 but before the handler, and its early return means the
+<code>TypeError</code> never happens. Today an undeclared key is only fatal if
+nothing short-circuits ahead of it.</p>
+<p>Validation at index 0 runs before every per-method decorator, so it
+preempts all of them. That gives:</p>
 <ul>
-<li><strong>No unsigned integer.</strong> Artifact version indexes and
-  <code>max_versions</code> must not be negative. A negative <code>max_versions</code>
-  is silently destructive: <code>Artifact.delete_old_versions()</code>
-  computes <code>sorted(indexes)[:-max]</code>, so <code>-1</code> deletes the oldest
-  version on every index add.</li>
-<li><strong>No bounded integer.</strong> The events <code>limit</code> has a documented
-  default of 100 and a cap of 1000; <code>offset</code> on blob reads and
-  upload truncate must be non-negative and, for truncate, within
-  the object.</li>
-<li><strong>No format-constrained string.</strong> MAC addresses (#534),
-  base64-encoded user data (#3269), netblocks that must not
-  overlap reserved ranges (#323).</li>
-<li><strong>No structured value types.</strong> Disk, network and video specs
-  are validated imperatively today (#936).</li>
+<li><strong><code>unknown=EXCLUDE</code></strong> (webargs' default for query) drops the key.
+  Nothing that succeeds today fails, and nothing that
+  short-circuits today changes. Requests that are 400s today would
+  start working — a compatibility improvement in the "was broken,
+  now works" direction, at the cost of silently swallowing a typo:
+  <code>{"nmae": "x"}</code> would create something unnamed rather than
+  erroring.</li>
+<li><strong><code>unknown=RAISE</code></strong> keeps rejecting, with
+  <code>{"error": "zzz: unknown parameter", "status": 400}</code> instead of
+  interpreter text. Requests that 400 today still 400. But a request
+  that today is short-circuited to a 404 or 403 by a per-method
+  decorator would now be a 400 instead.</li>
 </ul>
-<h2 id="reported-issues-this-plan-addresses">Reported issues this plan addresses<a class="headerlink" href="#reported-issues-this-plan-addresses" title="Permanent link">&para;</a></h2>
-<p>Found by scanning all 83 open issues. The core group is the
-reason for the plan; the error-contract group is the other half
-of "what does a caller see when they get it wrong", and it shares
-the same decorator chain.</p>
-<h3 id="core-declarative-validation">Core: declarative validation<a class="headerlink" href="#core-declarative-validation" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a></td>
-<td>2020-11-11</td>
-<td><strong>Broaden declarative type/validity checking across all API endpoints.</strong> The parent issue; explicitly notes only ~4 endpoint files use <code>use_kwargs</code> today.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a></td>
-<td>2021-09-02</td>
-<td>Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in <code>instance.py</code>.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3612">#3612</a></td>
-<td>2026-08-03</td>
-<td>Body parameters merged into handler kwargs untyped; broad <code>except TypeError</code> returns interpreter messages. The mechanism description above.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3609">#3609</a></td>
-<td>2026-08-02</td>
-<td><code>GET /nodes/&lt;node&gt;/events</code> with a string <code>limit</code> returns a 400 containing a Python type error. The trigger.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a></td>
-<td>2020-11-12</td>
-<td>Validate MAC address <em>format</em> on interface create (uniqueness is already enforced).</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3269">#3269</a></td>
-<td>2026-06-13</td>
-<td>Enforce base64-encoded user data at the API instead of failing later on the hypervisor with a traceback.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a></td>
-<td>2020-09-26</td>
-<td>Reject virtual networks that overlap reserved ranges (e.g. the floating network).</td>
-</tr>
-</tbody>
-</table>
-<h3 id="error-contract-and-attribution">Error contract and attribution<a class="headerlink" href="#error-contract-and-attribution" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a></td>
-<td>2026-07-26</td>
-<td>A bare <code>KeyError</code> surfaces as a generic "Server error" whose traceback shows only wrapper frames, plus a content-free paired WARNING.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3371">#3371</a></td>
-<td>2026-07-11</td>
-<td><code>record_exception()</code> logs tracebacks only at DEBUG, so ~35k traceback lines/day never reach centralised logging.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3615">#3615</a></td>
-<td>2026-08-03</td>
-<td><code>log_request</code> assigns a string over the whole header dict when redacting Authorization, so every authenticated request logs no headers at all.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3606">#3606</a></td>
-<td>2026-08-02</td>
-<td><code>JWT token has incorrect nonce</code> logged at ERROR with no client, namespace or endpoint context (40 events/14d on sfcbr).</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/2094">#2094</a></td>
-<td>2023-11-23</td>
-<td><code>DELETE .../route/&lt;addr&gt;</code> returns a bare 403 when the address is already unrouted; make it idempotent or friendlier.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="enabling">Enabling<a class="headerlink" href="#enabling" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3616">#3616</a></td>
-<td>2026-08-03</td>
-<td>Add <code>external_api/base.py</code> to the mypy target list. The validation layer lands here; it should be type-checked.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="adjacent-related-deliberately-not-absorbed">Adjacent — related, deliberately not absorbed<a class="headerlink" href="#adjacent-related-deliberately-not-absorbed" title="Permanent link">&para;</a></h3>
+<p>So <strong>neither option is behaviour-preserving</strong>, and the earlier
+framing of RAISE as "changes no outcome, only the message" was
+wrong: it changes the status code on every path where a per-method
+decorator currently answers first.</p>
+<p><strong>Recommendation: <code>RAISE</code>, provisionally.</strong> A malformed request
+being reported as malformed rather than as "namespace not found" is
+the more truthful answer, and it keeps the phase's rejections a
+superset of today's rather than a different set. But this is exactly
+what warn-only exists to settle, so the phase must count the two
+populations separately:</p>
 <ul>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/1974">#1974</a> — pagination for listing endpoints. It needs exactly the bounded <code>limit</code>/<code>offset</code> parameter types this plan defines, and the events <code>limit</code> is a special case of it, but the query and response-shape work belongs to
-  <a href="../api-query-batching-roadmap/"><code>api-query-batching-roadmap.md</code></a>.
-  <strong>Coordinate on the parameter types; do not merge the plans.</strong></li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3271">#3271</a> — bare image shorthand silently shadows a local label. Input <em>interpretation</em> rather than input <em>validity</em>; the resolution-order fix is independent.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a> — the mariadb gRPC client conflates "unavailable" with "not found". Same family (the wrong thing is surfaced to the caller) but a different layer, and already scoped elsewhere.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3308">#3308</a> — the ansible collection's networkspec parser makes every non-empty value truthy. A <em>consumer</em> of this contract, and a good end-to-end test of it, but fixed in the collection.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/764">#764</a> and <a href="https://github.com/shakenfist/shakenfist/issues/121">#121</a> — validating fetched image content. Validation, but of downloaded bytes rather than API input. Out of scope.</li>
+<li>undeclared key on a request that would have reached its handler
+  (RAISE and today agree);</li>
+<li>undeclared key on a request something else would have answered
+  first (RAISE changes the status).</li>
 </ul>
-<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
-<p>Resolved by phase 0. The measurements behind each are in
-<a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>.</p>
-<p><strong>The central hypothesis held.</strong> 229 of 236 declared parameter
-names (97%) match a kwarg their handler actually accepts, and no
-declared type contradicts its signature default. The
-declarations are good enough to compile.</p>
-<ol>
-<li><strong>Library — webargs + marshmallow.</strong> All three candidates
-   (webargs, marshmallow, pydantic) are already pinned direct
-   dependencies, so this is a fit decision, not a dependency
-   one. webargs exists to parse Flask request arguments, is
-   already used at four sites, and does per-location parsing.
-   Pydantic models persisted state here; keep that boundary.</li>
-<li><strong>Compile the existing declarations,</strong> with a per-endpoint
-   override for cases a declaration cannot express. Authoring
-   254 schemas to replace declarations that are already correct
-   is make-work, and the four endpoints that hand-author schemas
-   today are exactly the ones whose documentation has drifted.</li>
-<li><strong>Validation runs at index 0 of <code>method_decorators</code></strong> —
-   verified empirically as the innermost position, so after
-   authentication and before every per-method decorator. webargs'
-   default 422 handling must be replaced so failures come out
-   through <code>sf_api.error</code>.</li>
-<li><strong>The error shape does not change:</strong>
-   <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code>. The
-   official client never parses the message, and only 11 test
-   assertions touch error text.</li>
-<li><strong>Warn-only ends when every remaining rejection is
-   intended</strong> — not after a fixed duration. The window must
-   cover a full functional CI run plus seven days of sfcbr.
-   Warn records carry the offending value's <em>type</em>, never its
-   value.</li>
-<li><strong>Query strings become an accepted fallback</strong> for parameters
-   declared <code>query</code>, with the JSON body still authoritative.
-   Additive and unbreakable: the client sends everything in the
-   body regardless of method.</li>
-<li><strong>Response validation is out of scope,</strong> not deferred. It
-   breaks working clients when wrong, and no issue asks for it.</li>
-<li><strong>A body key colliding with a path parameter is rejected.</strong>
-   <code>log_request</code> already dodges one instance of this by mapping
-   body <code>uuid</code> to <code>passed_uuid</code>, which shows it is a known
-   hazard rather than a feature.
-   <em>Amended by phase 3:</em> the decision stands, the supporting
-   evidence does not. <code>passed_uuid</code> occurs once in the tree — the
-   assignment itself — so no handler accepts it and the remap
-   dodges nothing; it converts a body <code>uuid</code> into a guaranteed 400
-   on every endpoint. The check also cannot live where D3 puts the
-   validator, because <code>log_request</code> runs first and has already
-   merged the body. See D11 and D12 in
-   <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</li>
-<li><strong>The type vocabulary gains tokens and an optional
-   constraints element</strong> (<code>unsignedinteger</code>, <code>macaddr</code>,
-   <code>base64</code>, <code>netblock</code>; <code>minimum</code> / <code>maximum</code> / <code>pattern</code>).
-   These are valid Swagger 2.0 keywords, so constraints render
-   into the published OpenAPI instead of being invisible to
-   callers the way the events <code>limit</code> cap was.</li>
-</ol>
-<h3 id="phases">Phases<a class="headerlink" href="#phases" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Status</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>0: Research and decisions</td>
-<td>Complete</td>
-<td>Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See <a href="../PLAN-api-input-validation-phase-00-decisions/">phase 0</a></td>
-</tr>
-<tr>
-<td>1: Declaration audit</td>
-<td>Complete</td>
-<td>Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. <code>sshkey</code>/<code>userdata</code> in the published OpenAPI) and 20 undeclared parameters; make <code>swagger_helper()</code> reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See <a href="../PLAN-api-input-validation-phase-01-declaration-audit/">phase 1</a></td>
-</tr>
-<tr>
-<td>2: Type vocabulary</td>
-<td>Complete</td>
-<td>The specification-validation test (#3626) plus <code>schemes</code>/<code>securityDefinitions</code> template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; <code>unsignedinteger</code>/<code>macaddr</code>/<code>base64</code>/<code>netblock</code> tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events <code>limit</code> cap are visible to callers. See <a href="../PLAN-api-input-validation-phase-02-type-vocabulary/">phase 2</a></td>
-</tr>
-<tr>
-<td>3: Compile and warn</td>
-<td>Planned, not started</td>
-<td>Declarations to schemas; validate in warn-only mode; deploy to sfcbr and read the logs. Opens with the derivation generator below, which is a precondition rather than a step. Four further decisions (D10-D13) are recorded there, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
-</tr>
-<tr>
-<td>4: Enforce</td>
-<td>Not started</td>
-<td>Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the hand-authored <code>get_args</code> schemas into the compiled path</td>
-</tr>
-<tr>
-<td>5: Narrow the handlers</td>
-<td>Partly overtaken</td>
-<td>Narrow <code>except TypeError</code> to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below</td>
-</tr>
-<tr>
-<td>6: Required and semantics</td>
-<td>Not started</td>
-<td>Enforce <code>required</code> — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936</td>
-</tr>
-</tbody>
-</table>
-<h3 id="where-the-tracked-issues-stand">Where the tracked issues stand<a class="headerlink" href="#where-the-tracked-issues-stand" title="Permanent link">&para;</a></h3>
-<p>Recorded here rather than by editing the tables above, so there
-is one place to maintain and the tables stay a record of what
-the plan was scoped against.</p>
-<p><strong>Closed since the plan was written:</strong> #3609 (the trigger,
-2026-08-07), #3626 (specification validation in CI), #3616
-(<code>base.py</code> under mypy), #3642 (variadic handlers in the audit),</p>
-<h1 id="3629-body-supplied-all-see-d6-below-3615-log_request">3629 (body-supplied <code>all</code>, see D6 below), #3615 (<code>log_request</code><a class="headerlink" href="#3629-body-supplied-all-see-d6-below-3615-log_request" title="Permanent link">&para;</a></h1>
-<p>discarding headers).</p>
-<p><strong>Still open and still owned by this plan:</strong> #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;</p>
-<h1 id="3606-is-in-flight-as-pr-3714">3606 is in flight as PR #3714.<a class="headerlink" href="#3606-is-in-flight-as-pr-3714" title="Permanent link">&para;</a></h1>
-<p><strong>Phase 5 is being overtaken from outside.</strong> Two of its four
-attribution issues have been picked up by the automated issue
-fixer rather than by this plan. That is fine — they are genuinely
-independent of phases 3 and 4, which is why they were grouped
-rather than sequenced. It is recorded because it changes what
-phase 5 <em>is</em>: by the time phases 3 and 4 land, phase 5 is likely
-to be the single item that actually depends on them — narrowing
-<code>except TypeError</code> to JWT errors, which cannot happen until a
-validation layer is rejecting the malformed input that broad
-catch currently absorbs. Nobody picks that up incidentally,
-because on its own it looks like a regression risk with no
-visible benefit.</p>
-<h3 id="carried-into-phase-2-from-phase-1">Carried into phase 2 from phase 1<a class="headerlink" href="#carried-into-phase-2-from-phase-1" title="Permanent link">&para;</a></h3>
-<p>Phase 1 corrected which location each parameter declares. It did
-not change how <code>swagger_helper()</code> renders them, which leaves two
-specification-validity problems for phase 2 to pick up. Measured
-with <code>openapi_spec_validator</code> over the flasgger output (raised by
-the ninth review round and re-measured independently): develop
-produced 363 validation errors and this branch 241 at that
-measurement, with the entire "path template variable has no
-corresponding path parameter" class eliminated by the location
-audit. The <code>security</code> fix below then landed in phase 1 after all,
-and a rebase brought in the eleven federated-authentication
-handlers, so the branch now measures <strong>129</strong>: 128 from the body
-class, 1 from <code>schemes</code>.</p>
-<ul>
-<li><strong>Multiple body parameters per operation — fixed in phase 2.</strong>
-  Swagger 2.0 permits at most one <code>in: body</code> parameter, and it
-  must carry a <code>schema</code> rather than <code>type</code>/<code>format</code>;
-  <code>swagger_helper()</code> emitted <code>type</code>/<code>format</code> for everything, and
-  32 of 132 operations declared more than one body parameter (23
-  before phase 1 — correcting <code>key</code> from query to body on the
-  metadata endpoints added most of the rest, and the
-  federated-authentication endpoints arrived with several more).
-  Phase 2's second PR collapses an operation's body declarations
-  into a single generated <code>schema</code> at render time — declarations
-  keep their one-tuple-per-parameter shape, which is what the
-  audit reads and phase 3 compiles. The raw-body marker renders
-  as a binary schema, and declaring raw and named body parameters
-  together is rejected at import time. This took the validation
-  error count from 128 to zero, so the ratchet in
-  <code>test_openapi_spec.py</code> became a plain validity assertion.</li>
-<li><strong><code>schemes</code> renders as a string, not an array — fixed in
-  phase 2.</strong> <code>API_ADVERTISED_HTTP_SCHEMES</code> is typed <code>str</code> in
-  <code>config.py</code> while its own description calls it a "space
-  separated list", and <code>app.py</code> fed it straight into the
-  specification's top-level <code>schemes</code> key, which OpenAPI 2.0
-  requires to be an array of strings. A default deployment
-  therefore published <code>schemes: 'http'</code>. Pre-existing —
-  introduced in <code>01ef8a563</code>, not by this plan. Phase 2's first PR
-  splits the documented space-separated contract at the consumer
-  in <code>app.py</code>, and added the <code>securityDefinitions</code> entry the
-  <code>security</code> requirements referenced without defining.</li>
-<li><strong><code>security</code> renders as an object, not an array — fixed in
-  phase 1 after all.</strong> <code>swagger_helper()</code> emitted
-  <code>'security': {'bearerAuth': []}</code>, but OpenAPI 2.0 requires
-  <code>security</code> to be an <em>array</em> of requirement objects. This was
-  deferred here twice on scoping grounds, and the eleventh review
-  round questioned deferring a one-line change inside a function
-  the phase was already editing (the <code>format</code>/duplicated-key
-  fixes were the same class of renderer tweak). It shipped:
-  <code>'security': [{'bearerAuth': []}]</code> eliminated the entire
-  126-error class, the largest remaining. Kept in this list as a
-  record of the scoping call rather than as work to do.</li>
-<li><strong>Nothing validates the generated specification — fixed in
-  phase 2.</strong> Phase 1's path-implies-required rule exists to
-  satisfy linters and client generators, and was checked by hand.
-  Phase 2's first PR added
-  <code>shakenfist/tests/external_api/test_openapi_spec.py</code>, which
-  runs <code>openapi_spec_validator</code> over flasgger's output and holds
-  the remaining invalidity to an exact ratchet count (128, all in
-  the body-parameter class above), failing on any new error class
-  or any change in the count
-  (<a href="https://github.com/shakenfist/shakenfist/issues/3626">#3626</a>).
-  The test landed before the renderer fix on purpose: it turns
-  "invalid in N places" into a number that moves.</li>
-</ul>
-<h3 id="carried-into-phase-3-from-phase-1">Carried into phase 3 from phase 1<a class="headerlink" href="#carried-into-phase-3-from-phase-1" title="Permanent link">&para;</a></h3>
-<p><strong>Generate the derivation's input space rather than sampling it.</strong>
-A precondition for compiling, in the same way the audit itself
-was.</p>
-<p>Phase 1 took five review rounds, and four of them found a defect
-in the machinery added by the round before: the Werkzeug
-converter regex, the <code>flask.request.args</code> fallback, the webargs
-scope leak, and an emptied parameter list. Every one was
-<code>declarations.py</code> misreading source, and every one was a shape
-that did not occur anywhere in the tree — so no amount of testing
-against the tree could have found them, and neither could
-mutating it, which only permutes shapes already present.</p>
-<p>While the declarations are documentation, a misread costs a wrong
-line in the published API. Once phase 3 compiles them, the same
-misread rejects a valid request: a <code>path</code> parameter derived as
-<code>body</code> produces a schema hunting the JSON body for a URL segment,
-and decision D6's query-string fallback is granted only to
-parameters derived as <code>query</code>. The cost of the defect class rises
-sharply exactly here, which is why this belongs to phase 3 and
-not earlier.</p>
-<p>The shape to build is a <strong>combinatorial generator</strong>, not a
-fuzzer. Enumerate the axes and assert the derivation recovers
-what the source was constructed to mean:</p>
+<p>If the second population is large or is dominated by the official
+client, EXCLUDE wins and the recommendation should flip. That
+decision belongs to phase 4, with the counts in hand.</p>
+<p><strong>This preemption is general, not specific to unknown keys.</strong> Any
+validation failure at index 0 answers ahead of the per-method
+decorators, so a request that is both malformed <em>and</em> refers to a
+nonexistent object moves from 404 to 400 at enforcement. That is
+defensible — the request was malformed — but it is a contract change
+across the whole API, and phase 4 should state it in the release
+notes rather than discover it in a bug report.</p>
+<h3 id="d11-the-uuid-passed_uuid-remap-is-dead-and-d8-rests-on-it">D11. The <code>uuid</code> → <code>passed_uuid</code> remap is dead, and D8 rests on it<a class="headerlink" href="#d11-the-uuid-passed_uuid-remap-is-dead-and-d8-rests-on-it" title="Permanent link">&para;</a></h3>
+<p>Decision D8 says a body key colliding with a path parameter is
+rejected, and cites <code>log_request</code> mapping body <code>uuid</code> to
+<code>passed_uuid</code> as evidence "it is a known hazard rather than a
+feature".</p>
+<p><code>passed_uuid</code> appears exactly once in the tree — at the assignment
+in <code>log_request</code> itself. No handler accepts it; no declaration names
+it. The remap therefore does not dodge the collision. It converts
+<code>{"uuid": ...}</code> on <em>every</em> endpoint into a guaranteed 400 with
+interpreter text, as the probe above shows.</p>
+<p>Phase 3 should delete the special case and let <code>uuid</code> fall under
+D10 with every other undeclared key. D8's underlying point survives
+— a body key overwriting a path parameter is a real hazard — but its
+supporting evidence does not, and the plan should stop citing it.</p>
+<h3 id="d12-collision-detection-cannot-live-in-the-validator">D12. Collision detection cannot live in the validator<a class="headerlink" href="#d12-collision-detection-cannot-live-in-the-validator" title="Permanent link">&para;</a></h3>
+<p>D3 places validation at index 0 of <code>Resource.method_decorators</code>.
+That is correct and unchanged: flask_restful applies the list in
+order with each wrapping the previous, so index 0 is <em>innermost</em>,
+running after authentication and still outside every per-method
+decorator.</p>
+<p>But <code>log_request</code> is at index 1, which means it runs <strong>before</strong>
+index 0 — and it has already merged the body into <code>kwargs</code> by the
+time the validator sees anything. A body key that overwrote a path
+parameter is, at index 0, indistinguishable from a path parameter
+that simply had that value.</p>
+<p>So D8 cannot be implemented in the validator. Either <code>log_request</code>
+records what it overwrote (a request-scoped marker on <code>flask.g</code>,
+the pattern <code>record_exception</code> already uses for
+<code>_RECORDED_EXCEPTION_FIELDS</code>), or the check lives in <code>log_request</code>
+itself. The marker is preferable: it keeps <code>log_request</code> doing one
+job and keeps the policy in one place.</p>
+<h3 id="d13-how-the-compiled-schema-reaches-the-handler">D13. How the compiled schema reaches the handler<a class="headerlink" href="#d13-how-the-compiled-schema-reaches-the-handler" title="Permanent link">&para;</a></h3>
+<p><code>swagger_helper(section, description, parameters, responses, ...)</code>
+does not know which class or method it is decorating, so it cannot
+key a registry by handler. And <code>swag_from</code>'s <code>specs_dict</code> is an
+attribute on the function: <code>base.py</code> warns in two places that
+several of its decorators predate <code>functools.wraps</code> and do not
+propagate attributes, which is why <code>_sf_public</code> is documented as
+"apply it as the outermost decorator" with a structural test to
+enforce it. Reading <code>specs_dict</code> off a wrapped bound method is the
+same trap.</p>
+<p><strong>Build the registry at mount time in <code>app.py</code></strong>, from the 94
+<code>api.add_resource()</code> calls. That is the same ground truth phase 1
+used for the location audit, it yields the class, the route and
+therefore the path-parameter set together, and it involves no
+attribute propagation. The validator looks up
+<code>(type(self).__name__, request.method.lower())</code>.</p>
+<p>A test asserts every mounted handler resolves to a compiled schema,
+so a route added without one fails rather than silently skipping
+validation. That is the same "absence must not be indistinguishable
+from success" rule the audit was rewritten around.</p>
+<h2 id="shape-of-the-work-three-prs-and-a-measurement">Shape of the work: three PRs and a measurement<a class="headerlink" href="#shape-of-the-work-three-prs-and-a-measurement" title="Permanent link">&para;</a></h2>
+<h3 id="pr-1-generate-the-derivations-input-space">PR 1 — Generate the derivation's input space<a class="headerlink" href="#pr-1-generate-the-derivations-input-space" title="Permanent link">&para;</a></h3>
+<p>The precondition the master plan sets, and the reason it is a
+precondition rather than a step: while declarations are
+documentation, a misread costs a wrong line in the published API;
+once they are compiled, the same misread rejects a valid request.</p>
+<p>Phase 1 took five review rounds and four of them found a defect in
+the machinery added by the round before — the Werkzeug converter
+regex, the <code>flask.request.args</code> fallback, the webargs scope leak, an
+emptied parameter list. Every one was <code>declarations.py</code> misreading
+source, and every one was a shape absent from the tree, so neither
+testing against the tree nor mutating it could have found them.</p>
+<p>Enumerate the axes and assert the derivation recovers what the
+source was constructed to mean:</p>
 <table>
 <thead>
 <tr>
@@ -11622,7 +11381,7 @@ what the source was constructed to mean:</p>
 </tr>
 <tr>
 <td>webargs</td>
-<td>none, <code>get_args</code> on the class, on the module, inline dict, <code>location='json'</code></td>
+<td>none, <code>get_args</code> on the class, on the module, inline dict, <code>location='json'</code>, <code>location='json_or_query'</code></td>
 </tr>
 <tr>
 <td><code>request.args</code></td>
@@ -11634,101 +11393,372 @@ what the source was constructed to mean:</p>
 </tr>
 </tbody>
 </table>
-<p>A few dozen cases, deterministic, well under a second. The oracle
-is free because the source is constructed knowing where the
-parameter comes from, which is what makes this different from
-mutating declarations in the tree: <code>audit()</code> derives the truth
-and compares, so flipping a declared location and asserting drift
-tests the comparison, not the derivation. Every real defect was
-on the other side of that comparison.</p>
-<p>No new dependency. <code>hypothesis</code> is not in the project, and
-randomness buys nothing over enumerating a space this small —
-the value is in covering the axes, not in sampling them.</p>
-<p><code>tools/check-api-declaration-guards.sh</code> stays as it is. It
-mutates the real tree to prove the <em>guards</em> fire, which is a
-different question from whether the <em>derivation</em> is right, and
-the two are complementary.</p>
-<p><strong>D6's query-string fallback shipped early, at three sites.</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/3629">Issue #3629</a>:
-<code>all</code> on the outstanding-operations endpoints was bound with
-<code>@use_kwargs(get_args, location='query')</code>, and webargs finishes
-with <code>kwargs.update(parsed_args)</code>, so the <code>load_default=False</code>
-from an absent query string overwrote the <code>all=True</code> that
-<code>log_request</code> merged in from the JSON body. The shipped client
-only ever sends a body, so the parameter never worked through
-it.</p>
-<p>This was predicted here to close with phase 3, "or sooner". It
-closed sooner, in <code>0de6c3b5c</code> (2026-08-09), and phase 3 inherits
-the mechanism rather than choosing one:</p>
+<p>The <code>json_or_query</code> value is new since the master plan listed these
+axes, and is exactly the kind of shape that was absent from the tree
+until it wasn't.</p>
+<p>A few dozen cases, deterministic, well under a second. The oracle is
+free: the source is constructed knowing where each parameter comes
+from. This is what makes it different from mutating declarations in
+the tree — flipping a declared location and asserting drift tests
+the <em>comparison</em>, and every real defect was on the other side of it,
+in the derivation.</p>
+<p>No new dependency; <code>hypothesis</code> is not in the project and randomness
+buys nothing over enumerating a space this small.</p>
+<p><code>tools/check-api-declaration-guards.sh</code> is unchanged. It proves the
+guards fire, which is a different question from whether the
+derivation is right.</p>
+<p><strong>Ships nothing to production.</strong> Its whole value is that it either
+finds defects in <code>declarations.py</code> before compilation depends on it,
+or it demonstrates there are none.</p>
+<h3 id="pr-2-compile-wired-but-inert">PR 2 — Compile, wired but inert<a class="headerlink" href="#pr-2-compile-wired-but-inert" title="Permanent link">&para;</a></h3>
+<p>Turn the declarations into marshmallow schemas and mount the
+registry. Nothing validates yet; nothing changes for any caller.</p>
 <ul>
-<li><code>base.py</code> registers a <strong><code>json_or_query</code> webargs location
-  loader</strong> which merges <code>req.args</code> and the JSON body with the
-  body authoritative, then drops keys the schema does not name
-  (mirroring webargs' <code>unknown=EXCLUDE</code> default for the query
-  location). The instance, artifact and network
-  outstanding-operations endpoints are bound to it.</li>
-<li><strong>A <code>('query', 'json')</code> tuple location was tried and
-  rejected.</strong> webargs keys validation failures by location, and
-  a tuple key is not JSON-serialisable, so a 422 becomes a 500.
-  Phase 3 must not re-derive this: the custom loader is the
-  supported shape.</li>
-<li><code>declarations.py</code> derives a schema bound to <code>json_or_query</code>
-  as a <strong><code>query</code></strong> location, so the published declaration is
-  unchanged and phase 1's audit still holds.</li>
+<li>An <code>ARGTYPES</code> → marshmallow field mapping. The table already
+  carries <code>type</code>, <code>format</code> and, for two tokens, <code>pattern</code>, plus the
+  optional constraints element on 5 declarations. The mapping is
+  mechanical, with three rules that are not:</li>
+<li><strong><code>netblock</code> compiles to a plain string.</strong> It is deliberately
+    format-only, with no pattern, because <code>NetworksEndpoint.post()</code>
+    validates with <code>ipaddress.ip_network()</code>, which parses IPv6 too.
+    Compiling a CIDR regex here would publish and then enforce an
+    API narrower than the one that ships. Phase 2 wrote that
+    reasoning down; phase 3 is where ignoring it would do damage.</li>
+<li><strong><code>uuidorname</code>, <code>namespace</code>, <code>node</code>, <code>url</code>, <code>ipv4</code> compile to
+    plain strings.</strong> Their prose <code>format</code> is documentation. Turning
+    them into semantic validators is phase 6 (#534, #3269, #323,
+    #936), and doing it here would smuggle enforcement into a
+    warn-only phase.</li>
+<li><strong><code>binary</code> and the raw-body sentinel are excluded.</strong> Upload
+    bodies are not JSON and must never be parsed as such.</li>
+<li>The registry, built at mount time per D13, keyed by class and
+  method.</li>
+<li><code>required</code> is compiled as <strong>metadata, not as a constraint</strong>. The
+  master plan already found <code>mode</code> on the agent-put endpoint
+  declared required while omitting it has always been accepted.
+  Enforcing required-ness is phase 6's decision; phase 3 records
+  what it <em>would</em> have rejected so phase 6 has data.</li>
 </ul>
-<p>Phase 3 therefore generalises an existing, tested loader to
-every parameter derived <code>query</code>, rather than introducing a
-second precedence rule alongside it. See
-<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</p>
-<h2 id="open-questions-for-phase-0">Open questions for phase 0<a class="headerlink" href="#open-questions-for-phase-0" title="Permanent link">&para;</a></h2>
-<p>All answered above; retained as the record of what phase 0
-was asked to decide.</p>
+<p>Tests: every mounted handler compiles; the compiled field set
+matches the declared parameter set for all 132 documented handlers;
+<code>netblock</code> and the five prose-format tokens compile to unconstrained
+strings; the three UNDOCUMENTED_BY_DESIGN handlers are absent by
+name rather than by accident.</p>
+<p>This PR should also reconcile with phase 2's <code>STRUCTURED_PARAMETERS</code>
+table in <code>test_openapi_spec.py</code>. That table pins what the <em>published
+specification</em> says about 16 parameters; the compiler is a second
+consumer of the same declarations. They must not be able to
+disagree — a test that walks both is cheap and closes the gap that
+produced two consecutive rounds of type-token defects in phase 2.</p>
+<h3 id="pr-3-validate-and-warn">PR 3 — Validate, and warn<a class="headerlink" href="#pr-3-validate-and-warn" title="Permanent link">&para;</a></h3>
+<p>The behaviour-visible PR, and still not a behaviour change.</p>
+<ul>
+<li>A <code>validate_request</code> decorator inserted at index 0 of
+  <code>method_decorators</code>, so it runs after authentication (an
+  unauthenticated caller cannot probe the schema) and before every
+  per-method decorator.</li>
+<li>A <code>@webargs_parser.error_handler</code> replacing webargs' default
+  <code>abort(422)</code> with <code>sf_api.error(400, ...)</code>, per D4. <strong>This fixes an
+  existing defect as a side effect</strong> — though not the one this
+  paragraph first claimed. No error handler is registered today, but
+  no client ever saw webargs' raw 422 either:
+  <code>suppress_exceptions_to_client</code>'s bare <code>except Exception</code> swallowed
+  the abort's <code>HTTPException</code> into a 500 with a traceback and an
+  on-disk exception record per occurrence. The review round proved
+  the handler alone is inert for the same reason, so the fix is two
+  halves: this handler, and an <code>HTTPException</code> carve-out in
+  <code>suppress_exceptions_to_client</code> (and <code>record_exception</code>) restricted
+  to aborts carrying a crafted response, so a bare <code>abort()</code> cannot
+  start answering werkzeug's HTML error pages. Worth a line in the
+  release notes.</li>
+<li>Warn-only is the default and is controlled by one config setting,
+  <code>API_VALIDATION_MODE</code>, with values <code>warn</code> and <code>enforce</code>. Phase 4
+  flips the default; the setting exists from the start so the flip
+  is a one-line, revertible change rather than a code change.</li>
+<li>The D12 collision marker in <code>log_request</code>, and deletion of the
+  dead <code>passed_uuid</code> remap (D11).</li>
+</ul>
+<p><strong>What a warn record contains.</strong> One structured log line per
+request that would have been rejected, at <code>info</code>, with:
+<code>request-id</code> (already threaded), method, the concrete path and the
+route template (so findings aggregate by endpoint), the parameter
+name (truncated and stripped of non-printables — it is client
+supplied), the reason, the validation detail, the active mode, the
+status the request returned anyway, and the offending value's
+<strong>type</strong>. Never its value — D5, and several of these routes carry
+credentials, which is why <code>log_request</code> drops the whole body on
+<code>handles_credentials()</code> routes rather than naming fields. (The first
+draft promised the declared location and type as fields; the
+declaration is recoverable from route + parameter, so they are not
+carried on every line.)</p>
+<p>Rejection reasons must be counted separately, because they answer
+different questions:</p>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>What a nonzero count means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>type mismatch</td>
+<td>the declaration is wrong, or callers send junk</td>
+</tr>
+<tr>
+<td>unknown parameter (D10)</td>
+<td>callers send keys we do not declare</td>
+</tr>
+<tr>
+<td>missing required (D12)</td>
+<td><code>required</code> is over-declared; phase 6 input</td>
+</tr>
+<tr>
+<td>body/path collision (D8)</td>
+<td>the hazard is real in practice</td>
+</tr>
+<tr>
+<td>constraint violation</td>
+<td>the five bounds are wrong or callers exceed them</td>
+</tr>
+</tbody>
+</table>
+<p>Each record also carries <strong>what the request returned anyway</strong>. That
+single field is what separates D10's two populations, and it is the
+only way to measure the preemption cost: a warn whose request went
+on to return 200 is a rejection enforcement would introduce, and a
+warn whose request returned 404 is a status code enforcement would
+change rather than a new refusal. Without it the warn log says how
+often validation <em>would</em> fire but not what it would cost, which is
+the question phase 4 has to answer.</p>
+<p>That has a design consequence: the validator cannot log and move
+on, because at index 0 the outcome is not known yet. It stashes the
+pending warn on <code>flask.g</code> and something downstream emits it once the
+response exists — the same request-scoped hand-off
+<code>record_exception</code> uses for <code>_RECORDED_EXCEPTION_FIELDS</code>, and a
+reason to build the telemetry as a Flask <code>after_request</code> hook rather
+than as part of the decorator.</p>
+<p>A prometheus counter with those as labels, alongside the log line,
+so "is it quiet?" is answerable from a dashboard rather than by
+grepping Loki. The label set is bounded and small; parameter name is
+<em>not</em> a label.</p>
+<h3 id="then-measure">Then: measure<a class="headerlink" href="#then-measure" title="Permanent link">&para;</a></h3>
+<p>Deploy to sfcbr and read the logs. Per D5 the window is not a fixed
+duration — it ends when every remaining rejection is intended — and
+it must cover a full functional CI run plus seven days of sfcbr.</p>
+<p>CI matters as much as sfcbr here, and for a different reason: sfcbr
+has one workload driven mostly by the official client, while CI
+exercises the ansible collection, which is a second implementation
+of this API's contract and the one most likely to send something the
+declarations do not describe (see #3308, where the collection's
+networkspec parser makes every non-empty value truthy).</p>
+<p>Two notes for whoever reads the log, both from the review round:</p>
+<ul>
+<li>Query-declared parameters are checked against the merged,
+  body-authoritative view the <code>json_or_query</code> loader reads, so the
+  shipped client's everything-in-the-body habit is measured rather
+  than a blind spot. The merge is applied to every query-declared
+  parameter, but only the <code>json_or_query</code> sites actually read the
+  body -- <code>blob.py</code>'s data endpoint binds plain <code>query</code> -- so a
+  body-supplied <code>offset</code>/<code>limit</code> there produces a finding about a
+  value the endpoint ignores. Read such findings as caller defects
+  (the value was sent somewhere it does nothing), not as rejections
+  enforcement would introduce. A repeated query key (<code>?tag=a&amp;tag=b</code>) is still
+  collapsed to its first value before checking; no query parameter
+  is array-typed today (arrays are refused outside a body at import
+  time), so a finding of that shape would be an artefact of the
+  collapse rather than a caller defect.</li>
+<li>The measurement apparatus itself has no functional-CI self-check:
+  nothing in <code>shakenfist_ci</code> sends a deliberately-undeclared key and
+  asserts a finding line appears. Verify the apparatus by hand early
+  in the sfcbr window — one malformed request, one grep — before
+  reading seven days of quiet log as seven days of clean callers.</li>
+</ul>
+<h2 id="coordination-and-adjacencies">Coordination and adjacencies<a class="headerlink" href="#coordination-and-adjacencies" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>#3612</strong> is the issue this phase's mechanism section describes,
+  and D10 is where it actually gets closed — but not until phase 4,
+  because warn-only still returns the interpreter text.</li>
+<li><strong>#1974 (pagination)</strong> needs the bounded <code>limit</code>/<code>offset</code> types
+  this compiles. Coordinate on the parameter types; the query and
+  response-shape work stays in
+  <a href="../api-query-batching-roadmap/"><code>api-query-batching-roadmap.md</code></a>.</li>
+<li><strong>Phase 6</strong> consumes the <code>required</code> and constraint warn counts.
+  Nothing in phase 3 pre-empts its decision.</li>
+<li><strong>The client</strong> (<code>shakenfist_client</code>, a separate repository) is not
+  changed by this phase and must not need to be. If warn data shows
+  the shipped client sends something the declarations reject, that
+  is a declaration bug until proven otherwise — the client is the
+  reference implementation of what the API accepts today.</li>
+</ul>
+<h2 id="what-this-phase-does-not-do">What this phase does not do<a class="headerlink" href="#what-this-phase-does-not-do" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>It rejects nothing.</strong> Every request that succeeds today
+  succeeds afterwards, with the same status and body.</li>
+<li><strong>No semantic validation.</strong> MAC format, base64-ness, netblock
+  overlap and the instance-create structures are phase 6.</li>
+<li><strong>No <code>required</code> enforcement.</strong></li>
+<li><strong>No response validation.</strong> Out of scope by D7, not deferred.</li>
+<li><strong>It does not narrow <code>except TypeError</code>.</strong> That is phase 5 and it
+  is gated on phase 4: the broad catch is currently absorbing the
+  malformed input this layer will start handling, and removing it
+  before enforcement would turn 400s into 500s.</li>
+</ul>
+<h2 id="verification-phase-wide">Verification, phase-wide<a class="headerlink" href="#verification-phase-wide" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The derivation generator (PR 1) passes, and is demonstrated to
+  fail when <code>declarations.py</code> is mutated — a generator that cannot
+  fail proves nothing, which is the lesson the mutation harness
+  exists to encode.</li>
+<li><code>tools/check-api-declaration-guards.sh</code> still reports all
+  mutations caught, with new mutations for the compilation path:
+  a token compiled to the wrong field, a handler mounted without a
+  schema, a semantic validator smuggled onto a prose-format token.</li>
+<li>The full unit suite passes; <code>pre-commit run --all-files</code> clean.</li>
+<li>The published specification still validates with zero errors, so
+  phase 2's assertion holds and compilation has not perturbed
+  rendering.</li>
+<li>Functional CI green, which for this phase is a <em>measurement</em> as
+  much as a gate: a warn count of zero across a full CI run is
+  evidence, and a warn count that is large is the finding.</li>
+</ul>
+<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>webargs/marshmallow, pydantic, or hand-rolled?</strong> Pydantic is
-   already a core dependency (config and <code>schema/</code>), but webargs
-   is what the four existing sites use and is already wired into
-   Flask request parsing. Which one, and is consistency with
-   <code>schema/</code> worth more than consistency with the existing four
-   endpoints?</li>
-<li><strong>Compile the existing declarations, or author new schemas?</strong>
-   Compiling gets 96% coverage for free but inherits any drift.
-   Authoring is honest but is 254 hand-written declarations.
-   Is there a middle path — compile, then let an endpoint
-   override with an explicit schema where the declaration is
-   insufficient?</li>
-<li><strong>Where does validation sit in <code>method_decorators</code>?</strong> It must
-   run after authentication (so an unauthenticated caller cannot
-   probe the schema) but before the handler. <code>CLAUDE.md</code> warns
-   that this ordering is subtle; what breaks?</li>
-<li><strong>What is the malformed-input response shape?</strong> A single
-   <code>400 {"error": "..."}</code> naming the parameter, or a
-   field-keyed structure? Does anything depend on the current
-   text? What does <code>shakenfist-client</code> do with it?</li>
-<li><strong>How long does warn-only run, and what makes it "quiet
-   enough"?</strong> sfcbr is one cluster with one workload; CI is
-   another. Is that enough evidence to enforce?</li>
-<li><strong>What happens to a query parameter on a GET?</strong> The events
-   endpoints read <code>limit</code> only from the JSON body — a <code>?limit=5</code>
-   query string is silently ignored, which is surprising and
-   fragile (a GET body is not guaranteed to survive proxies).
-   Should the migration accept <code>location=('query', 'json')</code> for
-   these, and is that a breaking change for anyone?</li>
-<li><strong>Do we validate responses too?</strong> Out of scope as written, but
-   the same declarations describe response examples, and
-   <code>external_view()</code> drift is a real source of client bugs.</li>
-<li><strong>Body keys silently overwriting path parameters.</strong> Is that
-   ever intentional? <code>ArtifactVersionEndpoint.delete</code> currently
-   lets a body <code>version_id</code> override the URL segment. If not
-   intentional, the schema layer is where it stops.</li>
+<li>Every mounted handler resolves to a compiled schema, enforced by
+   a test rather than by inspection.</li>
+<li>Warn-only runs for a full CI run plus seven days on sfcbr.</li>
+<li>Every remaining warn is classified: declaration bug, caller bug,
+   or intended rejection. <strong>The exit condition is that the list is
+   explained, not that it is empty</strong> — an intended rejection is a
+   success, and phase 4 is what turns it into a 400.</li>
+<li>No production behaviour change attributable to the phase.</li>
+<li>A written recommendation for D10's <code>EXCLUDE</code>/<code>RAISE</code> choice,
+   backed by the two undeclared-key populations — reaches-handler
+   versus answered-first — rather than by taste, together with an
+   estimate of how many requests change status code at enforcement
+   because validation preempts a per-method decorator.</li>
 </ol>
-<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Rewriting the API surface, changing resource paths, or
-  versioning the API.</li>
-<li>Response-shape validation (see open question 7).</li>
-<li>Authentication or authorization changes.</li>
-<li>The mariadb-layer error semantics in #3373.</li>
-</ul>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>The three PRs have landed. The measurement has not: warn-only is
+deployed nowhere yet, so the phase is code-complete and evidence-empty.</p>
+<p><strong>Four deviations from this plan, all recorded because each was a
+better answer than the one planned.</strong></p>
+<ol>
+<li><strong>Compiled from the rendered specification, not from <code>ARGTYPES</code>.</strong>
+   The plan called for a second token-to-marshmallow mapping. Reading
+   <code>swagger_helper()</code>'s output instead means there is exactly one
+   interpretation of a token in the process, so the compiled schema and
+   the published specification cannot drift apart — and the three
+   special cases the plan wrote out (netblock, prose formats, raw body)
+   became consequences of the rendering rather than rules this module
+   states and could get wrong.</li>
+<li><strong>The derivation had a defect, and PR 1 found it.</strong>
+   <code>derived_location()</code> returned <code>path</code> before consulting the query
+   sources, so a handler whose declared parameters are all path
+   parameters could read <code>flask.request.args</code> with a key the walk
+   cannot name and the audit would report the tree clean. No handler in
+   the tree has that shape, which is exactly why the generated cross
+   product was a precondition rather than a nicety.</li>
+<li><strong>The decorator had to propagate markers.</strong> Putting <code>validate_request</code>
+   at index 0 puts it between the bound method and
+   <code>_authenticate_unless_public</code>, which reads <code>__self__</code> for the
+   resource class and <code>_sf_public</code> / <code>_sf_scope</code> for the policy
+   markers. Without <code>functools.wraps</code> plus an explicit <code>__self__</code> copy,
+   <strong>every <code>@public</code> endpoint would have started demanding a token</strong>.
+   The plan named this file's attribute-propagation trap as a reason to
+   avoid <code>specs_dict</code>; it did not notice the decorator itself walks
+   into it.</li>
+<li><strong>No prometheus counter.</strong> The plan asked for one alongside the log
+   line. sf-api has no metrics exporter — it is a gunicorn app, and the
+   database daemon's <code>start_http_server</code> has no equivalent here — so
+   the counter would have meant inventing one. The structured log is
+   what the measurement step actually reads, and it carries the same
+   labels. Adding an exporter to sf-api is worth doing, and is not this
+   phase.</li>
+</ol>
+<p><strong>D10's framing was wrong in the first draft and is corrected in the
+plan above.</strong> <code>RAISE</code> was written up as behaviour-preserving; probing
+<code>POST /auth</code> without mocking the namespace lookup disproved it, because
+<code>arg_is_namespace</code> short-circuits to 404 before the handler is reached.
+Neither <code>RAISE</code> nor <code>EXCLUDE</code> is neutral. The recommendation stands as
+<code>RAISE</code>, provisionally, and warn-only counts the two populations.</p>
+<p><strong>Not done, and deliberately.</strong> <code>required</code> is recorded and never
+enforced. Semantic validation of the prose formats is untouched.
+<code>except TypeError</code> is still broad — narrowing it is phase 5 and is
+gated on phase 4, because it is currently absorbing the malformed
+input this layer will start handling.</p>
+<p><strong>Verification.</strong> All 31 mutations in
+<code>tools/check-api-declaration-guards.sh</code> caught, including three which
+break the derivation and three which break the compiler. 2725 unit
+tests pass. <code>pre-commit run --all-files</code> clean. The published
+specification still validates with zero errors.</p>
+<p><strong>The review round found three runtime defects, all fixed.</strong> The
+automated review of the phase 3 PR proved (with a reproduction) that
+the webargs error handler was inert -- its 400 abort was swallowed
+into a 500 by <code>suppress_exceptions_to_client</code>, exactly as webargs' own
+422 always had been, so the baseline claim in this plan's first draft
+was wrong and is corrected above. It also caught <code>kwargs.update(j)</code>
+turning a non-object JSON body into a 500 (and silently merging a list
+of two-character strings), and the validator re-parsing raw upload
+bodies as JSON. The shape of the first two is worth remembering: both
+were behaviour changes hiding inside refactors of code whose old
+behaviour was itself an accident (<code>TypeError</code> from a merge loop,
+caught by a broad <code>except</code> two decorators out), and the unit tests
+passed because they tested components in isolation while the defect
+lived in the stack. The fixes ship with request-level tests through
+the real decorator stack, and each fix was mutation-tested. Hardening
+from the same round: unknown-parameter findings are capped per request
+and parameter names truncated (log-amplification), <code>API_VALIDATION_MODE</code>
+is a <code>Literal</code> so a typo fails at config load instead of silently
+meaning warn, declared patterns must be <code>^...$</code> anchored at import
+time so JSON Schema search and marshmallow match semantics provably
+coincide, and query-declared parameters are checked against the
+merged <code>json_or_query</code> view.</p>
+<p><strong>The second review round found one more contradiction, fixed.</strong>
+<code>enforce</code> rejected on <em>any</em> finding, including <code>missing-required</code> --
+while three documents said required is recorded and never enforced,
+and the unit test asserting that only checked the compiled marshmallow
+field (the missing-required path bypasses marshmallow entirely). The
+enforcement decision now filters <code>missing-required</code> findings out, with
+a request-level test that <code>enforce</code> plus an omitted required parameter
+still reaches the handler. From the same round: <code>API_VALIDATION_MODE</code>
+gained <code>off</code> as an operator safety valve against log volume; parameter
+names are stripped of non-printables as well as truncated; the warn
+line carries the route template so findings aggregate by endpoint; and
+the validator reads the body <code>log_request</code> stashed on <code>flask.g</code> rather
+than re-fetching it, so it reports on exactly what the handler
+receives and a non-JSON body is not parsed twice.</p>
+<p><strong>The third review round found the round-two fix had a defect of its
+own</strong> -- the restructured enforce branch returned before stashing its
+findings, so an enforced rejection would have emitted no warn line:
+the measurement going dark at the exact moment phase 4 flips the
+switch. Findings are now stashed before the enforce decision, and the
+round's other real gap is closed too: nothing had pinned that a
+finding on a <em>successful</em> request leaves the response untouched,
+which is the phase's central promise and the population D10 sizes.
+Both ship with request-level tests. Defensive hardening from the same
+round: an unrecognised type token now drops its published bounds
+(Range on a Raw field raises TypeError through schema.validate()),
+_schema_findings() catches anything a schema raises and reports
+nothing rather than changing a response, and build_registry() refuses
+two endpoint classes sharing a bare name at mount time, since the
+registry key could not tell their requests apart.</p>
+<p><strong>The fourth review round had no fix items and the loop was declared
+converged</strong> (fix trajectory 8, 1, 2, 0). Considers taken because they
+were real: the pattern validator now uses re.fullmatch (Python's $
+matches before a trailing newline, ECMA-262's does not) and the
+import-time check also refuses top-level alternation, which escapes
+the anchors; and the finding line redacts the parameter name on
+credential-carrying routes, because it was a third body-reading
+logger and the other two consult handles_credentials() and drop the
+lot. Declined, with reasons: a HEAD bypass matters only if a HEAD
+route ever takes parameters; CompiledEndpoint.names is recomputed per
+request but is a set-union over tiny sets; and the functional-CI
+self-check remains recorded in the measurement notes above rather
+than in this phase.</p>
+<p><strong>The next step is not code.</strong> Deploy to sfcbr, run functional CI, and
+read the warn log. Success criterion 3 is that every remaining finding
+is explained, not that there are none.</p>
 
 
 
@@ -11749,7 +11779,7 @@ was asked to decide.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-api-input-validation.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-api-input-validation.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-api-input-validation/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-api-input-validation-phase-03-compile-and-warn.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-api-input-validation-phase-03-compile-and-warn.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-api-input-validation-phase-03-compile-and-warn/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

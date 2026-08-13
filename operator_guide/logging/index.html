@@ -10864,6 +10864,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#api-request-validation-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API request validation findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#events-vs-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11246,6 +11257,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#api-request-validation-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API request validation findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#events-vs-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11458,6 +11480,60 @@ metrics endpoint:</p>
 </tr>
 </tbody>
 </table>
+<h2 id="api-request-validation-findings">API request validation findings<a class="headerlink" href="#api-request-validation-findings" title="Permanent link">&para;</a></h2>
+<p>After upgrading you may see <code>API request validation finding</code> lines
+from <code>sf-api</code> in your log stream. These are <strong>informational</strong>: they
+record a request which did not match its endpoint's published
+parameter declarations, and while <code>API_VALIDATION_MODE</code> is <code>warn</code>
+(the default) they change no response — the request was answered
+exactly as it always was. Do not set <code>enforce</code> yet; that switch is
+phase 4 of the API input validation plan and only makes sense once
+the warn log for your own callers has been read and understood. If
+the lines themselves become a problem — a chatty caller sending an
+undeclared key on every request is an extra line per request —
+<code>API_VALIDATION_MODE</code> can be set to <code>off</code>, which disables the layer
+entirely.</p>
+<p>Each line carries:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>validation-reason</code></td>
+<td>Which rule the request missed: <code>unknown-parameter</code> (a body key the endpoint does not declare), <code>type-mismatch</code> (a declared parameter with a value of the wrong type), <code>missing-required</code> (a declared-required parameter that was not supplied), or <code>body-path-collision</code> (a body key with the same name as a URL path parameter).</td>
+</tr>
+<tr>
+<td><code>validation-parameter</code></td>
+<td>The parameter concerned, truncated to 64 characters.</td>
+</tr>
+<tr>
+<td><code>validation-detail</code></td>
+<td>The specific rule that was missed — for a <code>type-mismatch</code>, the validation message (for example <code>Not a valid integer.</code>).</td>
+</tr>
+<tr>
+<td><code>validation-value-type</code></td>
+<td>The Python type of the offending value. The value itself is never logged.</td>
+</tr>
+<tr>
+<td><code>route</code></td>
+<td>The route template (for example <code>/instances/&lt;instance_ref&gt;</code>), so findings aggregate by endpoint; <code>path</code> carries the concrete request path.</td>
+</tr>
+<tr>
+<td><code>validation-response-status</code></td>
+<td>The status the request went on to return anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change.</td>
+</tr>
+<tr>
+<td><code>validation-mode</code></td>
+<td>The active <code>API_VALIDATION_MODE</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>The reason codes and the measurement they feed are described in
+<code>docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md</code>.</p>
 <h2 id="events-vs-logs">Events vs logs<a class="headerlink" href="#events-vs-logs" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist has two structured-record streams, and they are not
 the same thing:</p>

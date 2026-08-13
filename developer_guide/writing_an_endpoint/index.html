@@ -10960,6 +10960,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-validation-does-with-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What validation does with them
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-is-not-checked-yet" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11086,9 +11097,17 @@ exactly that reason, and now reads:</p>
 <p>Constraints are validated at import time in the same style as
 everything else: unknown keys, non-numeric bounds, bounds on
 non-numeric types, contradictory bounds, patterns that do not
-compile, patterns on non-string types, and a constraint restating a
-key its type token already renders (a second <code>minimum</code> on
-<code>unsignedinteger</code>) all raise <code>InvalidAPIDeclaration</code>. Note that
+compile, patterns on non-string types, unanchored patterns, and a
+constraint restating a key its type token already renders (a second
+<code>minimum</code> on <code>unsignedinteger</code>) all raise <code>InvalidAPIDeclaration</code>.
+A pattern must be <code>^...$</code> anchored, with no top-level alternation
+(<code>^a|b$</code> is anchored on neither branch — wrap it in a group), because
+its two consumers read anything looser differently: JSON Schema
+<code>pattern</code> is an unanchored <em>search</em>, while the compiled validator
+requires the whole value to match (<code>re.fullmatch</code>, chosen because
+Python's <code>$</code> also matches before a trailing newline and ECMA-262's
+does not). Fully anchored and group-wrapped is the one form both read
+identically, so it is required rather than documented. Note that
 declared constraints are <em>published documentation</em> until phase 3 of
 <a href="../../plans/PLAN-api-input-validation/">PLAN-api-input-validation</a>
 compiles them — a constraint does not reject anything yet.</p>
@@ -11202,11 +11221,49 @@ which is what CI actually enforces, since no workflow runs pre-commit.</p>
 assertions: it breaks each property on purpose and confirms the guard
 fires. Run it if you change the derivation or add an assertion, since
 a guard that passes on a deliberately broken tree is not a guard.</p>
+<p>Those assertions compare declarations against the derivation, so they
+are only as good as the derivation itself — and the tree can only
+exercise the source shapes it happens to contain.
+<code>shakenfist/tests/external_api/test_derivation_generator.py</code> covers
+the rest: it crosses route form, <code>@use_kwargs</code> binding and
+<code>flask.request.args</code> read style, builds a synthetic endpoint for each
+of the 225 combinations, and asserts the derivation recovers what that
+case was constructed to mean. Every defect found while building the
+phase 1 audit was a shape absent from the tree, which is why this is
+generated rather than sampled. <strong>If you add a way for a parameter to
+arrive, add an axis value here</strong> — a shape the generator does not
+enumerate is a shape nothing checks.</p>
+<h2 id="what-validation-does-with-them">What validation does with them<a class="headerlink" href="#what-validation-does-with-them" title="Permanent link">&para;</a></h2>
+<p>The declarations are compiled into marshmallow schemas at startup
+(<code>shakenfist/external_api/validation.py</code>) and checked against every
+request. <strong>Nothing is rejected</strong>: <code>API_VALIDATION_MODE</code> defaults to
+<code>warn</code>, which logs what would have been refused and changes no
+response. Setting it to <code>enforce</code> answers <code>400</code> in the usual
+<code>{"error": ..., "status": ...}</code> shape, and is phase 4's switch to
+throw once the warn log is understood.</p>
+<p>A warn record carries the endpoint, the parameter, the reason, the
+offending value's <strong>type</strong> — never its value — and the status the
+request went on to return anyway. That last field is the interesting
+one: a finding on a request which returned 200 is a rejection
+enforcement would introduce, while one on a request which returned 404
+is a status code enforcement would merely change, because validation
+runs ahead of the per-method decorators which produce those.</p>
+<p>Reasons are counted separately because they answer different
+questions: <code>unknown-parameter</code>, <code>type-mismatch</code>, <code>missing-required</code>
+and <code>body-path-collision</code>.</p>
+<p>Two things it deliberately does not do. <code>required</code> is recorded but
+never enforced — not even in <code>enforce</code> mode, where missing-required
+findings are filtered out of the rejection decision. Several
+parameters are declared required while omitting them has always
+worked, and what to do about that is phase 6.
+And the prose <code>format</code> on a type token is documentation: <code>netblock</code>,
+<code>uuidorname</code>, <code>namespace</code>, <code>node</code>, <code>url</code> and <code>ipv4</code> compile to plain
+strings, because semantic validation of them is also phase 6. Only
+<code>type</code>, <code>pattern</code>, <code>minimum</code> and <code>maximum</code> constrain anything.</p>
 <h2 id="what-is-not-checked-yet">What is not checked yet<a class="headerlink" href="#what-is-not-checked-yet" title="Permanent link">&para;</a></h2>
-<p>The declarations are documentation today. Compiling them into
-per-endpoint request validation is phase 3 of the plan; until then a
-correct declaration does not stop a caller sending something else.
-Two known gaps:</p>
+<p>Enforcement is off, so a correct declaration still does not stop a
+caller sending something else. Two known gaps in the derivation
+itself:</p>
 <p>(The published specification itself <em>is</em> checked:
 <code>shakenfist/tests/external_api/test_openapi_spec.py</code> validates the
 generated OpenAPI with <code>openapi_spec_validator</code> on every CI run, so a
