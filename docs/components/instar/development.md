@@ -383,17 +383,36 @@ same name:
 
 | Setting | Value |
 |---------|-------|
+| Ruleset | "Develop branch", id `20783686` (created 2026-08-12) |
 | Target | `refs/heads/develop` |
 | Enforcement | active |
 | Bypass | team `shakenfist/sf-can-skip-merge-queue`, mode `always` |
 | Rules | `deletion`, `non_fast_forward`, `merge_queue`, `pull_request`, `required_status_checks` |
-| Required checks | `Can enqueue`, `Can merge` (both GitHub Actions, integration 15368) |
+| Required checks | `Can enqueue` (GitHub Actions, integration 15368). `Can merge` is **not yet required** — see below |
 | Queue grouping | `ALLGREEN`, `max_entries_to_build: 1`, `max_entries_to_merge: 5` |
 | Queue merge method | `MERGE`, min 1 entry, 5 minute wait |
 | Check timeout | 360 minutes |
 | Required approvals | 0 (`dismiss_stale_reviews_on_push: true`) |
 
-Two of those deserve explanation:
+**`Can merge` is deliberately not required yet.** It only runs on
+`merge_group` events, so until a real merge group has executed, GitHub
+has never seen that check context — and requiring a context that has
+never reported blocks every merge, on a branch that had no protection
+to fall back to. The ruleset therefore shipped requiring `Can enqueue`
+alone. Once a PR has gone through the queue and `Can merge` has
+reported, add it:
+
+```bash
+# Read the current ruleset, append the context, PUT it back.
+gh api repos/shakenfist/instar/rulesets/20783686 > ruleset.json
+# add {"context": "Can merge", "integration_id": 15368} to the
+# required_status_checks rule, then:
+gh api -X PUT repos/shakenfist/instar/rulesets/20783686 --input ruleset.json
+```
+
+Until that is done the matrix runs in the queue but does not *gate* it.
+
+Two other settings deserve explanation:
 
 - **`max_entries_to_build: 1`** bounds the cost of the matrix. Only one
   merge group builds at a time, so the seven-wide fan-out is seven
