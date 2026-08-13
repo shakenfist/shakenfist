@@ -46,11 +46,6 @@ class InvalidStateForTask(NetIfaceOpException):
         super().__init__(op, 'network not in a state which allows this task')
 
 
-class NoAllocatedFloatingAddress(NetIfaceOpException):
-    def __init__(self, op):
-        super().__init__(op, 'interface has not floating address assigned')
-
-
 class NetIfaceOp(BaseClusterOperation):
     object_type = schema.object_type
     initial_version = schema.initial_version
@@ -101,7 +96,7 @@ class NetIfaceOp(BaseClusterOperation):
             raise NoSuchNetwork(self)
 
         ni = NetworkInterface.from_db(self.interface_uuid)
-        if not n:
+        if not ni:
             self.log.warning(
                 f'Network interface {self.interface_uuid} missing')
             raise NoSuchNetworkInterface(self)
@@ -120,9 +115,25 @@ class NetIfaceOp(BaseClusterOperation):
 
         floating = ni.floating.get('floating_address')
         if not floating:
-            self.log.warning(
-                'Not floating an interface with no floating address')
-            raise NoAllocatedFloatingAddress(self)
+            # Every enqueue site allocates the floating address (or verifies
+            # one exists) before enqueueing this task, so having no address
+            # here means a concurrent defloat or interface delete released it
+            # between enqueue and execution. The float has been superseded by
+            # that later request and skipping it is the correct outcome, not
+            # an error.
+            self.log.with_fields({
+                'instance_uuid': ni.instance_uuid,
+                'namespace': n.namespace,
+                'interface_state': ni.state.value}).info(
+                'Floating address released before interface_float executed; '
+                'a defloat or interface delete superseded this float')
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [self, n, ni, ('instance', ni.instance_uuid)],
+                'add floating IP superseded by defloat or delete, skipped',
+                extra={'inner': ni.ipv4,
+                       'interface_state': ni.state.value})
+            return
 
         # Multi-target audit event preserves the correlation that today's
         # Network.add_floating_ip(... affected_objects=[self, n, ni]) emits.
