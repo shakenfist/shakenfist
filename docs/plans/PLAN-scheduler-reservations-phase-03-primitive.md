@@ -358,7 +358,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 1 | Remove the legacy `node_attributes.instances` column handling per P1: delete `_dual_write_legacy_instances()` and its calls (`node.py:661,:668,:670-686`), drop the union from `Node.instances` (`node.py:626-654`), remove the field from the node-attributes schema model, update the reconciler comment block (`mariadb.py:23694-23701`) to say the precondition is now met, fix affected unit tests. Commit message records the rollback floor (P1) | medium | sonnet | worktree | Not started |
 | 2 | Add `SCHEDULER_DISK_OVERCOMMIT` (float, default 5.0) to `config.py` beside the other overcommit ratios; apply it to the headroom term in `_derive_disk_limit_gb()` per P3; thread it through the reconcile RPC request like the demand constants; unit tests for the scaled limit incl. zero-free and reservation-exceeds-free edges; document in `docs/operator_guide/database.md` | medium | sonnet | worktree | Not started |
 | 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Complete — see step 3 notes |
-| 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Not started |
+| 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Complete — see step 4 notes |
 | 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Not started |
 | 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Not started |
 | 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Not started |
@@ -441,6 +441,42 @@ now reflected in the code's docstrings:
   than `sa.text()` so `sa.Uuid` binding is handled by the dialect
   (the pitfall-6 hazard); no statement joins the dashed and
   undashed forms.
+
+### Step 4: implementation notes (2026-08-14)
+
+- **P5's over-limit event is derived by probe-then-force.** The
+  reply of a non-enforced admission carries post-admit counters
+  but not limits, so "did this push the node over?" cannot be read
+  from it. `Instance._admit_placement()` therefore always calls
+  the RPC guarded first: an admit is the common case and costs no
+  extra RPC; a denial rolled back cleanly, names the exceeded
+  dimensions, the loud event is emitted with that detail, and the
+  placement is then recorded unguarded. Ground truth always wins;
+  the ledger records reality either way.
+- **An RPC failure is not a denial.** `success=False` (database
+  unreachable, malformed input) raises `WriteException` for
+  enforcing callers — it must not read as "the cluster is full" to
+  a caller walking candidates — and for `enforce=False` callers
+  logs loudly and returns, so a database blip cannot abort a
+  cleaner pass; the attribute was not changed, and the next pass
+  retries.
+- **`Node.add_instance()` / `remove_instance()` are deleted.**
+  After the rewiring their only callers were tests. The
+  `Node.instances` read property stays.
+- The startup reconciliation has four branches on the primitive:
+  repair-in-place, move-to-authoritative-node (the RPC's
+  delete-all-then-insert removes the stale local row),
+  release-for-deleted, and a zero-amount release for a reference
+  whose instance row is already gone (nothing to read sizes from;
+  the reconciler trues up the counters within a pass).
+- `instance.py` reuses `mariadb._disk_spec_virtual_gb()` (the
+  reconciler's executable disk-sum specification) and
+  `mariadb._json_dumps()` (so the placement column bytes match the
+  generic attribute path); both uses carry NOTE comments and are
+  candidates for promotion to public helpers in review.
+- Stale prose found for step 7: `ARCHITECTURE.md` ~825-838,
+  `AGENTS.md` ~437-461 and `docs/operator_guide/database.md` ~756
+  still describe the legacy dual-write and/or the stopgap.
 
 *(Step 6's docker-MariaDB results are recorded here when the
 step runs: the harness, the seed shape, each check's outcome,

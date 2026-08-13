@@ -642,17 +642,12 @@ class Node(dbo):
             RelationshipType.INSTANCE_LOCATION)
         return [str(ref.target_uuid) for ref in refs]
 
-    def add_instance(self, instance_uuid):
-        mariadb.record_relationship(
-            ObjectType.NODE, str(self.uuid),
-            RelationshipType.INSTANCE_LOCATION, None,
-            ObjectType.INSTANCE, str(instance_uuid))
-
-    def remove_instance(self, instance_uuid):
-        mariadb.remove_relationship(
-            ObjectType.NODE, str(self.uuid),
-            RelationshipType.INSTANCE_LOCATION, None,
-            ObjectType.INSTANCE, str(instance_uuid))
+    # NOTE(mikal): there is deliberately no add_instance() or
+    # remove_instance() here. Placement rows are written only by the
+    # atomic admission and release RPCs (scheduler-reservations phase
+    # 3), which move the capacity counters in the same transaction --
+    # a helper which wrote a reference row on its own would record a
+    # placement nothing had paid for.
 
     @property
     def dependency_versions(self):

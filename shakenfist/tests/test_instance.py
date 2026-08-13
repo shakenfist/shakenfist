@@ -17,6 +17,7 @@ from shakenfist.config import SFConfig
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -1157,3 +1158,281 @@ class InstanceDiskFetchTestCase(base.ShakenFistTestCase):
         self.assertEqual([], deps)
         mock_afo.assert_not_called()
         mock_owned.assert_not_called()
+
+
+class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
+    """Placement goes through the atomic admission and release RPCs.
+
+    Placement used to be a non-atomic triple: write the placement
+    attribute, remove the old node's reference, insert the new one. It
+    is now a single database transaction which also draws down the
+    capacity counters, so a placement can never be recorded without the
+    capacity it consumes (scheduler-reservations phase 3).
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', self.instance_uuid, cpus=2, memory=2048,
+            disk_spec=[{'base': 'cirros', 'size': 8}],
+            set_state=instance.Instance.STATE_CREATED)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+        self.node2 = self.mock_mariadb.node_uuids['node2']
+        self.node3 = self.mock_mariadb.node_uuids['node3']
+
+    def _placed_on(self):
+        """Which nodes hold an INSTANCE_LOCATION row for this instance."""
+        return sorted(
+            r.source_uuid
+            for r in self.mock_mariadb.object_references.values()
+            if r.relationship == RelationshipType.INSTANCE_LOCATION
+            and r.target_uuid == self.instance_uuid)
+
+    def test_placement_writes_attribute_and_reference(self):
+        self.inst.place_instance(self.node2)
+
+        self.assertEqual(self.node2, self.inst.placement['node'])
+        self.assertEqual(1, self.inst.placement['placement_attempts'])
+        self.assertEqual([self.node2], self._placed_on())
+
+    def test_placement_claims_capacity(self):
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        self.assertEqual(2, row['used_cpus'])
+        self.assertEqual(2048, row['used_memory_mb'])
+        self.assertEqual(8, row['used_disk_gb'])
+
+    def test_unchanged_placement_is_not_rewritten(self):
+        self.inst.place_instance(self.node2)
+        with mock.patch('shakenfist.mariadb.admit_instance_placement') as a:
+            self.inst.place_instance(self.node2)
+        self.assertFalse(a.called)
+        self.assertEqual(1, self.inst.placement['placement_attempts'])
+
+    def test_move_leaves_exactly_one_placement_row(self):
+        old = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        new = self.mock_mariadb.set_node_capacity(
+            self.node3, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        self.inst.place_instance(self.node2)
+        self.inst.place_instance(self.node3)
+
+        self.assertEqual([self.node3], self._placed_on())
+        self.assertEqual(0, old['used_cpus'])
+        self.assertEqual(2, new['used_cpus'])
+        self.assertEqual(2, self.inst.placement['placement_attempts'])
+
+    def test_denial_raises_the_typed_exception(self):
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        exc = self.assertRaises(
+            exceptions.CapacityAdmissionDenied,
+            self.inst.place_instance, self.node2)
+        self.assertEqual('node', exc.failing_stage)
+        self.assertEqual(
+            ['cpus'], [d['dimension'] for d in exc.dimensions
+                       if d['exceeded']])
+
+        # Nothing was recorded: a denial is not a placement.
+        self.assertEqual({}, self.inst.placement)
+        self.assertEqual([], self._placed_on())
+
+    def test_a_denied_node_does_not_stop_a_later_candidate(self):
+        # The shape step 5's pick-then-claim walk depends on.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node3, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        self.assertRaises(
+            exceptions.CapacityAdmissionDenied,
+            self.inst.place_instance, self.node2)
+        self.inst.place_instance(self.node3)
+        self.assertEqual([self.node3], self._placed_on())
+
+    def test_enforce_false_records_over_limit_placements(self):
+        # P5: the cleaner and the startup reconciliation record where a
+        # libvirt domain already is, and a guard cannot refuse reality.
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        self.inst.place_instance(self.node2, enforce=False)
+
+        self.assertEqual(self.node2, self.inst.placement['node'])
+        self.assertEqual([self.node2], self._placed_on())
+        self.assertEqual(2, row['used_cpus'])
+
+    def test_enforce_false_events_the_over_limit_write(self):
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2, enforce=False)
+
+        messages = [c.args[1] for c in add_event.call_args_list]
+        self.assertIn(
+            'placement recorded despite exceeding capacity guard', messages)
+
+    def test_a_within_limits_write_is_not_evented_as_over_limit(self):
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2, enforce=False)
+
+        messages = [c.args[1] for c in add_event.call_args_list]
+        self.assertNotIn(
+            'placement recorded despite exceeding capacity guard', messages)
+        self.assertIn('instance placed', messages)
+
+    def test_an_unguarded_placement_is_loud(self):
+        # P7: no capacity row for this node yet, mid-upgrade.
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+
+        messages = [c.args[1] for c in add_event.call_args_list]
+        self.assertIn('instance placed without capacity guard', messages)
+
+    def test_a_failed_write_raises_rather_than_reading_as_full(self):
+        # A database blip must not be indistinguishable from "the
+        # cluster has no room", or a caller walking candidates would 507
+        # a create which had plenty of capacity.
+        failure = {
+            'success': False, 'error': 'database unavailable',
+            'admitted': False, 'unguarded': False, 'clamped': False,
+            'failing_stage': '', 'dimensions': [], 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
+        with mock.patch('shakenfist.mariadb.admit_instance_placement',
+                        return_value=failure):
+            self.assertRaises(
+                exceptions.WriteException,
+                self.inst.place_instance, self.node2)
+
+    def test_a_failed_write_does_not_raise_when_not_enforcing(self):
+        # The cleaner runs this for every domain on the node; a database
+        # blip must not abort its pass. The next pass retries, because
+        # the placement attribute was not changed.
+        failure = {
+            'success': False, 'error': 'database unavailable',
+            'admitted': False, 'unguarded': False, 'clamped': False,
+            'failing_stage': '', 'dimensions': [], 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
+        with mock.patch('shakenfist.mariadb.admit_instance_placement',
+                        return_value=failure):
+            self.inst.place_instance(self.node2, enforce=False)
+        self.assertEqual({}, self.inst.placement)
+
+    def test_placement_is_visible_inside_an_enclosing_memo(self):
+        # The RPC writes the placement column behind the object's back,
+        # so the memo of the attributes row has to be dropped just as
+        # _db_set_attribute() would have dropped it.
+        with self.inst.attribute_memo():
+            self.assertEqual({}, self.inst.placement)
+            self.inst.place_instance(self.node2)
+            self.assertEqual(self.node2, self.inst.placement['node'])
+
+    def test_delete_globally_releases_capacity(self):
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        self.inst._delete_globally()
+
+        self.assertEqual(0, row['used_cpus'])
+        self.assertEqual(0, row['used_memory_mb'])
+        self.assertEqual(0, row['used_disk_gb'])
+        self.assertEqual([], self._placed_on())
+
+        # P8: where the instance was is still readable after delete.
+        self.assertEqual(self.node2, self.inst.placement['node'])
+
+    def test_release_is_skipped_when_never_placed(self):
+        with mock.patch('shakenfist.mariadb.release_instance_placement') as r:
+            self.inst._delete_globally()
+        self.assertFalse(r.called)
+
+    def test_hard_delete_releases_before_deleting_the_rows(self):
+        # The release needs the instance's cpus, memory and disk spec,
+        # which only exist while the static and attribute rows do.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        seen = {}
+        real = self.mock_mariadb._mariadb_release_instance_placement
+
+        def _watch(*args, **kwargs):
+            seen['rows_present'] = (
+                self.instance_uuid in self.mock_mariadb.instance_objects
+                and self.instance_uuid in self.mock_mariadb.instance_attributes)
+            seen['args'] = args
+            return real(*args, **kwargs)
+
+        with mock.patch('shakenfist.mariadb.release_instance_placement',
+                        side_effect=_watch):
+            self.inst.hard_delete()
+
+        self.assertTrue(seen['rows_present'])
+        self.assertEqual(
+            (self.instance_uuid, 'unittest', 2, 2048, 8), seen['args'])
+        self.assertEqual([], self._placed_on())
+
+    def test_hard_delete_release_behind_delete_globally_is_a_noop(self):
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+        self.inst._delete_globally()
+
+        released = []
+        real = self.mock_mariadb._mariadb_release_instance_placement
+
+        def _watch(*args, **kwargs):
+            result = real(*args, **kwargs)
+            released.append(result['released'])
+            return result
+
+        with mock.patch('shakenfist.mariadb.release_instance_placement',
+                        side_effect=_watch):
+            self.inst.hard_delete()
+
+        self.assertEqual([False], released)
+        self.assertEqual(0, row['used_cpus'])

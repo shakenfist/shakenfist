@@ -172,22 +172,80 @@ def restore_instances():
     # gathered at its start is a stale snapshot -- before removing a
     # reference, re-check the instance's authoritative placement so a
     # concurrently placed instance is never unrecorded.
-    desired = {str(inst.uuid) for inst in instances}
+    #
+    # Every write here goes through the placement admission and release
+    # RPCs rather than writing reference rows directly, so this
+    # reconciliation cannot itself produce the duplicate placement rows
+    # the RPCs exist to eliminate: an admission deletes every
+    # INSTANCE_LOCATION row for the instance before inserting the one it
+    # wrote. These are ground-truth writes -- the placement attribute is
+    # the authority and is deliberately left exactly as it is, right down
+    # to the placement_attempts count -- so they do not enforce the
+    # capacity guard (P5).
+    desired = {str(inst.uuid): inst for inst in instances}
     n = Node.from_db(config.NODE_NAME)
+    node_uuid = str(n.uuid)
     current = set(n.instances)
 
-    for instance_uuid in desired - current:
-        n.add_instance(instance_uuid)
+    for instance_uuid in set(desired) - current:
+        _reconcile_placement(desired[instance_uuid], node_uuid, node_uuid)
 
-    for instance_uuid in current - desired:
+    for instance_uuid in current - set(desired):
         inst = instance.Instance.from_db(instance_uuid)
         if inst:
             placement = inst.placement
-            if (placement.get('node') == str(n.uuid) and
+            placed_on = placement.get('node')
+            if (placed_on == node_uuid and
                     inst.state.value not in instance.Instance.TERMINAL_STATES):
                 # Placed here after our snapshot was taken; keep it.
                 continue
-        n.remove_instance(instance_uuid)
+            if (placed_on and
+                    inst.state.value not in instance.Instance.TERMINAL_STATES):
+                # Live, but somewhere else. Recording it where it
+                # actually is removes our stale row as a side effect of
+                # the admission's delete-all-then-insert, and moves the
+                # capacity charge to the node which is really carrying
+                # it.
+                _reconcile_placement(inst, placed_on, node_uuid)
+                continue
+
+            # Gone, or on its way out. Give the capacity back.
+            mariadb.release_instance_placement(
+                instance_uuid, inst.namespace, inst.cpus, inst.memory,
+                mariadb._disk_spec_virtual_gb(inst.disk_spec),
+                node_uuid=node_uuid)
+            continue
+
+        # No instance row at all, so there is nothing to read the
+        # resource sizes from. Drop the reference row and let the
+        # capacity reconciler recompute the counters from ground truth
+        # on its next pass rather than guessing at amounts.
+        mariadb.release_instance_placement(
+            instance_uuid, '', 0, 0, 0, node_uuid=node_uuid)
+
+
+def _reconcile_placement(inst, node_uuid, old_node_uuid):
+    """Repair one instance's placement reference rows.
+
+    The placement attribute is already correct here -- this path exists
+    to repair the reference rows around it -- so the attribute is
+    rewritten byte for byte, without incrementing placement_attempts:
+    nothing about this is a new placement attempt. That is also why it
+    cannot go through Instance.place_instance(), whose unchanged-node
+    early-out would skip the repair entirely.
+    """
+    result = mariadb.admit_instance_placement(
+        str(inst.uuid), inst.namespace, node_uuid, inst.cpus, inst.memory,
+        mariadb._disk_spec_virtual_gb(inst.disk_spec),
+        mariadb._json_dumps(inst.placement),
+        old_node_uuid=(old_node_uuid if old_node_uuid != node_uuid else ''),
+        enforce=False)
+    if not result['success']:
+        LOG.with_fields({
+            'instance': str(inst.uuid),
+            'node': node_uuid,
+            'error': result['error']}).error(
+                'Failed to reconcile instance placement')
 
 
 def _restore_instances_in_background():

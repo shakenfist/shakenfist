@@ -571,9 +571,13 @@ performance. This is required for all deployments - MariaDB must be configured.
   release cycle as a rollback fallback.
 - **Instance placement** (`object_references` table): Which instances
   are on which node is recorded as `instance_location` reference rows
-  (source: node UUID, target: instance UUID), written by
-  `Instance.place_instance()` via `Node.add_instance()` /
-  `remove_instance()`. This replaced the `instances` JSON list on
+  (source: node UUID, target: instance UUID). They are written only by
+  the atomic `admit_instance_placement()` and
+  `release_instance_placement()` RPCs, which move the capacity
+  counters, write the `placement` attribute and rewrite the reference
+  rows in one transaction; `Instance.place_instance()` is the sole
+  caller for placement, and `Node` has no placement-writing helpers.
+  This replaced the `instances` JSON list on
   `node_attributes`, whose full-row read-modify-write maintenance lost
   updates to concurrent writers (observed as scheduler affinity
   failures in CI). Reference rows are now the sole record of

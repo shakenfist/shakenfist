@@ -3,13 +3,15 @@ import time
 from unittest import mock
 
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist import scheduler
 from shakenfist.config import SFConfig
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import GiB
 from shakenfist.instance import Instance
-from shakenfist.node import Node
 from shakenfist.node import nodes_by_free_disk_descending
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -742,16 +744,20 @@ class PlacementLedgerAdmissionTestCase(SchedulerTestCase):
             self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
 
     def test_only_the_authoritative_placement_is_charged(self):
-        # place_instance() removes the old node's reference on a
-        # best-effort basis (it skips a node whose row has gone), so an
-        # instance which has moved can leave a reference behind on the
-        # node it left. The instance's own placement attribute is the
-        # authority for where it actually is, and a node is charged only
-        # for the instances which agree they are on it.
+        # Duplicate placement rows are what the atomic admission RPC
+        # exists to stop producing, but historical ones can survive on a
+        # node which was down when an instance moved away from it. The
+        # instance's own placement attribute is the authority for where
+        # it actually is, and a node is charged only for the instances
+        # which agree they are on it. The stale row is fabricated
+        # directly here because no code path can produce one any more.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         inst = self.mock_mariadb.create_instance(
             'moved', cpus=16, place_on_node='node3')
-        Node.from_db(self._node_uuid('node2')).add_instance(inst.uuid)
+        mariadb.record_relationship(
+            ObjectType.NODE, self._node_uuid('node2'),
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, str(inst.uuid))
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
         nodes = scheduler.Scheduler().find_candidates(fake_inst)

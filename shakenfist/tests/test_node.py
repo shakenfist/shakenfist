@@ -664,7 +664,13 @@ class NodeSetLifecycleStateTestCase(base.ShakenFistTestCase):
 
 
 class NodeInstanceManagementTestCase(base.ShakenFistTestCase):
-    """Tests for instance add/remove on nodes."""
+    """Tests for the read side of instance placement on nodes.
+
+    There is deliberately no add_instance() / remove_instance() to test:
+    placement rows are written only by the atomic admission and release
+    RPCs, which move the capacity counters in the same transaction
+    (scheduler-reservations phase 3).
+    """
 
     def _make_node(self):
         """Helper to create a Node with mocked dependencies."""
@@ -678,29 +684,11 @@ class NodeInstanceManagementTestCase(base.ShakenFistTestCase):
         n._DatabaseBackedObject__in_memory_only = False
         return n
 
-    @mock.patch('shakenfist.node.mariadb.record_relationship')
-    def test_add_instance(self, mock_record):
-        """Adding an instance records an INSTANCE_LOCATION reference."""
+    def test_no_direct_placement_writers(self):
+        """A Node cannot write placement rows on its own."""
         n = self._make_node()
-        inst_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-        n.add_instance(inst_uuid)
-
-        mock_record.assert_called_once_with(
-            ObjectType.NODE, str(TEST_UUID),
-            RelationshipType.INSTANCE_LOCATION, None,
-            ObjectType.INSTANCE, inst_uuid)
-
-    @mock.patch('shakenfist.node.mariadb.remove_relationship')
-    def test_remove_instance(self, mock_remove):
-        """Removing an instance removes the INSTANCE_LOCATION reference."""
-        inst_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-        n = self._make_node()
-        n.remove_instance(inst_uuid)
-
-        mock_remove.assert_called_once_with(
-            ObjectType.NODE, str(TEST_UUID),
-            RelationshipType.INSTANCE_LOCATION, None,
-            ObjectType.INSTANCE, inst_uuid)
+        self.assertFalse(hasattr(n, 'add_instance'))
+        self.assertFalse(hasattr(n, 'remove_instance'))
 
     @mock.patch('shakenfist.node.mariadb.get_references_from')
     def test_instances_property_reads_references(self, mock_get_refs):
