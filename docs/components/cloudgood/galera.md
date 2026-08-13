@@ -283,6 +283,23 @@ throughput is not the average of your nodes, and it is not the throughput
 of the node your load balancer is pointing at. In steady state, cluster
 wide write throughput converges on the apply rate of the slowest member.
 
+???+ example "Watching it happen"
+
+    There is a runnable version of this in
+    [examples/galera/flow-control](https://github.com/shakenfist/cloudgood/tree/main/examples/galera/flow-control):
+    a three node cluster in containers, a write load pointed at node1, and a
+    switch that makes node3 slow. On a sixteen core host the measured effect
+    of crippling node3 was that cluster throughput fell from around 13,000
+    commits per second to around 500, with the cluster paused 97% of the
+    time.
+
+    The detail worth seeing for yourself is which node showed the evidence.
+    node3 held a receive queue of thirty odd write sets and sent more than
+    two thousand flow control events in half a minute. node1, which was
+    taking every single write and whose throughput had dropped by a factor
+    of twenty five, reported a receive queue of zero and sent no flow
+    control at all.
+
 All of this is observable, but -- and this catches people out -- almost
 entirely through status variables rather than through logs. These are the
 counters worth putting on a dashboard before you need them, and several of
@@ -294,11 +311,9 @@ them have a sharp edge worth knowing about:
     An instantaneous snapshot, so it is honest but twitchy.
 
 `wsrep_local_recv_queue_avg`
-:   The average queue length **since the most recent status query**. A
+:   The average queue length since the counters were last reset. A
     consistently non-zero value means this node is the bottleneck, and you
-    have found your slow node. Note those reset semantics: reading the
-    variable clears it, so the figure describes the interval since whoever
-    last looked, which may have been your monitoring system a second ago.
+    have found your slow node.
 
 `wsrep_flow_control_paused`
 :   The fraction of time since the last `FLUSH STATUS` that replication was
@@ -317,11 +332,10 @@ them have a sharp edge worth knowing about:
     averaging problem above.
 
 `wsrep_flow_control_sent` and `wsrep_flow_control_recv`
-:   Counts of flow control pause events this node has sent, and has
-    received plus sent, **since the most recent status query**. A non-zero
-    `sent` means this node is the one doing the throttling rather than a
-    victim of it, which is usually the question you actually want answered.
-    These reset on read as well.
+:   Counts of flow control pause events this node has sent, and has received
+    plus sent. A non-zero and climbing `sent` means this node is the one
+    doing the throttling rather than a victim of it, which is usually the
+    question you actually want answered.
 
 `wsrep_cert_deps_distance`
 :   The average distance in the sequence between transactions that could
@@ -331,14 +345,24 @@ them have a sharp edge worth knowing about:
 
 !!! warning
 
-    Three of those variables reset when they are queried, not on a timer
-    and not on restart. If two things poll the same node -- say Prometheus
-    every fifteen seconds and you at a `mysql` prompt -- they consume each
-    other's counts, and your interactive reading will look reassuringly
-    small because the scraper just took the interesting part. When
-    investigating by hand on a monitored cluster, trust
-    `wsrep_flow_control_paused_ns` and `wsrep_local_recv_queue`, which do
-    not have this behaviour.
+    Check the reset semantics on your own version rather than trusting the
+    documentation, because the two do not currently agree. The MariaDB
+    knowledge base describes `wsrep_flow_control_sent`,
+    `wsrep_flow_control_recv` and `wsrep_local_recv_queue_avg` as measured
+    "since the most recent status query", which would mean that reading
+    them resets them and that two pollers would consume each other's
+    counts. Measured on MariaDB 11.4 that is not what happens: consecutive
+    reads return identical values, the counters climb monotonically, and
+    only `FLUSH STATUS` clears them. The distinction matters for how you
+    read a dashboard, so it is worth thirty seconds and a `DO SLEEP(4)` to
+    establish which behaviour you actually have. The
+    [flow control example](https://github.com/shakenfist/cloudgood/tree/main/examples/galera/flow-control)
+    shows the test.
+
+    What is not in doubt is that these are all *cumulative* rather than
+    per-interval, which is why `wsrep_flow_control_paused` is the wrong
+    thing to alert on and a differenced `wsrep_flow_control_paused_ns` is
+    the right one.
 
 ### What gets logged? Almost nothing
 
