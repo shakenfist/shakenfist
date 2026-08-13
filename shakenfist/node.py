@@ -633,57 +633,26 @@ class Node(dbo):
         concurrent full-row writer could silently revert a placement
         (observed as the scheduler's affinity pass scoring a node zero
         in CI). References are single-row inserts and deletes, so no
-        cross-writer coordination is needed.
-
-        Transition-only: the result is unioned with the legacy JSON
-        column so placements written by not-yet-upgraded nodes during
-        a rolling upgrade stay visible to upgraded schedulers. The
-        union (and the column) go away next release; each node's
-        queues-daemon startup reconciliation converges the two stores.
+        cross-writer coordination is needed. These reference rows are
+        the sole record of placement; the legacy JSON column was
+        removed in scheduler-reservations phase 3.
         """
         refs = mariadb.get_references_from(
             ObjectType.NODE, str(self.uuid),
             RelationshipType.INSTANCE_LOCATION)
-        found = [str(ref.target_uuid) for ref in refs]
-
-        attrs = self._load_attributes()
-        if attrs is not None:
-            for instance_uuid in attrs.instances:
-                if instance_uuid not in found:
-                    found.append(instance_uuid)
-        return found
+        return [str(ref.target_uuid) for ref in refs]
 
     def add_instance(self, instance_uuid):
         mariadb.record_relationship(
             ObjectType.NODE, str(self.uuid),
             RelationshipType.INSTANCE_LOCATION, None,
             ObjectType.INSTANCE, str(instance_uuid))
-        self._dual_write_legacy_instances(str(instance_uuid), present=True)
 
     def remove_instance(self, instance_uuid):
         mariadb.remove_relationship(
             ObjectType.NODE, str(self.uuid),
             RelationshipType.INSTANCE_LOCATION, None,
             ObjectType.INSTANCE, str(instance_uuid))
-        self._dual_write_legacy_instances(str(instance_uuid), present=False)
-
-    def _dual_write_legacy_instances(self, instance_str, present):
-        """Keep the legacy node_attributes.instances column current.
-
-        Transition-only: a rollback to the previous release reads its
-        placements from this column, so it must stay fresh for one
-        release cycle after the INSTANCE_LOCATION cutover. Remove this
-        method together with the column.
-        """
-        with self.get_lock_attr('instances', 'Sync legacy instances'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            if present and instance_str not in attrs.instances:
-                attrs.instances.append(instance_str)
-                self._save_attributes(fields=['instances'])
-            elif not present and instance_str in attrs.instances:
-                attrs.instances.remove(instance_str)
-                self._save_attributes(fields=['instances'])
 
     @property
     def dependency_versions(self):

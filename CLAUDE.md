@@ -576,11 +576,9 @@ performance. This is required for all deployments - MariaDB must be configured.
   `remove_instance()`. This replaced the `instances` JSON list on
   `node_attributes`, whose full-row read-modify-write maintenance lost
   updates to concurrent writers (observed as scheduler affinity
-  failures in CI). For one transition release the legacy column is
-  dual-written (masked, under the `instances` lock) and unioned into
-  `Node.instances` reads, so rolling upgrades and rollback both see
-  fresh placements; column, dual-write and union all go away next
-  release.
+  failures in CI). Reference rows are now the sole record of
+  placement; the legacy column, its dual-write and the union in
+  `Node.instances` were removed in scheduler-reservations phase 3.
 - **Cluster Locks** (`cluster_locks` table): Distributed locks with
   a server-side `expires_at TIMESTAMP`. Holders refresh the lease
   every ~20s while alive; if a holder dies (or is partitioned for

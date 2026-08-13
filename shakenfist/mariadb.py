@@ -10626,7 +10626,6 @@ def _direct_create_node_attributes(
                 is_network_node=data.is_network_node,
                 is_eventlog_node=data.is_eventlog_node,
                 is_database_node=data.is_database_node,
-                instances=data.instances,
                 daemons=data.daemons,
                 daemon_states=data.daemon_states,
                 qemu_version=data.qemu_version,
@@ -10682,10 +10681,6 @@ def _direct_get_node_attributes(
                 is_network_node=result.is_network_node,
                 is_eventlog_node=result.is_eventlog_node,
                 is_database_node=result.is_database_node,
-                instances=(
-                    result.instances
-                    if result.instances else []
-                ),
                 daemons=(
                     result.daemons
                     if result.daemons else []
@@ -10739,7 +10734,6 @@ def _node_attributes_column_values(
         'is_network_node': data.is_network_node,
         'is_eventlog_node': data.is_eventlog_node,
         'is_database_node': data.is_database_node,
-        'instances': data.instances,
         'daemons': data.daemons,
         'daemon_states': data.daemon_states,
         'qemu_version': data.qemu_version,
@@ -11199,7 +11193,6 @@ def _node_attrs_to_proto(
         is_network_node=data.is_network_node,
         is_eventlog_node=data.is_eventlog_node,
         is_database_node=data.is_database_node,
-        instances_json=_json_dumps(data.instances),
         daemons_json=_json_dumps(data.daemons),
         daemon_states_json=_json_dumps(
             data.daemon_states
@@ -11260,10 +11253,6 @@ def _node_attrs_from_proto(
         is_network_node=d.is_network_node,
         is_eventlog_node=d.is_eventlog_node,
         is_database_node=d.is_database_node,
-        instances=(
-            json.loads(d.instances_json)
-            if d.instances_json else []
-        ),
         daemons=(
             json.loads(d.daemons_json)
             if d.daemons_json else []
@@ -23769,14 +23758,11 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # it means phase 3 must decide explicitly which number its guard uses
 # rather than assuming the two agree.
 #
-# The ledger reads only these INSTANCE_LOCATION rows. During the one
-# transition release where Node.instances still unions in the legacy
-# node_attributes.instances JSON column, a placement written by a
-# pre-cutover node exists only in that column and is invisible here, so
-# mid-rolling-upgrade the used_* counters under-count -- the
-# non-conservative direction for an admission guard. Phase 3 must not
-# enable the counter guard until the legacy column and its union are
-# gone.
+# The ledger reads only these INSTANCE_LOCATION rows. The legacy
+# node_attributes.instances JSON column, its dual-write and the union
+# in Node.instances were removed in scheduler-reservations phase 3
+# (this change), so a placement is always visible here once written --
+# the precondition for enabling the counter guard is met.
 #
 # Duplicated placements are the other way this ledger is inexact: a
 # lost node's INSTANCE_LOCATION row can survive place_instance()'s

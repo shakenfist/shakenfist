@@ -2152,10 +2152,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             is_network_node=d.is_network_node,
             is_eventlog_node=d.is_eventlog_node,
             is_database_node=d.is_database_node,
-            instances=(
-                json.loads(d.instances_json)
-                if d.instances_json else []
-            ),
             daemons=(
                 json.loads(d.daemons_json)
                 if d.daemons_json else []
@@ -2215,7 +2211,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             is_network_node=data.is_network_node,
             is_eventlog_node=data.is_eventlog_node,
             is_database_node=data.is_database_node,
-            instances_json=json.dumps(data.instances),
             daemons_json=json.dumps(data.daemons),
             daemon_states_json=json.dumps(data.daemon_states),
             qemu_version_json=(
