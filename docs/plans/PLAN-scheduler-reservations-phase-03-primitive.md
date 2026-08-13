@@ -357,7 +357,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 |------|-------------|--------|-------|-----------|--------|
 | 1 | Remove the legacy `node_attributes.instances` column handling per P1: delete `_dual_write_legacy_instances()` and its calls (`node.py:661,:668,:670-686`), drop the union from `Node.instances` (`node.py:626-654`), remove the field from the node-attributes schema model, update the reconciler comment block (`mariadb.py:23694-23701`) to say the precondition is now met, fix affected unit tests. Commit message records the rollback floor (P1) | medium | sonnet | worktree | Not started |
 | 2 | Add `SCHEDULER_DISK_OVERCOMMIT` (float, default 5.0) to `config.py` beside the other overcommit ratios; apply it to the headroom term in `_derive_disk_limit_gb()` per P3; thread it through the reconcile RPC request like the demand constants; unit tests for the scaled limit incl. zero-free and reservation-exceeds-free edges; document in `docs/operator_guide/database.md` | medium | sonnet | worktree | Not started |
-| 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Not started |
+| 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Complete — see step 3 notes |
 | 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Not started |
 | 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Not started |
 | 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Not started |
@@ -394,6 +394,53 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
   pre-filter removal.
 
 ## Validation
+
+### Step 3: implementation notes (2026-08-14)
+
+The RPCs were implemented as designed, with live-MariaDB tests run
+against a docker MariaDB 11 under `utf8mb4_bin` during the step
+itself (30 new live tests beside the existing 22; the full live
+suite passes). Design refinements made during implementation, all
+now reflected in the code's docstrings:
+
+- **A move skips the cluster/claim stage entirely.** The design's
+  "no cluster-row wash" was underspecified: the first cut
+  incremented the namespace-side ledger on a move with nothing to
+  decrement (the old node's row is on the node side), inflating
+  the namespace by one instance per move until the next reconcile
+  — caught by the live tests. Both the cluster singleton's
+  unclaimed sums and a claim's `used_*` are namespace-denominated
+  and node-independent, and a move never changes namespace, so a
+  move consumes nothing on that side and is never refusable at
+  that stage.
+- **Canonical order extended.** Release also runs cluster/claim
+  before node rows (the step 8 checklist's "everywhere" reading),
+  and the two `scheduler_node_capacity` rows in a move are updated
+  in uuid order — otherwise two moves crossing between the same
+  node pair deadlock.
+- **Fail-open also covers a missing `cluster_capacity` singleton**
+  (a cluster whose reconciler has never run), same reasoning as
+  P7's missing node row; `unguarded=true` in the reply either way.
+- **`target_load <= 0` disables the demand clause** rather than
+  denying everything, mirroring the disk-overcommit `<= 0`
+  fallback — an unset proto3 double reads as 0.0 from a
+  mid-upgrade caller.
+- **Denial detail is double-typed and includes a `demand`
+  pseudo-dimension**, since a D13 refusal would otherwise report
+  no exceeded dimension at all.
+- **`enforce=False` keeps the rowcount check** with a key-only
+  WHERE: a zero rowcount then means the row was concurrently
+  deleted, which is a legitimate abort rather than a denial.
+- **D1's rowcount question is answered and pinned.** SQLAlchemy's
+  mysqldb dialect sets `CLIENT_FOUND_ROWS`, so `rowcount` counts
+  matched rows; a guarded UPDATE whose SET is a no-op reads as
+  "guard passed". A live test asserts this against a real server.
+- Retries use a new `_retry_transaction` (1213/1205/1020) rather
+  than widening the lock paths' `_retry_on_deadlock`, which must
+  keep 1205 non-retryable. Statements use SQLAlchemy core rather
+  than `sa.text()` so `sa.Uuid` binding is handled by the dialect
+  (the pitfall-6 hazard); no statement joins the dashed and
+  undashed forms.
 
 *(Step 6's docker-MariaDB results are recorded here when the
 step runs: the harness, the seed shape, each check's outcome,

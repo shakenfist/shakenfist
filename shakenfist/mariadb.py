@@ -29,7 +29,7 @@ import math
 import random
 import time
 import threading
-from typing import Any, Callable, cast, Dict, List, Optional, TypeVar
+from typing import Any, Callable, cast, Dict, List, Optional, TypedDict, TypeVar
 from uuid import UUID
 from uuid import uuid4
 
@@ -24433,3 +24433,996 @@ def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
         config.SCHEDULER_DEMAND_PER_VCPU,
         config.SCHEDULER_DEMAND_DECAY_SECONDS,
         config.SCHEDULER_DISK_OVERCOMMIT)
+
+
+# =============================================================================
+# Scheduler Placement Admission (MariaDB)
+#
+# Scheduler-reservations phase 3: the atomicity primitive the plan exists
+# for (D1, D3). AdmitInstancePlacement performs the guarded capacity
+# drawdown, the placement attribute write and the placement reference
+# rewrite in one transaction, so two concurrent creates racing one
+# remaining slot admit exactly once and a stale duplicate placement row
+# cannot be produced. ReleaseInstancePlacement is its floored-decrement
+# mirror. See
+# docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+#
+# There is deliberately no fallback Python composition of the existing
+# single-table RPCs: the whole point is that these are one transaction.
+# =============================================================================
+
+# MariaDB errnos on which the entire admission transaction is retried
+# (D1). 1213 ER_LOCK_DEADLOCK is the InnoDB deadlock victim, 1205
+# ER_LOCK_WAIT_TIMEOUT is the same contention resolved by the timeout
+# rather than the detector, and 1020 ER_CHECKREAD is "record has changed
+# since last read". All three mean "your transaction lost a race, run it
+# again"; anything else is a real error.
+#
+# _retry_on_deadlock() above is deliberately not reused or widened. It
+# guards the cluster-lock paths, where a 1205 means a lease genuinely
+# could not be taken within the caller's budget and retrying inside the
+# database daemon would eat the caller's acquire timeout. Here the whole
+# transaction rolled back and re-running it is both cheap and correct.
+_TRANSIENT_TRANSACTION_ERRNOS = frozenset((1213, 1205, 1020))
+_TRANSACTION_MAX_ATTEMPTS = 4
+_TRANSACTION_BASE_DELAY = 0.005
+
+# The three allocation dimensions, in the order they appear in denial
+# detail. 'demand' (D13) is reported alongside them when the node's
+# demand clause is what refused.
+CAPACITY_DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
+
+
+class CapacityDimensionDetailDict(TypedDict):
+    """One dimension's numbers at the moment a guard refused."""
+
+    dimension: str
+    limit: float
+    used: float
+    requested: float
+    exceeded: bool
+
+
+class AdmitPlacementResult(TypedDict):
+    """The reply _direct_admit_instance_placement builds."""
+
+    success: bool
+    error: str
+    admitted: bool
+    unguarded: bool
+    clamped: bool
+    failing_stage: str
+    dimensions: list[CapacityDimensionDetailDict]
+    node_used_cpus: int
+    node_used_memory_mb: int
+    node_used_disk_gb: int
+    node_expected_demand: float
+
+
+class ReleasePlacementResult(TypedDict):
+    """The reply _direct_release_instance_placement builds."""
+
+    success: bool
+    error: str
+    released: bool
+    clamped: bool
+
+
+class _AdmissionDenied(Exception):
+    """A guarded UPDATE matched no row, so the transaction must abort.
+
+    Carries the stage that refused ('cluster', 'claim' or 'node') so the
+    caller's walk to the next candidate and the D9 diagnostics both know
+    why. Raised inside the ``engine.begin()`` block, which rolls the
+    transaction back on the way out; the per-dimension detail is then
+    assembled from a fresh read.
+    """
+
+    def __init__(self, stage: str) -> None:
+        super().__init__(stage)
+        self.stage = stage
+
+
+class _PlacementRowMissing(Exception):
+    """The instance has no instance_attributes row to place.
+
+    Callers create an instance before placing it, so this is a bug in
+    the caller rather than a case to paper over by inserting a row: an
+    attributes row conjured here would be missing every other attribute
+    the create path sets.
+    """
+
+
+def _is_retryable_transaction_error(exc: OperationalError) -> bool:
+    """Is this an OperationalError worth re-running the transaction for?
+
+    SQLAlchemy wraps the underlying DB-API exception in ``exc.orig``; the
+    mysqldb driver puts the MariaDB errno in ``orig.args[0]``.
+    """
+    orig = getattr(exc, 'orig', None)
+    if orig is None:
+        return False
+    args: tuple[Any, ...] = getattr(orig, 'args', ())
+    if len(args) == 0:
+        return False
+    return args[0] in _TRANSIENT_TRANSACTION_ERRNOS
+
+
+def _retry_transaction(fn: Callable[[], _T], op_name: str) -> _T:
+    """Run a whole transaction, retrying it on transient contention.
+
+    Bounded attempts with jittered exponential backoff, so a burst of
+    concurrent admissions against one node does not synchronise on the
+    next round. Re-raises the last error if every attempt fails, so the
+    caller's OperationalError handling still runs.
+    """
+    last_error: Optional[OperationalError] = None
+    for attempt in range(_TRANSACTION_MAX_ATTEMPTS):
+        try:
+            return fn()
+        except OperationalError as e:
+            if not _is_retryable_transaction_error(e):
+                raise
+            last_error = e
+            if attempt < _TRANSACTION_MAX_ATTEMPTS - 1:
+                delay = (_TRANSACTION_BASE_DELAY * (2 ** attempt)
+                         * random.uniform(0.5, 1.5))
+                time.sleep(delay)
+    LOG.warning(
+        f'{op_name}: {_TRANSACTION_MAX_ATTEMPTS} consecutive transient '
+        f'transaction failures, giving up: {last_error}')
+    assert last_error is not None
+    raise last_error
+
+
+def _capacity_dimension(
+        dimension: str, limit: float, used: float,
+        requested: float) -> CapacityDimensionDetailDict:
+    """Build one denial-detail entry, recomputing the guard comparison.
+
+    ``exceeded`` is the same ``used + requested <= limit`` test the SQL
+    guard made, evaluated here against the values read back after the
+    rollback. It names the dimensions that actually failed rather than
+    reporting every dimension of the failing stage as suspect.
+    """
+    return {
+        'dimension': dimension,
+        'limit': float(limit),
+        'used': float(used),
+        'requested': float(requested),
+        'exceeded': bool(used + requested > limit),
+    }
+
+
+def _empty_admit_result() -> AdmitPlacementResult:
+    """A successful, not-yet-decided admission reply."""
+    return {
+        'success': True,
+        'error': '',
+        'admitted': False,
+        'unguarded': False,
+        'clamped': False,
+        'failing_stage': '',
+        'dimensions': [],
+        'node_used_cpus': 0,
+        'node_used_memory_mb': 0,
+        'node_used_disk_gb': 0,
+        'node_expected_demand': 0.0,
+    }
+
+
+def _demand_guard_clause(
+        node_key: UUID, demand_add: float,
+        target_load: float) -> Optional[sa.ColumnElement[bool]]:
+    """The D13 feedforward clause of the node guard, or None to skip it.
+
+    ``measured cpu_load_1 + expected_demand + demand_add <= target_load x
+    cpu_schedulable``, with both measured inputs read from the typed
+    node_metrics columns inside the admission transaction (P2). The
+    scheduler's own measurement-denominated filters remain cheap
+    pre-filters in find_candidates(); this is the clause that makes the
+    decision atomic with the drawdown.
+
+    NULL metrics inputs pass rather than deny. A node whose resources
+    daemon has not yet published typed columns (mid-upgrade) has no
+    schedulable-thread count to compute a bound from, and refusing every
+    placement on it would be a worse failure than one reconcile period
+    of yesterday's behaviour -- the same reasoning as P7's fail-open for
+    a missing capacity row. A NULL cpu_load_1 with a known thread count
+    is different: there the bound is computable, so the load term simply
+    coalesces to zero.
+
+    A non-positive ``target_load`` disables the clause entirely. An
+    unset proto3 double reads as 0.0, so a caller mid-upgrade that does
+    not send the field must not silently have every placement denied.
+    """
+    if target_load <= 0:
+        return None
+
+    capacity = _get_scheduler_node_capacity_table()
+    metrics = _get_node_metrics_table()
+    load = sa.select(metrics.c.cpu_load_1).where(
+        metrics.c.node_uuid == node_key).scalar_subquery()
+    schedulable = sa.select(metrics.c.cpu_schedulable).where(
+        metrics.c.node_uuid == node_key).scalar_subquery()
+    return sa.or_(
+        schedulable.is_(None),
+        sa.func.coalesce(load, 0.0) + capacity.c.expected_demand
+        + demand_add <= target_load * schedulable)
+
+
+def _floored_node_decrement(
+        conn: sa.Connection, node_key: UUID, cpus: int, memory_mb: int,
+        disk_gb: int) -> tuple[bool, bool]:
+    """Decrement a node's used_* counters, floored at zero (P6).
+
+    First the guarded form (``used >= x`` per dimension), which is the
+    ordinary case and leaves the counters exactly right. On a miss --
+    the counters are already lower than this release believes, because a
+    reconcile pass has recomputed them from ground truth in between --
+    the unguarded ``GREATEST(0, used - x)`` form runs instead, so a
+    release racing the reconciler can never drive a counter negative.
+
+    ``expected_demand`` is deliberately not decremented: the D13 term
+    decays with instance age and the reconciler recomputes it every
+    pass, so subtracting a placement's original contribution here would
+    over-credit a node whose contribution had already decayed.
+
+    Returns ``(touched, clamped)``. ``touched`` is False when there is no
+    capacity row for the node at all, which is P7's fail-open case
+    rather than a clamp.
+    """
+    capacity = _get_scheduler_node_capacity_table()
+
+    guarded = sa.update(capacity).where(sa.and_(
+        capacity.c.node_uuid == node_key,
+        capacity.c.used_cpus >= cpus,
+        capacity.c.used_memory_mb >= memory_mb,
+        capacity.c.used_disk_gb >= disk_gb,
+    )).values(
+        used_cpus=capacity.c.used_cpus - cpus,
+        used_memory_mb=capacity.c.used_memory_mb - memory_mb,
+        used_disk_gb=capacity.c.used_disk_gb - disk_gb,
+        updated_at=sa.func.now())
+    if conn.execute(guarded).rowcount > 0:
+        return True, False
+
+    clamp = sa.update(capacity).where(
+        capacity.c.node_uuid == node_key
+    ).values(
+        used_cpus=sa.func.greatest(0, capacity.c.used_cpus - cpus),
+        used_memory_mb=sa.func.greatest(
+            0, capacity.c.used_memory_mb - memory_mb),
+        used_disk_gb=sa.func.greatest(0, capacity.c.used_disk_gb - disk_gb),
+        updated_at=sa.func.now())
+    if conn.execute(clamp).rowcount > 0:
+        LOG.warning(
+            f'Clamped capacity decrement on node {node_key}: counters were '
+            f'below the released allocation ({cpus} cpus, {memory_mb} MB, '
+            f'{disk_gb} GB)')
+        return True, True
+    return False, False
+
+
+def _floored_namespace_decrement(
+        conn: sa.Connection, claim_uuid: Optional[UUID], cpus: int,
+        memory_mb: int, disk_gb: int) -> bool:
+    """Floored decrement of the claim row, or the cluster unclaimed sums.
+
+    The namespace-side mirror of _floored_node_decrement: guarded first,
+    ``GREATEST(0, ...)`` on a miss. Returns True if it had to clamp.
+    """
+    if claim_uuid is not None:
+        table: sa.Table = _get_namespace_claims_table()
+        key = table.c.uuid == claim_uuid
+        columns = ('used_cpus', 'used_memory_mb', 'used_disk_gb')
+    else:
+        table = _get_cluster_capacity_table()
+        key = table.c.id == 1
+        columns = ('unclaimed_used_cpus', 'unclaimed_used_memory_mb',
+                   'unclaimed_used_disk_gb')
+
+    amounts = (cpus, memory_mb, disk_gb)
+    guarded = sa.update(table).where(sa.and_(key, *[
+        table.c[column] >= amount
+        for column, amount in zip(columns, amounts)
+    ])).values(updated_at=sa.func.now(), **{
+        column: table.c[column] - amount
+        for column, amount in zip(columns, amounts)
+    })
+    if conn.execute(guarded).rowcount > 0:
+        return False
+
+    clamp = sa.update(table).where(key).values(
+        updated_at=sa.func.now(), **{
+            column: sa.func.greatest(0, table.c[column] - amount)
+            for column, amount in zip(columns, amounts)
+        })
+    if conn.execute(clamp).rowcount > 0:
+        LOG.warning(
+            f'Clamped capacity decrement on {table.name}: counters were '
+            f'below the released allocation ({cpus} cpus, {memory_mb} MB, '
+            f'{disk_gb} GB)')
+        return True
+    # No row at all: nothing was ever charged here, so nothing to clamp.
+    return False
+
+
+def _active_claim_for_namespace(
+        conn: sa.Connection, namespace: str) -> Optional[sa.Row[Any]]:
+    """The namespace's active, unexpired claim row, or None.
+
+    This is a plain non-locking read, so running it before the cluster
+    UPDATE does not violate D1's canonical write order (cluster_capacity,
+    then namespace_claims, then scheduler_node_capacity) -- only the
+    guarded UPDATEs take row locks and those still run in order. Ordered
+    by uuid so a namespace that somehow holds two claims resolves the
+    same way on every node.
+
+    Returns None until phase 4 lands the claims API, since nothing can
+    create a claim row before then (P4).
+    """
+    claims = _get_namespace_claims_table()
+    return conn.execute(sa.select(claims).where(sa.and_(
+        claims.c.namespace == namespace,
+        claims.c.state == 'active',
+        claims.c.expires_at > sa.func.now(),
+    )).order_by(claims.c.uuid).limit(1)).first()
+
+
+def _instance_location_nodes(
+        conn: sa.Connection, instance_uuid: str) -> list[UUID]:
+    """The nodes holding an instance_location reference for an instance.
+
+    object_references stores the dashed uuid form in both endpoint
+    columns while scheduler_node_capacity keys on sa.Uuid (undashed
+    CHAR(32) on MariaDB), so the source uuids are parsed here rather
+    than compared across the two forms (CLAUDE.md pitfall 6).
+    """
+    refs = _get_object_references_table()
+    rows = conn.execute(sa.select(refs.c.source_uuid).where(sa.and_(
+        refs.c.relationship == str(RelationshipType.INSTANCE_LOCATION),
+        refs.c.target_object_type == str(ObjectType.INSTANCE),
+        refs.c.target_uuid == instance_uuid,
+    ))).fetchall()
+
+    nodes = []
+    for row in rows:
+        try:
+            nodes.append(UUID(str(row.source_uuid)))
+        except ValueError:
+            LOG.warning(
+                f'Skipping instance_location row for {instance_uuid} with '
+                f'malformed node uuid {row.source_uuid!r}')
+    return nodes
+
+
+def _delete_instance_location_rows(
+        conn: sa.Connection, instance_uuid: str) -> int:
+    """Delete every instance_location row targeting an instance.
+
+    Every source node, not just the one being moved off. This is what
+    makes a duplicate placement row unproducible: the reconciler's usage
+    query charges an instance to every node holding a reference for it
+    (see the comment block above _RECONCILE_USAGE_SQL), so a survivor of
+    the old best-effort per-node removal double-charged the ledger.
+    """
+    refs = _get_object_references_table()
+    return int(conn.execute(sa.delete(refs).where(sa.and_(
+        refs.c.relationship == str(RelationshipType.INSTANCE_LOCATION),
+        refs.c.target_object_type == str(ObjectType.INSTANCE),
+        refs.c.target_uuid == instance_uuid,
+    ))).rowcount)
+
+
+def _admission_denial_dimensions(
+        stage: str, namespace: str, node_key: UUID, cpus: int,
+        memory_mb: int, disk_gb: int, demand_add: float,
+        target_load: float) -> list[CapacityDimensionDetailDict]:
+    """Per-dimension detail for a denial, read fresh after the rollback.
+
+    MariaDB has no way to report which of an UPDATE's WHERE clauses was
+    the one that failed, and the transaction that could have told us has
+    been rolled back, so the numbers come from a follow-up read. They can
+    differ slightly from the values the guard saw (another admission may
+    have committed in between), which is why ``exceeded`` is recomputed
+    from what was read rather than asserted: the reply says what is true
+    now, at the depth the scheduler's Python rejection reasons have
+    always carried.
+    """
+    engine = _get_engine()
+    dimensions: list[CapacityDimensionDetailDict] = []
+    requested = {'cpus': cpus, 'memory_mb': memory_mb, 'disk_gb': disk_gb}
+
+    try:
+        with engine.connect() as conn:
+            if stage == 'claim':
+                claim = _active_claim_for_namespace(conn, namespace)
+                if claim is not None:
+                    for dimension in CAPACITY_DIMENSIONS:
+                        dimensions.append(_capacity_dimension(
+                            dimension,
+                            getattr(claim, f'limit_{dimension}'),
+                            getattr(claim, f'used_{dimension}'),
+                            requested[dimension]))
+
+            elif stage == 'cluster':
+                cluster = _get_cluster_capacity_table()
+                row = conn.execute(sa.select(cluster).where(
+                    cluster.c.id == 1)).first()
+                if row is not None:
+                    for dimension in CAPACITY_DIMENSIONS:
+                        # D14's unclaimed guard is
+                        # unclaimed_used + x <= total - claimed, so the
+                        # effective limit is what active claims have not
+                        # already spoken for.
+                        dimensions.append(_capacity_dimension(
+                            dimension,
+                            (getattr(row, f'total_{dimension}')
+                             - getattr(row, f'claimed_{dimension}')),
+                            getattr(row, f'unclaimed_used_{dimension}'),
+                            requested[dimension]))
+
+            elif stage == 'node':
+                capacity = _get_scheduler_node_capacity_table()
+                row = conn.execute(sa.select(capacity).where(
+                    capacity.c.node_uuid == node_key)).first()
+                if row is not None:
+                    for dimension in CAPACITY_DIMENSIONS:
+                        dimensions.append(_capacity_dimension(
+                            dimension,
+                            getattr(row, f'limit_{dimension}'),
+                            getattr(row, f'used_{dimension}'),
+                            requested[dimension]))
+
+                    # The D13 demand clause is the other way the node
+                    # guard can refuse, and a denial with no exceeded
+                    # allocation dimension is exactly the case an
+                    # operator needs told about.
+                    metrics = _get_node_metrics_table()
+                    measured = conn.execute(sa.select(
+                        metrics.c.cpu_load_1, metrics.c.cpu_schedulable
+                    ).where(metrics.c.node_uuid == node_key)).first()
+                    if (target_load > 0 and measured is not None
+                            and measured.cpu_schedulable is not None):
+                        dimensions.append(_capacity_dimension(
+                            'demand',
+                            target_load * measured.cpu_schedulable,
+                            ((measured.cpu_load_1 or 0.0)
+                             + row.expected_demand),
+                            demand_add))
+    except OperationalError as e:
+        # The detail is diagnostic, not load bearing: the denial itself
+        # is already decided and the caller walks to the next candidate
+        # either way.
+        LOG.warning(f'Could not read denial detail for stage {stage}: {e}')
+
+    return dimensions
+
+
+def _direct_admit_instance_placement(
+        instance_uuid: str, namespace: str, node_uuid: str,
+        old_node_uuid: str, cpus: int, memory_mb: int, disk_gb: int,
+        demand_add: float, target_load: float, enforce: bool,
+        placement_json: str) -> AdmitPlacementResult:
+    """Draw down capacity and write a placement, atomically (D1, D3).
+
+    One transaction, statements in D1's canonical order --
+    ``cluster_capacity``, then ``namespace_claims``, then
+    ``scheduler_node_capacity`` -- retried as a whole on transient
+    contention. The order matters because it is the order every writer
+    of these tables uses, which is what keeps concurrent admissions from
+    deadlocking against each other rather than merely recovering from it.
+
+    The steps are:
+
+    1. Branch select (P4): a namespace with an active, unexpired claim
+       draws the claim down; every other namespace draws down the
+       cluster singleton's unclaimed guard per D14.
+    2. The cluster or claim guarded UPDATE.
+    3. The target node's guarded UPDATE, including the D13 demand clause.
+    4. On a move, the old node's floored decrement (P6). A move never
+       changes namespace, so there is no cluster-row wash to do.
+    5. The placement attribute write, masked to that one column.
+    6. The placement reference rewrite: delete every instance_location
+       row for the instance, then insert the new one.
+
+    A guarded UPDATE matching no row aborts the transaction and returns
+    ``admitted=False`` with the failing stage and per-dimension detail.
+    ``enforce=False`` (P5) keeps every counter update but reduces each
+    WHERE to its key equality, for the ground-truth writers that record
+    where a libvirt domain already is -- a guard cannot refuse reality.
+    A node with no capacity row admits unguarded and says so (P7).
+
+    Rowcount semantics: SQLAlchemy's mysqldb dialect sets the
+    ``CLIENT_FOUND_ROWS`` flag, so ``rowcount`` is the number of rows
+    *matched*, not changed. That is load bearing here -- a guarded UPDATE
+    whose SET happens to be a no-op (a zero-sized dimension, or a
+    re-placement writing the identical placement JSON within the same
+    second) must read as "the guard passed", not as a denial. The live
+    test suite asserts it against a real server.
+
+    Emits no events: the caller emits them from the reply fields, so
+    sf-database never has to know an instance's event history.
+    """
+    engine = _get_engine()
+    capacity = _get_scheduler_node_capacity_table()
+    claims = _get_namespace_claims_table()
+    cluster = _get_cluster_capacity_table()
+    attributes = _get_instance_attributes_table()
+    refs = _get_object_references_table()
+
+    result = _empty_admit_result()
+
+    try:
+        instance_key = UUID(instance_uuid)
+        node_key = UUID(node_uuid)
+        old_node_key = UUID(old_node_uuid) if old_node_uuid else None
+    except ValueError as e:
+        LOG.warning(f'admit_instance_placement given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    if not placement_json:
+        result['success'] = False
+        result['error'] = 'placement_json is required'
+        return result
+    try:
+        json.loads(placement_json)
+    except ValueError as e:
+        # The column is JSON typed, so garbage here would surface as an
+        # opaque MariaDB error deep inside the transaction.
+        result['success'] = False
+        result['error'] = f'placement_json is not valid JSON: {e}'
+        return result
+
+    if old_node_key == node_key:
+        # Re-placing onto the same node is not a move: the counters
+        # already hold this instance's allocation for this node and
+        # decrementing then re-incrementing them is a no-op with a
+        # spurious clamp risk in the middle.
+        old_node_key = None
+
+    now = time.time()
+
+    def _admit() -> AdmitPlacementResult:
+        outcome = _empty_admit_result()
+        with engine.begin() as conn:
+            # Non-locking reads first: which branch applies, and whether
+            # the rows the guards need exist at all.
+            claim = _active_claim_for_namespace(conn, namespace)
+            node_present = conn.execute(sa.select(capacity.c.node_uuid).where(
+                capacity.c.node_uuid == node_key)).first() is not None
+            cluster_present = conn.execute(sa.select(cluster.c.id).where(
+                cluster.c.id == 1)).first() is not None
+
+            if not node_present:
+                # P7: mid-upgrade, a node whose metrics row predates
+                # phase 1 has no capacity row, and the cluster totals do
+                # not include its limits either -- so guarding the
+                # cluster row against a total this node contributes
+                # nothing to would deny placements for a reason that is
+                # not true. Fail open on every guard, loudly, and let
+                # the reconciler create the row on its next pass.
+                outcome['unguarded'] = True
+            guarded = enforce and node_present
+
+            # (2) The cluster or claim guard, which a move skips
+            # entirely rather than washing an increment against a
+            # decrement. Both the cluster singleton's unclaimed sums and
+            # a claim's used_* are namespace-denominated and
+            # node-independent, and a placement move never changes
+            # namespace, so a move consumes no new capacity on this side
+            # -- the instance's allocation has been counted here since
+            # its first placement. Incrementing again (with nothing to
+            # decrement, because the old node's row is on the other side
+            # of the ledger) inflates the namespace by one instance per
+            # move until the next reconcile pass. A move is likewise not
+            # refusable at this stage: there is nothing new to refuse.
+            if old_node_key is not None:
+                pass
+            elif claim is not None:
+                where = [claims.c.uuid == claim.uuid]
+                if guarded:
+                    where += [
+                        claims.c.used_cpus + cpus <= claims.c.limit_cpus,
+                        (claims.c.used_memory_mb + memory_mb
+                         <= claims.c.limit_memory_mb),
+                        (claims.c.used_disk_gb + disk_gb
+                         <= claims.c.limit_disk_gb),
+                    ]
+                if conn.execute(sa.update(claims).where(
+                        sa.and_(*where)).values(
+                            used_cpus=claims.c.used_cpus + cpus,
+                            used_memory_mb=(claims.c.used_memory_mb
+                                            + memory_mb),
+                            used_disk_gb=claims.c.used_disk_gb + disk_gb,
+                            updated_at=sa.func.now())).rowcount == 0:
+                    raise _AdmissionDenied('claim')
+            elif cluster_present:
+                where = [cluster.c.id == 1]
+                if guarded:
+                    # D14's best-effort unclaimed guard: what active
+                    # claims have not spoken for is what an unclaimed
+                    # namespace may use.
+                    where += [
+                        (cluster.c.unclaimed_used_cpus + cpus
+                         <= cluster.c.total_cpus - cluster.c.claimed_cpus),
+                        (cluster.c.unclaimed_used_memory_mb + memory_mb
+                         <= (cluster.c.total_memory_mb
+                             - cluster.c.claimed_memory_mb)),
+                        (cluster.c.unclaimed_used_disk_gb + disk_gb
+                         <= (cluster.c.total_disk_gb
+                             - cluster.c.claimed_disk_gb)),
+                    ]
+                if conn.execute(sa.update(cluster).where(
+                        sa.and_(*where)).values(
+                            unclaimed_used_cpus=(
+                                cluster.c.unclaimed_used_cpus + cpus),
+                            unclaimed_used_memory_mb=(
+                                cluster.c.unclaimed_used_memory_mb
+                                + memory_mb),
+                            unclaimed_used_disk_gb=(
+                                cluster.c.unclaimed_used_disk_gb + disk_gb),
+                            updated_at=sa.func.now())).rowcount == 0:
+                    raise _AdmissionDenied('cluster')
+            else:
+                # The reconciler has never run, so there is no singleton
+                # to draw down. Same fail-open reasoning as P7.
+                outcome['unguarded'] = True
+
+            # (3) and (4): the two scheduler_node_capacity rows, in uuid
+            # order. Both statements touch the same table, so a fixed
+            # intra-table order is the same discipline the inter-table
+            # canonical order buys: without it two moves crossing in
+            # opposite directions between the same pair of nodes take
+            # each other's rows in opposite orders and deadlock. The
+            # guard still decides the whole transaction whichever order
+            # the rows are touched in, because a denial rolls the old
+            # node's decrement back with everything else.
+            def _claim_node() -> None:
+                if not node_present:
+                    return
+                where = [capacity.c.node_uuid == node_key]
+                if guarded:
+                    where += [
+                        capacity.c.used_cpus + cpus <= capacity.c.limit_cpus,
+                        (capacity.c.used_memory_mb + memory_mb
+                         <= capacity.c.limit_memory_mb),
+                        (capacity.c.used_disk_gb + disk_gb
+                         <= capacity.c.limit_disk_gb),
+                    ]
+                    demand = _demand_guard_clause(
+                        node_key, demand_add, target_load)
+                    if demand is not None:
+                        where.append(demand)
+                if conn.execute(sa.update(capacity).where(
+                        sa.and_(*where)).values(
+                            used_cpus=capacity.c.used_cpus + cpus,
+                            used_memory_mb=(capacity.c.used_memory_mb
+                                            + memory_mb),
+                            used_disk_gb=capacity.c.used_disk_gb + disk_gb,
+                            expected_demand=(capacity.c.expected_demand
+                                             + demand_add),
+                            updated_at=sa.func.now())).rowcount == 0:
+                    raise _AdmissionDenied('node')
+
+            def _release_old_node() -> None:
+                if old_node_key is None:
+                    return
+                _, clamped = _floored_node_decrement(
+                    conn, old_node_key, cpus, memory_mb, disk_gb)
+                outcome['clamped'] = outcome['clamped'] or clamped
+
+            if old_node_key is not None and old_node_key.int < node_key.int:
+                _release_old_node()
+                _claim_node()
+            else:
+                _claim_node()
+                _release_old_node()
+
+            # (5) The placement attribute, masked to the one column
+            # exactly as the generic attribute write path does.
+            if conn.execute(sa.update(attributes).where(
+                    attributes.c.uuid == instance_key).values(
+                        placement=placement_json)).rowcount == 0:
+                raise _PlacementRowMissing(
+                    f'instance {instance_uuid} has no instance_attributes row')
+
+            # (6) The placement references.
+            _delete_instance_location_rows(conn, instance_uuid)
+            conn.execute(sa.insert(refs).values(
+                # The type and relationship columns are plain String(64)
+                # storing the enum *value* via str(member), and the uuid
+                # columns store the dashed 36 character form -- both
+                # conventions matching _direct_record_relationship
+                # exactly, because the reconciler's ground-truth query
+                # reads these rows.
+                source_object_type=str(ObjectType.NODE),
+                source_uuid=node_uuid,
+                relationship=str(RelationshipType.INSTANCE_LOCATION),
+                relationship_value=None,
+                target_object_type=str(ObjectType.INSTANCE),
+                target_uuid=instance_uuid,
+                created=now,
+                last_active=now))
+
+            # MariaDB has no UPDATE ... RETURNING, so the post-admit
+            # counters are a follow-up PK SELECT inside the transaction.
+            if node_present:
+                row = conn.execute(sa.select(capacity).where(
+                    capacity.c.node_uuid == node_key)).first()
+                if row is not None:
+                    outcome['node_used_cpus'] = int(row.used_cpus)
+                    outcome['node_used_memory_mb'] = int(row.used_memory_mb)
+                    outcome['node_used_disk_gb'] = int(row.used_disk_gb)
+                    outcome['node_expected_demand'] = float(
+                        row.expected_demand)
+
+        outcome['admitted'] = True
+        return outcome
+
+    try:
+        return _retry_transaction(
+            _admit, f'admit_instance_placement({instance_uuid})')
+    except _AdmissionDenied as denial:
+        result['failing_stage'] = denial.stage
+        result['dimensions'] = _admission_denial_dimensions(
+            denial.stage, namespace, node_key, cpus, memory_mb, disk_gb,
+            demand_add, target_load)
+        return result
+    except _PlacementRowMissing as e:
+        LOG.warning(f'MariaDB admit_instance_placement refused: {e}')
+        result['success'] = False
+        result['error'] = str(e)
+        return result
+    except (OperationalError, IntegrityError) as e:
+        LOG.warning(
+            f'MariaDB admit_instance_placement failed for '
+            f'{instance_uuid}: {e}')
+        result['success'] = False
+        result['error'] = f'MariaDB error: {e}'
+        return result
+
+
+def _direct_release_instance_placement(
+        instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
+        memory_mb: int, disk_gb: int) -> ReleasePlacementResult:
+    """Give an instance's capacity back and drop its placement rows (P6).
+
+    One transaction in D1's canonical order (the namespace side, then
+    the node side), so release cannot deadlock against admission. Every
+    decrement is floored at zero, so a release racing a reconcile pass
+    cannot drive a counter negative.
+
+    Idempotent by construction: after the first call the instance has no
+    instance_location rows, so a second call with no explicit node finds
+    nothing to release, touches no counter and returns
+    ``released=False``. That is what makes ``hard_delete()``'s sweep safe
+    to run behind ``_delete_globally()``'s release.
+
+    The ``placement`` attribute is deliberately not cleared (P8):
+    ``enqueue_delete()`` and the event history both read it after
+    deletion, and the reconciler's ledger already excludes instances in
+    state ``deleted``.
+    """
+    engine = _get_engine()
+    result: ReleasePlacementResult = {
+        'success': True, 'error': '', 'released': False, 'clamped': False}
+
+    try:
+        named_node = UUID(node_uuid) if node_uuid else None
+    except ValueError as e:
+        LOG.warning(f'release_instance_placement given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    def _release() -> ReleasePlacementResult:
+        outcome: ReleasePlacementResult = {
+            'success': True, 'error': '', 'released': False, 'clamped': False}
+        with engine.begin() as conn:
+            if named_node is not None:
+                nodes = [named_node]
+            else:
+                nodes = _instance_location_nodes(conn, instance_uuid)
+
+            if not nodes:
+                # Nothing was held: no reference rows and no node named.
+                # Decrementing here would take capacity away from an
+                # instance that never had it (a double release), so the
+                # counters are left alone and the caller is told this
+                # was a no-op.
+                return outcome
+
+            claim = _active_claim_for_namespace(conn, namespace)
+
+            # The namespace side is charged once per instance however
+            # many nodes hold a reference for it -- duplicate placement
+            # rows are exactly what the admission RPC exists to stop
+            # producing, and the reconciler recomputes both sides from
+            # ground truth every pass, so a residual discrepancy from a
+            # historical duplicate corrects itself within one period.
+            if _floored_namespace_decrement(
+                    conn, claim.uuid if claim is not None else None,
+                    cpus, memory_mb, disk_gb):
+                outcome['clamped'] = True
+
+            for node_key in sorted(set(nodes), key=lambda u: u.int):
+                _, clamped = _floored_node_decrement(
+                    conn, node_key, cpus, memory_mb, disk_gb)
+                outcome['clamped'] = outcome['clamped'] or clamped
+
+            _delete_instance_location_rows(conn, instance_uuid)
+            outcome['released'] = True
+
+        return outcome
+
+    try:
+        return _retry_transaction(
+            _release, f'release_instance_placement({instance_uuid})')
+    except (OperationalError, IntegrityError) as e:
+        LOG.warning(
+            f'MariaDB release_instance_placement failed for '
+            f'{instance_uuid}: {e}')
+        result['success'] = False
+        result['error'] = f'MariaDB error: {e}'
+        return result
+
+
+def _grpc_admit_instance_placement(
+        instance_uuid: str, namespace: str, node_uuid: str,
+        old_node_uuid: str, cpus: int, memory_mb: int, disk_gb: int,
+        demand_add: float, target_load: float, enforce: bool,
+        placement_json: str) -> AdmitPlacementResult:
+    """Admit a placement via the database microservice.
+
+    This sits on the instance-create hot path, upstream of an API
+    request the user is waiting on, so it uses the bounded budget rather
+    than the default GRPC_RETRIES * GRPC_TIMEOUT worst case. A timeout
+    is not ambiguous the way a lost write would be: the transaction is
+    atomic, so it either committed (and the reconciler will agree with
+    the counters) or it did not, and the caller retries or walks to the
+    next candidate.
+    """
+    result = _empty_admit_result()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.AdmitInstancePlacementRequest(
+            instance_uuid=instance_uuid,
+            namespace=namespace,
+            node_uuid=node_uuid,
+            old_node_uuid=old_node_uuid,
+            cpus=cpus,
+            memory_mb=memory_mb,
+            disk_gb=disk_gb,
+            demand_add=demand_add,
+            target_load=target_load,
+            enforce=enforce,
+            placement_json=placement_json)
+        reply = _grpc_call(
+            stub.AdmitInstancePlacement, request,
+            timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['admitted'] = bool(reply.admitted)
+        result['unguarded'] = bool(reply.unguarded)
+        result['clamped'] = bool(reply.clamped)
+        result['failing_stage'] = reply.failing_stage
+        result['dimensions'] = [
+            {
+                'dimension': d.dimension,
+                'limit': float(d.limit),
+                'used': float(d.used),
+                'requested': float(d.requested),
+                'exceeded': bool(d.exceeded),
+            } for d in reply.dimensions]
+        result['node_used_cpus'] = int(reply.node_used_cpus)
+        result['node_used_memory_mb'] = int(reply.node_used_memory_mb)
+        result['node_used_disk_gb'] = int(reply.node_used_disk_gb)
+        result['node_expected_demand'] = float(reply.node_expected_demand)
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC AdmitInstancePlacement failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
+def _grpc_release_instance_placement(
+        instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
+        memory_mb: int, disk_gb: int) -> ReleasePlacementResult:
+    """Release a placement via the database microservice.
+
+    Bounded like the admission call: this runs on the delete path, and a
+    release that could not be recorded is repaired by the next reconcile
+    pass rather than by blocking the delete.
+    """
+    result: ReleasePlacementResult = {
+        'success': True, 'error': '', 'released': False, 'clamped': False}
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReleaseInstancePlacementRequest(
+            instance_uuid=instance_uuid,
+            namespace=namespace,
+            node_uuid=node_uuid,
+            cpus=cpus,
+            memory_mb=memory_mb,
+            disk_gb=disk_gb)
+        reply = _grpc_call(
+            stub.ReleaseInstancePlacement, request,
+            timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['released'] = bool(reply.released)
+        result['clamped'] = bool(reply.clamped)
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC ReleaseInstancePlacement failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
+def admit_instance_placement(
+        instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
+        memory_mb: int, disk_gb: int, placement_json: str,
+        old_node_uuid: str = '',
+        enforce: bool = True) -> AdmitPlacementResult:
+    """Atomically claim capacity for an instance and place it.
+
+    The D13 demand parameters come from this process's config, like the
+    reconciler's, so the database daemon needs no copy of the scheduler
+    configuration.
+
+    Returns:
+
+        {'success': bool, 'error': str,
+         'admitted': bool, 'unguarded': bool, 'clamped': bool,
+         'failing_stage': '' | 'cluster' | 'claim' | 'node',
+         'dimensions': [{'dimension': str, 'limit': float, 'used': float,
+                         'requested': float, 'exceeded': bool}, ...],
+         'node_used_cpus': int, 'node_used_memory_mb': int,
+         'node_used_disk_gb': int, 'node_expected_demand': float}
+
+    ``success`` says the RPC ran; ``admitted`` says what it decided.
+    A caller that treats a failed RPC as a denial would walk to the next
+    candidate on a database blip and eventually 507 a create that had
+    plenty of capacity, so the two are deliberately separate fields.
+    """
+    demand_add = cpus * config.SCHEDULER_DEMAND_PER_VCPU
+    if _use_database_service():
+        return _grpc_admit_instance_placement(
+            instance_uuid, namespace, node_uuid, old_node_uuid, cpus,
+            memory_mb, disk_gb, demand_add, config.SCHEDULER_TARGET_LOAD,
+            enforce, placement_json)
+    return _direct_admit_instance_placement(
+        instance_uuid, namespace, node_uuid, old_node_uuid, cpus, memory_mb,
+        disk_gb, demand_add, config.SCHEDULER_TARGET_LOAD, enforce,
+        placement_json)
+
+
+def release_instance_placement(
+        instance_uuid: str, namespace: str, cpus: int, memory_mb: int,
+        disk_gb: int, node_uuid: str = '') -> ReleasePlacementResult:
+    """Give an instance's claimed capacity back and drop its placement.
+
+    ``node_uuid`` is optional: an empty value releases wherever the
+    instance's placement references point, which is what the delete
+    paths want since they know the instance rather than its node.
+
+    Returns:
+
+        {'success': bool, 'error': str, 'released': bool,
+         'clamped': bool}
+
+    ``released`` is False when there was nothing to release, which is
+    how a repeat call (``hard_delete()`` behind ``_delete_globally()``)
+    is told from a real one.
+    """
+    if _use_database_service():
+        return _grpc_release_instance_placement(
+            instance_uuid, namespace, node_uuid, cpus, memory_mb, disk_gb)
+    return _direct_release_instance_placement(
+        instance_uuid, namespace, node_uuid, cpus, memory_mb, disk_gb)

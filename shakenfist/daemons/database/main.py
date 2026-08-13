@@ -2513,6 +2513,74 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.ReconcileSchedulerCapacityReply(
                 success=False)
 
+    def AdmitInstancePlacement(
+        self,
+        request: database_pb2.AdmitInstancePlacementRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.AdmitInstancePlacementReply:
+        """Draw down capacity and write a placement, atomically (phase 3).
+
+        The whole point of this RPC is that the guarded capacity
+        drawdown, the placement attribute write and the placement
+        reference rewrite are one MariaDB transaction, so there is no
+        Python-side composition to fall back to and nothing here to do
+        but hand the request to the direct implementation.
+
+        An unexpected exception is a denial-shaped reply with
+        ``success=False``: a caller that read only ``admitted`` would
+        walk to the next candidate, which is the safe direction, while
+        one that checks ``success`` can tell a database problem from a
+        full cluster.
+        """
+        try:
+            self.monitor.counters['admit_instance_placement'].inc()
+            result = mariadb._direct_admit_instance_placement(
+                request.instance_uuid, request.namespace, request.node_uuid,
+                request.old_node_uuid, request.cpus, request.memory_mb,
+                request.disk_gb, request.demand_add, request.target_load,
+                request.enforce, request.placement_json)
+            reply = database_pb2.AdmitInstancePlacementReply(
+                success=result['success'],
+                error=result['error'],
+                admitted=result['admitted'],
+                unguarded=result['unguarded'],
+                clamped=result['clamped'],
+                failing_stage=result['failing_stage'],
+                node_used_cpus=result['node_used_cpus'],
+                node_used_memory_mb=result['node_used_memory_mb'],
+                node_used_disk_gb=result['node_used_disk_gb'],
+                node_expected_demand=result['node_expected_demand'])
+            for dimension in result['dimensions']:
+                reply.dimensions.add(**dimension)
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database AdmitInstancePlacement failed', e)
+            return database_pb2.AdmitInstancePlacementReply(
+                success=False, error=str(e))
+
+    def ReleaseInstancePlacement(
+        self,
+        request: database_pb2.ReleaseInstancePlacementRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReleaseInstancePlacementReply:
+        """Give an instance's capacity back and drop its placement rows."""
+        try:
+            self.monitor.counters['release_instance_placement'].inc()
+            result = mariadb._direct_release_instance_placement(
+                request.instance_uuid, request.namespace, request.node_uuid,
+                request.cpus, request.memory_mb, request.disk_gb)
+            return database_pb2.ReleaseInstancePlacementReply(
+                success=result['success'],
+                error=result['error'],
+                released=result['released'],
+                clamped=result['clamped'])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReleaseInstancePlacement failed', e)
+            return database_pb2.ReleaseInstancePlacementReply(
+                success=False, error=str(e))
+
     # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
@@ -6046,6 +6114,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_all_node_daemon_states', 'delete_node_daemon_state',
             # MariaDB scheduler capacity operations
             'reconcile_scheduler_capacity',
+            'admit_instance_placement', 'release_instance_placement',
         ]
         for op in operations:
             self.counters[op] = Counter(

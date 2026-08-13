@@ -3478,7 +3478,6 @@ class NodeAttributesProto(_message.Message):
     IS_HYPERVISOR_FIELD_NUMBER: _builtins.int
     IS_NETWORK_NODE_FIELD_NUMBER: _builtins.int
     IS_EVENTLOG_NODE_FIELD_NUMBER: _builtins.int
-    INSTANCES_JSON_FIELD_NUMBER: _builtins.int
     DAEMONS_JSON_FIELD_NUMBER: _builtins.int
     DAEMON_STATES_JSON_FIELD_NUMBER: _builtins.int
     QEMU_VERSION_JSON_FIELD_NUMBER: _builtins.int
@@ -3504,9 +3503,8 @@ class NodeAttributesProto(_message.Message):
     is_hypervisor: _builtins.bool
     is_network_node: _builtins.bool
     is_eventlog_node: _builtins.bool
-    instances_json: _builtins.str
-    """Instance and daemon tracking (JSON-encoded lists)"""
     daemons_json: _builtins.str
+    """Daemon tracking (JSON-encoded lists)"""
     daemon_states_json: _builtins.str
     qemu_version_json: _builtins.str
     """Software versions (JSON-encoded lists)"""
@@ -3540,7 +3538,6 @@ class NodeAttributesProto(_message.Message):
         is_hypervisor: _builtins.bool = ...,
         is_network_node: _builtins.bool = ...,
         is_eventlog_node: _builtins.bool = ...,
-        instances_json: _builtins.str = ...,
         daemons_json: _builtins.str = ...,
         daemon_states_json: _builtins.str = ...,
         qemu_version_json: _builtins.str = ...,
@@ -3559,7 +3556,7 @@ class NodeAttributesProto(_message.Message):
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["daemon_states_json", b"daemon_states_json", "daemons_json", b"daemons_json", "dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "has_spice_server_cert_subject", b"has_spice_server_cert_subject", "installed_version", b"installed_version", "instances_json", b"instances_json", "is_database_node", b"is_database_node", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "spice_server_cert_subject", b"spice_server_cert_subject", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["daemon_states_json", b"daemon_states_json", "daemons_json", b"daemons_json", "dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "has_spice_server_cert_subject", b"has_spice_server_cert_subject", "installed_version", b"installed_version", "is_database_node", b"is_database_node", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "spice_server_cert_subject", b"spice_server_cert_subject", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -9022,3 +9019,261 @@ class ReconcileSchedulerCapacityReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ReconcileSchedulerCapacityReply: _TypeAlias = ReconcileSchedulerCapacityReply  # noqa: Y015
+
+@_typing.final
+class AdmitInstancePlacementRequest(_message.Message):
+    """Scheduler placement admission and release (MariaDB)
+    Scheduler-reservations phase 3 (see docs/plans/
+    PLAN-scheduler-reservations-phase-03-primitive.md). Admission draws
+    down the materialised counters and writes the placement in one
+    transaction, in D1's canonical order: cluster_capacity, then
+    namespace_claims, then scheduler_node_capacity.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    INSTANCE_UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    OLD_NODE_UUID_FIELD_NUMBER: _builtins.int
+    CPUS_FIELD_NUMBER: _builtins.int
+    MEMORY_MB_FIELD_NUMBER: _builtins.int
+    DISK_GB_FIELD_NUMBER: _builtins.int
+    DEMAND_ADD_FIELD_NUMBER: _builtins.int
+    TARGET_LOAD_FIELD_NUMBER: _builtins.int
+    ENFORCE_FIELD_NUMBER: _builtins.int
+    PLACEMENT_JSON_FIELD_NUMBER: _builtins.int
+    instance_uuid: _builtins.str
+    """Dashed uuid form"""
+    namespace: _builtins.str
+    """The instance's namespace, for the claim lookup"""
+    node_uuid: _builtins.str
+    """Dashed uuid form, the node being claimed"""
+    old_node_uuid: _builtins.str
+    """Dashed uuid form of the node the instance is moving off, empty for a
+    first placement. A move never changes namespace, so the cluster and
+    claim rows are untouched by the old node's decrement.
+    """
+    cpus: _builtins.int
+    memory_mb: _builtins.int
+    disk_gb: _builtins.int
+    """Virtual size summed from disk_spec"""
+    demand_add: _builtins.float
+    """The D13 demand feedforward the placement adds to the node's
+    expected_demand, and the D13 target load the demand clause tests
+    against. Both are computed by the caller from its own scheduler
+    configuration (cpus x SCHEDULER_DEMAND_PER_VCPU, and
+    SCHEDULER_TARGET_LOAD) so the database daemon needs no copy of it.
+    """
+    target_load: _builtins.float
+    enforce: _builtins.bool
+    """False for the ground-truth writers (the cleaner's placement rewrites
+    and the queues daemon's reference reconciliation, per P5): they
+    record where a libvirt domain already is, which a guard cannot
+    refuse. Every counter update still happens, only the guard clauses
+    are dropped.
+    """
+    placement_json: _builtins.str
+    """The JSON written to instance_attributes.placement, masked to that
+    one column exactly as the generic attribute write path does.
+    """
+    def __init__(
+        self,
+        *,
+        instance_uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        node_uuid: _builtins.str = ...,
+        old_node_uuid: _builtins.str = ...,
+        cpus: _builtins.int = ...,
+        memory_mb: _builtins.int = ...,
+        disk_gb: _builtins.int = ...,
+        demand_add: _builtins.float = ...,
+        target_load: _builtins.float = ...,
+        enforce: _builtins.bool = ...,
+        placement_json: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cpus", b"cpus", "demand_add", b"demand_add", "disk_gb", b"disk_gb", "enforce", b"enforce", "instance_uuid", b"instance_uuid", "memory_mb", b"memory_mb", "namespace", b"namespace", "node_uuid", b"node_uuid", "old_node_uuid", b"old_node_uuid", "placement_json", b"placement_json", "target_load", b"target_load"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___AdmitInstancePlacementRequest: _TypeAlias = AdmitInstancePlacementRequest  # noqa: Y015
+
+@_typing.final
+class CapacityDimensionDetail(_message.Message):
+    """One dimension's numbers at the moment a guard refused, assembled from
+    a fresh read after the transaction rolled back so the caller's audit
+    event and its eventual 507 carry the depth the scheduler's Python
+    rejection reasons do. The values are doubles because the demand
+    dimension is fractional; the three allocation dimensions are exact
+    integers far inside the range a double represents exactly.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DIMENSION_FIELD_NUMBER: _builtins.int
+    LIMIT_FIELD_NUMBER: _builtins.int
+    USED_FIELD_NUMBER: _builtins.int
+    REQUESTED_FIELD_NUMBER: _builtins.int
+    EXCEEDED_FIELD_NUMBER: _builtins.int
+    dimension: _builtins.str
+    """cpus, memory_mb, disk_gb or demand"""
+    limit: _builtins.float
+    used: _builtins.float
+    requested: _builtins.float
+    exceeded: _builtins.bool
+    """Did this dimension actually fail?"""
+    def __init__(
+        self,
+        *,
+        dimension: _builtins.str = ...,
+        limit: _builtins.float = ...,
+        used: _builtins.float = ...,
+        requested: _builtins.float = ...,
+        exceeded: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["dimension", b"dimension", "exceeded", b"exceeded", "limit", b"limit", "requested", b"requested", "used", b"used"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CapacityDimensionDetail: _TypeAlias = CapacityDimensionDetail  # noqa: Y015
+
+@_typing.final
+class AdmitInstancePlacementReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    ADMITTED_FIELD_NUMBER: _builtins.int
+    UNGUARDED_FIELD_NUMBER: _builtins.int
+    CLAMPED_FIELD_NUMBER: _builtins.int
+    FAILING_STAGE_FIELD_NUMBER: _builtins.int
+    DIMENSIONS_FIELD_NUMBER: _builtins.int
+    NODE_USED_CPUS_FIELD_NUMBER: _builtins.int
+    NODE_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    NODE_USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    NODE_EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    error: _builtins.str
+    admitted: _builtins.bool
+    unguarded: _builtins.bool
+    """The target node (or the cluster singleton) had no capacity row, so
+    the placement was made without a guard (P7). The reconciler creates
+    the row on its next pass; the caller logs this loudly.
+    """
+    clamped: _builtins.bool
+    """A floored decrement of the old node's counters hit zero rather than
+    subtracting cleanly (P6) -- a release racing the reconciler. The
+    counters are still correct after the next reconcile pass.
+    """
+    failing_stage: _builtins.str
+    """'', 'cluster', 'claim' or 'node'"""
+    node_used_cpus: _builtins.int
+    """The target node's counters after a successful admission, read back
+    by PK SELECT inside the transaction (MariaDB has no UPDATE ...
+    RETURNING). Zero when the admission was denied or unguarded.
+    """
+    node_used_memory_mb: _builtins.int
+    node_used_disk_gb: _builtins.int
+    node_expected_demand: _builtins.float
+    @_builtins.property
+    def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        admitted: _builtins.bool = ...,
+        unguarded: _builtins.bool = ...,
+        clamped: _builtins.bool = ...,
+        failing_stage: _builtins.str = ...,
+        dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
+        node_used_cpus: _builtins.int = ...,
+        node_used_memory_mb: _builtins.int = ...,
+        node_used_disk_gb: _builtins.int = ...,
+        node_expected_demand: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___AdmitInstancePlacementReply: _TypeAlias = AdmitInstancePlacementReply  # noqa: Y015
+
+@_typing.final
+class ReleaseInstancePlacementRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    INSTANCE_UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    CPUS_FIELD_NUMBER: _builtins.int
+    MEMORY_MB_FIELD_NUMBER: _builtins.int
+    DISK_GB_FIELD_NUMBER: _builtins.int
+    instance_uuid: _builtins.str
+    """Dashed uuid form"""
+    namespace: _builtins.str
+    node_uuid: _builtins.str
+    """Dashed uuid form of the node to release. Empty releases wherever the
+    instance's instance_location rows point, which is what a delete
+    path wants: it knows the instance, not necessarily its node.
+    """
+    cpus: _builtins.int
+    memory_mb: _builtins.int
+    disk_gb: _builtins.int
+    def __init__(
+        self,
+        *,
+        instance_uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        node_uuid: _builtins.str = ...,
+        cpus: _builtins.int = ...,
+        memory_mb: _builtins.int = ...,
+        disk_gb: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cpus", b"cpus", "disk_gb", b"disk_gb", "instance_uuid", b"instance_uuid", "memory_mb", b"memory_mb", "namespace", b"namespace", "node_uuid", b"node_uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReleaseInstancePlacementRequest: _TypeAlias = ReleaseInstancePlacementRequest  # noqa: Y015
+
+@_typing.final
+class ReleaseInstancePlacementReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    RELEASED_FIELD_NUMBER: _builtins.int
+    CLAMPED_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    released: _builtins.bool
+    """False when there was nothing to release: no reference rows and no
+    node named, so no counters were touched. Double release is harmless
+    by construction (floored decrements over zero reference rows), and
+    this is how the caller tells a real release from a repeat.
+    """
+    clamped: _builtins.bool
+    error: _builtins.str
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        released: _builtins.bool = ...,
+        clamped: _builtins.bool = ...,
+        error: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "error", b"error", "released", b"released", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReleaseInstancePlacementReply: _TypeAlias = ReleaseInstancePlacementReply  # noqa: Y015

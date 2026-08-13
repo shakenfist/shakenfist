@@ -1149,6 +1149,16 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.ReconcileSchedulerCapacityRequest.SerializeToString,
                 response_deserializer=database__pb2.ReconcileSchedulerCapacityReply.FromString,
                 _registered_method=True)
+        self.AdmitInstancePlacement = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/AdmitInstancePlacement',
+                request_serializer=database__pb2.AdmitInstancePlacementRequest.SerializeToString,
+                response_deserializer=database__pb2.AdmitInstancePlacementReply.FromString,
+                _registered_method=True)
+        self.ReleaseInstancePlacement = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReleaseInstancePlacement',
+                request_serializer=database__pb2.ReleaseInstancePlacementRequest.SerializeToString,
+                response_deserializer=database__pb2.ReleaseInstancePlacementReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer:
@@ -2604,6 +2614,28 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def AdmitInstancePlacement(self, request, context):
+        """Scheduler-reservations phase 3: the atomicity primitive the plan
+        exists for (D1, D3). One transaction performs the guarded capacity
+        drawdown, the placement attribute write and the placement reference
+        rewrite, so two concurrent creates racing one remaining slot admit
+        exactly once and a stale duplicate placement row cannot be produced.
+        The scheduler configuration the guards need (the demand feedforward
+        term and the target load) rides in on the request, so the database
+        daemon needs no copy of it. Audit events are emitted by the caller
+        from the reply fields; sf-database emits none. See
+        docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReleaseInstancePlacement(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -3721,6 +3753,16 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.ReconcileSchedulerCapacity,
                     request_deserializer=database__pb2.ReconcileSchedulerCapacityRequest.FromString,
                     response_serializer=database__pb2.ReconcileSchedulerCapacityReply.SerializeToString,
+            ),
+            'AdmitInstancePlacement': grpc.unary_unary_rpc_method_handler(
+                    servicer.AdmitInstancePlacement,
+                    request_deserializer=database__pb2.AdmitInstancePlacementRequest.FromString,
+                    response_serializer=database__pb2.AdmitInstancePlacementReply.SerializeToString,
+            ),
+            'ReleaseInstancePlacement': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReleaseInstancePlacement,
+                    request_deserializer=database__pb2.ReleaseInstancePlacementRequest.FromString,
+                    response_serializer=database__pb2.ReleaseInstancePlacementReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -9744,6 +9786,60 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/ReconcileSchedulerCapacity',
             database__pb2.ReconcileSchedulerCapacityRequest.SerializeToString,
             database__pb2.ReconcileSchedulerCapacityReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AdmitInstancePlacement(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/AdmitInstancePlacement',
+            database__pb2.AdmitInstancePlacementRequest.SerializeToString,
+            database__pb2.AdmitInstancePlacementReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReleaseInstancePlacement(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReleaseInstancePlacement',
+            database__pb2.ReleaseInstancePlacementRequest.SerializeToString,
+            database__pb2.ReleaseInstancePlacementReply.FromString,
             options,
             channel_credentials,
             insecure,

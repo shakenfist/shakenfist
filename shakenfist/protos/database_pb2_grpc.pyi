@@ -398,6 +398,19 @@ class DatabaseServiceStub:
     no copy of the caller's scheduler configuration. See
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
     """
+    AdmitInstancePlacement: _grpc.UnaryUnaryMultiCallable[_database_pb2.AdmitInstancePlacementRequest, _database_pb2.AdmitInstancePlacementReply]
+    """Scheduler-reservations phase 3: the atomicity primitive the plan
+    exists for (D1, D3). One transaction performs the guarded capacity
+    drawdown, the placement attribute write and the placement reference
+    rewrite, so two concurrent creates racing one remaining slot admit
+    exactly once and a stale duplicate placement row cannot be produced.
+    The scheduler configuration the guards need (the demand feedforward
+    term and the target load) rides in on the request, so the database
+    daemon needs no copy of it. Audit events are emitted by the caller
+    from the reply fields; sf-database emits none. See
+    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+    """
+    ReleaseInstancePlacement: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseInstancePlacementRequest, _database_pb2.ReleaseInstancePlacementReply]
 
 @_typing.type_check_only
 class DatabaseServiceAsyncStub(DatabaseServiceStub):
@@ -769,6 +782,19 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     no copy of the caller's scheduler configuration. See
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
     """
+    AdmitInstancePlacement: _aio.UnaryUnaryMultiCallable[_database_pb2.AdmitInstancePlacementRequest, _database_pb2.AdmitInstancePlacementReply]  # type: ignore[assignment]
+    """Scheduler-reservations phase 3: the atomicity primitive the plan
+    exists for (D1, D3). One transaction performs the guarded capacity
+    drawdown, the placement attribute write and the placement reference
+    rewrite, so two concurrent creates racing one remaining slot admit
+    exactly once and a stale duplicate placement row cannot be produced.
+    The scheduler configuration the guards need (the demand feedforward
+    term and the target load) rides in on the request, so the database
+    daemon needs no copy of it. Audit events are emitted by the caller
+    from the reply fields; sf-database emits none. See
+    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+    """
+    ReleaseInstancePlacement: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseInstancePlacementRequest, _database_pb2.ReleaseInstancePlacementReply]  # type: ignore[assignment]
 
 class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -2475,5 +2501,30 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         no copy of the caller's scheduler configuration. See
         docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
         """
+
+    @_abc_1.abstractmethod
+    def AdmitInstancePlacement(
+        self,
+        request: _database_pb2.AdmitInstancePlacementRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.AdmitInstancePlacementReply, _abc.Awaitable[_database_pb2.AdmitInstancePlacementReply]]:
+        """Scheduler-reservations phase 3: the atomicity primitive the plan
+        exists for (D1, D3). One transaction performs the guarded capacity
+        drawdown, the placement attribute write and the placement reference
+        rewrite, so two concurrent creates racing one remaining slot admit
+        exactly once and a stale duplicate placement row cannot be produced.
+        The scheduler configuration the guards need (the demand feedforward
+        term and the target load) rides in on the request, so the database
+        daemon needs no copy of it. Audit events are emitted by the caller
+        from the reply fields; sf-database emits none. See
+        docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+        """
+
+    @_abc_1.abstractmethod
+    def ReleaseInstancePlacement(
+        self,
+        request: _database_pb2.ReleaseInstancePlacementRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ReleaseInstancePlacementReply, _abc.Awaitable[_database_pb2.ReleaseInstancePlacementReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

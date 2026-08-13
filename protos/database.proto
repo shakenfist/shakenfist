@@ -383,6 +383,19 @@ service DatabaseService {
   // no copy of the caller's scheduler configuration. See
   // docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
   rpc ReconcileSchedulerCapacity (ReconcileSchedulerCapacityRequest) returns (ReconcileSchedulerCapacityReply) {}
+
+  // Scheduler-reservations phase 3: the atomicity primitive the plan
+  // exists for (D1, D3). One transaction performs the guarded capacity
+  // drawdown, the placement attribute write and the placement reference
+  // rewrite, so two concurrent creates racing one remaining slot admit
+  // exactly once and a stale duplicate placement row cannot be produced.
+  // The scheduler configuration the guards need (the demand feedforward
+  // term and the target load) rides in on the request, so the database
+  // daemon needs no copy of it. Audit events are emitted by the caller
+  // from the reply fields; sf-database emits none. See
+  // docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+  rpc AdmitInstancePlacement (AdmitInstancePlacementRequest) returns (AdmitInstancePlacementReply) {}
+  rpc ReleaseInstancePlacement (ReleaseInstancePlacementRequest) returns (ReleaseInstancePlacementReply) {}
 }
 
 // Generic status reply
@@ -1228,8 +1241,15 @@ message NodeAttributesProto {
   bool is_network_node = 7;
   bool is_eventlog_node = 8;
 
-  // Instance and daemon tracking (JSON-encoded lists)
-  string instances_json = 9;
+  // Which instances are placed on this node is queried live from the
+  // instance_location rows in object_references; the legacy
+  // node_attributes.instances JSON column, its dual-write and the union
+  // in Node.instances were removed in scheduler-reservations phase 3.
+  // Tag reserved to prevent accidental reuse.
+  reserved 9;
+  reserved "instances_json";
+
+  // Daemon tracking (JSON-encoded lists)
   string daemons_json = 10;
   string daemon_states_json = 11;
 
@@ -2604,4 +2624,100 @@ message ReconcileSchedulerCapacityReply {
   int64 claims_expired = 4;
   repeated NodeCapacity nodes = 5;
   ClusterCapacity cluster = 6;
+}
+
+// Scheduler placement admission and release (MariaDB)
+// Scheduler-reservations phase 3 (see docs/plans/
+// PLAN-scheduler-reservations-phase-03-primitive.md). Admission draws
+// down the materialised counters and writes the placement in one
+// transaction, in D1's canonical order: cluster_capacity, then
+// namespace_claims, then scheduler_node_capacity.
+
+message AdmitInstancePlacementRequest {
+  string instance_uuid = 1;   // Dashed uuid form
+  string namespace = 2;       // The instance's namespace, for the claim lookup
+  string node_uuid = 3;       // Dashed uuid form, the node being claimed
+  // Dashed uuid form of the node the instance is moving off, empty for a
+  // first placement. A move never changes namespace, so the cluster and
+  // claim rows are untouched by the old node's decrement.
+  string old_node_uuid = 4;
+  int64 cpus = 5;
+  int64 memory_mb = 6;
+  int64 disk_gb = 7;          // Virtual size summed from disk_spec
+  // The D13 demand feedforward the placement adds to the node's
+  // expected_demand, and the D13 target load the demand clause tests
+  // against. Both are computed by the caller from its own scheduler
+  // configuration (cpus x SCHEDULER_DEMAND_PER_VCPU, and
+  // SCHEDULER_TARGET_LOAD) so the database daemon needs no copy of it.
+  double demand_add = 8;
+  double target_load = 9;
+  // False for the ground-truth writers (the cleaner's placement rewrites
+  // and the queues daemon's reference reconciliation, per P5): they
+  // record where a libvirt domain already is, which a guard cannot
+  // refuse. Every counter update still happens, only the guard clauses
+  // are dropped.
+  bool enforce = 10;
+  // The JSON written to instance_attributes.placement, masked to that
+  // one column exactly as the generic attribute write path does.
+  string placement_json = 11;
+}
+
+// One dimension's numbers at the moment a guard refused, assembled from
+// a fresh read after the transaction rolled back so the caller's audit
+// event and its eventual 507 carry the depth the scheduler's Python
+// rejection reasons do. The values are doubles because the demand
+// dimension is fractional; the three allocation dimensions are exact
+// integers far inside the range a double represents exactly.
+message CapacityDimensionDetail {
+  string dimension = 1;   // cpus, memory_mb, disk_gb or demand
+  double limit = 2;
+  double used = 3;
+  double requested = 4;
+  bool exceeded = 5;      // Did this dimension actually fail?
+}
+
+message AdmitInstancePlacementReply {
+  bool success = 1;       // The RPC ran; false means an error, see error
+  string error = 2;
+  bool admitted = 3;
+  // The target node (or the cluster singleton) had no capacity row, so
+  // the placement was made without a guard (P7). The reconciler creates
+  // the row on its next pass; the caller logs this loudly.
+  bool unguarded = 4;
+  // A floored decrement of the old node's counters hit zero rather than
+  // subtracting cleanly (P6) -- a release racing the reconciler. The
+  // counters are still correct after the next reconcile pass.
+  bool clamped = 5;
+  string failing_stage = 6;   // '', 'cluster', 'claim' or 'node'
+  repeated CapacityDimensionDetail dimensions = 7;
+  // The target node's counters after a successful admission, read back
+  // by PK SELECT inside the transaction (MariaDB has no UPDATE ...
+  // RETURNING). Zero when the admission was denied or unguarded.
+  int64 node_used_cpus = 8;
+  int64 node_used_memory_mb = 9;
+  int64 node_used_disk_gb = 10;
+  double node_expected_demand = 11;
+}
+
+message ReleaseInstancePlacementRequest {
+  string instance_uuid = 1;   // Dashed uuid form
+  string namespace = 2;
+  // Dashed uuid form of the node to release. Empty releases wherever the
+  // instance's instance_location rows point, which is what a delete
+  // path wants: it knows the instance, not necessarily its node.
+  string node_uuid = 3;
+  int64 cpus = 4;
+  int64 memory_mb = 5;
+  int64 disk_gb = 6;
+}
+
+message ReleaseInstancePlacementReply {
+  bool success = 1;       // The RPC ran; false means an error, see error
+  // False when there was nothing to release: no reference rows and no
+  // node named, so no counters were touched. Double release is harmless
+  // by construction (floored decrements over zero reference rows), and
+  // this is how the caller tells a real release from a repeat.
+  bool released = 2;
+  bool clamped = 3;
+  string error = 4;
 }
