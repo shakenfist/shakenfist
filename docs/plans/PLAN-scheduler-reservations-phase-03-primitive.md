@@ -360,7 +360,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Complete — see step 3 notes |
 | 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Complete — see step 4 notes |
 | 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Complete — see step 5 notes |
-| 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Not started |
+| 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Complete — see step 6 notes. Validation ran and **found a blocker**: correct under contention, but ER_CHECKREAD (1020) retry exhaustion on MariaDB 11.6.2+ turns concurrent creates into 500s. Left unfixed for operator direction; blocks step 9 |
 | 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Not started |
 | 8 | Management-session code review against the checklist below | medium | management session | none | Not started |
 | 9 | Operator review and PR; deploy to sfcbr and soak: reconciler drift metric stays zero with admission live, no 507 regression in CI pass rates | — | operator | — | Not started |
@@ -513,13 +513,220 @@ now reflected in the code's docstrings:
   and ~258, plus `ARCHITECTURE.md` ~825-838 and
   `docs/operator_guide/database.md` ~756 carried over from step 4.
 
-*(Step 6's docker-MariaDB results are recorded here when the
-step runs: the harness, the seed shape, each check's outcome,
-and admission-transaction timings. Mirror the format of phase
-2's Validation section. The race, burst, move/duplicate,
-double-release, dormant-claim-branch, fail-open and
-reconciler-zero-drift cases named in the step 6 brief must each
-be reported individually.)*
+### Step 6: docker-MariaDB concurrency validation (2026-08-14)
+
+**Headline: the primitive is correct under contention and it is
+not yet shippable on a current MariaDB.** No run of any scenario
+ever over-admitted, lost a counter or left the reconciler
+anything to repair. But on a server with
+`innodb_snapshot_isolation` ON — the default from MariaDB 11.6.2,
+which is what Debian 13, Ubuntu 24.04's `mariadb:11` image and
+every recent container tag give you — three of the five
+scenarios fail with the admission RPC returning
+`success=False`, which `Instance._admit_placement()` raises as
+`WriteException` and the create path turns into an HTTP 500.
+Details and root cause below; **this is a blocker for step 9 and
+is left unfixed deliberately, for the operator to direct.**
+
+#### Environment and harness
+
+Server: MariaDB `11.8.8-MariaDB-ubu2404` in a disposable
+`mariadb:11` container, database collation `utf8mb4_bin` (the
+strict collation the live suites deliberately test under, flipped
+per test and restored in cleanup), `--max-connections=500`,
+`innodb_lock_wait_timeout` 50, `transaction_isolation`
+REPEATABLE-READ. Every scenario was run under both
+`innodb_snapshot_isolation` ON (the server default) and OFF.
+
+The harness is a new `PlacementAdmissionConcurrencyLiveTestCase`
+in `shakenfist/tests/test_mariadb_capacity_admission_live.py`,
+beside the existing single-threaded suite, which was refactored
+onto a shared `_LiveCapacityFixture` so both share one database
+setup. It is a kept, repeatable harness rather than a one-off
+script, as the success criteria require. Every test starts a
+`threading.Barrier` so the calls genuinely overlap, and every
+test reports the server version, collation and snapshot-isolation
+setting it ran under: a concurrency result that does not name the
+regime is not a result. All 52 pre-existing live tests passed
+before anything was added, and still do.
+
+#### Scenario results (`innodb_snapshot_isolation` OFF)
+
+These are the numbers for the regime the primitive currently
+behaves correctly in.
+
+* **Race for one slot** — 20 rounds x 8 threads = 160 admissions
+  against a node seeded with room for exactly one more instance.
+  Every round: exactly 1 admitted, 7 denied, all denials clean
+  (`success=True`, `failing_stage='node'`, at least one dimension
+  flagged exceeded) and no exception ever surfaced from a worker.
+  Counters after each round exactly `used_cpus` 12,
+  `used_memory_mb` 12288, `used_disk_gb` 120,
+  `expected_demand` 10.0, cluster `unclaimed_used_*` 12 / 12288 /
+  120, and exactly one `INSTANCE_LOCATION` row across all eight
+  instances — so no denied transaction left its cluster-row
+  increment behind. **Admission timing: median 15.7 ms, p99
+  22.0 ms, max 23.0 ms.**
+* **Burst admission** — 50 concurrent admissions, alternating
+  between a node bound by cpus (`limit_cpus` 12, fits 3) and one
+  bound by memory (`limit_memory_mb` 8192, fits 2), against a
+  cluster singleton with room for all of them so the node rows
+  are what refuse. Exactly 5 admitted (3 and 2) and 45 denied.
+  Final counters exactly 12 / 12288 / 120 and 8 / 8192 / 80;
+  cluster 20 / 20480 / 200. Every denial named `node` as the
+  failing stage and flagged the dimension that node is actually
+  bound by, with `used + requested > limit` re-checked against
+  the live values. `expected_demand` accumulated to 30.0 and
+  20.0, summing to 50.0 = 20 admitted vCPUs x
+  `SCHEDULER_DEMAND_PER_VCPU` — once per admission, not once per
+  attempt. This is the first demonstration that RAM binds as an
+  allocation-denominated dimension. **Timing: median 98.1 ms, p99
+  124.6 ms** (50 transactions serialising on one singleton row).
+* **Move and duplicate elimination** — an instance placed on one
+  node, a stale duplicate `INSTANCE_LOCATION` row then planted on
+  a third node (the survivor a best-effort removal in the old
+  non-atomic triple could leave), then a move with `old_node`
+  set. Old node decremented to 0 / 0 / 0, new node 4 / 4096 / 40,
+  and exactly one reference row survives — on the new node,
+  taking the planted duplicate with it although no caller named
+  that node. The namespace side is untouched: with an active
+  `namespace_claims` row for the namespace, the claim's `used_*`
+  is identical before and after (4 / 4096 / 40) and the cluster
+  singleton stays at 0.
+* **Crossing moves** — 8 simultaneous moves, 4 in each direction
+  between the same pair of nodes, the case the uuid-ordered
+  intra-table statement order exists for. All admitted, no
+  clamps, both nodes ended at 16 / 16384 / 160.
+* **Randomised cycling with reconciler agreement** — 6 threads x
+  60 operations = 360 randomised admits, moves and releases over
+  12 instances of three sizes and 4 deliberately uneven nodes
+  (`cpu_schedulable` 16 / 8 / 4 / 2, so the small ones deny).
+  A representative run: 125 admits, 97 moves, 116 releases, 22
+  denials, no clamp and no RPC failure. Operations are serialised
+  per instance to model the attribute lock `place_instance()`
+  holds. The counters were then checked twice, against two
+  independent oracles: a Python model built from the replies
+  (exact on every node and on the cluster singleton), and a full
+  reconcile pass — `delta_used_cpus`, `delta_used_memory_mb` and
+  `delta_used_disk_gb` **zero on every node**, `nodes_added` 0,
+  `nodes_removed` 0, and the rebuilt cluster `unclaimed_used_*`
+  identical to the pre-reconcile row. P2's "guard and reconciler
+  agree by construction" is now tested rather than argued.
+  **Timing: median 8.8 ms, p99 16.9 ms.**
+
+The double-release, dormant-claim-branch and fail-open cases
+named in the step 6 brief are already covered by the
+single-threaded suite written during step 3
+(`test_double_release_is_harmless`,
+`test_an_active_claim_is_drawn_down_instead_of_the_cluster` and
+its siblings, `test_a_node_with_no_capacity_row_admits_unguarded`,
+`test_a_cluster_with_no_singleton_admits_unguarded`); they were
+re-run here rather than duplicated, and all 30 pass.
+
+#### The finding: ER_CHECKREAD under snapshot isolation
+
+With `innodb_snapshot_isolation` ON, the same harness gives:
+
+| Scenario | Concurrency | Result |
+|---|---|---|
+| Race for one slot | 8 | passes, median 27.1 ms / p99 35.7 ms (1.7x the OFF regime — that is retry backoff, not database work) |
+| Move and duplicate | 1 | passes |
+| Crossing moves | 8 | **fails**: 1020 on `scheduler_node_capacity` |
+| Burst | 50 | **fails**: 1020 on `cluster_capacity` |
+| Randomised soak | 6 | **fails**: 1020 on `cluster_capacity` |
+
+The error is `ER_CHECKREAD` (1020), *"Record has changed since
+last read in table 'cluster_capacity'; try restarting
+transaction"*. Under snapshot isolation a guarded `UPDATE` whose
+target row moved since the transaction's snapshot does not block
+and re-evaluate its `WHERE`; it aborts immediately and the client
+must restart the transaction.
+
+**Root cause, and phase 0 predicted it exactly.** The phase 0
+findings' step 2 benchmark results say (in
+`PLAN-scheduler-reservations-phase-00-findings.md`): "ER_CHECKREAD
+(1020) never fired... The guarded UPDATE is the transaction's
+first statement, so the snapshot is established by the DML itself
+and there is no stale-snapshot window. **The risk returns if a
+plain SELECT precedes the guarded UPDATE inside the same RR
+transaction.**" That is what
+`_direct_admit_instance_placement()` now does: it opens the
+transaction with three non-locking `SELECT`s (the active claim
+lookup, the node-row presence probe and the cluster-singleton
+presence probe) before touching a guarded `UPDATE`. Those probes
+exist for good reasons — the P4 branch select, and P7's fail-open
+— but they establish the snapshot early, and every admission then
+races every other admission on the `cluster_capacity` singleton,
+the hottest row in the design.
+
+**Correctness is not affected.** In no run, in either regime, at
+any retry budget, did the guard admit more than the seeded
+capacity or leave a counter wrong. The failure is availability
+and latency: the transaction aborts and, once the retry budget is
+gone, the RPC reports a hard error rather than an admission or a
+denial. `Instance._admit_placement()` correctly refuses to read
+that as "the cluster is full" and raises `WriteException`, so the
+user-visible symptom is a 500 on instance create under
+concurrency, not a wrong placement.
+
+**The retry budget is one attempt short.** Instrumenting
+`_retry_transaction` (diagnosis only, not committed) over the
+50-way burst at the shipped `_TRANSACTION_MAX_ATTEMPTS = 4` gives
+an attempts histogram of `{1: 2, 2: 1, 3: 1, 4: 46}` — 46 of 50
+transactions hit the ceiling. Raising the budget to 8 makes all
+five scenarios pass under snapshot isolation with counters exact
+and reconciler drift still zero (histogram
+`{1: 249, 2: 213, 3: 44, 4: 25, 5: 49, 6: 8}` across the whole
+suite), but at a cost: the burst's median admission goes to
+313.8 ms and the soak's p99 to 179.8 ms, against 98.1 ms and
+16.9 ms with snapshot isolation off. A budget bump alone buys
+correctness back by burning wall time on the instance-create hot
+path, which is the opposite of the "net database load goes down"
+claim in this plan's risk table. The principled fix is to stop
+establishing the snapshot early — make a guarded `UPDATE` the
+transaction's first statement and fold the presence probes into
+it or into the retry path — which is a change to the primitive
+and therefore out of scope for a validation step.
+
+**CI would not have caught this.** The live suites run in the
+`schema_enum_widening` job on a `debian-12` runner, whose
+`mariadb-server` is 10.11, where `innodb_snapshot_isolation` does
+not exist. The whole new suite passes there. Whatever fix is
+chosen, the harness needs to run against a server with the
+variable ON before it can be believed.
+
+#### Everything else that failed first time
+
+* The crossing-moves scenario failed its first run for a reason
+  that turned out to be the test's own seeding, not the code:
+  with the default `demand_add` of `cpus x
+  SCHEDULER_DEMAND_PER_VCPU`, eight placements followed by eight
+  moves push `expected_demand` past `SCHEDULER_TARGET_LOAD x
+  cpu_schedulable` and D13 denies the moves. The test now passes
+  `demand_add=0.0`, but the behaviour is worth recording as an
+  operational property: a move adds the new node's feedforward
+  term without crediting the old node's back (deliberately — see
+  `test_a_move_does_not_credit_expected_demand_back`), so an
+  instance churning between nodes inflates cluster-wide demand
+  until the next reconcile pass recomputes it from placement
+  ages. Self-healing within five minutes, but a node that sees
+  heavy preflight-redirect traffic can talk itself out of
+  admitting.
+* Nothing else. The refactor of the existing suite onto the
+  shared fixture was clean on the first run, and the previously
+  existing 52 live tests passed unchanged throughout.
+
+#### Functional smoke assertion
+
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_events.py`'s
+`test_instance_events` now also asserts that creating an instance
+emitted the step 4 `instance placed` audit event (message string
+checked against what `Instance._admit_placement()` actually
+emits). It polls for up to 30 s, because events are eventually
+consistent, and tolerates extra events and more than one
+placement — a preflight redirect or a cleaner rewrite-to-local
+legitimately places the same instance again. This runs in cluster
+CI, not in the docker harness.
 
 ## Administration and logistics
 

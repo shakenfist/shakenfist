@@ -36,15 +36,23 @@ collation to utf8mb4_bin for the duration of each test), so they must be
 run serially -- ``stestr run --serial``, as CI does.
 """
 
+import functools
 import json
+import math
 import os
+import random
+import statistics
+import sys
+import threading
 import time
 import unittest
 from unittest import mock
 from uuid import uuid4
 
 import sqlalchemy as sa
+from testtools import content
 
+from shakenfist.constants import GiB
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
@@ -68,22 +76,47 @@ TEST_TABLES = [
 
 TARGET_LOAD = 0.75
 
+# The concurrency suite's shape. These are deliberately module level so
+# a soak run can be widened from one place, and so the numbers reported
+# in the plan's Validation section have a single source of truth.
+RACE_THREADS = 8
+RACE_ROUNDS = 20
+BURST_THREADS = 50
+SOAK_THREADS = 6
+SOAK_OPERATIONS_PER_THREAD = 60
+SOAK_NODES = 4
+SOAK_INSTANCES = 12
 
-@unittest.skipUnless(
-    os.environ.get(DSN_ENV),
-    f'{DSN_ENV} not set; requires a disposable MariaDB database')
-class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
-    """Run real admissions and releases against a real MariaDB."""
+# SCHEDULER_DEMAND_PER_VCPU's default, so the accumulated feedforward
+# term can be asserted as admitted vCPUs x this constant.
+DEMAND_PER_VCPU = 2.5
 
-    def setUp(self):
-        super().setUp()
-        self.engine = sa.create_engine(os.environ[DSN_ENV])
+
+class _LiveCapacityFixture(base.ShakenFistTestCase):
+    """Shared live-MariaDB scaffolding for both suites in this module.
+
+    Both want the same disposable database, the same utf8mb4_bin
+    collation and the same set of ensured tables; only the seed shape
+    and the connection pool differ, so those are what a subclass
+    supplies.
+    """
+
+    # SQLAlchemy pools five connections by default, which is right for
+    # the single threaded suite and useless for the concurrency one: a
+    # pool smaller than the thread count serialises the admissions at
+    # the pool rather than at the row locks, so the race under test
+    # never actually races.
+    ENGINE_KWARGS: dict = {}
+
+    def _prepare_database(self):
+        self.engine = sa.create_engine(os.environ[DSN_ENV],
+                                       **self.ENGINE_KWARGS)
         self.addCleanup(self.engine.dispose)
         self.addCleanup(self._drop_tables)
         self._drop_tables()
 
-        # Run this suite against a case-sensitive collation, for the same
-        # reason the reconciler's live suite does: object_references
+        # Run these suites against a case-sensitive collation, for the
+        # same reason the reconciler's live suite does: object_references
         # stores enum member *values* while object_states stores member
         # *names*, and the two spellings differ only in case, so a
         # binding naming the wrong convention is papered over by the
@@ -116,8 +149,33 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        self.now = time.time()
-        self._seed()
+    def _capacity(self, node):
+        table = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(table).where(
+                table.c.node_uuid == node)).first()
+
+    def _cluster(self):
+        table = mariadb._get_cluster_capacity_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(table)).first()
+
+    def _references_for(self, instance):
+        table = mariadb._get_object_references_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(table.c.source_uuid).where(sa.and_(
+                table.c.relationship == str(
+                    RelationshipType.INSTANCE_LOCATION),
+                table.c.target_object_type == str(ObjectType.INSTANCE),
+                table.c.target_uuid == str(instance)))).fetchall()
+
+    def _placement_of(self, instance):
+        table = mariadb._get_instance_attributes_table()
+        with self.engine.connect() as conn:
+            row = conn.execute(sa.select(table.c.placement).where(
+                table.c.uuid == instance)).first()
+        value = row.placement
+        return json.loads(value) if isinstance(value, str) else value
 
     def _drop_tables(self):
         with self.engine.connect() as conn:
@@ -132,7 +190,7 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
             conn.commit()
 
     def _fill_required(self, table, known):
-        """Fill NOT NULL columns this suite does not care about."""
+        """Fill NOT NULL columns these suites do not care about."""
         row = dict(known)
         for col in table.columns:
             if (col.name in row or col.nullable
@@ -156,6 +214,55 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
     def _insert(self, conn, table, **known):
         conn.execute(sa.insert(table).values(
             self._fill_required(table, known)))
+
+    def _place_reference(self, node, instance, created=None):
+        table = mariadb._get_object_references_table()
+        with self.engine.connect() as conn:
+            self._insert(
+                conn, table,
+                source_object_type=str(ObjectType.NODE),
+                source_uuid=str(node),
+                relationship=str(RelationshipType.INSTANCE_LOCATION),
+                target_object_type=str(ObjectType.INSTANCE),
+                target_uuid=str(instance),
+                created=created or self.now, last_active=self.now)
+            conn.commit()
+
+    def _add_claim(self, namespace='ci-1', limit_cpus=8,
+                   limit_memory_mb=8192, limit_disk_gb=80, used_cpus=4,
+                   used_memory_mb=4096, used_disk_gb=40, hours=4):
+        claim_uuid = uuid4()
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            self._insert(
+                conn, table, uuid=claim_uuid, namespace=namespace,
+                limit_cpus=limit_cpus, limit_memory_mb=limit_memory_mb,
+                limit_disk_gb=limit_disk_gb, used_cpus=used_cpus,
+                used_memory_mb=used_memory_mb, used_disk_gb=used_disk_gb,
+                state='active',
+                expires_at=sa.text(f'NOW() + INTERVAL {hours} HOUR'),
+                updated_at=sa.func.now())
+            conn.commit()
+        return claim_uuid
+
+    def _claim(self, claim_uuid):
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(table).where(
+                table.c.uuid == claim_uuid)).first()
+
+
+@unittest.skipUnless(
+    os.environ.get(DSN_ENV),
+    f'{DSN_ENV} not set; requires a disposable MariaDB database')
+class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
+    """Run real admissions and releases against a real MariaDB."""
+
+    def setUp(self):
+        super().setUp()
+        self._prepare_database()
+        self.now = time.time()
+        self._seed()
 
     def _seed(self):
         # node_a  a capacity row with room for exactly one more of the
@@ -224,72 +331,11 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
         return mariadb._direct_release_instance_placement(
             str(instance), namespace, node, cpus, memory_mb, disk_gb)
 
-    def _capacity(self, node):
-        table = mariadb._get_scheduler_node_capacity_table()
-        with self.engine.connect() as conn:
-            return conn.execute(sa.select(table).where(
-                table.c.node_uuid == node)).first()
-
-    def _cluster(self):
-        table = mariadb._get_cluster_capacity_table()
-        with self.engine.connect() as conn:
-            return conn.execute(sa.select(table)).first()
-
     def _references(self, instance=None):
-        instance = instance or self.instance
-        table = mariadb._get_object_references_table()
-        with self.engine.connect() as conn:
-            return conn.execute(sa.select(table.c.source_uuid).where(sa.and_(
-                table.c.relationship == str(
-                    RelationshipType.INSTANCE_LOCATION),
-                table.c.target_object_type == str(ObjectType.INSTANCE),
-                table.c.target_uuid == str(instance)))).fetchall()
+        return self._references_for(instance or self.instance)
 
     def _placement(self, instance=None):
-        instance = instance or self.instance
-        table = mariadb._get_instance_attributes_table()
-        with self.engine.connect() as conn:
-            row = conn.execute(sa.select(table.c.placement).where(
-                table.c.uuid == instance)).first()
-        value = row.placement
-        return json.loads(value) if isinstance(value, str) else value
-
-    def _place_reference(self, node, instance=None, created=None):
-        instance = instance or self.instance
-        table = mariadb._get_object_references_table()
-        with self.engine.connect() as conn:
-            self._insert(
-                conn, table,
-                source_object_type=str(ObjectType.NODE),
-                source_uuid=str(node),
-                relationship=str(RelationshipType.INSTANCE_LOCATION),
-                target_object_type=str(ObjectType.INSTANCE),
-                target_uuid=str(instance),
-                created=created or self.now, last_active=self.now)
-            conn.commit()
-
-    def _add_claim(self, namespace='ci-1', limit_cpus=8,
-                   limit_memory_mb=8192, limit_disk_gb=80, used_cpus=4,
-                   used_memory_mb=4096, used_disk_gb=40, hours=4):
-        claim_uuid = uuid4()
-        table = mariadb._get_namespace_claims_table()
-        with self.engine.connect() as conn:
-            self._insert(
-                conn, table, uuid=claim_uuid, namespace=namespace,
-                limit_cpus=limit_cpus, limit_memory_mb=limit_memory_mb,
-                limit_disk_gb=limit_disk_gb, used_cpus=used_cpus,
-                used_memory_mb=used_memory_mb, used_disk_gb=used_disk_gb,
-                state='active',
-                expires_at=sa.text(f'NOW() + INTERVAL {hours} HOUR'),
-                updated_at=sa.func.now())
-            conn.commit()
-        return claim_uuid
-
-    def _claim(self, claim_uuid):
-        table = mariadb._get_namespace_claims_table()
-        with self.engine.connect() as conn:
-            return conn.execute(sa.select(table).where(
-                table.c.uuid == claim_uuid)).first()
+        return self._placement_of(instance or self.instance)
 
     # ------------------------------------------------------------------
     # Admission
@@ -541,7 +587,7 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
         self._admit(self.node_a)
         # Simulate the duplicate placement row that the old non-atomic
         # triple could leave behind: a survivor of a best-effort removal.
-        self._place_reference(self.node_c)
+        self._place_reference(self.node_c, self.instance)
         self.assertEqual(2, len(self._references()))
 
         result = self._admit(self.node_b, old_node=str(self.node_a))
@@ -656,7 +702,7 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(8, self._cluster().unclaimed_used_cpus)
 
     def test_release_clamps_rather_than_going_negative(self):
-        self._place_reference(self.node_b)
+        self._place_reference(self.node_b, self.instance)
         result = self._release()
         self.assertTrue(result['released'])
         self.assertTrue(result['clamped'])
@@ -687,8 +733,8 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(8, self._capacity(self.node_a).used_cpus)
 
     def test_release_follows_duplicate_references_to_every_node(self):
-        self._place_reference(self.node_a)
-        self._place_reference(self.node_b)
+        self._place_reference(self.node_a, self.instance)
+        self._place_reference(self.node_b, self.instance)
         capacity_t = mariadb._get_scheduler_node_capacity_table()
         with self.engine.connect() as conn:
             conn.execute(sa.update(capacity_t).where(
@@ -740,3 +786,701 @@ class PlacementAdmissionLiveTestCase(base.ShakenFistTestCase):
         fifth = self._admit(self.node_a)
         self.assertFalse(fifth['admitted'])
         self.assertEqual('node', fifth['failing_stage'])
+
+
+@unittest.skipUnless(
+    os.environ.get(DSN_ENV),
+    f'{DSN_ENV} not set; requires a disposable MariaDB database')
+class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
+    """Adversarially concurrent admissions against a real MariaDB.
+
+    The suite above proves each guard binds. This one proves they bind
+    *under contention*, which is the only property the phase exists for:
+    "two concurrent creates against one remaining slot cannot both be
+    admitted". No mock can test that -- the guarantee is entirely a
+    property of InnoDB re-evaluating a guarded UPDATE's WHERE against
+    the row as committed by whoever held the lock first -- so this is
+    the step 6 harness from
+    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md, kept
+    repeatable rather than run once and thrown away.
+
+    Four scenarios, each asserting counters exactly rather than
+    approximately, because an off-by-one in a ledger is the whole bug
+    class:
+
+    * a race for one slot, repeated for enough rounds that a
+      once-in-twenty interleaving cannot pass unnoticed,
+    * a burst against known capacity, with two nodes bound by different
+      dimensions, so "denied" is checked to name a dimension that
+      genuinely was exceeded,
+    * a move with a stale duplicate placement row planted first,
+    * a randomised admit/release/move soak from several threads,
+      followed by a reconcile pass which must report zero drift. That
+      last one is the "guard and reconciler agree by construction"
+      claim of decision P2, tested rather than asserted in prose.
+    """
+
+    # One pooled connection per concurrent admission plus headroom for
+    # the assertions' own reads.
+    ENGINE_KWARGS = {'pool_size': BURST_THREADS + 8, 'max_overflow': 8,
+                     'pool_timeout': 120}
+
+    def setUp(self):
+        super().setUp()
+        self._prepare_database()
+        self.now = time.time()
+        self.sizes = {}
+        self._report_server_regime()
+
+    def _report_server_regime(self):
+        """Record the server settings the run's result is only true for.
+
+        ``innodb_snapshot_isolation`` is ON by default from MariaDB
+        11.6.2 and absent before it, and it changes what a guarded
+        UPDATE does when it collides: block and re-evaluate, or abort
+        with ER_CHECKREAD (1020) for the caller to retry. A concurrency
+        result that does not say which regime produced it is not a
+        result -- see the phase 0 findings' MariaDB caveats and the
+        step 6 notes in
+        docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+        """
+        with self.engine.connect() as conn:
+            version = conn.execute(sa.text('SELECT VERSION()')).scalar()
+            collation = conn.execute(sa.text(
+                'SELECT @@collation_database')).scalar()
+            try:
+                snapshot = conn.execute(sa.text(
+                    'SELECT @@innodb_snapshot_isolation')).scalar()
+            except sa.exc.OperationalError:
+                snapshot = 'absent (pre 11.6.2)'
+        self._report('server-regime', (
+            f'MariaDB {version}, collation {collation}, '
+            f'innodb_snapshot_isolation {snapshot}'))
+
+    # ------------------------------------------------------------------
+    # Seeding
+    # ------------------------------------------------------------------
+
+    def _add_node(self, limit_cpus=1000, limit_memory_mb=1000000,
+                  limit_disk_gb=100000, used_cpus=0, used_memory_mb=0,
+                  used_disk_gb=0, cpu_schedulable=64, cpu_load_1=0.5,
+                  reconcilable=False):
+        """Seed one hypervisor: a capacity row and a metrics row.
+
+        ``reconcilable`` adds the nodes and object_states rows the
+        reconciler needs before it will keep a capacity row for this
+        node; the tests which never reconcile do not need them.
+        """
+        node = uuid4()
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        metrics_t = mariadb._get_node_metrics_table()
+        nodes_t = mariadb._get_nodes_table()
+        states_t = mariadb._get_object_states_table()
+
+        with self.engine.connect() as conn:
+            self._insert(conn, capacity_t, node_uuid=node,
+                         limit_cpus=limit_cpus,
+                         limit_memory_mb=limit_memory_mb,
+                         limit_disk_gb=limit_disk_gb, used_cpus=used_cpus,
+                         used_memory_mb=used_memory_mb,
+                         used_disk_gb=used_disk_gb, expected_demand=0.0,
+                         updated_at=sa.func.now())
+            self._insert(conn, metrics_t, node_uuid=node,
+                         cpu_schedulable=cpu_schedulable,
+                         cpu_load_1=cpu_load_1, memory_max=65536,
+                         memory_reserved_mb=2048,
+                         disk_free_instances=500 * GiB,
+                         disk_reservation_gb=20, metrics_json={},
+                         is_hypervisor=True, timestamp=self.now,
+                         fqdn=f'n-{str(node)[:8]}')
+            if reconcilable:
+                self._insert(conn, nodes_t, uuid=node,
+                             fqdn=f'n-{str(node)[:8]}')
+                self._insert(conn, states_t, object_type=ObjectType.NODE,
+                             object_uuid=str(node), state_value='created',
+                             update_time=self.now)
+            conn.commit()
+        return node
+
+    def _add_instance(self, cpus=4, memory_mb=4096, disk_gb=40,
+                      namespace='ci-1', stated=False):
+        instance = uuid4()
+        instances_t = mariadb._get_instances_table()
+        attributes_t = mariadb._get_instance_attributes_table()
+        states_t = mariadb._get_object_states_table()
+
+        with self.engine.connect() as conn:
+            self._insert(conn, instances_t, uuid=instance, cpus=cpus,
+                         memory=memory_mb,
+                         disk_spec=json.dumps([{'size': disk_gb}]),
+                         namespace=namespace, name=str(instance)[:8])
+            self._insert(conn, attributes_t, uuid=instance,
+                         placement=json.dumps(None))
+            if stated:
+                self._insert(conn, states_t, object_type=ObjectType.INSTANCE,
+                             object_uuid=str(instance),
+                             state_value='created', update_time=self.now)
+            conn.commit()
+        self.sizes[instance] = {'cpus': cpus, 'memory_mb': memory_mb,
+                                'disk_gb': disk_gb, 'namespace': namespace}
+        return instance
+
+    def _set_cluster(self, total_cpus, total_memory_mb, total_disk_gb,
+                     unclaimed_used_cpus=0, unclaimed_used_memory_mb=0,
+                     unclaimed_used_disk_gb=0):
+        table = mariadb._get_cluster_capacity_table()
+        with self.engine.connect() as conn:
+            self._insert(conn, table, id=1, total_cpus=total_cpus,
+                         total_memory_mb=total_memory_mb,
+                         total_disk_gb=total_disk_gb, claimed_cpus=0,
+                         claimed_memory_mb=0, claimed_disk_gb=0,
+                         unclaimed_used_cpus=unclaimed_used_cpus,
+                         unclaimed_used_memory_mb=unclaimed_used_memory_mb,
+                         unclaimed_used_disk_gb=unclaimed_used_disk_gb,
+                         updated_at=sa.func.now())
+            conn.commit()
+
+    # ------------------------------------------------------------------
+    # Calling the primitive
+    # ------------------------------------------------------------------
+
+    def _admit(self, node, instance, old_node='', enforce=True,
+               demand_add=None, target_load=TARGET_LOAD):
+        size = self.sizes[instance]
+        if demand_add is None:
+            demand_add = size['cpus'] * DEMAND_PER_VCPU
+        return mariadb._direct_admit_instance_placement(
+            str(instance), size['namespace'], str(node), old_node,
+            size['cpus'], size['memory_mb'], size['disk_gb'], demand_add,
+            target_load, enforce,
+            json.dumps({'node': str(node), 'placement_attempts': 1}))
+
+    def _release(self, instance, node=''):
+        size = self.sizes[instance]
+        return mariadb._direct_release_instance_placement(
+            str(instance), size['namespace'], node, size['cpus'],
+            size['memory_mb'], size['disk_gb'])
+
+    def _reconcile(self):
+        result = mariadb._direct_reconcile_scheduler_capacity(
+            DEMAND_PER_VCPU, 600, 1.0)
+        self.assertIsNotNone(result, 'reconcile pass failed')
+        return result
+
+    # ------------------------------------------------------------------
+    # Concurrency and reporting plumbing
+    # ------------------------------------------------------------------
+
+    def _run_concurrently(self, calls):
+        """Fire every call at once; return [(reply, seconds), ...].
+
+        The barrier is load bearing. Without it thread startup staggers
+        the calls enough that the first transaction has committed before
+        the last has begun, and the race this suite exists to run never
+        happens -- the test would pass for the wrong reason.
+
+        Anything raised out of a worker is collected and asserted on in
+        the main thread: the primitive must express "no capacity" as a
+        denial reply, never as an exception, so a raise here is a
+        finding rather than a test error.
+        """
+        barrier = threading.Barrier(len(calls))
+        outcomes = [None] * len(calls)
+        failures = []
+
+        def _worker(index, call):
+            try:
+                barrier.wait(timeout=120)
+                started = time.perf_counter()
+                reply = call()
+                outcomes[index] = (reply, time.perf_counter() - started)
+            except BaseException as e:
+                failures.append(f'{type(e).__name__}: {e}')
+
+        threads = [threading.Thread(target=_worker, args=(index, call))
+                   for index, call in enumerate(calls)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=300)
+
+        self.assertEqual([], failures, 'a call raised instead of replying')
+        self.assertNotIn(None, outcomes, 'a worker did not complete')
+        return outcomes
+
+    def _report(self, label, text):
+        """Record a measurement both durably and visibly.
+
+        addDetail keeps it with the (possibly failing) test result;
+        stderr is what a developer watching a soak run actually sees,
+        and what the plan's Validation numbers were read from.
+        """
+        self.addDetail(label, content.text_content(text))
+        sys.stderr.write(f'\n{label}: {text}\n')
+
+    def _timing_summary(self, label, seconds):
+        ordered = sorted(seconds)
+        index = max(0, math.ceil(0.99 * len(ordered)) - 1)
+        median = statistics.median(ordered)
+        p99 = ordered[index]
+        self._report(label, (
+            f'{len(ordered)} calls, median {median * 1000:.1f} ms, '
+            f'p99 {p99 * 1000:.1f} ms, max {ordered[-1] * 1000:.1f} ms'))
+        return median, p99
+
+    # ------------------------------------------------------------------
+    # Scenario (a): a race for exactly one slot
+    # ------------------------------------------------------------------
+
+    def _reset_race_round(self, node):
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        cluster_t = mariadb._get_cluster_capacity_table()
+        refs_t = mariadb._get_object_references_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(capacity_t).where(
+                capacity_t.c.node_uuid == node).values(
+                    used_cpus=8, used_memory_mb=8192, used_disk_gb=80,
+                    expected_demand=0.0))
+            conn.execute(sa.update(cluster_t).where(
+                cluster_t.c.id == 1).values(
+                    unclaimed_used_cpus=8, unclaimed_used_memory_mb=8192,
+                    unclaimed_used_disk_gb=80))
+            conn.execute(sa.delete(refs_t))
+            conn.commit()
+
+    def test_a_race_for_one_slot_admits_exactly_once(self):
+        # The success criterion the phase was written for, run wide (8
+        # threads rather than the plan's two) and repeatedly, because a
+        # guard that leaks one admission in twenty interleavings is a
+        # guard that would leak in production and pass a single-shot
+        # test.
+        node = self._add_node(limit_cpus=12, limit_memory_mb=12288,
+                              limit_disk_gb=120, used_cpus=8,
+                              used_memory_mb=8192, used_disk_gb=80)
+        # Deliberately roomy, so the node row is the only thing that can
+        # refuse and a miscount cannot hide behind the cluster guard.
+        self._set_cluster(total_cpus=1000, total_memory_mb=1024000,
+                          total_disk_gb=100000, unclaimed_used_cpus=8,
+                          unclaimed_used_memory_mb=8192,
+                          unclaimed_used_disk_gb=80)
+        instances = [self._add_instance() for _ in range(RACE_THREADS)]
+
+        seconds = []
+        for round_number in range(RACE_ROUNDS):
+            self._reset_race_round(node)
+            outcomes = self._run_concurrently([
+                functools.partial(self._admit, node, instance)
+                for instance in instances])
+            seconds.extend(elapsed for _, elapsed in outcomes)
+            replies = [reply for reply, _ in outcomes]
+
+            for reply in replies:
+                self.assertTrue(reply['success'],
+                                f'round {round_number}: {reply["error"]}')
+            admitted = [r for r in replies if r['admitted']]
+            self.assertEqual(
+                1, len(admitted),
+                f'round {round_number}: {len(admitted)} of {RACE_THREADS} '
+                f'admitted into one slot')
+            for reply in replies:
+                if reply['admitted']:
+                    continue
+                # A clean denial, at the stage that ran out of room.
+                self.assertEqual('node', reply['failing_stage'])
+                self.assertTrue(
+                    any(d['exceeded'] for d in reply['dimensions']),
+                    f'round {round_number}: denial named no dimension')
+
+            row = self._capacity(node)
+            self.assertEqual(12, row.used_cpus, f'round {round_number}')
+            self.assertEqual(12288, row.used_memory_mb)
+            self.assertEqual(120, row.used_disk_gb)
+            # Exactly one admission's worth of feedforward, so no denied
+            # transaction left its increment behind.
+            self.assertEqual(4 * DEMAND_PER_VCPU, row.expected_demand)
+
+            cluster = self._cluster()
+            self.assertEqual(12, cluster.unclaimed_used_cpus,
+                             f'round {round_number}: cluster row leaked')
+            self.assertEqual(12288, cluster.unclaimed_used_memory_mb)
+            self.assertEqual(120, cluster.unclaimed_used_disk_gb)
+
+            placed = [(instance, reference.source_uuid)
+                      for instance in instances
+                      for reference in self._references_for(instance)]
+            self.assertEqual(1, len(placed),
+                             f'round {round_number}: {placed}')
+
+        self._report('race-shape', (
+            f'{RACE_ROUNDS} rounds x {RACE_THREADS} threads, '
+            f'1 admitted and {RACE_THREADS - 1} denied per round'))
+        self._timing_summary('race-admission-timings', seconds)
+
+    # ------------------------------------------------------------------
+    # Scenario (b): a burst against known capacity
+    # ------------------------------------------------------------------
+
+    def test_a_burst_admits_exactly_the_fitting_number(self):
+        # Two nodes bound by different dimensions, because this phase
+        # gives RAM and disk allocation-denominated protection for the
+        # first time and a burst that only ever binds on cpus would not
+        # show it.
+        cpu_node = self._add_node(limit_cpus=12, limit_memory_mb=1000000,
+                                  limit_disk_gb=100000)
+        memory_node = self._add_node(limit_cpus=1000, limit_memory_mb=8192,
+                                     limit_disk_gb=100000)
+        self._set_cluster(total_cpus=1012, total_memory_mb=1008192,
+                          total_disk_gb=200000)
+
+        instances = [self._add_instance() for _ in range(BURST_THREADS)]
+        # Alternating, so the two nodes are contended simultaneously and
+        # the cluster singleton -- which every one of the 50 must take a
+        # lock on first -- is the shared choke point it is in production.
+        targets = [cpu_node if index % 2 == 0 else memory_node
+                   for index in range(BURST_THREADS)]
+
+        outcomes = self._run_concurrently([
+            functools.partial(self._admit, target, instance)
+            for target, instance in zip(targets, instances)])
+
+        admitted_by_node = {cpu_node: 0, memory_node: 0}
+        denied_by_node = {cpu_node: [], memory_node: []}
+        for (reply, _), target in zip(outcomes, targets):
+            self.assertTrue(reply['success'], reply['error'])
+            if reply['admitted']:
+                admitted_by_node[target] += 1
+            else:
+                denied_by_node[target].append(reply)
+
+        # 12 cpus / 4 = 3, and 8192 MB / 4096 = 2.
+        self.assertEqual(3, admitted_by_node[cpu_node])
+        self.assertEqual(2, admitted_by_node[memory_node])
+
+        cpu_row = self._capacity(cpu_node)
+        self.assertEqual(12, cpu_row.used_cpus)
+        self.assertEqual(3 * 4096, cpu_row.used_memory_mb)
+        self.assertEqual(3 * 40, cpu_row.used_disk_gb)
+        memory_row = self._capacity(memory_node)
+        self.assertEqual(8192, memory_row.used_memory_mb)
+        self.assertEqual(2 * 4, memory_row.used_cpus)
+        self.assertEqual(2 * 40, memory_row.used_disk_gb)
+
+        cluster = self._cluster()
+        self.assertEqual(5 * 4, cluster.unclaimed_used_cpus)
+        self.assertEqual(5 * 4096, cluster.unclaimed_used_memory_mb)
+        self.assertEqual(5 * 40, cluster.unclaimed_used_disk_gb)
+
+        # Every denial names a dimension that really is exceeded, and
+        # the one this node is bound by. The detail is recomputed from a
+        # read after the rollback, so it could in principle disagree
+        # with the guard that refused; it cannot understate here because
+        # a burst with no releases only ever grows the used counters.
+        for node, dimension in ((cpu_node, 'cpus'),
+                                (memory_node, 'memory_mb')):
+            self.assertEqual(25 - admitted_by_node[node],
+                             len(denied_by_node[node]))
+            for reply in denied_by_node[node]:
+                self.assertEqual('node', reply['failing_stage'])
+                detail = {d['dimension']: d for d in reply['dimensions']}
+                self.assertTrue(detail[dimension]['exceeded'],
+                                f'{dimension} denial did not name it')
+                self.assertGreater(
+                    detail[dimension]['used'] + detail[dimension]['requested'],
+                    detail[dimension]['limit'])
+
+        # D13's feedforward term accumulated once per admission and not
+        # once per attempt: 20 admitted vCPUs x the demand constant.
+        self.assertEqual(3 * 4 * DEMAND_PER_VCPU, cpu_row.expected_demand)
+        self.assertEqual(2 * 4 * DEMAND_PER_VCPU, memory_row.expected_demand)
+        self.assertEqual(
+            5 * 4 * DEMAND_PER_VCPU,
+            cpu_row.expected_demand + memory_row.expected_demand)
+
+        self._report('burst-shape', (
+            f'{BURST_THREADS} concurrent admissions, '
+            f'{sum(admitted_by_node.values())} admitted '
+            f'({admitted_by_node[cpu_node]} cpu-bound node, '
+            f'{admitted_by_node[memory_node]} memory-bound node), '
+            f'{BURST_THREADS - sum(admitted_by_node.values())} denied'))
+        self._timing_summary('burst-admission-timings',
+                             [elapsed for _, elapsed in outcomes])
+
+    # ------------------------------------------------------------------
+    # Scenario (c): a move over a stale duplicate placement row
+    # ------------------------------------------------------------------
+
+    def test_a_move_eliminates_a_planted_duplicate_placement(self):
+        # Survey item 1: the counter ledger fail-closes on duplicate
+        # placement rows, so the primitive has to stop them being
+        # producible rather than filter them out. The duplicate planted
+        # here is exactly what the old non-atomic triple could leave
+        # behind when its best-effort removal lost.
+        old_node = self._add_node(limit_cpus=48, limit_memory_mb=49152,
+                                  limit_disk_gb=480)
+        new_node = self._add_node(limit_cpus=48, limit_memory_mb=49152,
+                                  limit_disk_gb=480)
+        stale_node = self._add_node()
+        self._set_cluster(total_cpus=1000, total_memory_mb=1024000,
+                          total_disk_gb=100000)
+        # A claim makes the namespace side visible: with one active, the
+        # claim row rather than the cluster singleton is what a move
+        # must leave alone.
+        claim_uuid = self._add_claim(namespace='ci-1', limit_cpus=64,
+                                     limit_memory_mb=65536,
+                                     limit_disk_gb=640, used_cpus=0,
+                                     used_memory_mb=0, used_disk_gb=0)
+        instance = self._add_instance()
+
+        self.assertTrue(self._admit(old_node, instance)['admitted'])
+        before = self._claim(claim_uuid)
+        self.assertEqual(4, before.used_cpus)
+
+        self._place_reference(stale_node, instance)
+        self.assertEqual(2, len(self._references_for(instance)))
+
+        reply = self._admit(new_node, instance, old_node=str(old_node))
+        self.assertTrue(reply['admitted'], reply['error'])
+        self.assertFalse(reply['clamped'])
+
+        self.assertEqual(0, self._capacity(old_node).used_cpus)
+        self.assertEqual(0, self._capacity(old_node).used_memory_mb)
+        self.assertEqual(0, self._capacity(old_node).used_disk_gb)
+        self.assertEqual(4, self._capacity(new_node).used_cpus)
+        self.assertEqual(4096, self._capacity(new_node).used_memory_mb)
+        self.assertEqual(40, self._capacity(new_node).used_disk_gb)
+
+        # Exactly one row survives, on the new node -- the planted
+        # duplicate went with it even though no caller named stale_node.
+        self.assertEqual([str(new_node)],
+                         [r.source_uuid for r in
+                          self._references_for(instance)])
+        self.assertEqual({'node': str(new_node), 'placement_attempts': 1},
+                         self._placement_of(instance))
+
+        # The namespace side is untouched by a move: a move never
+        # changes namespace, and the instance has been counted there
+        # since its first placement.
+        after = self._claim(claim_uuid)
+        self.assertEqual(before.used_cpus, after.used_cpus)
+        self.assertEqual(before.used_memory_mb, after.used_memory_mb)
+        self.assertEqual(before.used_disk_gb, after.used_disk_gb)
+        cluster = self._cluster()
+        self.assertEqual(0, cluster.unclaimed_used_cpus)
+
+    def test_concurrent_moves_between_two_nodes_do_not_deadlock(self):
+        # The reason both scheduler_node_capacity rows in a move are
+        # touched in uuid order: two moves crossing in opposite
+        # directions between the same pair of nodes would otherwise take
+        # the rows in opposite orders. A deadlock is retried rather than
+        # fatal, so what this asserts is that every reply is a clean
+        # success and the counters end where ground truth says.
+        node_one = self._add_node(limit_cpus=48, limit_memory_mb=49152,
+                                  limit_disk_gb=480)
+        node_two = self._add_node(limit_cpus=48, limit_memory_mb=49152,
+                                  limit_disk_gb=480)
+        self._set_cluster(total_cpus=1000, total_memory_mb=1024000,
+                          total_disk_gb=100000)
+
+        movers = [self._add_instance() for _ in range(4)]
+        stayers = [self._add_instance() for _ in range(4)]
+        # demand_add is zero throughout: a move adds the new node's
+        # feedforward term without crediting the old node's back (the
+        # term decays with instance age and is recomputed by the
+        # reconciler), so eight placements plus eight moves would deny
+        # on D13 for reasons that have nothing to do with lock order.
+        for instance in movers:
+            self.assertTrue(self._admit(node_one, instance,
+                                        demand_add=0.0)['admitted'])
+        for instance in stayers:
+            self.assertTrue(self._admit(node_two, instance,
+                                        demand_add=0.0)['admitted'])
+
+        calls = [functools.partial(self._admit, node_two, instance,
+                                   old_node=str(node_one), demand_add=0.0)
+                 for instance in movers]
+        calls += [functools.partial(self._admit, node_one, instance,
+                                    old_node=str(node_two), demand_add=0.0)
+                  for instance in stayers]
+        for reply, _ in self._run_concurrently(calls):
+            self.assertTrue(reply['success'], reply['error'])
+            self.assertTrue(reply['admitted'], reply['failing_stage'])
+            self.assertFalse(reply['clamped'])
+
+        # Every instance swapped nodes, so the two nodes swapped totals
+        # -- which here are the same, four instances each.
+        for node in (node_one, node_two):
+            row = self._capacity(node)
+            self.assertEqual(16, row.used_cpus)
+            self.assertEqual(4 * 4096, row.used_memory_mb)
+            self.assertEqual(4 * 40, row.used_disk_gb)
+        self.assertEqual(8 * 4, self._cluster().unclaimed_used_cpus)
+
+    # ------------------------------------------------------------------
+    # Scenario (d): randomised cycling, then the reconciler
+    # ------------------------------------------------------------------
+
+    def test_randomised_cycling_leaves_the_reconciler_nothing_to_fix(self):
+        """The P2 claim -- guard and reconciler agree by construction.
+
+        The guard denominates in the allocation ledger precisely because
+        that is what the reconciler recomputes from ground truth, so
+        after any sequence of admissions, moves and releases a reconcile
+        pass must find nothing to change. ``delta_used_*`` per node is
+        that drift signal; a non-zero one means the primitive and the
+        recompute disagree about what a placement costs.
+        """
+        for name, value in (('CPU_OVERCOMMIT_RATIO', 3.0),
+                            ('RAM_OVERCOMMIT_RATIO', 3.0)):
+            ratio = mock.patch.object(mariadb.config, name, value)
+            ratio.start()
+            self.addCleanup(ratio.stop)
+
+        # Deliberately uneven, so the small nodes deny sometimes and the
+        # soak exercises the rollback path as well as the happy one.
+        nodes = [self._add_node(cpu_schedulable=threads, reconcilable=True)
+                 for threads in (16, 8, 4, 2)[:SOAK_NODES]]
+        shapes = [(1, 1024, 10), (2, 2048, 20), (4, 4096, 40)]
+        instances = [
+            self._add_instance(*shapes[index % len(shapes)], stated=True)
+            for index in range(SOAK_INSTANCES)]
+
+        # Establish ground truth before the soak: the reconciler writes
+        # the limits its own arithmetic derives, so the counters the
+        # soak starts from are the ones it would have recomputed.
+        self._reconcile()
+
+        placement = {instance: None for instance in instances}
+        instance_locks = {instance: threading.Lock()
+                          for instance in instances}
+        tally = {'admit': 0, 'move': 0, 'release': 0, 'denied': 0}
+        tally_lock = threading.Lock()
+        failures = []
+        seconds = []
+
+        def _record(kind, elapsed):
+            with tally_lock:
+                tally[kind] += 1
+                seconds.append(elapsed)
+
+        def _worker(seed):
+            rng = random.Random(seed)
+            try:
+                for _ in range(SOAK_OPERATIONS_PER_THREAD):
+                    instance = rng.choice(instances)
+                    # Per instance serialisation models the attribute
+                    # lock place_instance() holds. Without it two
+                    # threads could place the same instance twice with
+                    # neither naming the other's node as old_node, which
+                    # no production path can do and which would leave a
+                    # charge behind by design rather than by bug.
+                    with instance_locks[instance]:
+                        current = placement[instance]
+                        started = time.perf_counter()
+                        if current is None:
+                            node = rng.choice(nodes)
+                            # demand_add is zero for the soak: the
+                            # feedforward term only accumulates between
+                            # reconcile passes, so a few hundred
+                            # operations of it would end with every node
+                            # denying on demand and stop exercising the
+                            # ledger this test is about.
+                            reply = self._admit(node, instance,
+                                                demand_add=0.0)
+                            elapsed = time.perf_counter() - started
+                            if reply['admitted']:
+                                placement[instance] = node
+                                _record('admit', elapsed)
+                            else:
+                                _record('denied', elapsed)
+                        elif rng.random() < 0.5:
+                            node = rng.choice(
+                                [n for n in nodes if n != current])
+                            reply = self._admit(node, instance,
+                                                old_node=str(current),
+                                                demand_add=0.0)
+                            elapsed = time.perf_counter() - started
+                            if reply['admitted']:
+                                placement[instance] = node
+                                _record('move', elapsed)
+                            else:
+                                _record('denied', elapsed)
+                        else:
+                            reply = self._release(instance)
+                            elapsed = time.perf_counter() - started
+                            placement[instance] = None
+                            _record('release', elapsed)
+
+                        if not reply['success']:
+                            failures.append(f'rpc failed: {reply["error"]}')
+                        if reply['clamped']:
+                            # A counter would have gone negative, which
+                            # means the ledger had already diverged from
+                            # ground truth. Nothing in this soak should
+                            # produce that.
+                            failures.append(f'clamped on {instance}')
+            except BaseException as e:
+                failures.append(f'{type(e).__name__}: {e}')
+
+        threads = [threading.Thread(target=_worker, args=(seed,))
+                   for seed in range(SOAK_THREADS)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=600)
+        self.assertEqual([], failures)
+        self.assertEqual(SOAK_THREADS * SOAK_OPERATIONS_PER_THREAD,
+                         sum(tally.values()))
+
+        # First check the counters against an independent model built in
+        # Python from the replies, which is a different oracle from the
+        # reconciler's SQL and catches an error the two could share.
+        expected_nodes = {node: [0, 0, 0] for node in nodes}
+        expected_cluster = [0, 0, 0]
+        for instance, node in placement.items():
+            if node is None:
+                continue
+            size = self.sizes[instance]
+            for index, key in enumerate(('cpus', 'memory_mb', 'disk_gb')):
+                expected_nodes[node][index] += size[key]
+                expected_cluster[index] += size[key]
+        for node, expected in expected_nodes.items():
+            row = self._capacity(node)
+            self.assertEqual(expected,
+                             [row.used_cpus, row.used_memory_mb,
+                              row.used_disk_gb],
+                             f'node {node} ledger disagrees with the replies')
+        cluster_before = self._cluster()
+        self.assertEqual(expected_cluster,
+                         [cluster_before.unclaimed_used_cpus,
+                          cluster_before.unclaimed_used_memory_mb,
+                          cluster_before.unclaimed_used_disk_gb])
+
+        # Then the reconciler, recomputing from placement ground truth.
+        result = self._reconcile()
+        self.assertEqual(0, result['nodes_added'])
+        self.assertEqual(0, result['nodes_removed'])
+        for node in result['nodes']:
+            self.assertEqual(
+                [0, 0, 0],
+                [node['delta_used_cpus'], node['delta_used_memory_mb'],
+                 node['delta_used_disk_gb']],
+                f'reconciler found drift on {node["node_uuid"]}')
+        # The cluster singleton is rebuilt rather than deltaed, so its
+        # drift is the before/after comparison. total_* is deliberately
+        # not compared: limit_disk_gb is "virtual drawdown plus measured
+        # free space", so it legitimately moves with used_disk_gb.
+        self.assertEqual(cluster_before.unclaimed_used_cpus,
+                         result['cluster']['unclaimed_used_cpus'])
+        self.assertEqual(cluster_before.unclaimed_used_memory_mb,
+                         result['cluster']['unclaimed_used_memory_mb'])
+        self.assertEqual(cluster_before.unclaimed_used_disk_gb,
+                         result['cluster']['unclaimed_used_disk_gb'])
+
+        self._report('soak-shape', (
+            f'{SOAK_THREADS} threads x {SOAK_OPERATIONS_PER_THREAD} '
+            f'operations over {SOAK_INSTANCES} instances and '
+            f'{len(nodes)} nodes: {tally["admit"]} admits, '
+            f'{tally["move"]} moves, {tally["release"]} releases, '
+            f'{tally["denied"]} denials; reconciler drift zero on every '
+            f'counter'))
+        self._timing_summary('soak-operation-timings', seconds)
