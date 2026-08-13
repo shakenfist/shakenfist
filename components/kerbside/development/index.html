@@ -5991,6 +5991,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 5: the consoles page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -11381,7 +11409,10 @@ writes it next to a symlink of the real static tree, because the
 templates reference their assets as root-relative absolute paths
 (<code>/static/sfui/...</code>). Only pages that have actually been converted
 onto <code>base-sfui.html</code> are supported; today that is <code>login</code>, which
-needs neither authentication nor the database.</p>
+needs neither authentication nor the database, and <code>consoles</code>, whose
+fixtures render two consoles -- one with sessions and active tokens,
+one with neither -- so a single screenshot shows both terminate
+states (the two-step disclosure and the dim zero badge).</p>
 <p>The script imports <code>kerbside.api</code>, so it needs an interpreter with
 kerbside's dependencies installed. The tox environment already has
 them, which makes <code>.tox/py3/bin/python</code> the interpreter to reach for

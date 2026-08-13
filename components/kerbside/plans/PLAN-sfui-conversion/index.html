@@ -6042,6 +6042,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 5: the consoles page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -11610,7 +11638,7 @@ locally-running kerbside.</p>
 <tr>
 <td>5. Consoles page</td>
 <td>PLAN-sfui-conversion-phase-05-consoles.md</td>
-<td>Not started</td>
+<td>Done</td>
 </tr>
 <tr>
 <td>6. Sessions, sources and audit pages</td>
@@ -11697,7 +11725,17 @@ locally-running kerbside.</p>
    re-cut the Material Symbols icons to
    <code>fill="currentColor"</code> so they follow the theme (updating
    <code>static/icons/README.md</code> provenance notes; delete the
-   two dead icons).</li>
+   two dead icons).
+   <strong>Amended in phase 5 planning:</strong> an SVG loaded via
+   <code>&lt;img&gt;</code> resolves <code>currentColor</code> in its own isolated
+   document and can never follow the page theme, so the
+   icons become inline Jinja includes under
+   <code>templates/icons/</code> and <code>static/icons/</code> retires; and the
+   connect dropdown flattens to two visible anchor-buttons
+   rather than being rebuilt (sfui deliberately has no
+   dropdown primitive), which pulls one small canonical
+   sfui addition — <code>.sf-btn</code> suppressing the base-layer
+   link underline so anchors can be buttons.</li>
 <li><strong>Sessions, sources and audit</strong> (plan at medium effort —
    the patterns are established by now). Native <code>&lt;details&gt;</code>
    accordion for sessions (fixing the duplicate ids),
