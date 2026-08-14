@@ -299,6 +299,15 @@ errors 1213/1205/1020:
    makes duplicate placement rows stop being producible, survey
    item 1), then insert the new row.
 
+The branch select of step 1, and the presence probes P7 needs, run
+on a separate autocommit connection *before* the transaction opens.
+That is not an optimisation, it is a correctness requirement on
+MariaDB 11.6.2+: a plain SELECT inside the transaction establishes
+its read view early and every later guarded UPDATE against a
+contended row then aborts with ER_CHECKREAD instead of blocking and
+re-evaluating. See step 6a for the measurement and the TOCTOU
+consequences.
+
 `rowcount == 0` on a guarded UPDATE aborts the transaction and
 returns denied with the failing stage named, so the caller's
 walk and the D9 diagnostics both know why. A missing node
@@ -360,7 +369,8 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Complete — see step 3 notes |
 | 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Complete — see step 4 notes |
 | 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Complete — see step 5 notes |
-| 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Complete — see step 6 notes. Validation ran and **found a blocker**: correct under contention, but ER_CHECKREAD (1020) retry exhaustion on MariaDB 11.6.2+ turns concurrent creates into 500s. Left unfixed for operator direction; blocks step 9 |
+| 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Complete — see step 6 notes. Validation found a blocker (ER_CHECKREAD retry exhaustion on MariaDB 11.6.2+ turning concurrent creates into 500s); **resolved in step 6a**, which is where the shipping numbers are |
+| 6a | Fix the step 6 blocker in the primitive: move the branch select and presence probes out of both transactions so a guarded UPDATE is the first statement, per the phase 0 finding. Re-run the full live suite twice under `innodb_snapshot_isolation` ON and the concurrency class once under OFF | medium | opus | worktree | Complete — see step 6a notes |
 | 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Not started |
 | 8 | Management-session code review against the checklist below | medium | management session | none | Not started |
 | 9 | Operator review and PR; deploy to sfcbr and soak: reconciler drift metric stays zero with admission live, no 507 regression in CI pass rates | — | operator | — | Not started |
@@ -525,8 +535,11 @@ every recent container tag give you — three of the five
 scenarios fail with the admission RPC returning
 `success=False`, which `Instance._admit_placement()` raises as
 `WriteException` and the create path turns into an HTTP 500.
-Details and root cause below; **this is a blocker for step 9 and
-is left unfixed deliberately, for the operator to direct.**
+Details and root cause below. **This was a blocker for step 9; it
+was fixed on 2026-08-14 by the restructure in step 6a below, and
+the full live suite now passes twice back to back with
+`innodb_snapshot_isolation` ON at the shipped retry budget. Read
+this section for the diagnosis and 6a for the resolution.**
 
 #### Environment and harness
 
@@ -728,12 +741,209 @@ placement — a preflight redirect or a cleaner rewrite-to-local
 legitimately places the same instance again. This runs in cluster
 CI, not in the docker harness.
 
+### Step 6a: snapshot-isolation fix (2026-08-14)
+
+**Headline: the blocker is fixed, at the shipped retry budget, with
+no cost in latency.** The full live suite passes twice back to back
+with `innodb_snapshot_isolation` ON, ER_CHECKREAD (1020) never fires
+at all across the whole concurrency class, and the timings are back
+on the OFF-regime baseline rather than the 3x figures a retry-budget
+bump bought.
+
+#### The restructure
+
+The fix is the principled one step 6 named and deliberately did not
+take: **no plain `SELECT` may precede the first guarded `UPDATE`
+inside the transaction**, because that `SELECT` is what establishes
+the read view early. So the reads moved out rather than the budget
+moving up.
+
+* `_direct_admit_instance_placement()`'s three probes — the P4
+  branch select via `_active_claim_for_namespace()`, the node-row
+  presence probe and the cluster-singleton presence probe — are now
+  a single `_probe_admission_rows()` on its own autocommit
+  connection, run before `engine.begin()` and returning an
+  `_AdmissionProbe` namedtuple. It runs *inside* the retried
+  closure, so a transaction that loses a race re-reads the world on
+  its next attempt rather than re-deciding on the losing attempt's
+  view.
+* Inside the transaction the statement order is unchanged and
+  canonical: the cluster-or-claim guarded `UPDATE` first (a move
+  still skips that stage, so its first statement is one of the two
+  uuid-ordered `scheduler_node_capacity` writes; a fully fail-open
+  admission's first statement is the placement attribute write — an
+  `UPDATE` either way), then the node rows, then the placement
+  attribute, then the reference `DELETE`/`INSERT`, then the
+  post-admit counter `SELECT`. That last read is deliberately left
+  where it is: reads *after* our own writes are safe, because those
+  rows are locked by the `UPDATE`s we already issued. The D13 demand
+  clause's subselect against `node_metrics` also stays inside the
+  guarded `UPDATE`, which is exactly the shape phase 0 benchmarked
+  clean — it is part of the DML that establishes the read view, not
+  a statement before it.
+* `_direct_release_instance_placement()` had the same defect and got
+  the same treatment: `_instance_location_nodes()` and the claim
+  branch select are now `_probe_release_rows()`, outside the
+  transaction, whose first statement is therefore the floored
+  namespace decrement. A release with nothing held now opens no
+  transaction at all.
+* `_TRANSACTION_MAX_ATTEMPTS` stays at 4 and 1020 stays in
+  `_TRANSIENT_TRANSACTION_ERRNOS`, belt and braces: MDEV-39263
+  reports the error firing "most of the time, but not every time",
+  so its absence is not something to rely on.
+
+The invariant is stated as a block comment above
+`_probe_admission_rows()` citing the phase 0 step 2 finding, echoed
+at the top of each transaction body, and repeated in `AGENTS.md`.
+
+#### TOCTOU: what the moved probes now race, and why it is fine
+
+Every one of the moved reads is time-of-check-to-time-of-use racy by
+construction. Each resolves as either a spurious single-candidate
+denial — the caller walks to its next candidate, and the state that
+caused the denial is the new truth anyway — or an unguarded
+admission the reconciler trues up within a pass. Neither violates
+the ledger:
+
+* **Claim branch.** A claim created or expired in the window sends
+  one admission down the other branch. Both branches are
+  namespace-denominated ledgers the reconciler recomputes from
+  ground truth every pass, so the worst case is one instance charged
+  to the cluster's unclaimed sums instead of the claim (or the
+  reverse) for up to one reconcile period. Nothing can create a
+  claim before phase 4 lands the claims API, so today the branch is
+  dormant.
+* **Node-row presence.** Present-then-deleted makes the node guard
+  match no row, which reads as a denial — and a node whose capacity
+  row just vanished is not a node this placement wanted.
+  Absent-then-created admits unguarded and says so in the reply,
+  which is precisely what P7 already does for a node the reconciler
+  has not sized.
+* **Cluster singleton presence.** Identically: a spurious denial, or
+  one unguarded admission, both self-correcting.
+* **Release's reference lookup.** This one was *already* racy before
+  it moved: it was a plain non-locking read, so two concurrent
+  releases of the same instance both saw the rows and both
+  decremented. The floored decrements and the next reconcile pass
+  are what has always made that safe. Moving it out widens the
+  window by one round trip and changes nothing else; in production
+  the instance's attribute lock serialises the callers.
+
+None of the four can over-admit past a guard that was actually
+evaluated. That is the trade, and it is a good one: the alternative
+is a primitive that 500s under concurrency on every current MariaDB.
+
+#### Results
+
+Same harness, same disposable container as step 6: MariaDB
+`11.8.8-MariaDB-ubu2404` (`mariadb:11`), `utf8mb4_bin`,
+`--max-connections=500`, `innodb_lock_wait_timeout=50`,
+REPEATABLE-READ, DSN
+`mariadb+mysqldb://root:sfroot@127.0.0.1:33061/sf`.
+
+**`innodb_snapshot_isolation` ON (the server default), shipped
+`_TRANSACTION_MAX_ATTEMPTS = 4`.** The full live suite — all four
+`test_mariadb_*_live` modules, 58 tests, `stestr run --serial` —
+**passed twice back to back**, including
+`PlacementAdmissionConcurrencyLiveTestCase`. Both soak runs reported
+reconciler drift zero on every counter.
+
+| Scenario | Run 1 | Run 2 |
+|---|---|---|
+| Race for one slot (160 calls, 20 x 8) | median 15.6 ms, p99 22.3 ms, max 22.5 ms | median 17.1 ms, p99 23.0 ms, max 23.9 ms |
+| Burst (50 concurrent; 5 admitted / 45 denied both runs) | median 135.6 ms, p99 167.4 ms | median 98.1 ms, p99 129.4 ms |
+| Randomised soak (360 ops) | median 10.9 ms, p99 20.4 ms, max 24.9 ms; 126 admits / 92 moves / 121 releases / 21 denials | median 10.3 ms, p99 24.3 ms, max 28.1 ms; 129 admits / 91 moves / 123 releases / 17 denials |
+
+Run 1's burst is the cold figure (first run against a freshly
+created schema); run 2 is the steady-state one and lands exactly on
+the OFF-regime baseline.
+
+**Retry instrumentation (diagnosis only, not committed).** The same
+counter step 6 used, over the whole concurrency class under ON:
+
+| | probes inside (pre-fix) | probes outside (6a) |
+|---|---|---|
+| 1020s observed | 673 | **0** |
+| 1213s observed | 0 | 1 |
+| Attempts histogram | `{1: 221, 2: 227, 3: 37, 4: 103}` | `{1: 587, 2: 1}` |
+| Outcome | 3 of 5 scenarios fail | all 5 pass |
+
+The pre-fix column is not step 6's recorded run: it is a *control*
+executed the same day against the same container, because the
+instrumentation script initially imported the stale pre-fix copy of
+`shakenfist` installed in `.tox/py3/site-packages` instead of the
+worktree. The accident is worth recording — it reproduced the
+blocker exactly, on the same server, minutes apart from the passing
+run, which is about as clean an A/B as this could have got.
+
+**`innodb_snapshot_isolation` OFF, concurrency class only.** Still
+green — the fix does not regress the regime the primitive already
+worked in. Race median 16.2 ms / p99 22.0 ms; burst median 102.7 ms
+/ p99 134.0 ms (5 admitted, 45 denied); soak median 10.6 ms / p99
+21.6 ms, 124 admits / 99 moves / 117 releases / 20 denials, drift
+zero.
+
+#### Timing comparison against step 6
+
+| | 6: OFF (pre-fix) | 6: ON, budget 4 | 6: ON, budget 8 | **6a: ON** | **6a: OFF** |
+|---|---|---|---|---|---|
+| Race median | 15.7 ms | 27.1 ms | — | **15.6-17.1 ms** | **16.2 ms** |
+| Race p99 | 22.0 ms | 35.7 ms | — | **22.3-23.0 ms** | **22.0 ms** |
+| Burst median | 98.1 ms | fails | 313.8 ms | **98.1-135.6 ms** | **102.7 ms** |
+| Burst p99 | 124.6 ms | fails | — | **129.4-167.4 ms** | **134.0 ms** |
+| Soak median | 8.8 ms | fails | — | **10.3-10.9 ms** | **10.6 ms** |
+| Soak p99 | 16.9 ms | fails | 179.8 ms | **20.4-24.3 ms** | **21.6 ms** |
+
+The reading: under snapshot isolation the restructured primitive
+performs like the pre-fix code did with snapshot isolation *off*,
+which is the point. The 1.7x race-latency penalty step 6 measured
+under ON is gone entirely — it was retry backoff, and there are now
+no retries to back off from. Against the OFF baseline the soak's
+median moves 8.8 -> 10.6 ms and its p99 16.9 -> 21.6 ms; that is the
+one extra autocommit round trip per operation, and it is the honest
+cost of the fix. The budget-8 alternative cost 313.8 ms on the burst
+median and 179.8 ms on the soak p99 — 3.2x and 8.3x worse
+respectively, on the instance-create hot path.
+
+#### Tests
+
+* `SnapshotIsolationInvariantTestCase` in
+  `test_mariadb_capacity_admission.py` is the structural regression
+  test. The mocked engine now hands `engine.begin()` and
+  `engine.connect()` *separate* connections over one router, so a
+  test can assert which statements ran where — the previous mock
+  routed both to the same connection and could not have caught this
+  bug in either direction. Ten new cases: the transaction opens with
+  an `UPDATE` on the unclaimed, claimed, move and fully-fail-open
+  paths and on release; the probes and the release reference lookup
+  ran in autocommit; the post-admit counter read is allowed because
+  it follows our writes; a double release opens no transaction; and
+  a probe that cannot reach the database is a failed RPC (`success`
+  False) rather than an admission or a denial.
+* No existing unit test encoded the old read-inside-transaction
+  order, so none needed rewriting; the two error-path tests that
+  mocked only `engine.begin()` were extended to wire the probe
+  connection too, so they now fail for the reason they claim to.
+* 85 unit tests in the module (was 75) and the whole 2,938-test
+  suite pass; flake8 and all 34 mypy invocations are clean.
+
+**CI still cannot catch a regression of this.** The live suites run
+on a `debian-12` runner with MariaDB 10.11, where
+`innodb_snapshot_isolation` does not exist. The structural unit tests
+above are the CI-visible guard; the behavioural one needs a server
+with the variable ON, which for now means running the harness by hand
+as this step did. Worth raising in step 8 review as a candidate for a
+second live-suite job on a newer MariaDB.
+
 ## Administration and logistics
 
 ### Success criteria
 
 * Two concurrent admissions for one remaining slot admit exactly
   one (step 6's race test, kept as a repeatable harness).
+* The whole live suite passes with `innodb_snapshot_isolation` ON
+  — the default on every current MariaDB — at the shipped retry
+  budget, with no ER_CHECKREAD exhaustion (step 6a).
 * `git grep _committed_vcpus` and
   `git grep _dual_write_legacy_instances` both return nothing.
 * Every production writer of placement reaches the database
@@ -789,7 +999,16 @@ CI, not in the docker harness.
 
 ### Bugs fixed during this work
 
-*(populated during implementation)*
+* **ER_CHECKREAD retry exhaustion under `innodb_snapshot_isolation`**
+  (found in step 6, fixed in step 6a). Both placement transactions
+  opened with plain `SELECT`s, which established their read view
+  early and made every guarded `UPDATE` against a contended row
+  abort with 1020 instead of blocking. On MariaDB 11.6.2+ this
+  turned concurrent instance creates into HTTP 500s; 46 of a 50-way
+  burst exhausted the retry budget. Fixed by moving the probes onto
+  an autocommit connection so a guarded `UPDATE` is each
+  transaction's first statement. Never shipped — found by the
+  phase's own validation step, before the PR.
 
 ### Back brief
 

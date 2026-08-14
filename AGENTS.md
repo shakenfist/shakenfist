@@ -55,6 +55,14 @@ metrics. The headlines:
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md)
   before writing an attribute update; a whole-object write races.
 
+- **A guarded UPDATE must be the transaction's first statement.** From
+  MariaDB 11.6.2 `innodb_snapshot_isolation` defaults ON, and a
+  transaction whose read view was opened by a plain `SELECT` aborts with
+  ER_CHECKREAD rather than blocking and re-evaluating. CI runs 10.11,
+  where the variable does not exist, so this fails only in production —
+  see
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement).
+
 - **Protobuf enums are generated, not hand-written.**
   `shakenfist/schema/` is the source of truth. Add a member with the next
   available `proto_id`, run `tox -e genprotos`, and never change or reuse

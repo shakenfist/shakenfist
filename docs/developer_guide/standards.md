@@ -52,6 +52,39 @@ rather than having to retrofit one. The mask travels over gRPC as
 replaced the whole row would let a caller name the wrong fields and
 still see the write it expected.
 
+## A guarded UPDATE must be the transaction's first statement
+
+`innodb_snapshot_isolation` defaults ON from MariaDB 11.6.2, which is
+what Debian 13, Ubuntu 24.04 and every recent container tag ship. Under
+it, a REPEATABLE READ transaction whose read view was established by a
+plain `SELECT` does not block and re-evaluate a later `UPDATE` whose
+target row has moved since — it aborts the whole transaction with
+ER_CHECKREAD (1020). When the guarded `UPDATE` is instead the
+transaction's *first* statement, the read view is established by the DML
+itself, there is no stale-snapshot window, and a contending writer
+blocks on the row lock and then re-evaluates its `WHERE`, which is the
+behaviour every guarded-counter design in `shakenfist/mariadb.py`
+depends on.
+
+So in `_direct_admit_instance_placement()` and
+`_direct_release_instance_placement()` the branch selects and presence
+probes run on a separate autocommit connection *before* `engine.begin()`
+(`_probe_admission_rows()`, `_probe_release_rows()`). Reads that happen
+*after* the transaction's own writes are fine, because those rows are
+already locked by them, and a subquery carried inside a guarded `UPDATE`
+is fine because it is part of the DML that establishes the read view.
+Moving a probe back inside the transaction re-introduces the failure: it
+was measured as 46 of 50 concurrent admissions exhausting the retry
+budget and turning an instance create into an HTTP 500.
+
+The structural regression tests are `SnapshotIsolationInvariantTestCase`
+in `shakenfist/tests/test_mariadb_capacity_admission.py`; the
+behavioural one is `PlacementAdmissionConcurrencyLiveTestCase` in the
+matching `_live` module, which only bites against a server with the
+variable ON — CI's `debian-12` runner has MariaDB 10.11, where it does
+not exist, so this is a rule CI cannot enforce for you. See
+`docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md` step 6a.
+
 ## Secret-carrying fields are `SecretStr`
 
 Fields which hold a credential — `key` and `nonce` on

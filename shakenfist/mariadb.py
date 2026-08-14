@@ -29,7 +29,8 @@ import math
 import random
 import time
 import threading
-from typing import Any, Callable, cast, Dict, List, Optional, TypedDict, TypeVar
+from typing import (Any, Callable, cast, Dict, List, NamedTuple, Optional,
+                    TypedDict, TypeVar)
 from uuid import UUID
 from uuid import uuid4
 
@@ -24463,6 +24464,14 @@ def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
 # could not be taken within the caller's budget and retrying inside the
 # database daemon would eat the caller's acquire timeout. Here the whole
 # transaction rolled back and re-running it is both cheap and correct.
+#
+# 1020 is belt and braces rather than a working part. Both transactions
+# open with a guarded UPDATE (see the block comment above
+# _probe_admission_rows()), which is the shape phase 0 benchmarked as
+# never raising it, and the live concurrency suite confirms it does not
+# fire against a server with innodb_snapshot_isolation ON. It stays in
+# the set because MDEV-39263 reports the error firing "most of the time,
+# but not every time", so it is not something to rely on the absence of.
 _TRANSIENT_TRANSACTION_ERRNOS = frozenset((1213, 1205, 1020))
 _TRANSACTION_MAX_ATTEMPTS = 4
 _TRANSACTION_BASE_DELAY = 0.005
@@ -24765,12 +24774,18 @@ def _active_claim_for_namespace(
         conn: sa.Connection, namespace: str) -> Optional[sa.Row[Any]]:
     """The namespace's active, unexpired claim row, or None.
 
-    This is a plain non-locking read, so running it before the cluster
-    UPDATE does not violate D1's canonical write order (cluster_capacity,
-    then namespace_claims, then scheduler_node_capacity) -- only the
-    guarded UPDATEs take row locks and those still run in order. Ordered
-    by uuid so a namespace that somehow holds two claims resolves the
-    same way on every node.
+    This is a plain non-locking read, so it does not participate in D1's
+    canonical write order (cluster_capacity, then namespace_claims, then
+    scheduler_node_capacity) -- only the guarded UPDATEs take row locks
+    and those still run in order. Ordered by uuid so a namespace that
+    somehow holds two claims resolves the same way on every node.
+
+    It must **not** be run inside an admission or release transaction:
+    a plain SELECT there establishes the transaction's read view and
+    re-introduces ER_CHECKREAD under ``innodb_snapshot_isolation``. See
+    the block comment above _probe_admission_rows(). The one caller that
+    runs it on its own connection outside any write transaction --
+    _admission_denial_dimensions() -- is fine.
 
     Returns None until phase 4 lands the claims API, since nothing can
     create a claim row before then (P4).
@@ -24808,6 +24823,144 @@ def _instance_location_nodes(
                 f'Skipping instance_location row for {instance_uuid} with '
                 f'malformed node uuid {row.source_uuid!r}')
     return nodes
+
+
+# ---------------------------------------------------------------------------
+# THE FIRST STATEMENT INSIDE AN ADMISSION OR RELEASE TRANSACTION MUST BE A
+# GUARDED (OR FLOORED) UPDATE. A plain SELECT before it re-introduces
+# ER_CHECKREAD under innodb_snapshot_isolation.
+#
+# innodb_snapshot_isolation defaults ON from MariaDB 11.6.2, which is what
+# Debian 13, Ubuntu 24.04 and every recent container tag ship. Under it a
+# REPEATABLE READ transaction whose read view was established by a plain
+# SELECT does not block and re-evaluate a later UPDATE whose target row has
+# moved since -- it aborts the whole transaction with ER_CHECKREAD (1020),
+# "Record has changed since last read". When the guarded UPDATE is instead
+# the transaction's first statement, the read view is established by the DML
+# itself, there is no stale-snapshot window, and a contending writer blocks
+# on the row lock and then re-evaluates the WHERE, which is the behaviour
+# the whole guarded-UPDATE design depends on.
+#
+# This is not a hypothesis. Phase 0's step 2 benchmark (see
+# docs/plans/PLAN-scheduler-reservations-phase-00-findings.md, "Step 2
+# benchmark results") ran 96 cells across both regimes and recorded
+# ER_CHECKREAD never firing for the guarded-UPDATE idioms, explicitly
+# because the guarded UPDATE was the transaction's first statement, with
+# the warning that "the risk returns if a plain SELECT precedes the guarded
+# UPDATE inside the same RR transaction". Phase 3's step 6 validation then
+# demonstrated exactly that: with the branch and presence probes opening
+# the transaction, 46 of a 50-way admission burst exhausted the retry
+# budget on 1020 and surfaced as HTTP 500s on instance create.
+#
+# So the probes run here, on their own connection, before the transaction
+# opens. Reads that happen *after* our own writes inside the transaction
+# are fine -- those rows are already locked by our UPDATEs -- which is why
+# the post-admit counter SELECT may stay where it is. Subqueries carried
+# inside a guarded UPDATE (the D13 demand clause against node_metrics) are
+# likewise fine: they are part of the DML that establishes the read view.
+# ---------------------------------------------------------------------------
+
+class _AdmissionProbe(NamedTuple):
+    """What an admission must know before it opens its transaction."""
+
+    claim_uuid: Optional[UUID]
+    node_present: bool
+    cluster_present: bool
+
+
+def _probe_admission_rows(namespace: str, node_key: UUID) -> _AdmissionProbe:
+    """Read an admission's branch select and presence probes (P4, P7).
+
+    Runs on its own connection, outside the write transaction, for the
+    reason in the block comment above. Re-run on every retry attempt, so
+    a transaction that lost a race re-reads the world rather than
+    re-deciding on the losing attempt's view.
+
+    The reads are time-of-check-to-time-of-use racy by construction, and
+    deliberately so. Each of the three has a bounded, acceptable
+    resolution:
+
+    * The claim branch. A claim created or expired between the probe and
+      the transaction sends this one admission down the other branch.
+      Both branches are namespace-denominated ledgers the reconciler
+      recomputes from ground truth every pass, so the worst case is one
+      instance charged to the cluster's unclaimed sums instead of the
+      claim (or the reverse) for up to one reconcile period.
+    * The node-row presence probe. Present-then-deleted makes the node
+      guard match no row, which reads as a denial: the caller walks to
+      its next candidate, and a node whose capacity row just vanished is
+      not a node this placement wanted anyway. Absent-then-created
+      admits unguarded and says so in the reply, which is exactly what
+      P7 already does for a node the reconciler has not sized.
+    * The cluster singleton probe, identically: a spurious
+      single-candidate denial, or one unguarded admission the reconciler
+      trues up within a pass.
+
+    None of the three can over-admit past a guard that was actually
+    evaluated, and none can leave a counter the reconciler will not
+    repair. That is the trade the invariant is worth.
+    """
+    engine = _get_engine()
+    capacity = _get_scheduler_node_capacity_table()
+    cluster = _get_cluster_capacity_table()
+
+    with engine.connect() as conn:
+        claim = _active_claim_for_namespace(conn, namespace)
+        node_present = conn.execute(sa.select(capacity.c.node_uuid).where(
+            capacity.c.node_uuid == node_key)).first() is not None
+        cluster_present = conn.execute(sa.select(cluster.c.id).where(
+            cluster.c.id == 1)).first() is not None
+
+    return _AdmissionProbe(
+        claim_uuid=claim.uuid if claim is not None else None,
+        node_present=node_present, cluster_present=cluster_present)
+
+
+class _ReleaseProbe(NamedTuple):
+    """What a release must know before it opens its transaction."""
+
+    nodes: list[UUID]
+    claim_uuid: Optional[UUID]
+
+
+def _probe_release_rows(
+        namespace: str, instance_uuid: str,
+        named_node: Optional[UUID]) -> _ReleaseProbe:
+    """Read a release's held nodes and claim branch, outside the transaction.
+
+    Same invariant and the same reasoning as _probe_admission_rows(): a
+    release opens with a floored decrement, so its reference lookup and
+    branch select cannot run inside the transaction.
+
+    The claim branch races exactly as it does for an admission. The
+    reference lookup was already racy before it moved: it was a plain
+    non-locking read, so two concurrent releases of the same instance
+    both saw the rows and both decremented, and the floored decrements
+    plus the next reconcile pass are what has always made that safe.
+    Moving it out widens that window by one round trip and changes
+    nothing else; in production the instance's attribute lock serialises
+    the callers anyway.
+
+    A named node skips the lookup entirely, which is the path
+    ``_delete_globally()`` and the cleaner take.
+    """
+    if named_node is not None:
+        nodes = [named_node]
+    else:
+        nodes = []
+
+    engine = _get_engine()
+    with engine.connect() as conn:
+        if named_node is None:
+            nodes = _instance_location_nodes(conn, instance_uuid)
+        if not nodes:
+            # Nothing is held, so there is no transaction to open and no
+            # branch to select.
+            return _ReleaseProbe(nodes=[], claim_uuid=None)
+        claim = _active_claim_for_namespace(conn, namespace)
+
+    return _ReleaseProbe(
+        nodes=nodes, claim_uuid=claim.uuid if claim is not None else None)
 
 
 def _delete_instance_location_rows(
@@ -24929,10 +25082,15 @@ def _direct_admit_instance_placement(
 
     The steps are:
 
-    1. Branch select (P4): a namespace with an active, unexpired claim
-       draws the claim down; every other namespace draws down the
-       cluster singleton's unclaimed guard per D14.
-    2. The cluster or claim guarded UPDATE.
+    1. Branch select (P4) and presence probes (P7), **outside** the
+       transaction: a namespace with an active, unexpired claim draws
+       the claim down; every other namespace draws down the cluster
+       singleton's unclaimed guard per D14. These are plain reads and
+       must not run inside the transaction -- see the block comment
+       above _probe_admission_rows() for why, and for what the resulting
+       time-of-check-to-time-of-use races resolve as.
+    2. The cluster or claim guarded UPDATE, which is therefore the first
+       statement the transaction issues.
     3. The target node's guarded UPDATE, including the D13 demand clause.
     4. On a move, the old node's floored decrement (P6). A move never
        changes namespace, so there is no cluster-row wash to do.
@@ -25001,25 +25159,39 @@ def _direct_admit_instance_placement(
 
     def _admit() -> AdmitPlacementResult:
         outcome = _empty_admit_result()
-        with engine.begin() as conn:
-            # Non-locking reads first: which branch applies, and whether
-            # the rows the guards need exist at all.
-            claim = _active_claim_for_namespace(conn, namespace)
-            node_present = conn.execute(sa.select(capacity.c.node_uuid).where(
-                capacity.c.node_uuid == node_key)).first() is not None
-            cluster_present = conn.execute(sa.select(cluster.c.id).where(
-                cluster.c.id == 1)).first() is not None
 
-            if not node_present:
-                # P7: mid-upgrade, a node whose metrics row predates
-                # phase 1 has no capacity row, and the cluster totals do
-                # not include its limits either -- so guarding the
-                # cluster row against a total this node contributes
-                # nothing to would deny placements for a reason that is
-                # not true. Fail open on every guard, loudly, and let
-                # the reconciler create the row on its next pass.
-                outcome['unguarded'] = True
-            guarded = enforce and node_present
+        # (1) The branch select and the two presence probes, deliberately
+        # on their own connection *outside* the transaction below. See the
+        # block comment above _probe_admission_rows(): the first statement
+        # inside the transaction must be a guarded UPDATE or every
+        # admission that loses a race dies of ER_CHECKREAD instead of
+        # blocking and re-evaluating its guard.
+        probe = _probe_admission_rows(namespace, node_key)
+        claim_uuid = probe.claim_uuid
+        node_present = probe.node_present
+
+        if not node_present:
+            # P7: mid-upgrade, a node whose metrics row predates phase 1
+            # has no capacity row, and the cluster totals do not include
+            # its limits either -- so guarding the cluster row against a
+            # total this node contributes nothing to would deny
+            # placements for a reason that is not true. Fail open on
+            # every guard, loudly, and let the reconciler create the row
+            # on its next pass.
+            outcome['unguarded'] = True
+        guarded = enforce and node_present
+
+        with engine.begin() as conn:
+            # INVARIANT: the first statement executed on this connection
+            # must be a guarded (or, for a move, floored) UPDATE. A plain
+            # SELECT here establishes the transaction's read view early
+            # and makes every later guarded UPDATE against a contended
+            # row abort with ER_CHECKREAD (1020) under
+            # innodb_snapshot_isolation, which is ON by default from
+            # MariaDB 11.6.2. Phase 0's step 2 benchmark predicted this
+            # and phase 3's step 6 validation reproduced it (46 of 50
+            # concurrent admissions exhausting the retry budget). Reads
+            # after our own writes are fine -- we hold those row locks.
 
             # (2) The cluster or claim guard, which a move skips
             # entirely rather than washing an increment against a
@@ -25035,8 +25207,8 @@ def _direct_admit_instance_placement(
             # refusable at this stage: there is nothing new to refuse.
             if old_node_key is not None:
                 pass
-            elif claim is not None:
-                where = [claims.c.uuid == claim.uuid]
+            elif claim_uuid is not None:
+                where = [claims.c.uuid == claim_uuid]
                 if guarded:
                     where += [
                         claims.c.used_cpus + cpus <= claims.c.limit_cpus,
@@ -25053,7 +25225,7 @@ def _direct_admit_instance_placement(
                             used_disk_gb=claims.c.used_disk_gb + disk_gb,
                             updated_at=sa.func.now())).rowcount == 0:
                     raise _AdmissionDenied('claim')
-            elif cluster_present:
+            elif probe.cluster_present:
                 where = [cluster.c.id == 1]
                 if guarded:
                     # D14's best-effort unclaimed guard: what active
@@ -25209,6 +25381,12 @@ def _direct_release_instance_placement(
     decrement is floored at zero, so a release racing a reconcile pass
     cannot drive a counter negative.
 
+    The reference lookup and the claim branch select run before the
+    transaction opens (_probe_release_rows), so the transaction's first
+    statement is an UPDATE -- see the block comment above
+    _probe_admission_rows() for the ER_CHECKREAD invariant that requires
+    it, and for what the resulting races resolve as.
+
     Idempotent by construction: after the first call the instance has no
     instance_location rows, so a second call with no explicit node finds
     nothing to release, touches no counter and returns
@@ -25235,21 +25413,25 @@ def _direct_release_instance_placement(
     def _release() -> ReleasePlacementResult:
         outcome: ReleasePlacementResult = {
             'success': True, 'error': '', 'released': False, 'clamped': False}
+
+        # The reference lookup and the branch select, on their own
+        # connection outside the transaction below, for the reason in the
+        # block comment above _probe_admission_rows(): the transaction's
+        # first statement must be an UPDATE.
+        probe = _probe_release_rows(namespace, instance_uuid, named_node)
+
+        if not probe.nodes:
+            # Nothing was held: no reference rows and no node named.
+            # Decrementing here would take capacity away from an
+            # instance that never had it (a double release), so the
+            # counters are left alone, no transaction is opened at all,
+            # and the caller is told this was a no-op.
+            return outcome
+
         with engine.begin() as conn:
-            if named_node is not None:
-                nodes = [named_node]
-            else:
-                nodes = _instance_location_nodes(conn, instance_uuid)
-
-            if not nodes:
-                # Nothing was held: no reference rows and no node named.
-                # Decrementing here would take capacity away from an
-                # instance that never had it (a double release), so the
-                # counters are left alone and the caller is told this
-                # was a no-op.
-                return outcome
-
-            claim = _active_claim_for_namespace(conn, namespace)
+            # INVARIANT: the first statement on this connection is the
+            # floored namespace decrement, an UPDATE. Do not read here --
+            # see _probe_admission_rows()'s block comment.
 
             # The namespace side is charged once per instance however
             # many nodes hold a reference for it -- duplicate placement
@@ -25258,11 +25440,10 @@ def _direct_release_instance_placement(
             # ground truth every pass, so a residual discrepancy from a
             # historical duplicate corrects itself within one period.
             if _floored_namespace_decrement(
-                    conn, claim.uuid if claim is not None else None,
-                    cpus, memory_mb, disk_gb):
+                    conn, probe.claim_uuid, cpus, memory_mb, disk_gb):
                 outcome['clamped'] = True
 
-            for node_key in sorted(set(nodes), key=lambda u: u.int):
+            for node_key in sorted(set(probe.nodes), key=lambda u: u.int):
                 _, clamped = _floored_node_decrement(
                     conn, node_key, cpus, memory_mb, disk_gb)
                 outcome['clamped'] = outcome['clamped'] or clamped

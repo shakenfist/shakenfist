@@ -85,11 +85,14 @@ def _cluster_row(total_cpus=144, claimed_cpus=16, unclaimed_used_cpus=8):
 class _PlacementRouter:
     """Routes a mocked connection's execute() to canned rows and rowcounts.
 
-    The admission transaction issues a fixed sequence of reads followed
-    by a fixed sequence of guarded writes; each test says what it wants
-    each of them to return and this dispatches on the compiled statement
-    text. Every executed statement is recorded so the tests can assert
-    on shapes as well as outcomes.
+    An admission reads its branch and presence probes in autocommit and
+    then issues a fixed sequence of guarded writes inside a transaction;
+    each test says what it wants each of them to return and this
+    dispatches on the compiled statement text. Every executed statement
+    is recorded so the tests can assert on shapes as well as outcomes,
+    and recorded separately per connection kind so a test can assert the
+    ER_CHECKREAD invariant: nothing inside the transaction reads before
+    the first guarded UPDATE.
     """
 
     def __init__(self, claim=None, node_row=_capacity_row(),
@@ -99,6 +102,9 @@ class _PlacementRouter:
         self.node_row = node_row
         self.cluster_row = cluster_row
         self.reference_nodes = reference_nodes or []
+        self.context = 'autocommit'
+        self.transactional = []
+        self.autocommit = []
         self.rowcounts = {
             'claim_update': 1,
             'cluster_update': 1,
@@ -120,9 +126,20 @@ class _PlacementRouter:
         result.rowcount = rowcount
         return result
 
+    def on(self, context):
+        """A connection-level execute() side effect tagged as autocommit or not."""
+        def _execute(stmt, *args, **kwargs):
+            self.context = context
+            return self(stmt, *args, **kwargs)
+        return _execute
+
     def __call__(self, stmt, *args, **kwargs):
         text, _ = _compiled(stmt)
         self.executed.append((text, stmt))
+        if self.context == 'transaction':
+            self.transactional.append(text)
+        else:
+            self.autocommit.append(text)
 
         if text.startswith('SELECT'):
             if 'FROM namespace_claims' in text:
@@ -174,14 +191,22 @@ class _PlacementRouter:
 
 
 class _PlacementMixin:
-    """Runs an admission or release against a routed mock engine."""
+    """Runs an admission or release against a routed mock engine.
+
+    The transactional connection (``engine.begin()``) and the autocommit
+    one (``engine.connect()``, where the probes and the denial detail
+    read run) are separate mocks over the same router, so tests can tell
+    which statement ran where.
+    """
 
     def _run(self, router, **kwargs):
         engine = mock.MagicMock()
-        conn = mock.MagicMock()
-        conn.execute.side_effect = router
-        engine.begin.return_value.__enter__.return_value = conn
-        engine.connect.return_value.__enter__.return_value = conn
+        transaction = mock.MagicMock()
+        transaction.execute.side_effect = router.on('transaction')
+        autocommit = mock.MagicMock()
+        autocommit.execute.side_effect = router.on('autocommit')
+        engine.begin.return_value.__enter__.return_value = transaction
+        engine.connect.return_value.__enter__.return_value = autocommit
         with mock.patch('shakenfist.mariadb._get_engine',
                         return_value=engine):
             return self._call(**kwargs)
@@ -615,27 +640,46 @@ class AdmitInputValidationTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertIn('valid JSON', result['error'])
         self.assertEqual([], router.executed)
 
-    def test_operational_error_is_a_failed_rpc(self):
+    def _run_with_transaction_error(self, error):
+        """A working probe connection and a transaction that always fails."""
+        router = _PlacementRouter()
         engine = mock.MagicMock()
-        conn = mock.MagicMock()
-        conn.execute.side_effect = _operational_error(1064)
-        engine.begin.return_value.__enter__.return_value = conn
+        transaction = mock.MagicMock()
+        transaction.execute.side_effect = error
+        autocommit = mock.MagicMock()
+        autocommit.execute.side_effect = router.on('autocommit')
+        engine.begin.return_value.__enter__.return_value = transaction
+        engine.connect.return_value.__enter__.return_value = autocommit
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            return self._call()
+
+    def test_operational_error_is_a_failed_rpc(self):
+        result = self._run_with_transaction_error(_operational_error(1064))
+        self.assertFalse(result['success'])
+        self.assertFalse(result['admitted'])
+        self.assertIn('MariaDB error', result['error'])
+
+    def test_integrity_error_is_a_failed_rpc(self):
+        result = self._run_with_transaction_error(
+            IntegrityError('stmt', {}, Exception('x')))
+        self.assertFalse(result['success'])
+
+    def test_a_failed_probe_is_a_failed_rpc(self):
+        # The probes moved out of the transaction, but they are still
+        # part of the operation: a database that cannot answer them must
+        # not read as an admission or a denial.
+        engine = mock.MagicMock()
+        autocommit = mock.MagicMock()
+        autocommit.execute.side_effect = _operational_error(2006)
+        engine.connect.return_value.__enter__.return_value = autocommit
         with mock.patch('shakenfist.mariadb._get_engine',
                         return_value=engine):
             result = self._call()
         self.assertFalse(result['success'])
         self.assertFalse(result['admitted'])
         self.assertIn('MariaDB error', result['error'])
-
-    def test_integrity_error_is_a_failed_rpc(self):
-        engine = mock.MagicMock()
-        conn = mock.MagicMock()
-        conn.execute.side_effect = IntegrityError('stmt', {}, Exception('x'))
-        engine.begin.return_value.__enter__.return_value = conn
-        with mock.patch('shakenfist.mariadb._get_engine',
-                        return_value=engine):
-            result = self._call()
-        self.assertFalse(result['success'])
+        engine.begin.assert_not_called()
 
 
 class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
@@ -731,6 +775,144 @@ class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
         result = self._run(router, node_uuid='not-a-uuid')
         self.assertFalse(result['success'])
         self.assertIn('malformed uuid', result['error'])
+
+
+class SnapshotIsolationInvariantTestCase(_PlacementMixin,
+                                         base.ShakenFistTestCase):
+    """No plain SELECT may precede the first guarded UPDATE (step 6a).
+
+    innodb_snapshot_isolation is ON by default from MariaDB 11.6.2. A
+    plain SELECT inside the transaction establishes its read view early,
+    and every later guarded UPDATE against a row another admission has
+    since changed then aborts with ER_CHECKREAD (1020) rather than
+    blocking and re-evaluating its WHERE. Phase 0's benchmark predicted
+    it; phase 3's step 6 validation reproduced it as 46 of 50 concurrent
+    admissions exhausting the retry budget and 500ing an instance
+    create.
+
+    These are the structural regression tests for that. The live suite's
+    PlacementAdmissionConcurrencyLiveTestCase is the behavioural one,
+    but it only bites against a real server with the variable ON, which
+    the debian-12 CI runner does not have.
+    """
+
+    def _admit(self, **kwargs):
+        args = {
+            'instance_uuid': str(INST1), 'namespace': 'ci-1',
+            'node_uuid': str(NODE1), 'old_node_uuid': '', 'cpus': 4,
+            'memory_mb': 4096, 'disk_gb': 20, 'demand_add': 10.0,
+            'target_load': 0.75, 'enforce': True,
+            'placement_json': PLACEMENT_JSON,
+        }
+        args.update(kwargs)
+        return mariadb._direct_admit_instance_placement(**args)
+
+    def _release(self, **kwargs):
+        args = {
+            'instance_uuid': str(INST1), 'namespace': 'ci-1',
+            'node_uuid': '', 'cpus': 4, 'memory_mb': 4096, 'disk_gb': 20,
+        }
+        args.update(kwargs)
+        return mariadb._direct_release_instance_placement(**args)
+
+    def _assert_opens_with_an_update(self, router):
+        self.assertNotEqual(
+            [], router.transactional,
+            'the transaction issued no statements at all')
+        self.assertTrue(
+            router.transactional[0].startswith('UPDATE'),
+            'the transaction opened with %r, which is not a guarded '
+            'UPDATE -- see the ER_CHECKREAD invariant in mariadb.py'
+            % router.transactional[0].split('\n')[0])
+
+    def _assert_no_read_before_the_first_write(self, router):
+        writes = [i for i, text in enumerate(router.transactional)
+                  if not text.startswith('SELECT')]
+        self.assertNotEqual([], writes)
+        self.assertEqual(
+            [], [text for text in router.transactional[:writes[0]]
+                 if text.startswith('SELECT')])
+
+    def test_an_unclaimed_admission_opens_with_the_cluster_update(self):
+        self._call = self._admit
+        router = _PlacementRouter(claim=None)
+        self._run(router)
+        self._assert_opens_with_an_update(router)
+        self.assertIn('UPDATE cluster_capacity', router.transactional[0])
+
+    def test_a_claimed_admission_opens_with_the_claim_update(self):
+        self._call = self._admit
+        router = _PlacementRouter(claim=_claim_row())
+        self._run(router)
+        self._assert_opens_with_an_update(router)
+        self.assertIn('UPDATE namespace_claims', router.transactional[0])
+
+    def test_a_move_opens_with_a_node_update(self):
+        # A move skips the cluster/claim stage entirely, so the first
+        # statement is one of the two scheduler_node_capacity writes.
+        self._call = self._admit
+        router = _PlacementRouter(claim=None)
+        self._run(router, old_node_uuid=str(NODE2))
+        self._assert_opens_with_an_update(router)
+        self.assertIn('UPDATE scheduler_node_capacity',
+                      router.transactional[0])
+
+    def test_a_fully_unguarded_admission_still_opens_with_an_update(self):
+        # No node capacity row and no cluster singleton: every guard
+        # fails open, and the first statement is the placement attribute
+        # write. Still an UPDATE, still no early read view.
+        self._call = self._admit
+        router = _PlacementRouter(claim=None, node_row=None,
+                                  cluster_row=None)
+        result = self._run(router)
+        self.assertTrue(result['admitted'])
+        self.assertTrue(result['unguarded'])
+        self._assert_opens_with_an_update(router)
+
+    def test_a_release_opens_with_the_floored_namespace_decrement(self):
+        self._call = self._release
+        router = _PlacementRouter(claim=None, reference_nodes=[NODE1])
+        self._run(router)
+        self._assert_opens_with_an_update(router)
+        self.assertIn('UPDATE cluster_capacity', router.transactional[0])
+
+    def test_the_probes_run_outside_the_transaction(self):
+        self._call = self._admit
+        router = _PlacementRouter(claim=_claim_row())
+        self._run(router)
+        # The branch select and both presence probes ran in autocommit.
+        self.assertTrue(any('FROM namespace_claims' in text
+                            for text in router.autocommit))
+        self.assertTrue(any('FROM scheduler_node_capacity' in text
+                            for text in router.autocommit))
+        self.assertTrue(any('FROM cluster_capacity' in text
+                            for text in router.autocommit))
+
+    def test_the_reference_lookup_runs_outside_the_release_transaction(self):
+        self._call = self._release
+        router = _PlacementRouter(claim=None, reference_nodes=[NODE1])
+        self._run(router)
+        self.assertTrue(any('FROM object_references' in text
+                            for text in router.autocommit))
+        self.assertEqual([], [text for text in router.transactional
+                              if text.startswith('SELECT')])
+
+    def test_the_post_admit_counter_read_is_allowed_after_our_writes(self):
+        # Reads after our own writes are safe: those rows are locked by
+        # the UPDATEs we already issued, so they cannot move under us.
+        self._call = self._admit
+        router = _PlacementRouter(claim=None)
+        self._run(router)
+        self._assert_no_read_before_the_first_write(router)
+        self.assertTrue(any(text.startswith('SELECT')
+                            for text in router.transactional))
+
+    def test_a_double_release_opens_no_transaction_at_all(self):
+        self._call = self._release
+        router = _PlacementRouter(claim=None, reference_nodes=[])
+        result = self._run(router)
+        self.assertFalse(result['released'])
+        self.assertEqual([], router.transactional)
 
 
 class FlooredDecrementTestCase(base.ShakenFistTestCase):
