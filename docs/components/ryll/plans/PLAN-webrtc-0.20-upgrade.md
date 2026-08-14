@@ -58,8 +58,22 @@ Within `bridge.rs`, the webrtc-facing code is concentrated:
 | `WebrtcBridge::new` | 166–360 | Media engine, interceptors, PC, tracks, control DC, three callbacks |
 | `accept_offer` | 420–440 | set-remote / create-answer / set-local / wait-for-gathering |
 | `send_control` / `close` | 513–545 | DC send, PC teardown |
-| `connection_state` | ~864 | State accessor used by the reaper |
+| `connection_state` | 861–865 | Test-only state accessor (`#[cfg(test)]`) |
 | RTP pumps | 580–830 | `track.write_rtp` against `rtp` crate types |
+
+`connection_state` sits inside a `#[cfg(test)]` impl block and is
+never called by production code — the reaper in
+`ryll/src/web/lifecycle.rs` uses `dead_handle()` /
+`dead_flag_handle()`, which never touch the peer connection. The
+call sites that matter for the port are the *test clients*, which
+call it on a raw `RTCPeerConnection`. Phase 01 covers the
+consequences.
+
+There are also four near-identical client-side peer connection
+setups (`bridge.rs:904-948`, `tests/loopback.rs:100-216`,
+`tests/lifecycle.rs:88-140`, `ryll/src/web/signalling.rs:434-492`),
+every one of which uses API that changes in 0.20. Collapsing them
+to one implementation is phase 01's largest step.
 
 ### What 0.20 changes
 
@@ -166,18 +180,31 @@ against 0.17.1 today, and shrinks the atomic step:
   with three methods, still registered through the 0.17 API. The
   struct is then trivially re-targeted at
   `PeerConnectionEventHandler` in phase 02.
-- Shadow the connection state in that struct — the state-change
-  callback already sees every transition — and reimplement
-  `connection_state()` (`:864`) to read the shadow rather than
-  ask the PC. This removes one of the no-direct-replacement
+- Collapse the four duplicated client-side peer connection setups
+  into one shared test helper behind a `test-support` feature, so
+  phase 02 rewrites that boilerplate once instead of four times
+  across two crates. This is the largest step in the phase and
+  was not visible when this master plan was first written.
+- Shadow the connection state inside that helper — the
+  state-change callback already sees every transition — so
+  `wait_until_connected` reads the shadow rather than calling
+  `RTCPeerConnection::connection_state()`. This removes one of
+  the no-direct-replacement
   items entirely, and works identically on 0.17.
-- Give `accept_offer` an explicit "gathering complete" signal
-  (a `Notify` or oneshot raised from the state-change path)
-  rather than calling `gathering_complete_promise()` inline, and
-  verify the SDP it returns is byte-identical to today's.
+- Give `accept_offer` an explicit "gathering complete" signal —
+  a sticky `Notify` + `AtomicBool` pair raised from a new
+  `on_ice_gathering_state_change` handler, which 0.17 already
+  provides — rather than calling `gathering_complete_promise()`
+  inline, and prove the answer SDP carries the same candidate
+  set. This validates the phase 02 design for the riskiest
+  no-direct-replacement item while we can still fall back.
 
 Each of these is its own commit. All of them are testable now,
-which is the point.
+which is the point. Detailed in
+[PLAN-webrtc-0.20-upgrade-phase-01-prework.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/),
+which corrects two things this master plan got wrong on first
+writing: `connection_state` is test-only, and the client-PC
+setup is duplicated four times.
 
 ### Phase 02 — The atomic bump
 
@@ -244,7 +271,7 @@ minutes.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Pre-work on 0.17 | PLAN-webrtc-0.20-upgrade-phase-01-prework.md | Not started |
+| 1. Pre-work on 0.17 | [PLAN-webrtc-0.20-upgrade-phase-01-prework.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/) | Complete — baseline captured, 1g agrees within noise |
 | 2. Atomic bump to 0.20 | PLAN-webrtc-0.20-upgrade-phase-02-bump.md | Not started |
 | 3. Socket binding configuration | PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs.md | Not started |
 | 4. Soak validation and docs | PLAN-webrtc-0.20-upgrade-phase-04-soak.md | Not started |
@@ -259,10 +286,16 @@ Roughly a week, with a realistic band of three days to two weeks:
 
 | Phase | Estimate |
 |---|---|
-| 01 — pre-work on 0.17 | 1 day |
-| 02 — atomic bump | 2–3 days |
+| 01 — pre-work on 0.17 | 2 days |
+| 02 — atomic bump | 1.5–2.5 days |
 | 03 — socket binding config | ½ day |
 | 04 — soak and docs | 1 day |
+
+Phase 01 grew by a day after detailed planning surfaced the
+four-way client-PC duplication, and phase 02 came down by the
+same amount — the work moved out of the atomic commit rather than
+appearing from nowhere, which is a better trade than the totals
+suggest.
 
 The variance is almost entirely in phase 02, and almost entirely
 in the two items with no direct replacement: ICE-gathering
