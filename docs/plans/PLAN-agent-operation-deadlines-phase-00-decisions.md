@@ -172,3 +172,116 @@ absence of measurement) behind the progress-timeout default, and the
 state-audit verdicts. The `expired`-versus-`ERROR` decision and the
 progress-timeout default are the two the operator most needs to
 confirm; do not record either without explicit agreement.
+
+## Results
+
+### Measurement results (step 0a)
+
+**Runs checked** — the five most recent successful `merge_group` runs
+of the "Functional tests" workflow (all after PR #3506's merge,
+ff259930d, 2026-07-26):
+
+| Run id | Date (UTC) | Queue branch (PR) |
+|---|---|---|
+| 31663812079 | 2026-08-13 | merge queue, pr-3726 |
+| 31640716414 | 2026-08-12 | merge queue, pr-3727 |
+| 31576979115 | 2026-08-12 | merge queue, pr-3714 |
+| 31225327822 | 2026-08-07 | merge queue, pr-3614 |
+| 31219864140 | 2026-08-07 | merge queue, pr-3653 |
+
+**Transfer stats** — parsed from `sf-sidechannel` JSON journal lines
+in the `bundle-shakenfist-full-guests` artifacts
+(`bundle/sf*/_commands/journalctl-sf-units`); each request paired
+with its completion on the `agent_operation` uuid. Exactly 10
+completed transfers per run, 50 total.
+
+| Metric | count | min | p50 | p95 | max |
+|---|---|---|---|---|---|
+| Duration (s, request-to-completion) | 50 | 0.146 | 0.249 | 0.417 | 2.834 |
+| Size (bytes) | 50 | 7 | 813 | 86,177 | 625,094,656 |
+
+- The two slowest/largest transfers are the deliberate big-file
+  tests: 625 MB in 2.83 s (~220 MB/s) and 494 MB in 1.99 s
+  (~248 MB/s). Every other transfer (48/50) finished in under 0.44 s.
+- 5 request lines had no stat or completion — all are
+  `path=/tmp/nosuch`, i.e. the deliberate `test_get_missing_file`
+  negative case (one per run). No genuinely hung or lost transfer was
+  observed.
+- **Bounding internal gaps**: per-chunk logs are debug-only and
+  absent from these journals, so intra-transfer gaps are not directly
+  measurable. The request-to-completion duration is therefore the
+  upper bound on any internal stall within a transfer: the worst case
+  across all 50 transfers is **2.834 s**, more than 20x under a 60 s
+  progress timeout.
+
+**test_agentops wall-clock times** (stestr per-test timings from the
+Guests job logs; runs 31663812079 / 31219864140): individual tests
+range 117.9-284.0 s (worst: `test_interface_plug_and_exec_reboot` at
+~283 s in both runs). Test wall times are dominated by instance
+boot/agent-ready waits, not transfer time — all 50 transfers in a run
+sum to well under 10 s.
+
+**Conclusion for the 60 s progress-timeout default**: the slowest
+observed CI transfer (625 MB) completes in under 3 s end-to-end, so a
+60 s progress timeout carries roughly 20x headroom over the worst
+complete transfer observed, let alone any internal gap within one.
+
+### State audit (step 0b)
+
+| Site | file:line | Verdict | Notes |
+|---|---|---|---|
+| `state_targets` map | `shakenfist/operations/agentoperation.py:25` | NEEDS UPDATE (4) | Phase 4 adds `expired` plus transitions into it (from initial/preflight/queued/executing) and `expired -> deleted` so API delete keeps working. |
+| `BaseOperation.ACTIVE_STATES` | `shakenfist/operations/baseoperation.py:38` | NEEDS UPDATE (4) | `{created, queued, executing, complete}` — `error` already excluded. Feeds `dbo_iter` no-prefilter default (`baseobject.py:809-811`) and `from_db_by_ref` (`baseobject.py:393`), so expired ops vanish from default iteration exactly like error ops do today. Decide in phase 4 whether that is desired. |
+| Instance delete sweep of agent ops | `shakenfist/instance.py:1084-1088` | NEEDS UPDATE (4) | `AgentOperations([instance_filter])` uses the ACTIVE_STATES prefilter, so expired ops (like error ops today) are not soft-deleted with their instance; they must be reaped some other way. |
+| Hard-delete sweep | `shakenfist/constants.py:190` (`FINAL_OBJECT_STATES`) + `shakenfist/daemons/cluster/scheduled_tasks.py:559-602` | NEEDS UPDATE (4) | `{deleted, complete, abort}` only. Without adding `expired`, expired ops are never hard-deleted and leak state rows forever (cf. issue 3532 class of bug). Must be in the phase 4 change set. |
+| `Instance.agent_operation_next` | `shakenfist/instance.py:2108-2128` | IGNORED safely | Explicitly matches QUEUED (dispatch) and INITIAL/PREFLIGHT (wait); every other state — which would include `expired` — falls to the retire branch and is popped. Correct behaviour for free. |
+| Instance external view queue | `shakenfist/instance.py:639-644` | IGNORED safely | Renders `external_view()` of whatever is on the queue; state is an opaque string. |
+| API enqueue endpoints | `shakenfist/external_api/instance.py:1682,1726,1770` | IGNORED safely | Only set PREFLIGHT/QUEUED on freshly created ops; never read state. |
+| API get/delete/list endpoints | `shakenfist/external_api/agentoperation.py:107-122,195-207` | IGNORED safely | State passed through opaquely; `delete()` works provided `expired -> deleted` is in `state_targets` (phase 4). |
+| Sidechannel executor exit guard | `shakenfist/daemons/sidechannel/main.py:339-346` | IGNORED safely | `== STATE_EXECUTING` guard means an op concurrently flipped to `expired` is not clobbered to ERROR. |
+| Sidechannel completion write | `shakenfist/daemons/sidechannel/main.py:817-821` | IGNORED safely | Guarded `== STATE_EXECUTING` before `-> COMPLETE`; expired op is left alone. |
+| Sidechannel unguarded error writes | `shakenfist/daemons/sidechannel/main.py:470,476,794,848` | NEEDS UPDATE (4) | Unconditional `state = STATE_ERROR`; if phase 4 expiry can fire mid-execution, `expired -> error` violates `state_targets` and raises `InvalidStateException` (`baseobject.py:587-591`). Phase 4 must guard these or allow the transition. |
+| Sidechannel error-abort check | `shakenfist/daemons/sidechannel/main.py:869` | NEEDS UPDATE (4) | `== STATE_ERROR` empties the remaining command list; an op expired mid-flight would keep executing commands unless phase 4 adds `expired` here (this is the enforcement seam). |
+| `node_aop_op._preflight` | `shakenfist/operations/node_aop_op.py:92,107,110` | IGNORED safely | `!= STATE_PREFLIGHT` early-returns, so an expired op is silently not promoted to QUEUED. |
+| `node_aop_op.dispatch_task` error path | `shakenfist/operations/node_aop_op.py:89` | NEEDS UPDATE (4) | Unguarded `aop.state = Instance.STATE_ERROR` in the except block; from `expired` this raises. Same guard as sidechannel needed. |
+| `_ACTIVE_OPERATION_STATES` | `shakenfist/mariadb.py:4785` | IGNORED safely | Cluster-operation gating only (not agent ops); `expired` being absent correctly reads as terminal anyway. |
+| State machine docs | `docs/developer_guide/state_machine.md:21-59` | NEEDS UPDATE (7) | Documents the seven current states and the mermaid graph; needs `expired` node, edges and prose. Also `docs/developer_guide/api_reference/agentoperations.md:54` example (opaque, optional). |
+| CI await loops | `shakenfist/deploy/shakenfist_ci/base.py:671`; `smoke_ci_tests/test_agentops.py:52,96,148-153,207,218,236`; `guest_ci_tests/test_agentops.py:37,68,112,164-169` | NEEDS UPDATE (7) | All spin `while state != 'complete'` (base.py loop has no timeout at all); an expired op hangs the test until the suite timeout, same as `error` today. Should fail fast on terminal states. `cluster_ci_tests/test_api.py:48,59` is cluster ops, unaffected. |
+| `sf-ctl` object-type list | `shakenfist/client/ctl.py:485` | IGNORED safely | Type name list only; state values opaque. |
+| Unit tests | `shakenfist/tests/test_daemon_sidechannel_executor.py:51,56`; `test_instance.py:737` | IGNORED safely | Use existing states; phase 4 adds new cases rather than fixing breaks. |
+| Metrics / eventlog / cleaner | (none found) | IGNORED safely | No Prometheus metric, eventlog path, or cleaner-daemon code enumerates agent-op states; events record transitions generically and the cleaner (`daemons/cleaner/`) never touches agent ops. |
+| Client `_await_agentop` | client-python `shakenfist_client/apiclient.py:1169-1181` | NEEDS UPDATE (6) | Polls `== 'complete'` until async deadline then returns the op as-is; `expired` (like `error` today) burns the whole deadline instead of returning early. |
+| Client `await_agent_command` | client-python `shakenfist_client/apiclient.py:1418-1441` | NEEDS UPDATE (6) | Confirmed: polls only for `'complete'`, ignores `error`; expired op waits out the full timeout then raises `AgentAwaitTimeout` (state does appear in the message). Should short-circuit on terminal states — client-python#363. |
+| Client `await_agent_fetch` | client-python `shakenfist_client/apiclient.py:1488-1503` | NEEDS UPDATE (6) | Same pattern with a hardcoded 120 s loop; raises `AgentCommandError` including the state. |
+| Client CLI rendering | client-python `shakenfist_client/commandline/instance.py:264,274` | IGNORED safely | Prints `agentop['state']` as an opaque string in table/CSV/JSON. |
+| sfui | (repository) | IGNORED safely | The sfui repo contains no references to agent operations at all (recursive grep for agent_operation/agentoperation/agentop is empty), so it is unaffected. |
+
+**BREAKS verdicts: none.** The two near-misses are the unguarded
+`state = STATE_ERROR` writes (sidechannel `main.py:470,476,794,848`;
+`node_aop_op.py:89`) and the `== STATE_ERROR` abort check
+(`main.py:869`): they cannot break today because nothing produces
+`expired` yet, and they only become reachable-from-expired if phase 4
+allows expiry of an EXECUTING op — so they are phase 4 design
+obligations, not current breakage. Everything else either
+string-matches specific states (falling through safely on unknowns)
+or treats state as opaque.
+
+Grep patterns used: `ACTIVE_STATES|state_targets`,
+`STATE_(QUEUED|PREFLIGHT|EXECUTING|COMPLETE|ERROR|DELETED)`,
+`'complete'|'executing'|'queued'|'preflight'` (and double-quoted
+forms), `agentop|agent_operation|AgentOperation|AGENTOPERATION`,
+`FINAL_OBJECT_STATES`, `hard_delete|STATE_DELETED`, and
+`op['state']`-style dict access, across the server repo (including
+`shakenfist/deploy/shakenfist_ci/`, `daemons/`, `docs/`),
+client-python's `shakenfist_client/`, and the sfui tree.
+
+### Back brief outcome (step 0c)
+
+The operator confirmed the distinct `expired` state and all four
+remaining proposals as put, and chose a **30 second** progress
+timeout default over the proposed 60 — the measurement's ~20x
+headroom supported the tighter value (still ~10x over the worst
+observed complete transfer). Decisions are recorded in the master
+plan's "Decisions from phase 0" section; the client fail-fast gap is
+filed as client-python#363 and referenced from the master plan's
+phase 6 row.

@@ -171,8 +171,7 @@ Both are declared per the parameter declaration rules (body location,
 accepts. New config options:
 
 - `AGENT_OPERATION_DEFAULT_DEADLINE` = 600
-- `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` = 60 (see open
-  questions)
+- `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` = 30 (see decisions)
 
 ### Enforcement points
 
@@ -181,7 +180,7 @@ increasing order of reach:
 
 1. **At dequeue** — `Instance.agent_operation_next()` checks the
    deadline before returning an operation. An expired queued operation
-   is transitioned to its terminal expiry state, popped, and the next
+   is transitioned to `expired`, popped, and the next
    entry considered. This is the "skip a cycle" behaviour for periodic
    callers: work the caller has already abandoned never occupies the
    executor.
@@ -342,8 +341,8 @@ retry design above sufficient without any agent protocol change:
 Consequently a retried attempt may run concurrently with a zombie
 prior attempt inside the guest. For `get-file` (concurrent reads of
 the same file) this is harmless; for retried `execute` it would mean
-running the command twice, which is one reason `execute` retry
-semantics need care (see open questions).
+running the command twice, which is why `execute` is not retried
+(decision 6).
 
 ### Command dispatch restructure
 
@@ -374,43 +373,53 @@ and get the 600-second server default, which is tighter than the 900s
 constant it replaces but far above observed legitimate operation
 times.
 
-## Open questions (resolve in phase 0)
+## Decisions from phase 0
 
-1. **Terminal state for expiry: distinct `expired` state or `ERROR`
-   with a machine-readable error?** A distinct terminal state is more
-   queryable ("how often am I skipping cycles?") and cleanly
+Resolved 2026-08-15 with the operator, on the evidence in
+`PLAN-agent-operation-deadlines-phase-00-decisions.md` (a 50-transfer
+measurement across five recent merge-queue CI runs, and a
+three-repository audit of every consumer of agent operation state).
+
+1. **Expiry is a distinct terminal state, `expired`.** It cleanly
    distinguishes "the caller's budget ran out" from "the operation
-   failed"; the cost is a new state in `state_targets`, the state
-   machine docs, anything that enumerates terminal states, and client
-   await handling (an old client polling an `expired` operation just
-   times out on its own clock, which is acceptable). Recommendation:
-   distinct `expired` state.
-2. **Progress timeout default.** 60 seconds is proposed: generous
-   against IO scheduling stalls on a loaded hypervisor, but an order
-   of magnitude faster than today's 900s at detecting the #3516 wedge.
-   Needs a sanity check against worst-case observed chunk gaps in CI
-   under load before being locked in.
-3. **Retry attempt cap.** Proposed 3 (initial dispatch plus two
+   failed" and makes skipped cycles queryable. The audit found no
+   consumer that breaks on the new state — old clients already treat
+   `error` and `expired` identically (they recognise neither, a
+   fail-fast gap tracked as client-python#363) — and enumerated the
+   phase 4 obligations: `state_targets` edges (into `expired` from
+   every non-terminal state, plus `expired -> deleted`), adding
+   `expired` to `FINAL_OBJECT_STATES` (`constants.py:190`) so the
+   hard-delete sweep reaps it rather than leaking state rows, guarding
+   the five unguarded `state = STATE_ERROR` writes (sidechannel
+   `main.py:470,476,794,848`; `node_aop_op.py:89`) that would raise
+   `InvalidStateException` from `expired`, and including `expired` in
+   the executor's command-abort check (`main.py:869`).
+2. **The progress timeout default is 30 seconds**
+   (`AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT`). Measurement: the
+   worst complete transfer observed in CI was 625 MB in 2.83 s
+   (~220 MB/s), and 48 of 50 transfers finished in under 0.44 s, so
+   30 seconds is ~10x headroom over the worst *total* duration, let
+   alone any internal gap — while detecting the #3516 wedge 30x
+   faster than the 900 s constant it replaces.
+3. **The retry attempt cap is 3** (initial dispatch plus two
    retries), as a config option.
-4. **Does the deadline apply to `PREFLIGHT`?** Put-blob operations
-   pass through a preflight queue task before reaching `QUEUED`. The
-   dequeue check only covers `QUEUED`; a deadline check at preflight
-   execution would close the gap. Probably yes, and cheap.
-5. **Where exactly the reaper sweep lives** in the sidechannel main
-   loop, and its cadence. It must not add per-instance database load
-   on the fast path (see the existing comment about
-   `agent_operation_next()` costing an uncached attribute read per
-   instance per pass).
-6. **Is `execute` retried?** A retried `execute` re-runs a possibly
-   non-idempotent command, and the agent cannot cancel a prior
-   attempt's child process (see the connection teardown section), so
-   both attempts' side effects can land. Options: never retry
-   `execute` (fail fast, as today); retry only on failures that
-   provably preceded dispatch to the agent; or make retry a
-   per-command capability flag alongside `reports_progress`, with the
-   caller able to opt in. Recommendation: the capability-flag shape,
-   defaulting to retryable for transfers and non-retryable for
-   `execute`.
+4. **The deadline applies during `PREFLIGHT`**, checked inside
+   `NodeAgentopOp._preflight()` before and after the potentially long
+   `Blob.ensure_local()` copy — the longest pre-queue delay in the
+   system, and precisely the time a receipt-anchored deadline exists
+   to count.
+5. **The reaper is an extension of `reap_instance_executors()`**
+   (`daemons/sidechannel/main.py:972`), which already runs at the top
+   of every dispatcher pass serialised with dispatch. It must cover
+   both a dead executor thread and the no-entry case after a daemon
+   restart, with the database read gated on the instance actually
+   having a non-terminal operation so the idle fast path stays cheap.
+6. **`execute` is not retried.** Retryability is a per-command
+   capability flag alongside `reports_progress` in the dispatch
+   registry — true for transfers, false for `execute` — because a
+   retried `execute` re-runs a possibly non-idempotent command while
+   the agent cannot cancel the prior attempt's child process, so both
+   attempts' side effects could land.
 
 ## Non-goals
 
@@ -474,14 +483,14 @@ the slot at all.
 
 | Phase | Plan | Status | Content |
 |-------|------|--------|---------|
-| 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Planning | Resolve open questions; record decisions in this file |
+| 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Complete | Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan |
 | 1 | | Not started | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change) |
 | 2 | | Not started | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
 | 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
-| 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT` |
+| 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check) |
 | 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
-| 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling |
-| 7 | | Not started | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci` |
+| 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast) |
+| 7 | | Not started | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on `!= 'complete'`, one with no timeout at all) |
 
 Each phase gets its own detailed plan file before implementation.
 Unit tests land with each phase; the functional test in phase 7
