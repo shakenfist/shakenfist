@@ -12,6 +12,7 @@ from typing import Optional
 from pydantic import AnyHttpUrl
 from pydantic import BeforeValidator
 from pydantic import Field
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 from pydantic_settings import NoDecode
 
@@ -43,6 +44,19 @@ from pydantic_settings import NoDecode
 # docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
 SECRET_CONFIG_KEY_RE = re.compile(
     r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)')
+
+
+# The sentinel AUTH_SECRET_SEED carries until an operator sets one, which
+# verify_config() refuses to start on.
+#
+# Named rather than written twice because the field is a SecretStr, and
+# SecretStr('x') == 'x' is False. Comparing the field against a bare
+# string literal is therefore always false, silently, which would turn
+# that refusal into a cluster happily signing tokens with the shipped
+# default. The comparison must unwrap, and there are exactly two places
+# which legitimately read this value: verify_config() below, and
+# external_api/app.py where it becomes JWT_SECRET_KEY.
+UNCONFIGURED_AUTH_SECRET_SEED = '~~unconfigured~~'
 
 
 def get_node_name() -> str:
@@ -189,8 +203,13 @@ class SFConfig(BaseSettings):
             'gunicorn graceful_timeout.'
         )
     )
-    AUTH_SECRET_SEED: str = Field(
-        '~~unconfigured~~',
+    # SecretStr so that dumping the configuration -- which the sf-queues
+    # startup banner does for every field -- renders asterisks rather
+    # than the seed every JWT in the cluster is signed with. Read the
+    # real value with .get_secret_value(); there are two such reads,
+    # both listed on UNCONFIGURED_AUTH_SECRET_SEED below.
+    AUTH_SECRET_SEED: SecretStr = Field(
+        SecretStr(UNCONFIGURED_AUTH_SECRET_SEED),
         description='A random string to seed auth secrets with.'
     )
     API_TOKEN_DURATION: int = Field(
@@ -647,8 +666,11 @@ class SFConfig(BaseSettings):
             'blank).'
         )
     )
-    LOKI_AUTH_HEADER: str = Field(
-        '',
+    # A SecretStr, so "treat as a secret" is enforced by the type rather
+    # than left as an instruction to the next reader. Unwrapped once,
+    # where the push request's headers are assembled.
+    LOKI_AUTH_HEADER: SecretStr = Field(
+        SecretStr(''),
         description=(
             'Opaque value sent verbatim as the Authorization header on '
             'every Loki push (for example "Bearer <token>" or a Basic '
@@ -893,8 +915,10 @@ class SFConfig(BaseSettings):
         'shakenfist',
         description='Username for MariaDB connections.'
     )
-    MARIADB_PASSWORD: str = Field(
-        '',
+    # SecretStr for the same reason as AUTH_SECRET_SEED. Unwrapped once,
+    # where the SQLAlchemy connection URL is built in mariadb.py.
+    MARIADB_PASSWORD: SecretStr = Field(
+        SecretStr(''),
         description='Password for MariaDB connections.'
     )
     MARIADB_DATABASE: str = Field(
@@ -927,7 +951,15 @@ def verify_config(skip_auth_seed: bool = False) -> None:
     failures: list[str] = []
 
     if not skip_auth_seed:
-        if config.AUTH_SECRET_SEED == '~~unconfigured~~':
+        # get_secret_value() is required, not stylistic. AUTH_SECRET_SEED
+        # is a SecretStr, and SecretStr('x') == 'x' is False, so
+        # comparing the field directly against the sentinel would be
+        # false for every possible configuration -- including an
+        # unconfigured one -- and this refusal would never fire again.
+        # The failure mode is a cluster signing every token in its zone
+        # with the value shipped in this file.
+        if (config.AUTH_SECRET_SEED.get_secret_value()
+                == UNCONFIGURED_AUTH_SECRET_SEED):
             failures.append('You must configure AUTH_SECRET_SEED!')
 
     if failures:

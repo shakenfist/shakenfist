@@ -102,8 +102,11 @@ def _push_to_loki(daemon_name: str, body: dict[str, Any]) -> bool:
     headers = {'Content-Type': 'application/json'}
     if config.LOKI_TENANT:
         headers['X-Scope-OrgID'] = config.LOKI_TENANT
+    # SecretStr implements __len__, so the emptiness test below still
+    # means "not configured"; only the value itself needs unwrapping, at
+    # the point it goes on the wire.
     if config.LOKI_AUTH_HEADER:
-        headers['Authorization'] = config.LOKI_AUTH_HEADER
+        headers['Authorization'] = config.LOKI_AUTH_HEADER.get_secret_value()
 
     try:
         with LOGSHIP_PUSH_SECONDS.time():

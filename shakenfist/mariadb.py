@@ -798,8 +798,13 @@ def _get_connection_url() -> str:
     # Use mariadb dialect with mysqldb driver. The mariadb dialect is required
     # for MariaDB-specific types like INET4. The mysqldb driver is available
     # via python3-mysqldb.
+    #
+    # The password is unwrapped explicitly. This is the one place it may
+    # be, and the resulting URL is itself a credential -- it must never be
+    # logged, which is why this returns it rather than logging it here.
     return (
-        f'mariadb+mysqldb://{config.MARIADB_USER}:{config.MARIADB_PASSWORD}'
+        f'mariadb+mysqldb://{config.MARIADB_USER}:'
+        f'{config.MARIADB_PASSWORD.get_secret_value()}'
         f'@{config.MARIADB_HOST}:{config.MARIADB_PORT}/{config.MARIADB_DATABASE}'
     )
 

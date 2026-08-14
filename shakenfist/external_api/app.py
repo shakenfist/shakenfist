@@ -63,7 +63,11 @@ app = flask.Flask(__name__)
 RequestID(app)
 api = flask_restful.Api(app, catch_all_404s=False)
 
-app.config['JWT_SECRET_KEY'] = config.AUTH_SECRET_SEED
+# Unwrapped because flask_jwt_extended signs with this value directly.
+# Note that this puts the seed into app.config, which several Flask
+# debugging surfaces will happily render -- the SecretStr stops at this
+# boundary, so nothing here may be logged.
+app.config['JWT_SECRET_KEY'] = config.AUTH_SECRET_SEED.get_secret_value()
 jwt = JWTManager(app)
 
 swagger = flasgger.Swagger(app, template={

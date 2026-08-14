@@ -8,6 +8,7 @@ failure, backoff, row retention). Mirrors
 """
 from unittest import mock
 
+from pydantic import SecretStr
 import requests
 
 from shakenfist import logship_drainer
@@ -48,11 +49,17 @@ class PushToLokiTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
     """``_push_to_loki`` HTTP behaviour, headers, and bool contract."""
 
     def _config(self, base_url='http://loki:3100', tenant='', auth=''):
+        # LOKI_AUTH_HEADER is a SecretStr on the real config, so it is
+        # patched as one here. Substituting a plain str would leave the
+        # production get_secret_value() call untested, and this is the
+        # only coverage asserting the credential reaches the wire
+        # unmasked -- a missed unwrap would send Loki the literal
+        # '**********' and every push would fail authentication.
         return mock.patch.multiple(
             logship_drainer.config,
             LOKI_BASE_URL=base_url,
             LOKI_TENANT=tenant,
-            LOKI_AUTH_HEADER=auth)
+            LOKI_AUTH_HEADER=SecretStr(auth))
 
     def test_2xx_returns_true(self):
         resp = mock.Mock(status_code=204)
