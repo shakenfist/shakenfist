@@ -8,7 +8,10 @@ for build commands, conventions, and common tasks, and
 ## Database migrations
 
 Kerbside uses Alembic for database schema migrations. The migration
-files are located in the `alembic/versions/` directory.
+files are located in the `kerbside/migrations/versions/` directory.
+They live inside the package so that they ship in the wheel and
+`kerbside db upgrade` can run them from an install with no
+repository checkout present.
 
 ### Creating a new migration
 
@@ -17,9 +20,9 @@ cd /path/to/shakenfist/kerbside
 alembic revision -m "description_of_your_changes"
 ```
 
-This will create a new migration file in `alembic/versions/`. Edit the
-generated file to add your schema changes in the `upgrade()` and
-`downgrade()` functions.
+This will create a new migration file in
+`kerbside/migrations/versions/`. Edit the generated file to add your
+schema changes in the `upgrade()` and `downgrade()` functions.
 
 Example:
 
@@ -48,6 +51,32 @@ alembic downgrade -1
 **Note:** Alembic automatically uses the database URL from the
 kerbside configuration, so ensure your kerbside config is properly set
 up before running migrations.
+
+### Applying migrations to a deployment
+
+The bare `alembic` commands above need a repository checkout, because
+they read `alembic.ini` from the repository root. A deployment installed
+from a wheel has neither, and uses the CLI instead:
+
+```bash
+kerbside db upgrade                        # to head
+kerbside db upgrade --revision <revision>  # to a specific revision
+kerbside db downgrade --revision <revision>
+```
+
+These resolve the migration scripts from inside the installed package,
+so they work from any working directory. Both take the database URL from
+`SQL_URL`, exactly as the `alembic` commands do, so the same environment
+or `/etc/kerbside/kerbside.ini` configuration applies -- see
+[configuration.md](/components/kerbside/configuration/).
+
+`downgrade` requires `--revision` and has no default. A downgrade with
+an implied target is too easy to run against the wrong database.
+
+Note that a percent sign in `SQL_URL` -- which is what an operator gets
+from percent-encoding `@`, `/`, `#` or `!` in a database password -- is
+escaped for Alembic automatically. No special handling is needed in the
+configuration.
 
 ## Diagrams in the documentation
 
