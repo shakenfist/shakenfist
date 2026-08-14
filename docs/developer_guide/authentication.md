@@ -562,3 +562,63 @@ debugging, does not log bodies for any route under `/auth`. Those routes carry
 plaintext key secrets inbound and minted tokens outbound. The request URL is
 still recorded, so the trace retains the namespace and the key name and loses
 only the credential.
+
+### Secret-carrying fields are typed, not just handled carefully
+
+Every credential leak found so far had the same shape -- `extra={'token':
+token}`, or an f-string, with the logging or event layer coercing the value to a
+string on the way out. Nothing in the type system objected, and review caught
+them one at a time, repeatedly. So the types object now.
+
+Fields which carry a credential are `pydantic.SecretStr`. `str()`, `repr()`,
+f-strings and `%s` formatting of one all yield `**********`, and the real value
+comes back only from an explicit `.get_secret_value()` call. That call is the
+point of the design: each one is somewhere a reviewer can stop and ask whether
+the plaintext belongs there, and there are few enough to read in one sitting.
+
+The wrapped fields are `NamespaceKeyAttributesData.key` and `.nonce`, and the
+configuration options `AUTH_SECRET_SEED`, `MARIADB_PASSWORD` and
+`LOKI_AUTH_HEADER`. The unwrap sites are the bcrypt comparison in `/auth`, the
+nonce comparison in `verify_token()`, the JWT claim in `create_token()`, the two
+SQL writes and the gRPC encoder for key attributes, the JWT signing key in
+`external_api/app.py`, the database connection URL, and the Loki push header.
+
+Three consequences are worth knowing before touching this code.
+
+**`SecretStr` never compares equal to a `str`.** `SecretStr('x') == 'x'` is
+`False`, so a comparison against a bare string literal is silently always false
+rather than a type error. `config.py` keeps the value it compares
+`AUTH_SECRET_SEED` against as a named constant,
+`UNCONFIGURED_AUTH_SECRET_SEED`, and unwraps for the comparison: getting this
+wrong makes the "you must configure a seed" refusal unreachable and lets a
+cluster sign every token in its zone with the default shipped in the source.
+
+**Assertions about secrets must compare `.get_secret_value()`.** Both obvious
+alternatives are broken, and neither fails loudly.
+`assertNotIn(attrs.key, haystack)` passes unconditionally, because `testtools`'
+matcher does not require the needle to be a string and a `SecretStr` is never a
+substring of one. `assertNotIn(str(attrs.key), haystack)` asserts that the
+literal `**********` is absent, which is true of an event which leaked the real
+secret. Either spelling turns a leak guard into a test which passes while
+checking nothing, so `test_namespace_key_object.py` routes them through one
+helper and pins that the helper still fails on a real leak.
+
+**The schema generator needs an explicit column mapping.** `SecretStr` maps to
+`VARCHAR(255)` in `PYTHON_TO_SQLALCHEMY` (`shakenfist/schema/sqlalchemy.py`),
+identically to `str`, so wrapping an existing field needs no migration. Without
+that entry the generator's unknown-type fallback only logs a warning and returns
+`LONGTEXT` -- and because tables are created from the model only when they are
+absent, that would diverge fresh installs from every upgraded cluster with no
+schema version change to notice it.
+
+Type safety does not replace the structural protections around it. The `/auth`
+body redaction covers a credential which arrives before any model exists, and
+the daemon startup banner redacts by configuration *key name* because it
+iterates every option, including ones which do not carry a `SecretStr` yet.
+Each mechanism covers a gap the others do not, so do not remove one as
+redundant.
+
+Finally, a serialised view is not a safe home for a credential.
+`external_view()` on both `NamespaceKey` and `BlobTransfer` deliberately omits
+the secret material, because those views are passed directly into events and
+log fields.

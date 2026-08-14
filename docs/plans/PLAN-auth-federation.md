@@ -619,7 +619,7 @@ groundwork exists, and lives mostly outside this repository.
 | 3. Federated exchange and scope enforcement | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Complete |
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Complete |
-| 6. Secrets that cannot be logged by accident | [PLAN-auth-federation-phase-06-secret-types.md](PLAN-auth-federation-phase-06-secret-types.md) | Planned |
+| 6. Secrets that cannot be logged by accident | [PLAN-auth-federation-phase-06-secret-types.md](PLAN-auth-federation-phase-06-secret-types.md) | Complete |
 | 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
 
 The phase 7 plan has not been drafted yet; the open questions
@@ -636,13 +636,23 @@ phase is the argument for both: phase 6 makes the mistake
 hard to make, phase 7 makes it detectable when it is made
 anyway.
 
-Planning phase 6 found a sixth site, and it is worse than
-the five: `sf-queues` logs every configuration item at INFO
-on startup, so `AUTH_SECRET_SEED` and `MARIADB_PASSWORD` are
-written out in full and shipped to Loki. It is live in
-production and was found by querying log aggregation for the
-credential — which is the mechanism phase 7 proposes, used by
-hand. See phase 6's survey for the evidence.
+Phase 6 found two more sites, both worse than the five, and
+found both by querying log aggregation for the credential —
+which is the mechanism phase 7 proposes, used by hand.
+Planning it found the sixth: `sf-queues` logs every
+configuration item at INFO on startup, so `AUTH_SECRET_SEED`
+and `MARIADB_PASSWORD` were written out in full and shipped
+to Loki on every daemon start. Executing it found the
+seventh, in the sweep step: `BlobTransfer.external_view()`
+published the transfer's authorisation token, and every
+caller of that method passes the result into an audit event
+or a log line, so a live credential left the cluster on every
+blob transfer. Both are fixed. See phase 6's survey and its
+step 6f for the evidence.
+
+That two of the seven were found by a standing query and
+none by review is the strongest argument this plan has for
+phase 7, and for building the log-sink half of it first.
 
 Neither blocks phases 3–5. There was an ordering hazard here
 — phase 7's secret format needed to be settled before phase
@@ -1158,6 +1168,35 @@ implemented because the following statements will be true:
   purging the existing log entries is a Loki retention
   question. Operator guidance for both belongs in
   `docs/operator_guide/`.
+* **`BlobTransfer.token` as a `SecretStr`.** Phase 6's sweep
+  found this field is a bearer credential -- the transfers
+  daemon compares it against what an inbound connection
+  presents before sending blob data -- and that
+  `external_view()` published it into two audit events and
+  the transfers daemon's log fields, so it was reaching Loki
+  on every blob transfer. Phase 6 removed it from
+  `external_view()`, which closes every path it was
+  escaping by, and stopped there: wrapping the field itself
+  touches about fourteen sites across `mariadb.py`, the
+  database daemon, `blob.py` and the transfers daemon, which
+  is a change the size of phase 6's own step 6c and not what
+  the sweep step was scoped for. Worth doing for the same
+  reason the namespace key fields were done, just not as an
+  afterthought to a documentation step.
+* **Secret material in `util/vdi_tokens.py`.** The Kerbside
+  signing key's private PEM is handled as plain strings
+  inside a dict stored in a `cluster_config` row. It is
+  protected today by convention plus the row name ending in
+  `_KEY` so `SECRET_CONFIG_KEY_RE` masks it in
+  `show-config`, and its module docstring is explicit that
+  private key material must never be logged, evented or
+  served. Nothing found it leaking. Wrapping it means
+  restructuring that dict rather than changing a field type,
+  hence deferred. Note separately that `load_cluster_config()`
+  pushes every `cluster_config` row into the environment of
+  every daemon, so the private key is present in each
+  daemon's environ -- a different exposure surface from
+  logging, and one this plan has not examined.
 * **Wrapping the minted plaintext key secret.** Phase 6
   Decision 6 leaves `credentials.generate()`'s output a plain
   `str`. It is the one value in the system which is an actual

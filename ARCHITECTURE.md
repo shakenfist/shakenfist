@@ -1117,6 +1117,21 @@ The develop branch uses:
   `api_base.handles_credentials()`, and drop the body wholesale rather than
   redacting named fields — a name-based rule leaks the day a route arrives
   whose credential field it has not heard of
+- Secret-carrying fields are `pydantic.SecretStr`, so stringifying one
+  anywhere yields `**********` and the plaintext comes back only from an
+  explicit `.get_secret_value()` call. This covers the namespace key hash
+  and nonce plus `AUTH_SECRET_SEED`, `MARIADB_PASSWORD` and
+  `LOKI_AUTH_HEADER`, and complements rather than replaces the structural
+  rules above: the request-body rule catches a credential arriving before
+  any model exists, and the `sf-queues` startup banner redacts by
+  configuration key name because it iterates every option, including ones
+  not yet typed. Both leaks closed during this work — that banner, and
+  `BlobTransfer.external_view()` publishing a transfer's authorisation
+  token into events — were found by querying Loki for the credential
+  rather than by review. See `docs/developer_guide/authentication.md`,
+  which also explains why assertions about secrets must compare
+  `.get_secret_value()`: both obvious alternatives make a leak guard pass
+  while checking nothing
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 
