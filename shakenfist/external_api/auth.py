@@ -184,7 +184,13 @@ class AuthEndpoint(api_base.Resource):
         keys = {} if malformed else namespace_from_db.keys.get(
             'nonced_keys', {})
         for keyname in keys:
-            possible_key = base64.b64decode(keys[keyname]['key'])
+            # The accessor hands out the hash as a SecretStr; bcrypt
+            # needs the real bytes, so this is one of the two places
+            # which unwraps. The nonce below stays wrapped -- it is
+            # passed straight to create_token(), which unwraps it into
+            # the JWT claim itself.
+            possible_key = base64.b64decode(
+                keys[keyname]['key'].get_secret_value())
             try:
                 if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                     # One extra point read, and only on the successful

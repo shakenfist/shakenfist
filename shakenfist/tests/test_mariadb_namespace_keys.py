@@ -566,7 +566,8 @@ class DirectFindNamespaceKeysTestCase(base.ShakenFistTestCase):
         first_static, first_attrs = results[0]
         self.assertEqual('first', first_static.name)
         self.assertEqual('banana', first_static.namespace)
-        self.assertEqual('aGFzaC1vbmU=', first_attrs.key)
+        self.assertEqual(
+            'aGFzaC1vbmU=', first_attrs.key.get_secret_value())
         self.assertIsNone(first_attrs.expiry)
         self.assertIsNone(first_attrs.scopes)
         self.assertIsNone(first_attrs.provenance)
@@ -637,7 +638,7 @@ class DirectGetNamespaceKeyByNameTestCase(base.ShakenFistTestCase):
         static_data, attrs = row
         self.assertEqual('keyname', static_data.name)
         self.assertEqual('banana', static_data.namespace)
-        self.assertEqual('nonce-one', attrs.nonce)
+        self.assertEqual('nonce-one', attrs.nonce.get_secret_value())
         self.assertEqual(2000.0, attrs.expiry)
         self.assertEqual(['read'], attrs.scopes)
         self.assertEqual({'source': 'oidc'}, attrs.provenance)

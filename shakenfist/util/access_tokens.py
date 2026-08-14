@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
+from pydantic import SecretStr
 
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def create_token(
-    ns: 'Namespace', keyname: str, nonce: str,
+    ns: 'Namespace', keyname: str, nonce: SecretStr,
     duration: int = config.API_TOKEN_DURATION,
     scopes: Optional[list[str]] = None
 ) -> dict[str, str | int]:
@@ -39,9 +40,15 @@ def create_token(
     # and must mint a token which satisfies nothing. Testing scopes for
     # truthiness makes an empty grant mean total access, which is the
     # worst direction for an authorisation bug to fail in.
+    #
+    # The nonce arrives wrapped and is unwrapped here, which is the only
+    # place it legitimately becomes a plain string. Getting this wrong
+    # fails loudly rather than silently: a masked nonce in the claim
+    # never matches the stored one, so verify_token() rejects every
+    # request minted from the key.
     claims = {
         'iss': config.ZONE,
-        'nonce': nonce,
+        'nonce': nonce.get_secret_value(),
         'scopes': (list(scopes) if scopes is not None
                    else [api_scopes.WILDCARD])
     }

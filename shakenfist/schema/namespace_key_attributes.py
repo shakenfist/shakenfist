@@ -16,6 +16,7 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import SecretStr
 from pydantic import UUID4
 
 from shakenfist.schema.sqlalchemy import SQLNativeUUID
@@ -31,10 +32,17 @@ class NamespaceKeyAttributesData(BaseModel):
         uuid: The NamespaceKey's unique identifier (FK to
             namespace_keys).
         key: The base64-encoded bcrypt hash of the key's secret. Never
-            the plaintext, and never exposed by external_view().
+            the plaintext, and never exposed by external_view(). A
+            SecretStr, so stringifying it anywhere -- an f-string, a
+            log line, an event's extra dict -- yields asterisks rather
+            than the hash. Read the real value with
+            .get_secret_value(), which is deliberately conspicuous.
         nonce: The nonce embedded in tokens minted from this key.
             Rotating the key changes the nonce, which invalidates
-            every outstanding token that referenced the old one.
+            every outstanding token that referenced the old one. Also
+            a SecretStr: publishing a nonce tells a reader which of
+            their captured tokens are still live and confirms no
+            rotation has happened, so it is a secret in its own right.
         expiry: Nullable epoch seconds after which the key may no
             longer mint or validate tokens. NULL means the key never
             expires.
@@ -53,11 +61,15 @@ class NamespaceKeyAttributesData(BaseModel):
     # The NamespaceKey's UUID - primary key
     uuid: Annotated[UUID4, SQLNativeUUID()]
 
-    # Base64-encoded bcrypt hash of the key secret
-    key: Annotated[str, Field(max_length=255)]
+    # Base64-encoded bcrypt hash of the key secret. SecretStr maps to
+    # the same VARCHAR(255) a plain str does (see
+    # PYTHON_TO_SQLALCHEMY in schema/sqlalchemy.py), so this is a
+    # Python-side type change with no schema consequence -- the table
+    # is still at version 1.
+    key: Annotated[SecretStr, Field(max_length=255)]
 
     # Nonce, compared on every token validation
-    nonce: Annotated[str, Field(max_length=255)]
+    nonce: Annotated[SecretStr, Field(max_length=255)]
 
     # Nullable epoch seconds; NULL means "never expires"
     expiry: Optional[float] = None

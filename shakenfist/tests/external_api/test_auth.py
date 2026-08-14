@@ -592,10 +592,11 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
 
         rotated = Namespace.from_db('system').lookup_key('rotate-me')
         self.assertNotEqual(original.nonce, rotated.nonce)
+        rotated_hash = rotated.key.get_secret_value()
         self.assertTrue(bcrypt.checkpw(
-            'replacement'.encode('utf-8'), base64.b64decode(rotated.key)))
+            'replacement'.encode('utf-8'), base64.b64decode(rotated_hash)))
         self.assertFalse(bcrypt.checkpw(
-            'original'.encode('utf-8'), base64.b64decode(rotated.key)))
+            'original'.encode('utf-8'), base64.b64decode(rotated_hash)))
 
     def test_update_key_accepts_an_expiry(self):
         self._add_key('rotate-me', 'original')
@@ -639,7 +640,8 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         unchanged = Namespace.from_db('system').lookup_key('rotate-me')
         self.assertEqual(original.nonce, unchanged.nonce)
         self.assertTrue(bcrypt.checkpw(
-            'original'.encode('utf-8'), base64.b64decode(unchanged.key)))
+            'original'.encode('utf-8'),
+            base64.b64decode(unchanged.key.get_secret_value())))
 
 
 class ExternalApiTestCase(base.ShakenFistTestCase):

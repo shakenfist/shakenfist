@@ -9,6 +9,7 @@ import json
 from unittest import mock
 
 import bcrypt
+from pydantic import SecretStr
 
 from shakenfist import exceptions
 from shakenfist.constants import get_object_class
@@ -41,6 +42,32 @@ class NamespaceKeyTestCase(base.ShakenFistTestCase):
                 if d.name == name
                 and (namespace is None or d.namespace == namespace)]
 
+    def _assert_no_secret_material(self, mock_add_event, attrs):
+        """Assert no event carries the stored hash or the nonce.
+
+        The needles are unwrapped with get_secret_value() deliberately,
+        and this helper exists so the reason is written down once rather
+        than re-derived at each call site.
+
+        Both of the obvious spellings are broken now that these fields
+        are SecretStr, and neither breaks loudly.
+        ``assertNotIn(attrs.key, haystack)`` passes unconditionally:
+        testtools' Contains matcher does not require the needle to be a
+        string, and a SecretStr is never a substring of one. That is not
+        hypothetical -- these two tests silently stopped testing anything
+        the moment the field type changed, and only a deliberate check
+        caught it. ``assertNotIn(str(attrs.key), haystack)`` is worse,
+        because it asserts the literal '**********' is absent, which is
+        true of an event which leaked the real secret.
+
+        See docs/plans/PLAN-auth-federation-phase-06-secret-types.md,
+        Decision 7. test_the_secret_guard_detects_a_real_leak() proves
+        this helper still fails when a secret genuinely escapes.
+        """
+        for call in mock_add_event.call_args_list:
+            self.assertNotIn(attrs.key.get_secret_value(), str(call))
+            self.assertNotIn(attrs.nonce.get_secret_value(), str(call))
+
 
 class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
     def test_new_writes_both_rows_and_is_created(self):
@@ -60,7 +87,7 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         # this phase were checked against hashes built this way.
         k = NamespaceKey.new('banana', 'deploy', 'sekrit')
 
-        stored = self._attributes(k).key
+        stored = self._attributes(k).key.get_secret_value()
         self.assertTrue(bcrypt.checkpw(
             'sekrit'.encode('utf-8'), base64.b64decode(stored)))
         self.assertFalse(bcrypt.checkpw(
@@ -72,7 +99,7 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             k = NamespaceKey.new('banana', 'deploy', 'sekrit')
 
         mock_random_id.assert_called_once_with()
-        self.assertEqual('noncenonce', k.nonce)
+        self.assertEqual('noncenonce', k.nonce.get_secret_value())
 
     def test_new_stores_expiry_scopes_and_provenance(self):
         k = NamespaceKey.new(
@@ -94,19 +121,23 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         # Namespace.add_key() has always overwritten a key of the same
         # name rather than erroring, and that must keep working.
         first = NamespaceKey.new('banana', 'deploy', 'sekrit', expiry=2000.0)
-        original_hash = self._attributes(first).key
-        original_nonce = self._attributes(first).nonce
+        original_hash = self._attributes(first).key.get_secret_value()
+        original_nonce = self._attributes(first).nonce.get_secret_value()
 
         second = NamespaceKey.new('banana', 'deploy', 'different')
 
         # Same object, new secret material...
         self.assertEqual(first.uuid, second.uuid)
         self.assertEqual(1, len(self._keys_named('deploy', 'banana')))
-        self.assertNotEqual(original_hash, self._attributes(second).key)
-        self.assertNotEqual(original_nonce, self._attributes(second).nonce)
+        self.assertNotEqual(
+            original_hash, self._attributes(second).key.get_secret_value())
+        self.assertNotEqual(
+            original_nonce,
+            self._attributes(second).nonce.get_secret_value())
         self.assertTrue(bcrypt.checkpw(
             'different'.encode('utf-8'),
-            base64.b64decode(self._attributes(second).key)))
+            base64.b64decode(
+                self._attributes(second).key.get_secret_value())))
 
         # ...and the whole attribute set is replaced, so the expiry the
         # first call set is gone, exactly as add_key() behaved.
@@ -130,7 +161,8 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             attributes_rows, len(self.mock_mariadb.namespace_key_attributes))
         self.assertTrue(bcrypt.checkpw(
             'different'.encode('utf-8'),
-            base64.b64decode(self._attributes(loser).key)))
+            base64.b64decode(
+                self._attributes(loser).key.get_secret_value())))
 
     def test_the_same_name_in_another_namespace_is_a_different_key(self):
         self.mock_mariadb.create_namespace('apple', 'key1', 'bacon')
@@ -148,9 +180,50 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
 
         attrs = self._attributes(k)
         self.assertNotEqual(0, len(mock_add_event.call_args_list))
-        for call in mock_add_event.call_args_list:
-            self.assertNotIn(attrs.key, str(call))
-            self.assertNotIn(attrs.nonce, str(call))
+        self._assert_no_secret_material(mock_add_event, attrs)
+
+    def test_the_secret_guard_detects_a_real_leak(self):
+        """Prove the guard above is capable of failing.
+
+        A test which cannot fail is not a test, and the two guards in
+        this file were exactly that for the length of one edit -- see
+        _assert_no_secret_material(). This deliberately leaks the hash
+        and then the nonce into an event and asserts the helper objects
+        to each, so that any future repair which makes the guards
+        vacuous fails here instead of passing quietly.
+        """
+        with mock.patch('shakenfist.eventlog.add_event'):
+            k = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        attrs = self._attributes(k)
+
+        for leaked in [attrs.key.get_secret_value(),
+                       attrs.nonce.get_secret_value()]:
+            leaky = mock.MagicMock()
+            leaky.call_args_list = [
+                mock.call('objtype', 'uuid', 'audit', 'leaked',
+                          extra={'oops': leaked})]
+            self.assertRaises(
+                Exception, self._assert_no_secret_material, leaky, attrs)
+
+    def test_a_masked_secret_is_not_mistaken_for_absence(self):
+        """The other half of Decision 7.
+
+        An event carrying the rendered form of a SecretStr contains
+        '**********' and not the secret, so the guard must pass on it.
+        This pins that the guard tests the real value rather than the
+        mask -- if it were rewritten to compare str(attrs.key), this
+        event would look like a leak and the test would fail.
+        """
+        with mock.patch('shakenfist.eventlog.add_event'):
+            k = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        attrs = self._attributes(k)
+
+        masked = mock.MagicMock()
+        masked.call_args_list = [
+            mock.call('objtype', 'uuid', 'audit', 'masked',
+                      extra={'key': str(attrs.key),
+                             'nonce': str(attrs.nonce)})]
+        self._assert_no_secret_material(masked, attrs)
 
 
 class NamespaceKeyLookupTestCase(NamespaceKeyTestCase):
@@ -186,17 +259,26 @@ class NamespaceKeyLookupTestCase(NamespaceKeyTestCase):
 class NamespaceKeyRotationTestCase(NamespaceKeyTestCase):
     def test_rotate_changes_both_hash_and_nonce(self):
         k = NamespaceKey.new('banana', 'deploy', 'sekrit')
-        original_hash = self._attributes(k).key
-        original_nonce = self._attributes(k).nonce
+        original_hash = self._attributes(k).key.get_secret_value()
+        original_nonce = self._attributes(k).nonce.get_secret_value()
 
         returned_nonce = k.rotate('newsekrit')
 
-        self.assertNotEqual(original_hash, self._attributes(k).key)
-        self.assertNotEqual(original_nonce, self._attributes(k).nonce)
-        self.assertEqual(self._attributes(k).nonce, returned_nonce)
+        self.assertNotEqual(
+            original_hash, self._attributes(k).key.get_secret_value())
+        self.assertNotEqual(
+            original_nonce, self._attributes(k).nonce.get_secret_value())
+        # rotate() returns a SecretStr, matching what it stored. Compared
+        # unwrapped so a mismatch reports the values rather than two
+        # identical rows of asterisks.
+        self.assertIsInstance(returned_nonce, SecretStr)
+        self.assertEqual(
+            self._attributes(k).nonce.get_secret_value(),
+            returned_nonce.get_secret_value())
         self.assertTrue(bcrypt.checkpw(
             'newsekrit'.encode('utf-8'),
-            base64.b64decode(self._attributes(k).key)))
+            base64.b64decode(
+                self._attributes(k).key.get_secret_value())))
 
     def test_rotate_keeps_the_object_identity_and_state(self):
         k = NamespaceKey.new('banana', 'deploy', 'sekrit')
@@ -214,9 +296,7 @@ class NamespaceKeyRotationTestCase(NamespaceKeyTestCase):
 
         attrs = self._attributes(k)
         self.assertNotEqual(0, len(mock_add_event.call_args_list))
-        for call in mock_add_event.call_args_list:
-            self.assertNotIn(attrs.key, str(call))
-            self.assertNotIn(attrs.nonce, str(call))
+        self._assert_no_secret_material(mock_add_event, attrs)
 
 
 class NamespaceKeyExpiryTestCase(NamespaceKeyTestCase):
@@ -245,8 +325,11 @@ class NamespaceKeyExternalViewTestCase(NamespaceKeyTestCase):
         self.assertNotIn('key', view)
         self.assertNotIn('nonce', view)
         serialised = json.dumps(view, default=str)
-        self.assertNotIn(attrs.key, serialised)
-        self.assertNotIn(attrs.nonce, serialised)
+        # Unwrapped needles, for the reasons on
+        # _assert_no_secret_material(): a SecretStr needle would make
+        # both of these pass whatever the view contained.
+        self.assertNotIn(attrs.key.get_secret_value(), serialised)
+        self.assertNotIn(attrs.nonce.get_secret_value(), serialised)
 
     def test_external_view_exposes_the_operator_visible_fields(self):
         k = NamespaceKey.new(

@@ -22,6 +22,7 @@ from uuid import UUID
 from uuid import uuid4
 
 import bcrypt
+from pydantic import SecretStr
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sfrandom  # noreorder
 
@@ -188,8 +189,12 @@ class NamespaceKey(dbo):
             'namespace': namespace,
             'name': name,
             'version': cls.current_version,
-            'key': hash_secret(plaintext_secret),
-            'nonce': sfrandom.random_id(),
+            # Wrapped here rather than left for the model to coerce, so
+            # that the strip in _db_create() is belt and this is braces:
+            # if that filter were ever removed, the audit event would
+            # carry asterisks rather than the hash and the nonce.
+            'key': SecretStr(hash_secret(plaintext_secret)),
+            'nonce': SecretStr(sfrandom.random_id()),
             'expiry': expiry,
             'scopes': scopes,
             'provenance': provenance
@@ -217,7 +222,7 @@ class NamespaceKey(dbo):
 
     def rotate(self, plaintext_secret: str, expiry: Optional[float] = None,
                scopes: Optional[list[str]] = None,
-               provenance: Optional[dict[str, Any]] = None) -> str:
+               provenance: Optional[dict[str, Any]] = None) -> SecretStr:
         """Replace the key's secret with a new hash and a new nonce.
 
         The whole mutable attribute set is replaced, not just the
@@ -225,15 +230,17 @@ class NamespaceKey(dbo):
         has always done: passing no expiry clears any expiry the key
         used to have.
 
-        Returns the new nonce, as Namespace.add_key() does today.
+        Returns the new nonce, as Namespace.add_key() does today, and
+        wrapped for the same reason the stored value is: a nonce tells a
+        holder of captured tokens which of them are still live.
         """
         _uuid = _as_uuid(self.uuid)
-        nonce = sfrandom.random_id()
+        nonce = SecretStr(sfrandom.random_id())
 
         with self.get_lock_attr('key', 'Rotate key'):
             attrs = NamespaceKeyAttributesData(
                 uuid=_uuid,
-                key=hash_secret(plaintext_secret),
+                key=SecretStr(hash_secret(plaintext_secret)),
                 nonce=nonce,
                 expiry=expiry,
                 scopes=scopes,
@@ -265,19 +272,26 @@ class NamespaceKey(dbo):
         return mariadb.get_namespace_key_attributes(_as_uuid(self.uuid))
 
     @property
-    def key(self) -> Optional[str]:
-        """The base64 encoded bcrypt hash. Secret -- never externalise."""
+    def key(self) -> Optional[SecretStr]:
+        """The base64 encoded bcrypt hash. Secret -- never externalise.
+
+        Returned wrapped, so a caller which logs it gets asterisks. The
+        only consumer needing the real bytes is the bcrypt comparison in
+        /auth, which unwraps explicitly.
+        """
         attrs = self._attributes()
         if not attrs:
             return None
         return attrs.key
 
     @property
-    def nonce(self) -> Optional[str]:
+    def nonce(self) -> Optional[SecretStr]:
         """The nonce embedded in tokens minted from this key.
 
         Secret in the sense that it must never leave the cluster: it is
-        the revocation handle, and rotation changes it.
+        the revocation handle, and rotation changes it. Returned wrapped
+        for the same reason as key(); the token minting path unwraps it
+        into the JWT claim.
         """
         attrs = self._attributes()
         if not attrs:

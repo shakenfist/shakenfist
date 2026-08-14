@@ -35,6 +35,7 @@ from uuid import uuid4
 
 import grpc
 from prometheus_client import Counter
+from pydantic import SecretStr
 import sqlalchemy as sa
 from sqlalchemy import event as sa_event
 from sqlalchemy.dialects.mysql import INET4
@@ -12661,8 +12662,8 @@ def _direct_get_namespace_key_by_name(
                 ),
                 NamespaceKeyAttributesData(
                     uuid=row.uuid,
-                    key=row.key,
-                    nonce=row.nonce,
+                    key=SecretStr(row.key),
+                    nonce=SecretStr(row.nonce),
                     expiry=row.expiry,
                     scopes=_decode_optional_json_list(row.scopes),
                     provenance=_decode_optional_json_dict(row.provenance)
@@ -12766,8 +12767,8 @@ def _direct_find_namespace_keys(
                     ),
                     NamespaceKeyAttributesData(
                         uuid=row.uuid,
-                        key=row.key,
-                        nonce=row.nonce,
+                        key=SecretStr(row.key),
+                        nonce=SecretStr(row.nonce),
                         expiry=row.expiry,
                         scopes=_decode_optional_json_list(row.scopes),
                         provenance=_decode_optional_json_dict(row.provenance)
@@ -12844,10 +12845,15 @@ def _direct_create_namespace_key_attributes(
 
     try:
         with engine.connect() as conn:
+            # The hash and the nonce are SecretStr on the model, so they
+            # are unwrapped here rather than handed to SQLAlchemy as
+            # objects. This is the storage boundary: below it the value
+            # is a VARCHAR, above it a type which will not stringify by
+            # accident.
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
-                key=data.key,
-                nonce=data.nonce,
+                key=data.key.get_secret_value(),
+                nonce=data.nonce.get_secret_value(),
                 expiry=data.expiry,
                 scopes=(None if data.scopes is None
                         else _json_dumps(data.scopes)),
@@ -12882,8 +12888,8 @@ def _direct_get_namespace_key_attributes(
 
             return NamespaceKeyAttributesData(
                 uuid=result.uuid,
-                key=result.key,
-                nonce=result.nonce,
+                key=SecretStr(result.key),
+                nonce=SecretStr(result.nonce),
                 expiry=result.expiry,
                 scopes=_decode_optional_json_list(result.scopes),
                 provenance=_decode_optional_json_dict(result.provenance)
@@ -12903,11 +12909,12 @@ def _direct_update_namespace_key_attributes(
 
     try:
         with engine.connect() as conn:
+            # Unwrapped at the storage boundary, as in the insert above.
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                key=data.key,
-                nonce=data.nonce,
+                key=data.key.get_secret_value(),
+                nonce=data.nonce.get_secret_value(),
                 expiry=data.expiry,
                 scopes=(None if data.scopes is None
                         else _json_dumps(data.scopes)),
@@ -12977,11 +12984,16 @@ def _namespace_key_attrs_to_proto(
     Nullable fields use proto3 field presence: expiry, scopes_json and
     provenance_json are simply left unset when the model value is
     None, so NULL survives the round trip.
+
+    The hash and the nonce are unwrapped from SecretStr here because
+    protobuf string fields will not take the wrapper. This is the wire
+    boundary; _namespace_key_attrs_from_proto() re-wraps on the way back
+    in, so the secret is a SecretStr everywhere above the transport.
     """
     proto = database_pb2.NamespaceKeyAttributesProto(
         uuid=str(data.uuid),
-        key=data.key,
-        nonce=data.nonce
+        key=data.key.get_secret_value(),
+        nonce=data.nonce.get_secret_value()
     )
     if data.expiry is not None:
         proto.expiry = data.expiry
@@ -12998,8 +13010,8 @@ def _namespace_key_attrs_from_proto(
     """Build a NamespaceKeyAttributesData model from its proto."""
     return NamespaceKeyAttributesData(
         uuid=UUID(d.uuid),
-        key=d.key,
-        nonce=d.nonce,
+        key=SecretStr(d.key),
+        nonce=SecretStr(d.nonce),
         expiry=d.expiry if d.HasField('expiry') else None,
         scopes=(json.loads(d.scopes_json)
                 if d.HasField('scopes_json') else None),

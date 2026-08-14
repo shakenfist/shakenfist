@@ -193,6 +193,15 @@ class Namespace(dbo):
         verify_token need them. Nothing which does not authenticate a
         request should use it -- external_view() is the operator
         visible shape.
+
+        The 'key' and 'nonce' values are SecretStr, deliberately left
+        wrapped rather than unwrapped into this dict. An untyped dict is
+        exactly the shape which stringifies into a log line without
+        anything objecting, and this is the highest traffic secret path
+        in the system, so the protection is kept all the way to the two
+        consumers -- the bcrypt comparison and token minting, both in
+        /auth -- which unwrap at the point of use. Callers reading only
+        key names (there are several) are unaffected.
         """
         nonced_keys = {}
         for key, attrs in namespace_key.keys_with_attributes(
@@ -254,7 +263,10 @@ class Namespace(dbo):
         so a key cannot be minted with more privilege than the caller
         creating it.
 
-        Returns the new nonce, as it always has.
+        Returns the new nonce, as it always has, wrapped as a SecretStr
+        to match NamespaceKey.rotate(). Only one caller uses the return
+        value -- get_api_token() below, which hands it straight to
+        create_token() and so never needs it unwrapped.
         """
         key = namespace_key.NamespaceKey.new(
             self.uuid, name, value, expiry=expiry, scopes=scopes)
