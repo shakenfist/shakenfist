@@ -6238,6 +6238,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 6: sessions, sources and audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -11811,7 +11839,7 @@ locally-running kerbside.</p>
 <tr>
 <td>6. Sessions, sources and audit pages</td>
 <td>PLAN-sfui-conversion-phase-06-remaining-pages.md</td>
-<td>Not started</td>
+<td>Done</td>
 </tr>
 <tr>
 <td>7. morphdom polling</td>
@@ -11910,7 +11938,14 @@ locally-running kerbside.</p>
    shared table styling throughout, the sources CA
    disclosure, the audit page's stray <code>&lt;/td&gt;</code>/unclosed
    <code>&lt;tr&gt;</code>, and make use of <code>total_events</code> on the audit
-   page.</li>
+   page.
+   <strong>Amended in phase 6 planning:</strong> this phase is
+   template-only — every primitive it needs already exists
+   in the vendored <code>sf.css</code>, so there is no canonical sfui
+   step and no re-vendor; and the two-step terminate script
+   moves out of <code>consoles.html</code> into a shared
+   <code>templates/includes/two-step-terminate.html</code> here, so
+   phase 8's POST conversion edits one copy.</li>
 <li><strong>morphdom polling</strong> (plan at medium effort, following
    the dashboard pattern). Replace the meta refresh: fetch
    the current URL with <code>Accept: text/html</code>, parse, and
