@@ -11217,6 +11217,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#q5-why-does-the-web-stream-never-recover-from-sustained-surface-churn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q5 — Why does the web stream never recover from sustained surface churn?
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11372,6 +11383,33 @@ after the patched libspice-server is in place.</p>
 contention model. If a 006-style follow-up shows the
 workload-driven command ring is the real floor, Q4 won't help
 and phase 17 is cancelled rather than executed.</p>
+<h3 id="q5-why-does-the-web-stream-never-recover-from-sustained-surface-churn">Q5 — Why does the web stream never recover from sustained surface churn?<a class="headerlink" href="#q5-why-does-the-web-stream-never-recover-from-sustained-surface-churn" title="Permanent link">&para;</a></h3>
+<p><strong>Linked plan:</strong>
+<a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">webrtc-0.20 phase 01 pre-work, "Found during execution"</a>
+(where the symptom was recorded during the baseline soaks).</p>
+<p><strong>Symptom history:</strong></p>
+<ul>
+<li>During the phase-01 baseline soaks (August 2026), the
+  uefi-latency-guest performed a full video-mode reset (SPICE
+  surface destroy → 640x480 → recreate 1280x800) on every
+  colour change, and the browser stream took a few seconds to
+  recover from each one.</li>
+<li>Driving a colour change every 5 s — faster than recovery —
+  wedged the viewer on black <em>permanently</em>, even though ryll's
+  logs showed the surfaces cycling and the encoder restarting.
+  At a 30 s cadence, recovery completed every time.</li>
+</ul>
+<p><strong>What would close it:</strong> identifying which layer stops
+delivering — encoder output, RTP pump, or browser-side decode —
+when a mode-set interrupts an in-progress recovery, and a fix
+making recovery convergent at any churn cadence. The wedge
+reproduces on demand: <code>make test-qemu</code>, <code>ryll --web</code>, and a QMP
+<code>sendkey</code> every 5 s.</p>
+<p><strong>Why parked:</strong> real desktops rarely mode-set repeatedly, so
+this is a robustness gap rather than a dogfooding blocker, and
+the webrtc-0.20 port (phases 02–04) rewrites the adjacent code
+paths — diagnosis before the port would likely be throwaway
+work.</p>
 <h2 id="when-to-add-a-new-entry">When to add a new entry<a class="headerlink" href="#when-to-add-a-new-entry" title="Permanent link">&para;</a></h2>
 <p>Add a Q-entry here when <strong>all</strong> of the following hold:</p>
 <ol>

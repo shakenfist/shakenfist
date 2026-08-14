@@ -12022,19 +12022,25 @@ come down by at least as much, and its risk comes down more.</p>
    asserts the local description carries <code>a=candidate:</code> lines the
    instant <code>wait_for_gathering</code> returns.
    <code>accept_offer_answer_carries_all_candidates</code> additionally runs
-   the full exchange 20 times and asserts a non-zero, invariant
-   candidate count. The sticky-signal design needs no second
-   condition, and this open question no longer inflates phase 02's
-   estimate.</p>
+   the full exchange repeatedly and asserts a non-zero candidate
+   count every time (5 iterations in the smoke tier; the 20-run
+   invariant-count soak is gated behind <code>RYLL_GATHERING_SOAK=1</code>
+   after PR #267 review flagged the exact-equality check as
+   coupled to host interface churn). The sticky-signal design
+   needs no second condition, and this open question no longer
+   inflates phase 02's estimate.</p>
 </li>
 <li>
-<p><strong>Should <code>test-support</code> be a feature or a separate crate?</strong> A
-   feature is lighter and matches the workspace, but it means
-   <code>shakenfist-spice-webrtc</code> — a published crate — carries test
-   scaffolding in its source tree. If that grates, the
-   alternative is a <code>shakenfist-spice-webrtc-testkit</code> dev-only
-   workspace member. Decide during 1c; the migration is the same
-   either way.</p>
+<p>~~<strong>Should <code>test-support</code> be a feature or a separate crate?</strong>~~
+   <strong>Answered during 1c: a feature.</strong> It is lighter, matches the
+   workspace, and the reasoning is recorded in the crate's
+   <code>Cargo.toml</code> comment. The accepted consequence is that
+   <code>src/test_client.rs</code> (~500 lines) ships in the published
+   crates.io tarball for <code>shakenfist-spice-webrtc</code>; it has no
+   production-surface impact because the module is gated behind
+   <code>#[cfg(any(test, feature = "test-support"))]</code> and the feature
+   is off by default. If the tarball weight ever grates, the
+   <code>-testkit</code> crate split remains available.</p>
 </li>
 <li>
 <p><strong>Does <code>loopback.rs</code>'s <code>on_track</code> wiring belong in the
@@ -12070,6 +12076,19 @@ the process exits.</p>
 <p>This is a genuine production bug fix that happens to have been
 found by porting work, not a refactor. It is called out here so
 it is not mistaken for one.</p>
+<p>The PR #267 review then pointed out that the fix left the
+correct-but-subtle pattern copy-pasted at four sites — the exact
+duplication that produced the original bug. The wait and raise
+halves are now consolidated into
+<code>shakenfist_spice_webrtc::StickySignal</code> (<code>src/sticky.rs</code>), used
+by <code>wait_for_dead</code>, <code>wait_for_gathering</code>,
+<code>TestPeer::offer_and_gather</code>, and the ryll bridge reaper (which
+takes a single <code>dead_signal()</code> handle in place of the old
+<code>dead_handle()</code>/<code>dead_flag_handle()</code> pair). The type carries unit
+tests for the pre-raised fast path, the lost-wakeup schedule
+itself (raise after the waiter registered but before it was
+woken), and multiple/repeat waiters — coverage the inline copies
+could not have without a running ICE stack.</p>
 <h3 id="the-notify-path-versus-the-fast-path">The notify path versus the fast path<a class="headerlink" href="#the-notify-path-versus-the-fast-path" title="Permanent link">&para;</a></h3>
 <p>Whether <code>wait_for_gathering</code>'s first call blocks on the
 notification or finds the flag already set is timing-dependent,
@@ -12090,8 +12109,10 @@ faster than recovery, and the viewer then shows black
 the surfaces cycling and the encoder restarting. At a 30 s
 cadence recovery completes every time. Real desktops rarely
 mode-set repeatedly, so this is a robustness gap rather than a
-dogfooding blocker, but it is worth a standalone issue: the
-encoder/stream should survive surface churn at any cadence.</p>
+dogfooding blocker. Tracked as
+<a href="/components/ryll/plans/OPEN-QUESTIONS/">Q5 in OPEN-QUESTIONS.md</a>: the encoder/stream
+should survive surface churn at any cadence, and the right time
+to diagnose is after the 0.20 port rewrites the adjacent paths.</p>
 
 
 
