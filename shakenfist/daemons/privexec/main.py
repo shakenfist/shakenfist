@@ -137,6 +137,16 @@ class PrivExecJob:
             privexec_pb2.HashAlgorithm.XXH128: 'xxh128sum'
         }
 
+        if not os.path.exists(req.path):
+            log.error('Failed to hash file, file not found')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    error=privexec_pb2.HashFileReply.FILE_NOT_FOUND
+                )
+            )
+
         if req.algorithm not in hash_commands:
             log.error('Failed to hash file, no hasher found')
             return privexec_pb2.PrivExecReply(
