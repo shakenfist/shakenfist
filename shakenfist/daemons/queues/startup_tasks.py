@@ -13,6 +13,7 @@ from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.blob import Blob
 from shakenfist.config import config
+from shakenfist.config import SECRET_CONFIG_KEY_RE
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
@@ -218,6 +219,44 @@ def _resolve_node_uuid():
             'Resolved node UUID during startup tasks')
 
 
+def redacted_config_items():
+    """The configuration as (key, value) pairs, with secrets masked.
+
+    The startup banner below writes these at INFO, and INFO and above is
+    shipped off the node to Loki (see shakenfist/logship.py), so a
+    secret which reaches this loop leaves the cluster and lands in log
+    aggregation. AUTH_SECRET_SEED and MARIADB_PASSWORD did exactly that
+    until this was added.
+
+    The test is on the key name rather than the value's type because
+    this iterates *every* configuration item, including options which
+    do not exist yet. The secret-carrying fields are separately typed
+    SecretStr, which covers every other path one might be stringified
+    on; the two mechanisms are complementary rather than redundant, and
+    removing either re-opens a hole the other does not close. See
+    docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+
+    The predicate over-matches by design -- it is shared with
+    sf-ctl show-config, where hiding a value behind --show-secrets costs
+    nothing. This banner has no such escape hatch, so numbers are
+    exempted: API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES and
+    KERBSIDE_TOKEN_DURATION all match the name pattern, none of them can
+    be a credential, and all three are tunables an operator reads this
+    output to confirm. A credential is always a string (or a SecretStr,
+    which is not an int either, so it is still masked here as well as
+    rendering as asterisks on its own).
+
+    Field order is deliberately left as the model reports it, because
+    operators grep this output.
+    """
+    for key, value in config.model_dump().items():
+        numeric = isinstance(value, (bool, int, float))
+        if SECRET_CONFIG_KEY_RE.search(key) and not numeric:
+            yield key, '<redacted>'
+        else:
+            yield key, value
+
+
 def startup_tasks():
     # Ensure NODE_UUID is resolved before we try to use it. This runs
     # before the daemon's run() method which would normally resolve it.
@@ -245,7 +284,7 @@ def startup_tasks():
     n.add_event(EVENT_TYPE_AUDIT, f'node is running v{version}')
 
     # Log configuration on startup
-    for key, value in config.model_dump().items():
+    for key, value in redacted_config_items():
         LOG.info(f'Configuration item {key} = {value}')
 
     daemon.set_log_level(LOG, 'main')

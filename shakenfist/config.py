@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 import json
 import os
+import re
 import socket
 import sys
 from typing import Annotated
@@ -13,6 +14,35 @@ from pydantic import BeforeValidator
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import NoDecode
+
+
+# Configuration keys whose values are secrets, matched by name.
+#
+# Two callers need the same answer and must not disagree about it, which
+# is why this lives here rather than in either of them: sf-ctl's
+# show-config redacts matches by default so its output is safe to log
+# (and set-config avoids echoing their values), and the daemon startup
+# banner in daemons/queues/startup_tasks.py redacts them out of the
+# "Configuration item" lines it writes at INFO. Those lines are shipped
+# to Loki, so a secret which reaches one leaves the cluster. The same
+# reasoning puts handles_credentials() in external_api/base.py rather
+# than in app.py.
+#
+# Match generously -- under-matching leaks a credential, while
+# over-matching merely hides a value behind --show-secrets. It does in
+# fact over-match today, catching the integer API_TOKEN_DURATION,
+# FEDERATION_MAX_TOKEN_BYTES and KERBSIDE_TOKEN_DURATION, which is the
+# harmless direction.
+#
+# This is deliberately belt-and-braces with the SecretStr types on the
+# secret-carrying fields themselves. The startup banner iterates every
+# configuration item rather than named ones, so a name check is what
+# covers a secret option which does not exist yet; the types are what
+# cover every other way a field might be stringified. Removing either
+# one re-opens a hole the other does not close. See
+# docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+SECRET_CONFIG_KEY_RE = re.compile(
+    r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)')
 
 
 def get_node_name() -> str:
