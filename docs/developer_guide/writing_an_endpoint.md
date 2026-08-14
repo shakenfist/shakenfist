@@ -63,13 +63,13 @@ behaviour belongs in the specification only where the server already
 coerces or rejects outside it. The events `limit` publishes a minimum
 of 1 because the server replaces anything lower with the default;
 `cpus` and `memory` publish 0 rather than 1 because nothing rejects a
-zero today, and tightening them is a phase 3 decision to be made with
-warn-only data.
+zero today, and tightening them is a decision to be made once there is
+warn-only data to make it with.
 
 Nothing derives a type from the handler the way locations are derived,
-so getting this wrong is invisible until a client generator or phase
-3's compiler acts on it. Two examples, both caught in review of the
-phase 2 work rather than by a machine:
+so getting this wrong is invisible until a client generator or the
+constraint compiler acts on it. Two examples, both caught in review by
+a human rather than by a machine:
 
 * `metadata` on instance create was declared `arrayofdict` while the
   handler answers 400 to anything but a dictionary — harmless while
@@ -122,8 +122,7 @@ requires the whole value to match (`re.fullmatch`, chosen because
 Python's `$` also matches before a trailing newline and ECMA-262's
 does not). Fully anchored and group-wrapped is the one form both read
 identically, so it is required rather than documented. Note that
-declared constraints are *published documentation* until phase 3 of
-[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
+declared constraints are *published documentation* until [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
 compiles them — a constraint does not reject anything yet.
 
 Three keys, deliberately. `maxLength`, `minLength`, `minItems` and
@@ -131,9 +130,9 @@ Three keys, deliberately. `maxLength`, `minLength`, `minItems` and
 waiting for them — a rule `name` is refused above 255 characters,
 `scopes` must be non-empty, `configdrive` accepts only two values —
 but each needs its own import-time validation and its own mutation in
-the guard harness, and phase 2 set out to publish the numeric and
-pattern bounds. They are scoped out rather than overlooked; phase 3
-is where the case for adding them gets concrete.
+the guard harness, and the current scope is the numeric and pattern
+bounds. They are scoped out rather than overlooked; see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md)
+for where the case for adding them gets made.
 
 **There is no per-handler authentication decorator.** Authentication is
 the default, applied to every handler by `_authenticate_unless_public`
@@ -244,8 +243,8 @@ the rest: it crosses route form, `@use_kwargs` binding and
 `flask.request.args` read style, builds a synthetic endpoint for each
 of the 225 combinations, and asserts the derivation recovers what that
 case was constructed to mean. Every defect found while building the
-phase 1 audit was a shape absent from the tree, which is why this is
-generated rather than sampled. **If you add a way for a parameter to
+original declaration audit was a shape absent from the tree, which is
+why this is generated rather than sampled. **If you add a way for a parameter to
 arrive, add an axis value here** — a shape the generator does not
 enumerate is a shape nothing checks.
 
@@ -256,8 +255,8 @@ The declarations are compiled into marshmallow schemas at startup
 request. **Nothing is rejected**: `API_VALIDATION_MODE` defaults to
 `warn`, which logs what would have been refused and changes no
 response. Setting it to `enforce` answers `400` in the usual
-`{"error": ..., "status": ...}` shape, and is phase 4's switch to
-throw once the warn log is understood.
+`{"error": ..., "status": ...}` shape, and is the switch to throw once
+the warn log is understood.
 
 A warn record carries the endpoint, the parameter, the reason, the
 offending value's **type** — never its value — and the status the
@@ -275,10 +274,10 @@ Two things it deliberately does not do. `required` is recorded but
 never enforced — not even in `enforce` mode, where missing-required
 findings are filtered out of the rejection decision. Several
 parameters are declared required while omitting them has always
-worked, and what to do about that is phase 6.
+worked, and what to do about that is still open — see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
 And the prose `format` on a type token is documentation: `netblock`,
 `uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
-strings, because semantic validation of them is also phase 6. Only
+strings, because semantic validation of them is not built yet. Only
 `type`, `pattern`, `minimum` and `maximum` constrain anything.
 
 ## What is not checked yet
@@ -291,7 +290,8 @@ itself:
 `shakenfist/tests/external_api/test_openapi_spec.py` validates the
 generated OpenAPI with `openapi_spec_validator` on every CI run, so a
 change that renders an invalid specification fails rather than
-shipping — the fate of the 129 validation errors phase 2 removed.)
+shipping — the fate of the 129 validation errors that were removed when
+the type vocabulary landed.)
 
 * `header` and `formData` cannot be derived from the code, so they are
   reported rather than corrected. No endpoint uses either today, and

@@ -164,9 +164,10 @@ from `sf-api` in your log stream. These are **informational**: they
 record a request which did not match its endpoint's published
 parameter declarations, and while `API_VALIDATION_MODE` is `warn`
 (the default) they change no response — the request was answered
-exactly as it always was. Do not set `enforce` yet; that switch is
-phase 4 of the API input validation plan and only makes sense once
-the warn log for your own callers has been read and understood. If
+exactly as it always was. Do not set `enforce` yet; it only makes
+sense once the warn log for your own callers has been read and
+understood. See
+[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md). If
 the lines themselves become a problem — a chatty caller sending an
 undeclared key on every request is an extra line per request —
 `API_VALIDATION_MODE` can be set to `off`, which disables the layer
@@ -240,3 +241,28 @@ Alloy, vector, …), you can leave `LOKI_BASE_URL` unset and have
 your agent scrape each node's journal. Shaken Fist's logs are
 structured JSON there too, so your agent can parse and label them
 however your pipeline prefers.
+
+## Log shipping internals
+
+Daemons log structured JSON via `shakenfist_utilities.logs` (one JSON object
+per line; this is the only daemon log format). Shaken Fist does not aggregate
+logs onto a primary node. Instead, when a Loki endpoint is configured
+(`LOKI_BASE_URL`), each daemon ships its own logs to that operator-provided
+Loki through an in-process, on-disk-spooled, batched HTTP push modelled
+directly on the eventlog spool/drainer:
+
+- `shakenfist/logship_spool.py` — a per-daemon disk-backed sqlite spool under
+  `/srv/shakenfist/spool/logship/<daemon>-<pid>.db` (the durability boundary;
+  drop-and-count over a high-water mark; orphan recovery).
+- `shakenfist/logship_drainer.py` — a background thread that batches spooled
+  lines and POSTs them to Loki's `/loki/api/v1/push` with exponential backoff,
+  retaining failed batches for retry.
+- `shakenfist/logship.py` — a `logging.Handler` that JSON-formats each record
+  into the spool, plus `start()`, which (in Loki mode) attaches the handler to
+  the root logger and removes the library's per-module syslog handlers so logs
+  go to Loki only.
+
+When no Loki endpoint is configured the daemons log to the local systemd
+journal instead. Loki stream labels are bounded to `{job, daemon, host}`; all
+identifiers stay in the JSON body. See
+the sections above.

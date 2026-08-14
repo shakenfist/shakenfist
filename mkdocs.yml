@@ -404,6 +404,11 @@ nav:
         - "Mypy": developer_guide/mypy.md
         - "Network dispatcher": developer_guide/network_dispatcher.md
         - "Release process": developer_guide/release_process.md
+        - "CI": developer_guide/ci.md
+        - "Coding rules": developer_guide/coding_rules.md
+        - "Database internals": developer_guide/database_internals.md
+        - "Security model": developer_guide/security_model.md
+        - "Subsystem internals": developer_guide/subsystem_internals.md
         - "Standards": developer_guide/standards.md
         - "State machine": developer_guide/state_machine.md
         - "Updating docs": developer_guide/updating_docs.md

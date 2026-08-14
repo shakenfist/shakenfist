@@ -58,7 +58,7 @@ dependencies (like `shakenfist_utilities`) don't have type stubs.
 
 We're adopting an incremental approach to type checking:
 
-### Phase 1: Schema Module (Current)
+### Stage 1: schema module (current)
 
 Start with the `shakenfist/schema/` module because:
 
@@ -66,13 +66,13 @@ Start with the `shakenfist/schema/` module because:
 - The SQLAlchemy utilities benefit most from type checking
 - It's a self-contained module with clear boundaries
 
-### Phase 2: New Code
+### Stage 2: new code
 
 All new code should include type annotations. When adding new files or
 significantly modifying existing ones, add type annotations and enable strict
 checking.
 
-### Phase 3: Core Utilities
+### Stage 3: core utilities
 
 Gradually add types to utility modules that are used across the codebase:
 
@@ -80,7 +80,7 @@ Gradually add types to utility modules that are used across the codebase:
 - `shakenfist/constants.py`
 - `shakenfist/config.py`
 
-### Phase 4: Object Classes
+### Stage 4: object classes
 
 Add types to the object model layer:
 
