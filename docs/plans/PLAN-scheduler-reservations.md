@@ -440,6 +440,16 @@ advisory-mode ceiling enforcement with structured events
 (D16), opt-in semantics and best-effort accounting for
 unclaimed namespaces (D14/D17). The conductor-side
 integration (D18) lands in private-ci once this phase ships.
+Prerequisite from phase 3 review: the admission
+transaction's P7 fail-open (`guarded = enforce and
+node_present`) currently drops *every* guard when the
+target node has no capacity row, including the
+namespace-claim branch, whose limits are
+namespace-denominated and node-independent. Harmless while
+`namespace_claims` is empty; phase 4 must split the flag
+(claim guard enforced whenever `enforce` is true and a
+claim row exists) before advisory enforcement means
+anything on an unsized node.
 
 **Phase 5 — caller migration and hard ceiling.** Migrate the
 three `Scheduler()` call sites per D11 (queue worker to the

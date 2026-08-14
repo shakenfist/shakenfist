@@ -871,6 +871,11 @@ class InstancesEndpoint(api_base.Resource):
         # So walk the list (D7). A WriteException is deliberately not
         # caught -- an unreachable database is not a full cluster, and
         # trying the next node would only ask it the same question.
+        #
+        # This walk (including the P9 demand-only re-walk below) also
+        # exists in node_inst_netdesc_op.py's _instance_preflight();
+        # until phase 5 extracts a shared helper, a semantic change here
+        # must be made there too.
         denials = {}
 
         def place_walk(enforce_demand):

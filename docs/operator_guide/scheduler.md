@@ -209,6 +209,17 @@ pushes a node over its limit this way still updates every counter and
 is recorded loudly in the instance's events, rather than silently
 absorbed.
 
+Of those two, only the startup reconciliation repairs a missing
+`instance_location` row: the cleaner's per-domain rewrite early-outs
+when the placement attribute already names the right node, so an
+instance whose attribute is correct but whose reference row (and so
+capacity charge) is missing stays under-counted until the node's
+queues daemon next restarts. No current write path can produce that
+divergence -- the attribute and the row are written by one transaction
+-- so if you ever see a persistent under-count of a node's committed
+resources, the remedy is a restart of that node's Shaken Fist
+services, and the interesting question is what deleted the row.
+
 `/admin/resources` (`summarize_resources()`) publishes `cpu_committed`
 sourced from these same counters rather than a separate walk,
 alongside `cpu_committed_row_present`: a node the reconciler has not
@@ -273,6 +284,15 @@ admission still accumulates its demand contribution so later enforced
 admissions see it. Without this, a small or single-node cluster under
 rapid create churn -- CI being the canonical case -- would refuse
 creates indefinitely while sitting essentially idle.
+
+Note the steady-state cost on a cluster that stays demand-saturated
+(sustained churn against a small node count): because each waived
+admission still adds demand, every create pays both walks -- twice the
+admission RPCs and an extra pair of audit events -- until churn slows
+enough for the reconciler's decay to catch up. That is the accepted
+trade (a second walk is cheaper than a failed create), and frequent
+`waiving demand guard` events are the signal that the demand constants
+are mis-sized for the cluster rather than that anything is wrong.
 
 ## Diagnosing a placement decision
 

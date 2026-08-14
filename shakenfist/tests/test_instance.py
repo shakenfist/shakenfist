@@ -1377,6 +1377,24 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             self.inst.place_instance(self.node2, enforce=False)
         self.assertEqual({}, self.inst.placement)
 
+    def test_a_denied_unguarded_retry_does_not_raise_when_not_enforcing(self):
+        # The unguarded retry's key-only UPDATE can match nothing when
+        # the capacity row vanished between the probe and the write (the
+        # reconciler dropped a node which stopped being a schedulable
+        # hypervisor mid-pass). That is a benign abort, not a capacity
+        # denial: a ground-truth writer has no candidate to walk to, and
+        # raising would abort the rest of the cleaner's pass.
+        denied = {
+            'success': True, 'error': '',
+            'admitted': False, 'unguarded': False, 'clamped': False,
+            'failing_stage': 'node', 'dimensions': [], 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
+        with mock.patch('shakenfist.mariadb.admit_instance_placement',
+                        return_value=denied):
+            self.inst.place_instance(self.node2, enforce=False)
+        self.assertEqual({}, self.inst.placement)
+
     def _counting_fetch(self):
         """Count fetches of the instance_attributes row."""
         return mock.patch(

@@ -1307,7 +1307,8 @@ was passing for the right reason all along.
   which predates the variable. A second live-suite job against a
   `mariadb:11` container (or a debian-13 runner) would cover it with
   no new test code -- the harness already reports the server regime
-  it ran under. Needs runner/DSN infrastructure, not code.
+  it ran under. Needs runner/DSN infrastructure, not code. Tracked
+  as issue #3759 at the second review round's request.
 
 ### Bugs fixed during this work
 

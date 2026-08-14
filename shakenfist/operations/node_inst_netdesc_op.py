@@ -184,6 +184,11 @@ class NodeInstNetdescOp(BaseClusterOperation):
             # candidates until one takes the instance (D7). Exhausting
             # the list is the same outcome as the scheduler finding no
             # candidates at all, so it is raised as one.
+            #
+            # This walk (including the P9 demand-only re-walk below)
+            # also exists in external_api/instance.py's create path;
+            # until phase 5 extracts a shared helper, a semantic change
+            # here must be made there too.
             denials = {}
 
             def place_walk(enforce_demand):

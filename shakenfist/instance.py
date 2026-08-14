@@ -1094,6 +1094,13 @@ class Instance(dbowo):
             placement = copy.deepcopy(self.placement)
             old_location = placement.get('node')
             if old_location == location:
+                # This early-out means place_instance() is not a repair
+                # path: an instance whose attribute already names this
+                # node but which is missing its INSTANCE_LOCATION row
+                # (and so its capacity charge) is left as-is here. The
+                # queues daemon's restore_instances() owns that repair,
+                # via _reconcile_placement() precisely because it cannot
+                # go through this method.
                 return
 
             placement['node'] = location
@@ -1124,15 +1131,26 @@ class Instance(dbowo):
                 return
 
             if not result['admitted']:
-                # enforce=False never reaches here: _admit_placement()
-                # retries a denial unguarded.
                 self.add_event(
                     EVENT_TYPE_AUDIT, 'instance placement denied',
                     extra={
                         'node': location,
                         'failing_stage': result['failing_stage'],
-                        'dimensions': result['dimensions']
+                        'dimensions': result['dimensions'],
+                        'enforce': enforce
                     })
+                if not enforce:
+                    # _admit_placement() retries a denial unguarded, so
+                    # the only way here is the retry's own key-only
+                    # UPDATE matching nothing: the capacity row vanished
+                    # between the probe and the write (the reconciler
+                    # dropped a node which stopped being a schedulable
+                    # hypervisor mid-pass). That is a benign abort, not
+                    # a capacity denial, and a ground-truth writer has
+                    # no candidate to walk to -- raising would abort the
+                    # rest of the caller's pass. Nothing was written;
+                    # the next cleaner pass retries.
+                    return
                 raise exceptions.CapacityAdmissionDenied(
                     result['failing_stage'], result['dimensions'])
 
