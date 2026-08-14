@@ -1,0 +1,494 @@
+# Agent operation deadlines and progress detection
+
+## Prompt
+
+Before responding to questions or discussion points in this document,
+explore the shakenfist codebase thoroughly. Read the sidechannel daemon
+(`shakenfist/daemons/sidechannel/main.py`, especially
+`SideChannelExecutorJob` and `_execute_inner`), the agent operation
+object (`shakenfist/operations/agentoperation.py` and
+`shakenfist/operations/baseoperation.py`), the instance-side queue
+(`Instance.agent_operation_next` and `agent_operation_enqueue` in
+`shakenfist/instance.py`), the three REST endpoints that create agent
+operations (`InstanceAgentPutBlobEndpoint`, `InstanceAgentGetEndpoint`,
+`InstanceAgentExecuteEndpoint` in
+`shakenfist/external_api/instance.py`), and the MariaDB accessors for
+agent operations in `shakenfist/mariadb.py`. The client-side await
+loop lives in the sibling `client-python` repository. Ground your
+answers in what the code actually does today rather than guessing.
+
+All planning documents go into `docs/plans/`.
+
+Consult `ARCHITECTURE.md` for the system architecture overview and
+`CLAUDE.md` for build commands, project conventions, the API parameter
+declaration rules, the attribute field-mask rule, and the state
+machine documentation pointer.
+
+When we get to detailed planning, I prefer a separate plan file per
+detailed phase, named for the master plan with `-phase-NN-descriptive`
+appended before the `.md` extension.
+
+I prefer one commit per logical change, and at minimum one commit per
+phase. Do not batch unrelated changes into a single commit.
+
+## Situation
+
+Issue #3516: `sf-sidechannel` can leave an agent operation wedged in
+`executing` until the client gives up. The trigger (issue #2240, a
+`get-file` that never delivers) is agent-side and still open, but the
+hypervisor-side handling turns a transient hiccup into a test-fatal
+hang. This is currently one of the two most frequent merge-queue CI
+flakes (`test_agentops.TestAgentOperations.test_instance_put_and_get_blob`,
+three occurrences in the week to 2026-08-14).
+
+This is not just a CI problem. The sidechannel dispatch loop runs at
+most one executor per instance (`_dispatch_loop` skips any instance
+with a live executor), so a wedged operation monopolises the
+instance's executor slot: the user loses the ability to run *any*
+agent operation against that instance until the 900-second backstop
+fires. A single stuck `get-file` takes out the whole agent surface of
+the instance for a quarter of an hour.
+
+PR #3506 already landed two mitigations: a try/finally in
+`SideChannelExecutorJob.execute()` that marks a still-`EXECUTING`
+operation `ERROR` on abnormal executor exit, and a whole-operation
+execution deadline (`AGENT_OPERATION_EXECUTION_TIMEOUT`, hardcoded to
+900 seconds in `shakenfist/daemons/sidechannel/main.py`). CI
+occurrences post-dating those fixes show why they are insufficient:
+
+1. **The 900s backstop is longer than every client await.** The guest
+   CI awaits give up after 120-377 seconds, so from the client's
+   perspective the operation is still wedged in `executing` when it
+   times out. The server then grinds on for the remainder of the 900
+   seconds doing work nobody wants, holding the per-instance executor
+   slot.
+2. **A failed operation is never retried.**
+   `Instance.agent_operation_next()` pops the queue entry as soon as
+   the operation leaves `QUEUED`, so an `EXECUTING` operation is never
+   re-dispatched. A transient agent hiccup is fatal to the operation.
+3. **The whole-operation deadline cannot distinguish a stalled
+   transfer from a genuinely large one.** A single wall-clock number
+   has to be big enough for the biggest legitimate transfer, which
+   makes it useless for detecting stalls quickly.
+4. **There is no server-side notion of the client's intent.** The
+   client knows exactly how long it is willing to wait (its await
+   timeout) but has no way to communicate it. Periodic callers (an
+   operation every N seconds) would rather skip a cycle than queue
+   deeper and deeper behind a backlog.
+
+## Decisions already made
+
+These were settled in discussion before this plan was written and are
+not open questions:
+
+1. **Two independent timeout knobs per operation.**
+   - A **wall-clock deadline**, expressed by the client as "seconds
+     since this REST request was received". Queue time (and preflight
+     time, for put-blob) counts against it. The API server converts it
+     to an absolute expiry timestamp at request receipt and stores
+     that on the operation.
+   - A **progress timeout**: "no forward progress for N seconds is
+     fatal". Only meaningful for commands that can observe progress.
+2. **The server default deadline is 600 seconds** (a new config
+   option, replacing the hardcoded 900s
+   `AGENT_OPERATION_EXECUTION_TIMEOUT` constant). A client may pass an
+   explicit sentinel (0) meaning "no wall-clock deadline".
+3. **The no-deadline + progress-timeout combination is a first-class
+   use case.** Streaming a 1TB file out of an instance should set
+   deadline=none and rely on the progress timeout to detect fatal
+   stalls (and permit retry) without ever timing out just for being
+   big.
+4. **Progress observation is a declared capability of each agent
+   command.** The command dispatch in `SideChannelExecutorJob` (today
+   an if/elif chain at the bottom of `_execute_inner`) is restructured
+   so that each command declares whether it reports progress, making
+   progress support an obvious thing to implement for future
+   commands. `get-file` and `put-blob` report progress via file
+   chunks; `execute` cannot (a shell command that produces no output
+   until completion is indistinguishable from a stalled one) and is
+   covered by the wall-clock deadline only.
+5. **Aggressive defaults live client-side, not server-side.** The
+   client library populates the deadline from its own await timeout by
+   default; the server default stays conservative so existing callers
+   with slow-but-legitimate operations do not break.
+6. **Retry is in scope.** An operation that fails in `EXECUTING`
+   before its deadline (executor death, progress stall) is
+   re-dispatched rather than failed, within an attempt bound.
+
+## Design sketch
+
+### Object model and schema
+
+`AgentOperation` (version bump 3 -> 4) gains two new static values,
+stored as nullable columns on the `agent_operations` table:
+
+- `deadline` — absolute unix timestamp (float) after which the
+  operation must not be dispatched and must not continue executing.
+  NULL means no wall-clock deadline (the client passed the 0
+  sentinel). Computed by the API server at request receipt as
+  `time.time() + deadline_seconds`.
+- `progress_timeout` — float seconds; NULL means "use the server
+  default for progress-capable commands".
+
+Static values are immutable, which fits: the client's intent is fixed
+at submission time.
+
+`AgentOperationAttributesData` gains two new mutable fields:
+
+- `last_progress` — float unix timestamp of the most recent observed
+  progress, persisted with a throttle (at most one write every ~10
+  seconds) so a fast chunk stream does not hammer the attributes
+  table. Needed so that a reaper on the hypervisor node can reason
+  about a no-deadline operation whose executor died without running
+  its finally block.
+- `attempts` — integer dispatch counter for the retry bound.
+
+Per the field-mask rule in CLAUDE.md,
+`update_agent_operation_attributes` must take a `fields` mask before
+these fields are added — today it only carries `results`, so
+`add_result()`'s unmasked write would clobber concurrent
+`last_progress`/`attempts` updates (exactly the cross-attribute lost
+update the rule exists to prevent). Schema migration runs via
+`sf-ctl ensure-mariadb-schema` as usual; migrations must be
+idempotent.
+
+Both values appear in `external_view()` so clients (and CI diagnostics)
+can see them.
+
+### API surface
+
+The three creating endpoints (`.../agent/execute`, `.../agent/get`,
+`.../agent/put`) gain two optional body parameters:
+
+- `deadline_seconds` — number, minimum 0. 0 means "no deadline".
+  Omitted means the server default (600).
+- `progress_timeout_seconds` — number, minimum 0. 0 means "disabled".
+  Omitted means the server default for progress-capable commands.
+
+Both are declared per the parameter declaration rules (body location,
+`number` type token, constraints dict with `minimum`), and both get
+`STRUCTURED_PARAMETERS` entries describing what the handler actually
+accepts. New config options:
+
+- `AGENT_OPERATION_DEFAULT_DEADLINE` = 600
+- `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` = 60 (see open
+  questions)
+
+### Enforcement points
+
+The deadline and progress timeout are enforced at three places, in
+increasing order of reach:
+
+1. **At dequeue** — `Instance.agent_operation_next()` checks the
+   deadline before returning an operation. An expired queued operation
+   is transitioned to its terminal expiry state, popped, and the next
+   entry considered. This is the "skip a cycle" behaviour for periodic
+   callers: work the caller has already abandoned never occupies the
+   executor.
+2. **In the executor** — `_execute_inner()` replaces the fixed
+   `AGENT_OPERATION_EXECUTION_TIMEOUT` check with two checks: the
+   operation's absolute deadline (if any), and
+   `time.time() - last_progress > progress_timeout` while a
+   progress-capable command is in flight. Note that `last_data` in the
+   executor loop is refreshed by *any* socket traffic including ping
+   replies, so it is not a progress signal; progress must be observed
+   in the command reply handlers (`file_chunk`, `file_chunk_reply`,
+   `stat_result`, `execute_reply`) via an explicit
+   `observe_progress()` hook.
+3. **By a node-local reaper** — the sidechannel daemon's main loop
+   (which already iterates this node's instances and knows which
+   executors are live) sweeps for operations in `EXECUTING` with no
+   live executor thread. If the operation's deadline has passed, or
+   its persisted `last_progress` is older than its progress timeout
+   plus the persistence throttle slack, the reaper resolves it
+   (retry or expire, below). This covers the case PR #3506's finally
+   block cannot: the sidechannel process dying outright.
+
+Because only the sidechannel daemon on the instance's placement node
+dispatches executors, the reaper has no cross-node race: reaping and
+dispatching are serialised in one process.
+
+Clock skew note: the absolute deadline is computed on the API node and
+enforced on the hypervisor node. Shaken Fist already assumes
+NTP-synchronised cluster nodes; a skew of a few seconds is immaterial
+against a 600-second default, and the progress timeout is computed
+entirely node-locally.
+
+### Retry
+
+A retried operation must not lose its place in line: appending it
+back onto the tail of the instance queue would reorder it behind
+operations submitted after it, violating the linear model (op1 "put a
+file" retrying behind op2 "execute the script that reads it" runs
+them in the wrong order). Equally, having the executor silently
+re-execute in place would bypass dispatch (losing the 5-second
+attempt throttle as natural backoff, and the per-dispatch audit
+events) and would still need a second, queue-based mechanism for the
+case where the executor died with the daemon.
+
+Instead, retry exploits the pop being lazy. Today the queue entry is
+still at the head *while* the operation executes;
+`agent_operation_next()` only pops it on a later call, once the state
+has provably left `QUEUED`. So: the pop rule changes to "pop only
+operations in a terminal state" (an `EXECUTING` head with a live
+executor returns nothing, as dispatch skips instances with executors
+anyway), and retry is nothing more than the state transition
+`EXECUTING -> QUEUED` (a new edge in `state_targets`) applied to an
+operation whose entry never left the head. The dispatcher then
+re-dispatches it exactly like a first attempt: same position, fresh
+connection, throttled, evented. There is no re-enqueue and therefore
+no reordering; the retrying operation deliberately blocks later
+operations until it completes, errors, or expires — which is the
+linear contract working as intended, now bounded by the deadline and
+attempt cap rather than open-ended.
+
+The transition is applied either by the executor's exit path
+(deadline, progress stall, exception, with attempts and deadline
+checked) or by the reaper for a dead executor; both run in the one
+sidechannel process per instance, serialised with dispatch, so the
+transition cannot race a concurrent pop. The invariant becomes "the
+queue entry lives at the head until the operation reaches a terminal
+state", a strict strengthening of today's model. The
+single-executor-per-instance guarantee is unchanged. Otherwise —
+deadline passed or attempts exhausted — the operation goes to its
+terminal failure state and the lazy pop removes it as today. The
+retry policy is therefore "retry until the deadline expires or
+attempts are exhausted, whichever is first"; the attempt cap exists
+so no-deadline operations cannot retry forever.
+
+Partial results on retry need care: a retried `get-file` restarts the
+transfer from offset 0 and must not append to or duplicate the
+previous attempt's blob. The first attempt's incomplete blob (if any)
+must be cleaned up when the retry is scheduled.
+
+### Failure semantics between operations
+
+Linear execution raises the question: when an operation fails
+terminally (error or expiry), should the operations queued behind it
+be cancelled, since they may depend on the failed operation having
+prepared something for them?
+
+No — and deliberately so. The instance queue is shared by every
+caller authorised for the instance (two API clients' operations, and
+system-generated operations, interleave in the one queue), so a
+queue-wide cascade would cancel unrelated callers' work because
+someone else's operation failed. The promise of the linear model is
+**ordering, not dependency**: operations execute one at a time in
+submission order, and each has an independent outcome — shell `;`,
+not `&&`. This is today's contract (a queue simply continues past an
+`ERROR` operation) and this plan preserves it; it must be documented
+explicitly in the user guide as part of phase 7.
+
+Dependency semantics do exist, but scoped where they can be correct:
+
+- **Within one operation**, the commands list is already a fail-fast
+  transaction: on `ERROR` the executor clears the remaining commands
+  (`self.commands = []`), so a put-blob whose transfer fails never
+  runs its chmod. This is the transactional primitive — it is just
+  not currently composable from the public API, which builds only
+  fixed command lists per endpoint.
+- **Across operations**, the pattern already exists in the codebase:
+  cluster operations carry `depends_on` (fate-sharing — at dequeue a
+  dependency in `ERROR`/`DELETED`/`ABORT` aborts the dependent
+  operation, a missing dependency errors it, an in-flight one defers
+  it; see `daemons/queues/workitem.py`) and, separately, `runs_after`
+  (ordering only — wait for the operation to finish, outcome
+  irrelevant). That is precisely the `&&`-versus-`;` distinction,
+  with the cascade following declared edges rather than queue
+  adjacency, which is what makes it correct in a shared queue. The
+  future direction for agent operations is to extend this existing
+  vocabulary rather than invent a lane identifier — see non-goals.
+
+In practice the hazard window is narrow: the dominant client pattern
+(including the CI suite) is submit-and-await, where a dependent
+operation is only submitted after its predecessor succeeded. Only
+callers who pipeline submissions without awaiting can observe a
+dependent operation running after its predecessor failed, and those
+callers can already cancel their own queued operations via the
+existing agent operation DELETE endpoint. Deadline propagation also
+softens the expiry case specifically: a pipelined chain submitted
+with one client timeout carries the same deadline on every
+operation, so when the first expires the rest typically expire with
+it rather than executing against missing preparation.
+
+### Connection teardown and agent-side recovery
+
+A question raised during planning: if the hypervisor closes its side
+of the virtio-vsock connection, does the agent abort and can we
+reconnect? Inspection of both sides shows recovery-by-reconnect
+already works at the transport level, which is what makes the abort +
+retry design above sufficient without any agent protocol change:
+
+- The executor's vsock connection is scoped to the executor job
+  (`with self.instance.socket_on_vsock_channel('sf-agent2')` in
+  `SideChannelJob.execute()`), so any executor exit — deadline,
+  progress stall, exception — already closes the hypervisor side.
+- The agent (`shakenfist_agent/commandline/daemon.py` in the sibling
+  `agent-python` repository) accepts **concurrent connections**: each
+  `accept()` spawns a fresh daemon worker thread. A retried dispatch
+  therefore connects and is welcomed even if a previous worker is
+  still wedged; a stuck worker does not block the listener.
+- A worker blocked in `recv()` sees EOF on close and exits cleanly. A
+  worker mid-transfer hits `BrokenPipeError` on its next send, which
+  is caught, abandons the command, and the worker then exits via EOF.
+- The one non-recovering case is a worker wedged in something that
+  neither sends nor receives — an `execute` child (the agent runs
+  `obj.communicate(None, timeout=None)` with no cancellation on
+  connection close) or a file read hung in the guest kernel. That
+  thread stays wedged and any in-guest side effects continue, but
+  because workers are per-connection daemon threads this costs the
+  guest a thread, not the operation path.
+
+Consequently a retried attempt may run concurrently with a zombie
+prior attempt inside the guest. For `get-file` (concurrent reads of
+the same file) this is harmless; for retried `execute` it would mean
+running the command twice, which is one reason `execute` retry
+semantics need care (see open questions).
+
+### Command dispatch restructure
+
+The if/elif chain in `_execute_inner()` (`execute` / `put-blob` /
+`chmod` / `get-file`) becomes a small per-command handler registry on
+`SideChannelExecutorJob`, where each handler declares:
+
+- `reports_progress` (bool) — whether the progress timeout applies
+  while this command is in flight;
+- its dispatch method and reply handler(s).
+
+The registry makes "does this command support progress, and where
+would I observe it?" a question with an obvious answer for the next
+command someone adds. This is a mechanical refactor with no behaviour
+change, done as its own commit before the enforcement logic lands.
+
+### Client (sibling `client-python` repository)
+
+- The SDK's agent-operation await helpers pass their await timeout as
+  `deadline_seconds` by default, so the server never keeps working
+  after the client has given up. An explicit kwarg overrides.
+- New CLI flags on the relevant `sf-client instance` verbs:
+  `--deadline` and `--progress-timeout` (0 meaning none/disabled).
+- The await loop treats the expiry outcome as terminal.
+
+Old clients keep working: they simply never send the new parameters
+and get the 600-second server default, which is tighter than the 900s
+constant it replaces but far above observed legitimate operation
+times.
+
+## Open questions (resolve in phase 0)
+
+1. **Terminal state for expiry: distinct `expired` state or `ERROR`
+   with a machine-readable error?** A distinct terminal state is more
+   queryable ("how often am I skipping cycles?") and cleanly
+   distinguishes "the caller's budget ran out" from "the operation
+   failed"; the cost is a new state in `state_targets`, the state
+   machine docs, anything that enumerates terminal states, and client
+   await handling (an old client polling an `expired` operation just
+   times out on its own clock, which is acceptable). Recommendation:
+   distinct `expired` state.
+2. **Progress timeout default.** 60 seconds is proposed: generous
+   against IO scheduling stalls on a loaded hypervisor, but an order
+   of magnitude faster than today's 900s at detecting the #3516 wedge.
+   Needs a sanity check against worst-case observed chunk gaps in CI
+   under load before being locked in.
+3. **Retry attempt cap.** Proposed 3 (initial dispatch plus two
+   retries), as a config option.
+4. **Does the deadline apply to `PREFLIGHT`?** Put-blob operations
+   pass through a preflight queue task before reaching `QUEUED`. The
+   dequeue check only covers `QUEUED`; a deadline check at preflight
+   execution would close the gap. Probably yes, and cheap.
+5. **Where exactly the reaper sweep lives** in the sidechannel main
+   loop, and its cadence. It must not add per-instance database load
+   on the fast path (see the existing comment about
+   `agent_operation_next()` costing an uncached attribute read per
+   instance per pass).
+6. **Is `execute` retried?** A retried `execute` re-runs a possibly
+   non-idempotent command, and the agent cannot cancel a prior
+   attempt's child process (see the connection teardown section), so
+   both attempts' side effects can land. Options: never retry
+   `execute` (fail fast, as today); retry only on failures that
+   provably preceded dispatch to the agent; or make retry a
+   per-command capability flag alongside `reports_progress`, with the
+   caller able to opt in. Recommendation: the capability-flag shape,
+   defaulting to retryable for transfers and non-retryable for
+   `execute`.
+
+## Non-goals
+
+- Fixing the agent-side get-file delivery bug itself (#2240). This
+  plan converts it from test-fatal to a logged, retried blip; the
+  agent bug remains open and separately tracked.
+- Progress reporting for `execute`. If the agent ever streams command
+  output, `execute` can declare `reports_progress` then; nothing in
+  this design precludes it.
+- Agent-side cancellation of in-flight work. When the hypervisor
+  abandons a connection, an `execute` child keeps running in the
+  guest and a wedged worker thread is leaked until the guest agent
+  restarts. A cancellation protocol (kill the child on
+  `hypervisor_departure` or connection close) is an `agent-python`
+  change worth its own issue, but nothing here depends on it.
+- Concurrent agent operations on one instance. The
+  one-executor-per-instance rule is load-bearing across the
+  orchestration model, and relaxing it is a re-engineering of
+  dispatch, durability and ordering semantics together — see
+  "Why concurrency stays out of scope" below. The dependency-based
+  future is captured separately in
+  `PLAN-agent-operation-dependencies.md`.
+- Deadlines for cluster operations (`ClusterOperation`). The
+  mechanism is deliberately agent-operation-scoped for now; if it
+  proves useful the schema pattern can be lifted to `BaseOperation`
+  later.
+
+### Why concurrency stays out of scope
+
+The one-executor-per-instance rule is not a transport limitation —
+the agent already runs a worker thread per connection. But it is
+load-bearing in three places:
+
+1. The strict FIFO queue is a user-visible semantic that callers rely
+   on to chain operations ("put a file, then execute it"), so
+   parallelism would need explicit dependency declaration in the API,
+   the way cluster operations chain.
+2. `agent_operation_next()`'s crash-safety argument is literally "the
+   head of the queue cannot double dispatch because there is one
+   executor"; concurrency would replace that head pointer with
+   per-operation claims or leases.
+3. This plan's own reaper and retry designs are race-free *because*
+   dispatch and reaping for an instance serialise in one process.
+
+Relaxing it is therefore its own master plan if ever wanted. The
+nearer future — explicit ordering and fate-sharing without
+concurrency — is already planned:
+`PLAN-agent-operation-dependencies.md` extends the cluster operation
+`depends_on`/`runs_after` vocabulary to agent operations (including
+cross-instance edges and per-edge settle delays), gated on this plan
+landing because a dependency-blocked operation accrues queue time
+against its deadline, so user-created dependency cycles resolve by
+expiry rather than deadlocking.
+
+Meanwhile this plan shrinks the cost of serialisation itself:
+head-of-line blocking drops from 900 seconds to roughly the progress
+timeout, and queue-time expiry stops abandoned work from occupying
+the slot at all.
+
+## Phases
+
+| Phase | Content |
+|-------|---------|
+| 0 | Resolve open questions; record decisions in this file |
+| 1 | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change) |
+| 2 | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
+| 3 | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
+| 4 | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT` |
+| 5 | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
+| 6 | client-python: deadline from await timeout, CLI flags, terminal-state handling |
+| 7 | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci` |
+
+Each phase gets its own detailed plan file before implementation.
+Unit tests land with each phase; the functional test in phase 7
+exercises at minimum: an explicit short deadline expiring a queued
+operation, the default deadline appearing in `external_view()`, an
+`execute` of a long-running command surviving longer than the
+progress timeout (proving the progress timeout does not apply to
+non-progress commands), and a follow-up operation dispatching
+promptly after a first operation is expired (proving the executor
+slot is actually freed).

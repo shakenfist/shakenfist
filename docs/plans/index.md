@@ -25,6 +25,7 @@ The **generic-allocator / network-service-ports / network-carrier-model triple**
 
 [Declarative API input validation](PLAN-api-input-validation.md) is independent of all of the above and gated on nothing, so it can start whenever there is appetite. It closes a cluster of reported issues going back to 2020 (#528 and #936 are the parent issues) whose common cause is that request body values reach handlers untyped. It is drafted now because a per-endpoint fix for one instance of it (#3609) was attempted and abandoned: seven hand-rolled guards, two of them wrong on the first attempt, and the defect class still not covered. Its one coordination point is with the [API query batching roadmap](api-query-batching-roadmap.md), which needs the same bounded `limit`/`offset` parameter types for #1974.
 
+[Agent operation deadlines and progress detection](PLAN-agent-operation-deadlines.md) is similarly independent and gated on nothing. It is driven by CI reliability, but the defect is user-facing too: the #3516 `sf-sidechannel` wedge (a `get-file` stuck in `executing` until the client times out, with the agent-side trigger tracked as #2240) is one of the two most frequent merge-queue flakes as of 2026-08, and because each instance runs at most one executor, a wedged operation also blocks every other agent operation against that instance until the 900-second backstop fires. It adds client-propagated wall-clock deadlines and per-command progress timeouts to agent operations, plus a retry path for operations that fail in `executing`. Its API-facing phase follows the parameter declaration rules that [Declarative API input validation](PLAN-api-input-validation.md) enforces, but does not depend on that plan's remaining phases.
 The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing.
 
 ## Plan Status
@@ -176,7 +177,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [API input validation](PLAN-api-input-validation.md) | Phase 4: Enforce | Not started | Turn on rejection; fold the four hand-authored schemas into the compiled path |
 | [API input validation](PLAN-api-input-validation.md) | Phase 5: Narrow the handlers | Not started | Narrow `except TypeError`; fix attribution issues #3523, #3371, #3606, #3615 |
 | [API input validation](PLAN-api-input-validation.md) | Phase 6: Required and semantics | Not started | Enforce `required`; semantic validators for #534, #3269, #323, #936 |
-
+| [Agent operation deadlines](PLAN-agent-operation-deadlines.md) | Master plan | Not started | Client-propagated wall-clock deadlines (600s server default) and per-command progress timeouts for agent operations, with queue-time expiry, a node-local reaper and retry-until-deadline; converts the #3516 `get-file` wedge (a top merge-queue CI flake) from test-fatal to a retried blip |
 ### Status Definitions
 
 - **Stub**: Framing recorded for future detailed planning; not yet ready to execute
