@@ -257,6 +257,7 @@ nav:
                 - "sfui conversion phase 3: shared styling and morphdom": components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical.md
                 - "sfui conversion phase 4: the new base and the login page": components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login.md
                 - "sfui conversion phase 5: the consoles page": components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles.md
+                - "sfui conversion phase 6: sessions, sources and audit": components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages.md
                 - "Shaken Fist VDI console tokens (kerbside side)": components/kerbside/plans/PLAN-kerbside-vdi-tokens.md
                 - "Two-tier CI phase 1: the oVirt lane deploys and drives kerbside": components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md
                 - "Two-tier CI phase 2: promote sf-e2e to a PR smoke gate": components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md

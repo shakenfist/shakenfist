@@ -240,7 +240,7 @@ locally-running kerbside.
 | 3. sfui canonical additions (shakenfist/sfui repo) | PLAN-sfui-conversion-phase-03-sfui-canonical.md | Done |
 | 4. New base + login page | PLAN-sfui-conversion-phase-04-base-login.md | Done |
 | 5. Consoles page | PLAN-sfui-conversion-phase-05-consoles.md | Done |
-| 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Not started |
+| 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Done |
 | 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Not started |
 | 8. Terminate actions to POST (#133) | PLAN-sfui-conversion-phase-08-terminate-post.md | Not started |
 | 9. Teardown, docs and issue closure | PLAN-sfui-conversion-phase-09-teardown.md | Not started |
@@ -326,6 +326,13 @@ Phase notes, dependencies and recommended planning effort:
    disclosure, the audit page's stray `</td>`/unclosed
    `<tr>`, and make use of `total_events` on the audit
    page.
+   **Amended in phase 6 planning:** this phase is
+   template-only — every primitive it needs already exists
+   in the vendored `sf.css`, so there is no canonical sfui
+   step and no re-vendor; and the two-step terminate script
+   moves out of `consoles.html` into a shared
+   `templates/includes/two-step-terminate.html` here, so
+   phase 8's POST conversion edits one copy.
 7. **morphdom polling** (plan at medium effort, following
    the dashboard pattern). Replace the meta refresh: fetch
    the current URL with `Accept: text/html`, parse, and
