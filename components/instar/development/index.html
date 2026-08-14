@@ -2080,6 +2080,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#do-not-bump-the-release-images-base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Do not bump the release image's base
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Do not bump the release image&#39;s base">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-bullseye-reaches-end-of-life" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When bullseye reaches end of life
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11405,6 +11433,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#do-not-bump-the-release-images-base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Do not bump the release image's base
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Do not bump the release image&#39;s base">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-bullseye-reaches-end-of-life" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When bullseye reaches end of life
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11617,6 +11673,70 @@ for conventions and the Claude Code skills, and
 glibc floor empirically, <code>tools/verify-glibc-floor.sh &lt;deb&gt; &lt;rpm&gt;</code>
 installs the packages on every target distribution and runs
 <code>info</code>/<code>create</code>/<code>map</code> under KVM.</p>
+<h3 id="do-not-bump-the-release-images-base">Do not bump the release image's base<a class="headerlink" href="#do-not-bump-the-release-images-base" title="Permanent link">&para;</a></h3>
+<p><code>src/.devcontainer/build/Dockerfile</code> pins <code>debian:bullseye</code>, and that
+pin is the product rather than an implementation detail: the base's
+glibc <em>is</em> the floor of every binary we ship, so a newer Debian is a
+regression dressed as an update. <code>renovate.json</code> excludes the file for
+that reason; the dev/test image next door stays managed normally.</p>
+<p>Two checks back the pin up, because a comment is not a control:</p>
+<ul>
+<li><code>tools/ci/check-glibc-floor.sh</code> runs on the line immediately after
+  <code>make instar</code>, in both <code>build-and-test</code> and the release workflow, and
+  fails if the binary references a symbol above <code>GLIBC_2.31</code> — the
+  floor published in <a href="/components/instar/installation/">installation.md</a>, not the matrix
+  CI's oldest distro (Rocky 9, 2.34), which is looser than the promise
+  and would let a smaller base movement through unnoticed. It needs
+  nothing but the built binary, so it gates every pull request. The
+  placement is deliberate: the unit test run that follows builds bin
+  targets into the same <code>src/target/release/</code> from the <em>dev</em> image, so
+  a later check could read a binary that image relinked.</li>
+<li><code>tools/verify-glibc-floor.sh</code> is the empirical version above, and
+  remains the real acceptance gate — but it needs containers, packages
+  and <code>/dev/kvm</code>, so it runs in the merge queue matrix or by hand.</li>
+</ul>
+<p>The gap between those two is not hypothetical. Renovate raised the base
+to <code>debian:trixie</code> in #488; the floor went from <code>GLIBC_2.30</code> to
+<code>GLIBC_2.39</code>; pull request CI passed completely, because nothing on the
+pull request path looks at the floor; and the failure surfaced as three
+red distros in the merge queue after the change was already on
+<code>develop</code>. The cheap check exists to make that a pull request failure.</p>
+<h4 id="when-bullseye-reaches-end-of-life">When bullseye reaches end of life<a class="headerlink" href="#when-bullseye-reaches-end-of-life" title="Permanent link">&para;</a></h4>
+<p><strong>Debian 11 LTS ends on 2026-08-31</strong>
+(<a href="https://wiki.debian.org/LTS">wiki.debian.org/LTS</a>). "Do not bump this
+tag" is not meant to outlive that date unexamined, so here is what
+happens and what the options are.</p>
+<p>The failure mode is not a glibc change — it is the image's
+<code>apt-get update</code> starting to fail once bullseye moves to
+<code>archive.debian.org</code>, which breaks from-scratch builds of
+<code>instar-release</code> while an already-built image keeps working. Expect it
+to surface as a red CI job on a runner that had no cached image, not as
+a support-matrix regression.</p>
+<p>No option is free, because "move to the next Debian" is not available:
+bookworm ships glibc 2.36, above both the 2.31 we publish and the 2.34
+the matrix needs, so taking it silently drops Debian 11, Ubuntu 22.04
+and Rocky 9.</p>
+<ul>
+<li><strong>Pin a <code>snapshot.debian.org</code> bullseye base</strong> and point apt at the
+  same snapshot. Keeps the floor and the support matrix exactly as
+  published; costs a frozen, unpatched build toolchain. The binary's
+  security posture depends on the Rust toolchain and our own code far
+  more than on the build image's C library, so this is the least
+  disruptive option, and the one to reach for if the deadline arrives
+  before a decision does.</li>
+<li><strong>Move to bookworm and narrow the promise</strong> to glibc 2.36. This drops
+  Debian 11, Ubuntu 22.04 LTS and Rocky/RHEL 9 — the last of which is
+  in the matrix CI and, per
+  <a href="/components/instar/plans/PLAN-distro-matrix-ci/">PLAN-distro-matrix-ci.md</a> decision
+  D1, was the reason the floor was set this low. It needs
+  <code>installation.md</code>, <code>README.md</code>, <code>MAX_GLIBC</code> in
+  <code>check-glibc-floor.sh</code>, and the matrix distro list all updated
+  together.</li>
+<li><strong>Change build strategy</strong> — a <code>zig cc</code> or <code>cargo-zigbuild</code> style
+  cross-link against an explicitly chosen older glibc, decoupling the
+  floor from the base image entirely. The most work, and the only
+  option that stops this recurring every few years.</li>
+</ul>
 <h2 id="pre-commit-hooks">Pre-commit hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>This project uses pre-commit hooks for Rust code quality:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Install pre-commit (if not already installed)</span>
