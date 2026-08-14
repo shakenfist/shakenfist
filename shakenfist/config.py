@@ -4,7 +4,9 @@ import os
 import re
 import socket
 import sys
+from collections.abc import Iterator
 from typing import Annotated
+from typing import Any
 from typing import Literal
 from typing import NoReturn
 from typing import Optional
@@ -19,15 +21,16 @@ from pydantic_settings import NoDecode
 
 # Configuration keys whose values are secrets, matched by name.
 #
-# Two callers need the same answer and must not disagree about it, which
-# is why this lives here rather than in either of them: sf-ctl's
+# Three callers need the same answer and must not disagree about it,
+# which is why this lives here rather than in any one of them: sf-ctl's
 # show-config redacts matches by default so its output is safe to log
-# (and set-config avoids echoing their values), and the daemon startup
-# banner in daemons/queues/startup_tasks.py redacts them out of the
-# "Configuration item" lines it writes at INFO. Those lines are shipped
-# to Loki, so a secret which reaches one leaves the cluster. The same
-# reasoning puts handles_credentials() in external_api/base.py rather
-# than in app.py.
+# (and set-config avoids echoing their values), and both sites which
+# dump every configuration item -- the daemon startup banner in
+# daemons/queues/startup_tasks.py and _config_failure() below -- render
+# through redacted_config_items(). The banner writes its lines at INFO,
+# and INFO and above is shipped to Loki, so a secret which reaches it
+# leaves the cluster. The same reasoning puts handles_credentials() in
+# external_api/base.py rather than in app.py.
 #
 # Match generously -- under-matching leaks a credential, while
 # over-matching merely hides a value behind --show-secrets. It does in
@@ -36,7 +39,7 @@ from pydantic_settings import NoDecode
 # harmless direction.
 #
 # This is deliberately belt-and-braces with the SecretStr types on the
-# secret-carrying fields themselves. The startup banner iterates every
+# secret-carrying fields themselves. The dumping sites iterate every
 # configuration item rather than named ones, so a name check is what
 # covers a secret option which does not exist yet; the types are what
 # cover every other way a field might be stringified. Removing either
@@ -934,11 +937,51 @@ load_cluster_config()
 config = SFConfig()
 
 
+def redacted_config_items() -> Iterator[tuple[str, Any]]:
+    """The configuration as (key, value) pairs, with secrets masked.
+
+    Both callers dump every configuration item. The sf-queues startup
+    banner writes them at INFO, and INFO and above is shipped off the
+    node to Loki (see shakenfist/logship.py), so a secret which reaches
+    that loop leaves the cluster and lands in log aggregation.
+    AUTH_SECRET_SEED and MARIADB_PASSWORD did exactly that until this
+    was added. _config_failure() below prints them to the operator's
+    terminal, and to the journal when a daemon is what failed.
+
+    The test is on the key name rather than the value's type because
+    this iterates *every* configuration item, including options which
+    do not exist yet. The secret-carrying fields are separately typed
+    SecretStr, which covers every other path one might be stringified
+    on; the two mechanisms are complementary rather than redundant, and
+    removing either re-opens a hole the other does not close. See
+    docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+
+    The predicate over-matches by design -- it is shared with
+    sf-ctl show-config, where hiding a value behind --show-secrets costs
+    nothing. Neither caller here has such an escape hatch, so numbers
+    are exempted: API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES and
+    KERBSIDE_TOKEN_DURATION all match the name pattern, none of them can
+    be a credential, and all three are tunables an operator reads this
+    output to confirm. A credential is always a string (or a SecretStr,
+    which is not an int either, so it is still masked here as well as
+    rendering as asterisks on its own).
+
+    Field order is deliberately left as the model reports it, because
+    operators grep this output.
+    """
+    for key, value in config.model_dump().items():
+        numeric = isinstance(value, (bool, int, float))
+        if SECRET_CONFIG_KEY_RE.search(key) and not numeric:
+            yield key, '<redacted>'
+        else:
+            yield key, value
+
+
 def _config_failure(failures: list[str]) -> NoReturn:
     print('Configuration failed validation!')
     print()
     print('Configuration as read:')
-    for key, value in config.dict().items():
+    for key, value in redacted_config_items():
         print(f'    {key} = {value}')
     print()
     print('Errors:')
