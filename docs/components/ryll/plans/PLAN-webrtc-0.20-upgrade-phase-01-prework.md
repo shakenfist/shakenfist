@@ -447,18 +447,24 @@ come down by at least as much, and its risk comes down more.
    asserts the local description carries `a=candidate:` lines the
    instant `wait_for_gathering` returns.
    `accept_offer_answer_carries_all_candidates` additionally runs
-   the full exchange 20 times and asserts a non-zero, invariant
-   candidate count. The sticky-signal design needs no second
-   condition, and this open question no longer inflates phase 02's
-   estimate.
+   the full exchange repeatedly and asserts a non-zero candidate
+   count every time (5 iterations in the smoke tier; the 20-run
+   invariant-count soak is gated behind `RYLL_GATHERING_SOAK=1`
+   after PR #267 review flagged the exact-equality check as
+   coupled to host interface churn). The sticky-signal design
+   needs no second condition, and this open question no longer
+   inflates phase 02's estimate.
 
-2. **Should `test-support` be a feature or a separate crate?** A
-   feature is lighter and matches the workspace, but it means
-   `shakenfist-spice-webrtc` — a published crate — carries test
-   scaffolding in its source tree. If that grates, the
-   alternative is a `shakenfist-spice-webrtc-testkit` dev-only
-   workspace member. Decide during 1c; the migration is the same
-   either way.
+2. ~~**Should `test-support` be a feature or a separate crate?**~~
+   **Answered during 1c: a feature.** It is lighter, matches the
+   workspace, and the reasoning is recorded in the crate's
+   `Cargo.toml` comment. The accepted consequence is that
+   `src/test_client.rs` (~500 lines) ships in the published
+   crates.io tarball for `shakenfist-spice-webrtc`; it has no
+   production-surface impact because the module is gated behind
+   `#[cfg(any(test, feature = "test-support"))]` and the feature
+   is off by default. If the tarball weight ever grates, the
+   `-testkit` crate split remains available.
 
 3. **Does `loopback.rs`'s `on_track` wiring belong in the
    helper?** It is currently the only site with it, so the plan
@@ -502,6 +508,20 @@ This is a genuine production bug fix that happens to have been
 found by porting work, not a refactor. It is called out here so
 it is not mistaken for one.
 
+The PR #267 review then pointed out that the fix left the
+correct-but-subtle pattern copy-pasted at four sites — the exact
+duplication that produced the original bug. The wait and raise
+halves are now consolidated into
+`shakenfist_spice_webrtc::StickySignal` (`src/sticky.rs`), used
+by `wait_for_dead`, `wait_for_gathering`,
+`TestPeer::offer_and_gather`, and the ryll bridge reaper (which
+takes a single `dead_signal()` handle in place of the old
+`dead_handle()`/`dead_flag_handle()` pair). The type carries unit
+tests for the pre-raised fast path, the lost-wakeup schedule
+itself (raise after the waiter registered but before it was
+woken), and multiple/repeat waiters — coverage the inline copies
+could not have without a running ICE stack.
+
 ### The notify path versus the fast path
 
 Whether `wait_for_gathering`'s first call blocks on the
@@ -525,5 +545,7 @@ faster than recovery, and the viewer then shows black
 the surfaces cycling and the encoder restarting. At a 30 s
 cadence recovery completes every time. Real desktops rarely
 mode-set repeatedly, so this is a robustness gap rather than a
-dogfooding blocker, but it is worth a standalone issue: the
-encoder/stream should survive surface churn at any cadence.
+dogfooding blocker. Tracked as
+[Q5 in OPEN-QUESTIONS.md](/components/ryll/plans/OPEN-QUESTIONS/): the encoder/stream
+should survive surface churn at any cadence, and the right time
+to diagnose is after the 0.20 port rewrites the adjacent paths.

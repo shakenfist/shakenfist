@@ -263,6 +263,11 @@ minutes.
 - Compare RSS and CPU against a 0.17 baseline captured before
   the bump — take that baseline during phase 01 while we are
   still on the old version.
+- Run `RYLL_GATHERING_SOAK=1 make test` on a quiet host: the
+  20-iteration invariant-candidate-count check on the gathering
+  signal is off by default (host interface churn makes it flaky
+  in CI) and this soak is exactly the deliberate occasion it is
+  gated for.
 - Update `ARCHITECTURE.md` and `AGENTS.md` if the bridge's task
   and callback structure changed shape, which phase 02 makes
   likely.

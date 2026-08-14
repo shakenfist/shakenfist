@@ -136,6 +136,37 @@ contention model. If a 006-style follow-up shows the
 workload-driven command ring is the real floor, Q4 won't help
 and phase 17 is cancelled rather than executed.
 
+### Q5 — Why does the web stream never recover from sustained surface churn?
+
+**Linked plan:**
+[webrtc-0.20 phase 01 pre-work, "Found during execution"](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/)
+(where the symptom was recorded during the baseline soaks).
+
+**Symptom history:**
+
+- During the phase-01 baseline soaks (August 2026), the
+  uefi-latency-guest performed a full video-mode reset (SPICE
+  surface destroy → 640x480 → recreate 1280x800) on every
+  colour change, and the browser stream took a few seconds to
+  recover from each one.
+- Driving a colour change every 5 s — faster than recovery —
+  wedged the viewer on black *permanently*, even though ryll's
+  logs showed the surfaces cycling and the encoder restarting.
+  At a 30 s cadence, recovery completed every time.
+
+**What would close it:** identifying which layer stops
+delivering — encoder output, RTP pump, or browser-side decode —
+when a mode-set interrupts an in-progress recovery, and a fix
+making recovery convergent at any churn cadence. The wedge
+reproduces on demand: `make test-qemu`, `ryll --web`, and a QMP
+`sendkey` every 5 s.
+
+**Why parked:** real desktops rarely mode-set repeatedly, so
+this is a robustness gap rather than a dogfooding blocker, and
+the webrtc-0.20 port (phases 02–04) rewrites the adjacent code
+paths — diagnosis before the port would likely be throwaway
+work.
+
 ## When to add a new entry
 
 Add a Q-entry here when **all** of the following hold:
