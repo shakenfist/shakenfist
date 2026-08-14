@@ -218,6 +218,7 @@ nav:
             - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
+                - "A working installation path: the compose demo": components/kerbside/plans/PLAN-demo-install.md
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
                 - "Backend host_subject enforcement": components/kerbside/plans/PLAN-host-subject.md
                 - "Consistency Audit Deferred Work": components/kerbside/plans/PLAN-consistency-audit.md
@@ -229,11 +230,16 @@ nav:
                 - "Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md
                 - "Kerbside VDI tokens phase 8: documentation": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md
                 - "Kerbside VDI tokens phase 9: full cross-repo end-to-end lane": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md
+                - "Phase 1: package the migrations and add `kerbside db upgrade`": components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
+                - "Phase 2: write the missing `etc/kerbside.conf.example`": components/kerbside/plans/PLAN-demo-install-phase-02-conf-example.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
+                - "Phase 3: the `docker compose` demo stack": components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo.md
+                - "Phase 4: a CI lane for the compose demo": components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane.md
                 - "Phase 4: Port latency loadtest to control socket": components/kerbside/plans/PLAN-test-harness-phase-04-port-latency.md
                 - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
+                - "Phase 5: rewrite `docs/installation.md`": components/kerbside/plans/PLAN-demo-install-phase-05-docs.md
                 - "Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency": components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding.md
                 - "Phase 7: First Sextant scenario tempest test": components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test.md
                 - "Phase 8: OpenStack CI lane disposition + oVirt provisioning flake": components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition.md
