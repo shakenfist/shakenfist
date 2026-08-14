@@ -25361,7 +25361,16 @@ def _direct_admit_instance_placement(
                 raise _PlacementRowMissing(
                     f'instance {instance_uuid} has no instance_attributes row')
 
-            # (6) The placement references.
+            # (6) The placement references. This delete is deliberately
+            # unfiltered: an admission owns the invariant that exactly
+            # one row survives it, so a historical duplicate on a node
+            # the caller never named is swept here *without* crediting
+            # that node (only old_node_uuid is decremented above). The
+            # residual over-charge is conservative -- it refuses work
+            # rather than overcommitting -- and the reconciler's next
+            # pass recomputes it away; the release path instead keeps
+            # rows and charges together (see
+            # _delete_instance_location_rows).
             _delete_instance_location_rows(conn, instance_uuid)
             conn.execute(sa.insert(refs).values(
                 # The type and relationship columns are plain String(64)

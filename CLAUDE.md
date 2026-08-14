@@ -587,8 +587,10 @@ performance. This is required for all deployments - MariaDB must be configured.
   `node_attributes`, whose full-row read-modify-write maintenance lost
   updates to concurrent writers (observed as scheduler affinity
   failures in CI). Reference rows are now the sole record of
-  placement; the legacy column, its dual-write and the union in
-  `Node.instances` were removed in scheduler-reservations phase 3.
+  placement; the dual-write and the union in `Node.instances` were
+  removed in scheduler-reservations phase 3, while the column itself
+  remains in place (nullable, unread) as a rollback fallback until a
+  later release drops it.
 - **Cluster Locks** (`cluster_locks` table): Distributed locks with
   a server-side `expires_at TIMESTAMP`. Holders refresh the lease
   every ~20s while alive; if a holder dies (or is partitioned for

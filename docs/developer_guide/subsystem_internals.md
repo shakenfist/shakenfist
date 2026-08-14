@@ -301,10 +301,12 @@ sentinels' 15-second `observe_this_node()` heartbeat) could silently revert
 a placement. References are single-row inserts and deletes, needing no
 cross-writer coordination. `Node.instances` queries them via
 `mariadb.get_references_from()` filtered by `INSTANCE_LOCATION`. Unlike
-`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. The legacy
-column, its dual-write and the read-side union were removed in
-scheduler-reservations phase 3, once every placement writer had moved onto
-the atomic admission primitive.
+`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. The dual-write and the
+read-side union were removed in scheduler-reservations phase 3, once every
+placement writer had moved onto the atomic admission primitive; the column
+itself remains declared in the table (nullable, no longer read or written)
+so upgraded databases keep a rollback fallback, and is dropped in a later
+release — the same treatment as the legacy `daemon_states` column.
 
 Placement rows are written only by two `sf-database` RPCs,
 `AdmitInstancePlacement` and `ReleaseInstancePlacement`, each performing its
