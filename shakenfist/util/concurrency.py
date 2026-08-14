@@ -200,7 +200,9 @@ def hash_file(path: str, algorithm_str: str) -> str:
     reply = _marshal_privexec_request(request, 'hash_file_reply')
     response = reply.hash_file_reply
     if response.error != privexec_pb2.HashFileReply.OK:
-        raise HashFailed()
+        raise HashFailed(
+            privexec_pb2.HashFileReply.Errors.Name(response.error),
+            response.error_text, path, algorithm_str)
     return response.hash
 
 

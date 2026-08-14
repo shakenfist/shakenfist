@@ -17,6 +17,7 @@ from pydantic import ValidationError
 import testtools
 
 from shakenfist.config import BaseSettings
+from shakenfist.exceptions import HashFailed
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.object_state import State
 from shakenfist.tests import base
@@ -382,3 +383,94 @@ class BlobFromDbMalformedUuidTestCase(base.ShakenFistTestCase):
     def test_from_db_malformed_uuid_returns_none(self):
         self.assertIsNone(
             blob.Blob.from_db('_heartbeat', suppress_failure_audit=True))
+
+
+class VerifyChecksumHashFailedTestCase(base.ShakenFistTestCase):
+    """A hash failure during checksum verification must not be invisible.
+
+    verify_checksum() previously let a bare HashFailed escape to the
+    background task wrapper, so a replica whose checksum could not be
+    verified failed with no blob uuid, no cause, and no consequence for
+    the replica (github issue 3744).
+    """
+
+    class FakeNodeConfig(BaseSettings):
+        STORAGE_PATH: str = '/srv/shakenfist'
+        NODE_NAME: str = 'sf-test-node'
+
+    def setUp(self):
+        super().setUp()
+
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+        mock_config = mock.patch(
+            'shakenfist.blob.config',
+            self.FakeNodeConfig(STORAGE_PATH=tempdir.name))
+        mock_config.start()
+        self.addCleanup(mock_config.stop)
+
+        mock_get_min = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version',
+            return_value=blob.Blob.current_version)
+        mock_get_min.start()
+        self.addCleanup(mock_get_min.stop)
+
+        mock_get_state = mock.patch(
+            'shakenfist.mariadb.get_state',
+            return_value=State(value='created', update_time=1234567890.0))
+        mock_get_state.start()
+        self.addCleanup(mock_get_state.stop)
+
+        self.b = blob.Blob(BlobData(
+            uuid='12345678-1234-4321-8234-123456789012',
+            modified=1234567890.0,
+            fetched_at=1234567891.0,
+            version=blob.Blob.current_version
+        ))
+
+        self.mock_add_event = mock.patch.object(blob.Blob, 'add_event')
+        self.add_event = self.mock_add_event.start()
+        self.addCleanup(self.mock_add_event.stop)
+
+        self.mock_remove = mock.patch.object(blob.Blob, '_remove_corrupt_blob')
+        self.remove_corrupt = self.mock_remove.start()
+        self.addCleanup(self.mock_remove.stop)
+
+    def test_file_not_found_drops_replica(self):
+        # The replica this node claims to hold is not on disk, so the
+        # location record is wrong and must be dropped.
+        with mock.patch(
+                'shakenfist.blob.util_concurrency.hash_file',
+                side_effect=HashFailed(
+                    'FILE_NOT_FOUND', '', '/some/blob', 'sha512')):
+            self.assertFalse(self.b.verify_checksum())
+
+        self.remove_corrupt.assert_called_once_with()
+        self.add_event.assert_called_once()
+        event_args = self.add_event.call_args
+        self.assertEqual('blob checksum verification error', event_args[0][1])
+        self.assertEqual('FILE_NOT_FOUND', event_args[1]['extra']['error'])
+
+    @mock.patch('shakenfist.mariadb.get_blob_hashes', return_value=[])
+    def test_transient_failure_keeps_replica(self, mock_get_hashes):
+        # A hasher failure (I/O error, missing hasher) might be transient:
+        # the replica must be kept and the exception re-raised so the
+        # operation errors visibly and the periodic sweep retries. This
+        # exercises the extra-algorithms loop, the call site observed in
+        # production.
+        with mock.patch(
+                'shakenfist.blob.util_concurrency.hash_file',
+                side_effect=HashFailed(
+                    'ALGORITHM_FAILED', 'Input/output error',
+                    '/some/blob', 'xxh128')):
+            exc = self.assertRaises(
+                HashFailed, self.b.verify_checksum,
+                hash='cafebeef', urgent=False)
+
+        self.assertEqual('ALGORITHM_FAILED', exc.error)
+        self.remove_corrupt.assert_not_called()
+        self.add_event.assert_called_once()
+        event_args = self.add_event.call_args
+        self.assertEqual('blob checksum verification error', event_args[0][1])
+        self.assertEqual('Input/output error',
+                         event_args[1]['extra']['error_text'])

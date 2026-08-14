@@ -483,7 +483,20 @@ class CreateNetworkNamespaceFailed(Exception):
 
 
 class HashFailed(Exception):
-    ...
+    """The privexec hash file helper failed to hash a file.
+
+    Carries the HashFileReply error details so that callers can tell a
+    missing file apart from a failing hasher or dying disk (issue 3744).
+    """
+
+    def __init__(self, error: str, error_text: str, path: str,
+                 algorithm: str) -> None:
+        super().__init__(
+            f'{error}: {error_text} (path={path}, algorithm={algorithm})')
+        self.error = error
+        self.error_text = error_text
+        self.path = path
+        self.algorithm = algorithm
 
 
 class ListingInterfaceAddressesFailed(Exception):

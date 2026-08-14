@@ -49,6 +49,7 @@ from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobsMustHaveContent
 from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
+from shakenfist.exceptions import HashFailed
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import callstack as util_callstack
@@ -1006,25 +1007,55 @@ class Blob(dbo):
         blob_uuid = str(self.uuid)
         now = time.time()
 
-        if hash:
-            sha512_hash = hash
-        if not hash:
-            sha512_hash = util_concurrency.hash_file(file_path, 'sha512')
+        try:
+            if hash:
+                sha512_hash = hash
+            else:
+                sha512_hash = util_concurrency.hash_file(file_path, 'sha512')
 
-        # Get existing hashes for this blob on this node from MariaDB
-        existing_hashes = mariadb.get_blob_hashes(blob_uuid, config.NODE_NAME)
-        existing_by_alg = {h.algorithm: h for h in existing_hashes}
+            # Get existing hashes for this blob on this node from MariaDB
+            existing_hashes = mariadb.get_blob_hashes(blob_uuid, config.NODE_NAME)
+            existing_by_alg = {h.algorithm: h for h in existing_hashes}
 
-        # Check for hash algorithms we don't have yet
-        needs_rehashing = False
-        extra_hashes = {}
-        for alg in BLOB_HASH_ALGORITHMS:
-            if alg not in existing_by_alg:
-                if not urgent:
-                    extra_hashes[alg] = \
-                        util_concurrency.hash_file(file_path, alg)
-                else:
-                    needs_rehashing = True
+            # Check for hash algorithms we don't have yet
+            needs_rehashing = False
+            extra_hashes = {}
+            for alg in BLOB_HASH_ALGORITHMS:
+                if alg not in existing_by_alg:
+                    if not urgent:
+                        extra_hashes[alg] = \
+                            util_concurrency.hash_file(file_path, alg)
+                    else:
+                        needs_rehashing = True
+
+        except HashFailed as e:
+            # Being unable to compute a hash at all is a different failure
+            # to a checksum mismatch, and "file not found" is a different
+            # failure to "disk is dying". Record why, with the blob uuid
+            # attached, before deciding what to do (issue 3744).
+            failure_fields = {
+                'error': e.error,
+                'error_text': e.error_text,
+                'algorithm': e.algorithm,
+                'node': config.NODE_NAME
+            }
+            self.log.with_fields(failure_fields).error(
+                'Unable to verify blob checksum')
+            self.add_event(EVENT_TYPE_AUDIT,
+                           'blob checksum verification error',
+                           extra=failure_fields)
+
+            if e.error == 'FILE_NOT_FOUND':
+                # This node claims to hold a replica which is not on disk,
+                # so the location record is wrong. Drop it and let the
+                # replicator recover the replica count elsewhere.
+                self._remove_corrupt_blob()
+                return False
+
+            # Anything else (hasher missing, I/O error) might be transient,
+            # so keep the replica. last_verified_at is not updated, which
+            # means the periodic checksum sweep will retry this node.
+            raise
 
         # If we're in a hurry but extra hashes are missing, enqueue those as
         # background tasks
