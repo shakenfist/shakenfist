@@ -212,7 +212,7 @@ def restore_instances():
             # Gone, or on its way out. Give the capacity back.
             _release_placement(
                 instance_uuid, inst.namespace, inst.cpus, inst.memory,
-                mariadb._disk_spec_virtual_gb(inst.disk_spec), node_uuid)
+                mariadb.disk_spec_virtual_gb(inst.disk_spec), node_uuid)
             continue
 
         # No instance row at all, so there is nothing to read the
@@ -252,11 +252,25 @@ def _reconcile_placement(inst, node_uuid, old_node_uuid):
     nothing about this is a new placement attempt. That is also why it
     cannot go through Instance.place_instance(), whose unchanged-node
     early-out would skip the repair entirely.
+
+    The move-to-authoritative-node branch uses this admission form
+    rather than releasing just our stale row because the admission's
+    delete-all-then-insert guarantees the end state -- a row and a
+    charge on the authoritative node -- even when that node has no row
+    yet (a pre-cutover placement the seeding migration missed, or a row
+    lost to the P1 rollback floor); a local release would repair our
+    side and leave the instance charged nowhere. The cost is a
+    transient overcount: when the authoritative node already holds its
+    row (the common case), it was already charged, and this admission
+    charges it again while crediting our node, overcounting it by one
+    instance until the next reconcile pass recomputes from ground
+    truth. That direction refuses work rather than overcommitting, and
+    only follows a queues-daemon restart.
     """
     result = mariadb.admit_instance_placement(
         str(inst.uuid), inst.namespace, node_uuid, inst.cpus, inst.memory,
-        mariadb._disk_spec_virtual_gb(inst.disk_spec),
-        mariadb._json_dumps(inst.placement),
+        mariadb.disk_spec_virtual_gb(inst.disk_spec),
+        mariadb.json_dumps(inst.placement),
         old_node_uuid=(old_node_uuid if old_node_uuid != node_uuid else ''),
         enforce=False)
     if not result['success']:

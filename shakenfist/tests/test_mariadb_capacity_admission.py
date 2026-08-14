@@ -769,6 +769,24 @@ class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
                         if 'UPDATE scheduler_node_capacity' in text]
         self.assertEqual(1, len(node_updates))
 
+    def test_a_named_node_release_deletes_only_its_own_row(self):
+        # The rows deleted are exactly the rows credited back. A
+        # historical duplicate on another node keeps both its row and
+        # its charge -- deleting it without a decrement would strand
+        # that node's charge until the next reconcile pass.
+        router = _PlacementRouter(claim=None,
+                                  reference_nodes=[NODE1, NODE2])
+        result = self._run(router, node_uuid=str(NODE2))
+
+        self.assertTrue(result['released'])
+        deletes = [stmt for text, stmt in router.executed
+                   if text.startswith('DELETE')]
+        self.assertEqual(1, len(deletes))
+        _, params = _compiled(deletes[0])
+        sources = [v for k, v in params.items()
+                   if k.startswith('source_uuid')]
+        self.assertEqual([[str(NODE2)]], sources)
+
     def test_double_release_is_a_harmless_no_op(self):
         # No reference rows and no node named: nothing was held, so
         # decrementing would take capacity from an instance that never

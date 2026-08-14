@@ -980,13 +980,8 @@ class Instance(dbowo):
         implementation so acquire and release cannot drift from the
         counters the reconciler recomputes from ground truth.
         """
-        # NOTE(mikal): _disk_spec_virtual_gb is private to mariadb.py
-        # because production reads the equivalent JSON_TABLE SQL, but it
-        # is deliberately the executable specification of that SQL --
-        # reimplementing the sum here is exactly the drift it exists to
-        # prevent.
         return (self.cpus, self.memory,
-                mariadb._disk_spec_virtual_gb(self.disk_spec))
+                mariadb.disk_spec_virtual_gb(self.disk_spec))
 
     def _admit_placement(self, location, old_location, placement, enforce,
                          enforce_demand):
@@ -1012,18 +1007,27 @@ class Instance(dbowo):
         emitted only once that unguarded write has actually succeeded --
         an event claiming a placement was recorded, followed by a failed
         recording, would be an audit trail which lies.
+
+        The probe waives the D13 demand clause: demand is a spreader,
+        never a capacity bound (P9), so a demand-only refusal is not an
+        over-limit condition and must not emit the event -- on the small
+        or busy clusters where demand runs hot, it would fire on routine
+        ground-truth writes and cost each one a second RPC. (When
+        ``enforce`` is True this same call is the admission rather than
+        a probe, and ``enforce_demand`` is honoured as passed.)
         """
         cpus, memory_mb, disk_gb = self._capacity_claim
         # NOTE(mikal): the RPC writes the placement column itself, so the
         # caller has to hand it the same bytes the generic attribute
         # write path would have stored -- hence mariadb's own serializer
         # rather than util_json's (which indents and sorts).
-        placement_json = mariadb._json_dumps(placement)
+        placement_json = mariadb.json_dumps(placement)
 
         result = mariadb.admit_instance_placement(
             str(self.uuid), self.namespace, location, cpus, memory_mb,
             disk_gb, placement_json, old_node_uuid=old_location,
-            enforce=True, enforce_demand=enforce_demand)
+            enforce=True,
+            enforce_demand=(enforce_demand and enforce))
 
         if not enforce and result['success'] and not result['admitted']:
             denial = result

@@ -24,17 +24,17 @@ from shakenfist.tests import base
 class UUIDEncoderTestCase(base.ShakenFistTestCase):
     def test_bare_uuid(self):
         u = uuid4()
-        self.assertEqual(f'"{u}"', mariadb._json_dumps(u))
+        self.assertEqual(f'"{u}"', mariadb.json_dumps(u))
 
     def test_nested_uuids(self):
         u1 = uuid4()
         u2 = uuid4()
-        encoded = mariadb._json_dumps({'instances': [u1, u2]})
+        encoded = mariadb.json_dumps({'instances': [u1, u2]})
         self.assertEqual(
             {'instances': [str(u1), str(u2)]}, json.loads(encoded))
 
     def test_other_unserializable_types_still_raise(self):
-        self.assertRaises(TypeError, mariadb._json_dumps, object())
+        self.assertRaises(TypeError, mariadb.json_dumps, object())
 
 
 class EngineJSONSerializerTestCase(base.ShakenFistTestCase):
@@ -54,7 +54,7 @@ class EngineJSONSerializerTestCase(base.ShakenFistTestCase):
                     mariadb._get_engine()
 
         self.assertEqual(
-            mariadb._json_dumps,
+            mariadb.json_dumps,
             mock_create.call_args.kwargs.get('json_serializer'))
 
         if hasattr(mariadb._local, 'engine'):

@@ -410,6 +410,15 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
   corrects within five minutes; sfcbr deploys all nodes in one
   ansible pass. Checked by: operator watches the drift metric
   during the step 9 soak.
+- **Mixed-version creates fail loudly (PR review, item 2):**
+  the inverse window -- a new sf-api calling an old sf-database --
+  gets UNIMPLEMENTED for AdmitInstancePlacement, which has no
+  Python fallback and is deliberately a failed write rather than
+  "cluster full", so every create 500s until the database tier is
+  upgraded. Mitigated by ordering, not code: upgrade the database
+  tier before the API nodes (now stated in
+  `docs/operator_guide/database.md`), and the error string names
+  the condition so a mis-ordered rollout diagnoses itself.
 - **False denials from stale limits:** `limit_*` refreshes only
   each reconcile pass, so a node whose real headroom grew
   mid-period can deny. The caller walks remaining candidates, so
@@ -1282,6 +1291,23 @@ was passing for the right reason all along.
   branch is dormant; **phase 4 makes it necessary**, since the claims API
   is the first thing that can produce a `claim`-stage denial in
   production and its callers will want unit coverage of that path.
+- The pick-then-claim walk (the `place_walk` closure, the P9
+  demand-only re-walk and the exhaustion branch) exists verbatim in
+  `shakenfist/external_api/instance.py` and
+  `shakenfist/operations/node_inst_netdesc_op.py`, differing only in
+  event sink and terminal action (PR review, item 5). Phase 5
+  migrates a third `Scheduler()` call site; extract a shared helper
+  (e.g. `scheduler.claim_first_available()`) as part of that
+  migration, when the third caller makes the right parameterisation
+  visible, rather than guessing it now from two.
+- The ER_CHECKREAD invariant has structural but not behavioural CI
+  coverage (PR review, item 7): the live concurrency suite only
+  bites against a server with `innodb_snapshot_isolation` ON, and the
+  `schema_enum_widening` job's debian-12 runner ships MariaDB 10.11,
+  which predates the variable. A second live-suite job against a
+  `mariadb:11` container (or a debian-13 runner) would cover it with
+  no new test code -- the harness already reports the server regime
+  it ran under. Needs runner/DSN infrastructure, not code.
 
 ### Bugs fixed during this work
 

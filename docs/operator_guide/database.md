@@ -419,6 +419,19 @@ Operators must run this command (or ensure their deployment automation runs
 it) before starting `sf-database` whenever an SF upgrade includes schema
 changes.
 
+Daemon upgrade ordering matters too: **upgrade the `sf-database` tier before
+`sf-api` and the queue daemons**. Instance placement is admitted by a
+database-service RPC (`AdmitInstancePlacement`) which has no client-side
+fallback -- a new `sf-api` calling an old `sf-database` receives gRPC
+UNIMPLEMENTED, which is deliberately treated as a failed write rather than
+as "the cluster is full", so every instance create returns HTTP 500 until
+the database tier catches up. The error string names the condition
+(`database service predates AdmitInstancePlacement`). A deployment that
+rolls every node in one pass keeps this window to minutes at most, but a
+staged rollout that upgrades API nodes and leaves the database tier on
+the old release stays broken until the tier is upgraded -- do the
+database tier first.
+
 ### initialise-node
 
 Creates a node record in the database. By default, it uses the local node's

@@ -242,22 +242,22 @@ class DemandDecayTestCase(base.ShakenFistTestCase):
 
 
 class DiskSpecReferenceTestCase(base.ShakenFistTestCase):
-    """_disk_spec_virtual_gb() is the JSON_TABLE reference semantics."""
+    """disk_spec_virtual_gb() is the JSON_TABLE reference semantics."""
 
     def test_sums_sizes(self):
         self.assertEqual(
-            30, mariadb._disk_spec_virtual_gb(
+            30, mariadb.disk_spec_virtual_gb(
                 [{'size': 10}, {'size': 20}]))
 
     def test_sizeless_and_null_elements_contribute_zero(self):
         # CD ROM style disks have no size; explicit nulls also occur.
         self.assertEqual(
-            10, mariadb._disk_spec_virtual_gb(
+            10, mariadb.disk_spec_virtual_gb(
                 [{'size': 10}, {'base': 'cd'}, {'size': None}]))
 
     def test_string_size_coerces(self):
         self.assertEqual(
-            8, mariadb._disk_spec_virtual_gb([{'size': '8'}]))
+            8, mariadb.disk_spec_virtual_gb([{'size': '8'}]))
 
     def test_fractional_sizes_round_half_away_from_zero(self):
         # MariaDB's JSON-number-to-BIGINT cast rounds half away from
@@ -267,33 +267,33 @@ class DiskSpecReferenceTestCase(base.ShakenFistTestCase):
         # (10.5 -> 10) and int() would truncate; either silently
         # diverges from the SQL this helper is the oracle for.
         self.assertEqual(
-            11, mariadb._disk_spec_virtual_gb([{'size': 10.5}]))
+            11, mariadb.disk_spec_virtual_gb([{'size': 10.5}]))
         self.assertEqual(
-            10, mariadb._disk_spec_virtual_gb([{'size': 10.4}]))
+            10, mariadb.disk_spec_virtual_gb([{'size': 10.4}]))
         self.assertEqual(
-            -3, mariadb._disk_spec_virtual_gb([{'size': -2.5}]))
+            -3, mariadb.disk_spec_virtual_gb([{'size': -2.5}]))
         self.assertEqual(
-            9, mariadb._disk_spec_virtual_gb([{'size': '8.7'}]))
+            9, mariadb.disk_spec_virtual_gb([{'size': '8.7'}]))
 
     def test_boolean_size_casts_like_sql(self):
         # JSON true/false cast to 1/0 in the BIGINT column.
         self.assertEqual(
-            1, mariadb._disk_spec_virtual_gb([{'size': True}]))
+            1, mariadb.disk_spec_virtual_gb([{'size': True}]))
         self.assertEqual(
-            0, mariadb._disk_spec_virtual_gb([{'size': False}]))
+            0, mariadb.disk_spec_virtual_gb([{'size': False}]))
 
     def test_garbage_size_contributes_zero(self):
         self.assertEqual(
-            10, mariadb._disk_spec_virtual_gb(
+            10, mariadb.disk_spec_virtual_gb(
                 [{'size': 10}, {'size': 'banana'}]))
 
     def test_non_dict_element_contributes_zero(self):
         self.assertEqual(
-            10, mariadb._disk_spec_virtual_gb([{'size': 10}, 'garbage']))
+            10, mariadb.disk_spec_virtual_gb([{'size': 10}, 'garbage']))
 
     def test_non_list_spec_is_zero(self):
-        self.assertEqual(0, mariadb._disk_spec_virtual_gb({'size': 10}))
-        self.assertEqual(0, mariadb._disk_spec_virtual_gb(None))
+        self.assertEqual(0, mariadb.disk_spec_virtual_gb({'size': 10}))
+        self.assertEqual(0, mariadb.disk_spec_virtual_gb(None))
 
 
 class FetchUsageTestCase(base.ShakenFistTestCase):

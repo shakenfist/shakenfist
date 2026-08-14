@@ -247,9 +247,21 @@ class _UUIDEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def _json_dumps(data: Any) -> str:
-    """JSON-serialize data, converting UUID objects to strings."""
+def json_dumps(data: Any) -> str:
+    """JSON-serialize data, converting UUID objects to strings.
+
+    Public because the placement admission RPC writes attribute columns
+    on the caller's behalf: instance.py and the queues daemon's startup
+    repair must hand it bytes serialized exactly as the generic
+    attribute path would have stored them, so they call this rather
+    than their own serializer.
+    """
     return json.dumps(data, cls=_UUIDEncoder)
+
+
+# The internal callers predate the promotion; both names are the same
+# function.
+_json_dumps = json_dumps
 
 
 # Thread-local storage for database connections and gRPC channels
@@ -23699,8 +23711,13 @@ def _decayed_demand_contribution(
     return cpus * demand_per_vcpu * (1.0 - age / demand_decay_seconds)
 
 
-def _disk_spec_virtual_gb(disk_spec: Any) -> int:
+def disk_spec_virtual_gb(disk_spec: Any) -> int:
     """Sum the virtual sizes (in GB) of a disk_spec JSON list.
+
+    Public because it is the one implementation of "how big is this
+    instance's disk claim": instance.py's capacity claim and the queues
+    daemon's startup repair must not reimplement the sum, or acquire
+    and release drift from the counters the reconciler recomputes.
 
     This is the executable specification of the JSON_TABLE aggregation in
     _RECONCILE_USAGE_SQL: elements without a numeric ``size`` (missing,
@@ -23808,7 +23825,7 @@ def _disk_spec_virtual_gb(disk_spec: Any) -> int:
 # The JSON_TYPE guard skips a disk_spec that is somehow not an array, and
 # the DEFAULT ... ON EMPTY / ON ERROR clauses make elements without a
 # numeric size contribute 0 -- one malformed disk_spec can not abort the
-# pass (see _disk_spec_virtual_gb for the reference semantics).
+# pass (see disk_spec_virtual_gb for the reference semantics).
 #
 # The enum-typed predicates span two storage conventions, and the bound
 # parameters must match each column's convention exactly.
@@ -24977,21 +24994,37 @@ def _probe_release_rows(
 
 
 def _delete_instance_location_rows(
-        conn: sa.Connection, instance_uuid: str) -> int:
-    """Delete every instance_location row targeting an instance.
+        conn: sa.Connection, instance_uuid: str,
+        source_nodes: Optional[list[UUID]] = None) -> int:
+    """Delete instance_location rows targeting an instance.
 
-    Every source node, not just the one being moved off. This is what
-    makes a duplicate placement row unproducible: the reconciler's usage
-    query charges an instance to every node holding a reference for it
-    (see the comment block above _RECONCILE_USAGE_SQL), so a survivor of
-    the old best-effort per-node removal double-charged the ledger.
+    Called without ``source_nodes`` by the admission transaction, this
+    deletes every source node's row, not just the one being moved off.
+    That is what makes a duplicate placement row unproducible: the
+    reconciler's usage query charges an instance to every node holding a
+    reference for it (see the comment block above _RECONCILE_USAGE_SQL),
+    so a survivor of the old best-effort per-node removal
+    double-charged the ledger.
+
+    A release instead passes the nodes its probe located (and its
+    caller's node filter selected), so the rows deleted are exactly the
+    nodes credited back -- deleting a row without its decrement would
+    strand that node's charge until the next reconcile pass, in the
+    direction that refuses work.
     """
     refs = _get_object_references_table()
-    return int(conn.execute(sa.delete(refs).where(sa.and_(
+    clauses = [
         refs.c.relationship == str(RelationshipType.INSTANCE_LOCATION),
         refs.c.target_object_type == str(ObjectType.INSTANCE),
         refs.c.target_uuid == instance_uuid,
-    ))).rowcount)
+    ]
+    if source_nodes is not None:
+        # object_references stores the dashed uuid form (CLAUDE.md
+        # pitfall 6), which is what str() of a UUID produces.
+        clauses.append(refs.c.source_uuid.in_(
+            [str(n) for n in source_nodes]))
+    return int(conn.execute(
+        sa.delete(refs).where(sa.and_(*clauses))).rowcount)
 
 
 def _admission_denial_dimensions(
@@ -25401,15 +25434,19 @@ def _direct_release_instance_placement(
     it, and for what the resulting races resolve as.
 
     Idempotent by construction, in both call forms: the
-    instance_location rows are the only record of what is charged, so
-    after the first call there are none, and a second call -- whether it
-    names a node or not -- finds nothing to release, touches no counter
-    and returns ``released=False``. A named node is a filter over those
-    rows rather than an assertion that they exist (see
-    _probe_release_rows()). That is what makes ``hard_delete()``'s sweep
-    safe to run behind ``_delete_globally()``'s release, and what stops a
-    repeated delete of an errored instance from handing its capacity out
-    twice.
+    instance_location rows are the only record of what is charged, and
+    the rows deleted are exactly the rows credited back (the delete is
+    filtered to the probe's nodes, matching the decrement loop), so a
+    second call -- whether it names a node or not -- finds nothing left
+    to release, touches no counter and returns ``released=False``. A
+    named node is a filter over those rows rather than an assertion
+    that they exist (see _probe_release_rows()), and a named release
+    leaves any row on *another* node alone, charge and all: the row and
+    its charge always travel together, so a historical duplicate stays
+    consistently charged until ``hard_delete()``'s unnamed sweep or the
+    reconciler collects it. That is what makes the sweep safe to run
+    behind ``_delete_globally()``'s release, and what stops a repeated
+    delete of an errored instance from handing its capacity out twice.
 
     The ``placement`` attribute is deliberately not cleared (P8):
     ``enqueue_delete()`` and the event history both read it after
@@ -25467,7 +25504,8 @@ def _direct_release_instance_placement(
                     conn, node_key, cpus, memory_mb, disk_gb)
                 outcome['clamped'] = outcome['clamped'] or clamped
 
-            _delete_instance_location_rows(conn, instance_uuid)
+            _delete_instance_location_rows(
+                conn, instance_uuid, source_nodes=probe.nodes)
             outcome['released'] = True
 
         return outcome
@@ -25572,7 +25610,16 @@ def _grpc_admit_instance_placement(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC AdmitInstancePlacement failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        if (isinstance(e, grpc.RpcError) and
+                e.code() == grpc.StatusCode.UNIMPLEMENTED):
+            # A mixed-version window: this RPC has no Python fallback,
+            # so an old sf-database fails every create until it is
+            # upgraded. Name the cause so the resulting 500 does.
+            result['error'] = (
+                'database service predates AdmitInstancePlacement; '
+                f'upgrade sf-database before sf-api: {e}')
+        else:
+            result['error'] = f'database unavailable: {e}'
         return result
 
 

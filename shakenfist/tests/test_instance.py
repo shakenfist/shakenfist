@@ -1306,6 +1306,25 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertIn(
             'placement recorded despite exceeding capacity guard', messages)
 
+    def test_a_demand_only_refusal_is_not_evented_as_over_limit(self):
+        # P9: demand is a spreader, never a capacity bound, so a
+        # ground-truth write refused on demand alone is not an
+        # over-limit condition. The probe waives the demand clause, so
+        # the write admits first time (one RPC, no loud event).
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100, demand_limit=1.0)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2, enforce=False)
+
+        messages = [c.args[1] for c in add_event.call_args_list]
+        self.assertNotIn(
+            'placement recorded despite exceeding capacity guard', messages)
+        self.assertIn('instance placed', messages)
+        self.assertEqual(self.node2, self.inst.placement['node'])
+        self.assertEqual([self.node2], self._placed_on())
+
     def test_a_within_limits_write_is_not_evented_as_over_limit(self):
         self.mock_mariadb.set_node_capacity(
             self.node2, limit_cpus=16, limit_memory_mb=16384,

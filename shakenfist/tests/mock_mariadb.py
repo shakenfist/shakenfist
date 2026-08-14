@@ -2873,19 +2873,29 @@ class MockMariaDB():
             if self._decrement_node_capacity(node, cpus, memory_mb, disk_gb):
                 result['clamped'] = True
 
-        self._delete_instance_location_rows(instance_uuid)
+        # As in the real implementation, the rows deleted are exactly
+        # the rows credited back: a named release leaves a row on
+        # another node alone, charge and all.
+        self._delete_instance_location_rows(instance_uuid, source_nodes=nodes)
         result['released'] = True
         self._trace(
             f'MockMariaDB.release_instance_placement({instance_uuid}): '
             f'released from {nodes}')
         return result
 
-    def _delete_instance_location_rows(self, instance_uuid):
-        """Remove every INSTANCE_LOCATION reference row for an instance."""
+    def _delete_instance_location_rows(self, instance_uuid,
+                                       source_nodes=None):
+        """Remove INSTANCE_LOCATION reference rows for an instance.
+
+        Every row when source_nodes is None (the admission form), or
+        only the named sources' rows (the release form).
+        """
         doomed = [
             key for key, r in self.object_references.items()
             if r.relationship == RelationshipType.INSTANCE_LOCATION
-            and r.target_uuid == str(instance_uuid)]
+            and r.target_uuid == str(instance_uuid)
+            and (source_nodes is None or
+                 str(r.source_uuid) in {str(n) for n in source_nodes})]
         for key in doomed:
             del self.object_references[key]
         return len(doomed)
