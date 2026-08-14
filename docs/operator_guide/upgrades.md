@@ -19,6 +19,16 @@ from ERROR or MISSING at the end of planned maintenance, and might be running
 and older version of Shaken Fist upon their return than other members of the
 cluster.
 
+!!! warning "Upgrading to v0.8.0"
+    Releases before v0.8.0 wrote `AUTH_SECRET_SEED`, `MARIADB_PASSWORD`
+    and `LOKI_AUTH_HEADER` into the daemon logs in plaintext on every
+    `sf-queues` start, and a blob transfer's authorisation token into
+    an audit event on every transfer. Upgrading stops that happening
+    but cannot undo it. See
+    [Credential rotation](credential_rotation.md#credentials-disclosed-before-v080)
+    for how to confirm the exposure on your own cluster, and what to
+    rotate.
+
 ## Upgrade process
 
 First off, upgrade the python packages in each node's virtualenv manually. This

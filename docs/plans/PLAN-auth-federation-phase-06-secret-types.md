@@ -387,3 +387,56 @@ assertion still fails when the secret genuinely leaks. An assertion
 that cannot be made to fail is not a test, and this is the exact
 mistake — checking that a named field is gone rather than that the
 secret is absent — which let step 2g's fifth site through.
+
+## Review notes
+
+The automated reviewer raised eight action items on the phase 6 PR.
+All were addressed; three are worth recording because they changed
+something beyond the line they pointed at.
+
+**The name-based redaction covered two of its three sites.** The
+reviewer observed that `_config_failure()` in `config.py` dumps every
+configuration option with the same shape as the startup banner, and
+did not consult `SECRET_CONFIG_KEY_RE` — so the argument this phase
+made for keeping the name check (a site which iterates *every* option
+needs one, because the types cannot cover an option that does not
+exist yet) applied to a site the phase had not touched. The redactor
+moved from `daemons/queues/startup_tasks.py` to `config.py` as
+`redacted_config_items()` and both callers now use it, which is also
+where a general-purpose config helper belongs. `config.dict()` became
+`config.model_dump()` while there, dropping a pydantic v1 deprecation.
+
+**The `Optional` nonce.** `Namespace.add_key()` returned
+`NamespaceKey.nonce`, an `Optional[SecretStr]` sourced from a fresh
+point read, into `create_token(nonce: SecretStr)` which unwraps
+immediately. The declared type was a lie and no mypy coverage exists
+on any of the three files involved. `NamespaceKey.new()` now records
+the nonce it minted on the returned object as `minted_nonce`, set on
+all three paths out, and `add_key()` returns that — honestly typed,
+and one fewer database read on the key creation path.
+
+**Six vacuous leak guards, not two.** The reviewer noted that
+`test_the_secret_guard_detects_a_real_leak()` asserted `Exception`
+rather than the assertion failure specifically. Narrowing it to
+`self.failureException` prompted re-examining the trap itself, and the
+mechanism turned out to be sharper than this plan recorded: `SecretStr`
+implements no `__contains__`, so `secret in string` raises `TypeError`,
+and `testtools`' `Contains.match()` *catches* `TypeError` and reports
+"does not contain". Such an assertion cannot fail, on either operand.
+
+Sweeping for the shape found four more emptied guards beyond the two
+this phase had already repaired — in `test_namespace_keys.py` (the
+`Namespace.external_view()` redaction guard) and three in
+`external_api/test_auth.py` — and not one had failed to announce
+itself. Fixing six sites and hoping to notice the seventh is not a
+strategy, so `ShakenFistTestCase` now raises `TypeError` when either
+operand of `assertIn`/`assertNotIn` is a `SecretStr`. That converts a
+silent pass into a loud failure for every test in the suite,
+permanently, and it is what found the fourth site. Pinned by
+`test_testcase_secret_guard.py`, including that ordinary assertions
+are unaffected.
+
+**Operator guidance now exists.** The disclosure was recorded only in
+this plan's Future work, which operators do not read. It is now
+`docs/operator_guide/credential_rotation.md`, linked from `upgrades.md`
+and `logging.md`.

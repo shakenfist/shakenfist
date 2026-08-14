@@ -595,13 +595,21 @@ cluster sign every token in its zone with the default shipped in the source.
 
 **Assertions about secrets must compare `.get_secret_value()`.** Both obvious
 alternatives are broken, and neither fails loudly.
-`assertNotIn(attrs.key, haystack)` passes unconditionally, because `testtools`'
-matcher does not require the needle to be a string and a `SecretStr` is never a
-substring of one. `assertNotIn(str(attrs.key), haystack)` asserts that the
-literal `**********` is absent, which is true of an event which leaked the real
-secret. Either spelling turns a leak guard into a test which passes while
-checking nothing, so `test_namespace_key_object.py` routes them through one
-helper and pins that the helper still fails on a real leak.
+`assertNotIn(attrs.key, haystack)` *cannot* fail: `SecretStr` implements no
+`__contains__`, so the containment raises `TypeError`, and `testtools`'
+`Contains` matcher catches `TypeError` and reports "does not contain".
+`assertNotIn(str(attrs.key), haystack)` asserts that the literal `**********`
+is absent, which is true of an event which leaked the real secret. Either
+spelling turns a leak guard into a test which passes while checking nothing.
+
+Wrapping the key fields did exactly that to six existing guards across three
+files, and not one of them failed to announce it — every one was found by going
+looking. So `ShakenFistTestCase` now raises `TypeError` when either operand of
+`assertIn`/`assertNotIn` is a `SecretStr`, which makes the shape impossible to
+write silently. `test_testcase_secret_guard.py` pins that check, including that
+it leaves ordinary assertions alone, and `test_namespace_key_object.py` routes
+its own guards through a single unwrapping helper whose ability to fail is
+itself tested.
 
 **The schema generator needs an explicit column mapping.** `SecretStr` maps to
 `VARCHAR(255)` in `PYTHON_TO_SQLALCHEMY` (`shakenfist/schema/sqlalchemy.py`),
@@ -613,10 +621,12 @@ schema version change to notice it.
 
 Type safety does not replace the structural protections around it. The `/auth`
 body redaction covers a credential which arrives before any model exists, and
-the daemon startup banner redacts by configuration *key name* because it
-iterates every option, including ones which do not carry a `SecretStr` yet.
-Each mechanism covers a gap the others do not, so do not remove one as
-redundant.
+the two places which dump every configuration option — the `sf-queues` startup
+banner and `_config_failure()` — redact by configuration *key name*, because
+they iterate every option including ones which do not carry a `SecretStr` yet.
+Both route through `config.redacted_config_items()` so they cannot disagree
+about which names are secret. Each mechanism covers a gap the others do not, so
+do not remove one as redundant.
 
 Finally, a serialised view is not a safe home for a credential.
 `external_view()` on both `NamespaceKey` and `BlobTransfer` deliberately omits

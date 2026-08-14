@@ -1166,8 +1166,19 @@ implemented because the following statements will be true:
   outstanding token cluster-wide, which is a deliberate
   operator action rather than something a phase does, and
   purging the existing log entries is a Loki retention
-  question. Operator guidance for both belongs in
-  `docs/operator_guide/`.
+  question.
+
+  The **guidance** half of this is now written.
+  `docs/operator_guide/credential_rotation.md` records the
+  disclosure, gives the LogQL to confirm it on a given
+  cluster, and covers the rotation procedure and blast
+  radius for each of the three affected options; it is
+  linked from `upgrades.md` and `logging.md` so an upgrading
+  operator meets it. That was added while addressing review
+  on the phase 6 PR, on the argument that a plan file's
+  Future work list does not reach operators. What remains
+  outstanding is the **act** of rotating on any given
+  deployment, which is the deployer's call.
 * **`BlobTransfer.token` as a `SecretStr`.** Phase 6's sweep
   found this field is a bearer credential -- the transfers
   daemon compares it against what an inbound connection

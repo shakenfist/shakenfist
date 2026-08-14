@@ -81,7 +81,13 @@ class BlobTransfer(BaseModel):
     updated_at: float  # Unix timestamp of last update
 
     def external_view(self) -> dict[str, Any]:
-        """Serialize BlobTransfer for JSON API responses.
+        """Serialize BlobTransfer for events and log fields.
+
+        Named external_view() to match the objects which really do
+        serialise into API responses, but no REST endpoint consumes
+        this one -- the three callers below are all event or logging
+        sites, which is what makes the omission below a correctness fix
+        rather than an API change.
 
         Deliberately without the token. ``token`` authorises the inbound
         connection to the transfer server -- the transfers daemon

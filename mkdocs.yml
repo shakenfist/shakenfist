@@ -415,6 +415,7 @@ nav:
        - "Installation": operator_guide/installation.md
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
+       - "Credential Rotation": operator_guide/credential_rotation.md
        - "Database": operator_guide/database.md
        - "Events": operator_guide/events.md
        - "Exception Tracking": operator_guide/exception_tracking.md
