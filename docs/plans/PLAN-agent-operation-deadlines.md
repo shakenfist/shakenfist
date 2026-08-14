@@ -472,16 +472,16 @@ the slot at all.
 
 ## Phases
 
-| Phase | Content |
-|-------|---------|
-| 0 | Resolve open questions; record decisions in this file |
-| 1 | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change) |
-| 2 | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
-| 3 | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
-| 4 | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT` |
-| 5 | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
-| 6 | client-python: deadline from await timeout, CLI flags, terminal-state handling |
-| 7 | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci` |
+| Phase | Plan | Status | Content |
+|-------|------|--------|---------|
+| 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Planning | Resolve open questions; record decisions in this file |
+| 1 | | Not started | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change) |
+| 2 | | Not started | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
+| 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
+| 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT` |
+| 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
+| 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling |
+| 7 | | Not started | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci` |
 
 Each phase gets its own detailed plan file before implementation.
 Unit tests land with each phase; the functional test in phase 7
