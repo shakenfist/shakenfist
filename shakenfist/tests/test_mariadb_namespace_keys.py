@@ -570,6 +570,14 @@ class DirectFindNamespaceKeysTestCase(base.ShakenFistTestCase):
         self.assertEqual('banana', first_static.namespace)
         self.assertEqual(
             'aGFzaC1vbmU=', first_attrs.key.get_secret_value())
+
+        # The decoder re-wraps explicitly rather than relying on
+        # pydantic to coerce the plain string off the row. Asserted
+        # rather than left implied by get_secret_value() above, so that
+        # the wrap is what this test pins and not a side effect of it.
+        self.assertIsInstance(first_attrs.key, SecretStr)
+        self.assertIsInstance(first_attrs.nonce, SecretStr)
+
         self.assertIsNone(first_attrs.expiry)
         self.assertIsNone(first_attrs.scopes)
         self.assertIsNone(first_attrs.provenance)
@@ -641,6 +649,13 @@ class DirectGetNamespaceKeyByNameTestCase(base.ShakenFistTestCase):
         self.assertEqual('keyname', static_data.name)
         self.assertEqual('banana', static_data.namespace)
         self.assertEqual('nonce-one', attrs.nonce.get_secret_value())
+
+        # As above: the explicit re-wrap on the read path, pinned as
+        # itself. This is the accessor token validation calls once per
+        # request, so it is the one most likely to be optimised later.
+        self.assertIsInstance(attrs.key, SecretStr)
+        self.assertIsInstance(attrs.nonce, SecretStr)
+
         self.assertEqual(2000.0, attrs.expiry)
         self.assertEqual(['read'], attrs.scopes)
         self.assertEqual({'source': 'oidc'}, attrs.provenance)

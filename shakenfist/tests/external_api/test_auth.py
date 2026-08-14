@@ -7,6 +7,7 @@ from unittest import mock
 from uuid import uuid4
 
 import bcrypt
+from pydantic import SecretStr
 
 from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -1151,7 +1152,10 @@ class AuthRejectionLoggingTestCase(base.ShakenFistTestCase):
         logged = self._replay(token)
         fields = self._fields_for(logged, 'JWT token has incorrect nonce')
         for name, value in fields.items():
-            self.assertNotIn(nonce, str(value),
+            # get_secret_value() is required, not stylistic: the stored
+            # nonce is a SecretStr, and a SecretStr needle never matches
+            # so the assertion would pass whatever the log contained.
+            self.assertNotIn(nonce.get_secret_value(), str(value),
                              f'the nonce leaked into the log in {name!r}')
 
     def test_removed_key_is_attributed_and_not_an_error(self):
@@ -1221,7 +1225,18 @@ class EventSecretsTestCase(base.ShakenFistTestCase):
         return found
 
     def _assert_absent_everywhere(self, secret):
-        """``secret`` appears in no recorded event, under any key."""
+        """``secret`` appears in no recorded event, under any key.
+
+        Unwraps a SecretStr caller-side rather than making each call
+        site do it. Two of the callers below pass a stored nonce or key
+        hash, which are SecretStr, and a SecretStr needle can never
+        match a string -- so before this unwrapped, those assertions
+        passed while checking nothing. The base class now refuses that
+        shape outright; this keeps the callers reading naturally.
+        """
+        if isinstance(secret, SecretStr):
+            secret = secret.get_secret_value()
+
         for message, extra in self.events:
             for name, value in extra.items():
                 self.assertNotIn(
@@ -1338,6 +1353,34 @@ class EventSecretsTestCase(base.ShakenFistTestCase):
                   for extra in self._extras_for('api response sent')]
         for body in bodies:
             self.assertNotIn('credentials', str(body))
+
+
+class JWTSigningKeyTestCase(base.ShakenFistTestCase):
+    """The seed must reach flask_jwt_extended unwrapped.
+
+    AUTH_SECRET_SEED is a SecretStr, and flask_jwt_extended signs with
+    whatever it is handed. A missed unwrap here would sign every token
+    in the zone with the ten asterisks SecretStr renders as -- which
+    still validates, because the same wrong value verifies it, so the
+    only symptom is that every token minted before the mistake stops
+    working and the cluster's signing key is a publicly known string.
+
+    Every /auth test covers this transitively, but they would fail as a
+    mass authentication outage rather than as anything pointing at the
+    seed. This one names the boundary.
+    """
+
+    def test_the_signing_key_is_not_a_secretstr(self):
+        key = external_api.app.config['JWT_SECRET_KEY']
+        self.assertIsInstance(key, str)
+        self.assertNotIsInstance(key, SecretStr)
+
+    def test_the_signing_key_is_the_seed_itself(self):
+        # Not the rendered mask, which is what an unwrap-free assignment
+        # produces and which reads as a perfectly ordinary string.
+        key = external_api.app.config['JWT_SECRET_KEY']
+        self.assertEqual(config.AUTH_SECRET_SEED.get_secret_value(), key)
+        self.assertNotEqual(str(config.AUTH_SECRET_SEED), key)
 
 
 class ReservedKeyPrefixTestCase(base.ShakenFistTestCase):

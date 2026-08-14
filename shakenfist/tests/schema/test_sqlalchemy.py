@@ -16,6 +16,8 @@ from pydantic import UUID4
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
+from shakenfist.schema.namespace_key_attributes import (
+    NamespaceKeyAttributesData)
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.schema.sqlalchemy import SQLIndex
 from shakenfist.schema.sqlalchemy import SQLLongText
@@ -135,6 +137,25 @@ class SecretStrColumnTypeTestCase(base.ShakenFistTestCase):
 
         col_type = _get_sqlalchemy_type(NotAKnownType, field_metadata=[])
         self.assertIsInstance(col_type, mysql.LONGTEXT)
+
+    def test_the_real_namespace_key_table_is_unchanged(self):
+        # The tests above use a synthetic model, which proves the
+        # mapping but not that the one table which actually has
+        # SecretStr fields came out the way it did before they were
+        # wrapped. That is the claim which lets
+        # NAMESPACE_KEY_ATTRIBUTES_VERSION stay at 1 with no migration,
+        # so it is asserted against the real model rather than a stand
+        # in.
+        metadata = sa.MetaData()
+        table = pydantic_to_sqlalchemy_table(
+            NamespaceKeyAttributesData, 'namespace_key_attributes_test',
+            metadata, primary_key_fields=['uuid'])
+
+        for column in ['key', 'nonce']:
+            col_type = table.c[column].type
+            self.assertIsInstance(col_type, sa.String, column)
+            self.assertEqual(255, col_type.length, column)
+            self.assertNotIsInstance(col_type, mysql.LONGTEXT, column)
 
 
 class PydanticToSQLAlchemyTableTestCase(base.ShakenFistTestCase):

@@ -108,7 +108,19 @@ class SecretConfigFieldTestCase(base.ShakenFistTestCase):
         conf = SFConfig()
         self.assertFalse(conf.LOKI_AUTH_HEADER)
 
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_AUTH_SECRET_SEED': UNCONFIGURED_AUTH_SECRET_SEED})
     def test_unconfigured_seed_is_still_refused(self):
+        # The environment is pinned rather than inherited. SFConfig
+        # reads SHAKENFIST_* from os.environ, and importing
+        # shakenfist.config runs load_cluster_config(), which pushes
+        # every cluster_config row into the environment on any host
+        # which can reach a database tier. On such a host the seed is
+        # already configured and this test -- the most important one in
+        # the phase -- would fail for a reason that has nothing to do
+        # with the code under test.
+        #
         # The regression this phase was most likely to introduce.
         # SecretStr('x') == 'x' is False, so comparing the field against
         # the sentinel directly makes this check unsatisfiable, and a
@@ -133,11 +145,16 @@ class SecretConfigFieldTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.config.config', conf):
             verify_config()
 
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_AUTH_SECRET_SEED': UNCONFIGURED_AUTH_SECRET_SEED})
     def test_the_sentinel_never_equals_the_wrapper(self):
         # A guard on the mistake itself, independent of how
         # verify_config() happens to be written: the wrapper never
         # equals the bare sentinel, so any future code comparing them
-        # directly is wrong.
+        # directly is wrong. Pinned to the sentinel for the same reason
+        # as the test above, so that it is the sentinel comparison being
+        # tested and not whatever seed the host happens to carry.
         conf = SFConfig()
         self.assertNotEqual(
             UNCONFIGURED_AUTH_SECRET_SEED, conf.AUTH_SECRET_SEED)

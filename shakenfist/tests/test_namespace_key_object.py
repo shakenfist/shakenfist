@@ -51,14 +51,20 @@ class NamespaceKeyTestCase(base.ShakenFistTestCase):
 
         Both of the obvious spellings are broken now that these fields
         are SecretStr, and neither breaks loudly.
-        ``assertNotIn(attrs.key, haystack)`` passes unconditionally:
-        testtools' Contains matcher does not require the needle to be a
-        string, and a SecretStr is never a substring of one. That is not
-        hypothetical -- these two tests silently stopped testing anything
-        the moment the field type changed, and only a deliberate check
-        caught it. ``assertNotIn(str(attrs.key), haystack)`` is worse,
-        because it asserts the literal '**********' is absent, which is
-        true of an event which leaked the real secret.
+        ``assertNotIn(attrs.key, haystack)`` cannot fail: SecretStr
+        implements no __contains__, so the containment raises
+        TypeError, and testtools' Contains matcher catches TypeError
+        and reports "does not contain". That is not hypothetical --
+        these two tests silently stopped testing anything the moment
+        the field type changed, and only a deliberate check caught it.
+        ``assertNotIn(str(attrs.key), haystack)`` is worse, because it
+        asserts the literal '**********' is absent, which is true of an
+        event which leaked the real secret.
+
+        ShakenFistTestCase now refuses a SecretStr operand outright, so
+        the first spelling raises rather than passing. This helper
+        stays because unwrapping in one place beats unwrapping at every
+        call site.
 
         See docs/plans/PLAN-auth-federation-phase-06-secret-types.md,
         Decision 7. test_the_secret_guard_detects_a_real_leak() proves
@@ -191,6 +197,14 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         and then the nonce into an event and asserts the helper objects
         to each, so that any future repair which makes the guards
         vacuous fails here instead of passing quietly.
+
+        The expected exception is self.failureException (testtools'
+        MismatchError) rather than a bare Exception, because Exception
+        is satisfied by the guard *breaking* as well as by the guard
+        firing: an AttributeError from a renamed field, or a typo in the
+        helper, would otherwise read as proof that the guard still
+        works. A test which proves another test can fail should not
+        itself be able to pass for the wrong reason.
         """
         with mock.patch('shakenfist.eventlog.add_event'):
             k = NamespaceKey.new('banana', 'deploy', 'sekrit')
@@ -203,7 +217,8 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
                 mock.call('objtype', 'uuid', 'audit', 'leaked',
                           extra={'oops': leaked})]
             self.assertRaises(
-                Exception, self._assert_no_secret_material, leaky, attrs)
+                self.failureException, self._assert_no_secret_material,
+                leaky, attrs)
 
     def test_a_masked_secret_is_not_mistaken_for_absence(self):
         """The other half of Decision 7.
