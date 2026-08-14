@@ -5283,6 +5283,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-demo-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A working installation path: the compose demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
         
   
@@ -5591,6 +5619,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: package the migrations and add `kerbside db upgrade`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -5647,6 +5703,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: write the missing `etc/kerbside.conf.example`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -5655,6 +5739,62 @@
     
   
     Phase 3: Control socket on Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: the `docker compose` demo stack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: a CI lane for the compose demo
   
 
     
@@ -5711,6 +5851,34 @@
     
   
     Phase 5: Direct-qemu CI workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: rewrite `docs/installation.md`
   
 
     
@@ -11901,6 +12069,22 @@ this chapter: <strong>one slow node pauses the entire cluster</strong>. Your wri
 throughput is not the average of your nodes, and it is not the throughput
 of the node your load balancer is pointing at. In steady state, cluster
 wide write throughput converges on the apply rate of the slowest member.</p>
+<details class="example" open="open">
+<summary>Watching it happen</summary>
+<p>There is a runnable version of this in
+<a href="https://github.com/shakenfist/cloudgood/tree/main/examples/galera/flow-control">examples/galera/flow-control</a>:
+a three node cluster in containers, a write load pointed at node1, and a
+switch that makes node3 slow. On a sixteen core host the measured effect
+of crippling node3 was that cluster throughput fell from around 13,000
+commits per second to around 500, with the cluster paused 97% of the
+time.</p>
+<p>The detail worth seeing for yourself is which node showed the evidence.
+node3 held a receive queue of thirty odd write sets and sent more than
+two thousand flow control events in half a minute. node1, which was
+taking every single write and whose throughput had dropped by a factor
+of twenty five, reported a receive queue of zero and sent no flow
+control at all.</p>
+</details>
 <p>All of this is observable, but -- and this catches people out -- almost
 entirely through status variables rather than through logs. These are the
 counters worth putting on a dashboard before you need them, and several of
@@ -11911,11 +12095,9 @@ them have a sharp edge worth knowing about:</p>
 waiting to be applied right now. On a healthy node this sits near zero.
 An instantaneous snapshot, so it is honest but twitchy.</dd>
 <dt><code>wsrep_local_recv_queue_avg</code></dt>
-<dd>The average queue length <strong>since the most recent status query</strong>. A
+<dd>The average queue length since the counters were last reset. A
 consistently non-zero value means this node is the bottleneck, and you
-have found your slow node. Note those reset semantics: reading the
-variable clears it, so the figure describes the interval since whoever
-last looked, which may have been your monitoring system a second ago.</dd>
+have found your slow node.</dd>
 <dt><code>wsrep_flow_control_paused</code></dt>
 <dd>The fraction of time since the last <code>FLUSH STATUS</code> that replication was
 paused by flow control. A value of 0.3 means the cluster spent thirty
@@ -11931,11 +12113,10 @@ one to graph: differencing consecutive samples gives pause time per
 interval, which is what you actually wanted, and it is immune to the
 averaging problem above.</dd>
 <dt><code>wsrep_flow_control_sent</code> and <code>wsrep_flow_control_recv</code></dt>
-<dd>Counts of flow control pause events this node has sent, and has
-received plus sent, <strong>since the most recent status query</strong>. A non-zero
-<code>sent</code> means this node is the one doing the throttling rather than a
-victim of it, which is usually the question you actually want answered.
-These reset on read as well.</dd>
+<dd>Counts of flow control pause events this node has sent, and has received
+plus sent. A non-zero and climbing <code>sent</code> means this node is the one
+doing the throttling rather than a victim of it, which is usually the
+question you actually want answered.</dd>
 <dt><code>wsrep_cert_deps_distance</code></dt>
 <dd>The average distance in the sequence between transactions that could
 possibly have been applied in parallel. It is an upper bound on useful
@@ -11944,14 +12125,23 @@ starting point for sizing applier threads.</dd>
 </dl>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Three of those variables reset when they are queried, not on a timer
-and not on restart. If two things poll the same node -- say Prometheus
-every fifteen seconds and you at a <code>mysql</code> prompt -- they consume each
-other's counts, and your interactive reading will look reassuringly
-small because the scraper just took the interesting part. When
-investigating by hand on a monitored cluster, trust
-<code>wsrep_flow_control_paused_ns</code> and <code>wsrep_local_recv_queue</code>, which do
-not have this behaviour.</p>
+<p>Check the reset semantics on your own version rather than trusting the
+documentation, because the two do not currently agree. The MariaDB
+knowledge base describes <code>wsrep_flow_control_sent</code>,
+<code>wsrep_flow_control_recv</code> and <code>wsrep_local_recv_queue_avg</code> as measured
+"since the most recent status query", which would mean that reading
+them resets them and that two pollers would consume each other's
+counts. Measured on MariaDB 11.4 that is not what happens: consecutive
+reads return identical values, the counters climb monotonically, and
+only <code>FLUSH STATUS</code> clears them. The distinction matters for how you
+read a dashboard, so it is worth thirty seconds and a <code>DO SLEEP(4)</code> to
+establish which behaviour you actually have. The
+<a href="https://github.com/shakenfist/cloudgood/tree/main/examples/galera/flow-control">flow control example</a>
+shows the test.</p>
+<p>What is not in doubt is that these are all <em>cumulative</em> rather than
+per-interval, which is why <code>wsrep_flow_control_paused</code> is the wrong
+thing to alert on and a differenced <code>wsrep_flow_control_paused_ns</code> is
+the right one.</p>
 </div>
 <h3 id="what-gets-logged-almost-nothing">What gets logged? Almost nothing<a class="headerlink" href="#what-gets-logged-almost-nothing" title="Permanent link">&para;</a></h3>
 <p>If you arrived at this section from the slow query log, the analogy
