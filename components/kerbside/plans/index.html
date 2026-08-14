@@ -11338,8 +11338,8 @@ repo root. For pre-push audits of our own work see
 <td>2026-08-14</td>
 <td><a href="/components/kerbside/plans/PLAN-demo-install/">A working installation path: the compose demo</a></td>
 <td><code>docs/installation.md</code> stops at acquisition, so a reader who follows it has software and no running system: it never mentions the two processes, the database, the TLS material, or a console source. Package the migrations and add <code>kerbside db upgrade</code> (a wheel install currently cannot create its own schema), write the missing <code>etc/kerbside.conf.example</code>, build a <code>docker compose</code> demo with a CI lane, and rewrite the page around it; resolves #3</td>
-<td>Not started</td>
-<td><a href="/components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/">phase 1</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/">phase 2</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/">phase 3</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/">phase 4</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-05-docs/">phase 5</a> (not started)</td>
+<td>In progress</td>
+<td><a href="/components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/">phase 1</a> (done 2026-08-14 — migrations moved into the package, <code>kerbside db upgrade</code>/<code>downgrade</code> and <code>kerbside demo token</code> added; verified from an installed wheel run outside any checkout. Fixed two logging defects found on the failure path, including alembic's env.py disabling every kerbside logger), <a href="/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/">phase 2</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/">phase 3</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/">phase 4</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-05-docs/">phase 5</a> (not started)</td>
 </tr>
 </tbody>
 </table>

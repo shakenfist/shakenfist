@@ -11497,7 +11497,7 @@ to function: <code>sql_url</code>, <code>auth_secret_seed</code>, <code>sources_
 </li>
 </ol>
 <h3 id="the-anti-rot-test">The anti-rot test<a class="headerlink" href="#the-anti-rot-test" title="Permanent link">&para;</a></h3>
-<p>Add a test in <code>kerbside/tests/</code> that:</p>
+<p>Add a test in <code>kerbside/tests/unit/</code> that:</p>
 <ol>
 <li>Parses <code>etc/kerbside.conf.example</code> with <code>configparser</code>,
    reading <strong>both</strong> live and commented-out keys — the
@@ -11519,9 +11519,12 @@ up from <code>__file__</code> to the directory containing <code>etc/</code>, and
 <strong>skip the test if not found</strong> rather than failing — an
 installed wheel has no <code>etc/</code>, and a test that fails when
 run from site-packages is a worse outcome than one that
-skips. Use the same skip idiom as any existing repo-data
-test in <code>kerbside/tests/</code>; if there is none,
-<code>unittest.SkipTest</code> with a message naming why.</p>
+skips. Use <code>unittest.SkipTest</code> with a message naming why.</p>
+<p>Tests live in <code>kerbside/tests/unit/</code>, as <code>test_*.py</code> using
+<code>testtools.TestCase</code>, each with a docstring explaining the
+defect it guards against — follow the neighbouring files.
+(Phase 1's survey corrected this path; an earlier draft of
+this plan said <code>kerbside/tests/</code>.)</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -11546,7 +11549,7 @@ test in <code>kerbside/tests/</code>; if there is none,
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add the anti-rot test described in "The anti-rot test" to <code>kerbside/tests/</code>, matching the existing test style in that directory. All three assertions: every <code>Config</code> field covered, no orphan keys, and the file parses. Skip cleanly when <code>etc/</code> is absent. Run it, then deliberately add a throwaway field to <code>Config</code> and confirm the test fails, then remove it — report that you did this, because a coverage test that cannot fail is worthless.</td>
+<td>Add the anti-rot test described in "The anti-rot test" to <code>kerbside/tests/unit/</code>, matching the existing test style in that directory. All three assertions: every <code>Config</code> field covered, no orphan keys, and the file parses. Skip cleanly when <code>etc/</code> is absent. Run it, then deliberately add a throwaway field to <code>Config</code> and confirm the test fails, then remove it — report that you did this, because a coverage test that cannot fail is worthless.</td>
 </tr>
 <tr>
 <td>2c</td>
