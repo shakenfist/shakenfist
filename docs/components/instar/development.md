@@ -42,6 +42,76 @@ glibc floor empirically, `tools/verify-glibc-floor.sh <deb> <rpm>`
 installs the packages on every target distribution and runs
 `info`/`create`/`map` under KVM.
 
+### Do not bump the release image's base
+
+`src/.devcontainer/build/Dockerfile` pins `debian:bullseye`, and that
+pin is the product rather than an implementation detail: the base's
+glibc *is* the floor of every binary we ship, so a newer Debian is a
+regression dressed as an update. `renovate.json` excludes the file for
+that reason; the dev/test image next door stays managed normally.
+
+Two checks back the pin up, because a comment is not a control:
+
+- `tools/ci/check-glibc-floor.sh` runs on the line immediately after
+  `make instar`, in both `build-and-test` and the release workflow, and
+  fails if the binary references a symbol above `GLIBC_2.31` — the
+  floor published in [installation.md](/components/instar/installation/), not the matrix
+  CI's oldest distro (Rocky 9, 2.34), which is looser than the promise
+  and would let a smaller base movement through unnoticed. It needs
+  nothing but the built binary, so it gates every pull request. The
+  placement is deliberate: the unit test run that follows builds bin
+  targets into the same `src/target/release/` from the *dev* image, so
+  a later check could read a binary that image relinked.
+- `tools/verify-glibc-floor.sh` is the empirical version above, and
+  remains the real acceptance gate — but it needs containers, packages
+  and `/dev/kvm`, so it runs in the merge queue matrix or by hand.
+
+The gap between those two is not hypothetical. Renovate raised the base
+to `debian:trixie` in #488; the floor went from `GLIBC_2.30` to
+`GLIBC_2.39`; pull request CI passed completely, because nothing on the
+pull request path looks at the floor; and the failure surfaced as three
+red distros in the merge queue after the change was already on
+`develop`. The cheap check exists to make that a pull request failure.
+
+#### When bullseye reaches end of life
+
+**Debian 11 LTS ends on 2026-08-31**
+([wiki.debian.org/LTS](https://wiki.debian.org/LTS)). "Do not bump this
+tag" is not meant to outlive that date unexamined, so here is what
+happens and what the options are.
+
+The failure mode is not a glibc change — it is the image's
+`apt-get update` starting to fail once bullseye moves to
+`archive.debian.org`, which breaks from-scratch builds of
+`instar-release` while an already-built image keeps working. Expect it
+to surface as a red CI job on a runner that had no cached image, not as
+a support-matrix regression.
+
+No option is free, because "move to the next Debian" is not available:
+bookworm ships glibc 2.36, above both the 2.31 we publish and the 2.34
+the matrix needs, so taking it silently drops Debian 11, Ubuntu 22.04
+and Rocky 9.
+
+- **Pin a `snapshot.debian.org` bullseye base** and point apt at the
+  same snapshot. Keeps the floor and the support matrix exactly as
+  published; costs a frozen, unpatched build toolchain. The binary's
+  security posture depends on the Rust toolchain and our own code far
+  more than on the build image's C library, so this is the least
+  disruptive option, and the one to reach for if the deadline arrives
+  before a decision does.
+- **Move to bookworm and narrow the promise** to glibc 2.36. This drops
+  Debian 11, Ubuntu 22.04 LTS and Rocky/RHEL 9 — the last of which is
+  in the matrix CI and, per
+  [PLAN-distro-matrix-ci.md](/components/instar/plans/PLAN-distro-matrix-ci/) decision
+  D1, was the reason the floor was set this low. It needs
+  `installation.md`, `README.md`, `MAX_GLIBC` in
+  `check-glibc-floor.sh`, and the matrix distro list all updated
+  together.
+- **Change build strategy** — a `zig cc` or `cargo-zigbuild` style
+  cross-link against an explicitly chosen older glibc, decoupling the
+  floor from the base image entirely. The most work, and the only
+  option that stops this recurring every few years.
+
 ## Pre-commit hooks
 
 This project uses pre-commit hooks for Rust code quality:
