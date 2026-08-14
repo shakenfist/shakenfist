@@ -170,6 +170,49 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             base64.b64decode(
                 self._attributes(loser).key.get_secret_value())))
 
+    def test_new_records_the_nonce_it_minted(self):
+        """All three paths out of new() must set minted_nonce.
+
+        Namespace.add_key() returns this rather than re-reading the
+        nonce property, so that it can promise a SecretStr rather than
+        an Optional one. If it ever disagreed with what was stored, the
+        token minted from a freshly created key would carry a nonce
+        which does not match the key, and every request made with that
+        token would 401 -- loud, but a long way from the cause.
+        """
+        # Path one: a genuine creation.
+        created = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self.assertIsNotNone(created.minted_nonce)
+        self.assertEqual(self._attributes(created).nonce.get_secret_value(),
+                         created.minted_nonce.get_secret_value())
+
+        # Path two: an existing name, so a rotation.
+        rotated = NamespaceKey.new('banana', 'deploy', 'different')
+        self.assertIsNotNone(rotated.minted_nonce)
+        self.assertEqual(self._attributes(rotated).nonce.get_secret_value(),
+                         rotated.minted_nonce.get_secret_value())
+        self.assertNotEqual(created.minted_nonce.get_secret_value(),
+                            rotated.minted_nonce.get_secret_value())
+
+        # Path three: losing the unique index race, which falls back to
+        # rotating the winner's key.
+        with mock.patch.object(NamespaceKey, 'from_db_by_name',
+                               side_effect=[None, rotated]):
+            loser = NamespaceKey.new('banana', 'deploy', 'third')
+        self.assertIsNotNone(loser.minted_nonce)
+        self.assertEqual(self._attributes(loser).nonce.get_secret_value(),
+                         loser.minted_nonce.get_secret_value())
+
+    def test_a_key_read_from_the_database_minted_nothing(self):
+        # minted_nonce is about this call, not about the key. A caller
+        # which reads a key back and finds a nonce there would be
+        # reading a stale value from whichever process last minted one.
+        created = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        fetched = NamespaceKey.from_db_by_name('banana', 'deploy')
+
+        self.assertEqual(created.uuid, fetched.uuid)
+        self.assertIsNone(fetched.minted_nonce)
+
     def test_the_same_name_in_another_namespace_is_a_different_key(self):
         self.mock_mariadb.create_namespace('apple', 'key1', 'bacon')
         one = NamespaceKey.new('banana', 'deploy', 'sekrit')

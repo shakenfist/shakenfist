@@ -89,6 +89,18 @@ class NamespaceKey(dbo):
         self.__namespace = static_values['namespace']
         self.__name = static_values['name']
 
+        # The nonce this call minted, when this object came from new()
+        # or rotate(). It is None on an object read from the database,
+        # which is every other way of getting one.
+        #
+        # This exists so a caller which has just minted a key can use
+        # the nonce without re-reading it. The nonce property does a
+        # fresh point read and is therefore Optional -- correctly, since
+        # a concurrent hard delete can empty it -- but a caller minting
+        # a token from the key it just created needs a value, not a
+        # maybe. See Namespace.add_key().
+        self.minted_nonce: Optional[SecretStr] = None
+
     @classmethod
     def _static_values_to_dict(cls, data: NamespaceKeyData) -> dict[str, Any]:
         return {
@@ -176,6 +188,12 @@ class NamespaceKey(dbo):
         tokens for the old secret stop validating because the nonce
         changed, but the key object, its uuid, and its event history
         survive.
+
+        The returned object carries the nonce this call minted in
+        ``minted_nonce``, on every one of the three paths out. Callers
+        which need it must read that rather than the nonce property,
+        which re-reads from the database and so can legitimately come
+        back empty.
         """
         existing = cls.from_db_by_name(namespace, name)
         if existing:
@@ -184,6 +202,7 @@ class NamespaceKey(dbo):
             return existing
 
         key_uuid = str(uuid4())
+        nonce = SecretStr(sfrandom.random_id())
         cls._db_create(key_uuid, {
             'uuid': key_uuid,
             'namespace': namespace,
@@ -194,7 +213,7 @@ class NamespaceKey(dbo):
             # if that filter were ever removed, the audit event would
             # carry asterisks rather than the hash and the nonce.
             'key': SecretStr(hash_secret(plaintext_secret)),
-            'nonce': SecretStr(sfrandom.random_id()),
+            'nonce': nonce,
             'expiry': expiry,
             'scopes': scopes,
             'provenance': provenance
@@ -216,6 +235,7 @@ class NamespaceKey(dbo):
                             provenance=provenance)
             return existing
 
+        k.minted_nonce = nonce
         k.state = cls.STATE_INITIAL
         k.state = cls.STATE_CREATED
         return k
@@ -232,7 +252,10 @@ class NamespaceKey(dbo):
 
         Returns the new nonce, as Namespace.add_key() does today, and
         wrapped for the same reason the stored value is: a nonce tells a
-        holder of captured tokens which of them are still live.
+        holder of captured tokens which of them are still live. It is
+        also recorded on the object as ``minted_nonce``, which is how
+        new() surfaces it when the caller cannot see which of create or
+        rotate it performed.
         """
         _uuid = _as_uuid(self.uuid)
         nonce = SecretStr(sfrandom.random_id())
@@ -256,6 +279,7 @@ class NamespaceKey(dbo):
         # Note that neither the hash nor the nonce may appear here.
         self.add_event(EVENT_TYPE_MUTATE, 'rotated key',
                        extra={'expiry': expiry})
+        self.minted_nonce = nonce
         return nonce
 
     # Static values
