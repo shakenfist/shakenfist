@@ -184,26 +184,47 @@ class NodeInstNetdescOp(BaseClusterOperation):
             # candidates until one takes the instance (D7). Exhausting
             # the list is the same outcome as the scheduler finding no
             # candidates at all, so it is raised as one.
-            target = None
             denials = {}
-            for candidate in candidates:
-                try:
-                    inst.place_instance(candidate)
-                    target = candidate
-                    break
-                except CapacityAdmissionDenied as e:
-                    denials[candidate] = {
-                        'failing_stage': e.failing_stage,
-                        'dimensions': e.dimensions,
-                    }
-                    add_event_multi(
-                        EVENT_TYPE_AUDIT, [self, inst],
-                        'reschedule candidate refused by capacity guard',
-                        extra={
-                            'node': candidate,
+
+            def place_walk(enforce_demand):
+                for candidate in candidates:
+                    try:
+                        inst.place_instance(
+                            candidate, enforce_demand=enforce_demand)
+                        return candidate
+                    except CapacityAdmissionDenied as e:
+                        denials[candidate] = {
                             'failing_stage': e.failing_stage,
                             'dimensions': e.dimensions,
-                        })
+                            'demand_only': e.demand_only,
+                        }
+                        add_event_multi(
+                            EVENT_TYPE_AUDIT, [self, inst],
+                            'reschedule candidate refused by capacity guard',
+                            extra={
+                                'node': candidate,
+                                'failing_stage': e.failing_stage,
+                                'dimensions': e.dimensions,
+                                'enforce_demand': enforce_demand,
+                            })
+                return None
+
+            target = place_walk(True)
+
+            # The D13 demand term spreads correlated bursts across
+            # nodes; it is not a capacity bound. The first pass already
+            # gave demand-quiet nodes their preference, so if nothing
+            # admitted and at least one candidate was refused on demand
+            # alone, walk again with the clause waived rather than
+            # aborting a start the cluster has real capacity for.
+            if target is None and any(
+                    d['demand_only'] for d in denials.values()):
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [self, inst],
+                    'no candidate admitted and some refused on demand '
+                    'alone, waiving demand guard',
+                    extra={'candidates': candidates, 'denials': denials})
+                target = place_walk(False)
 
             if target is None:
                 add_event_multi(

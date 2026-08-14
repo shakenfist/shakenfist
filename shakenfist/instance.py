@@ -988,7 +988,8 @@ class Instance(dbowo):
         return (self.cpus, self.memory,
                 mariadb._disk_spec_virtual_gb(self.disk_spec))
 
-    def _admit_placement(self, location, old_location, placement, enforce):
+    def _admit_placement(self, location, old_location, placement, enforce,
+                         enforce_demand):
         """Draw down capacity for a placement and write it, atomically.
 
         One RPC performs the guarded counter updates, the placement
@@ -1022,14 +1023,14 @@ class Instance(dbowo):
         result = mariadb.admit_instance_placement(
             str(self.uuid), self.namespace, location, cpus, memory_mb,
             disk_gb, placement_json, old_node_uuid=old_location,
-            enforce=True)
+            enforce=True, enforce_demand=enforce_demand)
 
         if not enforce and result['success'] and not result['admitted']:
             denial = result
             result = mariadb.admit_instance_placement(
                 str(self.uuid), self.namespace, location, cpus, memory_mb,
                 disk_gb, placement_json, old_node_uuid=old_location,
-                enforce=False)
+                enforce=False, enforce_demand=enforce_demand)
             if result['success']:
                 self._event_admission_over_limit(location, denial)
 
@@ -1051,7 +1052,7 @@ class Instance(dbowo):
                 'dimensions': result['dimensions']
             }, log_as_error=True)
 
-    def place_instance(self, location, enforce=True):
+    def place_instance(self, location, enforce=True, enforce_demand=True):
         """Place this instance on a node, claiming its capacity to do so.
 
         The placement attribute, the capacity counters and the
@@ -1068,6 +1069,14 @@ class Instance(dbowo):
         libvirt domain already is: a guard cannot refuse reality, and
         refusing to record it would leave the ledger wrong, which is
         strictly worse. Those writers get a loud event instead.
+
+        ``enforce_demand=False`` waives only the D13 demand feedforward
+        clause, keeping every real capacity dimension guarded. It is for
+        a walker's second pass after a first walk admitted nowhere and
+        was refused somewhere on demand alone: demand exists to spread
+        bursts across nodes, and when there is no quieter node to
+        spread to it must not refuse a cluster whose real capacity is
+        free (the smoke CI single-node lockout of 2026-08-14).
         """
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
@@ -1088,7 +1097,8 @@ class Instance(dbowo):
                 'placement_attempts', 0) + 1
 
             result = self._admit_placement(
-                location, old_location or '', placement, enforce)
+                location, old_location or '', placement, enforce,
+                enforce_demand)
 
             if not result['success']:
                 # The database could not be reached, or refused the
@@ -1137,6 +1147,7 @@ class Instance(dbowo):
                     'previous_node': old_location,
                     'placement_attempts': placement['placement_attempts'],
                     'enforce': enforce,
+                    'enforce_demand': enforce_demand,
                     'cpus': self.cpus,
                     'memory_mb': self.memory,
                     'node_used_cpus': result['node_used_cpus'],

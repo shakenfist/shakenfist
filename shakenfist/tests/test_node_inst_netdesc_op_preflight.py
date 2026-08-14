@@ -33,13 +33,17 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class FakeInstance:
     """An instance double with a state machine we control."""
 
-    def __init__(self, state_value, reject=(), deny=(),
+    def __init__(self, state_value, reject=(), deny=(), deny_demand=(),
                  fetch_dependencies=None):
         self._state_value = state_value
         self._reject = reject
         # Nodes whose capacity guard refuses this instance, as the
-        # admission RPC would (P2/D7).
+        # admission RPC would (P2/D7). ``deny`` refuses on a real
+        # dimension in every mode; ``deny_demand`` refuses on the D13
+        # demand term alone, so it admits when the walker's second pass
+        # waives that clause.
         self._deny = set(deny)
+        self._deny_demand = set(deny_demand)
         self.state_sets = []
         self.delete_errors = []
         self.placement = {'placement_attempts': 0}
@@ -68,12 +72,18 @@ class FakeInstance:
     def enqueue_delete_due_error(self, message):
         self.delete_errors.append(message)
 
-    def place_instance(self, node):
+    def place_instance(self, node, enforce_demand=True):
         self.placement_attempts.append(node)
         if node in self._deny:
             raise exceptions.CapacityAdmissionDenied(
                 'node', [{'dimension': 'cpus', 'limit': 16.0, 'used': 16.0,
                           'requested': 1.0, 'exceeded': True}])
+        if enforce_demand and node in self._deny_demand:
+            raise exceptions.CapacityAdmissionDenied(
+                'node', [{'dimension': 'cpus', 'limit': 16.0, 'used': 0.0,
+                          'requested': 1.0, 'exceeded': False},
+                         {'dimension': 'demand', 'limit': 6.0, 'used': 9.2,
+                          'requested': 2.5, 'exceeded': True}])
         self.placed_on.append(node)
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
@@ -186,6 +196,45 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
             second, op.instance_uuid, op.net_desc, op.tasks,
             op.priority, op.request_id, depends_on=None)
         self.assertEqual(NodeInstNetdescOp.STATE_ABORT, op.state.value)
+
+    def test_demand_only_refusals_are_waived_on_a_second_pass(self):
+        # The D13 demand feedforward spreads bursts across nodes; when
+        # the redirect walk admits nowhere and the refusals were on
+        # demand alone, it re-walks with the clause waived rather than
+        # aborting a start the cluster has real capacity for.
+        target = str(uuid4())
+        inst = FakeInstance('created', deny_demand=[target])
+
+        op, mock_enqueue, raised = self._redirect(inst, [target])
+
+        self.assertIsNone(raised)
+        # Two attempts: the enforced walk, then the waived one.
+        self.assertEqual([target, target], inst.placement_attempts)
+        self.assertEqual([target], inst.placed_on)
+        mock_enqueue.assert_called_once_with(
+            target, op.instance_uuid, op.net_desc, op.tasks,
+            op.priority, op.request_id, depends_on=None)
+        self.assertEqual(NodeInstNetdescOp.STATE_ABORT, op.state.value)
+
+    def test_the_waiver_reaches_past_a_genuinely_full_node(self):
+        # Mixed exhaustion: one node full on real capacity, another
+        # refused on demand alone. The second pass must run, and only
+        # the demand refusal is waivable.
+        full = str(uuid4())
+        demand_hot = str(uuid4())
+        inst = FakeInstance('created', deny=[full],
+                            deny_demand=[demand_hot])
+
+        op, mock_enqueue, raised = self._redirect(inst, [full, demand_hot])
+
+        self.assertIsNone(raised)
+        self.assertEqual(
+            [full, demand_hot, full, demand_hot],
+            inst.placement_attempts)
+        self.assertEqual([demand_hot], inst.placed_on)
+        mock_enqueue.assert_called_once_with(
+            demand_hot, op.instance_uuid, op.net_desc, op.tasks,
+            op.priority, op.request_id, depends_on=None)
 
     def test_every_candidate_denied_aborts_the_start(self):
         # An exhausted candidate list means the cluster really is full,

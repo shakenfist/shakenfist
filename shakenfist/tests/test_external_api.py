@@ -762,6 +762,58 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
         self.assertEqual(507, resp.status_code, resp.get_json())
         self.assertIn('2 candidates refused it', resp.get_json()['error'])
 
+    def test_demand_only_refusals_are_waived(self):
+        # The D13 demand feedforward spreads bursts across nodes; when
+        # no candidate admits and the refusals were on demand alone, the
+        # walk retries with the clause waived rather than 507ing a
+        # cluster with free real capacity (the smoke CI single-node
+        # lockout of 2026-08-14).
+        self.mock_mariadb.set_node_capacity(
+            self.NODE_A, limit_cpus=16, limit_memory_mb=65536,
+            limit_disk_gb=500, expected_demand=9.2, demand_limit=6.0)
+
+        with self._candidates(self.NODE_A):
+            resp = self._post('demand-waived')
+
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(self.NODE_A, resp.get_json()['node'])
+        # The waived admission still drew down real capacity and still
+        # accumulated its demand contribution.
+        row = self.mock_mariadb.node_capacity[self.NODE_A]
+        self.assertEqual(1, row['used_cpus'])
+        self.assertLess(9.2, row['expected_demand'])
+
+    def test_the_waiver_reaches_past_a_genuinely_full_node(self):
+        # A mixed exhaustion -- one node full on real capacity, another
+        # refused on demand alone -- must also re-walk: the demand-hot
+        # node has free real capacity, and pre-D13 it would have
+        # admitted this create.
+        self._full(self.NODE_A)
+        self.mock_mariadb.set_node_capacity(
+            self.NODE_B, limit_cpus=16, limit_memory_mb=65536,
+            limit_disk_gb=500, expected_demand=9.2, demand_limit=6.0)
+
+        with self._candidates(self.NODE_A, self.NODE_B):
+            resp = self._post('waived-mixed')
+
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(self.NODE_B, resp.get_json()['node'])
+        self.assertEqual(
+            0, self.mock_mariadb.node_capacity[self.NODE_A]['used_cpus'])
+
+    def test_real_capacity_exhaustion_is_still_a_507(self):
+        # The waiver frees only the demand clause. Nodes full on a real
+        # dimension stay full through the second pass.
+        self._full(self.NODE_A)
+        self._full(self.NODE_B)
+        self.mock_mariadb.node_capacity[self.NODE_A]['demand_limit'] = 6.0
+        self.mock_mariadb.node_capacity[self.NODE_A]['expected_demand'] = 9.2
+
+        with self._candidates(self.NODE_A, self.NODE_B):
+            resp = self._post('still-full')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+
     def test_a_database_failure_is_not_a_full_cluster(self):
         # A WriteException means the database could not be reached, not
         # that the cluster is full: asking the next node would only get

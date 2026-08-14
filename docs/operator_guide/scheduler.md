@@ -262,6 +262,18 @@ carries an unset field. The defaults are provisional, pending an
 analysis of accumulated cluster data, so expect them to change. There
 is no reason to tune them yet.
 
+Unlike the real dimensions, demand alone can never fail a create. The
+term exists to spread correlated bursts across nodes, not to bound
+capacity, so when a walk admits nowhere but at least one candidate was
+refused *only* on `demand` (every real dimension had room), the caller
+walks the candidates a second time with the demand clause waived and
+the placement proceeds on real capacity. Both walks are visible in the
+instance's audit events (`waiving demand guard`), and the waived
+admission still accumulates its demand contribution so later enforced
+admissions see it. Without this, a small or single-node cluster under
+rapid create churn -- CI being the canonical case -- would refuse
+creates indefinitely while sitting essentially idle.
+
 ## Diagnosing a placement decision
 
 Every stage of the pipeline records an audit event on the

@@ -402,6 +402,18 @@ actuation-to-observation gap for correlated CI bursts; the
 per-namespace learned demand value replaces the constant
 later without schema change.
 
+*Amendment (2026-08-14, phase 3):* the demand clause is a
+spreader, not a capacity bound, and is never allowed to fail
+a create on its own. When a candidate walk admits nowhere
+and at least one candidate was refused on demand alone
+(every real dimension had room), the walker re-walks with
+the demand clause waived and the placement proceeds. Without
+this the clause acts as a hard rate limit on small clusters:
+phase 3's first smoke CI run locked its single node out
+permanently (`expected_demand` 8–12 against a bound of
+`0.75 × 8 = 6`) while the node sat essentially idle, failing
+13 tests with 507s. See the phase 3 plan's decision P9.
+
 ### Namespace-claim questions 14-19
 
 **D14 (claims vs per-decision reservations): the per-decision

@@ -567,7 +567,11 @@ that would have been exceeded (`cpus`, `memory_mb`, `disk_gb`, or the
 placement, the preflight redirect) walk to the next candidate on a
 denial and, once every candidate is exhausted, return the ordinary 507
 "cluster full" response with the denial detail attached to the audit
-event. Not every writer enforces the guard: the cleaner's placement
+event. The `demand` term alone can never produce that 507: if the walk
+admits nowhere but some candidate was refused only on demand, the
+caller walks again with the demand clause waived, since demand exists
+to spread bursts across nodes rather than to bound capacity (see the
+scheduler operator guide). Not every writer enforces the guard: the cleaner's placement
 rewrites and the queues daemon's startup reconciliation pass
 `enforce=False`, because they record where a libvirt domain already
 *is* — a guard cannot refuse reality, and refusing to record it would

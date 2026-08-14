@@ -149,7 +149,7 @@ rows, phase 2 step 7 status) as part of the planning commit.
 
 ## Decisions
 
-Numbered P1..P8 to avoid colliding with the phase 0 D-numbers.
+Numbered P1..P9 to avoid colliding with the phase 0 D-numbers.
 
 **P1 — the legacy `node_attributes.instances` column, dual-write
 and union are removed now, as step 1 of this phase.** The
@@ -265,7 +265,34 @@ history both read it after deletion, and the ledger already
 handles deleted state correctly. Recorded here so the next
 reader does not "fix" it in passing.
 
-## Design
+**P9 (added 2026-08-14, after the first smoke CI run) — the D13
+demand clause can never fail a create on its own; walkers waive
+it on a second pass.** The first smoke CI run of this branch
+locked its single node out permanently: three suite workers
+creating 1-vCPU instances pushed `expected_demand` to 8–12
+against a bound of `SCHEDULER_TARGET_LOAD × cpu_schedulable =
+0.75 × 8 = 6`, while measured load was 0.45 and every real
+dimension read `used 0.0` — 13 tests failed with 507s from a
+node that was essentially idle. No constant survives that
+arithmetic on a small node under churn, so this is structural,
+not tuning: demand is a spreader (close the
+actuation-to-observation gap so bursts fan out across nodes),
+not a capacity bound. Both walkers (create path and preflight
+redirect) now re-walk once with `enforce_demand=False` when the
+enforced walk admitted nowhere and at least one denial was
+demand-only (`CapacityAdmissionDenied.demand_only`: node stage,
+`demand` the only exceeded dimension). The waiver is expressed
+as a zero `target_load`, which the guard already treats as
+"clause disabled" (its mid-upgrade proto3 semantics), so the
+RPC and transaction are unchanged; a waived admission still
+guards every real dimension and still accumulates its demand
+contribution. The trigger is *any* demand-only denial rather
+than *all*, because a mixed exhaustion (one node genuinely
+full, another merely demand-hot) also has free real capacity
+that pre-D13 code would have admitted. The demand constants
+remain provisional (D13's learner is still future work); the
+waiver makes their miscalibration cost a second walk instead of
+a failed create.
 
 ### The admission RPC
 
@@ -1268,6 +1295,18 @@ was passing for the right reason all along.
   an autocommit connection so a guarded `UPDATE` is each
   transaction's first statement. Never shipped — found by the
   phase's own validation step, before the PR.
+
+* **Demand-clause lockout of small clusters** (found by the first
+  smoke CI run of PR #3754, fixed as decision P9). The D13 demand
+  clause, applied as a hard admission guard, permanently locked the
+  single smoke node out under create churn: `expected_demand`
+  reached 8–12 against a bound of 6 while measured load was 0.45
+  and every real dimension was empty, failing 13 tests with 507s.
+  Fixed structurally: walkers re-walk once with the demand clause
+  waived when the enforced walk admits nowhere and at least one
+  denial was demand-only, so demand spreads load but can never fail
+  a create the cluster has real capacity for. Never shipped — caught
+  by PR CI before merge.
 
 ### Back brief
 

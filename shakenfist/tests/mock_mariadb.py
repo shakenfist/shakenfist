@@ -13,6 +13,7 @@ from itertools import count
 from typing import List, Optional
 from unittest import mock
 
+from shakenfist.config import config
 from shakenfist.constants import get_object_class
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
@@ -2677,12 +2678,20 @@ class MockMariaDB():
 
     def set_node_capacity(self, node_uuid, limit_cpus=0, limit_memory_mb=0,
                           limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
-                          used_disk_gb=0, expected_demand=0.0):
+                          used_disk_gb=0, expected_demand=0.0,
+                          demand_limit=None):
         """Seed a scheduler_node_capacity row for a node.
 
         No node has one by default, which is the phase 3 fail-open case
         (P7): admission proceeds unguarded and says so. Seeding a row
         makes the guard apply to that node.
+
+        ``demand_limit`` is the mock's stand-in for the real D13 bound
+        of ``SCHEDULER_TARGET_LOAD x cpu_schedulable`` (the mock has no
+        node_metrics table; fold any measured load into
+        ``expected_demand``). ``None``, the default, leaves the demand
+        clause out of the guard entirely, as a real deployment with
+        ``SCHEDULER_TARGET_LOAD`` at or below zero would.
         """
         self.node_capacity[str(node_uuid)] = {
             'limit_cpus': limit_cpus,
@@ -2692,6 +2701,7 @@ class MockMariaDB():
             'used_memory_mb': used_memory_mb,
             'used_disk_gb': used_disk_gb,
             'expected_demand': expected_demand,
+            'demand_limit': demand_limit,
         }
         return self.node_capacity[str(node_uuid)]
 
@@ -2701,9 +2711,13 @@ class MockMariaDB():
         Only nodes seeded with set_node_capacity() have a row, which is
         what the real table looks like too: the reconciler writes a row
         per schedulable hypervisor and declines to guess for the rest.
+        ``demand_limit`` is mock-internal configuration, not a column,
+        so it is not returned.
         """
-        return [dict(row, node_uuid=node_uuid)
-                for node_uuid, row in self.node_capacity.items()]
+        return [
+            {k: v for k, v in dict(row, node_uuid=node_uuid).items()
+             if k != 'demand_limit'}
+            for node_uuid, row in self.node_capacity.items()]
 
     def _decrement_node_capacity(self, node_uuid, cpus, memory_mb, disk_gb):
         """Floored decrement of one node's counters, as the RPC does (P6).
@@ -2727,7 +2741,8 @@ class MockMariaDB():
 
     def _mariadb_admit_instance_placement(
             self, instance_uuid, namespace, node_uuid, cpus, memory_mb,
-            disk_gb, placement_json, old_node_uuid='', enforce=True):
+            disk_gb, placement_json, old_node_uuid='', enforce=True,
+            enforce_demand=True):
         """Mock implementation of mariadb.admit_instance_placement()
 
         The counters are a simple in-memory ledger, but the reply shape,
@@ -2736,7 +2751,12 @@ class MockMariaDB():
         importantly for the callers under test -- the atomic combination
         of the placement attribute write with the delete-all-then-insert
         of the INSTANCE_LOCATION reference rows all match the real
-        implementation.
+        implementation. The D13 demand clause applies only to nodes
+        seeded with a ``demand_limit`` (see set_node_capacity()), is
+        waived by ``enforce_demand=False`` exactly as the real guard
+        waives it for a zero target load, and every admission
+        accumulates the placement's demand contribution whether or not
+        the clause was enforced -- also like the real UPDATE.
         """
         result = {
             'success': True, 'error': '', 'admitted': False,
@@ -2755,6 +2775,7 @@ class MockMariaDB():
                 f'no attributes row')
             return result
 
+        demand_add = cpus * config.SCHEDULER_DEMAND_PER_VCPU
         row = self.node_capacity.get(str(node_uuid))
         if row is None:
             result['unguarded'] = True
@@ -2771,6 +2792,14 @@ class MockMariaDB():
                     'used': float(used),
                     'requested': float(requested),
                     'exceeded': used + requested > limit})
+            if enforce_demand and row['demand_limit'] is not None:
+                dimensions.append({
+                    'dimension': 'demand',
+                    'limit': float(row['demand_limit']),
+                    'used': float(row['expected_demand']),
+                    'requested': float(demand_add),
+                    'exceeded': (row['expected_demand'] + demand_add
+                                 > row['demand_limit'])})
             if any(d['exceeded'] for d in dimensions):
                 result['failing_stage'] = 'node'
                 result['dimensions'] = dimensions
@@ -2783,6 +2812,7 @@ class MockMariaDB():
             row['used_cpus'] += cpus
             row['used_memory_mb'] += memory_mb
             row['used_disk_gb'] += disk_gb
+            row['expected_demand'] += demand_add
 
         if old_node_uuid and str(old_node_uuid) != str(node_uuid):
             result['clamped'] = self._decrement_node_capacity(

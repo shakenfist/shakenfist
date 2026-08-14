@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 
 from shakenfist.daemons.database import main as database_main
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.protos import database_pb2
 from shakenfist.tests import base
@@ -1260,6 +1261,26 @@ class PublicRoutingTestCase(base.ShakenFistTestCase):
             str(INST1), 'ci-1', str(NODE1), str(NODE2), 4, 4096, 20, 10.0,
             0.75, False, PLACEMENT_JSON)
 
+    @mock.patch('shakenfist.mariadb._grpc_admit_instance_placement')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_waiving_demand_sends_a_zero_target_load(self, _use, mock_grpc):
+        # enforce_demand=False is expressed as a zero target load, which
+        # the guard clause treats as "disabled" -- but the demand_add is
+        # still sent, because the admission still accumulates the
+        # placement's demand contribution for later enforced admissions
+        # to see.
+        with mock.patch.object(mariadb.config,
+                               'SCHEDULER_DEMAND_PER_VCPU', 2.5), \
+                mock.patch.object(mariadb.config,
+                                  'SCHEDULER_TARGET_LOAD', 0.75):
+            mariadb.admit_instance_placement(
+                str(INST1), 'ci-1', str(NODE1), 4, 4096, 20,
+                PLACEMENT_JSON, enforce_demand=False)
+        mock_grpc.assert_called_once_with(
+            str(INST1), 'ci-1', str(NODE1), '', 4, 4096, 20, 10.0, 0.0,
+            True, PLACEMENT_JSON)
+
     @mock.patch('shakenfist.mariadb._grpc_release_instance_placement')
     @mock.patch('shakenfist.mariadb._use_database_service',
                 return_value=True)
@@ -1385,3 +1406,35 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
                 mock.patch.object(database_main, 'Counter'):
             monitor = database_main.Monitor('test')
         self.assertIn('get_scheduler_node_capacity', monitor.counters)
+
+
+class DemandOnlyDenialTestCase(base.ShakenFistTestCase):
+    """CapacityAdmissionDenied.demand_only decides waiver eligibility.
+
+    The walkers' second pass hinges on this property, so its edges are
+    pinned: a denial is waivable only when the node stage refused and
+    the D13 demand term was the only exceeded dimension.
+    """
+
+    def _denial(self, failing_stage, exceeded_dimensions):
+        dimensions = [
+            {'dimension': d, 'limit': 6.0, 'used': 9.2, 'requested': 2.5,
+             'exceeded': d in exceeded_dimensions}
+            for d in ('cpus', 'memory_mb', 'disk_gb', 'demand')]
+        return exceptions.CapacityAdmissionDenied(
+            failing_stage, dimensions)
+
+    def test_a_demand_only_node_denial_is_waivable(self):
+        self.assertTrue(self._denial('node', {'demand'}).demand_only)
+
+    def test_a_real_dimension_makes_it_unwaivable(self):
+        self.assertFalse(
+            self._denial('node', {'demand', 'cpus'}).demand_only)
+
+    def test_a_cluster_stage_denial_is_never_waivable(self):
+        # The cluster and claim stages have no demand term; a 'demand'
+        # dimension appearing there would be a bug, not a waiver.
+        self.assertFalse(self._denial('cluster', {'demand'}).demand_only)
+
+    def test_no_exceeded_dimension_is_not_waivable(self):
+        self.assertFalse(self._denial('node', set()).demand_only)

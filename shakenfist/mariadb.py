@@ -25639,12 +25639,23 @@ def admit_instance_placement(
         instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
         memory_mb: int, disk_gb: int, placement_json: str,
         old_node_uuid: str = '',
-        enforce: bool = True) -> AdmitPlacementResult:
+        enforce: bool = True,
+        enforce_demand: bool = True) -> AdmitPlacementResult:
     """Atomically claim capacity for an instance and place it.
 
     The D13 demand parameters come from this process's config, like the
     reconciler's, so the database daemon needs no copy of the scheduler
     configuration.
+
+    ``enforce_demand=False`` waives the D13 demand clause for this
+    admission (by sending a zero target load, which the guard treats as
+    "clause disabled") while leaving every real capacity dimension
+    guarded and still accumulating the placement's demand contribution.
+    It exists for the walkers' second pass: when no candidate admitted
+    and at least one was refused on demand alone, there is no quieter
+    node to spread the burst to, and refusing a cluster with free real
+    capacity would turn a load-spreading heuristic into a user-visible
+    rate limit.
 
     Returns:
 
@@ -25662,14 +25673,15 @@ def admit_instance_placement(
     plenty of capacity, so the two are deliberately separate fields.
     """
     demand_add = cpus * config.SCHEDULER_DEMAND_PER_VCPU
+    target_load = config.SCHEDULER_TARGET_LOAD if enforce_demand else 0.0
     if _use_database_service():
         return _grpc_admit_instance_placement(
             instance_uuid, namespace, node_uuid, old_node_uuid, cpus,
-            memory_mb, disk_gb, demand_add, config.SCHEDULER_TARGET_LOAD,
+            memory_mb, disk_gb, demand_add, target_load,
             enforce, placement_json)
     return _direct_admit_instance_placement(
         instance_uuid, namespace, node_uuid, old_node_uuid, cpus, memory_mb,
-        disk_gb, demand_add, config.SCHEDULER_TARGET_LOAD, enforce,
+        disk_gb, demand_add, target_load, enforce,
         placement_json)
 
 

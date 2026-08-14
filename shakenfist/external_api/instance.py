@@ -871,26 +871,49 @@ class InstancesEndpoint(api_base.Resource):
         # So walk the list (D7). A WriteException is deliberately not
         # caught -- an unreachable database is not a full cluster, and
         # trying the next node would only ask it the same question.
-        placement = None
         denials = {}
-        for candidate in candidates:
-            try:
-                inst.place_instance(candidate)
-                placement = candidate
-                break
-            except exceptions.CapacityAdmissionDenied as e:
-                denials[candidate] = {
-                    'failing_stage': e.failing_stage,
-                    'dimensions': e.dimensions,
-                }
-                inst.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'schedule candidate refused by capacity guard',
-                    extra={
-                        'node': candidate,
+
+        def place_walk(enforce_demand):
+            for candidate in candidates:
+                try:
+                    inst.place_instance(
+                        candidate, enforce_demand=enforce_demand)
+                    return candidate
+                except exceptions.CapacityAdmissionDenied as e:
+                    denials[candidate] = {
                         'failing_stage': e.failing_stage,
                         'dimensions': e.dimensions,
-                    })
+                        'demand_only': e.demand_only,
+                    }
+                    inst.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'schedule candidate refused by capacity guard',
+                        extra={
+                            'node': candidate,
+                            'failing_stage': e.failing_stage,
+                            'dimensions': e.dimensions,
+                            'enforce_demand': enforce_demand,
+                        })
+            return None
+
+        placement = place_walk(True)
+
+        # The D13 demand term spreads correlated bursts across nodes; it
+        # is not a capacity bound. The first pass already gave
+        # demand-quiet nodes their preference, so if nothing admitted
+        # and at least one candidate was refused on demand alone, the
+        # only alternative to a second pass with the clause waived is
+        # failing a create the cluster has real capacity for -- which
+        # would turn a spreading heuristic into a user-visible rate
+        # limit (the smoke CI single-node lockout of 2026-08-14).
+        if placement is None and any(
+                d['demand_only'] for d in denials.values()):
+            inst.add_event(
+                EVENT_TYPE_AUDIT,
+                'no candidate admitted and some refused on demand alone, '
+                'waiving demand guard',
+                extra={'candidates': candidates, 'denials': denials})
+            placement = place_walk(False)
 
         if placement is None:
             inst.add_event(
