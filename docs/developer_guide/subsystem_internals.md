@@ -6,10 +6,10 @@ the operator-facing pages they link to.
 ## Scheduler and node capacity metrics
 
 Atomic reservation-table scheduling is being built per
-[PLAN-scheduler-reservations](../plans/PLAN-scheduler-reservations.md);
-the capacity tables and their reconciler exist but are inert, and the
-notes below describe both what runs today and the constraints on
-switching admission over to them.
+[PLAN-scheduler-reservations](../plans/PLAN-scheduler-reservations.md).
+The capacity tables, their reconciler and the guarded-UPDATE admission
+path that draws them down have all landed; a namespace claims API and
+further SQL pushdown are still to come.
 
 The scheduler ranks hypervisors by load per schedulable thread and
 admits against reservation-adjusted capacity. The reservation
@@ -301,12 +301,18 @@ sentinels' 15-second `observe_this_node()` heartbeat) could silently revert
 a placement. References are single-row inserts and deletes, needing no
 cross-writer coordination. `Node.instances` queries them via
 `mariadb.get_references_from()` filtered by `INSTANCE_LOCATION`. Unlike
-`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. For one
-transition release the legacy column is dual-written (masked, under the
-`instances` lock) and unioned into `Node.instances` reads, so placements
-written by not-yet-upgraded nodes mid-roll stay visible and a rollback
-still reads fresh data; each node's queues-daemon startup reconciliation
-converges the two stores, and the column is dropped next release.
+`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. The legacy
+column, its dual-write and the read-side union were removed in
+scheduler-reservations phase 3, once every placement writer had moved onto
+the atomic admission primitive.
+
+Placement rows are written only by two `sf-database` RPCs,
+`AdmitInstancePlacement` and `ReleaseInstancePlacement`, each performing its
+guarded capacity-counter update, the `placement` attribute write and the
+`INSTANCE_LOCATION` row rewrite in a single database transaction, so a
+placement can never be recorded without the capacity it consumes.
+`Instance.place_instance()` is the sole caller; `Node` carries no
+placement-writing methods.
 
 The `last_active` column is updated whenever a reference is observed to still
 be valid (e.g., when a node's cleaner daemon calls `observe()` on local blobs).

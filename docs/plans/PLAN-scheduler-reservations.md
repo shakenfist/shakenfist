@@ -352,7 +352,7 @@ table entirely (decision D8).
 | 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3) |
 | 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
 | 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
-| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Planned — phase plan drafted 2026-08-13, awaiting operator review |
+| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Implemented — on branch scheduler-reservations-phase-03, awaiting operator review and sfcbr soak (2026-08-14) |
 | 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |

@@ -371,7 +371,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Complete — see step 5 notes |
 | 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Complete — see step 6 notes. Validation found a blocker (ER_CHECKREAD retry exhaustion on MariaDB 11.6.2+ turning concurrent creates into 500s); **resolved in step 6a**, which is where the shipping numbers are |
 | 6a | Fix the step 6 blocker in the primitive: move the branch select and presence probes out of both transactions so a guarded UPDATE is the first statement, per the phase 0 finding. Re-run the full live suite twice under `innodb_snapshot_isolation` ON and the concurrency class once under OFF | medium | opus | worktree | Complete — see step 6a notes |
-| 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Not started |
+| 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Complete — see step 7 notes |
 | 8 | Management-session code review against the checklist below | medium | management session | none | Not started |
 | 9 | Operator review and PR; deploy to sfcbr and soak: reconciler drift metric stays zero with admission live, no 507 regression in CI pass rates | — | operator | — | Not started |
 
@@ -934,6 +934,108 @@ above are the CI-visible guard; the behavioural one needs a server
 with the variable ON, which for now means running the harness by hand
 as this step did. Worth raising in step 8 review as a candidate for a
 second live-suite job on a newer MariaDB.
+
+### Step 7: documentation (2026-08-14)
+
+Every stale location named in the step 4/5 notes was rewritten, plus
+two more the survey missed: `ARCHITECTURE.md`'s cluster-daemon material
+("nothing consumes them for admission... that arrives with phase 3's
+guarded-UPDATE path") and its "Instance Scheduling" section
+("observable-but-inert... but the scheduler does not yet consult
+them"), and `docs/operator_guide/scheduler.md`'s "Expected demand"
+section, which still said the demand feedforward term "does not affect
+placement" — false since D13's demand clause now rides in the guard's
+`WHERE`.
+
+**Files changed:**
+
+* `docs/operator_guide/database.md` — the `node_attributes` table row
+  and the capacity-tables section rewritten: counters are consumed for
+  admission, not just observed; the two RPCs, the `enforce` flag and
+  its ground-truth writers, fail-open, and the reconciler as drift
+  healer, all at the operator level; a new paragraph on
+  `innodb_snapshot_isolation` compatibility.
+* `docs/operator_guide/scheduler.md` — stages 1-5 reframed as
+  pre-filters rather than admission; the CPU-overcommit section's
+  stopgap description replaced with the measurement-only pre-filter it
+  reverted to; a new "Admission is a guarded capacity claim" section
+  carrying the walk/507/`enforce`/`cpu_committed_row_present` detail;
+  "Expected demand" corrected to say the term does affect placement
+  since this phase; the `dropped`-map and admin-resources-API
+  paragraphs corrected to drop the retired `committed_cpus` field.
+* `ARCHITECTURE.md` — the `object_references` section's dual-write
+  paragraph rewritten to record the removal and describe the two RPCs;
+  the cluster-daemon reconciler paragraph and the "Instance
+  Scheduling" section both corrected from "nothing consumes them yet"
+  to describe the guarded claim, with pointers to the operator docs
+  rather than duplicating them.
+* `CLAUDE.md` — the "Scheduler capacity" bullet's closing sentence
+  replaced (consumption landed, stopgap deleted); the bullet's
+  "maintained solely by the reconciler" claim corrected, since the
+  admission RPCs now also write these counters incrementally between
+  reconciler passes. The "Instance placement" bullet was already
+  correct from steps 1/4 and needed no change.
+* `AGENTS.md` — checked (grep for `dual-write`, `committed_vcpus`,
+  `add_instance`/`remove_instance`, `observable-but-inert`, `Nothing
+  consumes`); already fully correct from steps 5 and 6a, no change
+  needed.
+* `docs/plans/PLAN-scheduler-reservations.md` — phase table row 3
+  status only; the phase 2 and phase 3 scope stubs are untouched, per
+  brief.
+* `docs/plans/index.md` — phase 3 row only (status and description);
+  no other row touched.
+* This file — step 7 marked Complete.
+
+**Cross-check pass** (the success criterion: no fact about capacity
+accounting stated differently in `CLAUDE.md`, `docs/operator_guide/database.md`
+and the master plan):
+
+* *Counters consumed for admission as of phase 3, not merely
+  observed.* CLAUDE.md's "Scheduler capacity" bullet, database.md's
+  capacity-tables section, and the master plan's phase-3 row all say
+  this now.
+* *The reconciler recomputes counters wholesale every five minutes;
+  the admission RPCs additionally draw them down/release them
+  incrementally between passes.* Stated identically in CLAUDE.md and
+  database.md; the master plan's phase-3 stub already described the
+  RPC without claiming the reconciler as sole writer, so no
+  contradiction there.
+* *`namespace_claims` stays empty until phase 4; the claim branch is
+  unit-tested but dormant in production.* Unchanged and consistent in
+  CLAUDE.md, database.md and the master plan (phase 4 row still "Not
+  started").
+* *`enforce=False` ground-truth writers (cleaner, startup
+  reconciliation) update counters without refusing, and a push over
+  the limit is logged loudly.* Stated the same way in database.md and
+  scheduler.md; CLAUDE.md doesn't restate the enforce mechanics
+  (correctly deferring to the referenced docs rather than duplicating
+  them).
+* *A missing capacity row (node or cluster) fails open, and the
+  reconciler creates it on its next pass.* Stated identically in
+  database.md and (for the node case) AGENTS.md's existing "Scheduler
+  and node capacity metrics" section; not restated in CLAUDE.md, which
+  is a summary-level file by design.
+* *The issue-3498 stopgap (`_committed_vcpus()`) was deleted by this
+  phase.* Stated identically in CLAUDE.md, the master plan's phase-3
+  row and description, and `index.md`'s phase-3 row; `git grep
+  _committed_vcpus` confirms it is gone from all non-plan code.
+* *The legacy `node_attributes.instances` column, its dual-write and
+  the read-side union were removed by this phase (not "for one
+  transition release").* Stated identically in database.md's
+  `node_attributes` row, ARCHITECTURE.md and CLAUDE.md's "Instance
+  placement" bullet; confirmed against `node.py`, which has no
+  `add_instance()`/`remove_instance()` and no union in `Node.instances`.
+* *Phase status.* The master plan's phase table, `index.md`'s phase-3
+  row, and this file's own Execution table all now read "Implemented"
+  (this file's steps 1-7 as "Complete", the master plan and index rows
+  qualified "awaiting operator review and sfcbr soak, 2026-08-14") --
+  none of the three says "Planned" or "Not started" for phase 3 any
+  more.
+
+No stale claim survived the sweep beyond the two named above
+(`ARCHITECTURE.md`'s two locations and scheduler.md's "Expected
+demand" section); `pre-commit run --files <changed files>` (anchor-link
+check) passes on all seven changed files.
 
 ## Administration and logistics
 

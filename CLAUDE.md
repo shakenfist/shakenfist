@@ -551,14 +551,21 @@ performance. This is required for all deployments - MariaDB must be configured.
   capacity claim (limits, usage, state, server-side `expires_at`) and
   is empty until the claims API lands in phase 4; `cluster_capacity` is
   a singleton (id always 1) of total/claimed/unclaimed-used sums.
-  Maintained solely by the reconciler (a single
+  Recomputed wholesale from ground truth by the reconciler (a single
   `ReconcileSchedulerCapacity` RPC run every 5 minutes on the elected
-  cluster node) which recomputes every counter from ground truth. The
-  `used_*` counters are allocation ledgers over placed, non-deleted
-  instances, so they deliberately differ from the resources daemon's
-  active-domain measurements whenever instances are powered off.
-  Nothing consumes these tables for admission until phase 3's
-  guarded-UPDATE path (`docs/plans/PLAN-scheduler-reservations.md`).
+  cluster node); as of scheduler-reservations phase 3 also drawn down
+  and released incrementally on every placement by the
+  `AdmitInstancePlacement`/`ReleaseInstancePlacement` RPCs, each of
+  which performs a guarded `UPDATE` against these counters in the same
+  transaction as the placement write (see the Instance placement
+  bullet below and `docs/plans/PLAN-scheduler-reservations.md`). The
+  reconciler's job since phase 3 is drift correction rather than the
+  sole write path. The `used_*` counters are allocation ledgers over
+  placed, non-deleted instances, so they deliberately differ from the
+  resources daemon's active-domain measurements whenever instances are
+  powered off. The issue-3498 Python stopgap
+  (`Scheduler._committed_vcpus()`) was deleted by the same change that
+  wired admission onto these counters.
 - **Per-daemon state** (`node_daemon_states` table): One row per
   `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
   and optional `message`. Replaces the JSON `daemon_states` dict that
