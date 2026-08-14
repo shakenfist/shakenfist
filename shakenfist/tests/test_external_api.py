@@ -758,7 +758,7 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     @mock.patch(
         'shakenfist.external_api.instance.nino_create_and_enqueue')
     @mock.patch(
-        'shakenfist.external_api.instance.afo_create_and_enqueue')
+        'shakenfist.instance.afo_create_and_enqueue')
     @mock.patch(
         'shakenfist.external_api.instance.Artifact.owned_from_url_or_new')
     def test_post_instance_disk_loop_enqueues_artifact_fetch(
@@ -820,7 +820,7 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     @mock.patch(
         'shakenfist.external_api.instance.nino_create_and_enqueue')
     @mock.patch(
-        'shakenfist.external_api.instance.afo_create_and_enqueue')
+        'shakenfist.instance.afo_create_and_enqueue')
     @mock.patch(
         'shakenfist.external_api.instance.Artifact.owned_from_url_or_new')
     def test_post_instance_disk_loop_blob_uuid_branch(
@@ -863,7 +863,7 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     @mock.patch(
         'shakenfist.external_api.instance.nino_create_and_enqueue')
     @mock.patch(
-        'shakenfist.external_api.instance.afo_create_and_enqueue')
+        'shakenfist.instance.afo_create_and_enqueue')
     def test_post_instance_no_disks_skips_artifact_fetch(
             self, mock_afo, mock_nino):
         """A disk with no base and no blob_uuid skips afo_create_and_enqueue
@@ -972,7 +972,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
             Artifact.TYPE_IMAGE, self.URL, namespace=namespace)
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_a_shared_artifact_is_booted_from_and_not_fetched_into(
             self, mock_afo, mock_nino):
         # The fix. The fetch is enqueued against the blob rather than
@@ -984,7 +984,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertEqual(f'{BLOB_URL}{self.FOREIGN_BLOB}', url)
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_the_fetch_does_not_name_the_foreign_artifact(
             self, mock_afo, mock_nino):
         # The same fix stated on the other argument. artifact_uuid is
@@ -997,7 +997,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertNotEqual(str(self.foreign.uuid), artifact_uuid)
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_booting_from_a_shared_artifact_creates_nothing(
             self, mock_afo, mock_nino):
         # A property rather than a regression -- it held before the
@@ -1011,7 +1011,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertIsNone(self._owned_by('two'))
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_an_invisible_artifact_is_not_reused(self, mock_afo, mock_nino):
         # The control which proves the tests above are the sharing
         # rather than the URL. Unshared, so `two` cannot see it, so
@@ -1025,7 +1025,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertNotEqual(str(self.foreign.uuid), str(mine.uuid))
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_your_own_artifact_is_still_fetched_into(
             self, mock_afo, mock_nino):
         # The control for the whole class. An owner booting from their
@@ -1041,7 +1041,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
                          str(self._owned_by('system').uuid))
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_a_shared_artifact_with_no_blob_falls_through_to_our_own_fetch(
             self, mock_afo, mock_nino):
         # The branch the comment claims and nothing exercised. A visible
@@ -1059,7 +1059,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertIsNotNone(self._owned_by('two'))
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_a_not_yet_created_artifact_is_not_booted_from(
             self, mock_afo, mock_nino):
         # The usability half of the same fall-through, one step earlier:
@@ -1083,7 +1083,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertIsNotNone(self._owned_by('two'))
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_resolution_follows_the_target_namespace_not_the_requestor(
             self, mock_afo, mock_nino):
         # system creating an instance in `two`. Resolution uses the
@@ -1098,7 +1098,7 @@ class ExternalApiInstanceDiskBaseTargetTestCase(ExternalApiInstanceTestCase):
         self.assertNotEqual(str(self.foreign.uuid), str(mine.uuid))
 
     @mock.patch('shakenfist.external_api.instance.nino_create_and_enqueue')
-    @mock.patch('shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
     def test_a_successful_create_builds_no_refusal(self, mock_afo, mock_nino):
         # The disk.base fall-through asks whether a foreign artifact is
         # usable and carries on either way, so it must ask with the

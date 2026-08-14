@@ -22,10 +22,6 @@ from webargs.flaskparser import use_kwargs
 from shakenfist import baseobject
 from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.schema.operations.artifact_fetch_op \
-    import create_and_enqueue as afo_create_and_enqueue
-from shakenfist.schema.operations.artifact_fetch_op \
-    import model_tasks as afo_tasks
 from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
 from shakenfist.schema.operations.net_op \
@@ -871,47 +867,11 @@ class InstancesEndpoint(api_base.Resource):
         # Record placement
         inst.place_instance(placement)
 
-        # Request the artifact fetches immediately
-        instance_start_dependencies = []
-
-        for disk in inst.disk_spec:
-            disk_base = disk.get('base')
-            if disk.get('blob_uuid'):
-                url = f'{BLOB_URL}{disk["blob_uuid"]}'
-            elif not util_general.noneish(disk_base):
-                url = disk['base']
-            else:
-                # Empty disk with no base image, no artifact fetch needed
-                continue
-
-            # By ownership, for the same reason as the disk_base resolution
-            # above: the fetch this enqueues ends in add_index. By the time we
-            # get here url is either a blob we already resolved, or a URL we
-            # were entitled to fetch into our own namespace.
-            a = Artifact.owned_from_url_or_new(
-                Artifact.TYPE_IMAGE, url, namespace=namespace)
-            a.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
-
-            # TODO(mikal): I would really like the target_node not to be set
-            # here so that any node in the cluster could start downloading
-            # this image ASAP. Unfortunately, image download is also comingled
-            # with populating the local image cache for instance start at the
-            # moment and I need to tease that apart first.
-            op_type, op_uuid = afo_create_and_enqueue(
-                namespace,
-                url,
-                inst.uuid,
-                [afo_tasks.image_fetch],
-                PRIORITY.user_waiting,
-                artifact_uuid=a.uuid,
-                request_id=util_general.get_request_id(),
-                target_node=placement)
-            instance_start_dependencies.append(
-                dependency(op_type=op_type, op_uuid=op_uuid))
-
-        # Then request the instance start
-        if not instance_start_dependencies:
-            instance_start_dependencies = None
+        # Request the artifact fetches immediately, then the instance start
+        instance_start_dependencies = inst.enqueue_disk_fetches(
+            placement, PRIORITY.user_waiting,
+            request_id=util_general.get_request_id(),
+            artifact_event='creation request from REST API') or None
 
         nino_create_and_enqueue(
             placement,

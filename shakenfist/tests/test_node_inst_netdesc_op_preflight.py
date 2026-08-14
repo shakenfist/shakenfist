@@ -20,8 +20,10 @@ from uuid import uuid4
 from shakenfist import exceptions
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.node_inst_netdesc_op import create_and_enqueue
 from shakenfist.schema.operations.node_inst_netdesc_op import model_tasks
+from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -30,7 +32,7 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class FakeInstance:
     """An instance double with a state machine we control."""
 
-    def __init__(self, state_value, reject=()):
+    def __init__(self, state_value, reject=(), fetch_dependencies=None):
         self._state_value = state_value
         self._reject = reject
         self.state_sets = []
@@ -38,6 +40,8 @@ class FakeInstance:
         self.placement = {'placement_attempts': 0}
         self.requested_placement = None
         self.placed_on = []
+        self.fetch_dependencies = fetch_dependencies or []
+        self.disk_fetch_calls = []
 
     @property
     def state(self):
@@ -61,6 +65,12 @@ class FakeInstance:
     def place_instance(self, node):
         self.placed_on.append(node)
 
+    def enqueue_disk_fetches(self, target_node, priority, request_id=None,
+                             artifact_event=None):
+        self.disk_fetch_calls.append(
+            (target_node, priority, request_id, artifact_event))
+        return self.fetch_dependencies
+
 
 class PreflightRedirectTestCase(base.ShakenFistTestCase):
     def setUp(self):
@@ -82,11 +92,7 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         op.state = NodeInstNetdescOp.STATE_EXECUTING
         return op
 
-    def test_redirect_uses_schema_create_and_enqueue(self):
-        op = self._make_op()
-        inst = FakeInstance('created')
-        target_node = str(uuid4())
-
+    def _redirect(self, inst, target_node):
         fake_scheduler = mock.MagicMock()
         fake_scheduler.find_candidates.side_effect = [
             exceptions.LowResourceException('full here'),
@@ -94,6 +100,7 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         ]
         fake_scheduler.metrics = {target_node: {}}
 
+        op = self._make_op()
         with mock.patch(
                 'shakenfist.operations.node_inst_netdesc_op.scheduler.'
                 'Scheduler', return_value=fake_scheduler):
@@ -104,12 +111,40 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
                         'shakenfist.operations.node_inst_netdesc_op.'
                         'add_event_multi'):
                     op._instance_preflight(inst)
+        return op, mock_enqueue
+
+    def test_redirect_uses_schema_create_and_enqueue(self):
+        inst = FakeInstance('created')
+        target_node = str(uuid4())
+
+        op, mock_enqueue = self._redirect(inst, target_node)
 
         mock_enqueue.assert_called_once_with(
             target_node, op.instance_uuid, op.net_desc, op.tasks,
-            op.priority, op.request_id)
+            op.priority, op.request_id, depends_on=None)
         self.assertEqual([target_node], inst.placed_on)
         self.assertEqual(NodeInstNetdescOp.STATE_ABORT, op.state.value)
+
+    def test_redirect_enqueues_fetches_for_new_node(self):
+        # The artifact fetches minted at create time targeted the original
+        # placement, so a redirect must mint fresh fetches against the new
+        # node and gate the redirected start on them -- otherwise the new
+        # node's image cache is never populated and instance create raises
+        # ImageMissingFromCache (issue 3720).
+        fetch_deps = [dependency(op_type=ObjectType.ARTIFACT_FETCH_OP,
+                                 op_uuid=str(uuid4()))]
+        inst = FakeInstance('created', fetch_dependencies=fetch_deps)
+        target_node = str(uuid4())
+
+        op, mock_enqueue = self._redirect(inst, target_node)
+
+        self.assertEqual(
+            [(target_node, op.priority, op.request_id,
+              'fetch requested by instance start redirect')],
+            inst.disk_fetch_calls)
+        mock_enqueue.assert_called_once_with(
+            target_node, op.instance_uuid, op.net_desc, op.tasks,
+            op.priority, op.request_id, depends_on=fetch_deps)
 
     def _dispatch_failing_preflight(self, op):
         inst = FakeInstance('created')

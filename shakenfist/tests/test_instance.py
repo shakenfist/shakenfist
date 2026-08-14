@@ -15,6 +15,8 @@ from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.config import SFConfig
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -1063,3 +1065,95 @@ class InstanceSnapshotTargetTestCase(base.ShakenFistTestCase):
         # counts.
         first = self._snapshot_as('owner')
         self.assertEqual(first, self._snapshot_as('owner'))
+
+
+class InstanceDiskFetchTestCase(base.ShakenFistTestCase):
+    """Coverage for Instance.enqueue_disk_fetches (issue 3720).
+
+    Every placement decision must be paired with artifact fetches
+    targeting the chosen node, because instance create assumes the
+    image for each disk is already in the node-local cache.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.artifact.Artifact.owned_from_url_or_new')
+    def test_enqueue_disk_fetches(self, mock_owned, mock_afo):
+        blob_uuid = str(uuid.uuid4())
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', instance_uuid,
+            disk_spec=[
+                {'base': 'http://example.com/image', 'size': 8},
+                {'blob_uuid': blob_uuid, 'size': 8},
+                {'size': 8},
+            ])
+        i = instance.Instance.from_db(instance_uuid)
+
+        fake_artifact = mock.MagicMock()
+        fake_artifact.uuid = str(uuid.uuid4())
+        mock_owned.return_value = fake_artifact
+        op_uuids = [str(uuid.uuid4()), str(uuid.uuid4())]
+        mock_afo.side_effect = [
+            (ObjectType.ARTIFACT_FETCH_OP, op_uuids[0]),
+            (ObjectType.ARTIFACT_FETCH_OP, op_uuids[1]),
+        ]
+
+        target_node = str(uuid.uuid4())
+        deps = i.enqueue_disk_fetches(
+            target_node, PRIORITY.user_waiting, request_id='req-1',
+            artifact_event='fetch requested by instance start redirect')
+
+        # The empty disk enqueues nothing; the base URL and blob disks
+        # each get a fetch targeting the placed node.
+        self.assertEqual([
+            mock.call(
+                'unittest', 'http://example.com/image', i.uuid,
+                [instance.afo_tasks.image_fetch], PRIORITY.user_waiting,
+                artifact_uuid=fake_artifact.uuid, request_id='req-1',
+                target_node=target_node),
+            mock.call(
+                'unittest', f'{artifact.BLOB_URL}{blob_uuid}', i.uuid,
+                [instance.afo_tasks.image_fetch], PRIORITY.user_waiting,
+                artifact_uuid=fake_artifact.uuid, request_id='req-1',
+                target_node=target_node),
+        ], mock_afo.call_args_list)
+        self.assertEqual(op_uuids, [str(d.op_uuid) for d in deps])
+        self.assertEqual(
+            [ObjectType.ARTIFACT_FETCH_OP, ObjectType.ARTIFACT_FETCH_OP],
+            [d.op_type for d in deps])
+        self.assertEqual(2, fake_artifact.add_event.call_count)
+
+    @mock.patch('shakenfist.instance.afo_create_and_enqueue')
+    @mock.patch('shakenfist.artifact.Artifact.owned_from_url_or_new')
+    def test_enqueue_disk_fetches_no_images(self, mock_owned, mock_afo):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', instance_uuid, disk_spec=[{'size': 8}])
+        i = instance.Instance.from_db(instance_uuid)
+
+        deps = i.enqueue_disk_fetches(str(uuid.uuid4()), PRIORITY.user_waiting)
+
+        self.assertEqual([], deps)
+        mock_afo.assert_not_called()
+        mock_owned.assert_not_called()
