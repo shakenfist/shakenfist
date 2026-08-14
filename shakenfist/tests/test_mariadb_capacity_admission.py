@@ -724,12 +724,49 @@ class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertFalse(any('UPDATE cluster_capacity' in u
                              for u in updates))
 
-    def test_named_node_releases_without_consulting_references(self):
-        router = _PlacementRouter(claim=None)
+    def test_a_named_node_still_consults_the_references(self):
+        # A named node filters the located rows rather than replacing
+        # them, so the lookup runs in both call forms.
+        router = _PlacementRouter(claim=None, reference_nodes=[NODE2])
         result = self._run(router, node_uuid=str(NODE2))
+
         self.assertTrue(result['released'])
-        self.assertEqual([], [text for text in router.statements('SELECT')
-                              if 'FROM object_references' in text])
+        self.assertEqual(1, len([text for text in router.statements('SELECT')
+                                 if 'FROM object_references' in text]))
+
+    def test_a_named_node_holding_no_reference_releases_nothing(self):
+        # The repeated-delete shape: _delete_globally() names the node
+        # from the never-cleared placement attribute, and an instance
+        # which ended in state error reaches it on every delete attempt.
+        # Trusting the name would decrement the counters again each
+        # time, and the floors cannot catch it because other instances'
+        # usage keeps the counters above the released amount.
+        router = _PlacementRouter(claim=None, reference_nodes=[])
+        result = self._run(router, node_uuid=str(NODE2))
+
+        self.assertTrue(result['success'])
+        self.assertFalse(result['released'])
+        self.assertEqual([], router.statements('UPDATE'))
+        self.assertEqual([], [text for text, _ in router.executed
+                              if text.startswith('DELETE')])
+
+    def test_a_named_node_which_is_not_the_located_one_releases_nothing(self):
+        router = _PlacementRouter(claim=None, reference_nodes=[NODE1])
+        result = self._run(router, node_uuid=str(NODE2))
+
+        self.assertTrue(result['success'])
+        self.assertFalse(result['released'])
+        self.assertEqual([], router.statements('UPDATE'))
+
+    def test_a_named_node_releases_only_its_own_row(self):
+        router = _PlacementRouter(claim=None,
+                                  reference_nodes=[NODE1, NODE2])
+        result = self._run(router, node_uuid=str(NODE2))
+
+        self.assertTrue(result['released'])
+        node_updates = [text for text in router.statements('UPDATE')
+                        if 'UPDATE scheduler_node_capacity' in text]
+        self.assertEqual(1, len(node_updates))
 
     def test_double_release_is_a_harmless_no_op(self):
         # No reference rows and no node named: nothing was held, so

@@ -1358,14 +1358,50 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             self.inst.place_instance(self.node2, enforce=False)
         self.assertEqual({}, self.inst.placement)
 
+    def _counting_fetch(self):
+        """Count fetches of the instance_attributes row."""
+        return mock.patch(
+            'shakenfist.mariadb.get_instance_attributes',
+            side_effect=self.mock_mariadb._mariadb_get_instance_attributes)
+
     def test_placement_is_visible_inside_an_enclosing_memo(self):
         # The RPC writes the placement column behind the object's back,
         # so the memo of the attributes row has to be dropped just as
-        # _db_set_attribute() would have dropped it.
+        # _db_set_attribute() would have dropped it. Reading it back
+        # through a second Instance object rather than the placing one
+        # is what makes this test bite: the placing object's own dict
+        # would look right whether or not the memo was invalidated.
+        other = instance.Instance.from_db(self.instance_uuid)
+
+        with self._counting_fetch() as fetch:
+            with self.inst.attribute_memo():
+                self.assertEqual({}, self.inst.placement)
+                self.inst.place_instance(self.node2)
+                self.assertEqual(self.node2, self.inst.placement['node'])
+                self.assertEqual(self.node2, other.placement['node'])
+                # Three fetches: the pre-placement read, a second for the
+                # memoised object because the write dropped its memo, and
+                # one for the unmemoised second object. Without the
+                # invalidation the middle one would be served from the
+                # memo and this would be two.
+                self.assertEqual(3, fetch.call_count)
+
+    def test_a_denial_leaves_no_trace_in_an_enclosing_memo(self):
+        # A denial writes nothing, so nothing about the instance may
+        # change -- including the placement dict a memoised read handed
+        # out, which must not end up holding the refused node or a
+        # bumped placement_attempts.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
         with self.inst.attribute_memo():
+            memoised = self.inst.placement
+            self.assertRaises(
+                exceptions.CapacityAdmissionDenied,
+                self.inst.place_instance, self.node2)
+            self.assertEqual({}, memoised)
             self.assertEqual({}, self.inst.placement)
-            self.inst.place_instance(self.node2)
-            self.assertEqual(self.node2, self.inst.placement['node'])
 
     def test_delete_globally_releases_capacity(self):
         row = self.mock_mariadb.set_node_capacity(
@@ -1382,6 +1418,42 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
 
         # P8: where the instance was is still readable after delete.
         self.assertEqual(self.node2, self.inst.placement['node'])
+
+    def test_repeated_delete_of_an_errored_instance_releases_once(self):
+        # _delete_globally() names the release node from the placement
+        # attribute, which is never cleared (P8), and an instance which
+        # ends in state error rather than deleted passes the delete
+        # path's re-entrancy guard on every subsequent attempt. Release
+        # is reference-gated for exactly this reason: the second pass
+        # finds no INSTANCE_LOCATION row and must not decrement again.
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        # Another instance's usage, so the server-side floors cannot
+        # mask a second decrement of ours.
+        row['used_cpus'] = 8
+        row['used_memory_mb'] = 8192
+        row['used_disk_gb'] = 32
+
+        self.inst.place_instance(self.node2)
+        self.assertEqual(10, row['used_cpus'])
+
+        self.inst.state = f'{self.inst.state.value}-error'
+        self.inst._delete_globally()
+        self.assertEqual(instance.Instance.STATE_ERROR,
+                         self.inst.state.value)
+        self.assertEqual(8, row['used_cpus'])
+        self.assertEqual(8192, row['used_memory_mb'])
+        self.assertEqual(32, row['used_disk_gb'])
+
+        # The placement attribute still names node2, so the second
+        # delete asks to release from it again.
+        self.assertEqual(self.node2, self.inst.placement['node'])
+        self.inst._delete_globally()
+
+        self.assertEqual(8, row['used_cpus'])
+        self.assertEqual(8192, row['used_memory_mb'])
+        self.assertEqual(32, row['used_disk_gb'])
 
     def test_release_is_skipped_when_never_placed(self):
         with mock.patch('shakenfist.mariadb.release_instance_placement') as r:

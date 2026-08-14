@@ -3,6 +3,7 @@
 # part of their role is to combine foundational baseobjects into something more
 # useful.
 import base64
+import copy
 import io
 import json
 import os
@@ -1006,7 +1007,10 @@ class Instance(dbowo):
         limits, at the cost of no extra RPC. If it is denied, nothing
         was written (the denial rolls its transaction back), the denial
         detail names the dimensions which would have been exceeded, and
-        the placement is then recorded unguarded.
+        the placement is then recorded unguarded. The over-limit event is
+        emitted only once that unguarded write has actually succeeded --
+        an event claiming a placement was recorded, followed by a failed
+        recording, would be an audit trail which lies.
         """
         cpus, memory_mb, disk_gb = self._capacity_claim
         # NOTE(mikal): the RPC writes the placement column itself, so the
@@ -1021,11 +1025,13 @@ class Instance(dbowo):
             enforce=True)
 
         if not enforce and result['success'] and not result['admitted']:
-            self._event_admission_over_limit(location, result)
+            denial = result
             result = mariadb.admit_instance_placement(
                 str(self.uuid), self.namespace, location, cpus, memory_mb,
                 disk_gb, placement_json, old_node_uuid=old_location,
                 enforce=False)
+            if result['success']:
+                self._event_admission_over_limit(location, denial)
 
         return result
 
@@ -1065,7 +1071,14 @@ class Instance(dbowo):
         """
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
-            placement = self.placement
+            #
+            # _db_get_attribute() can return the dict an enclosing
+            # attribute_memo() block is caching, so the proposed
+            # placement is built on a copy. Mutating in place would let a
+            # denial -- which writes nothing -- still leave that memo (and
+            # anything else holding the same dict) reading the refused
+            # node with a bumped attempt count.
+            placement = copy.deepcopy(self.placement)
             old_location = placement.get('node')
             if old_location == location:
                 return
@@ -1316,9 +1329,12 @@ class Instance(dbowo):
         An empty ``node_uuid`` releases wherever the instance's
         placement references point, which is what the sweep in
         hard_delete() wants: it knows the instance rather than its node.
-        Decrements are floored at zero server side, and a release with
-        nothing left to release is a no-op, so calling this twice is
-        harmless by design.
+        A named node *filters* those references rather than replacing
+        them, so a repeat call is a no-op in either form -- which matters
+        here, because the node name comes from the ``placement``
+        attribute, which is never cleared (P8), and an instance which
+        ends in state ``error`` passes delete()'s re-entrancy guard on
+        every subsequent delete attempt.
         """
         cpus, memory_mb, disk_gb = self._capacity_claim
         result = mariadb.release_instance_placement(

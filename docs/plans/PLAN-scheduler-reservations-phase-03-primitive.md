@@ -372,7 +372,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 6 | Concurrency validation against a docker MariaDB (mirror phase 2 step 4): two threads racing one slot admit exactly once; a 50-create burst against known capacity admits exactly the fitting prefix; release/re-admit cycling leaves counters at reconciler ground truth. Record results in the Validation section. Add a functional smoke assertion to `shakenfist_ci` that a create emits the admission audit event | high | opus | worktree | Complete — see step 6 notes. Validation found a blocker (ER_CHECKREAD retry exhaustion on MariaDB 11.6.2+ turning concurrent creates into 500s); **resolved in step 6a**, which is where the shipping numbers are |
 | 6a | Fix the step 6 blocker in the primitive: move the branch select and presence probes out of both transactions so a guarded UPDATE is the first statement, per the phase 0 finding. Re-run the full live suite twice under `innodb_snapshot_isolation` ON and the concurrency class once under OFF | medium | opus | worktree | Complete — see step 6a notes |
 | 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Complete — see step 7 notes |
-| 8 | Management-session code review against the checklist below | medium | management session | none | Not started |
+| 8 | Management-session code review against the checklist below | medium | management session | none | Complete — 1 fix + 6 considers applied, 2 recorded; see step 8 notes |
 | 9 | Operator review and PR; deploy to sfcbr and soak: reconciler drift metric stays zero with admission live, no 507 regression in CI pass rates | — | operator | — | Not started |
 
 ## Risks and mitigations
@@ -1037,6 +1037,140 @@ No stale claim survived the sweep beyond the two named above
 demand" section); `pre-commit run --files <changed files>` (anchor-link
 check) passes on all seven changed files.
 
+### Step 8: management-session code review (2026-08-14)
+
+**Shape.** Two passes over the branch. A mechanical checklist pass
+(greps for the success criteria: `_committed_vcpus`,
+`_dual_write_legacy_instances`, `record_relationship.*INSTANCE_LOCATION`
+callers, direct `placement` attribute writers, `namespace_claims`
+writers, phase 4/5/6 material in the diff), and an independent
+adversarial reviewer given the full diff with no prior context and asked
+to find what the checklist would not. Eleven findings; adjudicated as one
+gating fix, six taken considers, two recorded for future work, and two
+which turned out to be already handled.
+
+**Reviewer's verdict:** the primitive is correct and well tested, the
+phase's own validation caught the one serious concurrency bug before it
+shipped, and the remaining findings are a single capacity-accounting
+correctness bug plus polish -- nothing which reopens a P-decision or the
+transaction design.
+
+#### The gating fix: named-node release must be reference-gated
+
+`_probe_release_rows()` took `nodes = [named_node]` without consulting
+the `INSTANCE_LOCATION` rows, so the "nothing held, no-op" guard could
+only ever fire for the no-node call form. Concretely:
+`Instance._delete_globally()` names the node from the `placement`
+attribute, which is never cleared (P8); the delete path's only
+re-entrancy guard is on state `deleted`; an instance which ends in
+`error` therefore reaches the release on every repeat delete. Each
+repeat decremented the node and namespace counters again, and the
+floors could not catch it because other instances' usage keeps the
+counters well above the amount being released. The capacity was handed
+out twice until the next reconcile pass.
+
+The fix makes the reference rows the sole authority for "is this
+instance still charged" in both call forms. Since phase 3 the placement
+attribute and the reference rows are written by one transaction, so
+that authority is exact. `node_uuid` is now a *filter* over the located
+rows: named and located releases that row, named and not located (or no
+rows at all) releases nothing and returns `released=False` with no
+transaction opened. `_delete_globally()` and `hard_delete()` keep their
+call shapes; the startup-tasks release callers name nodes that came
+from located references, so the filter admits them unchanged.
+
+Tests: the live `test_release_of_a_named_node_needs_no_references` was
+inverted and renamed `test_release_of_a_named_node_is_reference_gated`
+(the no-op is now the asserted behaviour), joined by live tests for a
+release naming a node which does not hold the instance and for the
+repeated-named-release shape; `mock_mariadb.py`'s release double was
+given the same semantics; and unit tests were added at both levels --
+`test_mariadb_capacity_admission.py` for the filter's four cases and
+`test_instance.py`'s
+`test_repeated_delete_of_an_errored_instance_releases_once` for the
+review's exact scenario. That last one was verified to fail against the
+pre-fix mock double.
+
+#### Considers taken
+
+* **Placement dict mutated in place.** `place_instance()` mutated the
+  dict `_db_get_attribute()` returned, which an enclosing
+  `attribute_memo()` block may be caching, and invalidated the memo only
+  on success -- so a denial left the memo holding the refused node with a
+  bumped `placement_attempts`. Now deep-copied before mutation; a denial
+  changes nothing observable. `test_placement_is_visible_inside_an_enclosing_memo`
+  passed even with the invalidation deleted, so it was reworked to read
+  through a second `Instance` object and assert the attribute-fetch
+  count; it was verified to fail with the invalidation removed. A new
+  `test_a_denial_leaves_no_trace_in_an_enclosing_memo` covers the
+  mutation itself.
+* **Doc contradictions.** `docs/operator_guide/database.md`'s
+  "maintained solely by a reconciler" and `ARCHITECTURE.md`'s "the
+  reconciler is the sole writer of the three capacity tables" were both
+  falsified by this branch. Aligned with CLAUDE.md's wording: recomputed
+  wholesale by the reconciler, drawn down and released incrementally by
+  the RPCs, reconciler as drift corrector.
+* **Stale docstring** in `daemons/network/maintain.py` still explained
+  why the vxid query does not read the legacy union; rewritten to record
+  that the reference rows have been the sole record since phase 3.
+* **Discarded release replies** in `startup_tasks.py`. Both calls now go
+  through a small `_release_placement()` helper which logs a warning on
+  `success=False`, matching `_reconcile_placement()`'s failure logging.
+* **The over-limit event preceded its write.** `_admit_placement()`
+  emitted `placement recorded despite exceeding capacity guard` before
+  the unguarded write it describes; if that write failed the audit trail
+  lied. Moved to after a successful unguarded call, keeping the denial
+  reply for the event detail.
+* **Unguarded-admission counter.** P7 is unbounded in time, not just
+  mid-upgrade -- a node the reconciler never sizes admits unguarded
+  forever -- so the step 9 soak needs to tell "guard working" from "guard
+  not running". `daemons/database/main.py` now increments a dedicated
+  `database_admit_instance_placement_unguarded_total` counter whenever a
+  reply comes back `unguarded`.
+* **CLAUDE.md name-dropped `_committed_vcpus()`**, breaking the plan's
+  own `git grep _committed_vcpus` success criterion for non-plan files.
+  Reworded to "the issue-3498 Python stopgap in the scheduler".
+* **The startup reconciliation does not emit P5's over-limit event.** It
+  calls `admit_instance_placement(enforce=False)` directly rather than
+  going through `Instance._admit_placement()`, so it never runs the
+  probe the event is derived from. This is a deliberate asymmetry, not a
+  bug -- the cleaner probes and events, the startup repair records
+  without probing -- and is now documented as such in
+  `docs/operator_guide/database.md` beside the `enforce=False`
+  paragraph.
+
+#### Recorded only
+
+Two findings were judged real but not worth acting on in this phase, and
+are in Future work above: `get_scheduler_node_capacity()` cannot
+distinguish a read failure from an empty table (degrading the cluster CI
+assertion to a skip), and `mock_mariadb.py` models no cluster, claim or
+demand denial stage (bounding what caller-side unit tests can assert;
+this becomes necessary with phase 4's claims API).
+
+#### Verification
+
+The full `test_mariadb_capacity_admission_live` suite (37 tests, up from
+34) was run serially twice back to back against a disposable
+`mariadb:11` container -- 11.8.8, `innodb_snapshot_isolation` ON,
+REPEATABLE-READ -- both times all green, including the concurrency class.
+The two capacity live suites together (52 tests) also pass. Unit:
+`test_instance`, `test_mariadb_capacity_admission` and
+`test_queues_startup_restore` -- 156 tests, all passing. `tox -eflake8`
+on the changed files and the full `tox -emypy` suite are both clean.
+
+**One review claim was inaccurate in detail.** The finding-1 write-up
+said `_probe_release_rows()` "takes `nodes = [named_node]` without
+consulting `INSTANCE_LOCATION` rows, so the *nothing held → no-op* guard
+can never fire" -- correct -- but the fix note added that `hard_delete()`
+would need no change *because* its call names no node. It does name no
+node, so it was already reference-gated and genuinely needed no change;
+the checklist's "double release is harmless" item was true before this
+fix for the `hard_delete()` path specifically and false only for the
+named-node path. The distinction matters for reading the existing
+`test_hard_delete_release_behind_delete_globally_is_a_noop` test, which
+was passing for the right reason all along.
+
 ## Administration and logistics
 
 ### Success criteria
@@ -1068,21 +1202,21 @@ check) passes on all seven changed files.
 
 ### Review checklist (management session, step 8)
 
-- [ ] Guarded UPDATEs follow canonical order everywhere,
+- [x] Guarded UPDATEs follow canonical order everywhere,
       including the release and move paths.
-- [ ] The concurrent-scheduling test exercises real MariaDB, not
+- [x] The concurrent-scheduling test exercises real MariaDB, not
       mocks (master plan checklist item).
-- [ ] `hard_delete()` accounts for capacity release (master plan
+- [x] `hard_delete()` accounts for capacity release (master plan
       checklist item); double release is harmless.
-- [ ] `enforce=False` paths update counters and emit the
+- [x] `enforce=False` paths update counters and emit the
       over-limit event.
-- [ ] No caller outside `mariadb.py` writes `INSTANCE_LOCATION`
+- [x] No caller outside `mariadb.py` writes `INSTANCE_LOCATION`
       rows or the `placement` attribute directly.
-- [ ] The claim branch is unreachable in production until phase
+- [x] The claim branch is unreachable in production until phase
       4 (no API can create a `namespace_claims` row) but fully
       unit-tested.
-- [ ] Diff contains no phase 4/5/6 material.
-- [ ] mypy clean; single quotes; 120-char lines.
+- [x] Diff contains no phase 4/5/6 material.
+- [x] mypy clean; single quotes; 120-char lines.
 
 ### Future work
 
@@ -1098,6 +1232,29 @@ check) passes on all seven changed files.
   diagnostics to progress.
 - The `placement` attribute is never cleared after delete (P8);
   worth a small cleanup once nothing reads it post-delete.
+- `mariadb.get_scheduler_node_capacity()` cannot distinguish a read
+  failure from an empty table: `_direct_get_scheduler_node_capacity()`
+  logs and returns `[]` on `OperationalError`, and the gRPC wrapper does
+  the same, so `summarize_resources()` publishes
+  `cpu_committed_row_present=False` for every node and the cluster CI
+  assertion in
+  `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_nodes.py`
+  degrades from an assertion to a skip. Harmless for the summary (a node
+  with no row is charged nothing and guarded by nothing either way), but
+  it means a persistently unreadable capacity table would silently
+  disable that CI check rather than failing it. Worth a distinguishable
+  error return once something depends on the read for more than display.
+- `shakenfist/tests/mock_mariadb.py`'s
+  `_mariadb_admit_instance_placement()` models only the node stage: it
+  has no cluster singleton, no `namespace_claims` row and no
+  expected-demand term, so a caller-side unit test can only produce a
+  `failing_stage` of `node`. That bounds what
+  `shakenfist/tests/test_instance.py` and
+  `shakenfist/tests/test_external_api.py` can assert about denial
+  handling to one of the four denial stages. Acceptable while the claim
+  branch is dormant; **phase 4 makes it necessary**, since the claims API
+  is the first thing that can produce a `claim`-stage denial in
+  production and its callers will want unit coverage of that path.
 
 ### Bugs fixed during this work
 

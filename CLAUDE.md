@@ -563,9 +563,8 @@ performance. This is required for all deployments - MariaDB must be configured.
   sole write path. The `used_*` counters are allocation ledgers over
   placed, non-deleted instances, so they deliberately differ from the
   resources daemon's active-domain measurements whenever instances are
-  powered off. The issue-3498 Python stopgap
-  (`Scheduler._committed_vcpus()`) was deleted by the same change that
-  wired admission onto these counters.
+  powered off. The issue-3498 Python stopgap in the scheduler was
+  deleted by the same change that wired admission onto these counters.
 - **Per-daemon state** (`node_daemon_states` table): One row per
   `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
   and optional `message`. Replaces the JSON `daemon_states` dict that

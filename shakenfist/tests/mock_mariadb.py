@@ -2813,19 +2813,25 @@ class MockMariaDB():
             node_uuid=''):
         """Mock implementation of mariadb.release_instance_placement()
 
-        An empty node_uuid releases wherever the instance's reference
-        rows point. With no node named and no rows there is nothing to
-        release, so released is False -- that is what makes the double
-        release behind _delete_globally() a no-op.
+        Release is reference-gated in both call forms, as the real
+        implementation is: the INSTANCE_LOCATION rows are the only
+        record of what is charged, and node_uuid filters them rather
+        than replacing them. So a release naming a node the instance
+        holds no reference on releases nothing and reports
+        released=False, which is what makes a repeat delete of an
+        errored instance -- whose never-cleared placement attribute
+        keeps naming its old node -- a no-op instead of a second
+        decrement.
         """
         result = {
             'success': True, 'error': '', 'released': False, 'clamped': False}
 
-        located = [
+        nodes = [
             r.source_uuid for r in self.object_references.values()
             if r.relationship == RelationshipType.INSTANCE_LOCATION
             and r.target_uuid == str(instance_uuid)]
-        nodes = [str(node_uuid)] if node_uuid else located
+        if node_uuid:
+            nodes = [n for n in nodes if str(n) == str(node_uuid)]
 
         if not nodes:
             self._trace(

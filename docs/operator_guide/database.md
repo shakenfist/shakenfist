@@ -539,8 +539,12 @@ second upsert cycle repopulates every live node — no backfill needed for a
 table whose rows are ephemeral by design.
 
 The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and
-`cluster_capacity`) are maintained solely by a reconciler that runs every five minutes on the
-elected cluster node. Each pass is a single `ReconcileSchedulerCapacity`
+`cluster_capacity`) are recomputed wholesale from ground truth by a
+reconciler that runs every five minutes on the elected cluster node, and —
+since phase 3, described below — are also drawn down and released
+incrementally by the placement admission and release RPCs between those
+passes. The reconciler is therefore the drift corrector rather than the
+only writer. Each pass is a single `ReconcileSchedulerCapacity`
 RPC which expires stale claims, re-derives each hypervisor's limits from
 the typed `node_metrics` columns (deliberately mirroring the scheduler's
 admission arithmetic), recomputes usage counters from placed instances,
@@ -570,7 +574,11 @@ rewrites and the queues daemon's startup reconciliation pass
 just leave the ledger wrong. A non-enforced write that pushes a node
 over its limit still updates every counter and emits a loud audit
 event (`placement recorded despite exceeding capacity guard`) so the
-overage is visible rather than silently absorbed. A node or the
+overage is visible rather than silently absorbed. One exception: the
+queues daemon's startup reconciliation records placements without
+probing for the overage first, so it does not emit that event — the
+cleaner probes and events, the startup repair records, and the
+reconciler's next pass surfaces any excess in the drift figures. A node or the
 cluster singleton missing its capacity row — mid-upgrade, or a cluster
 whose reconciler has never run — fails open: placement proceeds
 unguarded, an `instance placed without capacity guard` event records

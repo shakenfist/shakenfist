@@ -721,7 +721,10 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # The cluster row was never charged for a claimed namespace.
         self.assertEqual(8, self._cluster().unclaimed_used_cpus)
 
-    def test_release_of_a_named_node_needs_no_references(self):
+    def test_release_of_a_named_node_is_reference_gated(self):
+        # A named node filters the located references rather than
+        # overriding them. With no reference rows the instance holds
+        # nothing, so naming its old node must release nothing.
         self._admit(self.node_a)
         table = mariadb._get_object_references_table()
         with self.engine.connect() as conn:
@@ -729,8 +732,44 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
             conn.commit()
 
         result = self._release(node=str(self.node_a))
-        self.assertTrue(result['released'])
+        self.assertTrue(result['success'], result['error'])
+        self.assertFalse(result['released'])
+        self.assertFalse(result['clamped'])
+        self.assertEqual(12, self._capacity(self.node_a).used_cpus)
+        self.assertEqual(12, self._cluster().unclaimed_used_cpus)
+
+    def test_release_of_a_node_not_holding_the_instance_is_a_no_op(self):
+        # The instance is on node_a; releasing it "from" node_b must not
+        # touch either node's counters.
+        self._admit(self.node_a)
+        result = self._release(node=str(self.node_b))
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertFalse(result['released'])
+        self.assertEqual(12, self._capacity(self.node_a).used_cpus)
+        self.assertEqual(0, self._capacity(self.node_b).used_cpus)
+        self.assertEqual([str(self.node_a)],
+                         [r.source_uuid for r in self._references()])
+
+    def test_repeated_named_release_does_not_double_decrement(self):
+        # The shape a repeated delete of an errored instance takes:
+        # _delete_globally() names the node from the never-cleared
+        # placement attribute every time it runs.
+        self._admit(self.node_a)
+        node = str(self.node_a)
+
+        first = self._release(node=node)
+        self.assertTrue(first['released'])
         self.assertEqual(8, self._capacity(self.node_a).used_cpus)
+        self.assertEqual(8, self._cluster().unclaimed_used_cpus)
+
+        for _ in range(3):
+            repeat = self._release(node=node)
+            self.assertTrue(repeat['success'], repeat['error'])
+            self.assertFalse(repeat['released'])
+            self.assertFalse(repeat['clamped'])
+            self.assertEqual(8, self._capacity(self.node_a).used_cpus)
+            self.assertEqual(8, self._cluster().unclaimed_used_cpus)
 
     def test_release_follows_duplicate_references_to_every_node(self):
         self._place_reference(self.node_a, self.instance)

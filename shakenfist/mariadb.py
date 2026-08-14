@@ -24932,6 +24932,26 @@ def _probe_release_rows(
     release opens with a floored decrement, so its reference lookup and
     branch select cannot run inside the transaction.
 
+    **The instance_location rows are the sole authority for what is
+    charged, whether or not the caller names a node.** Since phase 3 the
+    placement attribute and the reference rows are written by one
+    transaction, so a node with no reference row for this instance is a
+    node holding nothing on its behalf. ``named_node`` is therefore a
+    *filter* over the located rows, never an override: named and located
+    releases that node's row; named and not located releases nothing at
+    all, returning ``released=False`` with no counter touched.
+
+    That distinction is what makes a repeat release harmless for a
+    *named-node* caller too. ``Instance._delete_globally()`` names the
+    node from the ``placement`` attribute, which is never cleared (P8),
+    and the delete path's re-entrancy guard only catches state
+    ``deleted`` -- an instance that ended in ``error`` reaches the
+    release on every delete attempt. Taking the named node on trust
+    decremented the node and namespace counters again each time (the
+    floors cannot catch it: other instances' usage keeps the counters
+    above the amount being released), silently handing that capacity out
+    twice until the next reconcile pass.
+
     The claim branch races exactly as it does for an admission. The
     reference lookup was already racy before it moved: it was a plain
     non-locking read, so two concurrent releases of the same instance
@@ -24940,19 +24960,12 @@ def _probe_release_rows(
     Moving it out widens that window by one round trip and changes
     nothing else; in production the instance's attribute lock serialises
     the callers anyway.
-
-    A named node skips the lookup entirely, which is the path
-    ``_delete_globally()`` and the cleaner take.
     """
-    if named_node is not None:
-        nodes = [named_node]
-    else:
-        nodes = []
-
     engine = _get_engine()
     with engine.connect() as conn:
-        if named_node is None:
-            nodes = _instance_location_nodes(conn, instance_uuid)
+        nodes = _instance_location_nodes(conn, instance_uuid)
+        if named_node is not None:
+            nodes = [n for n in nodes if n == named_node]
         if not nodes:
             # Nothing is held, so there is no transaction to open and no
             # branch to select.
@@ -25387,11 +25400,16 @@ def _direct_release_instance_placement(
     _probe_admission_rows() for the ER_CHECKREAD invariant that requires
     it, and for what the resulting races resolve as.
 
-    Idempotent by construction: after the first call the instance has no
-    instance_location rows, so a second call with no explicit node finds
-    nothing to release, touches no counter and returns
-    ``released=False``. That is what makes ``hard_delete()``'s sweep safe
-    to run behind ``_delete_globally()``'s release.
+    Idempotent by construction, in both call forms: the
+    instance_location rows are the only record of what is charged, so
+    after the first call there are none, and a second call -- whether it
+    names a node or not -- finds nothing to release, touches no counter
+    and returns ``released=False``. A named node is a filter over those
+    rows rather than an assertion that they exist (see
+    _probe_release_rows()). That is what makes ``hard_delete()``'s sweep
+    safe to run behind ``_delete_globally()``'s release, and what stops a
+    repeated delete of an errored instance from handing its capacity out
+    twice.
 
     The ``placement`` attribute is deliberately not cleared (P8):
     ``enqueue_delete()`` and the event history both read it after
@@ -25421,11 +25439,12 @@ def _direct_release_instance_placement(
         probe = _probe_release_rows(namespace, instance_uuid, named_node)
 
         if not probe.nodes:
-            # Nothing was held: no reference rows and no node named.
-            # Decrementing here would take capacity away from an
-            # instance that never had it (a double release), so the
-            # counters are left alone, no transaction is opened at all,
-            # and the caller is told this was a no-op.
+            # Nothing was held: this instance has no instance_location
+            # row (or none on the node the caller named). Decrementing
+            # here would take capacity away from an instance that no
+            # longer holds any -- a double release -- so the counters are
+            # left alone, no transaction is opened at all, and the caller
+            # is told this was a no-op.
             return outcome
 
         with engine.begin() as conn:
@@ -25661,7 +25680,11 @@ def release_instance_placement(
 
     ``node_uuid`` is optional: an empty value releases wherever the
     instance's placement references point, which is what the delete
-    paths want since they know the instance rather than its node.
+    paths want since they know the instance rather than its node. A
+    non-empty value *filters* those references rather than replacing
+    them -- naming a node the instance holds no reference on releases
+    nothing, because the reference rows are the only record of what is
+    charged.
 
     Returns:
 
@@ -25669,8 +25692,9 @@ def release_instance_placement(
          'clamped': bool}
 
     ``released`` is False when there was nothing to release, which is
-    how a repeat call (``hard_delete()`` behind ``_delete_globally()``)
-    is told from a real one.
+    how a repeat call (``hard_delete()`` behind ``_delete_globally()``,
+    or a second delete attempt on an errored instance) is told from a
+    real one.
     """
     if _use_database_service():
         return _grpc_release_instance_placement(

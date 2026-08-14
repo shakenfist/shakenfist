@@ -210,18 +210,37 @@ def restore_instances():
                 continue
 
             # Gone, or on its way out. Give the capacity back.
-            mariadb.release_instance_placement(
+            _release_placement(
                 instance_uuid, inst.namespace, inst.cpus, inst.memory,
-                mariadb._disk_spec_virtual_gb(inst.disk_spec),
-                node_uuid=node_uuid)
+                mariadb._disk_spec_virtual_gb(inst.disk_spec), node_uuid)
             continue
 
         # No instance row at all, so there is nothing to read the
         # resource sizes from. Drop the reference row and let the
         # capacity reconciler recompute the counters from ground truth
         # on its next pass rather than guessing at amounts.
-        mariadb.release_instance_placement(
-            instance_uuid, '', 0, 0, 0, node_uuid=node_uuid)
+        _release_placement(instance_uuid, '', 0, 0, 0, node_uuid)
+
+
+def _release_placement(instance_uuid, namespace, cpus, memory_mb, disk_gb,
+                       node_uuid):
+    """Release one stale placement reference, logging a failed RPC.
+
+    The reply is worth checking for the same reason
+    _reconcile_placement() checks its own: an unreachable database is
+    not "nothing to release", and a silent failure here leaves the
+    counters overstated until the capacity reconciler's next pass with
+    no record of why.
+    """
+    result = mariadb.release_instance_placement(
+        instance_uuid, namespace, cpus, memory_mb, disk_gb,
+        node_uuid=node_uuid)
+    if not result['success']:
+        LOG.with_fields({
+            'instance': instance_uuid,
+            'node': node_uuid,
+            'error': result['error']}).warning(
+                'Failed to release stale instance placement')
 
 
 def _reconcile_placement(inst, node_uuid, old_node_uuid):
