@@ -11521,6 +11521,20 @@ into two tiers.</p>
 <p>The trade is deliberate: a cloud-specific breakage now surfaces in
 the merge queue rather than on the PR, blocking the queue and
 costing a rerun.</p>
+<p>Both tiers also skip entirely when a change touches only files no
+lane exercises: the review-tracking state (<code>REVIEWS.md</code>, the
+<code>.vscode</code> weaudit files and review scope) and <code>docs/</code>. Each gating
+workflow carries a <code>check_paths</code> filter job whose output the heavy
+jobs skip on — a filter job rather than trigger-level
+<code>paths-ignore</code>, because a required check that never reports blocks
+the merge forever while a skipped one satisfies it (see the
+comments in <code>functional-tests.yml</code>). The filter list is duplicated
+in the three <code>check_paths</code> jobs and in <code>codeql-analysis.yml</code>'s
+trigger-level <code>paths-ignore</code> (safe there because CodeQL is not a
+required check); keep the copies in sync. In the merge queue only
+<code>functional-tests.yml</code> runs its filter, so a review-marks-only or
+docs-only queue entry skips the cloud matrices too — confirmed
+live on the queue entry for PR 304.</p>
 <table>
 <thead>
 <tr>
