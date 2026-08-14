@@ -11747,8 +11747,8 @@ change at all.</p>
 </tr>
 <tr>
 <td><code>connection_state</code></td>
-<td>~864</td>
-<td>State accessor used by the reaper</td>
+<td>861–865</td>
+<td>Test-only state accessor (<code>#[cfg(test)]</code>)</td>
 </tr>
 <tr>
 <td>RTP pumps</td>
@@ -11757,6 +11757,18 @@ change at all.</p>
 </tr>
 </tbody>
 </table>
+<p><code>connection_state</code> sits inside a <code>#[cfg(test)]</code> impl block and is
+never called by production code — the reaper in
+<code>ryll/src/web/lifecycle.rs</code> uses <code>dead_handle()</code> /
+<code>dead_flag_handle()</code>, which never touch the peer connection. The
+call sites that matter for the port are the <em>test clients</em>, which
+call it on a raw <code>RTCPeerConnection</code>. Phase 01 covers the
+consequences.</p>
+<p>There are also four near-identical client-side peer connection
+setups (<code>bridge.rs:904-948</code>, <code>tests/loopback.rs:100-216</code>,
+<code>tests/lifecycle.rs:88-140</code>, <code>ryll/src/web/signalling.rs:434-492</code>),
+every one of which uses API that changes in 0.20. Collapsing them
+to one implementation is phase 01's largest step.</p>
 <h3 id="what-020-changes">What 0.20 changes<a class="headerlink" href="#what-020-changes" title="Permanent link">&para;</a></h3>
 <p>webrtc-rs 0.20 re-homes the crate on the sans-io <code>rtc</code> protocol
 core, wrapped in a thin <em>async</em> layer. Note that the async model
@@ -11848,18 +11860,31 @@ against 0.17.1 today, and shrinks the atomic step:</p>
   with three methods, still registered through the 0.17 API. The
   struct is then trivially re-targeted at
   <code>PeerConnectionEventHandler</code> in phase 02.</li>
-<li>Shadow the connection state in that struct — the state-change
-  callback already sees every transition — and reimplement
-  <code>connection_state()</code> (<code>:864</code>) to read the shadow rather than
-  ask the PC. This removes one of the no-direct-replacement
+<li>Collapse the four duplicated client-side peer connection setups
+  into one shared test helper behind a <code>test-support</code> feature, so
+  phase 02 rewrites that boilerplate once instead of four times
+  across two crates. This is the largest step in the phase and
+  was not visible when this master plan was first written.</li>
+<li>Shadow the connection state inside that helper — the
+  state-change callback already sees every transition — so
+  <code>wait_until_connected</code> reads the shadow rather than calling
+  <code>RTCPeerConnection::connection_state()</code>. This removes one of
+  the no-direct-replacement
   items entirely, and works identically on 0.17.</li>
-<li>Give <code>accept_offer</code> an explicit "gathering complete" signal
-  (a <code>Notify</code> or oneshot raised from the state-change path)
-  rather than calling <code>gathering_complete_promise()</code> inline, and
-  verify the SDP it returns is byte-identical to today's.</li>
+<li>Give <code>accept_offer</code> an explicit "gathering complete" signal —
+  a sticky <code>Notify</code> + <code>AtomicBool</code> pair raised from a new
+  <code>on_ice_gathering_state_change</code> handler, which 0.17 already
+  provides — rather than calling <code>gathering_complete_promise()</code>
+  inline, and prove the answer SDP carries the same candidate
+  set. This validates the phase 02 design for the riskiest
+  no-direct-replacement item while we can still fall back.</li>
 </ul>
 <p>Each of these is its own commit. All of them are testable now,
-which is the point.</p>
+which is the point. Detailed in
+<a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">PLAN-webrtc-0.20-upgrade-phase-01-prework.md</a>,
+which corrects two things this master plan got wrong on first
+writing: <code>connection_state</code> is test-only, and the client-PC
+setup is duplicated four times.</p>
 <h3 id="phase-02-the-atomic-bump">Phase 02 — The atomic bump<a class="headerlink" href="#phase-02-the-atomic-bump" title="Permanent link">&para;</a></h3>
 <p>One commit, necessarily large:</p>
 <ul>
@@ -11927,8 +11952,8 @@ minutes.</p>
 <tbody>
 <tr>
 <td>1. Pre-work on 0.17</td>
-<td>PLAN-webrtc-0.20-upgrade-phase-01-prework.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">PLAN-webrtc-0.20-upgrade-phase-01-prework.md</a></td>
+<td>Complete — baseline captured, 1g agrees within noise</td>
 </tr>
 <tr>
 <td>2. Atomic bump to 0.20</td>
@@ -11962,11 +11987,11 @@ Phases 03 and 04 both depend on 02.</p>
 <tbody>
 <tr>
 <td>01 — pre-work on 0.17</td>
-<td>1 day</td>
+<td>2 days</td>
 </tr>
 <tr>
 <td>02 — atomic bump</td>
-<td>2–3 days</td>
+<td>1.5–2.5 days</td>
 </tr>
 <tr>
 <td>03 — socket binding config</td>
@@ -11978,6 +12003,11 @@ Phases 03 and 04 both depend on 02.</p>
 </tr>
 </tbody>
 </table>
+<p>Phase 01 grew by a day after detailed planning surfaced the
+four-way client-PC duplication, and phase 02 came down by the
+same amount — the work moved out of the atomic commit rather than
+appearing from nowhere, which is a better trade than the totals
+suggest.</p>
 <p>The variance is almost entirely in phase 02, and almost entirely
 in the two items with no direct replacement: ICE-gathering
 completion and whatever the datachannel event surface turns out
