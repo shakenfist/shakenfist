@@ -7105,16 +7105,26 @@ class UpdateAgentOperationAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___AgentOperationAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the AgentOperationAttributesData field names to write. An
+        empty list means write every column. See the equivalent comment
+        on UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents.
+        """
+
     def __init__(
         self,
         *,
         data: Global___AgentOperationAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

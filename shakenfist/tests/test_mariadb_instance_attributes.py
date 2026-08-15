@@ -14,6 +14,8 @@ from unittest import mock
 import sqlalchemy as sa
 
 from shakenfist import mariadb
+from shakenfist.schema.agentoperation_attributes import (
+    AgentOperationAttributesData)
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
@@ -130,6 +132,29 @@ class NetworkColumnValuesTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             ValueError, mariadb._network_attributes_column_values,
             self.data, ['floating_gateway', 'not_a_column'])
+
+
+class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = AgentOperationAttributesData(
+            uuid=uuid.uuid4(),
+            results={'0': {'status': 0}})
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._agent_operation_attributes_column_values(self.data)
+        self.assertEqual({'results'}, set(values))
+
+    def test_mask_limits_columns(self):
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['results'])
+        self.assertEqual({'results'}, set(values))
+        self.assertEqual('{"0": {"status": 0}}', values['results'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._agent_operation_attributes_column_values,
+            self.data, ['results', 'not_a_column'])
 
 
 class ArtifactColumnValuesTestCase(base.ShakenFistTestCase):

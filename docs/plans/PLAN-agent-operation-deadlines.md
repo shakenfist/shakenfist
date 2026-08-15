@@ -347,12 +347,23 @@ running the command twice, which is why `execute` is not retried
 ### Command dispatch restructure
 
 The if/elif chain in `_execute_inner()` (`execute` / `put-blob` /
-`chmod` / `get-file`) becomes a small per-command handler registry on
-`SideChannelExecutorJob`, where each handler declares:
+`chmod` / `get-file`) becomes one handler class per command,
+instantiated once per `SideChannelExecutorJob` and looked up by
+command name, where each handler declares:
 
 - `reports_progress` (bool) — whether the progress timeout applies
   while this command is in flight;
-- its dispatch method and reply handler(s).
+- `retryable` (bool) — whether phase 5 may retry it;
+- its dispatch method.
+
+The registry does not own reply handling. Replies are dispatched on
+the protobuf field they carry rather than on a command name, and the
+two do not map one-to-one — `file_chunk_reply` acks put-blob chunks
+while `file_chunk` carries get-file payloads, and the same handler
+serves whichever command is in flight. Phase 4's `observe_progress()`
+calls therefore go inside the existing reply handlers, and the
+registry answers only "may this command's progress be timed out, and
+may it be retried".
 
 The registry makes "does this command support progress, and where
 would I observe it?" a question with an obvious answer for the next
@@ -484,13 +495,13 @@ the slot at all.
 | Phase | Plan | Status | Content |
 |-------|------|--------|---------|
 | 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Complete | Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan |
-| 1 | | Not started | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change) |
+| 1 | [PLAN-agent-operation-deadlines-phase-01-groundwork.md](PLAN-agent-operation-deadlines-phase-01-groundwork.md) | Complete | Field mask for `update_agent_operation_attributes`; per-command handler classes replacing the dispatch if/elif chain, declaring `reports_progress` and `retryable` for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises `GetException` rather than `AttributeError` |
 | 2 | | Not started | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
 | 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
 | 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check) |
 | 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
 | 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast) |
-| 7 | | Not started | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on `!= 'complete'`, one with no timeout at all) |
+| 7 | | Not started | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on `!= 'complete'`, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below) |
 
 Each phase gets its own detailed plan file before implementation.
 Unit tests land with each phase; the functional test in phase 7
@@ -501,3 +512,45 @@ progress timeout (proving the progress timeout does not apply to
 non-progress commands), and a follow-up operation dispatching
 promptly after a first operation is expired (proving the executor
 slot is actually freed).
+
+### The CI suite's own awaits have the bug this plan fixes (#3770)
+
+Found during merge CI triage of PR #3764 and verified against the
+tree. `_await_agent_state`
+(`shakenfist/deploy/shakenfist_ci/base.py:436`) looks like a
+500-second deadline and is not one:
+
+```python
+time_since_last_progress = time.time()
+while time.time() - time_since_last_progress < 500:
+    ...
+    events = self.system_client.get_instance_events(instance_uuid, limit=1)
+    if events:
+        last_event = events[0]
+        time_since_last_progress = last_event['timestamp']
+```
+
+`get_instance_events(..., limit=1)` returns the most recent event of
+*any* type, so an instance going nowhere while still emitting events
+on any sub-500s cadence renews the window forever. The variable is
+named for progress; nothing in the query restricts it to progress.
+`_await_instance_create` (`base.py:471`) is the identical
+construction with a 180-second window. In run 31856630647 this cost
+the Guests job its entire 60-minute budget: two agent-awaiting tests
+never completed, and because the step was killed rather than failed,
+stestr wrote no results and the job named no failing test at all.
+
+This is the same two-knob confusion the plan resolves server-side --
+a progress window is not a deadline -- so phase 7 fixes it the same
+way: keep the event-renewed progress window, add an absolute ceiling
+on the whole await, and prefer restricting renewal to events that
+actually represent progress. The ceiling is the part that converts a
+future occurrence from a silent budget fire into a diagnosable test
+failure with a console dump. While there, correct the timeout
+message, which says "no progress in 5 minutes" for a 500-second (8m
+20s) window.
+
+Note the causal link to #3516 is plausible but unproven: both stalled
+tests await an agent, but nothing in that run confirms an orphaned
+agent operation, and #3696 is a distinct symptom (there the runner
+lost communication and uploaded nothing).

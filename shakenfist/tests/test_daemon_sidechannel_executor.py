@@ -17,6 +17,22 @@ class _FakeAgentOp:
         self.uuid = 'fake-agentop'
         self.state = _FakeState(state_value)
         self.error = None
+        self.commands = []
+
+
+class _FakeInstance:
+    def __init__(self):
+        self.uuid = 'fake-instance'
+
+
+class _FakeStatResultReply:
+    """Stands in for an AgentToHypervisor command with a stat_result field."""
+
+    class _StatResult:
+        size = 0
+        mode = 0
+
+    stat_result = _StatResult()
 
 
 class ExecutorOrphanTestCase(base.ShakenFistTestCase):
@@ -55,3 +71,75 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         # A completed op is not reassigned to error.
         self.assertEqual(AgentOperation.STATE_COMPLETE, job.agentop.state.value)
         self.assertIsNone(job.agentop.error)
+
+
+class ExecutorGetFileGuardTestCase(base.ShakenFistTestCase):
+    """The get-file transfer guards in _handle_stat_result() and
+    _handle_file_chunk() must raise GetException when no transfer is in
+    flight, not AttributeError -- which requires SideChannelExecutorJob.
+    __init__() to have initialised the four get-file attributes to None."""
+
+    def _make_executor(self):
+        # Deliberately runs the real __init__ rather than building the object
+        # with __new__ and assigning the attributes here. A hand-built object
+        # would pass this test even if __init__ stopped setting them, which is
+        # exactly the regression the test exists to catch. Only the abort path
+        # is stubbed, because it writes to /run/sf.
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            job = sidechannel.SideChannelExecutorJob(
+                _FakeInstance(), _FakeAgentOp(AgentOperation.STATE_QUEUED))
+        job.log = mock.MagicMock()
+        return job
+
+    def test_init_initialises_get_file_transfer_state(self):
+        job = self._make_executor()
+        self.assertIsNone(job._agent_path_for_get)
+        self.assertIsNone(job._blob_uuid)
+        self.assertIsNone(job._blob_partial_file)
+        self.assertIsNone(job._stat_result)
+
+    def test_handle_stat_result_raises_get_exception_not_attribute_error(self):
+        job = self._make_executor()
+        self.assertRaises(
+            sidechannel.GetException, job._handle_stat_result,
+            _FakeStatResultReply())
+
+
+class AgentCommandHandlerTestCase(base.ShakenFistTestCase):
+    """The command handler registry must cover exactly the commands the API
+    builds, unambiguously, and every handler must actually dispatch."""
+
+    # The complete set of agent commands constructed in
+    # shakenfist/external_api/instance.py.
+    API_COMMANDS = {'execute', 'put-blob', 'chmod', 'get-file'}
+
+    def test_handlers_cover_the_api_commands(self):
+        names = [cls.name for cls in sidechannel.AGENT_COMMAND_HANDLERS]
+        self.assertEqual(self.API_COMMANDS, set(names))
+
+    def test_handler_names_are_unique(self):
+        names = [cls.name for cls in sidechannel.AGENT_COMMAND_HANDLERS]
+        self.assertEqual(len(names), len(set(names)))
+
+    def test_every_handler_overrides_dispatch(self):
+        for cls in sidechannel.AGENT_COMMAND_HANDLERS:
+            self.assertNotEqual(
+                sidechannel.AgentCommandHandler.dispatch, cls.dispatch,
+                f'{cls.__name__} does not override dispatch')
+
+    def test_declared_capabilities(self):
+        # Declared in phase 1 and consumed in phases 4 and 5. Nothing reads
+        # these yet, so this test is the only thing holding them honest.
+        expected = {
+            # name: (reports_progress, retryable, register_as_outstanding)
+            'execute': (False, False, False),
+            'put-blob': (True, True, True),
+            'chmod': (False, True, False),
+            'get-file': (True, True, False)
+        }
+        actual = {
+            cls.name: (cls.reports_progress, cls.retryable,
+                       cls.register_as_outstanding)
+            for cls in sidechannel.AGENT_COMMAND_HANDLERS
+        }
+        self.assertEqual(expected, actual)
