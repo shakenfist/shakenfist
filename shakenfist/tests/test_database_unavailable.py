@@ -21,6 +21,7 @@ from shakenfist import mariadb
 from shakenfist.daemons import daemon
 from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist.daemons.queues import main as queues_main
+from shakenfist.daemons.queues import workitem as queues_workitem
 from shakenfist.protos import database_pb2
 from shakenfist.tests import base
 
@@ -767,3 +768,122 @@ class CorruptMappingRuleOverGrpcTestCase(base.ShakenFistTestCase):
         attrs = mariadb._grpc_get_mapping_rule_attributes(self.rule_uuid)
         self.assertEqual('an-issuer', attrs.issuer)
         self.assertEqual(['namespace'], attrs.scopes)
+
+
+class ClusterOperationFetchFailureTestCase(base.ShakenFistTestCase):
+    """Issue 3716: a failed cluster operation fetch must raise, not read
+    as an authoritative "no such operation". The queue workers discard a
+    work item whose operation lookup returns None, so conflating a
+    database failure with not-found silently loses queued operations (a
+    "Too many connections" storm dropped 596 of them, two of which were
+    network_destroys whose vxlans leaked permanently)."""
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.INTERNAL))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_error_raises_database_unavailable(
+            self, mock_use, mock_stub, mock_call):
+        # INTERNAL is what the database daemon's servicer returns when
+        # the direct path raises; it is not retryable and so reaches the
+        # wrapper as a raw RpcError rather than as a DatabaseUnavailable
+        # from _grpc_call's retry exhaustion.
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_cluster_operation, str(uuid.uuid4()))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_direct_operational_error_raises_database_unavailable(
+            self, mock_use, mock_engine):
+        # The direct path feeds the database daemon's servicer:
+        # swallowing an OperationalError there made the daemon reply
+        # found=False, so a MariaDB outage read as "operation does not
+        # exist" cluster-wide.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('Too many connections'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_cluster_operation, str(uuid.uuid4()))
+
+
+class QueuesWorkItemDatabaseUnavailableTestCase(base.ShakenFistTestCase):
+    """Issue 3716: a database outage during the queue worker's operation
+    lookup must leave the work item claimed for the stuck-row reaper to
+    re-queue, not resolve (and so permanently discard) it."""
+
+    OP_UUID = 'f34e9c4c-3b17-41ca-9bc1-2f5c23111412'
+
+    def _make_job(self):
+        with mock.patch('shakenfist.daemons.queues.workitem.daemon'):
+            return queues_workitem.Job(
+                'banana-user-facing', f'job-{self.OP_UUID}',
+                {
+                    'operation_type': 'node_net_op',
+                    'operation_uuid': self.OP_UUID
+                })
+
+    def test_lookup_outage_abandons_work_item(self):
+        job = self._make_job()
+        with mock.patch(
+            'shakenfist.daemons.queues.workitem.mariadb'
+        ) as mock_mariadb, mock.patch(
+            'shakenfist.daemons.queues.workitem.util_concurrency'
+        ), mock.patch(
+            'shakenfist.daemons.queues.workitem.get_object_class'
+        ) as mock_goc:
+            mock_goc.return_value.from_db.side_effect = \
+                exceptions.DatabaseUnavailable('down')
+
+            # Must not raise (the worker thread lives on), and must not
+            # resolve the work item (the stuck-row reaper re-queues it).
+            job.execute()
+            mock_mariadb.resolve_work_item.assert_not_called()
+
+    def test_missing_operation_still_resolves(self):
+        # A lookup which authoritatively finds nothing is still a
+        # discard: the operation was hard-deleted, not lost.
+        job = self._make_job()
+        with mock.patch(
+            'shakenfist.daemons.queues.workitem.mariadb'
+        ) as mock_mariadb, mock.patch(
+            'shakenfist.daemons.queues.workitem.util_concurrency'
+        ), mock.patch(
+            'shakenfist.daemons.queues.workitem.get_object_class'
+        ) as mock_goc:
+            mock_goc.return_value.from_db.return_value = None
+
+            job.execute()
+            mock_mariadb.resolve_work_item.assert_called_once_with(
+                'banana-user-facing', f'job-{self.OP_UUID}')
+
+    def test_successful_execution_resolves(self):
+        job = self._make_job()
+        with mock.patch(
+            'shakenfist.daemons.queues.workitem.mariadb'
+        ) as mock_mariadb, mock.patch(
+            'shakenfist.daemons.queues.workitem.util_concurrency'
+        ), mock.patch.object(
+            job, '_cluster_operation_execute'
+        ):
+            job.execute()
+            mock_mariadb.resolve_work_item.assert_called_once_with(
+                'banana-user-facing', f'job-{self.OP_UUID}')
+
+    def test_resolve_outage_does_not_kill_the_worker(self):
+        job = self._make_job()
+        with mock.patch(
+            'shakenfist.daemons.queues.workitem.mariadb'
+        ) as mock_mariadb, mock.patch(
+            'shakenfist.daemons.queues.workitem.util_concurrency'
+        ), mock.patch.object(
+            job, '_cluster_operation_execute'
+        ):
+            mock_mariadb.resolve_work_item.side_effect = \
+                exceptions.DatabaseUnavailable('down')
+
+            # The row stays claimed and the stuck-row reaper re-queues
+            # it, exactly as for a worker crash.
+            job.execute()

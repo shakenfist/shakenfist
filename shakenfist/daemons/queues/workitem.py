@@ -7,6 +7,7 @@ from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import mariadb
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.util import concurrency as util_concurrency
@@ -43,10 +44,32 @@ class Job(util_concurrency.Job):
         util_concurrency.set_thread_name(self.jobname)
         LOG.debug(f'This worker thread is executing job {self.jobname}')
 
+        resolve = True
         try:
             self._cluster_operation_execute()
+        except DatabaseUnavailable:
+            # The database went away during the operation lookup or the
+            # operation itself. Leave the work item claimed rather than
+            # resolving it: the stuck-row reaper re-queues it once the
+            # database returns, exactly as for a worker crash, so the op
+            # is retried rather than silently dropped (issue 3716 -- a
+            # "Too many connections" storm made this path discard 596
+            # queued cluster operations, permanently leaking hypervisor
+            # state).
+            self.log.warning(
+                'Database service unavailable, abandoning work item for '
+                'the stuck-row reaper')
+            resolve = False
         finally:
-            mariadb.resolve_work_item(self.queue_name, self.jobname)
+            if resolve:
+                try:
+                    mariadb.resolve_work_item(self.queue_name, self.jobname)
+                except DatabaseUnavailable:
+                    # Same recovery path as above: the row stays claimed
+                    # and the stuck-row reaper re-queues it.
+                    self.log.warning(
+                        'Database service unavailable resolving work item, '
+                        'leaving it for the stuck-row reaper')
             LOG.debug(
                 f'This worker thread is finished executing job {self.jobname}')
 

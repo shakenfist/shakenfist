@@ -20502,9 +20502,17 @@ def _direct_get_cluster_operation(
                 return None
             return _cluster_operation_row_to_dict(result)
     except OperationalError as e:
+        # A database failure must not read as "no such operation": the
+        # queue workers discard a work item whose operation lookup
+        # returns None, so swallowing an OperationalError here turned a
+        # "Too many connections" storm into 596 silently dropped
+        # cluster operations (issue 3716). Raising also means the
+        # database daemon's GetClusterOperation servicer returns
+        # INTERNAL to its clients instead of found=False.
         LOG.warning(
             f'MariaDB get failed for cluster_operation {uuid}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'cluster operation {uuid} could not be read: {e}') from e
 
 
 def _direct_get_cluster_operations_by_node(
@@ -20970,9 +20978,14 @@ def _grpc_get_cluster_operation(
             if reply.data.metadata_json else {}
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        # None from this function means "no such operation" and the
+        # queue workers discard the work item on that basis, so a
+        # transport or server failure must raise instead of conflating
+        # the two (issue 3716).
+        LOG.error(
             f'gRPC GetClusterOperation failed for {uuid}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'cluster operation {uuid} could not be read: {e}') from e
 
 
 def _grpc_get_cluster_operations_by_node(
