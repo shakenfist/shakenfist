@@ -106,27 +106,54 @@ wants the gate complete from the first merge.
 | Step | Effort | Model | Isolation | Brief |
 |------|--------|-------|-----------|-------|
 | 5a | low | (agent, on operator approval) | none | **Done 2026-08-12.** Ruleset "Develop branch" created (id `20783686`, enforcement `active`) via `POST /repos/shakenfist/instar/rulesets`, read back and diffed against intent — all five rules, queue parameters and bypass actor match. Required checks are `Can enqueue` **only**, per the safer of the two options below; `Can merge` is added in 5c once a merge group has made that context exist. |
-| 5b | low | (operator) | none | Confirm `GITLAB_TESTDATA_TOKEN` and any registry credentials are available to `merge_group` runs (the master-plan risk item). A queue run that can't fetch testdata fails opaquely. |
-| 5c | low | (operator) | none | Verification merge: take a trivial no-op PR through the queue end-to-end. Confirm the matrix runs in the `merge_group` context and the seven distros report, and that a `pull_request` push does NOT run the matrix (PR latency unchanged). **Then add `Can merge` to the ruleset's required checks** (recipe in `docs/development.md`) — until that is done the matrix runs in the queue but does not gate it, so this step is not finished when the first queue run goes green. |
-| 5d | low | sonnet | none | Docs close-out: mark the master plan Complete in `docs/plans/index.md` (+ `order.yml` if adding rows), add the CHANGELOG entry for merge-queue matrix CI, and record the enabled-settings snapshot (queue config, required checks) in `docs/development.md` so the configuration is reproducible if the repo is re-created. **Partly done 2026-08-11**: the settings snapshot and the queue/required-check rationale are in `docs/development.md` ("Merge queue and the `develop` ruleset"), and the CHANGELOG entry landed with phase 4. Remaining: mark the master plan Complete once 5a-5c are done. |
-| 5e | low | (operator) | none | After 5a lands, confirm the next nightly `export-repo-config` run proposes the new "Develop branch" ruleset — that is the export doing its job, and it makes the queue configuration reproducible without relying on the table in `docs/development.md`. (An earlier draft made this a defect report against the export; that was based on a stale checkout and is withdrawn.) |
+| 5b | low | (operator) | none | **Done 2026-08-14.** Confirmed by execution rather than inspection: both queue runs fetched testdata and ran the full stestr suite in all seven containers, so `GITLAB_TESTDATA_TOKEN` reaches `merge_group` events. The failures in the first run were the glibc regression, not credential failures — Rocky 9 reported `nothing provides libc.so.6(GLIBC_2.39)(64bit)` at package-install time. No registry credentials are needed; the distro base images are public. |
+| 5c | low | (operator) | none | **Done 2026-08-15.** The verification merge was #493 (a pre-commit pin bump, chosen as the trivial PR). It exercised the queue end-to-end: the matrix ran in `merge_group`, all seven distros reported, and the `pull_request` path left the matrix skipped so PR latency is unchanged. It also *found a live regression on `develop`* — Renovate's #488 had reverted phase 1's `debian:bullseye` pin to `trixie`, raising the shipped binary's glibc floor to 2.39 and breaking Rocky 9, Ubuntu 22.04 and Debian 12. Fixed in #496, whose own queue run then went 7/7 green. `Can merge` was added to the required checks on 2026-08-15, after the context existed. See the two-step note in `docs/development.md` for why the order matters and what the gap let through. |
+| 5d | low | sonnet | none | Docs close-out: mark the master plan Complete in `docs/plans/index.md` (+ `order.yml` if adding rows), add the CHANGELOG entry for merge-queue matrix CI, and record the enabled-settings snapshot (queue config, required checks) in `docs/development.md` so the configuration is reproducible if the repo is re-created. **Done 2026-08-15**: the settings snapshot and the queue/required-check rationale landed 2026-08-11 in `docs/development.md` ("Merge queue and the `develop` ruleset"), and the CHANGELOG entry landed with phase 4. This step updated the snapshot for the second required check, replaced the `Can merge` recipe (the old one PUT the `GET` response back, which is not valid input), recorded what the one-required-check window let through, and marked the master plan and `docs/plans/index.md` Complete. `order.yml` needs no change — it registers master plans only. |
+| 5e | low | (operator) | none | **Done 2026-08-14.** The nightly export proposed the ruleset in #495, which added `.github/exported-config/ruleset-develop-branch.json` and the `rulesets-summary.json` row; merged 04:37Z. The next export after 5c will propose the `Can merge` addition, which is the same mechanism confirming itself. Original brief: after 5a lands, confirm the next nightly `export-repo-config` run proposes the new "Develop branch" ruleset — that is the export doing its job, and it makes the queue configuration reproducible without relying on the table in `docs/development.md`. (An earlier draft made this a defect report against the export; that was based on a stale checkout and is withdrawn.) |
 
 ## Acceptance
 
-- Merge queue enabled on `develop` (and `main` if applicable), with the
-  matrix as a required check.
-- A real PR observed merging through the queue, gated by the matrix.
-- `pull_request` events do not run the matrix.
-- Master plan marked Complete; index/order/CHANGELOG updated.
+All met as of 2026-08-15.
+
+- ~~Merge queue enabled on `develop` (and `main` if applicable), with the
+  matrix as a required check.~~ Enabled on `develop`; `main` is not
+  applicable, it only receives release merges. `Can merge` — the
+  aggregate over the matrix, not the individual entries — is required.
+- ~~A real PR observed merging through the queue, gated by the matrix.~~
+  Two: #493 and #496. The gating is only true of merges from 2026-08-15;
+  see 5c and the `docs/development.md` note for what the earlier window
+  let through.
+- ~~`pull_request` events do not run the matrix.~~ Confirmed on both
+  PRs — the matrix and `Can merge` show `skipped` on the PR path.
+- ~~Master plan marked Complete; index/order/CHANGELOG updated.~~ Done
+  in 5d. `order.yml` registers master plans only and needed no change.
+
+## Outcome
+
+The queue paid for itself on its first run. #493 was chosen as a
+deliberately trivial verification merge, and the matrix it triggered
+found a regression that had been sitting on `develop` for a day:
+Renovate's #488 bumped the release image's base from `debian:bullseye`
+to `trixie`, which raised the shipped binary's glibc floor from 2.30 to
+2.39 and silently dropped Rocky 9, Ubuntu 22.04 and Debian 12 —
+precisely the compatibility phase 1 existed to buy. Nothing in the
+pull-request CI could have caught it: every job there runs on a single
+modern distro where a 2.39 floor is invisible. That is the argument for
+this whole programme, arriving unprompted on day one.
 
 ## Notes / risks
 
-- Merge-queue flakiness cascade (master plan): before enabling, be
+- ~~Merge-queue flakiness cascade (master plan): before enabling, be
   confident the matrix is stable — a flaky entry blocks ALL merges.
   Consider running the matrix in a non-gating "report-only" mode for a
-  week (via `workflow_dispatch` / a temporary non-required check)
-  before making it required, to measure flake rate on real load.
-- The export-repo-config workflow (`export-repo-config.yml`) may need to
-  learn the new branch-protection/queue settings so the exported repo
-  config stays authoritative — check whether it captures merge-queue
-  configuration and extend it if not.
+  week.~~ This is what happened, though not by design: the two-step
+  required-check order (5a, then 5c) left the matrix reporting but not
+  gating across two queue runs. Fourteen entries ran, and the seven
+  failures were all one real regression rather than flake. That is a
+  thin sample — the flakiness cascade remains a live risk, and the
+  master plan's mitigation (temporary `continue-on-error` on an entry
+  that fails twice consecutively, rather than holding the queue) is now
+  the operative one.
+- ~~The export-repo-config workflow may need to learn the new
+  branch-protection/queue settings.~~ It already did; no change was
+  needed. See 5e.
