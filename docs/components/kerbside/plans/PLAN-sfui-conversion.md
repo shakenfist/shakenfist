@@ -241,7 +241,7 @@ locally-running kerbside.
 | 4. New base + login page | PLAN-sfui-conversion-phase-04-base-login.md | Done |
 | 5. Consoles page | PLAN-sfui-conversion-phase-05-consoles.md | Done |
 | 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Done |
-| 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Not started |
+| 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Done |
 | 8. Terminate actions to POST (#133) | PLAN-sfui-conversion-phase-08-terminate-post.md | Not started |
 | 9. Teardown, docs and issue closure | PLAN-sfui-conversion-phase-09-teardown.md | Not started |
 
@@ -339,9 +339,14 @@ Phase notes, dependencies and recommended planning effort:
    morph the content container only (`data-theme` lives on
    `<html>`, which the morph never touches); update the
    "Content refreshed at" stamp from the poll. Ensure open
-   `<details>` disclosures survive a poll (morphdom
-   preserves the `open` attribute on matched nodes — verify
-   with the id discipline from phase 6).
+   `<details>` disclosures survive a poll.
+   **Corrected in phase 7 planning:** morphdom does *not*
+   preserve the `open` attribute natively — its attribute
+   sync would clobber operator state in both directions — so
+   the poll supplies an `onBeforeElUpdated` hook that copies
+   the live open state onto the incoming element (and skips
+   an armed terminate button entirely); the phase 6 stable
+   ids are what make morphdom match the right elements.
 8. **Terminate actions to POST** (plan at high effort).
    Routes, templates, CSRF double-submit wiring, CI lane
    scripts, tempest plugin, docs; closes #133.

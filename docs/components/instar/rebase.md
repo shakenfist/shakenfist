@@ -149,127 +149,126 @@ and the overlay becomes standalone.
 ## Known divergences from `qemu-img rebase`
 
 - **Long-path relocation is rejected.** Long new-backing paths
-  that don't fit the overlay's existing header slot are
-  refused with `ERROR_BACKING_PATH_TOO_LONG` (the planner's
-  in-place rewrite path is bounded by the existing slot size).
-  qemu-img silently relocates the path string to a fresh
-  cluster and updates the header offset. Lifting the gap is a
-  master-plan TODO; for now the picker in the differential
-  fuzzer matches the backing-name length to the overlay's
-  existing slot.
+ that don't fit the overlay's existing header slot are
+ refused with `ERROR_BACKING_PATH_TOO_LONG` (the planner's
+ in-place rewrite path is bounded by the existing slot size).
+ qemu-img silently relocates the path string to a fresh
+ cluster and updates the header offset. Lifting the gap is a
+ master-plan TODO; for now the picker in the differential
+ fuzzer matches the backing-name length to the overlay's
+ existing slot.
 - **Safe-mode rebase for vmdk is not yet supported.** instar
-  rejects with `ERROR_UNSUPPORTED_FORMAT`. qemu-img also
-  rejects vmdk rebase entirely (there is no upstream vmdk
-  rebase at all). The vmdk smoke tests use unsafe mode.
+ rejects with `ERROR_UNSUPPORTED_FORMAT`. qemu-img also
+ rejects vmdk rebase entirely (there is no upstream vmdk
+ rebase at all). The vmdk smoke tests use unsafe mode.
 - **Safe-mode rebase copy-on-writes snapshot-bearing
-  overlays.** Since phase 7 of
-  PLAN-qcow2-write-infrastructure (issue #421 resolved),
-  safe mode (including safe-mode detach) no longer refuses
-  an overlay with internal snapshots — it succeeds by
-  copying. Where the safe-mode allocator would previously
-  have mutated a snapshot-shared active L2 in place and
-  under-counted refcounts (`refcount=1 reference=2`,
-  enabling data loss via a later `snapshot -d`, issue
-  #421), it now COWs the shared L2 (copy `T → T'`, repoint
-  the L1, `rc(T')=1`, `rc(T)`−1; the shared write path is
-  documented in
-  [qcow2/qcow2-write-planner.md](/components/instar/qcow2/qcow2-write-planner/)).
-  The load-bearing
-  subtlety is the **snapshot-view semantic**: matching
-  qemu's contract, safe-mode rebase covers the active view
-  only, so after the rebase a snapshot's unallocated ranges
-  **read through the new backing** rather than staying at
-  their pre-rebase content — instar reproduces this
-  read-through-new-backing semantic exactly. The
-  correctness bar is qemu-parity (`qemu-img check` clean +
-  active-view `qemu-img compare` + a snapshot read-back
-  oracle whose expected value is the snapshot resolved
-  against the new backing), not image-byte identity. `-u`
-  is unchanged (it only rewrites the header
-  backing-pointer region, which is never snapshot-shared)
-  and stays parity-tested against qemu-img. **Known
-  limitation:** COW growth is coarsely sized at
-  `2 × overlay_cluster_count` (rebase writes into unowned
-  clusters); the over-provisioned refblocks are
-  check-clean, and a tighter bound is recorded follow-up
-  work.
+ overlays.** Since the PLAN-q workcow2-write-infrastructure (issue #421 resolved),
+ safe mode (including safe-mode detach) no longer refuses
+ an overlay with internal snapshots — it succeeds by
+ copying. Where the safe-mode allocator would previously
+ have mutated a snapshot-shared active L2 in place and
+ under-counted refcounts (`refcount=1 reference=2`,
+ enabling data loss via a later `snapshot -d`, issue
+ #421), it now COWs the shared L2 (copy `T → T'`, repoint
+ the L1, `rc(T')=1`, `rc(T)`−1; the shared write path is
+ documented in
+ [qcow2/qcow2-write-planner.md](/components/instar/qcow2/qcow2-write-planner/)).
+ The load-bearing
+ subtlety is the **snapshot-view semantic**: matching
+ qemu's contract, safe-mode rebase covers the active view
+ only, so after the rebase a snapshot's unallocated ranges
+ **read through the new backing** rather than staying at
+ their pre-rebase content — instar reproduces this
+ read-through-new-backing semantic exactly. The
+ correctness bar is qemu-parity (`qemu-img check` clean +
+ active-view `qemu-img compare` + a snapshot read-back
+ oracle whose expected value is the snapshot resolved
+ against the new backing), not image-byte identity. `-u`
+ is unchanged (it only rewrites the header
+ backing-pointer region, which is never snapshot-shared)
+ and stays parity-tested against qemu-img. **Known
+ limitation:** COW growth is coarsely sized at
+ `2 × overlay_cluster_count` (rebase writes into unowned
+ clusters); the over-provisioned refblocks are
+ check-clean, and a tighter bound is recorded follow-up
+ work.
 - **Overlays with extended L2 entries or unknown/compression
-  feature bits are refused.** Since the phase-5 migration of
-  safe mode onto `crates/qcow2-write`, safe-mode rebase
-  (including safe detach) refuses with error 15: ``the
-  overlay uses features instar rebase does not support
-  (extended L2 entries, or unknown/compression feature
-  bits). Use -u for a metadata-only rebase or fall back to
-  `qemu-img rebase` ``. The extended-L2 refusal replaces a
-  silent-corruption defect (the walk misread 16-byte
-  extended-L2 entries as 8-byte); the zstd/unknown-bit
-  refusal is spec-mandated and narrows shapes that
-  previously rebased correctly (the bit is inert without
-  compressed clusters). `-u` stays allowed. qemu-img builds
-  with the matching feature support proceed.
+ feature bits are refused.** Since the phase-5 migration of
+ safe mode onto `crates/qcow2-write`, safe-mode rebase
+ (including safe detach) refuses with error 15: ``the
+ overlay uses features instar rebase does not support
+ (extended L2 entries, or unknown/compression feature
+ bits). Use -u for a metadata-only rebase or fall back to
+ `qemu-img rebase` ``. The extended-L2 refusal replaces a
+ silent-corruption defect (the walk misread 16-byte
+ extended-L2 entries as 8-byte); the zstd/unknown-bit
+ refusal is spec-mandated and narrows shapes that
+ previously rebased correctly (the bit is inert without
+ compressed clusters). `-u` stays allowed. qemu-img builds
+ with the matching feature support proceed.
 - **Overlays with inconsistent metadata are refused.**
-  Safe-mode rebase refuses with error 16: ``the overlay's
-  metadata is inconsistent (refcounts, table flags or
-  layout); refusing to write into it. Run `qemu-img check`
-  on the overlay, or fall back to `qemu-img rebase` ``.
-  This covers a sparse (holed) refcount table — a
-  stock-producible, check-clean shape that rebase silently
-  misallocated before phase 5 (the rebase sibling of
-  commit's issue #428) — plus reserved bits and
-  classification inconsistencies. The sparse-table refusal
-  fires before any mutation and is byte-idempotent;
-  qemu-img rebases the same shape check-clean.
+ Safe-mode rebase refuses with error 16: ``the overlay's
+ metadata is inconsistent (refcounts, table flags or
+ layout); refusing to write into it. Run `qemu-img check`
+ on the overlay, or fall back to `qemu-img rebase` ``.
+ This covers a sparse (holed) refcount table — a
+ stock-producible, check-clean shape that rebase silently
+ misallocated previously (the rebase sibling of
+ commit's issue #428) — plus reserved bits and
+ classification inconsistencies. The sparse-table refusal
+ fires before any mutation and is byte-idempotent;
+ qemu-img rebases the same shape check-clean.
 - **Deep-allocation safe rebases refuse on refcount
-  exhaustion.** v1 never appends refblocks, so a safe
-  rebase that needs more cluster allocations than the
-  overlay's existing refcount blocks can hold refuses with
-  `ERROR_REFCOUNT_EXHAUSTED` where qemu-img completes.
-  (Before the phase-2 fix for issue #422 these shapes
-  could hang instead of refusing — a staged-L2 lookup went
-  stale after arena growth and the guest spun in its panic
-  handler; fixed, with staging reordered so the growable
-  L2 arena can no longer clobber refblock staging. The
-  phase-5 migration then retired the growable arena and its
-  staging-count caps outright: existing L2 tables are
-  windowed with `min(256, 2 MiB / cluster_size)` slots and
-  safe eviction, and refblocks stage at
-  `min(2048, 3 MiB / cluster_size)`, so overlays that
-  previously refused `ERROR_SCRATCH_TOO_SMALL` at staging
-  time on populated-L2 count alone now rebase.)
-  Retiring the exhaustion ceiling is the master plan's
-  refcount-growth generalization.
+ exhaustion.** v1 never appends refblocks, so a safe
+ rebase that needs more cluster allocations than the
+ overlay's existing refcount blocks can hold refuses with
+ `ERROR_REFCOUNT_EXHAUSTED` where qemu-img completes.
+ (Before the phase-2 fix for issue #422 these shapes
+ could hang instead of refusing — a staged-L2 lookup went
+ stale after arena growth and the guest spun in its panic
+ handler; fixed, with staging reordered so the growable
+ L2 arena can no longer clobber refblock staging. The
+ phase-5 migration then retired the growable arena and its
+ staging-count caps outright: existing L2 tables are
+ windowed with `min(256, 2 MiB / cluster_size)` slots and
+ safe eviction, and refblocks stage at
+ `min(2048, 3 MiB / cluster_size)`, so overlays that
+ previously refused `ERROR_SCRATCH_TOO_SMALL` at staging
+ time on populated-L2 count alone now rebase.)
+ Retiring the exhaustion ceiling is the master plan's
+ refcount-growth generalization.
 - **Beyond-EOV tail bytes of copied clusters are zeros.**
-  When the old backing chain is larger than the overlay's
-  virtual size, a copied tail cluster's bytes beyond
-  end-of-virtual-size are zero-filled where `qemu-img
-  rebase` carries the old chain's bytes into the raw file.
-  Virtual content is identical — bytes past EOV are not
-  virtual content — and this is the only raw-level
-  divergence sanctioned by the phase-5 migration proof.
+ When the old backing chain is larger than the overlay's
+ virtual size, a copied tail cluster's bytes beyond
+ end-of-virtual-size are zero-filled where `qemu-img
+ rebase` carries the old chain's bytes into the raw file.
+ Virtual content is identical — bytes past EOV are not
+ virtual content — and this is the only raw-level
+ divergence sanctioned by the phase-5 migration proof.
 - **Cross-cluster-size rebase is rejected.** If the new
-  backing's qcow2 cluster size differs from the overlay's,
-  safe-mode rebase refuses with
-  `ERROR_NEW_BACKING_INCOMPATIBLE`. qemu-img silently
-  succeeds but the resulting overlay has inconsistent
-  metadata; the master plan tracks this as a future
-  hardening item.
+ backing's qcow2 cluster size differs from the overlay's,
+ safe-mode rebase refuses with
+ `ERROR_NEW_BACKING_INCOMPATIBLE`. qemu-img silently
+ succeeds but the resulting overlay has inconsistent
+ metadata; the master plan tracks this as a future
+ hardening item.
 - **External-data-file qcow2 overlays are refused.** Rebase
-  refuses any overlay with the `INCOMPAT_EXTERNAL_DATA`
-  feature bit set; that's the qcow2 v3 external data file
-  feature, which is incompatible with backing chains.
-  qemu-img refuses for the same reason.
+ refuses any overlay with the `INCOMPAT_EXTERNAL_DATA`
+ feature bit set; that's the qcow2 v3 external data file
+ feature, which is incompatible with backing chains.
+ qemu-img refuses for the same reason.
 - **LUKS-encrypted overlays / backings are refused.**
-  Lifting the gap depends on the matching LUKS plumbing
-  on the convert side (master-plan Future work).
+ Lifting the gap depends on the matching LUKS plumbing
+ on the convert side (master-plan Future work).
 - **`--object OBJDEF` and `--image-opts` are not
-  implemented.** Rejected at the host CLI surface; the
-  qemu-img features they unlock require complex
-  plumbing not in scope for v1.
+ implemented.** Rejected at the host CLI surface; the
+ qemu-img features they unlock require complex
+ plumbing not in scope for v1.
 - **Cross-version baseline matrix scope.** The recorded
-  baselines cover qcow2 only — qemu-img rebase rejects
-  vmdk / vhd / vhdx with "Operation not supported" on
-  every shipped version, so there is no cross-tool diff
-  to record for those targets.
+ baselines cover qcow2 only — qemu-img rebase rejects
+ vmdk / vhd / vhdx with "Operation not supported" on
+ every shipped version, so there is no cross-tool diff
+ to record for those targets.
 
 ## Future work
 

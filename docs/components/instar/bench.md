@@ -189,9 +189,9 @@ guest refuses the write test:
 | Dirty / corrupt | The image's dirty or corrupt incompatible bits are set. |
 
 **Internal snapshots are now supported (copy-on-write).** Before
-phase 7 of PLAN-qcow2-write-infrastructure, `bench -w` refused any
+the PLAN-q workcow2-write-infrastructure, `bench -w` refused any
 image with `nb_snapshots > 0` because its overwrite path had no
-per-write ownership check. Since phase 7 (step 7d) the qcow2 `-w`
+per-write ownership check. Now (step 7d) the qcow2 `-w`
 path runs the crate's copy-on-write branch: a snapshot-shared data
 cluster is copied before it is written (copy `D → D'`, repoint the
 L2, `rc(D')=1`, `rc(D)`−1) and a snapshot-shared L2 table is COWed,
@@ -223,8 +223,7 @@ of 64 KiB and up.
 The qcow2 `-w` path runs on the shared `crates/qcow2-write`
 planner and `crates/qcow2-write-exec` executor — the same
 allocate-on-write infrastructure commit and rebase use, with
-bench as its third consumer (PLAN-qcow2-write-infrastructure
-phase 6). The planner classifies each scheduled write from a
+bench as its third consumer (the PLAN-qcow2-write-infrastructure work). The planner classifies each scheduled write from a
 staged metadata window and emits the mutation steps; the
 executor runs them through the call table. Refcount growth (see
 above) stays a bench-specific setup step, but now calls the
@@ -359,7 +358,7 @@ field:
 | 4 | `external data file` | The qcow2 image stores data in an external file. |
 | 5 | `encryption` | The qcow2 image is LUKS-encrypted. |
 | 6 | `dirty or corrupt` | The qcow2 dirty or corrupt incompatible bits are set. |
-| 7 | `internal snapshots` | Retained for defensive mapping only. Since phase 7's copy-on-write adoption (step 7d) `bench -w` COWs snapshot-shared clusters instead of refusing, so neither the `nb_snapshots > 0` host check nor a mid-run snapshot-shared cluster raises this gate. |
+| 7 | `internal snapshots` | Retained for defensive mapping only. Since copy-on-write was adopted, `bench -w` COWs snapshot-shared clusters instead of refusing, so neither the `nb_snapshots > 0` host check nor a mid-run snapshot-shared cluster raises this gate. |
 | anything else | `unsupported feature` | Reserved for future gate ids. |
 
 ## `--output json`
@@ -400,53 +399,53 @@ by its registry key, so a cross-validation mismatch that is *not*
 registered there is treated as a real regression.
 
 - **`depth-serialized`.** `-d` is echoed in the header for output
-  parity, but bench executes serially in v1; `--output json` always
-  reports `"effective-depth": 1` regardless of the requested depth.
+ parity, but bench executes serially in v1; `--output json` always
+ reports `"effective-depth": 1` regardless of the requested depth.
 - **`wrap-rule-10-0-8`.** instar adopts qemu master's fixed wrap rule
-  (`offset %= image_size - bufsize`) so a wrapped request never
-  overruns EOF; qemu-img 10.0.8 still ships the older `% image_size`
-  rule and can hit `Failed request: Input/output error` near EOF on
-  a request that wraps past the last full buffer. Observed on both
-  the read path (a 10240-byte image, phase 1) and the write path
-  (a cluster-straddling schedule wrapping past a 10 MiB raw image,
-  phase 5).
+ (`offset %= image_size - bufsize`) so a wrapped request never
+ overruns EOF; qemu-img 10.0.8 still ships the older `% image_size`
+ rule and can hit `Failed request: Input/output error` near EOF on
+ a request that wraps past the last full buffer. Observed on both
+ the read path (a 10240-byte image,) and the write path
+ (a cluster-straddling schedule wrapping past a 10 MiB raw image,
+).
 - **`cache-modes-refused`.** `-t` with any cache mode other than the
-  default `writeback` is refused (`bench: cache mode '<v>' is not
-  yet supported`); `qemu-img` runs every valid cache mode (e.g.
-  `-t none`) successfully.
+ default `writeback` is refused (`bench: cache mode '<v>' is not
+ yet supported`); `qemu-img` runs every valid cache mode (e.g.
+ `-t none`) successfully.
 - **`aio-refused`.** `-i <anything>` is refused (`bench: aio backend
-  '<v>' is not yet supported`); `qemu-img` runs with any recognised
-  aio backend.
+ '<v>' is not yet supported`); `qemu-img` runs with any recognised
+ aio backend.
 - **`native-aio-refused`.** `-n` is refused (`bench: native AIO (-n)
-  is not yet supported`); `qemu-img` also fails for `-n` alone, but
-  for an unrelated host requirement (`aio=native ... requires
-  cache.direct=on`) — both fail, for different reasons, not a
-  "qemu succeeds" divergence.
+ is not yet supported`); `qemu-img` also fails for `-n` alone, but
+ for an unrelated host requirement (`aio=native... requires
+ cache.direct=on`) — both fail, for different reasons, not a
+ "qemu succeeds" divergence.
 - **`image-opts-refused`.** `--image-opts` alone is refused
-  (`bench: --image-opts is not yet supported`); `qemu-img` runs it.
-  (`--image-opts` combined with `-f`/`--format` is qemu parity: both
-  refuse with the same mutual-exclusion text.)
+ (`bench: --image-opts is not yet supported`); `qemu-img` runs it.
+ (`--image-opts` combined with `-f`/`--format` is qemu parity: both
+ refuse with the same mutual-exclusion text.)
 - **`bufsize-cap-2mib`.** `-s` values inside qemu's
-  `[1, 2147483647]` range but above 2 MiB are refused (`bench:
-  buffer sizes above 2 MiB are not yet supported`); `qemu-img` runs
-  them (confirmed live with `-s 3M`).
+ `[1, 2147483647]` range but above 2 MiB are refused (`bench:
+ buffer sizes above 2 MiB are not yet supported`); `qemu-img` runs
+ them (confirmed live with `-s 3M`).
 - **`help-hint-names-instar`.** The filename-count error's second
-  line names instar, not qemu-img: `Try 'instar bench --help' for
-  more info` vs qemu's `Try 'qemu-img bench --help' for more info`.
+ line names instar, not qemu-img: `Try 'instar bench --help' for
+ more info` vs qemu's `Try 'qemu-img bench --help' for more info`.
 - **`zero-byte-early-failure`.** instar fails during backing-chain
-  discovery for a zero-byte image, before any header ever prints
-  (`error discovering backing chain for <file>: ...`); qemu-img
-  prints the header unconditionally then fails the first request
-  (`Failed request: Input/output error`). Both exit 1, but the
-  failure point and text are unrelated.
+ discovery for a zero-byte image, before any header ever prints
+ (`error discovering backing chain for <file>:...`); qemu-img
+ prints the header unconditionally then fails the first request
+ (`Failed request: Input/output error`). Both exit 1, but the
+ failure point and text are unrelated.
 - **`write-formats-limited`.** `-w` is refused on vmdk/vhd/vhdx
-  (`bench: write tests are not yet supported for <fmt>`); `qemu-img`
-  writes all of them. instar v1 only supports write tests on raw
-  and qcow2.
+ (`bench: write tests are not yet supported for <fmt>`); `qemu-img`
+ writes all of them. instar v1 only supports write tests on raw
+ and qcow2.
 - **`secure-raw-detection`.** A headerless raw image (no MBR or
-  other recognisable signature) is refused as an unsupported format
-  — instar's security posture requires a recognisable signature
-  before a file is treated as raw; `qemu-img` benches it happily.
+ other recognisable signature) is refused as an unsupported format
+ — instar's security posture requires a recognisable signature
+ before a file is treated as raw; `qemu-img` benches it happily.
 
 ## Examples
 
@@ -521,7 +520,7 @@ Error: "Invalid request count specified. Must be between 1 and 2147483647."
 ```
 
 A write test against a qcow2 image with an internal snapshot now
-**succeeds** (copy-on-write, since phase 7):
+**succeeds** (copy-on-write, now):
 
 ```
 $ instar bench -w -c 10 -f qcow2 disk.qcow2

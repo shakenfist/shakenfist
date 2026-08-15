@@ -221,8 +221,7 @@ rationale and the future-work pointer.
   [docs/quirks.md § Window filter is byte-level, not cluster-aligned](/components/instar/quirks/#window-filter-is-byte-level-not-cluster-aligned).
 
 The canonical list of integration-test cases skipped due to these
-divergences is `KNOWN_MAP_DIVERGENCES` in `tests/test_map.py`. The
-phase 8 differential fuzzer's `MAP_FIELD_SKIPS` in
+divergences is `KNOWN_MAP_DIVERGENCES` in `tests/test_map.py`. The differential fuzzer's `MAP_FIELD_SKIPS` in
 `scripts/differential-fuzz.py` skips the `present` field on vpc
 sources for the same VHD-unallocated reason.
 

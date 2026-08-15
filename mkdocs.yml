@@ -126,11 +126,13 @@ nav:
             - "Development": components/instar/development.md
             - "Format Auto-Detection Safety in Instar": components/instar/format-detection-safety.md
             - "Format Detection and Safety Check Coverage": components/instar/format-coverage.md
+            - "Guest and VMM architecture": components/instar/guest-architecture.md
             - "Image Handling and qemu-img Security Vulnerabilities": components/instar/security.md
             - "Info": components/instar/info.md
             - "Installation": components/instar/installation.md
             - "instar bench — benchmark the sandboxed I/O path": components/instar/bench.md
             - "Integration Test Suite": components/instar/testing.md
+            - "Per-format implementation notes": components/instar/format-internals.md
             - "qemu-img Output Formats": components/instar/output-formats.md
             - "qemu-img Quirks": components/instar/quirks.md
             - "qemu-img Usage Analysis": components/instar/usage.md
@@ -258,6 +260,7 @@ nav:
                 - "sfui conversion phase 4: the new base and the login page": components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login.md
                 - "sfui conversion phase 5: the consoles page": components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles.md
                 - "sfui conversion phase 6: sessions, sources and audit": components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages.md
+                - "sfui conversion phase 7: morphdom polling": components/kerbside/plans/PLAN-sfui-conversion-phase-07-polling.md
                 - "Shaken Fist VDI console tokens (kerbside side)": components/kerbside/plans/PLAN-kerbside-vdi-tokens.md
                 - "Two-tier CI phase 1: the oVirt lane deploys and drives kerbside": components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md
                 - "Two-tier CI phase 2: promote sf-e2e to a PR smoke gate": components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md
@@ -416,7 +419,6 @@ nav:
        - "Installation": operator_guide/installation.md
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
-       - "Credential Rotation": operator_guide/credential_rotation.md
        - "Database": operator_guide/database.md
        - "Events": operator_guide/events.md
        - "Exception Tracking": operator_guide/exception_tracking.md

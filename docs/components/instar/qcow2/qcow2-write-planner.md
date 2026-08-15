@@ -437,7 +437,7 @@ This document distils the current state; the phase-by-phase history and
 the empirical pins behind these decisions live in the plan files:
 [PLAN-qcow2-write-infrastructure.md](/components/instar/plans/PLAN-qcow2-write-infrastructure/)
 (the master plan, its per-phase Findings and the defect register) and its
-per-phase companions (phases 3–8 — the crate, the commit/rebase/bench
+per-phase companions (the crate, the commit/rebase/bench
 migrations, copy-on-write, refcount growth and fuzzing), plus
 [PLAN-bench-refcount-growth.md](/components/instar/plans/PLAN-bench-refcount-growth/)
 for the growth algorithm. Source:

@@ -276,6 +276,12 @@ Three details are easy to get wrong:
 
 Then actually look at both PNGs.
 
+A previewed polling page carries the same poll script a live page does,
+so it will fetch its own static URL every 30 seconds; against the
+statically served preview that returns identical content, which the
+poll's own unchanged-content short-circuit skips, so it is harmless by
+construction and needs no special handling.
+
 This only covers what renders. The interactive paths -- submitting
 a form, a wrong password, the theme toggle, logout -- still need a
 browser against a running kerbside, or a hand-check of the relevant

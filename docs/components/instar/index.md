@@ -81,12 +81,14 @@ that do not exist in qemu-img.
 |----------|-------------|
 | [Integration Testing](/components/instar/testing/) | Test suite comparing instar output against qemu-img |
 | [Differential Fuzzing](/components/instar/testing/#differential-fuzzing) | Randomised instar vs qemu-img comparison |
+| [Per-format Implementation Notes](/components/instar/format-internals/) | What each format parser supports, and the deliberate limits |
 | [Format Coverage](/components/instar/format-coverage/) | Comparison with oslo.utils format_inspector, plus the qemu-img parity axis: a consolidated op × format matrix tracking coverage against qemu-img's real format-driver roster |
 
 ## Understanding the Codebase
 
 | Document | Description |
 |----------|-------------|
+| [Guest and VMM Architecture](/components/instar/guest-architecture/) | The host-side VMM, the bare-metal guest, the call table and the guest memory map |
 | [Commentary Index](/components/instar/commentary/index/) | Lions-style annotated walkthrough of the codebase |
 | [Reading Order](/components/instar/commentary/reading-order/) | Which files to read, in what sequence, and what to look for |
 | [Architectural Decisions](/components/instar/commentary/architectural-decisions/) | The *why* behind every major design choice |

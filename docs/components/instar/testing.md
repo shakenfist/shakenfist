@@ -208,8 +208,7 @@ Wall clock: ~32 s serial / ~10 s with `make test-container`'s
 
 ### Snapshot Tests (`test_snapshot.py`)
 
-Tests for the `instar snapshot` subcommand (phase 11 of
-PLAN-snapshot), 94 tests across five families:
+Tests for the `instar snapshot` subcommand (the PLAN-s worknapshot), 94 tests across five families:
 
 - **List matrix (human)**: per baselined image, `TZ=UTC instar
   snapshot -l` byte-equals the host-resolved profile baseline
@@ -247,7 +246,7 @@ without crashing, hanging, or consuming excessive resources. Uses the
 detection), memory limits via `RLIMIT_AS` (resource exhaustion), and signal
 checks (crash detection).
 
-**Phase 1 — CVE-adjacent attacks:**
+**CVE-adjacent attacks:**
 - **Compression bombs**: Zlib and ZSTD compressed QCOW2 images with extreme
   expansion ratios. Verifies decompression buffer bounds are enforced and
   output files stay small.
@@ -260,7 +259,7 @@ checks (crash detection).
   below minimum (8) and above maximum (22). Verifies checked arithmetic
   prevents undefined behavior.
 
-**Phase 2 — boundary value cases:**
+**Boundary value cases:**
 - **Refcount order edges**: refcount_order = 7 (128-bit, invalid) and 255
   (extreme value). Verifies clamping or rejection.
 - **Oversized virtual size**: 1 petabyte and u64::MAX virtual sizes. Verifies
@@ -272,7 +271,7 @@ checks (crash detection).
 - **BAT beyond EOF**: VHD and VHDX images with BAT entries pointing past end
   of file. Verifies I/O error handling.
 
-**Phase 3 — format confusion:**
+**Format confusion:**
 - **Polyglot files**: QCOW2 magic header with VMDK descriptor body, and
   QCOW2 magic with ELF binary content. Verifies format detection works
   (magic wins) and structural validation catches inconsistencies.
@@ -738,7 +737,7 @@ every distro's real qemu-img (via
 `tools/test-package-functional.sh`) then found divergences the baseline
 comparison never could — see below.
 
-**Known divergences (found 2026-08-09, fixed in phase 2b 2026-08-10).**
+**Known divergences (found 2026-08-09, fixed 2026-08-10).**
 instar used to hard-code its newest-qemu behaviour for three things, so
 it diverged on every distro shipping an older qemu. All three are now
 version-gated:
@@ -753,7 +752,7 @@ version-gated:
 The third was not an output-format divergence at all but silent data
 loss in the VHD writer, found because the qcow1→vpc test compares a
 flattened round-trip. See `docs/quirks.md` ("VHD Virtual Size
-Calculation") and phase 2b's plan.
+Calculation") and the plan.
 
 One divergence remains documented rather than fixed: instar applies the
 qemu 10.0+ VHD size rule to VHDs with an *unrecognised* creator app,
@@ -825,8 +824,8 @@ full-suite test count far below the expected ~3250.
 ## Differential Fuzzing
 
 The project includes a differential fuzzer (`scripts/differential-fuzz.py`)
-that compares instar against qemu-img on randomly generated images. This is
-Phase 3 of the security audit plan (`PLAN-audit.md`).
+that compares instar against qemu-img on randomly generated images. It is
+part of the security audit plan (`PLAN-audit.md`).
 
 ### How it works
 
@@ -843,7 +842,7 @@ For each iteration the fuzzer:
 5. Compares outputs at each stage: exit codes, normalized JSON info
    output, and converted file content (SHA-256 of raw-flattened output).
 
-The `op_snapshot` arm (phase 13 of PLAN-snapshot) generates a
+The `op_snapshot` arm (the PLAN-s worknapshot) generates a
 fresh qcow2, then applies an identical random chain of
 `snapshot -c` / `-d` / `-a` and `qemu-io` write elements to the
 instar and qemu-img copies, asserting **byte-identity of the
@@ -853,7 +852,7 @@ normalized per docs/quirks.md). Its first runs surfaced a real
 multibyte list-padding bug and delete's missing surviving-L2
 COPIED refresh, both since fixed.
 
-The `op_repair` arm (phase 10 of PLAN-check-repair) builds a fresh
+The `op_repair` arm (the PLAN-c workheck-repair) builds a fresh
 qcow2 with known data, injects one random qcow2 corruption
 (refcount-zero / too-high / leaked / stale-copied / overlapping),
 forks the corrupt file to two byte-identical copies, and repairs
@@ -872,9 +871,9 @@ is intentionally narrower than `qemu-img -r leaks` (see
 [quirks.md](/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks)).
 
 The `op_commit`, `op_rebase` and `op_bench` arms draw a snapshot flag
-(40% probability, phase 8 of PLAN-qcow2-write-infrastructure) and, when
+(40% probability, the PLAN-q workcow2-write-infrastructure) and, when
 `qemu-io` is present, build a **snapshot-bearing** fixture that
-exercises the copy-on-write paths phase 7 opened — commit over a
+exercises the copy-on-write paths opened — commit over a
 backing- or overlay-snapshot span, safe rebase of a snapshot-bearing
 overlay, and `bench -w` over a snapshot-shared span. For those fixtures
 the oracle gains the phase-7 read-back triple: active-view `qemu-img
@@ -883,7 +882,7 @@ reference=2` scan) + per-carrier snapshot read-back `instar == qemu
 twin` (via `tests/helpers/snapshot_readback.py`), the last of which the
 active-view compare alone cannot see. Non-snapshot fixtures keep their
 existing oracle. This folds in and retires the standalone
-`scripts/cow-soak.py` soak (phase 7e); a 300-iteration local soak ran
+`scripts/cow-soak.py` soak; a 300-iteration local soak ran
 0 divergences.
 
 Known quirks (see [quirks.md](/components/instar/quirks/)) are excluded from comparison:
@@ -946,13 +945,13 @@ python3 scripts/differential-fuzz.py \
     --fail-fast
 ```
 
-## Phase 6: Coverage-Guided Fuzzing
+## Coverage-guided fuzzing
 
 Coverage-guided fuzzing uses `cargo-fuzz` (libFuzzer) to exercise the
 `no_std` parser crates directly, without the full VMM/KVM stack. A
 mock `CallTable` backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
-fuzzing (Phase 3) cannot reach.
+differential fuzzing cannot reach.
 
 ### Fuzz targets
 
@@ -1010,7 +1009,7 @@ sector-based I/O from the fuzzer input. **Sim harness** targets
 harness — here `crates/qcow2-write`'s `sim` module, feature-gated
 `#[cfg(any(test, feature = "sim"))]` and OFF in the production build.
 
-The two snapshot targets (phase 12 of PLAN-snapshot) cover the
+The two snapshot targets (the PLAN-s worknapshot) cover the
 streaming snapshot-table parser (`fuzz_snapshot_parse` drives
 `for_each_snapshot_entry` and the planner converter against
 adversarial qcow2 fragments) and the mutator primitives
@@ -1021,7 +1020,7 @@ table-serialisation round-trip — asserting semantic invariants
 such as precheck-never-mutates, inc/dec byte-identity, and
 allocator containment).
 
-`fuzz_check_repair` (phase 9 of PLAN-check-repair) dispatches one
+`fuzz_check_repair` (the PLAN-c workheck-repair) dispatches one
 of four `crates/check` repair planners per exec — leak
 reclamation, count accumulation, refcount correction, and COPIED
 reconciliation — asserting sub-byte-masked containment (co-resident
@@ -1031,8 +1030,7 @@ and bounds→`MisalignedAccess` error classifications, idempotence,
 and the "correct generalises reclaim" cross-check. The COPIED
 walker's deep invariants are delegated to `fuzz_snapshot_refcount`.
 
-The two `crates/qcow2-write` targets (phase 8 of
-PLAN-qcow2-write-infrastructure) fuzz the write planner rather than a
+The two `crates/qcow2-write` targets (the PLAN-q workcow2-write-infrastructure) fuzz the write planner rather than a
 parser. `fuzz_qcow2_write` decodes a fixture archetype (clean /
 backing-present / shared-data / shared-L2 nested / owned-L2 /
 zero-flag-target) at a cluster size {512, 4 KiB, 64 KiB, 2 MiB} and
@@ -1286,3 +1284,295 @@ no cross-crate changes, no new dependencies).
 - [Format Coverage](/components/instar/format-coverage/) - Comparison with oslo.utils format_inspector
 - [Format Detection Safety](/components/instar/format-detection-safety/) - Security model for format auto-detection
 - [Security Analysis](/components/instar/security/) - CVE analysis and threat model
+
+## Test Image Generation
+
+Synthetic test images that cannot be created by `qemu-img` are built
+by scripts in `scripts/`:
+
+- `create-vhd-testdata.sh` — Fixed VHD (disk_type=2) and differencing
+  VHD (disk_type=4) via Python struct packing and qemu-img patching
+- `create-vmdk-testdata.sh` — Binary VMDK4 with multi-extent descriptor
+- `create-luks-testdata.sh` — LUKS v1 containers with inner formats
+- `create-native-luks-testdata.py` — LUKS v1/v2 with known encrypted
+  content (v1 raw, v2 Argon2id, v1 wrapping QCOW2)
+- `create-qcow2-luks-testdata.sh` — QCOW2 with LUKS encryption (crypt_method=2)
+- `create-check-testdata.sh` — QCOW2 images with specific corruptions
+Adversarial and CVE-reproducer image generation scripts live in
+`instar-testdata/scripts/` (the private testdata repository), not in
+the public `instar/scripts/` directory. This includes scripts for
+compression bombs, circular/deep chains, integer overflow headers,
+boundary values, format confusion, and CVE reproducers.
+
+Generated images live in `../instar-testdata/custom/format-coverage/`
+and `../instar-testdata/custom/audit/` (adversarial images).
+The test manifest (`tests/manifest.json`) references them with
+`generated_by` and `skip_qemu_img: true`.
+
+## Cross-version qemu-img baselines
+
+`instar-testdata` ships a per-qemu-version baseline matrix
+generated by `make baselines-info` / `make baselines-check` /
+`make baselines-measure` (and aggregated via `make baselines`),
+plus a `create-info-json` matrix produced by
+`python scripts/generate-baselines.py --command create`, and a
+`dd-info-json` matrix (produced by `--command dd`) recording the
+`qemu-img info` JSON of the dd output for each `(format, window)`
+case across all 80 qemu-img versions
+(`instar-testdata/expected-outputs/dd-info-json/`).
+Each command writes recorded stdout / stderr / exit-code triples
+to `expected-outputs/<output-type>/[bucket/]<version>/<image-id>.{stdout,
+stderr,meta.json}`, then `make profiles` deduplicates them into
+profile buckets via `scripts/detect-profiles.py`. instar's
+integration tests select the matching baseline for the locally
+installed qemu-img version. Currently 80 versions are covered
+(6.0.0 through 10.2.0). The measure baselines additionally use
+a `_size/` pseudo-bucket for `--size`-mode invocations that have
+no source image, and a `__<target>` suffix on source-image
+filenames to record both `-O raw` and `-O qcow2` measurements
+of the same image. The create baselines bucket by target format
+(`create-info-json/<target>/<version>/<case-name>.{stdout,…}`)
+and run a two-step pipeline (`qemu-img create` then `qemu-img
+info --output=json`) — the recorded artefact is the info JSON
+on the produced fixture, not create's own log line. Case names
+like `1M-default` recur under every target, so `detect-profiles.py`
+names create-info-json's derived profile files `<target>-<case>`;
+flattening them under bare names silently discarded four of the
+five targets until 2026-08-11. Output types whose case names
+already encode the target (dd, map, measure, snapshot-list) are
+left unprefixed, so the prefix is decided per output type rather
+than per file and a consumer can always build the name it wants
+from `(target, case)`. Per-
+invocation random fields (vmdk `cid` / `parent-cid`, vhdx
+header-id) prevent dedup from collapsing duplicate-output
+versions, so each version gets its own profile; the comparison logic excludes those random fields from the
+field-equivalence check.
+
+## Integration Testing
+
+Integration tests compare `instar info` output against `qemu-img info` to verify
+drop-in replacement compatibility, validate `instar check` against deliberately
+corrupt test images, cross-validate `instar compare` output against
+`qemu-img compare`, cross-validate `instar convert` output against
+`qemu-img convert`, and cross-validate `instar measure` output against
+`qemu-img measure` for raw and qcow2 targets. Tests use Python testtools/stestr.
+
+instar emulates the host's `qemu-img` version; the harness selects the
+matching output baseline profile by full `major.minor.patch`
+(`base.py::_select_version_match`). `tools/probe-qemu-versions.sh`
+records the `qemu-img` version each matrix distro ships. See
+[docs/testing.md](https://github.com/shakenfist/instar/blob/develop/docs/testing.md)
+("qemu-img version profiles and the distro matrix") for the model and
+the per-distro table.
+
+`tools/test-package-functional.sh <package> <distro-image>` runs the
+full suite against the **installed** `.deb`/`.rpm` inside a target-distro
+container, using that distro's own `qemu-img` as the oracle (tests from
+the tree, binary from the package via `INSTAR_BINARY_PATH`). It is the
+per-entry runner for the distro-matrix CI and the first check to surface
+version-specific output-format parity gaps that host-only CI cannot. It
+is distinct from `tools/test-package-install.sh` (fast packaging smoke)
+and is driven across seven distros by the `package-matrix` job, which
+runs **only** in the merge queue and on `workflow_dispatch` — never on a
+pull request. `tools/ci/run-matrix-entry.sh` is the CI wrapper; use it
+(with `MATRIX_SELECT`) to reproduce an entry exactly as CI runs it.
+`can_merge` is the queue's required check, not the individual entries.
+`--select REGEX` replays a single failure on one distro, which matters
+because two containers sharing a KVM host produce timeout failures that
+mimic real divergences — always re-run uncontended before attributing
+one. The runner also refuses to report a **truncated** run as a pass
+(see docs/testing.md); do not weaken that guard.
+
+Two facts about distro qemu that the version model does not capture:
+RHEL-family `qemu-kvm` omits the `qed`, `qcow`, `parallels`, `dmg`,
+`bochs` and `cloop` drivers, so tests needing qemu-img as the oracle for
+those formats must call `skip_unless_qemu_supports()`; and image buffers
+must be compared with `assert_bytes_identical()` rather than
+`assertEqual`, because a multi-megabyte mismatch exceeds subunit's
+packet limit and silently truncates the run. An oracle that is simply
+absent (`qemu-storage-daemon` on some EL streams) is a `skipTest`, never
+an error.
+
+**Never guess a qemu version boundary — measure it.** instar-testdata
+carries 80 static per-version `qemu-img` builds under
+`qemu-img-binaries/x86_64/<version>/`, 6.0.0 through 10.2.0, that run
+directly on the host. Every boundary in `version::OutputProfile` was
+established by running the real binary; the version maps and profile
+baselines have been wrong before, and so has reasoning from qemu source.
+`info`, `map` and `snapshot` all accept `--qemu-version`, so both sides
+of a boundary are testable on the dev host without a distro container.
+
+**A green suite does not mean the baselines are right.** The derived
+`expected-outputs/*/profiles/` directories have been silently wrong
+twice while the `raw/` captures they come from were correct — once for
+`snapshot-list-human`, once for `create-info-json`, where every profile
+carried 10.2.0's output and four of five target formats had been
+overwritten out of existence. Neither showed up as a failure: a test
+that skips on the host's qemu version, or asserts only that a profile
+*exists*, passes just as loudly as one that compares bytes. When a
+baseline is suspect, diff `profiles/` against `raw/` and check the
+recorded `*_stdout_bytes` in each `.meta.json`, which is what
+`detect-profiles.py`'s `validate_profiles()` now does before it will
+commit anything.
+
+```bash
+# Set up test environment
+make test-venv
+
+# Run safe integration tests
+make test
+
+# Run tests with verbose output (shows diffs on failure)
+make test-report
+
+# Run all tests including malicious images (use with caution)
+make test-malicious
+
+# Run tests inside container (as CI does)
+make test-container
+
+# CI splits tests into three parallel jobs by format family:
+make test-container-core              # info, check, security, oslo-crossval
+make test-container-convert-qcow2    # QCOW2/VMDK/RAW convert + compare
+make test-container-convert-vhd      # VHD/VHDX convert (slowest)
+
+# Clean test artifacts
+make clean-tests
+```
+
+**Test structure:**
+- `tests/manifest.json` - Defines test images and their safety levels
+- `tests/test_info_safe.py` - Tests against known-safe images
+- `tests/test_info_malicious.py` - Tests against malicious images using expected overrides
+- `tests/test_check_formats.py` - Tests for check operation
+  (format detection, corruption, validation, incompatible
+  feature bits, ZSTD compression, extended L2 entries, ZSTD
+  + backing chains, extended L2 + compressed clusters,
+  refcount widths 1-64 bit, compressed cluster leak
+  detection, large cluster sizes 256K-2MB, VMDK GD/GT
+  validation with overlap/compressed grain marker/RGD checks,
+  VHD fragmentation/version/feature/fixed size validation,
+  VHDX file identifier/region table cross-check/fragmentation,
+  QCOW2 snapshot detection, TestExtendedL2Subclusters for
+  partial subcluster allocation with Normal/Zero/Unallocated
+  states)
+- `tests/test_check_repair.py` - Tests for `check --repair`
+  (leaks/all tiers repair the corrupt-fixture matrix to
+  `qemu-img check`-clean with guest data preserved; the
+  snapshot/compression/corrupt-bit refuse paths stay
+  byte-identical; the overlapping case is a safe partial repair;
+  plus `--repair`+`--chain` rejection, clean-image no-op,
+  qcow2-only handling, and idempotence)
+- `tests/test_compare.py` - Tests for compare operation
+  (raw-vs-raw, QCOW2-vs-raw, QCOW2-vs-QCOW2, compressed
+  QCOW2, backing chains, LUKS-in-QCOW2 decryption)
+- `tests/test_convert.py` - Tests for convert operation
+  (QCOW2-to-raw, raw-to-QCOW2, QCOW2 re-encoding,
+  compressed output with `-c` flag, backing chains,
+  round-trip validation, errors, large cluster sizes up to
+  2MB, manifest-driven cross-validation against qemu-img
+  including compressed output, encrypted QCOW2 decryption,
+  LUKS-in-QCOW2 decryption, native LUKS v1/v2 decryption,
+  LUKS v2 with Argon2id KDF and --max-guest-memory,
+  LUKS-wrapping-QCOW2 conversion, snapshot extraction,
+  extended L2 output with `--extended-l2`,
+  LUKS-encrypted output with `--luks-encrypt-passphrase`)
+- `tests/test_adversarial.py` - Adversarial image tests: compression bombs, circular
+  backing chains, deep chains, integer overflow triggers, refcount order edges,
+  oversized virtual sizes, VMDK grain size boundaries, VHDX conflicting dual
+  headers, VHD/VHDX BAT beyond EOF, polyglot files (QCOW2+VMDK, QCOW2+ELF),
+  truncated headers (QCOW2, VMDK, VHD), VMDK descriptor attacks (null bytes,
+  multi-extent, huge size). Uses `run_adversarial()` helper with timeout/memory/
+  signal enforcement.
+- `tests/test_security.py` - Security feature detection tests (backing files,
+  external data files, VMDK descriptors, raw format validation, backing chain
+  security) and CVE reproduction tests (CVE-2024-32498 external data file,
+  CVE-2015-5163 backing file traversal, CVE-2022-47951 VMDK descriptor,
+  CVE-2015-5162 resource exhaustion, CVE-2014-0223 L1 integer overflow,
+  CVE-2024-4467 json:{} format confusion). 19 CVE tests verify all 6 CVEs
+  are mitigated.
+- `tests/test_oslo_crossval.py` - Cross-validation against oslo.utils
+  format_inspector (format detection, safety checks, virtual size).
+  Skips if oslo.utils is not installed.
+- `tests/test_snapshot.py` - Integration tests for the `instar snapshot`
+  subcommand: 12-image list matrix vs cross-version baselines,
+  12 JSON golden comparisons with structural cross-check, mutation
+  round-trips (create/delete/apply) with `qemu-img check` post-op
+  assertions, error paths and qcow2-only enforcement, empty-table
+  behaviour. JSON goldens in `tests/golden/snapshot-list/`.
+- `tests/test_bench.py` - Integration tests for the `instar bench`
+  subcommand (62 tests): read/write request scheduling, host-side
+  validation matrix, the qcow2 write-envelope gates, `--output json`
+  schema validation, human-output byte-parity with `qemu-img bench`,
+  and the `KNOWN_BENCH_DIVERGENCES` registry.
+- `tests/expected_outputs/` - Expected output files for malicious images
+
+**Adding new test images:**
+
+Use the `/instar-add-test-image` skill for guided assistance, or manually:
+
+1. Add the image to `instar-testdata/` repository
+2. Add an entry to `tests/manifest.json` with appropriate safety level
+3. Add a scenario to the appropriate test file (`test_info_safe.py` or `test_info_malicious.py`)
+4. For malicious images, create an expected output file in `tests/expected_outputs/`
+
+**Adversarial test images:** Generated by scripts in `instar-testdata/scripts/`
+(compression bombs, circular/deep chains, integer overflow headers, boundary
+values for refcount order, virtual size, grain size, dual headers, BAT entries,
+polyglot files, truncated headers, VMDK descriptor attacks, CVE reproducers).
+Images live in `../instar-testdata/custom/audit/`. Scripts that generate
+adversarial or CVE-reproducer images must always be placed in the private
+`instar-testdata` repository, never in the public `instar/scripts/` directory.
+
+**LUKS test images:** Synthetic LUKS headers (luks-v1, luks-v2) are
+generated by `scripts/create-luks-headers.py` for header parsing tests.
+Real LUKS containers (luks-v1-raw-gpt, luks-v1-qcow2) are created by
+`scripts/create-luks-testdata.sh` using cryptsetup, with known test
+passphrases stored in the manifest. The `luks-v1-aes-xts` test image is
+built by `scripts/create-native-luks-testdata.py` (no root required) with
+known encrypted content for conversion testing. The `luks-v2-aes-xts`
+test image is built by `scripts/create-native-luks-v2-testdata.py` with
+low-memory Argon2id parameters for LUKS v2 conversion testing. The
+`luks-v1-qcow2-inner` test image is created by
+`scripts/create-luks-qcow2-inner-testdata.sh` for testing LUKS containers
+wrapping QCOW2 images. LUKS-in-QCOW2 test images are created by
+`scripts/create-qcow2-luks-testdata.sh`. These use `skip_qemu_img: true`
+since qemu-img cannot inspect inside LUKS without a secret object.
+
+See `docs/testing.md` for detailed documentation.
+
+**Safety levels:**
+- `safe` - Run by default, known-good images
+- `caution` - Edge cases that may expose bugs
+- `malicious` - CVE exploit images, require explicit opt-in
+
+## Testing Prototypes
+
+Each prototype has its own devcontainer with the required toolchain. Use the
+Makefile for building and testing:
+
+```bash
+# Build a specific prototype
+make build-prototype PROTOTYPE=virtio-block5
+
+# Build the devcontainer for a prototype
+make build-prototype-devcontainer PROTOTYPE=virtio-block5
+
+# View run instructions
+make run-prototype PROTOTYPE=virtio-block5
+```
+
+For manual testing without the Makefile:
+
+```bash
+cd prototypes/<prototype-name>
+./build.sh                           # Build the prototype
+sudo ./target/release/vmm guest.bin  # Run (requires KVM)
+```
+
+## Testing Considerations
+
+- Test with malformed/malicious input images
+- Verify sandbox containment
+- Check for resource exhaustion (memory, disk, CPU)
+
