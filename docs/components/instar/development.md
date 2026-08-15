@@ -458,29 +458,58 @@ same name:
 | Enforcement | active |
 | Bypass | team `shakenfist/sf-can-skip-merge-queue`, mode `always` |
 | Rules | `deletion`, `non_fast_forward`, `merge_queue`, `pull_request`, `required_status_checks` |
-| Required checks | `Can enqueue` (GitHub Actions, integration 15368). `Can merge` is **not yet required** — see below |
+| Required checks | `Can enqueue` and `Can merge` (GitHub Actions, integration 15368) |
 | Queue grouping | `ALLGREEN`, `max_entries_to_build: 1`, `max_entries_to_merge: 5` |
 | Queue merge method | `MERGE`, min 1 entry, 5 minute wait |
 | Check timeout | 360 minutes |
 | Required approvals | 0 (`dismiss_stale_reviews_on_push: true`) |
 
-**`Can merge` is deliberately not required yet.** It only runs on
-`merge_group` events, so until a real merge group has executed, GitHub
-has never seen that check context — and requiring a context that has
-never reported blocks every merge, on a branch that had no protection
-to fall back to. The ruleset therefore shipped requiring `Can enqueue`
-alone. Once a PR has gone through the queue and `Can merge` has
-reported, add it:
+**`Can merge` was added second, and the gap between the two was not
+theoretical.** `Can merge` only runs on `merge_group` events, so until
+a real merge group had executed GitHub had never seen that check
+context — and requiring a context that has never reported blocks every
+merge, on a branch that had no protection to fall back to. The ruleset
+therefore shipped on 2026-08-12 requiring `Can enqueue` alone, and
+`Can merge` was added on 2026-08-15 once the queue had made the context
+exist.
+
+In between, two PRs merged through the queue **without the matrix
+gating them**, because a job that is *skipped* reports success while a
+job that never runs reports nothing at all. `Can enqueue` carries an
+`if` test that excludes `merge_group`, so inside a merge group it skips,
+reports success, and satisfies the only required check. Both merges
+followed the same clock: `Can enqueue` skipped, and GitHub merged the
+entry thirty one seconds later with the seven-distro matrix still
+running. #496's matrix then took until 14:10Z to finish, and was green.
+#493's was not — Rocky 9 went red seventeen minutes after that PR had
+already merged, Ubuntu 22.04 and Debian 12 followed, and the `Can
+merge` aggregate reported `failure` seventy five minutes post-merge.
+The regression it was reporting (the release image's glibc floor) sat
+on `develop` until #496 fixed it.
+
+If you are recreating this repository, add both contexts up front only
+if you can also arrange for a merge group to have run; otherwise
+reproduce the two-step order above. To add a required context to a live
+ruleset, transform the exported object rather than PUTting the `GET`
+response back unchanged — the response carries fields that are not part
+of the update schema (`id`, `_links`, and `"parameters": null` on the
+rules that take no parameters):
 
 ```bash
-# Read the current ruleset, append the context, PUT it back.
-gh api repos/shakenfist/instar/rulesets/20783686 > ruleset.json
-# add {"context": "Can merge", "integration_id": 15368} to the
-# required_status_checks rule, then:
+gh api repos/shakenfist/instar/rulesets/20783686 | jq '{
+  name, target, enforcement, conditions,
+  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],
+  rules: [.rules[]
+    | if .type == "required_status_checks"
+      then .parameters.required_status_checks
+             += [{context: "Can merge", integration_id: 15368}]
+      else . end
+    | if .parameters == null then {type: .type} else . end]}' > ruleset.json
 gh api -X PUT repos/shakenfist/instar/rulesets/20783686 --input ruleset.json
 ```
 
-Until that is done the matrix runs in the queue but does not *gate* it.
+Read it back and diff it against the intent afterwards; dropping
+`bypass_actors` from the payload silently removes the bypass.
 
 Two other settings deserve explanation:
 
