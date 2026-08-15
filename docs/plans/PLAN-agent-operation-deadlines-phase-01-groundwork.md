@@ -326,8 +326,13 @@ test 0 -eq "$(grep -cE 'def _dispatch_(execute|put_blob|chmod|get_file)' shakenf
 #    table and the test that asserts its shape.
 test 2 -eq "$(grep -rl 'reports_progress' shakenfist/ --include=*.py | wc -l)"
 
-# 5. The get-file state is initialised where it is declared.
-grep -A20 'class SideChannelExecutorJob' shakenfist/daemons/sidechannel/main.py | grep -q '_blob_partial_file = None'
+# 5. The get-file state is initialised in the executor's __init__.
+#    Range-match the constructor rather than a fixed -A window: a window
+#    silently constrains how long the explanatory comment above those
+#    lines may be, which is not a property anyone should have to know.
+#    The unit test below is the authoritative check; this is a cheap
+#    smoke test of the same fact.
+sed -n '/class SideChannelExecutorJob/,/def execute/p' shakenfist/daemons/sidechannel/main.py | grep -q '_blob_partial_file = None'
 ```
 
 And, by inspection:
@@ -340,7 +345,12 @@ And, by inspection:
   every handler overrides `dispatch` -- asserted by a test rather
   than by reading.
 - Calling `_handle_stat_result` on a freshly constructed executor
-  raises `GetException`, not `AttributeError`, asserted by a test.
+  raises `GetException`, not `AttributeError`, asserted by a test
+  that builds the executor through its real `__init__`. A test that
+  assigns the four attributes by hand and then asserts the guard
+  fires proves nothing: it passes just as happily with the fix
+  reverted. Both assertions here were confirmed to fail when the
+  `__init__` lines are deleted.
 - No fact about the registry is stated differently in the master
   plan's "Command dispatch restructure" section and in the code:
   specifically, neither claims the registry owns reply handlers.

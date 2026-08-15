@@ -17,6 +17,22 @@ class _FakeAgentOp:
         self.uuid = 'fake-agentop'
         self.state = _FakeState(state_value)
         self.error = None
+        self.commands = []
+
+
+class _FakeInstance:
+    def __init__(self):
+        self.uuid = 'fake-instance'
+
+
+class _FakeStatResultReply:
+    """Stands in for an AgentToHypervisor command with a stat_result field."""
+
+    class _StatResult:
+        size = 0
+        mode = 0
+
+    stat_result = _StatResult()
 
 
 class ExecutorOrphanTestCase(base.ShakenFistTestCase):
@@ -55,6 +71,38 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         # A completed op is not reassigned to error.
         self.assertEqual(AgentOperation.STATE_COMPLETE, job.agentop.state.value)
         self.assertIsNone(job.agentop.error)
+
+
+class ExecutorGetFileGuardTestCase(base.ShakenFistTestCase):
+    """The get-file transfer guards in _handle_stat_result() and
+    _handle_file_chunk() must raise GetException when no transfer is in
+    flight, not AttributeError -- which requires SideChannelExecutorJob.
+    __init__() to have initialised the four get-file attributes to None."""
+
+    def _make_executor(self):
+        # Deliberately runs the real __init__ rather than building the object
+        # with __new__ and assigning the attributes here. A hand-built object
+        # would pass this test even if __init__ stopped setting them, which is
+        # exactly the regression the test exists to catch. Only the abort path
+        # is stubbed, because it writes to /run/sf.
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            job = sidechannel.SideChannelExecutorJob(
+                _FakeInstance(), _FakeAgentOp(AgentOperation.STATE_QUEUED))
+        job.log = mock.MagicMock()
+        return job
+
+    def test_init_initialises_get_file_transfer_state(self):
+        job = self._make_executor()
+        self.assertIsNone(job._agent_path_for_get)
+        self.assertIsNone(job._blob_uuid)
+        self.assertIsNone(job._blob_partial_file)
+        self.assertIsNone(job._stat_result)
+
+    def test_handle_stat_result_raises_get_exception_not_attribute_error(self):
+        job = self._make_executor()
+        self.assertRaises(
+            sidechannel.GetException, job._handle_stat_result,
+            _FakeStatResultReply())
 
 
 class AgentCommandHandlerTestCase(base.ShakenFistTestCase):

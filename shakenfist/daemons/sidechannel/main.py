@@ -457,6 +457,15 @@ class SideChannelExecutorJob(SideChannelJob):
         self.command_cache = {}
         self.chunk_iterator = None
 
+        # In-flight get-file transfer state, set by GetFileCommand.dispatch().
+        # Initialising them here is what lets _handle_stat_result() and
+        # _handle_file_chunk() raise GetException('Unknown file transfer')
+        # when no transfer is in flight, instead of AttributeError.
+        self._agent_path_for_get = None
+        self._blob_uuid = None
+        self._blob_partial_file = None
+        self._stat_result = None
+
         self.command_handlers = {
             cls.name: cls(self) for cls in AGENT_COMMAND_HANDLERS}
 
