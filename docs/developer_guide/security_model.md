@@ -1,5 +1,9 @@
 # Security model
 
+The trust boundaries Shaken Fist enforces, and the authorisation model
+that backs them. The rules below are properties the code is expected to
+hold; the ones which exist because a real defect broke them are written
+up in [coding_rules.md](coding_rules.md).
 
 - Multi-tenant with namespace isolation
 - JWT-based authentication, minted from namespace keys and bound to the

@@ -7,8 +7,9 @@ controls defer timing.
 
 ## Queue families
 
-Network operations are split across two queue families (see `ARCHITECTURE.md`
-for the full topology):
+Network operations are split across two queue families (see
+[sf-net daemon topology](#sf-net-daemon-topology) below for which node
+drains which):
 
 - **Per-node** (`{node_uuid}-network-{priority}`) — hypervisor-local operations
   such as `create_on_hypervisor` and `ensure_mesh`. The net-worker on that node
@@ -338,7 +339,7 @@ the call graph explicit.
 ## maintain.py and the discovery-only model
 
 `shakenfist/daemons/network/maintain.py` is **discovery-only**: the maintain
-thread it detects drift and enqueues reconciliation ops,
+thread detects drift and enqueues reconciliation ops,
 but never waits for them to complete. All `raise_for_error()` calls have been
 removed from the maintain loop. The net-worker dispatcher handles async
 reconciliation; the maintain thread's only job is to notice drift and express
@@ -783,7 +784,7 @@ argument covers per-node serialisation only. `ClusterLock`s serialise across the
 whole cluster via a different mechanism and remain in use for operations that
 require cluster-wide exclusion; the reasoning above does not apply to them.
 
-### sf-net daemon topology
+## sf-net daemon topology
 
 `sf-net` runs a `net-worker` job on **every** cluster node (not only the
 elected network node). Each node's worker drains its own per-node
@@ -795,7 +796,7 @@ queues for network-node-only operations (`create_on_network_node`,
 mutations are parallelised across nodes while network-node-singleton operations
 remain serialised.
 
-### Network facade architecture
+## Network facade architecture
 
 **Worker-only mutation surface.** `BridgedVXLanNetwork`
 (`shakenfist/network/bridged_vxlan_network.py`) is the only place that
@@ -888,4 +889,3 @@ and raises `NetworkOperationFailed` if the op ended in `STATE_ERROR`,
 letting callers that want exception-flow control use a familiar `try/raise`
 pattern without the error type being load-bearing across process
 boundaries.
-

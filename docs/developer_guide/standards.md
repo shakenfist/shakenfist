@@ -15,9 +15,16 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
 ### Code Style
 
 - Single quotes for strings, double quotes for docstrings
+- Never triple single quotes; triple double quotes instead
 - 120 character line wrap
 - Trim trailing whitespace
-- See [CLAUDE.md](../../CLAUDE.md) for detailed style guide
+- All imports at the top of the file. A late import inside a function is
+  only for breaking a circular import, and carries a comment saying so
+- Import order is standard library, third party, then `shakenfist`
+- Every file starts with `# Copyright 2019 Michael Still and contributors`
+
+This page is the style guide; `CLAUDE.md` and `AGENTS.md` summarise it
+and link here.
 
 ### Attribute updates use field masks
 
@@ -210,4 +217,3 @@ contributors who have run `pre-commit install`. A check that must hold
 in CI needs a unit test as well — which is why the parameter-location
 derivation is shared between the hook and
 `test_parameter_declarations.py`.
-

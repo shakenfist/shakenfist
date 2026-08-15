@@ -200,5 +200,5 @@ The new spool files live under `/srv/shakenfist/spool/eventlog/`
 and are managed automatically by the spool module.
 
 See [Database Architecture](database.md) for the broader
-MariaDB schema, and [ARCHITECTURE.md](../../ARCHITECTURE.md)
-for the full daemon picture.
+MariaDB schema, and `ARCHITECTURE.md` in the source repository for
+the full daemon picture.

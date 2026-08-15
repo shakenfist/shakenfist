@@ -4,22 +4,29 @@ How Shaken Fist's CI is put together: the workflows, the merge queue,
 the automated jobs that open their own pull requests, and the bot
 commands available on a PR.
 
+## GitHub Actions workflows
 
-## GitHub Actions Workflows
-
-The repository uses several GitHub Actions workflows:
+Every workflow in `.github/workflows/`:
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| `functional-tests.yml` | Main CI: lint, unit tests, functional tests | PR, merge_group |
-| `documentation-tests.yml` | Build and test documentation | PR |
+| `functional-tests.yml` | Main CI: lint, unit tests, functional tests, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the `shakenfist.shakenfist` Ansible collection (`shakenfist/deploy/collection/`), driven by the reusable `smoke-cluster` workflow in the `shakenfist/actions` repository | PR, merge_group |
+| `docs-tests.yml` | Build and test documentation | PR touching `docs/**` or `mkdocs.yml` |
+| `code-formatting.yml` | Whole-tree formatting sweep | Daily schedule, manual, self-test PR |
+| `codeql-analysis.yml` | CodeQL static analysis | Push, PR, weekly schedule |
 | `pin-indirect-dependencies.yml` | Reconcile pinned indirect dependencies, adding new ones and removing obsolete ones (runs `tools/pin-indirect-dependencies.sh`) | Daily schedule, PR self-test |
-| `export-repo-config.yml` | Export GitHub repo settings to version control | Daily schedule |
+| `renovate.yml` | Self-hosted Renovate dependency updates | Hourly schedule, manual |
+| `export-repo-config.yml` | Export GitHub repo settings to version control, via a shared reusable workflow in the `actions/` repository | Daily schedule |
 | `pr-re-review.yml` | Re-review PR on bot command | `@shakenfist-bot please re-review` |
-| `pr-address-comments.yml` | Address review comments on bot command | `@shakenfist-bot please address comments` |
-| `pr-fix-tests.yml` | Fix test failures on bot command | `@shakenfist-bot please attempt to fix` |
-| `test-drift-fix.yml` | Unit test fixer (called by pr-fix-tests) | workflow_call, workflow_dispatch |
+| `pr-address-comments.yml` | Address review comments on bot command | The bot comment command for addressing review comments |
+| `pr-fix-tests.yml` | Fix test failures on bot command | The bot comment command for fixing tests |
+| `test-drift-fix.yml` | Unit test fixer (called by `pr-fix-tests.yml`) | workflow_call, workflow_dispatch |
 | `issue-fix.yml` | Triage open issues, propose a fix as a draft PR | workflow_dispatch |
+| `scheduled-tests.yml` | Longer-running test sweep (schedule currently disabled) | workflow_dispatch |
+| `publish-website.yml` | Publish the mkdocs site | Push to `develop`, manual |
+| `refresh-website.yml` | Trigger a GitHub Pages rebuild | Daily schedule, manual |
+| `sync-external-docs.yml` | Import the sibling repositories' documentation into `docs/components/` | Hourly schedule, manual |
+| `release.yml` | Build and publish a release | Tag push, manual |
 
 ## Merge Queue Pattern
 
@@ -46,19 +53,22 @@ have changed and should be reviewed.
 
 ## Automated CI Jobs
 
-## Automated Delinter
+`functional-tests.yml` carries three jobs which act on the pull request
+themselves rather than only reporting on it.
+
+### Automated Delinter
 
 When flake8 fails, the `automated_delinter` job runs Claude Code to fix lint
 errors automatically. It skips if the last commit was from the bot to prevent
 loops.
 
-## Automated Exception Fixer
+### Automated Exception Fixer
 
 When functional tests detect exceptions in logs, the `automated_exception_fixer`
 job downloads the test bundles and runs Claude Code to analyze and fix the
 issues.
 
-## Automated Reviewer
+### Automated Reviewer
 
 After successful tests, the `automated_reviewer` job calls the shared
 `shakenfist/actions/.github/workflows/pr-auto-review.yml@main` reusable
@@ -79,7 +89,7 @@ has already reviewed.
 The reviewer produces structured JSON reviews, creates GitHub issues for
 actionable items, and embeds the JSON in the PR comment for automation.
 
-## Developer Automation (Bot Commands)
+### Developer Automation (Bot Commands)
 
 Authorized users can trigger automation by commenting on PRs:
 
@@ -116,23 +126,6 @@ payload (`api_error_status`), which the claude CLI's own
 unavailable models. A refused request is free, so the wrapper attempts
 the real job rather than paying for a pre-flight probe.
 
-
-
-## GitHub Actions
-
-- **functional-tests.yml**: Main CI workflow with merge queue support.
-  Includes automated reviewer (via shared action), delinter, and
-  exception fixer jobs. Functional jobs deploy nested test clusters via
-  the `shakenfist.shakenfist` Ansible collection
-  (`shakenfist/deploy/collection/`), driven by the reusable
-  `smoke-cluster` workflow in the `shakenfist/actions` repository.
-- **export-repo-config.yml**: Exports GitHub settings for version
-  control (uses shared reusable workflow from `actions/` repo).
-- **pr-re-review.yml**: Bot-triggered PR re-review.
-- **pr-address-comments.yml**: Bot-triggered comment addressing.
-- **pr-fix-tests.yml** / **test-drift-fix.yml**: Bot-triggered unit
-  test fixing.
-
 ## CI Caching
 
 Workflows that download packages use environment variables to route
@@ -164,4 +157,3 @@ The develop branch uses:
 - Required status checks: `Can see status`, `Can enqueue`
 - Merge queue with ALLGREEN grouping strategy
 - Configuration exported to `.github/exported-config/`
-

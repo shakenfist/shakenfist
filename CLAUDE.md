@@ -641,9 +641,19 @@ a PR to track the change. This provides an audit trail for configuration drift.
 
 - MkDocs site: `mkdocs serve` from project root
 - Key docs:
-  - `ARCHITECTURE.md` - System architecture overview
-  - `AGENTS.md` - Instructions for AI agents
+  - `ARCHITECTURE.md` - System architecture overview and index into `docs/`
+  - `AGENTS.md` - Instructions for AI agents, and the same index
   - `docs/manifesto.md` - Design philosophy
-  - `docs/developer_guide/` - Development guidance
+  - `docs/developer_guide/standards.md` - Code conventions, testing, the
+    authoritative style guide this file summarises
+  - `docs/developer_guide/coding_rules.md` - Rules that each came out of a
+    real defect
+  - `docs/developer_guide/database_internals.md` - Object cache, filter
+    pushdown, gRPC reliability, cluster operations, work queues
+  - `docs/developer_guide/subsystem_internals.md` - Scheduler capacity, node
+    and API health surfaces, daemon watchdog, REST contracts
+  - `docs/developer_guide/security_model.md` - Trust boundaries and
+    authorisation
+  - `docs/developer_guide/ci.md` - Workflows, merge queue, bot commands
   - `docs/components/` - Architecture docs
   - `docs/operator_guide/database.md` - Database architecture and MariaDB migration

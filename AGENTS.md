@@ -21,13 +21,16 @@ developer. The component map is [ARCHITECTURE.md](ARCHITECTURE.md).
 | How do I write an endpoint? | [docs/developer_guide/writing_an_endpoint.md](docs/developer_guide/writing_an_endpoint.md) |
 | How does the database layer behave? | [docs/developer_guide/database_internals.md](docs/developer_guide/database_internals.md) |
 | How are network operations dispatched? | [docs/developer_guide/network_dispatcher.md](docs/developer_guide/network_dispatcher.md) |
-| How do the scheduler, health surfaces and REST contracts work? | [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md) |
+| How do the scheduler, the health surfaces, the daemon watchdog and REST contracts work? | [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md) |
 | What is the security model? | [docs/developer_guide/security_model.md](docs/developer_guide/security_model.md) |
 | How does authentication work? | [docs/developer_guide/authentication.md](docs/developer_guide/authentication.md) |
 | How do object state machines work? | [docs/developer_guide/state_machine.md](docs/developer_guide/state_machine.md) |
 | How do I update the documentation? | [docs/developer_guide/updating_docs.md](docs/developer_guide/updating_docs.md) |
 
-[docs/index.md](docs/index.md) is the full index.
+Anything not in that table is still in `docs/`. The complete list of
+pages, in reading order, is the `nav:` section of
+[mkdocs.yml](mkdocs.yml), rendered at
+[shakenfist.com](https://shakenfist.com/).
 
 ## The rules that exist because we broke something
 
@@ -51,7 +54,7 @@ metrics. The headlines:
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md)
   before writing an attribute update; a whole-object write races.
 
-- **Native ENUM columns and Python enums are generated from one source.**
+- **Protobuf enums are generated, not hand-written.**
   `shakenfist/schema/` is the source of truth. Add a member with the next
   available `proto_id`, run `tox -e genprotos`, and never change or reuse
   an existing `proto_id`.
@@ -60,7 +63,24 @@ metrics. The headlines:
   `**********`; unwrap with `.get_secret_value()` only at named
   boundaries. A `SecretStr` never compares equal to a `str`, and the
   obvious leak assertions pass vacuously — see
-  [docs/developer_guide/standards.md](docs/developer_guide/standards.md).
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#secret-carrying-fields-are-secretstr).
+
+- **Native MariaDB ENUM columns freeze their value list at `CREATE
+  TABLE` time.** Adding a Python enum member therefore works on a fresh
+  install and breaks every existing database with "Data truncated for
+  column" — which greenfield CI does not catch. You do not write a
+  migration for it, because `_ensure_native_enum_columns()` reconciles;
+  see
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#native-enum-columns-and-python-enums).
+
+- **A long daemon pass that never reaches `idle()` must call
+  `pet_watchdog()`.** systemd kills the process at `WatchdogSec`
+  otherwise, while it is working normally. See
+  [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md#daemon-liveness-systemd-watchdog).
+
+- **A new on-disk object type declares its `health_dependencies`**, or
+  node health will not notice when the storage it lives on fails. See
+  [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md#node-resource-health).
 
 - **In-memory only objects never touch the database**, and **API
   parameter declarations are enforced at import time** — both are easy to

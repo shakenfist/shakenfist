@@ -16,7 +16,7 @@ below. Working conventions are in [AGENTS.md](AGENTS.md).
 | Database internals: object cache, filter pushdown, gRPC reliability, cluster operations | [docs/developer_guide/database_internals.md](docs/developer_guide/database_internals.md) |
 | Deployment, table inventory, schema system | [docs/operator_guide/database.md](docs/operator_guide/database.md) |
 | Network operation dispatch, queue families, error handling | [docs/developer_guide/network_dispatcher.md](docs/developer_guide/network_dispatcher.md) |
-| REST API contracts, scheduler capacity arithmetic, health surfaces, object references | [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md) |
+| REST API contracts, scheduler capacity arithmetic, node and API health surfaces, daemon watchdog, object references | [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md) |
 | Security model and trust boundaries | [docs/developer_guide/security_model.md](docs/developer_guide/security_model.md) |
 | Continuous integration and automation | [docs/developer_guide/ci.md](docs/developer_guide/ci.md) |
 | Coding rules learned from real defects | [docs/developer_guide/coding_rules.md](docs/developer_guide/coding_rules.md) |
@@ -25,9 +25,12 @@ below. Working conventions are in [AGENTS.md](AGENTS.md).
 | Object state machines | [docs/developer_guide/state_machine.md](docs/developer_guide/state_machine.md) |
 | Authentication and federated identity | [docs/developer_guide/authentication.md](docs/developer_guide/authentication.md) |
 | Logging and log shipping | [docs/operator_guide/logging.md](docs/operator_guide/logging.md) |
-| Node resource health | [docs/operator_guide/node_health.md](docs/operator_guide/node_health.md) |
+| Node health recovery and operator runbook | [docs/operator_guide/node_health.md](docs/operator_guide/node_health.md) |
 
-[docs/index.md](docs/index.md) is the full index.
+Anything not in that table is still in `docs/`. The complete list of
+pages, in reading order, is the `nav:` section of
+[mkdocs.yml](mkdocs.yml), rendered at
+[shakenfist.com](https://shakenfist.com/).
 
 ## System Components
 
@@ -345,7 +348,6 @@ Flask app (external_api/app.py)
    +-> /blobs/* - Blob storage
    +-> /nodes/* - Cluster management
 ```
-
 
 ## Security model
 

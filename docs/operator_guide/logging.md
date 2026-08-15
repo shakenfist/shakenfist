@@ -264,5 +264,6 @@ directly on the eventlog spool/drainer:
 
 When no Loki endpoint is configured the daemons log to the local systemd
 journal instead. Loki stream labels are bounded to `{job, daemon, host}`; all
-identifiers stay in the JSON body. See
-the sections above.
+identifiers stay in the JSON body — see
+[Labels and the field contract](#labels-and-the-field-contract) for the
+full contract.

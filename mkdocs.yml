@@ -400,19 +400,21 @@ nav:
             - "Upload (/upload/)": developer_guide/api_reference/upload.md
         - "Agent protocol": developer_guide/agent_protocol.md
         - "Authentication": developer_guide/authentication.md
+        - "CI": developer_guide/ci.md
         - "CI API coverage": developer_guide/ci_api_coverage.md
+        - "Coding rules": developer_guide/coding_rules.md
+        - "Database internals": developer_guide/database_internals.md
+        - "IO performance tuning": developer_guide/io_performance_tuning.md
         - "Mypy": developer_guide/mypy.md
         - "Network dispatcher": developer_guide/network_dispatcher.md
         - "Release process": developer_guide/release_process.md
-        - "CI": developer_guide/ci.md
-        - "Coding rules": developer_guide/coding_rules.md
-        - "Database internals": developer_guide/database_internals.md
         - "Security model": developer_guide/security_model.md
-        - "Subsystem internals": developer_guide/subsystem_internals.md
         - "Standards": developer_guide/standards.md
         - "State machine": developer_guide/state_machine.md
+        - "Subsystem internals": developer_guide/subsystem_internals.md
         - "Updating docs": developer_guide/updating_docs.md
         - "Workflow": developer_guide/workflow.md
+        - "Writing an endpoint": developer_guide/writing_an_endpoint.md
     - Plans:
         - "Overview": plans/index.md
         - "API Query Batching": plans/api-query-batching-roadmap.md

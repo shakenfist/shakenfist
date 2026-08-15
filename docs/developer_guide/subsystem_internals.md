@@ -115,6 +115,124 @@ case-sensitive collation makes a binding that confuses the two fail.
 Operator-facing documentation is
 [`scheduler.md`](../operator_guide/scheduler.md).
 
+## Node resource health
+
+Node storage health drives `node.state`, on a different axis from the
+daemon-liveness watchdog below. `shakenfist/resource_health.py` is the
+reusable, timeout-guarded path-check primitive (a hung `hard`-NFS mount
+blocks rather than erroring, so the deadline is the unhealthy signal).
+`shakenfist/node_health.py` maps a node's role to the object types it
+hosts, runs each type's declared `health_dependencies` paths, and marks
+the node `STATE_ERROR` via a `health` event (`EVENT_TYPE_HEALTH`, a
+channel separate from the audit log) carrying the affected object
+types. **A new object type that lives on disk must declare its
+`health_dependencies`**, or a node whose storage for it has failed will
+keep being scheduled onto.
+
+The declarations today are `Instance` → `instances`, `image_cache`,
+`blobs`; `Blob` → `blobs`; `Upload` → `uploads`. `sf-resources` probes
+the union of the types this node hosts, on its own thread rather than
+the metrics loop, so a blocking mount trips the probe's timeout instead
+of stalling the daemon. A failure moves the node to `error`, which
+stops scheduling onto it and discounts its blob replicas; `sf-cluster`
+then reads the affected types back
+(`node_health.errored_node_affected_types`) and cascades from a
+surviving node — erroring the node's instances and re-replicating its
+blobs, gated on which object type was affected. This mirrors the
+deleted-node path but errors rather than deletes.
+
+Node error never clears automatically; `sf-ctl clear-node-error` is the
+operator recovery path, documented in
+[`node_health.md`](../operator_guide/node_health.md).
+
+## Daemon liveness (systemd watchdog)
+
+`Daemon.pet_watchdog()` in `shakenfist/daemons/daemon.py` is the
+liveness seam for every non-trivial daemon. It writes
+`sd_notify(WATCHDOG=1)` at most every ~10s, and `Daemon.idle()` (the
+standard end-of-pass sleep) calls it automatically — so any daemon
+whose main loop reaches `idle()` at the end of each pass pets the
+watchdog with no extra instrumentation.
+
+**Any daemon loop that performs a long pass without going through
+`idle()` must call `pet_watchdog()` explicitly** — otherwise systemd
+will kill the process once `WatchdogSec` elapses, even though the
+daemon is working normally. The existing explicit callers are:
+
+- the `sf-cluster` elected loop, which sleeps on
+  `lock.lost_event.wait(5)` rather than `idle()` and so pets at the top
+  of each iteration;
+- `sf-cluster`'s `_cluster_wide_cleanup`, and `sf-cleaner`'s
+  `update_power_states`, `_maintain_blobs` and `_find_missing_blobs`,
+  which pet around inner-loop iterations that may each take several
+  seconds. `update_power_states` runs as a scheduled task outside the
+  cleaner's `idle()` loop, so it is petted per libvirt domain.
+
+If you add a new long-running maintenance pass to any of the eight
+armed daemons — `sf-database`, `sf-net`, `sf-cleaner`, `sf-cluster`,
+`sf-queues`, `sf-resources`, `sf-transfers`, `sf-sidechannel` — add
+`self.pet_watchdog()` calls inside its inner loop. Arming is configured
+in `sf.service` at `WatchdogSec=60s`, except `sf-cluster` and
+`sf-cleaner` at `300s`, whose maintenance passes legitimately run
+longer. Four units are deliberately excluded: `sentinel-first`,
+`sentinel-last`, `sf-privexec` and `sf-nodelock` are short-lived or
+event-driven and never run the `idle()`-based keepalive loop, so arming
+them would kill a healthy process that is simply waiting for its
+trigger. `sf-api` is excluded too — gunicorn has its own `--timeout`
+worker-liveness mechanism.
+
+When a daemon stops petting, systemd delivers SIGABRT and restarts it
+(`Restart=on-failure`). For the elected `sf-cluster` that doubles as
+the cluster-lock failover trigger: the killed process takes its
+in-process lease refresher with it, the `cluster/` lease lapses after
+60s, and a standby steals the lock via `UPDATE ... WHERE expires_at <
+NOW()`. Worst-case failover is about 360s (300s watchdog + 60s lease),
+with no operator intervention. See
+[`locks.md`](../operator_guide/locks.md) for the lease-expiry and
+lock-steal protocol.
+
+The watchdog tracks the **main (supervisor) loop only**. In the
+`WorkerPoolDaemon`-style daemons (net, queues, resources, transfers,
+sidechannel, database) the real work happens in spawned worker or gRPC
+threads while the main loop dispatches and pets via `idle()`, so a
+wedged *worker* under a healthy main loop keeps petting. `WATCHDOG`
+detects a stuck supervisor loop, not a stuck worker; deeper per-worker
+liveness (for example "is dnsmasq actually serving DHCP", issue #730)
+is explicitly future work. Do not over-trust it as a signal that every
+worker is healthy.
+
+## sf-api health surface
+
+`sf-api` exposes three unauthenticated HTTP endpoints on port 13000 for
+load balancer probing. It is the only load-balancer-routable surface in
+the cluster — every other daemon communicates internally over gRPC or
+the MariaDB-backed work queue.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /livez` | Liveness — always returns `200 ok`; the worker process is alive |
+| `GET /readyz` | Readiness — `200 ready` when the worker can serve traffic, `503 not ready` when draining or when sf-database is unreachable |
+| `GET /healthz` | Alias of `/readyz` |
+
+`shakenfist/external_api/health.py` is the per-worker readiness
+module. Each gunicorn worker runs a background checker thread (started
+by the `post_fork` hook in `gunicorn_config.py`) that polls
+sf-database's `grpc.health.v1.Health/Check` every 5 seconds and caches
+the result, so `/readyz` and `/healthz` answer from `health.is_ready()`
+in microseconds without an RPC on the request path. The cached flag
+flips to False only after three consecutive failures
+(`READINESS_FAIL_THRESHOLD`), debouncing transient blips, and a
+staleness guard means a wedged checker is itself treated as not-ready.
+
+The `post_worker_init` hook installs a SIGTERM handler that calls
+`health.begin_drain()` — a one-way latch flipping `/readyz` to 503
+immediately — and then keeps serving live requests for
+`API_DRAIN_GRACE` seconds (default 25) before the normal worker
+shutdown, giving the load balancer time to stop routing new
+connections before the process exits.
+
+Operator-facing probe guidance is in
+[`load_balancing.md`](../operator_guide/load_balancing.md).
 
 ## VDI console token mint path
 
@@ -130,7 +248,6 @@ row, `KERBSIDE_JWT_SIGNING_KEY` (two-key rotation window). The `sf-ctl`
 `ensure-kerbside-signing-key` / `rotate-kerbside-signing-key` subcommands
 bootstrap and rotate it. Operator runbook:
 `docs/operator_guide/vdi_console_tokens.md`.
-
 
 ## Object References
 
@@ -184,7 +301,6 @@ converges the two stores, and the column is dropped next release.
 The `last_active` column is updated whenever a reference is observed to still
 be valid (e.g., when a node's cleaner daemon calls `observe()` on local blobs).
 This enables detection of stale references for cleanup.
-
 
 ## REST API surface
 

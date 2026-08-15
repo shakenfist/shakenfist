@@ -5,7 +5,6 @@ covered in the [operator guide](../operator_guide/database.md): the
 static object value cache, filter-pushdown discipline, gRPC reliability,
 and the cluster operation tracking and work-queue machinery.
 
-
 ```
 +----------------+     +----------------+     +----------------+
 |   sf-api       |     |   sf-cleaner   |     |   sf-queues    |
@@ -108,7 +107,6 @@ writer (instance, network, networkinterface, agentoperation) and
 blob, artifact, upload, dnsmasq, namespace). Setting either to 0 disables that
 tier. Effectiveness is visible in the `database_object_cache_{hits,misses,
 evictions}_total` counters and in reduced `database_get_<type>_total` rates.
-
 
 ## SQL Filter-Pushdown Discipline
 
@@ -257,8 +255,7 @@ namespace objects are excluded from zombie repair. Both kinds of
 orphan are otherwise invisible to every state-driven iterator.
 
 The elected cluster node also runs
-`reconcile_scheduler_capacity()` every five minutes
-One pass is a single
+`reconcile_scheduler_capacity()` every five minutes. One pass is a single
 `ReconcileSchedulerCapacity` RPC which expires stale namespace
 claims, re-derives per-hypervisor limits from the typed
 `node_metrics` columns, recomputes usage counters from placed
@@ -332,4 +329,3 @@ two layers, both controlled by this metadata:
 The enqueue-side dedup is the cheaper of the two -- the row never
 gets inserted -- but the worker-side fold is the safety net for the
 race where two concurrent callers both lose the lookup.
-

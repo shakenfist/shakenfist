@@ -310,4 +310,3 @@ measurement bug was fixed. Do not register instance cleanups in a namespaced
 test; the base class already reaps them. Reserve `addCleanup` for state the
 base class knows nothing about, such as the host devices in
 `test_stray_vxlan.py` or a namespace the test made itself.
-
