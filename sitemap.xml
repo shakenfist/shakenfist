@@ -2329,7 +2329,19 @@
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/developer_guide/ci/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/developer_guide/ci_api_coverage/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/coding_rules/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/database_internals/</loc>
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>
@@ -2349,11 +2361,19 @@
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/developer_guide/security_model/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/developer_guide/standards/</loc>
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/state_machine/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/subsystem_internals/</loc>
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>

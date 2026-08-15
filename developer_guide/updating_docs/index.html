@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/developer_guide/updating_docs/">
       
       
-        <link rel="prev" href="../state_machine/">
+        <link rel="prev" href="../subsystem_internals/">
       
       
         <link rel="next" href="../workflow/">
@@ -10378,6 +10378,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ci_api_coverage/" class="md-nav__link">
         
   
@@ -10386,6 +10414,90 @@
     
   
     CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../coding_rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../database_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io_performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO performance tuning
   
 
     
@@ -10490,6 +10602,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../security_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../standards/" class="md-nav__link">
         
   
@@ -10526,6 +10666,34 @@
     
   
     State machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../subsystem_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem internals
   
 
     
@@ -10649,6 +10817,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#link-checking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Link Checking
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -10673,6 +10852,34 @@
     
   
     Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../writing_an_endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing an endpoint
   
 
     
@@ -11326,6 +11533,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11403,6 +11638,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#link-checking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Link Checking
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -11443,6 +11689,19 @@ View at <a href="http://localhost:8000">http://localhost:8000</a></p>
 This will push to the <code>gh-pages</code> branch of the current git remote.</p>
 <h2 id="navigation-bar">Navigation Bar<a class="headerlink" href="#navigation-bar" title="Permanent link">&para;</a></h2>
 <p>The navigation bar is configured via the <code>mkdocs.yml</code> file in the repository root.</p>
+<h2 id="link-checking">Link Checking<a class="headerlink" href="#link-checking" title="Permanent link">&para;</a></h2>
+<p><code>tools/check-doc-anchors.py</code> resolves every markdown link in <code>docs/</code> and in
+the root markdown files (<code>AGENTS.md</code>, <code>ARCHITECTURE.md</code>, <code>CLAUDE.md</code>,
+<code>README.md</code>), reporting links whose target file is missing and anchored links
+whose target heading does not exist. Neither mkdocs nor the docs-tests
+workflow notices either failure — the link still renders and drops the reader
+at the top of the page — and the root files are not part of the mkdocs site
+at all, so nothing else looks at their links.</p>
+<p>It runs as a pre-commit hook and, because no workflow runs pre-commit, as
+<code>shakenfist/tests/test_doc_anchors.py</code> in CI.</p>
+<p><code>docs/plans/</code> and <code>docs/components/</code> are excluded as link <em>sources</em>: plans are
+point-in-time records which are not maintained after they land, and components
+are synchronised in from the sibling repositories. Both remain valid targets.</p>
 
 
 

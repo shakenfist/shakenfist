@@ -10376,6 +10376,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
@@ -10384,6 +10412,90 @@
     
   
     CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/coding_rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/database_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/io_performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO performance tuning
   
 
     
@@ -10488,6 +10600,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/security_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/standards/" class="md-nav__link">
         
   
@@ -10544,6 +10684,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/subsystem_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/updating_docs/" class="md-nav__link">
         
   
@@ -10580,6 +10748,34 @@
     
   
     Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/writing_an_endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing an endpoint
   
 
     
@@ -11243,6 +11439,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#log-shipping-internals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log shipping internals
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -11435,6 +11642,34 @@
     
   
     Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
   
 
     
@@ -11647,6 +11882,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#log-shipping-internals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log shipping internals
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -11844,9 +12090,10 @@ from <code>sf-api</code> in your log stream. These are <strong>informational</st
 record a request which did not match its endpoint's published
 parameter declarations, and while <code>API_VALIDATION_MODE</code> is <code>warn</code>
 (the default) they change no response — the request was answered
-exactly as it always was. Do not set <code>enforce</code> yet; that switch is
-phase 4 of the API input validation plan and only makes sense once
-the warn log for your own callers has been read and understood. If
+exactly as it always was. Do not set <code>enforce</code> yet; it only makes
+sense once the warn log for your own callers has been read and
+understood. See
+<a href="../../plans/PLAN-api-input-validation/">PLAN-api-input-validation</a>. If
 the lines themselves become a problem — a chatty caller sending an
 undeclared key on every request is an extra line per request —
 <code>API_VALIDATION_MODE</code> can be set to <code>off</code>, which disables the layer
@@ -11937,6 +12184,30 @@ Alloy, vector, …), you can leave <code>LOKI_BASE_URL</code> unset and have
 your agent scrape each node's journal. Shaken Fist's logs are
 structured JSON there too, so your agent can parse and label them
 however your pipeline prefers.</p>
+<h2 id="log-shipping-internals">Log shipping internals<a class="headerlink" href="#log-shipping-internals" title="Permanent link">&para;</a></h2>
+<p>Daemons log structured JSON via <code>shakenfist_utilities.logs</code> (one JSON object
+per line; this is the only daemon log format). Shaken Fist does not aggregate
+logs onto a primary node. Instead, when a Loki endpoint is configured
+(<code>LOKI_BASE_URL</code>), each daemon ships its own logs to that operator-provided
+Loki through an in-process, on-disk-spooled, batched HTTP push modelled
+directly on the eventlog spool/drainer:</p>
+<ul>
+<li><code>shakenfist/logship_spool.py</code> — a per-daemon disk-backed sqlite spool under
+  <code>/srv/shakenfist/spool/logship/&lt;daemon&gt;-&lt;pid&gt;.db</code> (the durability boundary;
+  drop-and-count over a high-water mark; orphan recovery).</li>
+<li><code>shakenfist/logship_drainer.py</code> — a background thread that batches spooled
+  lines and POSTs them to Loki's <code>/loki/api/v1/push</code> with exponential backoff,
+  retaining failed batches for retry.</li>
+<li><code>shakenfist/logship.py</code> — a <code>logging.Handler</code> that JSON-formats each record
+  into the spool, plus <code>start()</code>, which (in Loki mode) attaches the handler to
+  the root logger and removes the library's per-module syslog handlers so logs
+  go to Loki only.</li>
+</ul>
+<p>When no Loki endpoint is configured the daemons log to the local systemd
+journal instead. Loki stream labels are bounded to <code>{job, daemon, host}</code>; all
+identifiers stay in the JSON body — see
+<a href="#labels-and-the-field-contract">Labels and the field contract</a> for the
+full contract.</p>
 
 
 

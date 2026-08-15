@@ -10376,6 +10376,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
@@ -10384,6 +10412,90 @@
     
   
     CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/coding_rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/database_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/io_performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO performance tuning
   
 
     
@@ -10488,6 +10600,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/security_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/standards/" class="md-nav__link">
         
   
@@ -10544,6 +10684,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/subsystem_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/updating_docs/" class="md-nav__link">
         
   
@@ -10580,6 +10748,34 @@
     
   
     Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/writing_an_endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing an endpoint
   
 
     
@@ -11943,6 +12139,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -12803,7 +13027,7 @@ three optional WHERE clauses the criteria specifies. The JOIN is always covered 
 each have their own single-column index on the type table.</p>
 <p><strong>When to use which entry point.</strong></p>
 <p>Name lookups from REST handlers should call the per-type <code>from_db_by_ref(name, namespace=ns)</code> class method
-(e.g. <code>Artifact.from_db_by_ref(ref, namespace=ns)</code>). This override was added in phases 2 and 3 and pushes
+(e.g. <code>Artifact.from_db_by_ref(ref, namespace=ns)</code>). The override pushes
 the name equality predicate to SQL.</p>
 <p>Bulk iteration scoped by state and/or namespace should use the iterator constructor directly:
 <code>Artifacts(namespace=ns, prefilter='active')</code>, <code>Instances(namespace=ns)</code>, <code>Networks(namespace=ns)</code>.
@@ -12818,7 +13042,7 @@ The <code>network_interfaces</code> table has no <code>namespace</code> or <code
 strips both fields from the criteria before building the query; they are silently ignored. State pushdown
 still works. The two FK filter fields <code>network_uuid</code> and <code>instance_uuid</code> <em>are</em> honoured — they map to
 indexed columns on the <code>network_interfaces</code> table, and they are how <code>Network.networkinterfaces</code> and
-<code>Instance.interfaces</code> resolve their per-parent NI list (phase 7 of the SQL-pushdown plan: those properties
+<code>Instance.interfaces</code> resolve their per-parent NI list (those properties
 return hydrated <code>NetworkInterface</code> objects rather than the cached UUID list that used to live on the
 attribute table). The other <code>find_*</code> helpers leave the FK fields at their default of <code>None</code> because the
 underlying tables have no matching column.</p>
@@ -13196,8 +13420,7 @@ daemons, as always), existing rows keep NULL columns until the next 60
 second upsert cycle repopulates every live node — no backfill needed for a
 table whose rows are ephemeral by design.</p>
 <p>The three capacity tables (<code>scheduler_node_capacity</code>, <code>namespace_claims</code> and
-<code>cluster_capacity</code>) belong to scheduler-reservations phase 2 and are
-maintained solely by a reconciler that runs every five minutes on the
+<code>cluster_capacity</code>) are maintained solely by a reconciler that runs every five minutes on the
 elected cluster node. Each pass is a single <code>ReconcileSchedulerCapacity</code>
 RPC which expires stale claims, re-derives each hypervisor's limits from
 the typed <code>node_metrics</code> columns (deliberately mirroring the scheduler's
@@ -13207,7 +13430,7 @@ recomputes the decaying expected-demand signal, and rebuilds the
 ensure-mariadb-schema</code> (run it before rolling the daemons after an
 upgrade, as always). In this release nothing consumes them for admission —
 the scheduler still admits directly from <code>node_metrics</code>; guarded-UPDATE
-admission against these counters arrives in a later release (phase 3 of
+admission against these counters arrives in a later release (see
 <code>docs/plans/PLAN-scheduler-reservations.md</code>). Operator-facing
 observability is the <code>scheduler_capacity_*</code> family of prometheus metrics
 (per-node limit/used/expected-demand gauges, cluster-row gauges, and
@@ -13613,9 +13836,10 @@ indexed FK column per parent — for example:</p>
 </code></pre></div>
 <p>Cached lists of <em>child</em> object UUIDs are deliberately not stored on
 the parent attribute table — querying the child table by an indexed
-FK column is the source of truth. Phase 7 of the SQL-pushdown plan
-removed the last two such caches (<code>network_attributes.networkinterfaces</code>
-and <code>instance_attributes.interfaces</code>); see <code>PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md</code>.</p>
+FK column is the source of truth. The last two such caches
+(<code>network_attributes.networkinterfaces</code> and
+<code>instance_attributes.interfaces</code>) have been removed; see
+<code>docs/plans/PLAN-sql-pushdown-filtering.md</code>.</p>
 <p>This approach:</p>
 <ul>
 <li><strong>Avoids wide generic tables</strong>: Each type has exactly the columns it needs</li>

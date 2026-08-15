@@ -10386,6 +10386,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../developer_guide/ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
@@ -10394,6 +10422,90 @@
     
   
     CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_guide/coding_rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_guide/database_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_guide/io_performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO performance tuning
   
 
     
@@ -10498,6 +10610,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../developer_guide/security_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../developer_guide/standards/" class="md-nav__link">
         
   
@@ -10554,6 +10694,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../developer_guide/subsystem_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../developer_guide/updating_docs/" class="md-nav__link">
         
   
@@ -10590,6 +10758,34 @@
     
   
     Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_guide/writing_an_endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing an endpoint
   
 
     
@@ -11243,6 +11439,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11296,10 +11520,10 @@ inside Shaken Fist, or against the vocabulary of an external tool -- the entry
 names the sibling meaning so that a reader who arrived by search is not misled.
 Other documents should link here rather than redefining these terms.</p>
 <p>Definitions describe what the code does <em>today</em>. Entries which once carried a
-<em>(planned)</em> marker for the workload identity federation work have lost it: as
-of phase 3 of <a href="../plans/PLAN-auth-federation/">PLAN-auth-federation</a>, trusted
-issuers, mapping rules, identity tokens and scopes all exist and are described
-here as they behave. Should a future entry describe something not yet built, it
+<em>(planned)</em> marker for the workload identity federation work have lost it:
+trusted issuers, mapping rules, identity tokens and scopes all exist now and
+are described here as they behave. See
+<a href="../plans/PLAN-auth-federation/">PLAN-auth-federation</a> for the design. Should a future entry describe something not yet built, it
 will say so explicitly.</p>
 <p>Entries are alphabetical. Each carries a short definition, a "Defined in"
 pointer to the authoritative code or documentation, and, where the term is
@@ -11342,8 +11566,8 @@ confused with an authorization term: capabilities do not grant or restrict
 access in Shaken Fist. The authorization noun is <a href="#scope">scope</a>.</p>
 <p><strong id="cluster-operation">cluster operation</strong> -- The internal work-queue object that
 tracks a unit of cluster-wide work through its own state machine. Defined in
-<code>ARCHITECTURE.md</code> ("Cluster Operation Tracking" and "Cluster Operation Storage
-and Work Queues"). Not to be confused with an <em>agent operation</em>, which is
+<code>docs/developer_guide/database_internals.md</code> ("Cluster Operation Tracking" and
+"Cluster Operation Storage and Work Queues"). Not to be confused with an <em>agent operation</em>, which is
 executed by the in-guest <a href="#agent">agent</a> rather than by cluster daemons.</p>
 <p><strong id="credential">credential</strong> -- In the documentation this word appears mainly for
 MariaDB database credentials -- the username and password an operator configures
@@ -11379,8 +11603,9 @@ and the exchange in <code>shakenfist/external_api/auth.py</code>.</p>
 VM with disks, network interfaces, and a lifecycle. Defined in
 <code>shakenfist/instance.py</code> and <code>docs/developer_guide/api_reference/instances.md</code>.
 Not to be confused with the generic "daemon instance" / "replica" sense used in
-<code>ARCHITECTURE.md</code> and <code>docs/operator_guide/database.md</code>, where "instance" means
-one running copy of the <code>sf-database</code> daemon.</p>
+<code>docs/developer_guide/database_internals.md</code> and
+<code>docs/operator_guide/database.md</code>, where "instance" means one running copy of
+the <code>sf-database</code> daemon.</p>
 <p><strong id="key">key</strong> -- Primary sense: a <a href="#namespace-key">namespace key</a>. Other in-tree
 senses of the word that a reader may land on: the inter-node <em>service keys</em> used
 for daemon-to-daemon authentication (the reserved <code>_service_key*</code> name prefix,
@@ -11453,11 +11678,13 @@ which are configuration, not object types:</p>
   (<code>docs/operator_guide/installation.md</code>).</li>
 <li><em>network node</em> -- the elected, singular ingress and egress point for all
   virtual networks, where floating IPs live; one per cluster
-  (<code>docs/operator_guide/installation.md</code>, <code>ARCHITECTURE.md</code>).</li>
+  (<code>docs/operator_guide/installation.md</code>,
+  <code>docs/developer_guide/network_dispatcher.md</code>).</li>
 <li><em>hypervisor node</em> -- a node that runs virtual machine instances
   (<code>docs/operator_guide/installation.md</code>).</li>
 <li><em>database-tier node</em> -- a node running an <code>sf-database</code> daemon against the
-  shared MariaDB; none is elected (<code>ARCHITECTURE.md</code>,
+  shared MariaDB; none is elected
+  (<code>docs/developer_guide/database_internals.md</code>,
   <code>docs/operator_guide/database.md</code>).</li>
 <li><em>storage-only node</em> -- a node that stores blobs but runs no VMs, used to hold
   blobs that are not needed by currently running instances (<code>docs/features.md</code>).</li>

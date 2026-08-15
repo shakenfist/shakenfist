@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/developer_guide/standards/">
       
       
-        <link rel="prev" href="../release_process/">
+        <link rel="prev" href="../security_model/">
       
       
         <link rel="next" href="../state_machine/">
@@ -10378,6 +10378,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ci_api_coverage/" class="md-nav__link">
         
   
@@ -10386,6 +10414,90 @@
     
   
     CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../coding_rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../database_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io_performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO performance tuning
   
 
     
@@ -10487,6 +10599,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../security_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -10556,6 +10696,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../subsystem_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../updating_docs/" class="md-nav__link">
         
   
@@ -10592,6 +10760,34 @@
     
   
     Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../writing_an_endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing an endpoint
   
 
     
@@ -11245,6 +11441,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11298,6 +11522,187 @@
 <p>(This is actually just notes to save our future selves from tripping over the same problems.)</p>
 <h2 id="memory">Memory<a class="headerlink" href="#memory" title="Permanent link">&para;</a></h2>
 <p>Memory is measured in MiB in Shaken Fist. All references to memory size are stored and transmitted in MiB: Gigabytes can be too big if you want a lot of small machines. Kilobytes is just too many numbers to type. The <code>libvirt</code> API measures memory in KiB. Therefore, interactions with the library need to be careful to convert from MiB to KiB.</p>
+<h2 id="code-style">Code Style<a class="headerlink" href="#code-style" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Single quotes for strings, double quotes for docstrings</li>
+<li>Never triple single quotes; triple double quotes instead</li>
+<li>120 character line wrap</li>
+<li>Trim trailing whitespace</li>
+<li>All imports at the top of the file. A late import inside a function is
+  only for breaking a circular import, and carries a comment saying so</li>
+<li>Import order is standard library, third party, then <code>shakenfist</code></li>
+<li>Every file starts with <code># Copyright 2019 Michael Still and contributors</code></li>
+</ul>
+<p>This page is the style guide; <code>CLAUDE.md</code> and <code>AGENTS.md</code> summarise it
+and link here.</p>
+<h2 id="attribute-updates-use-field-masks">Attribute updates use field masks<a class="headerlink" href="#attribute-updates-use-field-masks" title="Permanent link">&para;</a></h2>
+<p>The <code>update_*_attributes</code> functions in <code>shakenfist/mariadb.py</code> require a
+<code>fields</code> argument naming exactly the model fields the caller changed;
+only those columns are written to MariaDB. <code>fields=None</code> (write every
+column) is reserved for row creation and pydantic-upgrade persistence.
+An unmasked update is a cross-attribute lost update waiting to happen:
+it pushes a stale snapshot of the other columns over concurrent
+writers' committed changes. Relational data (like instance placement)
+belongs in a table with per-row inserts and deletes — see the
+<code>instance_location</code> rows in <code>object_references</code> — never in a JSON list
+on an attributes row.</p>
+<p>"The caller writes every column anyway" is not a reason to pass <code>None</code>.
+<code>TrustedIssuer.update</code> and <code>MappingRule.update</code> both replace their whole
+attribute set, because an issuer's URL and key source are one
+configuration and a rule's policy is one unit — and both still name
+every field. Naming them keeps <code>None</code> meaning only "creation or
+upgrade", so a reader can tell the two cases apart, and it means the
+day somebody adds a single-field writer they inherit a masked function
+rather than having to retrofit one. The mask travels over gRPC as
+<code>repeated string fields</code> on the request message, and the mock in
+<code>shakenfist/tests/mock_mariadb.py</code> honours it too — a mock that
+replaced the whole row would let a caller name the wrong fields and
+still see the write it expected.</p>
+<h2 id="secret-carrying-fields-are-secretstr">Secret-carrying fields are <code>SecretStr</code><a class="headerlink" href="#secret-carrying-fields-are-secretstr" title="Permanent link">&para;</a></h2>
+<p>Fields which hold a credential — <code>key</code> and <code>nonce</code> on
+<code>NamespaceKeyAttributesData</code>, and the <code>AUTH_SECRET_SEED</code>,
+<code>MARIADB_PASSWORD</code> and <code>LOKI_AUTH_HEADER</code> configuration options — are
+<code>pydantic.SecretStr</code>, so stringifying one yields <code>**********</code> rather
+than the value. Unwrapping with <code>.get_secret_value()</code> happens only at
+named boundaries (the SQL writes, the gRPC encoder, the bcrypt
+compare, the JWT claim), and each of those sites carries a comment
+saying what breaks if the unwrap is missed. Do not add an unwrap to
+make an error go away; move the value, or wrap the other side.</p>
+<p>Two traps, both of which have already caused real bugs:</p>
+<ul>
+<li><strong>A <code>SecretStr</code> never compares equal to a <code>str</code>.</strong> <code>SecretStr('x')
+  == 'x'</code> is <code>False</code>, silently. Any comparison against a literal must
+  unwrap — see <code>UNCONFIGURED_AUTH_SECRET_SEED</code> in <code>config.py</code>, which is
+  a named constant precisely so the comparison is written once.</li>
+<li><strong>Assertions about secrets pass vacuously if you get them wrong.</strong>
+  <code>assertNotIn(attrs.key, some_string)</code> does not raise on a non-string
+  needle under <code>testtools</code>, it just passes, always. And
+  <code>assertNotIn(str(attrs.key), ...)</code> asserts that <code>'**********'</code> is
+  absent, which is true of an event that leaked the real secret.
+  Compare <code>.get_secret_value()</code>, and see <code>_assert_no_secret_material()</code>
+  in <code>shakenfist/tests/test_namespace_key_object.py</code>, which is guarded
+  by two tests proving it can still fail.</li>
+</ul>
+<p><code>SecretStr</code> maps to <code>VARCHAR(255)</code> in <code>schema/sqlalchemy.py</code>, the same
+column <code>str</code> produces, so wrapping an existing field needs no
+migration and no schema version bump. Deleting that mapping entry
+would silently give fresh installs <code>LONGTEXT</code> while upgraded clusters
+kept <code>VARCHAR(255)</code>, with no version change to notice. Full detail in
+<a href="../authentication/"><code>authentication.md</code></a>.</p>
+<h2 id="native-enum-columns-and-python-enums">Native ENUM columns and Python enums<a class="headerlink" href="#native-enum-columns-and-python-enums" title="Permanent link">&para;</a></h2>
+<p>A handful of columns are native MariaDB <code>ENUM</code> types built with
+<code>sa.Enum(SomePythonEnum)</code> (e.g. <code>object_states.object_type</code>). MariaDB
+freezes an <code>ENUM</code>'s value list at <code>CREATE TABLE</code> time, so adding a
+member to the Python enum works on fresh installs but breaks existing
+databases ("Data truncated for column", error 1265) — greenfield CI
+will not catch this. You do NOT need to write a migration when adding
+an enum member: <code>ensure_schema()</code> ends with a reconciliation pass
+(<code>_ensure_native_enum_columns()</code> in <code>shakenfist/mariadb.py</code>) that
+discovers every <code>sa.Enum</code> column from the SQLAlchemy metadata and
+widens stale columns automatically. Unit coverage lives in
+<code>shakenfist/tests/test_mariadb_enum_columns.py</code>; the live upgrade path
+is exercised against a real MariaDB by the "Schema ENUM widening" CI
+job in <code>functional-tests.yml</code> (<code>tools/ci-enum-widening-test.sh</code>).</p>
+<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>When a change adds, renames, or removes a user-visible concept
+  (an object type, state, term, or similar), update
+  <a href="../../glossary/"><code>glossary.md</code></a> in the same change so the
+  glossary never drifts from the code.</li>
+</ul>
+<h2 id="in-memory-only-objects-never-touch-the-database">In-memory only objects never touch the database<a class="headerlink" href="#in-memory-only-objects-never-touch-the-database" title="Permanent link">&para;</a></h2>
+<p>Objects constructed with <code>in_memory_only=True</code> (the IPAM built when
+hydrating a deleted network, blob-reference image artifacts) keep their
+state, attributes and events in process memory. Any new persistence
+path must be guarded on <code>self.in_memory_only</code>: a database row written
+for an in-memory object is orphaned forever, because <code>hard_delete()</code>
+early-returns for in-memory objects and state-driven iterators skip
+objects whose static row is missing (issue 3532). Related uuid format
+gotcha: <code>object_states.object_uuid</code> stores dashed uuids while <code>sa.Uuid</code>
+static-table columns store undashed CHAR(32) — SQL joining the two must
+transform one side (see the orphan reconciliation queries in
+<code>mariadb.py</code>).</p>
+<h2 id="api-parameter-declarations-are-enforced-at-import-time">API parameter declarations are enforced at import time<a class="headerlink" href="#api-parameter-declarations-are-enforced-at-import-time" title="Permanent link">&para;</a></h2>
+<p>Every endpoint handler declares its parameters in
+<code>swag_from(api_base.swagger_helper(...))</code>, and <code>swagger_helper()</code>
+validates each declaration as the module is imported — so a malformed
+one raises <code>InvalidAPIDeclaration</code> and <strong>sf-api will not start</strong>. The
+rules: every handler carries a declaration (an empty parameter list is
+valid, no declaration at all is not); <code>location</code> is one of
+<code>SWAGGER_PARAMETER_LOCATIONS</code> <em>and</em> is where the parameter actually
+arrives (route segment → <code>path</code>, <code>use_kwargs(location='query')</code> key or
+<code>flask.request.args</code> read → <code>query</code>, otherwise <code>body</code>); a <code>path</code>
+parameter must be <code>required=True</code>; a raw body is declared as
+<code>api_base.RAW_BODY_PARAMETER</code> (and cannot be combined with named body
+parameters); and every accepted kwarg is declared, excluding the
+decorator-injected <code>*_from_db</code> objects. A declaration tuple has five
+elements plus an optional sixth constraints dict
+(<code>minimum</code>/<code>maximum</code>/<code>pattern</code>), also validated at import time. Body
+declarations stay one tuple per parameter but <em>render</em> as a single
+schema-carrying body parameter, because Swagger 2.0 allows only one;
+objects and arrays of objects can only be declared in the body, since
+outside one there is no schema object to nest a structure in. The
+token vocabulary is <code>api_base.ARGTYPES</code>.</p>
+<p><code>shakenfist/external_api/declarations.py</code> derives the correct answer
+from the source and is shared by the fixer
+(<code>tools/fix-api-parameter-locations.py --apply</code>), the pre-commit hook
+and <code>test_parameter_declarations.py</code>; <code>test_openapi_spec.py</code> validates
+the generated specification itself in CI. Full reference in
+<code>docs/developer_guide/writing_an_endpoint.md</code>.</p>
+<h2 id="events-vs-logs">Events vs logs<a class="headerlink" href="#events-vs-logs" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist has two structured-record streams; choose the right
+one when emitting a message:</p>
+<ul>
+<li><strong>If the message relates to one or more Shaken Fist objects</strong>
+  (instance, network, blob, artifact, …), emit an <strong>event</strong> via
+  <code>eventlog.add_event()</code> / <code>add_event_multi()</code>. Events are the
+  authoritative per-object record (stored in MariaDB, read back
+  through the REST API) and also emit an <code>Added event</code> log line,
+  so they appear in the log stream too.</li>
+<li><strong>If the message has no directly-associated object</strong> (daemon
+  lifecycle, scheduler decisions, node-level conditions), emit a
+  <strong>log</strong> line via the module <code>LOG</code>.</li>
+</ul>
+<p>Events stay authoritative in MariaDB — they are never moved to
+Loki; logs ship to Loki (or the local journal). The <code>Added event</code>
+echo into the log stream is controlled by <code>LOG_EVENTS_TO_LOKI</code>
+(default on). See
+<a href="../../operator_guide/logging/"><code>logging.md</code></a>
+and <a href="../../operator_guide/events/"><code>events.md</code></a>.</p>
+<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tox<span class="w">                              </span><span class="c1"># Run all tests</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tox<span class="w"> </span>-eflake8<span class="w">                     </span><span class="c1"># Lint check</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>tox<span class="w"> </span>-emypy<span class="w">                       </span><span class="c1"># Type checking</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>tox<span class="w"> </span>-ecover<span class="w">                      </span><span class="c1"># Coverage report</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>stestr<span class="w"> </span>run<span class="w"> </span><span class="o">{</span>test_name<span class="o">}</span><span class="w">           </span><span class="c1"># Run specific test</span>
+</code></pre></div>
+<h2 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
+<p>The repository uses pre-commit hooks to validate code before commits:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>pre-commit<span class="w">           </span><span class="c1"># Install pre-commit</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pre-commit<span class="w"> </span>install<span class="w">               </span><span class="c1"># Set up git hooks</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files<span class="w">       </span><span class="c1"># Run all hooks manually</span>
+</code></pre></div>
+<p>Current hooks:
+- <code>actionlint</code> - Validates GitHub Actions workflow files
+- <code>ansible-lint</code> - Validates the <code>shakenfist.shakenfist</code> Ansible collection
+  (<code>shakenfist/deploy/collection/</code>)
+- <code>flake8</code> - Style check via tox, on changed files
+- <code>py3</code> - Unit tests via tox
+- <code>check-from-db-by-ref-namespace</code> - Every <code>*_from_db_by_ref</code> call passes a
+  namespace, so an endpoint cannot fetch across tenants
+- <code>check-endpoint-authentication</code> - Endpoints inherit authentication from
+  <code>api_base.Resource.method_decorators</code> rather than each carrying a
+  decorator; this rejects resources that subclass <code>flask_restful.Resource</code>
+  directly, and <code>@api_base.public</code> markers that are not the outermost
+  decorator
+- <code>check-api-parameter-locations</code> - Every <code>swagger_helper()</code> parameter is
+  declared at the location it actually arrives at
+- <code>mypy</code> - Type checking via tox (incremental rollout)</p>
+<p>Note that no workflow runs pre-commit, so a hook only fires for
+contributors who have run <code>pre-commit install</code>. A check that must hold
+in CI needs a unit test as well — which is why the parameter-location
+derivation is shared between the hook and
+<code>test_parameter_declarations.py</code>.</p>
 
 
 
