@@ -25,6 +25,8 @@ a placement decision can be reconstructed after the fact (see
    per-domain vCPU maximum on that node.
 3. **CPU admission** -- allocated vCPUs (including this request)
    must stay under `schedulable threads x CPU_OVERCOMMIT_RATIO`.
+   The node is charged whichever is larger of its measured running
+   vCPUs and the `used_cpus` its capacity counters already record.
    See [CPU overcommit](#cpu-overcommit).
 4. **RAM admission** -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
@@ -42,8 +44,9 @@ a placement decision can be reconstructed after the fact (see
 8. **Disk bandwidth** -- nodes whose disks are saturated (busy
    more than 120% of wall time across spindles) are excluded.
 9. **Load ordering and weighted selection** -- the survivors are
-   ranked by load and a weighted-random choice spreads work
-   across similar nodes. See below.
+   ordered by load, best first, and a weighted-random shuffle
+   spreads work across similar nodes. No node is dropped here.
+   See below.
 
 Stages 1 to 5 are **pre-filters**: they answer, from a metrics
 snapshot up to a minute stale, whether a node probably can host the
@@ -119,11 +122,19 @@ are informational and nothing in scheduling consumes them yet.
 
 Candidate nodes that survive the hard filters are bucketed by
 **load per schedulable thread** (`cpu_load_1 / cpu_schedulable`)
-in coarse 0.25-wide bands, and only the lowest band continues.
-Normalising by size is what lets a cluster of differently sized
-machines compare fairly: an idle 24-thread node and a struggling
-12-thread node no longer look equivalent just because both have a
-load average under 1.0.
+in coarse 0.25-wide bands, and the list is ordered lowest band
+first. Normalising by size is what lets a cluster of differently
+sized machines compare fairly: an idle 24-thread node and a
+struggling 12-thread node no longer look equivalent just because
+both have a load average under 1.0.
+
+This stage **orders** the candidate list; it does not shorten it. A
+band says a node looks busier right now, not that it cannot host the
+instance -- every node reaching this stage has already passed every
+pre-filter. Because admission is a guarded claim that can refuse the
+node at the head of the list, a caller that runs out of candidates
+fails a create the cluster had room for, so the busier nodes stay in
+the list behind the preferred ones for the walk to fall through to.
 
 The bands are deliberately coarse. The metrics snapshot can be up
 to a minute stale, so a burst of instance creates is scheduled
@@ -132,15 +143,15 @@ send the entire burst to whichever node looked best at the last
 refresh. Coarse bands keep genuinely similar nodes interchangeable
 so a burst spreads across them.
 
-Within the winning band, selection is a weighted shuffle rather
-than a uniform one. A node's weight is its load headroom toward
+Within a band, ordering is a weighted shuffle rather than a uniform
+one. A node's weight is its load headroom toward
 `SCHEDULER_TARGET_LOAD` (default 0.75 per schedulable thread):
 
     weight = max(0.1, SCHEDULER_TARGET_LOAD x cpu_schedulable - cpu_load_1)
 
 A machine with twice the headroom draws roughly twice the share of
-a burst. The whole candidate list is weighted-shuffled (not just
-the first choice), because callers fall through to later candidates
+a burst. Every band is shuffled this way, not just the first choice
+from the best one, because callers fall through to later candidates
 when a placement fails.
 
 ## CPU overcommit
@@ -162,22 +173,33 @@ Note that on a cluster already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes are
 refused until they drain.
 
-This is a pre-filter, and it is deliberately measurement-only: it
-sizes a node from `cpu_total_instance_vcpus`, the resources daemon's
-count of *running* libvirt domains, republished roughly once a
-minute. That lags reality -- an instance still fetching its image has
-no domain to measure yet -- which is exactly why it is not the
-admission decision: its job is to order and prune the candidate list
-cheaply, not to make the final call. RAM and disk pre-filters are
-sized the same way, from published measurements alone. See [Admission
-is a guarded capacity claim](#admission-is-a-guarded-capacity-claim)
-for the allocation-denominated check that actually admits or refuses
-a placement, and closes the burst window a measurement alone cannot.
+This is a pre-filter, not the admission decision, but it is sized
+from both of the figures admission cares about. A node is charged
+whichever is larger of `cpu_total_instance_vcpus` -- the resources
+daemon's count of *running* libvirt domains, republished roughly once
+a minute -- and `used_cpus` from that node's capacity counters. The
+measurement alone lags reality, because an instance still fetching
+its image has no domain to measure yet, so a node whose capacity is
+fully claimed can measure as completely idle for minutes. Reading the
+counters here means such a node leaves the candidate list at this
+stage instead of surviving to be refused by the guard. RAM and disk
+pre-filters remain sized from published measurements alone.
+
+An instance being rescheduled is not charged for itself on the node
+it is already placed on, and a node with no capacity row -- one
+mid-upgrade, or one the reconciler declined to size -- is charged
+nothing, because admission will let it through unguarded too.
+
+See [Admission is a guarded capacity
+claim](#admission-is-a-guarded-capacity-claim) for the check that
+actually admits or refuses a placement, and closes the burst window
+a pre-filter cannot.
 
 ## Admission is a guarded capacity claim
 
 The pipeline above orders and prunes candidates from a metrics
-snapshot; it is not what admits an instance. Once a candidate is
+snapshot (and, for CPU, the counters below); it is not what admits
+an instance. Once a candidate is
 chosen, `Instance.place_instance()` makes one atomic claim against the
 allocation-denominated counters in `scheduler_node_capacity` (and,
 once the claims API exists, `namespace_claims`) -- the same database

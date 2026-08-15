@@ -1278,8 +1278,12 @@ was passing for the right reason all along.
   degrades from an assertion to a skip. Harmless for the summary (a node
   with no row is charged nothing and guarded by nothing either way), but
   it means a persistently unreadable capacity table would silently
-  disable that CI check rather than failing it. Worth a distinguishable
-  error return once something depends on the read for more than display.
+  disable that CI check rather than failing it. The CPU pre-filter now
+  reads the same helper, where an empty return degrades it to
+  measurement-only -- the behaviour that caused the single-candidate
+  lockout below, though there the guard still refuses correctly and
+  only the pre-filter's pruning is lost. Worth a distinguishable error
+  return once something depends on the read for more than display.
 - `shakenfist/tests/mock_mariadb.py`'s
   `_mariadb_admit_instance_placement()` models only the node stage: it
   has no cluster singleton, no `namespace_claims` row and no
@@ -1334,6 +1338,29 @@ was passing for the right reason all along.
   denial was demand-only, so demand spreads load but can never fail
   a create the cluster has real capacity for. Never shipped — caught
   by PR CI before merge.
+
+* **Single-candidate lockout: a measurement-only pre-filter behind a
+  ledger-denominated guard** (found by the first two merge-queue runs
+  of PR #3754, fixed 2026-08-15). Five creates failed with `507 no
+  node had capacity for this instance, 1 candidates refused it` in the
+  `tier` and `cluster` topologies. Two changes combined to cause it.
+  First, this phase replaced the issue-3498 `_committed_vcpus()`
+  placement walk with a purely measurement-denominated
+  `_has_sufficient_cpu()`, on the reasoning that the guard was now the
+  real admission; a node whose ledger was full therefore still measured
+  as idle (its instances had not booted) and stayed in the candidate
+  list. Second, the pre-existing load-bucket stage *filtered* the
+  candidate list to the lowest band rather than ordering it, so the
+  full node became the only candidate. The guard refused it (`cpus
+  limit 3.0, used 3.0`), the walk had nothing to fall through to, and
+  a cluster with two idle nodes returned a 507. Fixed on both sides:
+  the CPU pre-filter charges `max(measured, used_cpus)` again, read
+  from the counters in one query rather than rebuilt per placed
+  instance; and the bucketing now orders the whole candidate list
+  best-band-first instead of discarding the rest. Never shipped —
+  caught by merge CI before merge. The PR-level gate did not see it
+  because PR CI runs only the single-node smoke job; the multi-node
+  topologies run only in the merge queue.
 
 ### Back brief
 

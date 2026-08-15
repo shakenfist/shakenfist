@@ -300,7 +300,13 @@ class MetricsRefreshTestCase(SchedulerTestCase):
 
 
 class LoadAwareOrderingTestCase(SchedulerTestCase):
-    """Test load-per-thread bucketing and headroom-weighted selection."""
+    """Test load-per-thread bucketing and headroom-weighted selection.
+
+    The bucketing orders the candidate list; it does not shorten it.
+    Every node here has passed every admission filter, so a busier one
+    goes to the tail rather than being discarded -- the caller walks
+    the list against a capacity guard which can refuse the head of it.
+    """
 
     def test_loaded_small_node_loses_to_idle_big_nodes(self):
         # The sfcbr 2026-07-17 incident shape: a small node already under
@@ -320,7 +326,27 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
             random.seed(seed)
             nodes = scheduler.Scheduler().find_candidates(fake_inst)
             self.assertSetEqual(
-                self._node_uuids_set('node3', 'node4'), set(nodes))
+                self._node_uuids_set('node3', 'node4'), set(nodes[:2]))
+            self.assertEqual(self._node_uuid('node2'), nodes[-1])
+
+    def test_a_busier_node_is_ordered_last_not_dropped(self):
+        # The phase 3 regression which cost merge CI five creates on
+        # 2026-08-14: the busiest node won the bucket ordering, the
+        # capacity guard refused it, and because the ordering had
+        # discarded the other two viable nodes the walk had nothing left
+        # to try and the create 507ed. Ordering must leave them in the
+        # list, behind the preferred node, for the walk to fall through
+        # to.
+        self.mock_mariadb.set_node_metrics_same()
+        for n, load in [('node2', 8.0), ('node3', 0.2), ('node4', 4.0)]:
+            self.mock_mariadb.update_node_metrics(n, {
+                'cpu_max': 12, 'cpu_schedulable': 8, 'cpu_load_1': load})
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        random.seed(1)
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertEqual(
+            [self._node_uuid(n) for n in ['node3', 'node4', 'node2']], nodes)
 
     def test_similar_nodes_share_bucket_and_spread(self):
         # Nodes with similar normalised load land in the same coarse
@@ -366,7 +392,8 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         for _ in range(1000):
             nodes = s.find_candidates(fake_inst)
             self.assertSetEqual(
-                self._node_uuids_set('node2', 'node3'), set(nodes))
+                self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
+            self.assertEqual(self._node_uuid('node4'), nodes[-1])
             wins[nodes[0]] += 1
 
         ratio = (wins[self._node_uuid('node3')] /
@@ -393,9 +420,10 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         random.seed(1)
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
         # node2 has normalised load 4.0 / 10 = 0.40 (bucket 1); the
-        # others are in bucket 0.
+        # others are in bucket 0 and so lead the ordering.
         self.assertSetEqual(
-            self._node_uuids_set('node3', 'node4'), set(nodes))
+            self._node_uuids_set('node3', 'node4'), set(nodes[:2]))
+        self.assertEqual(self._node_uuid('node2'), nodes[-1])
 
     def test_old_dialect_fallback_ignores_infra_role(self):
         # The synthetic fallback no longer applies a role-aware bump: it
@@ -420,7 +448,8 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         random.seed(1)
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
         self.assertSetEqual(
-            self._node_uuids_set('node2', 'node3'), set(nodes))
+            self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
+        self.assertEqual(self._node_uuid('node4'), nodes[-1])
 
 
 class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
@@ -592,14 +621,16 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
 
 
 class CapacityCounterTestCase(SchedulerTestCase):
-    """The pre-filter measures, the capacity counters admit (P2).
+    """The pre-filter reads the counters the guard will draw down (P2).
 
-    The issue-3498 stopgap used to walk each candidate's placement rows
-    in Python and charge the node ``max(measured, committed)``. That
-    second ledger is gone: admission is now the guarded UPDATE against
-    ``scheduler_node_capacity`` which ``place_instance()`` makes, and
-    ``find_candidates()`` is a cheap, deliberately measurement-only
-    pre-filter which orders and prunes for it.
+    Admission is the guarded UPDATE against ``scheduler_node_capacity``
+    which ``place_instance()`` makes. ``find_candidates()`` is a cheap
+    pre-filter standing in front of it, and it charges a node
+    ``max(measured, committed)`` -- the issue-3498 arithmetic, but read
+    from the counters in one query rather than rebuilt in Python from
+    every candidate's placement rows. Reading only the measurement is
+    what let a node whose ledger was full stay in the list until the
+    guard refused it.
     """
 
     def _baseline(self, **overrides):
@@ -618,37 +649,65 @@ class CapacityCounterTestCase(SchedulerTestCase):
         metrics.update(overrides)
         return metrics
 
-    def test_prefilter_is_measurement_only(self):
+    def test_prefilter_drops_a_node_whose_ledger_is_full(self):
         # node2 has been placed with 16 vCPUs which have not booted yet,
-        # so its measurement still reads zero and the pre-filter keeps
-        # it. That is not a regression of issue 3498: the placement
-        # which put those vCPUs there also drew them down from node2's
-        # capacity counters, so the guard inside place_instance() is
-        # what refuses the next create, not this pass.
+        # so its measurement still reads zero -- the whole time an
+        # instance spends fetching its image it is invisible to
+        # cpu_total_instance_vcpus. The placement did draw those vCPUs
+        # down from node2's counters, and the pre-filter reads those, so
+        # node2 leaves the candidate list here rather than surviving to
+        # be refused by the guard.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, used_cpus=16)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_prefilter_keeps_a_node_with_no_capacity_row(self):
+        # A node the reconciler has not sized (P7) is guarded by
+        # nothing: admission will let it through unguarded, so the
+        # pre-filter must not refuse it on a ledger which does not
+        # exist. Only the measurement applies there.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         self.mock_mariadb.create_instance(
-            'placed-1', cpus=8, place_on_node='node2')
-        self.mock_mariadb.create_instance(
-            'placed-2', cpus=8, place_on_node='node2')
+            'placed-1', cpus=16, place_on_node='node2')
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
         self.assertSetEqual(
             self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
 
-    def test_prefilter_reads_no_placements(self):
-        # The pre-filter must not read instance state or attributes: it
-        # is a metrics-denominated pass and the reads the stopgap made
-        # per placed instance per candidate are exactly the cost the
-        # counters removed.
+    def test_prefilter_does_not_charge_an_instance_for_itself(self):
+        # A reschedule (the start redirect, or preflight) runs against
+        # an instance which is already placed, and its vCPUs are already
+        # in that node's used_cpus. Charging them a second time would
+        # drop the node the instance is on from its own candidate list.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
-        self.mock_mariadb.create_instance(
-            'placed-1', cpus=16, place_on_node='node2')
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', cpus=4, place_on_node='node2')
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, used_cpus=16)
+
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertIn(self._node_uuid('node2'), nodes)
+
+    def test_prefilter_reads_the_counters_once(self):
+        # One query for the whole decision, not one per candidate: the
+        # per-placed-instance reads the issue-3498 stopgap made are the
+        # cost the counters exist to remove.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
-        with mock.patch('shakenfist.instance.placement_filter') as pf:
+        with mock.patch(
+                'shakenfist.mariadb.get_scheduler_node_capacity',
+                side_effect=(
+                    self.mock_mariadb._mariadb_get_scheduler_node_capacity
+                )) as gsnc:
             nodes = scheduler.Scheduler().find_candidates(fake_inst)
-        pf.assert_not_called()
+        self.assertEqual(1, gsnc.call_count)
         self.assertSetEqual(
             self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
 
