@@ -14,7 +14,7 @@ background knowledge assumed below.
 
 ---
 
-## Phase 1: The Host Side (VMM)
+## Step 1: The Host Side (VMM)
 
 All files in this phase are under `src/vmm/src/`.
 
@@ -143,7 +143,7 @@ contain few surprising design decisions.
 
 ---
 
-## Phase 2: The ABI Contract (Shared)
+## Step 2: The ABI Contract (Shared)
 
 The single file `src/shared/src/lib.rs` is the most important file in
 the codebase after `vmm/main.rs`.
@@ -212,7 +212,7 @@ point to the same host cluster, this bitmap catches it.
 
 ---
 
-## Phase 3: The Guest Side (Core)
+## Step 3: The Guest Side (Core)
 
 ### Step 7: `core/src/main.rs` -- Guest boot
 
@@ -279,7 +279,7 @@ that receives configuration from the VMM at startup.
 
 ---
 
-## Phase 4: An Operation (Info)
+## Step 4: An Operation (Info)
 
 Now that you understand the infrastructure, read a complete operation
 to see how it all fits together.
@@ -317,7 +317,7 @@ backing file, etc.), and sends results back via `send_info_result()`.
 
 ---
 
-## Phase 5: A Format Crate (QCOW2)
+## Step 5: A Format Crate (QCOW2)
 
 ### Step 9: `crates/qcow2/src/lib.rs` -- QCOW2 parsing
 
@@ -355,7 +355,7 @@ Refcount table reading. Backing chain walking via `read_virtual_offset()`.
 
 ---
 
-## Phase 6: The Convert Operation
+## Step 6: The Convert Operation
 
 ### Step 10: `operations/convert/src/main.rs` -- Full pipeline
 
@@ -401,7 +401,7 @@ with format-specific defaults and validation ranges.
 
 ---
 
-## Phase 7: The Test Infrastructure
+## Step 7: The Test Infrastructure
 
 ### Step 11: `tests/` -- Integration tests
 

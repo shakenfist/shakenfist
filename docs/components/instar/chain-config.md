@@ -62,16 +62,16 @@ chain config.
 | 4 | `Vmdk3` | VMDK version 3 (COWD) |
 | 5 | `Vhd` | VHD/VPC |
 | 6 | `Vhdx` | VHDX |
-| 7 | `Qcow1` | QCOW version 1 — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 4 |
-| 8 | `Vdi` | VDI (VirtualBox) — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 2 |
-| 9 | `Qed` | QED (read-refused by policy, not because qemu deprecates it — see `docs/quirks.md` "Format-coverage phase 6") |
+| 7 | `Qcow1` | QCOW version 1 — full read support (convert/compare/dd/bench) |
+| 8 | `Vdi` | VDI (VirtualBox) — full read support (convert/compare/dd/bench) |
+| 9 | `Qed` | QED (read-refused by policy, not because qemu deprecates it — see `docs/quirks.md` "QED read-refusal as policy") |
 | 10 | `Iso` | ISO 9660 |
 | 11 | `Luks` | LUKS encrypted container |
 | 12 | `VmdkDescriptor` | VMDK monolithicFlat descriptor file (text; content lives in a separate flat extent file) |
-| 13 | `Parallels` | Parallels Disk Image, both magics — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 3 |
+| 13 | `Parallels` | Parallels Disk Image, both magics — full read support (convert/compare/dd/bench) |
 | 14 | `Bochs` | Bochs growing disk image — detection and info only, no read path |
 | 15 | `Cloop` | cloop compressed loopback image — detection and info only, no read path |
-| 16 | `Dmg` | Apple UDIF disk image — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 5 |
+| 16 | `Dmg` | Apple UDIF disk image — full read support (convert/compare/dd/bench) |
 
 ## Feature Flags
 

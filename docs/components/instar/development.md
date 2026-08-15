@@ -275,7 +275,7 @@ and format confusion attacks (polyglot files, truncated headers, VMDK
 descriptor attacks). CVE reproduction tests verify that 6 known qemu-img CVEs
 (CVE-2024-32498, CVE-2015-5163, CVE-2022-47951, CVE-2015-5162, CVE-2014-0223,
 CVE-2024-4467) are fully mitigated by instar's architecture.
-`tests/test_snapshot.py` (phase 11) adds 94 snapshot-subcommand tests: the
+`tests/test_snapshot.py` adds 94 snapshot-subcommand tests: the
 12-image list matrix against cross-version baselines, 12 JSON golden
 comparisons with a structural cross-check, mutation round-trips
 (create/delete/apply) with `qemu-img check` post-op assertions, error paths
@@ -568,3 +568,150 @@ python3 scripts/extract-fuzz-corpus.py --testdata /path/to/instar-testdata
 The CI workflow runs nightly at 04:00 UTC. Crashes are minimized and
 filed as GitHub Issues with the `security-audit` label immediately.
 See `src/fuzz/` for target implementations.
+
+## Build and dev containers
+
+The build runs in two devcontainer images: a minimal `debian:bullseye`
+release build image (`src/.devcontainer/build/Dockerfile`, image
+`instar-release`) that produces the binary and packages at a low glibc
+floor, and the full Debian dev/test image
+(`src/.devcontainer/Dockerfile`, image `instar-build`) that runs the
+test, fuzz, and audit suites. `make instar`/`deb`/`rpm` use the former;
+everything else uses the latter. See
+[docs/development.md](https://github.com/shakenfist/instar/blob/develop/docs/development.md)
+for which target uses which image and why bullseye.
+
+## Toolchain pinning
+
+Both devcontainer Dockerfiles pin the same Rust nightly via
+`ARG RUST_NIGHTLY=nightly-YYYY-MM-DD` — a broken floating nightly
+otherwise breaks every from-scratch image build (a 2026-07-24 nightly
+ICE'd compiling tokio inside `cargo install cargo-audit` and took out
+CI's "Build devcontainer" step). Renovate cannot bump rustup toolchain
+pins; instead the weekly `rust-nightly-bump` workflow
+(`tools/ci/bump-rust-nightly.sh`) rewrites and test-builds **both**
+images, then instar and the Rust test suite, against the newest
+published nightly and opens a bump PR only when everything passes. Do
+not un-pin the toolchain, and do not bump the pin by hand without at
+least building both images. (The lint container is separate and uses a
+stable `rust:` tag Renovate does manage; the dev image's Debian base is
+pinned by digest and Renovate walks it forward.)
+
+## CI tooling guards
+
+The `ci-tooling` CI job runs the cheap guards over CI's own tooling:
+the test-partition check below, plus
+`tools/ci/test-report-fuzz-crash.sh` and
+`tools/ci/test-pick-fuzz-artifact.sh` for the coverage-fuzz helpers
+(see "Crash reporting" in [docs/testing.md](/components/instar/testing/)). It is
+also the job named in `automated_reviewer`'s `needs` list, which is
+required to list every job that can fail a PR.
+
+Integration tests are split across several CI jobs by stestr regex
+selectors (the `test-container-*` Makefile targets).
+`tools/ci/check-test-partition.sh` fails if
+any `test_*.py` test is run by **no** pull-request job. When you add a
+new integration test module or a new integration job, the guard
+validates that the new partition still covers everything; an orphan is
+a hard CI failure. Deliberate exclusions live in an allowlist in
+`tools/ci/check-test-partition.py` (currently just the malicious
+suite). See [docs/testing.md](/components/instar/testing/).
+
+## GitHub Automation
+
+The project includes Claude Code-powered GitHub automation for common PR tasks.
+
+## Available Bot Commands
+
+Comment on a PR with these commands (requires write access to the repository):
+
+- `@shakenfist-bot please re-review` - Request a fresh automated code review
+- `@shakenfist-bot please retest` - Re-run functional tests without pushing a new commit
+- `@shakenfist-bot please attempt to fix` - Have Claude attempt to fix failing tests
+- `@shakenfist-bot please address comments` - Have Claude address automated review
+  feedback, creating one commit per valid issue
+
+## How Automated Review Works
+
+The review job lives in the shared workflow
+`shakenfist/actions/.github/workflows/pr-auto-review.yml`, not in this
+repository. `automated_reviewer` in `functional-tests.yml` is only the caller:
+its `needs:` list names this project's test jobs, which is what gates the
+review on CI passing. The runner, the timeout, the bot-commit check and the
+fork restriction all live in the shared workflow.
+
+Reviews run on same-repository pull requests only. The reviewer runs Claude
+Code with `--dangerously-skip-permissions` while holding a token with
+`pull-requests: write` and `issues: write`, and the PR diff is untrusted
+input, so a fork PR is skipped rather than reviewed. Fork PRs get a skipped
+job, not a failing one.
+
+The automated reviewer outputs structured JSON that is:
+1. Validated against a JSON schema (`tools/review-schema.json`)
+2. GitHub issues are created for actionable items (action=fix or action=document)
+3. Rendered to human-readable markdown and posted as a PR comment
+4. The raw JSON is embedded in a collapsed `<details>` section at the end of
+   the comment, allowing the address-comments automation to extract it
+
+The review comment includes links to the created issues with "Closes #N" syntax,
+so issues are automatically closed when the PR merges.
+
+Each review item has an `action` field:
+- `fix` - Must be fixed before merging (creates an issue)
+- `document` - Documentation should be added (creates an issue)
+- `consider` - Optional improvement (reviewer suggestion)
+- `none` - Informational observation only
+
+## How Automated Comment Addressing Works
+
+When you trigger `@shakenfist-bot please address comments`:
+
+1. The bot extracts the `review.json` from the PR review comment (from the
+   embedded `<details>` section)
+2. It extracts items where `action` is `fix` or `document`
+3. For each actionable item, Claude Code:
+   - Analyzes whether the item should be addressed
+   - If valid: makes the fix, runs pre-commit, and stages changes
+   - If disagreeing: provides a rationale explaining why
+4. Each valid fix gets its own commit with attribution
+5. All commits are pushed and a summary is posted to the PR
+
+This allows reviewers to cherry-pick or drop individual fixes as needed.
+
+## Workflow Files
+
+- `.github/workflows/functional-tests.yml` - Main CI, and the caller for the
+  shared automated review workflow
+  (`shakenfist/actions/.github/workflows/pr-auto-review.yml`)
+- `.github/workflows/release.yml` - Release workflow (Sigstore-signed tags, GitHub Releases with pre-compiled binaries)
+- `.github/workflows/pr-re-review.yml` - Manual re-review trigger
+- `.github/workflows/pr-retest.yml` - Manual retest trigger via bot command
+- `.github/workflows/pr-fix-tests.yml` - Test failure fixing
+- `.github/workflows/pr-address-comments.yml` - Review comment addressing
+- `.github/workflows/test-drift-fix.yml` - Scheduled/on-demand test maintenance
+- `.github/workflows/differential-fuzz.yml` - On-demand differential fuzzing (instar vs qemu-img + libyal)
+- `.github/workflows/coverage-fuzz.yml` - Coverage-guided fuzzing of parser crates (nightly + PR)
+- `.github/workflows/fuzz-autofix.yml` - Automated fuzzer bug fix (daily Claude Code, 30-turn limit)
+- `.github/workflows/rust-nightly-bump.yml` - Weekly devcontainer Rust nightly pin bump (see "Toolchain pinning" above)
+- `.github/workflows/codeql-analysis.yml` - CodeQL static analysis (push/PR to develop, plus weekly cron)
+- `.github/workflows/supply-chain.yml` - gitleaks secret scanning on debian-13 (PR/push, plus weekly cron)
+
+The self-hosted runners have no Docker preinstalled, so any job touching
+`docker` or a container-backed Makefile target needs an "Install Docker"
+step -- see "Self-hosted runners and Docker" in `docs/development.md`.
+
+## Scripts
+
+- `tools/review-pr-with-claude.sh` - Performs automated PR reviews (outputs JSON)
+- `tools/address-comments-with-claude.sh` - Addresses review comments (reads JSON)
+- `tools/create-review-issues.py` - Creates GitHub issues for actionable items
+- `tools/render-review.py` - Renders review JSON to markdown (includes issue links)
+- `tools/review-schema.json` - JSON schema for review output validation
+- `scripts/differential-fuzz.py` - Differential fuzzing script (instar vs qemu-img + libyal)
+- `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata
+- `tools/ci/fuzz-tier.sh` - Computes tiered nightly per-target fuzz durations
+- `tools/ci/report-fuzz-crash.sh` - Files the `security-audit` issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in `docs/testing.md`)
+- `tools/ci/pick-fuzz-artifact.sh` - Chooses which libFuzzer artifact to report as the reproducer
+- `tools/ci/test-report-fuzz-crash.sh`, `tools/ci/test-pick-fuzz-artifact.sh` - Tests for those two; run them after any change (the `ci-tooling` CI job does)
+- `tools/ci/check-glibc-floor.sh` - Fails if the built `instar` binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
+- `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it

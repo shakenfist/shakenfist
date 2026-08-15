@@ -107,8 +107,7 @@ The qcow2 crate exposes two parser variants:
   snapshot subcommand to emit one wire record per entry
   without ballooning the guest's stack. (An unused
   `find_snapshot_streaming` convenience wrapper with the old
-  per-entry id-or-name semantics was removed in PLAN-snapshot
-  phase 14.)
+  per-entry id-or-name semantics was removed during the PLAN-snapshot work.)
 - **`snapshot_entry_to_record`** — planner converter from the
   internal `SnapshotEntry` to the wire-FFI
   `shared::SnapshotEntryRecord`. Splits `date_sec` into hi/lo
@@ -144,64 +143,64 @@ and the `SnapshotEntryRecord::ICOUNT_ABSENT` constant.
 The mutating snapshot operations (`-c` / `-d` / `-a`) compose
 their per-mode patch lists from pure mutator primitives in the
 `src/crates/snapshot/` crate (parallel to `commit` and `rebase`;
-landed in PLAN-snapshot phase 5). The crate is `no_std`, depends
+landed during the PLAN-snapshot work). The crate is `no_std`, depends
 only on `qcow2` for type / constant access, and operates on
 caller-staged byte slices without any I/O.
 
 - **`read_refcount_in_block`** / **`set_refcount_in_block`** —
-  scalar accessors for every spec-permitted refcount width
-  (1, 2, 4, 8, 16, 32, 64). The setter was lifted from
-  `resize::qcow2::set_refcount`; resize calls it through a
-  thin wrapper.
+ scalar accessors for every spec-permitted refcount width
+ (1, 2, 4, 8, 16, 32, 64). The setter was lifted from
+ `resize::qcow2::set_refcount`; resize calls it through a
+ thin wrapper.
 - **`check_refcount_after_addend`** — overflow-safe arithmetic
-  used by the two-pass refcount mutator's dry-run pass.
+ used by the two-pass refcount mutator's dry-run pass.
 - **`alloc_cluster_in_refblocks`** — cursor-driven linear scan
-  over staged refcount blocks. Claims the first zero entry and
-  returns its host byte offset. v1 supports 16-bit refcounts
-  only.
+ over staged refcount blocks. Claims the first zero entry and
+ returns its host byte offset. v1 supports 16-bit refcounts
+ only.
 - **`rewrite_l1_entry_copied_flag`** / **`rewrite_l2_entry_copied_flag`** —
-  set or clear `OFLAG_COPIED` on one L1 / L2 entry. The L2
-  helper handles both standard (8-byte stride) and extended-L2
-  (16-byte stride; subcluster bitmap untouched) layouts.
+ set or clear `OFLAG_COPIED` on one L1 / L2 entry. The L2
+ helper handles both standard (8-byte stride) and extended-L2
+ (16-byte stride; subcluster bitmap untouched) layouts.
 - **`for_each_cluster_in_l1`** — visitor that walks the
-  L1 -> L2 chain and yields one `L1ClusterRef` per allocated
-  cluster (Standard or Compressed); unallocated L1 and L2
-  entries are skipped.
+ L1 -> L2 chain and yields one `L1ClusterRef` per allocated
+ cluster (Standard or Compressed); unallocated L1 and L2
+ entries are skipped.
 - **`update_snapshot_refcount`** — two-pass composed mutator.
-  Pass 1 walks the relevant L1(s) and runs
-  `check_refcount_after_addend` for every cluster; on the first
-  overflow it returns `RefcountOverflow { at_host_offset }`
-  *before* mutating any refblock. Pass 2 walks again and applies
-  the new refcounts via `set_refcount_in_block`. Handles
-  `IncrementForCreate`, `DecrementForDelete`, and
-  `SwapForApply { from_l1, to_l1 }`. Both passes adjust every
-  reachable **data** cluster **and** each **L2 table cluster** —
-  once per non-zero L1 entry, after that entry's data clusters —
-  mirroring qemu's `qcow2_update_snapshot_refcount`
-  (`block/qcow2-refcount.c`). The L2-table bump is mandatory for
-  create: after a create the active L1 and the snapshot's L1 copy
-  share the same physical L2 tables, so each L2 cluster's refcount
-  must reach 2 for a later guest write to trigger the L2
-  copy-on-write instead of silently overwriting the snapshot's L2
-  in place. The function never touches the L1 table's own
-  clusters — the caller owns those (create allocates the snapshot
-  L1 copy at refcount 1; delete frees the snapshot L1 explicitly).
-  *(The L2-table coverage was added in PLAN-snapshot phase 6,
-  closing a phase 5 correctness gap.)*
+ Pass 1 walks the relevant L1(s) and runs
+ `check_refcount_after_addend` for every cluster; on the first
+ overflow it returns `RefcountOverflow { at_host_offset }`
+ *before* mutating any refblock. Pass 2 walks again and applies
+ the new refcounts via `set_refcount_in_block`. Handles
+ `IncrementForCreate`, `DecrementForDelete`, and
+ `SwapForApply { from_l1, to_l1 }`. Both passes adjust every
+ reachable **data** cluster **and** each **L2 table cluster** —
+ once per non-zero L1 entry, after that entry's data clusters —
+ mirroring qemu's `qcow2_update_snapshot_refcount`
+ (`block/qcow2-refcount.c`). The L2-table bump is mandatory for
+ create: after a create the active L1 and the snapshot's L1 copy
+ share the same physical L2 tables, so each L2 cluster's refcount
+ must reach 2 for a later guest write to trigger the L2
+ copy-on-write instead of silently overwriting the snapshot's L2
+ in place. The function never touches the L1 table's own
+ clusters — the caller owns those (create allocates the snapshot
+ L1 copy at refcount 1; delete frees the snapshot L1 explicitly).
+ *(The L2-table coverage was added during the PLAN-snapshot work,
+ closing a correctness gap.)*
 - **`update_copied_flags_for_l1`** — walks the L1, rewriting the
-  `OFLAG_COPIED` flag on each L1 and L2 entry based on the
-  cluster's current refcount (set when refcount==1, clear
-  otherwise). Returns the number of entries rewritten. L2 entries
-  that reference no cluster (UNALLOCATED, or ZERO_PLAIN on
-  standard L2) are **scrubbed**, not skipped: qemu's
-  `qcow2_update_snapshot_refcount` strips `OFLAG_COPIED` before
-  classifying and assigns `refcount = 0` to those entry types, so
-  a stale COPIED bit is actively cleared on every walk — the
-  walker mirrors that (added in PLAN-snapshot phase 8, closing a
-  phase 5–7 fidelity gap; the extended-L2 subcluster bitmap is
-  untouched).
+ `OFLAG_COPIED` flag on each L1 and L2 entry based on the
+ cluster's current refcount (set when refcount==1, clear
+ otherwise). Returns the number of entries rewritten. L2 entries
+ that reference no cluster (UNALLOCATED, or ZERO_PLAIN on
+ standard L2) are **scrubbed**, not skipped: qemu's
+ `qcow2_update_snapshot_refcount` strips `OFLAG_COPIED` before
+ classifying and assigns `refcount = 0` to those entry types, so
+ a stale COPIED bit is actively cleared on every walk — the
+ walker mirrors that (added during the PLAN-snapshot work, closing a
+ fidelity gap; the extended-L2 subcluster bitmap is
+ untouched).
 
-The phase 6 create planner adds these table-serialisation
+The create planner adds these table-serialisation
 helpers (`src/crates/snapshot/src/table.rs`):
 
 - **`alloc_contiguous_clusters_in_refblocks`** — first-fit scan
@@ -225,7 +224,7 @@ helpers (`src/crates/snapshot/src/table.rs`):
   `%lu`-style ID arithmetic for the `max(existing IDs) + 1`
   assignment qemu's `find_new_snapshot_id` performs.
 
-The phase 7 delete planner adds:
+The delete planner adds:
 
 - **`snapshot_table_entry_bounds`** — the (start offset, unpadded
   length) of one raw table entry, walking entries exactly like
@@ -244,12 +243,12 @@ The phase 7 delete planner adds:
   staged refblocks *before any disk write* while deferring the
   paired apply until after the commit-point header write.
 
-The phase 8 apply planner adds:
+The apply planner adds:
 
 - **`MatchMode`** / **`FoundSnapshot`** /
   **`find_snapshot_in_table`** — the raw-table snapshot finder
   with per-mode matching semantics. `NameOnly` is delete's single
-  name pass (the phase 7 inline find was refactored onto it);
+  name pass (the inline find was refactored onto it);
   `IdThenName` is apply's two-full-pass resolver (qemu's
   `find_snapshot_by_id_or_name`: a complete ID pass, then — only
   if no ID matched — a complete name pass, so a later ID match
@@ -266,7 +265,7 @@ staged region directly (commit-binary style), because the
 writeback needs `fsync` barriers *between* write groups, which a
 flat patch list cannot express. (A speculative `SnapshotPatch` /
 `SnapshotPlan` patch-list API sat unused in the crate root
-through phase 13 and was removed in PLAN-snapshot phase 14.)
+through and was removed during the PLAN-snapshot work.)
 
 ### Create write ordering (crash safety)
 

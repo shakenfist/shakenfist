@@ -938,8 +938,7 @@ guest. Use the positional `FILENAME` argument instead.
 
 `qemu-img map` walks the backing chain when present and
 emits a non-zero `depth` field in JSON output for extents
-that resolve through a parent image. instar's phase 1 / 2
-walkers report the active layer only and refuse sources
+that resolve through a parent image. instar's walkers report the active layer only and refuse sources
 that carry a backing/parent reference (qcow2
 `backing_file_offset != 0`, vhd `disk_type ==
 DISK_TYPE_DIFFERENCING`, vhdx `has_parent`). Chain
@@ -968,9 +967,8 @@ runs. instar's vhd walker reports them as `present: false,
 zero: true, data: false` (`Hole`), faithful to the on-disk
 BAT marker. Functionally equivalent for downstream consumers
 that care only about which bytes contain data; visually
-different in the `present` field. Phase 6's
-`KNOWN_MAP_DIVERGENCES` (`hyperv-dynamic-vhd`,
-`virtualpc-vhd`) and phase 8's differential fuzzer
+different in the `present` field. The `KNOWN_MAP_DIVERGENCES` (`hyperv-dynamic-vhd`,
+`virtualpc-vhd`) and the differential fuzzer
 (`MAP_FIELD_SKIPS` in `scripts/differential-fuzz.py`)
 both skip the `present` field on vpc sources for this
 reason.
@@ -978,8 +976,7 @@ reason.
 ### VHDX `PAYLOAD_BLOCK_PARTIALLY_PRESENT` is reported as `data: true`
 
 `qemu-img map` walks the per-sector bitmap for partially-
-present VHDX blocks and emits per-sector extents. instar's
-phase 1 vhdx walker treats `PARTIALLY_PRESENT` as fully
+present VHDX blocks and emits per-sector extents. instar's vhdx walker treats `PARTIALLY_PRESENT` as fully
 present (same posture as `scan_allocation`) and reports
 the entire block as one `data: true` extent. The
 per-sector-bitmap walk is tracked as future work.
@@ -1022,11 +1019,10 @@ the bitmap and classifies subclusters directly.
 ### qcow2 compressed clusters report `compressed: false`
 
 `qemu-img map` emits `compressed: true` for extents that
-back compressed-cluster L2 entries. instar's phase 1 qcow2
+back compressed-cluster L2 entries. instar's qcow2
 walker classifies compressed clusters as `Data` with the
 compressed-payload file offset, but does not carry the
-compressed bit through the FFI / protobuf path. The phase 4
-renderer emits `compressed: false` for every extent
+compressed bit through the FFI / protobuf path. The renderer emits `compressed: false` for every extent
 unconditionally. Extending `MapExtentRecord` and
 `MapExtentMessage` with a `compressed: bool` field is
 tracked as future work; once landed, the differential
@@ -1042,7 +1038,7 @@ incorrectly stated "no trailing newline" based on a
 misread of `cat -A` output — `cat -A` places the `$`
 end-of-line marker *before* each newline, including the
 trailing one, which made the trailing newline easy to
-miss in spot-check verification. Phase 6's full baseline
+miss in spot-check verification. The full baseline
 sweep surfaced the discrepancy and corrected the
 renderer.)
 
@@ -1127,8 +1123,7 @@ to the next CHS-aligned multiple (legacy VHD geometry layout);
 `instar create -f vpc` emits exact bytes. The divergence is
 typically < 256 KiB across the supported size range. Both files
 are valid VHDs — the difference surfaces only in the
-`virtual-size` field reported by `qemu-img info`. Phase 8b's
-`tests/test_create.py::KNOWN_WRITER_DIVERGENCES` skips every
+`virtual-size` field reported by `qemu-img info`. The `tests/test_create.py::KNOWN_WRITER_DIVERGENCES` skips every
 affected case; closing this gap is documented future work.
 
 ### qcow2 `compat=0.10` is silently upgraded to `1.1`
@@ -1153,7 +1148,7 @@ emit zstd-compressed clusters.
 At virtual sizes ≤ 1 GiB, `instar create -f vhdx` defaults to
 an 8 MiB block size; `qemu-img create -f vhdx` always defaults
 to 32 MiB. Specifying `-o block_size=...` (or `--block-size`)
-explicitly avoids the divergence — phase 8b's matrix
+explicitly avoids the divergence — the matrix
 demonstrates clean round-trip for explicit block-size cases
 (`1G-block-16M`, `1G-block-32M`). Future work is to match
 qemu's 32 MiB default at all virtual sizes.
@@ -1166,8 +1161,7 @@ at end-of-file. The footer is the only metadata.
 `qemu-img info` without an explicit `-f` flag auto-detects the
 file as `format=raw` because the leading bytes carry no magic;
 pass `-f vpc` explicitly to surface the vhd format. This is
-qemu's native behaviour and not a bug in either tool. Phase 7's
-baselines were recorded without `-f`, so phase 8's matrix
+qemu's native behaviour and not a bug in either tool. The baselines were recorded without `-f`, so the matrix
 comparison naturally agrees on both sides.
 
 ## resize subcommand quirks
@@ -1187,11 +1181,10 @@ Same shortcut and rationale as `create`.
 
 `qemu-img resize -f vpc|vmdk|vhdx ...` rejects with
 `qemu-img: Image format driver does not support resize` on
-every qemu-img version from 6.0.0 through 10.2.0 (the matrix
-phase 10 exercises). instar resizes all three. The phase 10
-baselines record qemu's rejection verbatim, both as
+every qemu-img version from 6.0.0 through 10.2.0 (which the
+matrix exercises). instar resizes all three. The baselines record qemu's rejection verbatim, both as
 documentation of the cross-tool gap and as a tripwire for the
-day qemu adds support. Phase 11's `TestResizeConsistency`
+day qemu adds support. The `TestResizeConsistency`
 covers vmdk/vhd/vhdx via an `instar create → resize → info →
 check` round-trip rather than a cross-tool diff. If
 `vmdkinfo` / `vhdiinfo` (libyal) ever gain resize support,
@@ -1222,8 +1215,7 @@ instar rejects the combination outright with
 qemu silently accepts the combination and discards the
 preallocation flag (the shrink still happens; the prealloc is
 a no-op). The deliberate divergence makes the user's
-intent explicit when they pass conflicting flags. Phase 11's
-`TestResizeErrorPaths` pins the rejection message.
+intent explicit when they pass conflicting flags. The `TestResizeErrorPaths` pins the rejection message.
 
 ### `--preallocation=metadata` on raw is rejected
 
@@ -1239,7 +1231,7 @@ The qcow2 grow planner returns
 `ResizeError::PreallocationUnsupported` for `metadata` mode
 (`resize: guest reported error 8: preallocation mode not
 supported by this format`). qemu supports it. The planner gap
-was deferred from phase 2c; the integration matrix carries it
+was deferred; the integration matrix carries it
 in `KNOWN_RESIZE_DIVERGENCES` and the differential fuzz
 picker filters the case so it doesn't show up as a finding.
 Closing the gap requires the same `Qcow2Layout` extension
@@ -1255,8 +1247,7 @@ persists across resize. The resize planner preserves whatever
 the create writer chose, so an `instar create -f vpc` →
 `instar resize -f vpc` round-trip stays internally
 consistent; an `instar resize` against a qemu-created VHD
-preserves the qemu CHS-rounded size in the output. Phase 11's
-`TestResizeConsistency` for vhd uses a `>= expected_final_size`
+preserves the qemu CHS-rounded size in the output. The `TestResizeConsistency` for vhd uses a `>= expected_final_size`
 assertion (rather than equality) to accommodate any future
 CHS-rounding alignment in the resize writer.
 
@@ -1285,8 +1276,7 @@ Future work — see the "Planner gaps" section.
 
 ### Same file is exposed as input device 0 and output device 1
 
-The resize guest binary reads via `read_output_sector` (new
-in phase 7) and writes via `write_output_sector`, both
+The resize guest binary reads via `read_output_sector` and writes via `write_output_sector`, both
 dispatching to the output device at MMIO slot 1. The core
 init unconditionally probes input device 0; the host
 satisfies the probe with a 1-sector tempfile stub that the
@@ -1296,7 +1286,7 @@ output backing at slot 1. Mirrors the same pattern
 phase-11 integration run surfaced this contract: an earlier
 revision attached the output at slot 0, which broke the
 guest's `init stage=probe device=output address=0x10001000`
-walk. Caught and fixed before phase 11 landed.
+walk. Caught and fixed during development.
 
 ### qcow2 grow has no image-size ceiling; qcow2 shrink does
 
@@ -1432,19 +1422,18 @@ overlay uses features instar rebase does not support
 Use -u for a metadata-only rebase or fall back to `qemu-img
 rebase` ``.
 
-The extended-L2 half is a live-defect fix: before phase 5
+The extended-L2 half is a live-defect fix: previously
 the safe-mode walk misread the 16-byte extended-L2 entries
 as 8-byte classic entries and silently corrupted the
 overlay's virtual content — exit 0, damage visible only on
 read-back (issue
 [#431](https://github.com/shakenfist/instar/issues/431),
-identified during phase 5 of
-PLAN-qcow2-write-infrastructure). The
+identified during the PLAN-qcow2-write-infrastructure work). The
 zstd/unknown-bit half is spec-mandated (the qcow2 spec
 requires refusing unknown incompatible bits) and is a
 narrowing: the zstd bit is inert when the image contains no
 compressed clusters, so such images rebased correctly
-before phase 5 and now refuse — the same posture as
+previously and now refuse — the same posture as
 commit's error 16. The refusal fires before any staging or
 mutation; `-u` metadata-only rebase only rewrites
 header/path bytes and stays allowed.
@@ -1468,20 +1457,19 @@ for commit's backing side
 it is stock-producible (a discard history followed by
 `qemu-img resize --shrink` frees all-zero refblocks below
 still-populated ones), passes `qemu-img check` cleanly, and
-before phase 5 rebase's staging compacted the nonzero table
+previously rebase's staging compacted the nonzero table
 entries and indexed them as if dense — silently writing
 refcounts into the wrong refblocks (1092 check errors plus
 32 leaked clusters at exit 0 in the probe that found it;
 the overlay-side rebase sibling of #428; issue
 [#430](https://github.com/shakenfist/instar/issues/430),
-identified during phase 5 of
-PLAN-qcow2-write-infrastructure). qemu-img rebases the same
+identified during the PLAN-qcow2-write-infrastructure work). qemu-img rebases the same
 shape check-clean. The
 refusal fires at staging time, before any mutation, and is
 byte-idempotent
 (`tests/test_rebase.py:TestRebaseOverlayClassification`).
 
-### Overlay staging capacity widened by the phase-5 migration
+### Overlay staging capacity widened by the write-infrastructure migration
 
 The migrated safe mode retires the stage-everything model
 for existing L2 tables (and with it the growable L2 arena
@@ -1491,7 +1479,7 @@ Overlays whose populated-L2 count previously refused
 `ERROR_SCRATCH_TOO_SMALL` at staging time — even when
 nothing needed copying — now rebase: the probe exemplar
 (cs=512, 64 MiB overlay, 512 populated L2 tables, identical
-chains) refused before phase 5 and now succeeds check-clean
+chains) refused previously and now succeeds check-clean
 with qemu-img parity. The L2 window is
 `min(256, 2 MiB / cluster_size)` slots with reachable (and
 safe) eviction; refblock staging is byte-capacity-driven at
@@ -1528,8 +1516,7 @@ binary does not enable the decompress feature — where
 unchanged by the phase-5 migration (lifting it means
 enabling decompression in the rebase binary, a size and
 scope question tracked as future work). Compressed entries
-in the OVERLAY itself are skipped, before and after
-phase 5: the skip probe treats any non-zero L2 entry as
+in the OVERLAY itself are skipped, before and subsequently: the skip probe treats any non-zero L2 entry as
 mapped.
 
 ### The chain reader honours the zero flag on classic L2 entries (fixed)
@@ -1544,8 +1531,7 @@ corruption. Blast radius: every consumer of the chain
 reader — rebase, convert, compare and bench. Pre-existing
 `crates/qcow2` defect
 ([#432](https://github.com/shakenfist/instar/issues/432)),
-identified during phase 5 of
-PLAN-qcow2-write-infrastructure and explicitly NOT fixed by
+identified during the PLAN-qcow2-write-infrastructure work and explicitly NOT fixed by
 it.
 
 **Fixed** as step 7z of that plan (the standalone read-path
@@ -1563,8 +1549,7 @@ avoid `write -z` seeds.
 ### Deep-allocation safe rebase refuses on refcount exhaustion instead of hanging
 
 Issue #422's apparent 512-byte-cluster livelock was a guest
-panic spinning in the panic handler, fixed in phase 2 of
-PLAN-qcow2-write-infrastructure (the staged-L2 lookup slice
+panic spinning in the panic handler, fixed during the PLAN-qcow2-write-infrastructure work (the staged-L2 lookup slice
 went stale after arena growth; the growth arena could also
 clobber the refblock staging regions). Safe-mode rebases
 that allocate deeply no longer hang: shapes that exceed the
@@ -1577,7 +1562,7 @@ refcount-growth generalization. Note the exhaustion refusal
 is not byte-idempotent (semantically-inert data clusters
 are written before the guest refuses; the image stays
 check-clean); making envelope refusals mutation-free is
-folded into phase 3's ordering contract.
+folded into the ordering contract.
 
 ### `Image rebased.` / `Image detached.` output matches qemu byte-for-byte
 
@@ -1611,7 +1596,7 @@ The host info operation doesn't currently surface vmdk
 monolithicSparse's `parentFileNameHint` via the
 `backing_file` field, so the host's `-b`-against-
 recorded-parent check refuses every vmdk commit without
-an explicit `-b`. Phase 9's matrix and round-trip vmdk
+an explicit `-b`. The matrix and round-trip vmdk
 cases all pass an explicit `-b base.vmdk`. Tracked
 separately under PLAN-info's vmdk follow-ups; once the
 info-side gap lifts, the implicit form will work too.
@@ -1698,15 +1683,14 @@ Commit refuses when the committed extent lands on a
 compressed L2 entry in the backing, using the existing
 `ERROR_UNSUPPORTED_FORMAT` code (the same code the
 overlay side has always used for compressed entries).
-Before phase 4 this shape was silently corrupted: the
+Before this shape was silently corrupted: the
 per-cluster loop masked the compressed entry's offset and
 overwrote it in place, destroying the deflate streams of
 every virtual cluster packed into that host cluster —
 exit 0, `qemu-img check` clean, damage visible only on
 read-back (issue
 [#427](https://github.com/shakenfist/instar/issues/427),
-identified during phase 4 of
-PLAN-qcow2-write-infrastructure). qemu-img handles the
+identified during the PLAN-qcow2-write-infrastructure work). qemu-img handles the
 same shape correctly: it allocates a fresh uncompressed
 cluster and leaves the other packed streams intact. The
 refusal is a classification refusal: clusters committed
@@ -1730,20 +1714,19 @@ The sparse-refcount-table shape matters: it is producible
 with stock qemu-img operations (a discard history followed
 by `qemu-img resize --shrink` frees all-zero refblocks
 below still-populated ones) and passes `qemu-img check`
-cleanly, and before phase 4 instar's staging compacted the
+cleanly, and previously instar's staging compacted the
 nonzero table entries and indexed them as if dense —
 silently writing refcounts into the wrong refblocks (2654
 check errors in the probe that found it; issue
 [#428](https://github.com/shakenfist/instar/issues/428),
-identified during phase 4 of
-PLAN-qcow2-write-infrastructure). qemu-img
+identified during the PLAN-qcow2-write-infrastructure work). qemu-img
 commits into the same shape check-clean. The sparse-table
 refusal fires at staging time, before any mutation; the
 other error-17 shapes are classification refusals with the
 same scaffolding posture as the compressed-cluster refusal
 above.
 
-### Backing staging capacity widened by the phase-4 migration
+### Backing staging capacity widened by the write-infrastructure migration
 
 The migrated backing side stages refblocks by byte
 capacity — `min(2048, 3 MiB / cluster_size)` refblocks,
@@ -1760,7 +1743,7 @@ unchanged, so overlay-bound shapes refuse exactly as
 before. The remaining backing-side ceiling is refcount
 exhaustion (`CommitResult` error 11 — v1 never appends new
 refblocks); retiring it is the master plan's
-refcount-growth generalization (phase 6).
+refcount-growth generalization.
 
 ### Unaligned virtual sizes commit cleanly
 
@@ -1772,7 +1755,7 @@ clamped to `virtual_size` and classifies as full coverage
 in `crates/qcow2-write` — bytes beyond end-of-virtual-size
 are not virtual content, so the beyond-EOV zero-fill is
 the correct pre-image regardless of backing. Probed
-empirically during phase 4: tail bytes past EOV are zeros
+empirically: tail bytes past EOV are zeros
 under both tools on stock fixtures, and the proof matrix's
 unaligned combo passed byte-identical with zero fallbacks
 to virtual-content comparison.
@@ -1825,7 +1808,7 @@ Since the phase-6 migration (PLAN-qcow2-write-infrastructure),
 `instar bench -w` on a qcow2 image runs its allocate-on-write
 path on the shared `crates/qcow2-write` planner and
 `crates/qcow2-write-exec` executor — bench is the third
-consumer after commit (phase 4) and rebase (phase 5). The read
+consumer after commit and rebase. The read
 path, raw `-w`, and the vmdk/vhd/vhdx read support are
 untouched. The quirks below record how the migration changed
 `-w` behaviour. bench's own oracle is `qemu-img compare` +
@@ -1884,11 +1867,10 @@ A qcow2 v3 zero-flag (`QCOW_OFLAG_ZERO`) on the L2 entry bench
 is about to overwrite refuses with code 9 (Variant A) —
 pre-migration bench blind-allocated over it and chain-filled a
 pre-image the reader mis-handled. A zero flag in a **backing**
-cluster reached through the COW read (Variant B) was, at phase
-6, still mis-filled: a read-path defect in `crates/qcow2`'s
+cluster reached through the COW read (Variant B) was, at, still mis-filled: a read-path defect in `crates/qcow2`'s
 `cluster_lookup`
 ([#432](https://github.com/shakenfist/instar/issues/432)), not
-fixed by phase 6.
+since fixed.
 
 **Fixed** in step 7z (the standalone read-path fix landed
 before the COW work): `cluster_lookup` now returns
@@ -1946,7 +1928,7 @@ full pass over the snapshot table comparing **IDs**, then — only
 if no ID matched — a second full pass comparing **names**. A
 later entry matching by ID beats an earlier entry matching by
 name; see the `snapshot -a` matcher-asymmetry table below for
-the collision example. (Before PLAN-snapshot phase 14, instar
+the collision example. (Before the PLAN-snapshot work, instar
 returned the first per-entry id-or-name hit, which picked the
 wrong snapshot on ID/name-collision images.)
 
@@ -1965,9 +1947,9 @@ it is future work.
 
 `qemu-img snapshot` documents `-l` as "the default" — running
 `qemu-img snapshot image.qcow2` without a mode flag lists the
-snapshot table and exits 0. Before phase 9, instar's clap ArgGroup
+snapshot table and exits 0. Previously, instar's clap ArgGroup
 had `required = true`, so the bare form produced a clap usage error
-(exit 2). Phase 9 fixes this: the ArgGroup is now `required = false`,
+(exit 2). This is now fixed: the ArgGroup is `required = false`,
 and `run_snapshot` routes an absent mode flag to the real list path
 (`run_snapshot_list`), producing byte-identical output to the
 explicit `-l` form.
@@ -1981,9 +1963,9 @@ explicit `-l` form.
 qemu-img: Could not open 'IMAGE': force-share=on can only be used with read-only images
 ```
 
-Before phase 9, instar accepted `-U` with mutating modes and
+Previously, instar accepted `-U` with mutating modes and
 performed the mutation (the flag was plumbed to the guest but
-unenforced at the host). Phase 9 adds a host-side gate in
+unenforced at the host). A host-side gate exists in
 `run_snapshot` that fires before any file access: `-U` combined with
 `-c`, `-d`, or `-a` exits 1 with:
 
@@ -2017,7 +1999,7 @@ tool:
 
 The flag is accepted for CLI compatibility and forwarded to the guest
 via `FLAG_QUIET`, but the guest likewise ignores it for all modes
-implemented so far. The phase 6 note ("`-q` has no visible effect on
+implemented so far. The note ("`-q` has no visible effect on
 create") generalises to all four modes.
 
 ### Mixed mode flags: clap exits 2, qemu exits 1 (D3)
@@ -2061,8 +2043,8 @@ qemu's `qemu-img snapshot -l` renders rows with C
 multibyte UTF-8 names (`snäp-名前` is 7 chars but 12 bytes).
 instar's renderer pads the ID and TAG columns by byte length so
 the row layout is byte-identical to qemu's for any name. Found
-by PLAN-snapshot phase 13's differential fuzzer on its first
-smoke run — the phase 10/11 fixture names were all ASCII, where
+by the PLAN-snapshot differential fuzzer on its first
+smoke run — the fixture names were all ASCII, where
 the two semantics agree.
 
 ### Inter-entry snapshot-table padding bytes may differ
@@ -2076,9 +2058,9 @@ and never touches the pad bytes. On a table allocated into a
 delete following an apply that freed data clusters — qemu's
 padding therefore retains stale bytes while instar's reads zero.
 Both images are valid: the padding is dead bytes no parser
-reads. Unreachable in the phase 6–8 byte-identity matrices
+reads. Unreachable in the byte-identity matrices
 (their tables always landed in fresh zero clusters); found by
-the phase 13 differential fuzzer, whose comparator zeroes the
+the differential fuzzer, whose comparator zeroes the
 live table's pad bytes on both sides per step, alongside its
 date normalization.
 
@@ -2098,14 +2080,14 @@ the JSON spec (`"`, `\`, and C0 controls) and is the right
 choice for untrusted automation. Pipe human output through
 `less` or similar when listing images you do not trust.
 
-### Zero `date_sec` renders the epoch (fixed in phase 14)
+### Zero `date_sec` renders the epoch (since fixed)
 
 For a snapshot-table entry whose `date_sec` is 0, `instar
 snapshot -l` renders the Unix epoch in local time
 (`1970-01-01 00:00:00` under `TZ=UTC`), byte-identical to
 `qemu-img snapshot -l`, which feeds 0 through `localtime` like
 any other value. instar originally early-returned a blank
-`DATE` column here; PLAN-snapshot phase 14 resolved the
+`DATE` column here; the PLAN-snapshot work resolved the
 divergence in favour of parity (the project's standing
 principle) and removed the early return — the `localtime_r`
 path handles 0 fine, and the JSON output path carries raw
@@ -2115,7 +2097,7 @@ The input is degenerate: it is unreachable via qemu-created
 images — both `qemu-img snapshot -c` and `instar snapshot -c`
 always stamp the wall-clock creation time, so a zero `date_sec`
 requires a hand-crafted table. The original divergence was
-found by PLAN-snapshot phase 13's date-normalization probes,
+found by the PLAN-snapshot date-normalization probes,
 which is why the differential fuzzer's comparator normalizes
 `date_sec`/`date_nsec` to a fixed **nonzero** sentinel
 (`0x60000000`/`0`): with the nonzero value both tools rendered
@@ -2136,17 +2118,17 @@ qemu-img snapshot dump rather than the qemu-img info dump.
 ### Cross-version listing format: instar tracks the modern layout
 
 `qemu-img snapshot -l` output changed format between qemu 8.x and
-9.0. The cross-version baseline matrix (phase 10) captures exactly
+9.0. The cross-version baseline matrix captures exactly
 two profile families:
 
 - **Old format** (qemu 6.0.0 through 8.2.x): column headers `VM
-  SIZE` and `VM CLOCK` (space-separated), clock rendered with
-  2-digit hours (`00:00:00.000`).
+ SIZE` and `VM CLOCK` (space-separated), clock rendered with
+ 2-digit hours (`00:00:00.000`).
 - **New format** (qemu 9.0.0 onward): column headers `VM_SIZE` and
-  `VM_CLOCK` (underscore-separated), clock rendered with 4-digit
-  hours (`0000:00:00.000`), matching instar's renderer from phase 4.
+ `VM_CLOCK` (underscore-separated), clock rendered with 4-digit
+ hours (`0000:00:00.000`), matching instar's renderer.
 
-instar implements the new (≥9.0) format. Phase 11 integration tests
+instar implements the new (≥9.0) format. The integration tests
 compare `instar snapshot -l` output against the newest-format
 profile and use the old-format profiles only to validate the
 captured baselines. The raw per-version baselines for all 80
@@ -2159,8 +2141,7 @@ matrix versions live in
 and the parser's copy cap raised from `.min(63)` to `.min(255)`.
 The wire record's `name` field is 256 bytes, so no truncation
 occurs for any name qemu-img can produce (qemu caps creation at
-255 bytes). Fixture `snap-qcow2-longname` (200-byte name) in the
-phase 10 baseline matrix produces byte-identical output to
+255 bytes). Fixture `snap-qcow2-longname` (200-byte name) in the baseline matrix produces byte-identical output to
 `qemu-img snapshot -l`.
 
 **Residual note**: names longer than the 256-byte wire buffer
@@ -2172,7 +2153,7 @@ create path refuses 256+ byte names with an error.
 ### `snapshot -c` (create) quirks
 
 The following apply to `instar snapshot -c NAME` (create mode,
-landed in PLAN-snapshot phase 6).
+landed during the PLAN-snapshot work).
 
 - **Duplicate names are allowed.** Creating two snapshots with the
   same `NAME` succeeds and yields two distinct entries (IDs `1`
@@ -2205,10 +2186,9 @@ landed in PLAN-snapshot phase 6).
   small cluster sizes, where per-create allocations are many
   clusters (at `cluster_size=512` a 64M image's L1 copy alone is
   32 clusters) and each refblock covers little file range. Found
-  by the phase 13 differential fuzzer; its chain generator pairs
-  512-byte clusters only with 4M images (the phase 6–8 matrix
-  pairing). Refcount-structure growth is future work (phase 6
-  open question 7).
+  by the differential fuzzer; its chain generator pairs
+  512-byte clusters only with 4M images (the matrix
+  pairing). Refcount-structure growth is future work (open question 7).
 
 - **Dirty / corrupt images refused.** `qemu-img` auto-repairs a
   dirty lazy-refcount image when it opens it read-write; instar v1
@@ -2257,7 +2237,7 @@ landed in PLAN-snapshot phase 6).
 ### `snapshot -d` (delete) quirks
 
 The following apply to `instar snapshot -d SNAPSHOT` (delete
-mode, landed in PLAN-snapshot phase 7). The feature gates
+mode, landed during the PLAN-snapshot work). The feature gates
 (`refcount_bits != 16`, compressed clusters, encryption, external
 data file, bitmaps, dirty/corrupt) are the same uniform set as
 `-c` above.
@@ -2308,7 +2288,7 @@ data file, bitmaps, dirty/corrupt) are the same uniform set as
 ### `snapshot -a` (apply) quirks
 
 The following apply to `instar snapshot -a SNAPSHOT` (apply /
-"goto" mode, landed in PLAN-snapshot phase 8). The feature gates
+"goto" mode, landed during the PLAN-snapshot work). The feature gates
 are the same uniform set as `-c` / `-d` above.
 
 - **Snapshot argument matching is asymmetric between `-d` and
@@ -2369,7 +2349,7 @@ are the same uniform set as `-c` / `-d` above.
   with `file.discard=ignore`, while instar never writes freed
   clusters. With the protocol-level discard disabled, post-apply
   images are **bit-for-bit identical** to instar's across every
-  scenario the phase 6-8 matrices verified, including diverged
+  scenario the matrices verified, including diverged
   applies — with one cache-pressure exception the differential
   fuzzer later surfaced (issue #381): qemu's `-1` refcount walk
   refreshes COPIED flags inside the old active chain's L2s
@@ -2420,7 +2400,7 @@ the two tools' `leaks` tiers have deliberately different scope.
 
 **Classification: Safe behaviour** (qemu-parity, not a divergence).
 
-Since phase 7 of PLAN-qcow2-write-infrastructure, writes into a
+Since the PLAN-q workcow2-write-infrastructure, writes into a
 snapshot-bearing qcow2 image **copy-on-write** the shared clusters
 instead of refusing (the phase-2 interim gates) or corrupting them.
 This cross-cutting change lifts the snapshot caveats from `commit`
@@ -2429,7 +2409,7 @@ so all three now succeed on images that carry internal snapshots.
 
 ### The per-op snapshot-view semantic
 
-Phase 7 is net-new behaviour, so the correctness bar is **qemu-parity,
+This is net-new behaviour, so the correctness bar is **qemu-parity,
 not before/after byte identity**: `qemu-img check` clean + the active
 view `qemu-img compare`-identical to a qemu twin + a snapshot
 **read-back oracle** that extracts each pre-existing snapshot's virtual
@@ -2524,9 +2504,9 @@ Verified check-clean and read-back-parity against pinned qemu-img
 snapshot-bearing iterations (0 divergences) by `scripts/cow-soak.py`;
 `tests/helpers/snapshot_readback.py` is the reusable read-back oracle.
 
-## Format-coverage phase 1: Parallels, Bochs, cloop, DMG detection
+## Parallels, Bochs, cloop and DMG detection
 
-Phase 1 of `PLAN-format-coverage.md` added content-based detection and
+The PLAN-f workormat-coverage.md` added content-based detection and
 info parity for Parallels, Bochs, cloop, and DMG. The five entries below
 record the deliberate divergences this introduced, plus the closure of a
 pre-existing consumer defect the phase surfaced along the way. See
@@ -2615,12 +2595,12 @@ koly trailer but no parseable chunk table fails to open, and
 `qemu-img info` errors out.
 
 instar's `info` support parses only the koly trailer — it does not
-walk the chunk table, even after phase 5 gave convert/compare/dd/
-bench a full chunk-table reader (see "Format-coverage phase 5" below)
+walk the chunk table, even now that convert/compare/dd/
+bench a full chunk-table reader
 — so it reports format name and virtual size directly from the
 trailer's `SectorCount` field, successfully, even when the chunk
 table is missing or empty. This is a deliberate scope boundary, not
-an oversight: `info` never needed the chunk table, and phase 5 did
+an oversight: `info` never needed the chunk table, and the read work did
 not add one to it.
 
 #### Why This Matters
@@ -2658,11 +2638,10 @@ chain reader's default arm read `Unknown` images as **raw bytes** —
 emitting the container's bytes zero-padded to the header-declared
 virtual size, with no error and no indication anything was wrong. This
 was tracked as [#444](https://github.com/shakenfist/instar/issues/444),
-confirmed by phase 1 step 1a's empirical pin (see the phase plan's
+confirmed by an empirical pin (see the plan's
 Findings section), and fixed by step 3b. `vdi` gained a full read path
-in phase 2 and `parallels` in phase 3; neither is part of this refused
-set any longer — see "Format-coverage phase 2" and "Format-coverage
-phase 3" below.
+ and `parallels`; neither is part of this refused
+set any longer — see the format-coverage sections and the format-coverage sections below.
 
 #### instar Behavior (after the fix)
 
@@ -2680,10 +2659,9 @@ reading (detection and info only)
 This closed the hole for `qed` (previously silently read as raw,
 contradicting its documented "detected, refused" stance) as well as
 the four newly detected formats. `vdi` and `parallels` were in the
-same set at the time this phase landed; phase 2 graduated `vdi` and
-phase 3 graduated `parallels` to full read paths instead, so neither
-appears among the refused formats any longer (see "Format-coverage
-phase 2" and "Format-coverage phase 3" below). There is no flag to
+same set at the time; `vdi` and `parallels` were later
+graduated to full read paths instead, so neither
+appears among the refused formats any longer (see the format-coverage sections and the format-coverage sections below). There is no flag to
 disable this refusal — unlike `instar info`, convert/compare/dd have
 no `--unsafe-quirks` path at all, so the refusal is unconditional.
 
@@ -2697,9 +2675,9 @@ content, so reading it as raw is semantically correct. qemu-img
 (which has no ISO driver at all) converts ISOs as raw routinely;
 refusing them would be a parity regression on a common workflow, not
 a safety fix. `vdi` and `parallels` were in the same "raw would
-misrepresent it" group as the others until phase 2 and phase 3
+misrepresent it" group as the others until they were graduated
 respectively, which gave them full readers instead of a refusal —
-see "Format-coverage phase 2" and "Format-coverage phase 3" below.
+see the format-coverage sections and the format-coverage sections below.
 
 This produces an asymmetry worth noting explicitly: standalone `instar
 info` on an ISO reports `iso` by default (secure mode) and `raw` only
@@ -2714,13 +2692,13 @@ This is intentional (see the phase-1 plan's post-1a management review
 decision) and is pinned by tests asserting the exact ISO pass-through
 byte sizes (`convert` 393216, `dd` 376832).
 
-### DMG Pass-Through as Raw in the In-Place Ops (phase-1 accepted behaviour, retained through phase 5)
+### DMG pass-through as raw in the in-place ops (accepted behaviour)
 
 **Classification: Safe Quirk** (accepted, tracked for future work)
 
 #### Observed Behavior
 
-The koly-trailer probe added in phase 1 is wired only into the guest
+The koly-trailer probe added is wired only into the guest
 `info` op, as the phase-1 plan specified. The in-place single-image ops
 — `resize`, `map`, `measure`, and the other guest ops that detect via
 `detect_format_from_header` directly rather than through the `info`
@@ -2731,8 +2709,8 @@ cloop are unaffected for these in-place ops — they are header-detected
 at offset 0, which *is* wired into `detect_format_from_header`, so
 `resize`/`map`/`measure` refuse all three correctly. Bochs and cloop
 still refuse in every op; `parallels`'s convert/compare/dd/bench
-refusal was lifted in phase 3, which gave it a full reader instead —
-see "Format-coverage phase 3" below for the current per-op picture.
+refusal was lifted, which gave it a full reader instead —
+see the format-coverage sections below for the current per-op picture.
 
 #### Why This Matters
 
@@ -2745,12 +2723,12 @@ Only the single-image in-place ops are affected, and only for DMG.
 
 #### instar Behavior
 
-**Accepted for phase 1 and unchanged by phase 5, pinned by tests**
+**Accepted and unchanged, pinned by tests**
 (`test_dmg_{resized,measured,reads}_as_raw`): resize, map, and measure
-treat a DMG the same as any other raw-detected file. Phase 5
+treat a DMG the same as any other raw-detected file. The DMG read work
 (PLAN-format-coverage-phase-05-dmg-read.md) graduated DMG to a full
 chunk-table reader for convert/compare/dd/bench — see
-"Format-coverage phase 5" below — but deliberately did **not** wire
+the format-coverage sections below — but deliberately did **not** wire
 the koly probe into these in-place ops or their host prefix probes;
 their raw pass-through is explicitly retained, not merely left over.
 Wiring the koly trailer probe into the host in-place-op prefix probes
@@ -2759,11 +2737,11 @@ work (`docs/plans/PLAN-format-coverage.md`, "Future work"). `check`
 has the same retained-raw-pass-through shape for a different reason —
 it refuses DMG outright (exit 63) rather than reading it, but still
 names the format "raw" because its own dispatch never runs the koly
-probe either; see "Format-coverage phase 5" below.
+probe either; see the format-coverage sections below.
 
-## Format-coverage phase 2: VDI convert-from (read path)
+## VDI convert-from (read path)
 
-Phase 2 of `PLAN-format-coverage.md` graduated VDI (VirtualBox Disk
+The PLAN-f workormat-coverage.md` graduated VDI (VirtualBox Disk
 Image) from detect + info only to a full read format for convert,
 compare, and dd, via a new `src/crates/vdi/` parser crate wired into
 the qcow2 crate's chain reader (the same pattern VHD and VHDX use).
@@ -2905,7 +2883,7 @@ not silently falling back to a raw read of the malformed container.
 scope for the reader graduation — it still reports whatever
 detection-level fields (format name, a plausible virtual size) the
 raw header bytes yield, and exits 0, even for images the reader itself
-refuses. This mirrors the same info-stays-lenient stance phase 1
+refuses. This mirrors the same info-stays-lenient stance
 established for malformed DMGs (see above).
 
 #### instar Behavior
@@ -2918,9 +2896,9 @@ output for all four ops across the five malformed fixtures without
 pinning instar's exact error string (only qemu-img's error strings are
 version-stable enough to pin).
 
-## Format-coverage phase 3: Parallels convert-from (read path)
+## Parallels convert-from (read path)
 
-Phase 3 of `PLAN-format-coverage.md` graduated Parallels from detect +
+The PLAN-f workormat-coverage.md` graduated Parallels from detect +
 info only to a full read format for convert, compare, dd, and bench,
 via a new `src/crates/parallels/` parser crate wired into the qcow2
 crate's chain reader (the same pattern VDI, VHD, and VHDX use). Both
@@ -3060,7 +3038,7 @@ successfully.
 This is instar choosing not to implement extension parsing rather
 than a parity bug: no shipped or creatable fixture has `ext_off` set
 to a valid extension (`qemu-img create -f parallels` never writes
-one), the extension adds no data to the read path phase 3 needs, and
+one), the extension adds no data to the read path needs, and
 silently ignoring an unparsed extension would risk misreading an
 image whose extension actually matters once one exists. Refusing
 cleanly is the safe default until a real need for extension support
@@ -3106,7 +3084,7 @@ reads `tracks` (offset 28) and sets `result.cluster_size = tracks <<
 `print_info_result_json`, `src/vmm/src/main.rs`) suppress
 `cluster_size` for the `"parallels"` format string specifically, in
 both human and JSON output — the same format-gated suppression
-mechanism phase 1 used for the dirty-flag JSON field. The suppression
+mechanism used for the dirty-flag JSON field. The suppression
 is format-gated, not value-gated, so a real nonzero `tracks` value
 stays hidden exactly as qemu's own silence does. Verified by a full
 `test_info_safe` run passing byte-identical against the qemu-img
@@ -3169,9 +3147,9 @@ crate's boundary unit tests reference the constant symbolically and
 needed no rewrite. Pinned by the `parallels-huge-tracks` fixture
 (`tracks` patched to 4186128, the smallest refused value).
 
-## Format-coverage phase 4: QCOW1 convert-from (read path)
+## QCOW1 convert-from (read path)
 
-Phase 4 of `PLAN-format-coverage.md` graduated QCOW1 ("qcow", qemu's
+The PLAN-f workormat-coverage.md` graduated QCOW1 ("qcow", qemu's
 original deprecated format, magic `QFI\xfb` + version 1) from a
 misdetected-as-QCOW2 dead end to a full read format for convert,
 compare, dd, and bench, via a new `src/crates/qcow1/` parser crate
@@ -3565,10 +3543,10 @@ instar regression.
 `qcow1-odd-size` diverges on vsize, per the odd-size section above)
 — confirmed live against real oslo.utils during step 4d.
 
-## Format-coverage phase 5: DMG convert-from (read path)
+## DMG convert-from (read path)
 
-Phase 5 of `PLAN-format-coverage.md` graduated DMG (Apple UDIF,
-detect + info only since phase 1) to a full read format for convert,
+The PLAN-f workormat-coverage.md` graduated DMG (Apple UDIF,
+detect + info only now) to a full read format for convert,
 compare, dd, and bench, via a new `src/crates/dmg/` parser crate
 wired into the qcow2 crate's chain reader (the same pattern VDI,
 Parallels, and QCOW1 use) — commits `f53817f` (plan), `e77b30b`
@@ -3857,11 +3835,11 @@ divergence into a real convert-time behavioural difference)
 
 #### Observed Behavior
 
-Phase 1 already recorded that qemu-img's DMG probe is almost
+It is already recorded above that qemu-img's DMG probe is almost
 entirely `.dmg`-filename-extension based, while instar detects DMG
 by content (the koly-trailer scan) regardless of filename (see
 "DMG Detection: Content-Based Trailer Probing vs qemu's Filename
-Extension" above). Before phase 5, this divergence was purely a
+Extension" above). Previously, this divergence was purely a
 detection-report difference, since convert/compare/dd refused all
 detected-but-unsupported formats via the #444 gate either way. Now
 that DMG has a real read path, the divergence has a real behavioural
@@ -3907,7 +3885,7 @@ names the real format (`"(vdi)"`, `"(parallels)"`, `"(qcow)"`) because
 those formats are header-detected at offset 0, which *is* wired into
 `detect_format_from_header` — `check`'s own format dispatch has no
 DMG arm and never runs the koly-trailer probe (that probe lives only
-in the `info` op's guest chain, as established in phase 1). So
+in the `info` op's guest chain, as established). So
 `instar check` on a DMG image sees the UDIF container as `Raw` and
 refuses with `This image format (raw) does not support checks`,
 exit 63 — a message naming the *wrong* format, unlike every other
@@ -3957,8 +3935,8 @@ gate refusal, no DMG reader involvement at all.
 
 #### Why This Matters
 
-This behaviour predates phase 5 (the detection collapse is phase-1
-logic), but phase 5's graduation of DMG to a real read format makes
+This behaviour predates the DMG read work (the detection collapse is original
+logic), but the graduation of DMG to a real read format makes
 it worth pinning explicitly: without a test, a future change to the
 #444 gate or the DMG reader's init path could accidentally start
 routing this fixture through the DMG reader (which would then need
@@ -3972,7 +3950,7 @@ pass-through on both `convert` and `dd` — the unknown-format
 exemption applies exactly as it does for any other raw-shaped
 detection, with no DMG-specific code path ever entered. `info` still
 reports whatever the trailer helper's `unknown`-collapsed view
-produces (unchanged from phase 1). This is treated as an accepted,
+produces (unchanged). This is treated as an accepted,
 pre-existing corner of the #444 gate's design, not a phase-5 defect.
 
 ### Typed Refusal Strings Are Guest-Side Debug Output, Not the User-Facing Failure
@@ -4057,11 +4035,11 @@ new region. Binary size grew by roughly +9.5 KB per DMG-enabled
 guest operation (convert now sits at roughly 41% of the 768 KB
 per-operation cap, per `make check-binary-sizes`).
 
-## Format-coverage phase 6: QED read-refusal as policy
+## QED read-refusal as policy
 
-Phase 6 of `PLAN-format-coverage.md` resolved the master plan's Open
+The PLAN-f workormat-coverage.md` resolved the master plan's Open
 question 1 — does QED get a read path, like VDI/Parallels/QCOW1/DMG in
-phases 2-5, or a principled, documented, fully-tested refusal? — by
+earlier work, or a principled, documented, fully-tested refusal? — by
 choosing refusal as deliberate policy, not a read path. Step 6a added
 QED-named refusal pins for every op that lacked one (check, map,
 measure, bench, resize, rebase, commit, amend, snapshot, bitmap;
@@ -4140,7 +4118,7 @@ The convert/compare/dd/bench/check/map/measure/resize/rebase/commit
 rows are genuine divergences — qemu-img performs these successfully on
 QED (all rc 0, empirically verified against qemu-img 10.0.11), instar
 refuses by policy, in the same recorded-divergence class as the
-map/measure scope refusals phases 2-5 chose for VDI/Parallels/QCOW1/
+map/measure scope refusals chosen for VDI/Parallels/QCOW1/
 DMG. Only the amend/snapshot/bitmap rows are **not** divergences:
 qemu-img itself refuses those on QED (no amend driver, no internal
 snapshots, no persistent-bitmap store), so there instar's refusal
@@ -4167,7 +4145,7 @@ surface, both pre-existing and orthogonal to this phase's scope:
 
 Normalising these would touch shared refusal-message code paths used
 by every other format's equivalent refusals, for a purely cosmetic,
-zero-user-value gain — explicitly out of scope for phase 6 (see the
+zero-user-value gain — explicitly out of scope (see the
 phase plan's "Out of scope" section).
 
 #### instar Behavior
@@ -4184,8 +4162,7 @@ behaviour change)
 #### Observed Behavior
 
 Earlier drafts of `docs/plans/PLAN-format-coverage.md` (and other
-repository docs) described QED as "(deprecated)" in qemu-img. Phase 6's
-empirical research found this to be **false**: QED has no entry in any
+repository docs) described QED as "(deprecated)" in qemu-img. The empirical research found this to be **false**: QED has no entry in any
 `deprecated.rst`/`removed-features.rst`, no runtime warning on any op
 or qemu version, and `qemu-img create -f qed` still succeeds on
 10.2.0. qemu-img reads, writes, checks, maps, measures, and benches

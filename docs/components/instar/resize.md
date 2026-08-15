@@ -146,35 +146,35 @@ entire data region. This is a deliberate divergence — see
 ## Known divergences from `qemu-img resize`
 
 - **vmdk / vpc / vhdx supported by instar only**. `qemu-img resize`
-  rejects every version of these formats with `Image format driver
-  does not support resize`. instar resizes all three; the baseline
-  matrix has no qemu side to diff against, so coverage is via the
-  internal consistency suite (`TestResizeConsistency`).
+ rejects every version of these formats with `Image format driver
+ does not support resize`. instar resizes all three; the baseline
+ matrix has no qemu side to diff against, so coverage is via the
+ internal consistency suite (`TestResizeConsistency`).
 - **Sparse-format data-region preallocation**. For grow with
-  `falloc`/`full`, instar preallocates only the appended file
-  region; qemu preallocates the entire data region. Documented in
-  `docs/quirks.md`. Full parity queued under Future work.
+ `falloc`/`full`, instar preallocates only the appended file
+ region; qemu preallocates the entire data region. Documented in
+ `docs/quirks.md`. Full parity queued under Future work.
 - **`--preallocation=falloc|full` + `--shrink`**. qemu silently
-  accepts and discards the flag; instar rejects with a clear
-  message. Deliberate divergence for user clarity.
+ accepts and discards the flag; instar rejects with a clear
+ message. Deliberate divergence for user clarity.
 - **`--preallocation=metadata` on raw**. qemu accepts and no-ops;
-  instar rejects with `--preallocation=metadata is not supported
-  for raw`. Same rationale.
+ instar rejects with `--preallocation=metadata is not supported
+ for raw`. Same rationale.
 - **qcow2 `--preallocation=metadata`**. The qcow2 grow planner
-  rejects with `preallocation mode not supported by this format`;
-  qemu supports it. Queued under Future work as the
-  `Preallocation::Metadata` planner gap from phase 2c.
+ rejects with `preallocation mode not supported by this format`;
+ qemu supports it. Queued under Future work as the
+ `Preallocation::Metadata` planner gap.
 - **VHD CHS-rounded virtual_size carry-forward**. VHD's legacy
-  geometry rounds virtual_size up to the next CHS-aligned multiple;
-  qemu rounds during create, instar emits exact bytes (documented
-  under `## create subcommand quirks`). The divergence persists
-  through resize — the resize planner preserves whatever the create
-  writer chose.
+ geometry rounds virtual_size up to the next CHS-aligned multiple;
+ qemu rounds during create, instar emits exact bytes (documented
+ under `## create subcommand quirks`). The divergence persists
+ through resize — the resize planner preserves whatever the create
+ writer chose.
 - **qcow2 images carrying persistent dirty bitmaps**. instar
-  **refuses** to resize them, because resizing rebuilds the header
-  cluster and would drop the qcow2 bitmaps extension (and its
-  bitmaps). `qemu-img resize` instead resizes the image,
-  dropping/invalidating the bitmaps. instar fails with:
+ **refuses** to resize them, because resizing rebuilds the header
+ cluster and would drop the qcow2 bitmaps extension (and its
+ bitmaps). `qemu-img resize` instead resizes the image,
+ dropping/invalidating the bitmaps. instar fails with:
 
   ```
   refusing to resize an image with persistent dirty bitmaps (would
@@ -193,63 +193,61 @@ The create-side carry-forwards are listed in
 
 ## Future work
 
-- qcow2 `Preallocation::Metadata` (phase 2c): emit the populated
-  L1/L2/refcount layout for the new range, mirroring create's
-  metadata mode.
-- vmdk shrink (phase 6): currently `UnsupportedShrink`; the
-  monolithicSparse format itself permits shrink, the planner just
-  doesn't implement the GD walk yet.
-- vhd shrink (phase 4): same — fixed grow + dynamic grow ship,
-  shrink is deferred.
-- vhdx shrink (phase 5): qemu has no upstream implementation to
-  mirror; we don't either.
-- Sparse-format data-region preallocation (phase 9): close the
-  qemu-parity gap on `falloc`/`full` for qcow2 / vhdx / vmdk /
-  vhd-dynamic. Each format needs a per-format walk-and-populate
-  pass over its data region.
+- qcow2 `Preallocation::Metadata`: emit the populated
+ L1/L2/refcount layout for the new range, mirroring create's
+ metadata mode.
+- vmdk shrink: currently `UnsupportedShrink`; the
+ monolithicSparse format itself permits shrink, the planner just
+ doesn't implement the GD walk yet.
+- vhd shrink: same — fixed grow + dynamic grow ship,
+ shrink is deferred.
+- vhdx shrink: qemu has no upstream implementation to
+ mirror; we don't either.
+- Sparse-format data-region preallocation: close the
+ qemu-parity gap on `falloc`/`full` for qcow2 / vhdx / vmdk /
+ vhd-dynamic. Each format needs a per-format walk-and-populate
+ pass over its data region.
 - vmdk multi-extent subformats (`twoGbMaxExtentSparse`,
-  `twoGbMaxExtentFlat`, `monolithicFlat`): currently rejected
-  with `UnsupportedSubformat`. Multi-file resize needs the same
-  multi-output-device call-table extension that create's roadmap
-  already calls out.
+ `twoGbMaxExtentFlat`, `monolithicFlat`): currently rejected
+ with `UnsupportedSubformat`. Multi-file resize needs the same
+ multi-output-device call-table extension that create's roadmap
+ already calls out.
 - Differencing VHD / VHDX as a resize target: rejected today;
-  needs the parent-locator update path.
-- `--object OBJDEF` and `--image-opts`: rejected at the host CLI
-  (phase 8). LUKS-encrypted resize would land alongside the
-  matching `--object` plumbing on the convert side.
+ needs the parent-locator update path.
+- `--object OBJDEF` and `--image-opts`: rejected at the host CLI. LUKS-encrypted resize would land alongside the
+ matching `--object` plumbing on the convert side.
 - Tightening `QCOW2_MAX_RESIZE_SCRATCH` (32 MiB) for non-default
-  cluster sizes. The differential fuzzer surfaced this — 2 MiB
-  cluster_size with even modest virtual sizes overflows the
-  scratch buffer (`image too large for the resize scratch
-  buffer`). The picker filters the combination today.
+ cluster sizes. The differential fuzzer surfaced this — 2 MiB
+ cluster_size with even modest virtual sizes overflows the
+ scratch buffer (`image too large for the resize scratch
+ buffer`). The picker filters the combination today.
 - Targeted shrink-side refcount-block pre-pass. Followup-01
-  lifted the per-cluster-size image-size ceiling for qcow2
-  *grow* by staging only the refcount blocks the chosen flavour
-  will touch.  Shrink retains the old "stage every non-zero
-  block" pre-pass and so retains the ceiling (~128 GiB at the
-  default 64 KiB cluster).  Lifting it requires a two-phase
-  shrink pre-pass: walk L2 tables first to identify which
-  clusters will be discarded, then stage only the refcount
-  blocks containing those clusters.
-- Planner-side defensive checks for inconsistent host inputs
-  (phase 12 finding; partially addressed by followup-01d's
-  vmdk `checked_mul`). The VHDX planner can return
-  `Ok(plan { total_file_size: 0 })` when the host passes
-  impossibly small file sizes — not reachable from real callers
-  (the host derives `current_file_size` from `stat()`) but worth
-  hardening; similar shapes elsewhere need a systematic sweep.
+ lifted the per-cluster-size image-size ceiling for qcow2
+ *grow* by staging only the refcount blocks the chosen flavour
+ will touch. Shrink retains the old "stage every non-zero
+ block" pre-pass and so retains the ceiling (~128 GiB at the
+ default 64 KiB cluster). Lifting it requires a two-phase
+ shrink pre-pass: walk L2 tables first to identify which
+ clusters will be discarded, then stage only the refcount
+ blocks containing those clusters.
+- Planner-side defensive checks for inconsistent host inputs (partially addressed by followup-01d's
+ vmdk `checked_mul`). The VHDX planner can return
+ `Ok(plan { total_file_size: 0 })` when the host passes
+ impossibly small file sizes — not reachable from real callers
+ (the host derives `current_file_size` from `stat()`) but worth
+ hardening; similar shapes elsewhere need a systematic sweep.
 - Re-parse round-trip in `fuzz_resize_planners`: reconstruct a
-  faithful starting image from the fuzzer's synthetic
-  existing-state bytes and re-parse with the matching format
-  crate.
+ faithful starting image from the fuzzer's synthetic
+ existing-state bytes and re-parse with the matching format
+ crate.
 - Curated seed corpus for `fuzz_resize_planners`. `scripts/
-  extract-fuzz-corpus.py` doesn't have a resize codepath today.
+ extract-fuzz-corpus.py` doesn't have a resize codepath today.
 - Populated-image differential coverage: today the differential
-  harness creates empty start images. Once data-region
-  preallocation parity lands, the populated-image variant
-  becomes meaningful.
+ harness creates empty start images. Once data-region
+ preallocation parity lands, the populated-image variant
+ becomes meaningful.
 - vmdk / vhd / vhdx differential coverage via libyal tools
-  (`vmdkinfo`, `vhdiinfo`) if they ever gain resize support.
+ (`vmdkinfo`, `vhdiinfo`) if they ever gain resize support.
 
 For the per-format resize planners, see
 `src/crates/resize/src/lib.rs` (the `plan_resize_*` functions).

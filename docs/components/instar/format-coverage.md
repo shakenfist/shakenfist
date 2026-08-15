@@ -55,7 +55,7 @@ for details on why this approach is secure.
 
 *† DMG is detected by content — scanning the file's final 1024 bytes for the koly trailer magic — not by the `.dmg` filename extension qemu-img probes for. A misnamed DMG (no `.dmg` suffix) still detects under instar but probes as raw under qemu-img. See [quirks.md](/components/instar/quirks/) for details.*
 
-*‡ QCOW1 detection was actually broken until PLAN-format-coverage phase 4 (2026-07-18), despite this document previously claiming "Yes": `detect_format_from_header` checked the QCOW2 magic first and never consulted the version field, so every real QCOW1 image (whose magic is byte-identical to QCOW2's, `QFI\xfb`) misdetected as QCOW2 — producing garbage `info` output (virtual size 0, a qcow2-shaped `compat: 0.10` block) and a misleading convert error. Detection is now version-aware: `QFI\xfb` + version 1 routes to QCOW1 ("qcow"), any other version keeps the QCOW2 route. See [quirks.md](/components/instar/quirks/) for the full record.*
+*‡ QCOW1 detection was actually broken until the PLAN-format-coverage work (2026-07-18), despite this document previously claiming "Yes": `detect_format_from_header` checked the QCOW2 magic first and never consulted the version field, so every real QCOW1 image (whose magic is byte-identical to QCOW2's, `QFI\xfb`) misdetected as QCOW2 — producing garbage `info` output (virtual size 0, a qcow2-shaped `compat: 0.10` block) and a misleading convert error. Detection is now version-aware: `QFI\xfb` + version 1 routes to QCOW1 ("qcow"), any other version keeps the QCOW2 route. See [quirks.md](/components/instar/quirks/) for the full record.*
 
 ### Formats Not Yet Detected by Instar
 
@@ -74,17 +74,17 @@ provide the detail behind.
 
 The underlying evidence for every divergence recorded here lives in the six
 `docs/quirks.md` "Format-coverage phase" sections:
-[phase 1](/components/instar/quirks/#format-coverage-phase-1-parallels-bochs-cloop-dmg-detection)
+[Parallels, Bochs, cloop and DMG detection](/components/instar/quirks/#parallels-bochs-cloop-and-dmg-detection)
 (detection, the #444 detect-only refusal, DMG raw pass-through in the in-place
 ops),
-[phase 2](/components/instar/quirks/#format-coverage-phase-2-vdi-convert-from-read-path) (VDI),
-[phase 3](/components/instar/quirks/#format-coverage-phase-3-parallels-convert-from-read-path)
+[VDI](/components/instar/quirks/#vdi-convert-from-read-path) (VDI),
+[Parallels](/components/instar/quirks/#parallels-convert-from-read-path)
 (Parallels),
-[phase 4](/components/instar/quirks/#format-coverage-phase-4-qcow1-convert-from-read-path)
+[QCOW1](/components/instar/quirks/#qcow1-convert-from-read-path)
 (QCOW1),
-[phase 5](/components/instar/quirks/#format-coverage-phase-5-dmg-convert-from-read-path) (DMG),
+[DMG](/components/instar/quirks/#dmg-convert-from-read-path) (DMG),
 and
-[phase 6](/components/instar/quirks/#format-coverage-phase-6-qed-read-refusal-as-policy) (QED).
+[QED](/components/instar/quirks/#qed-read-refusal-as-policy) (QED).
 Cells with no recorded source were measured empirically on 2026-07-20 against
 the built instar binary and qemu-img 10.0.11, using the existing
 instar-testdata fixtures; those measurements are recorded in
@@ -172,54 +172,53 @@ qed images; instar refuses those by scope, not by inability (note 15).
 ### Notes
 
 1. **VDI `check`** — instar refuses (exit 63, "does not support checks");
-   qemu-img validates the VDI block map (rc 0). Recorded in quirks.md phase 2
-   ("`check` Still Refuses VDI; `qemu-img check` Does Not").
+ qemu-img validates the VDI block map (rc 0). Recorded in quirks.md
+ ("`check` Still Refuses VDI; `qemu-img check` Does Not").
 2. **VDI / Parallels / QCOW1 `map` and `measure`** — instar refuses ("source
-   format unrecognised" / "source image is unsupported format"); qemu-img
-   supports both against these sources (rc 0). Deliberate scope divergence,
-   tracked as master-plan future work; QCOW1's is recorded in quirks.md
-   phase 4 ("`check`, `map`, and `measure`"). Measured 2026-07-20 vs
-   qemu-img 10.0.11.
+ format unrecognised" / "source image is unsupported format"); qemu-img
+ supports both against these sources (rc 0). Deliberate scope divergence,
+ tracked as master-plan future work; QCOW1's is recorded in quirks.md ("`check`, `map`, and `measure`"). Measured 2026-07-20 vs
+ qemu-img 10.0.11.
 3. **Parallels `check`** — instar refuses (exit 63); qemu-img has a Parallels
-   check but **asserts and crashes** (`parallels_check_duplicate`) on
-   adversarial BAT input on 10.x, where 6.0.0 reported cleanly — a real qemu
-   regression. Recorded in quirks.md phase 3.
+ check but **asserts and crashes** (`parallels_check_duplicate`) on
+ adversarial BAT input on 10.x, where 6.0.0 reported cleanly — a real qemu
+ regression. Recorded in quirks.md.
 4. **QCOW1 `check`** — genuine parity: **both** refuse (qemu's qcow driver has
-   no check implementation; instar exits 63 with a "(qcow)"-named message,
-   qemu with a shorter one). Recorded in quirks.md phase 4.
+ no check implementation; instar exits 63 with a "(qcow)"-named message,
+ qemu with a shorter one). Recorded in quirks.md.
 5. **DMG `check`** — both refuse (exit 63). instar's message names the format
-   **"raw"**, not "dmg", because `check`'s own dispatch never runs the koly
-   trailer probe. Recorded in quirks.md phase 5 ("`check` Names the Format
-   '(raw)', Not '(dmg)'").
+ **"raw"**, not "dmg", because `check`'s own dispatch never runs the koly
+ trailer probe. Recorded in quirks.md ("`check` Names the Format
+ '(raw)', Not '(dmg)'").
 6. **DMG `map` / `measure` / `resize`** — instar treats the UDIF container as a
-   **raw** disk image (the koly probe is wired only into the `info`/convert
-   chain, not these paths), so it returns success against the wrong bytes;
-   qemu-img handles the real DMG for `map`/`measure`, and under filename-probe
-   auto-detection also reads a `.dmg` as raw for `resize`. Recorded in
-   quirks.md phase 1 ("DMG Pass-Through as Raw in the In-Place Ops") and
-   phase 5. Measured 2026-07-20.
+ **raw** disk image (the koly probe is wired only into the `info`/convert
+ chain, not these paths), so it returns success against the wrong bytes;
+ qemu-img handles the real DMG for `map`/`measure`, and under filename-probe
+ auto-detection also reads a `.dmg` as raw for `resize`. Recorded in
+ quirks.md ("DMG Pass-Through as Raw in the In-Place Ops") and
+. Measured 2026-07-20.
 7. **QED (all cells)** — instar refuses every op except `info` **by policy**
-   (nil demand + oslo.utils' explicit QED ban), not by inability. qemu-img
-   performs convert / compare / dd / bench / check / map / measure / resize /
-   rebase / commit on QED (all rc 0), so those are recorded divergences;
-   `amend` / `snapshot` / `bitmap` are R= because qemu-img refuses them on QED
-   too. Full per-op record in quirks.md phase 6 ("QED Read-Refusal Is
-   Deliberate Policy, Not a Parity Gap").
+ (nil demand + oslo.utils' explicit QED ban), not by inability. qemu-img
+ performs convert / compare / dd / bench / check / map / measure / resize /
+ rebase / commit on QED (all rc 0), so those are recorded divergences;
+ `amend` / `snapshot` / `bitmap` are R= because qemu-img refuses them on QED
+ too. Full per-op record in quirks.md ("QED Read-Refusal Is
+ Deliberate Policy, Not a Parity Gap").
 8. **VMDK / VHD / VHDX `resize` and VMDK `rebase` — instar-only** — qemu-img
-   refuses these on every shipped version ("Image format driver does not
-   support resize / rebase"); instar performs them (monolithicSparse for
-   vmdk). See the Resize and Rebase Format Support tables below. Measured
-   2026-07-20.
+ refuses these on every shipped version ("Image format driver does not
+ support resize / rebase"); instar performs them (monolithicSparse for
+ vmdk). See the Resize and Rebase Format Support tables below. Measured
+ 2026-07-20.
 9. **VHD `check` — instar-only** — instar runs full VHD footer/BAT validation
-   (rc 0); qemu-img refuses `check` on vpc ("This image format does not
-   support checks", exit 63). Measured 2026-07-20.
+ (rc 0); qemu-img refuses `check` on vpc ("This image format does not
+ support checks", exit 63). Measured 2026-07-20.
 10. **VHDX `map` — instar-only** — instar emits the VHDX allocation map (rc 0);
     qemu-img `map` refuses dynamic VHDX ("File contains external, encrypted or
     compressed clusters", rc 1). Measured 2026-07-20.
 11. **Bochs / cloop convert / compare / dd / bench** — instar refuses via the
     #444 detect-only gate ("detected but not supported for reading (detection
     and info only)"); qemu-img reads both (rc 0). Bochs and cloop are
-    detect + info only in instar (quirks.md phase 1). Measured 2026-07-20.
+    detect + info only in instar (see quirks.md). Measured 2026-07-20.
 12. **Bochs / cloop `map` and `measure`** — instar refuses both. qemu-img
     **measures** both (rc 0) — an R‡ divergence — but its `map` also refuses
     both ("File contains external, encrypted or compressed clusters"), so `map`
@@ -227,7 +226,7 @@ qed images; instar refuses those by scope, not by inability (note 15).
     2026-07-20.
 13. **ISO** — instar reads ISO as **raw** for convert / compare / dd / map /
     measure / resize, matching qemu-img (which has no ISO driver and also reads
-    it as raw) — the deliberate #444 ISO exemption (quirks.md phase 1).
+    it as raw) — the deliberate #444 ISO exemption (see quirks.md).
     `check` is R= (both exit 63, instar naming "raw"). The one divergence is
     `bench`, which instar refuses ("bench: unsupported input format") where
     qemu-img benches the raw container (rc 0). Measured 2026-07-20.
@@ -422,8 +421,7 @@ cross-tool diff).
 For vmdk monolithicSparse, the implicit-`-b` resolution
 path is blocked because the host info operation doesn't
 currently expose vmdk monolithicSparse's
-`parentFileNameHint` via the `backing_file` field. Phase 9's
-matrix and round-trip tests use explicit `-b base.vmdk` to
+`parentFileNameHint` via the `backing_file` field. The matrix and round-trip tests use explicit `-b base.vmdk` to
 sidestep this; once the info-side gap lifts (tracked under
 PLAN-info's vmdk follow-ups), the implicit form will work
 too. See [docs/commit.md](/components/instar/commit/) and the "commit
@@ -513,11 +511,11 @@ full reference.
 
 | Format | Check | oslo.utils | instar |
 |--------|-------|------------|-------|
-| QED | Banned entirely | Rejects | Detects format; `info` reads correctly (byte-parity with qemu-img) but every other op is **refused by policy (phase 6)**, not just detected — a deliberate decision, not a parity gap: qemu-img converts/checks/maps/measures/benches/resizes/rebases/commits QED normally (all rc 0) but instar refuses all of those; only amend/snapshot/bitmap match qemu's own refusals. See [quirks.md](/components/instar/quirks/#format-coverage-phase-6-qed-read-refusal-as-policy) |
+| QED | Banned entirely | Rejects | Detects format; `info` reads correctly (byte-parity with qemu-img) but every other op is **refused by policy**, not just detected — a deliberate decision, not a parity gap: qemu-img converts/checks/maps/measures/benches/resizes/rebases/commits QED normally (all rc 0) but instar refuses all of those; only amend/snapshot/bitmap match qemu's own refusals. See [quirks.md](/components/instar/quirks/#qed-read-refusal-as-policy) |
 | LUKS | Version check (only v1) | Rejects v2+ | Detects format, version, cipher, hash, UUID, payload offset, key slots, inner format (with passphrase); convert decrypts v1/v2 containers |
 | VDI | None | Pass-through | Detects format, UUID; convert/compare/dd read via a full reader — header validated against qemu's 12 open-time rules, block-map entries bounds-checked, past-EOF block reads zero-filled (`check` still refuses, exit 63) |
 | Parallels | None | Pass-through | Detects format, magic, version; convert/compare/dd/bench read via a full reader — open validated per qemu's RO rules, BAT decoded per-magic (sector-valued v1, cluster-valued v2/ext), past-EOF and out-of-BAT reads zero-filled, `ext_off != 0` refused (`check` still refuses, exit 63) |
-| QCOW1 ("qcow") | None | Pass-through | Detects format (version-aware split from QCOW2, fixed in phase 4), cluster/L2 bits, backing file, encryption; convert/compare/dd/bench read via a full reader — per-cluster walk, backing-chain fall-through, raw-DEFLATE compressed clusters, past-EOF zero-fill (`check` still refuses, exit 63; `map`/`measure` still refuse, a recorded divergence since qemu supports both) |
+| QCOW1 ("qcow") | None | Pass-through | Detects format (version-aware split from QCOW2, since fixed), cluster/L2 bits, backing file, encryption; convert/compare/dd/bench read via a full reader — per-cluster walk, backing-chain fall-through, raw-DEFLATE compressed clusters, past-EOF zero-fill (`check` still refuses, exit 63; `map`/`measure` still refuse, a recorded divergence since qemu supports both) |
 | DMG (UDIF) | None | Pass-through | Detects format via koly-trailer content scan; convert/compare/dd/bench read via a full reader — koly + mish/BLKX chunk table (XML-plist and resource-fork paths), zero/raw/ignore/zlib codecs, typed refusals for unsupported codecs and over-cap chunks, gaps and truncation are read ERRORS (never zero-fill) (`check` still refuses, exit 63, naming the format "raw" since check never runs the koly probe; `map`/`measure`/`resize` still pass DMG through as raw, an unchanged divergence since qemu supports all three) |
 | ISO | None | Pass-through | Detects format* |
 | VHD | None | Pass-through | Detects creator app; full check validation (footer/header checksums, version/feature validation, BAT bounds, overlap detection, fragmentation, fixed VHD size check, footer copy consistency) |
@@ -608,7 +606,7 @@ full reference.
 
 | Image ID | Description | Safety | Key Features |
 |----------|-------------|--------|--------------|
-| qed-simple | QED format image | safe | `info` byte-parity with qemu-img; every other op refused by policy (phase 6) — not because qemu deprecates QED (it doesn't) |
+| qed-simple | QED format image | safe | `info` byte-parity with qemu-img; every other op refused by policy — not because qemu deprecates QED (it doesn't) |
 
 #### QCOW1 Images (12)
 
@@ -831,7 +829,7 @@ qcow2-luks).
 
 18. **VDI Input Support** - Convert, compare, and dd support VDI
     (VirtualBox Disk Image) as read-only input, both dynamic and
-    static images (`src/crates/vdi/`, PLAN-format-coverage phase 2).
+    static images (`src/crates/vdi/`).
     The header is validated against qemu's 12 open-time rules; the
     block map is walked with an allocation-order lookup through the
     standard sector-cached pattern. qemu parity is exact: discarded
@@ -849,7 +847,7 @@ qcow2-luks).
 19. **Parallels Input Support** - Convert, compare, dd, and bench
     support Parallels as read-only input, both the legacy
     "WithoutFreeSpace" (v1) and "WithouFreSpacExt" (v2/ext) magics
-    (`src/crates/parallels/`, PLAN-format-coverage phase 3). The
+    (`src/crates/parallels/`). The
     header is validated against qemu's RO open-time rules (tracks
     non-zero and under the empirically-corrected cap of 4186127,
     bat_entries under 0x3fffffff, a recognised magic, version 2,
@@ -876,7 +874,7 @@ qcow2-luks).
     support QCOW1 ("qcow", qemu's original copy-on-write format,
     superseded by qcow2 but not formally deprecated by qemu) as
     read-only input, including backing chains and compressed
-    clusters (`src/crates/qcow1/`, PLAN-format-coverage phase 4).
+    clusters (`src/crates/qcow1/`).
     This phase also **fixed a pre-existing detection defect**: real
     QCOW1 images were misdetected as QCOW2 because
     `detect_format_from_header` checked only the shared `QFI\xfb`
@@ -922,7 +920,7 @@ qcow2-luks).
 21. **DMG Input Support** - Convert, compare, dd, and bench support
     DMG (Apple UDIF) as read-only input, via a new `src/crates/dmg/`
     crate wired into the qcow2 crate's chain reader
-    (PLAN-format-coverage phase 5). The reader parses the koly
+    (`src/crates/dmg/`). The reader parses the koly
     trailer (reusing the phase-1 shared trailer helpers), then the
     chunk table from EITHER the XML-plist path (a byte-for-byte port
     of glib's lenient string-scanning base64 decoder — invalid
@@ -971,10 +969,10 @@ qcow2-luks).
     sees is the generic "convert operation failed" wrapper, matching
     the VDI-precedent posture for adversarial pins.
 
-22. **QED Read-Refusal as Policy** - Phase 6 resolved the master
+22. **QED Read-Refusal as Policy** - This resolved the master
     plan's Open question 1 (read support vs. refusal for QED) by
     choosing refusal as deliberate policy rather than a sixth read
-    path (PLAN-format-coverage phase 6). A per-op audit found zero
+    path. A per-op audit found zero
     dangerous cases: `info` already reads QED correctly (byte-parity
     with qemu-img), and every other subcommand refuses cleanly with a
     typed message and no file modification. QED-named refusal pins

@@ -9,7 +9,7 @@ If you discover a security vulnerability in instar, please report it
 via [GitHub Security Advisories](https://github.com/shakenfist/instar/security/advisories/new).
 Do not file public issues for security vulnerabilities.
 
-## Phase 1: Static Analysis and Code Review
+## Static analysis and code review
 
 **Date:** 2026-03-14
 **Scope:** All Rust source code in the instar workspace (15 crates)
@@ -226,7 +226,7 @@ These architectural properties are verified during every audit:
    checked arithmetic (`checked_mul`, `checked_add`) to prevent
    integer overflow.
 
-## Phase 4: CVE Reproduction
+## CVE reproduction
 
 **Date:** 2026-03-16
 **Scope:** 6 known qemu-img CVEs verified against instar
@@ -297,7 +297,7 @@ partition table). This attack class is architecturally impossible.
 None. All 6 CVEs are fully mitigated by instar's existing
 architecture. No new code changes were required.
 
-## Phase 5: VMM Boundary Audit
+## VMM boundary audit
 
 **Date:** 2026-03-17
 **Scope:** All host-side VMM code — virtio-block device emulation,
@@ -451,7 +451,7 @@ improvements:
 - I/O thread silently drops `process_queue` errors via `if let`.
 - Mutex `unwrap()` could cascade if another thread panics.
 
-## Phase 6: Coverage-Guided Fuzzing (2026-03-19)
+## Coverage-guided fuzzing (2026-03-19)
 
 ### Scope
 
