@@ -11672,6 +11672,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Phases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The CI suite's own awaits have the bug this plan fixes (#3770)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -12012,13 +12029,23 @@ running the command twice, which is why <code>execute</code> is not retried
 (decision 6).</p>
 <h3 id="command-dispatch-restructure">Command dispatch restructure<a class="headerlink" href="#command-dispatch-restructure" title="Permanent link">&para;</a></h3>
 <p>The if/elif chain in <code>_execute_inner()</code> (<code>execute</code> / <code>put-blob</code> /
-<code>chmod</code> / <code>get-file</code>) becomes a small per-command handler registry on
-<code>SideChannelExecutorJob</code>, where each handler declares:</p>
+<code>chmod</code> / <code>get-file</code>) becomes one handler class per command,
+instantiated once per <code>SideChannelExecutorJob</code> and looked up by
+command name, where each handler declares:</p>
 <ul>
 <li><code>reports_progress</code> (bool) — whether the progress timeout applies
   while this command is in flight;</li>
-<li>its dispatch method and reply handler(s).</li>
+<li><code>retryable</code> (bool) — whether phase 5 may retry it;</li>
+<li>its dispatch method.</li>
 </ul>
+<p>The registry does not own reply handling. Replies are dispatched on
+the protobuf field they carry rather than on a command name, and the
+two do not map one-to-one — <code>file_chunk_reply</code> acks put-blob chunks
+while <code>file_chunk</code> carries get-file payloads, and the same handler
+serves whichever command is in flight. Phase 4's <code>observe_progress()</code>
+calls therefore go inside the existing reply handlers, and the
+registry answers only "may this command's progress be timed out, and
+may it be retried".</p>
 <p>The registry makes "does this command support progress, and where
 would I observe it?" a question with an obvious answer for the next
 command someone adds. This is a mechanical refactor with no behaviour
@@ -12157,9 +12184,9 @@ the slot at all.</p>
 </tr>
 <tr>
 <td>1</td>
-<td></td>
-<td>Not started</td>
-<td>Field mask for <code>update_agent_operation_attributes</code>; command dispatch registry refactor (no behaviour change)</td>
+<td><a href="../PLAN-agent-operation-deadlines-phase-01-groundwork/">PLAN-agent-operation-deadlines-phase-01-groundwork.md</a></td>
+<td>Complete</td>
+<td>Field mask for <code>update_agent_operation_attributes</code>; per-command handler classes replacing the dispatch if/elif chain, declaring <code>reports_progress</code> and <code>retryable</code> for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises <code>GetException</code> rather than <code>AttributeError</code></td>
 </tr>
 <tr>
 <td>2</td>
@@ -12195,7 +12222,7 @@ the slot at all.</p>
 <td>7</td>
 <td></td>
 <td>Not started</td>
-<td>Docs (state machine, operator + developer guides), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all)</td>
+<td>Docs (state machine, operator + developer guides), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below)</td>
 </tr>
 </tbody>
 </table>
@@ -12208,6 +12235,41 @@ progress timeout (proving the progress timeout does not apply to
 non-progress commands), and a follow-up operation dispatching
 promptly after a first operation is expired (proving the executor
 slot is actually freed).</p>
+<h3 id="the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770">The CI suite's own awaits have the bug this plan fixes (#3770)<a class="headerlink" href="#the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770" title="Permanent link">&para;</a></h3>
+<p>Found during merge CI triage of PR #3764 and verified against the
+tree. <code>_await_agent_state</code>
+(<code>shakenfist/deploy/shakenfist_ci/base.py:436</code>) looks like a
+500-second deadline and is not one:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">time_since_last_progress</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">while</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">time_since_last_progress</span> <span class="o">&lt;</span> <span class="mi">500</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">...</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">system_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">if</span> <span class="n">events</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">last_event</span> <span class="o">=</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">time_since_last_progress</span> <span class="o">=</span> <span class="n">last_event</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span>
+</code></pre></div>
+<p><code>get_instance_events(..., limit=1)</code> returns the most recent event of
+<em>any</em> type, so an instance going nowhere while still emitting events
+on any sub-500s cadence renews the window forever. The variable is
+named for progress; nothing in the query restricts it to progress.
+<code>_await_instance_create</code> (<code>base.py:471</code>) is the identical
+construction with a 180-second window. In run 31856630647 this cost
+the Guests job its entire 60-minute budget: two agent-awaiting tests
+never completed, and because the step was killed rather than failed,
+stestr wrote no results and the job named no failing test at all.</p>
+<p>This is the same two-knob confusion the plan resolves server-side --
+a progress window is not a deadline -- so phase 7 fixes it the same
+way: keep the event-renewed progress window, add an absolute ceiling
+on the whole await, and prefer restricting renewal to events that
+actually represent progress. The ceiling is the part that converts a
+future occurrence from a silent budget fire into a diagnosable test
+failure with a console dump. While there, correct the timeout
+message, which says "no progress in 5 minutes" for a 500-second (8m
+20s) window.</p>
+<p>Note the causal link to #3516 is plausible but unproven: both stalled
+tests await an agent, but nothing in that run confirms an orphaned
+agent operation, and #3696 is a distinct symptom (there the runner
+lost communication and uploaded nothing).</p>
 
 
 
