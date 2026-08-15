@@ -495,7 +495,7 @@ the slot at all.
 | Phase | Plan | Status | Content |
 |-------|------|--------|---------|
 | 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Complete | Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan |
-| 1 | [PLAN-agent-operation-deadlines-phase-01-groundwork.md](PLAN-agent-operation-deadlines-phase-01-groundwork.md) | Planning | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change); initialising the get-file transfer state so its existing guard can fire |
+| 1 | [PLAN-agent-operation-deadlines-phase-01-groundwork.md](PLAN-agent-operation-deadlines-phase-01-groundwork.md) | Complete | Field mask for `update_agent_operation_attributes`; per-command handler classes replacing the dispatch if/elif chain, declaring `reports_progress` and `retryable` for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises `GetException` rather than `AttributeError` |
 | 2 | | Not started | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
 | 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
 | 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check) |
