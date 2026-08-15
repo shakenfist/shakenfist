@@ -27,6 +27,7 @@ class ImageElement:
     name: str           # Filename or digest hash
     data: object        # File-like object or None (skipped)
     layer_index: int | None = None  # Manifest position
+    temp_path: str | None = None    # Backing temp file, if any
 ```
 
 | Element Type | Description |
@@ -39,10 +40,66 @@ processing without loading entire images into memory. The `layer_index`
 field is set when layers are delivered out of order (see
 [Out-of-Order Delivery](#out-of-order-layer-delivery) below).
 
+`temp_path` names the temp file backing `data`, when the input had to spill
+the layer to disk. An output writer may `os.rename()` that file into place
+instead of copying bytes out of the file handle, which on the same
+filesystem avoids the copy entirely.
+
+**The hand-off rule:** an input only sets `temp_path` when it is willing to
+give the file away — `inputs/docker.py` passes it only for the last
+reference to a buffered layer, since an earlier reference still needs the
+file for a later yield. The input then unlinks the path in a `finally`
+block guarded by `os.path.exists()`, so an output that renamed the file
+away turns that cleanup into a no-op rather than an error.
+
+Two rules follow for anyone writing either half. An output must not move a
+file that has no `temp_path`, and must not touch `temp_path` after
+`process_image_element()` returns — the input frees it as soon as the call
+unwinds. An input must not set `temp_path` on a file it still needs, and
+must keep its unlink existence-guarded rather than unconditional.
+`outputs/directory.py` is the reference implementation of the output half,
+including the `shutil.move()` fallback for a cross-filesystem rename.
+
 ## Input Sources
 
-Input sources implement the `ImageInput` interface and provide image elements
-from various sources.
+Input sources implement the `ImageInput` interface (`inputs/base.py`) and
+provide image elements from various sources.
+
+```python
+class ImageInput(ABC):
+    image: str    # abstract property, the image name
+    tag: str      # abstract property, the image tag
+
+    @abstractmethod
+    def fetch(self, fetch_callback=None, ordered=True):
+        """Yield ImageElement instances."""
+
+    def get_manifest(self): return None
+    def get_config(self): return None
+```
+
+`fetch()` is the only abstract method. `fetch_callback` takes a layer
+digest and returns False to skip that layer, in which case the element is
+still yielded but with `data=None`. `ordered=True` yields layers in
+manifest order; `ordered=False` yields them as they become available with
+`layer_index` set (see
+[Out-of-Order Delivery](#out-of-order-layer-delivery)).
+
+`get_manifest()` and `get_config()` are optional metadata accessors that
+must not download layer blobs. They are what the read-only `info` and
+`check` commands consume. Both default to returning `None`, and **`None`
+means "this source cannot answer", not "the image has no such data"** — so
+a caller has to handle the null case rather than assume it is a failure:
+
+| Input | `get_manifest()` | `get_config()` |
+|-------|------------------|----------------|
+| `registry://`, `quay://` | Yes | Yes |
+| `docker://` | `None` — the daemon exposes no distribution manifest | Yes |
+| `tar://` | `None` | Yes |
+| `dockerpush://` | `None` | `None` — nothing is known until Docker pushes |
+
+`_build_info()` in `main.py` is the reference for degrading gracefully
+across all four cases.
 
 ### Registry Input
 
@@ -97,25 +154,16 @@ design.
 
 **Hybrid Streaming:**
 
-To minimize disk usage for large images, the Docker input uses a hybrid
-streaming approach:
+To minimize disk usage for large images, the Docker input streams the
+tarball sequentially and only buffers to a temp file when a layer arrives
+out of order. In the optimistic case no temp files are used at all, so a
+26GB image with in-order layers costs near zero disk. Temp file location
+is configurable via `--temp-dir`.
 
-```
-fetch() generator
-    └── Stream tarball sequentially (mode='r|')
-    └── Read manifest.json to get expected layer order
-    └── For each file in stream:
-        ├── If next expected layer: yield directly (zero disk I/O)
-        └── If out-of-order: buffer to temp file for later
-    └── After stream: yield remaining buffered layers in order
-```
-
-Key aspects:
-- In the optimistic case (layers in order), no temp files are used
-- Out-of-order layers are buffered to individual temp files
-- Temp files are deleted immediately after yielding
-- For a 26GB image with in-order layers, disk usage is near zero
-- Temp file location is configurable via `--temp-dir` option
+The mechanism — the inspect API call that pre-computes the manifest,
+tarball format detection, and the zero-buffering path for Docker 25+ — is
+described in
+[internals.md](/components/occystrap/internals/#docker-daemon-hybrid-streaming).
 
 ### Docker Push Input
 
@@ -244,6 +292,35 @@ Filters propagate the `requires_ordered_layers` property from their
 wrapped output, so the pipeline respects the final output's ordering
 needs.
 
+### The diff_id contract
+
+A filter that changes layer content invalidates the `rootfs.diff_ids` list
+in the image config, and the config normally arrives *before* the layers it
+describes. `ImageFilter` in `filters/base.py` resolves that ordering
+problem with four helpers, and a content-modifying filter must use all of
+them rather than forwarding the config itself:
+
+| Helper | Purpose |
+|--------|---------|
+| `_buffer_config(element)` | Hold the `CONFIG_FILE` back instead of forwarding it |
+| `_record_new_diff_id(sha256_hex, layer_index, original_hex=None)` | Record the digest of a rewritten layer |
+| `_skip_layer(layer_index)` | Advance the layer counter for a layer left untouched |
+| `_forward_buffered_config()` | Rewrite `diff_ids` and forward the config |
+
+`finalize()` calls `_forward_buffered_config()` for you, so the config is
+emitted last with the corrected digests. `_skip_layer()` matters because
+under ordered delivery `layer_index` is `None` and the base class is
+counting positions itself — a filter that silently drops a layer without
+calling it leaves every later diff_id attributed to the wrong position.
+
+`original_hex` is what makes the mapping usable across images. When it is
+supplied and differs from the new digest, the `original -> filtered` pair
+is recorded in the shared `diff_id_map`. Content-modifying filters must
+therefore accept a `diff_id_map` kwarg and forward it to the base class,
+and `PipelineBuilder.build_filter()` must be taught to pass it. Proxy mode
+depends on this: a layer already rewritten for one image is recognised when
+a second image references the original digest.
+
 ### Filter Capabilities
 
 Filters can:
@@ -292,30 +369,91 @@ Each filter wraps the next, forming a chain that processes elements in order.
 
 ## Output Writers
 
-Output writers implement the `ImageOutput` interface and handle the final
-destination of processed elements.
+Output writers implement the `ImageOutput` interface (`outputs/base.py`)
+and handle the final destination of processed elements.
 
-All output writers log a summary line at the end of processing.
+```python
+class ImageOutput(ABC):
+    @property
+    def requires_ordered_layers(self): ...
 
-The registry output provides a detailed breakdown of where time was spent:
+    @abstractmethod
+    def fetch_callback(self, digest): ...
 
+    @abstractmethod
+    def process_image_element(self, element): ...
+
+    @abstractmethod
+    def finalize(self): ...
+
+    def verify(self, full=False): return CheckResults()
 ```
-Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
-  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
+
+`fetch_callback()` returns False for a layer the destination already has,
+which is how a writer avoids paying for a download it would discard.
+`requires_ordered_layers` tells the driver whether this writer can cope
+with out-of-order delivery; the driver passes it straight to `fetch()` as
+`ordered`. `finalize()` runs once after the last element and is where
+manifests get written and files closed.
+
+`verify()` is optional and runs *after* `finalize()` and after any
+post-processing step such as `write_bundle()`. The base implementation
+returns an empty, passing `CheckResults`. `full=False` is the fast path —
+check that blobs and files exist and are the right size; `full=True`
+re-reads and revalidates the data. Record what you expect during
+`process_image_element()` and assert it in `verify()`; `DirWriter` is the
+reference implementation. `RegistryWriter.verify()` is the case worth
+knowing about, because `finalize()` closes every HTTP client, so it has to
+build a fresh one rather than reusing the pooled clients.
+
+### Driving the pipeline
+
+`_fetch()` in `main.py` is the driver that connects the two halves:
+
+```python
+ordered = output.requires_ordered_layers
+with redirect_logging():
+    for element in img.fetch(
+            fetch_callback=output.fetch_callback,
+            ordered=ordered):
+        output.process_image_element(element)
+    output.finalize()
 ```
 
-This shows:
-- **compress** - total CPU time spent compressing layers (summed across threads)
-- **upload** - total time spent on upload HTTP requests (summed across threads)
-- **upload_skipped** - number of blobs that already existed in the registry
-- **MB in / MB out** - uncompressed input size vs compressed output size
-- **ratio** - compression ratio (compressed / uncompressed as percentage)
+The `redirect_logging()` context manager comes from `progress.py` and
+routes log records around any active progress bar, so log lines do not
+interleave with the bar's redraws. `_fetch()` also attaches a
+`util.RequestStats` to the input if it has a `stats` attribute, and
+returns the byte, layer, retry and rate-limit counters for the caller to
+report.
 
-Other outputs log a simpler summary:
+All output writers log a structured summary line at the end of processing,
+emitted with `LOG.with_fields()` so the fields survive into log
+aggregation rather than being baked into a sentence.
 
-```
-Processed 12345678 bytes in 5 layers in 3.2 seconds
-```
+`ImageOutput._log_summary()` in `outputs/base.py` produces the common
+form, logged as `Processing complete`:
+
+| Field | Meaning |
+|-------|---------|
+| `bytes` | Total bytes seen by the writer |
+| `layers` | Number of `IMAGE_LAYER` elements written |
+| `elapsed_s` | Wall clock seconds, to one decimal place |
+
+The registry output overrides this in `RegistryWriter.finalize()` with a
+detailed breakdown of where time was spent, logged as `Push complete`:
+
+| Field | Meaning |
+|-------|---------|
+| `layers` | Number of layers in the pushed manifest |
+| `elapsed_s` | Wall clock seconds for the whole push |
+| `compress_s` | CPU time spent compressing layers, summed across threads |
+| `upload_s` | Time spent on upload HTTP requests, summed across threads |
+| `upload_skipped` | Blobs that already existed in the registry |
+| `cache_hits` | Layers served from the cross-invocation layer cache |
+| `input_mb` | Uncompressed input size |
+| `output_mb` | Compressed output size |
+| `ratio_pct` | Compression ratio, output over input, as a percentage |
 
 ### Tarball Output
 
@@ -516,6 +654,10 @@ and `exclude` to maximize layer deduplication:
 This means that if two images share identical layers (after filtering),
 the second push will skip uploading those layers entirely.
 
+The `compression.py` module that implements format detection, streaming
+compression and decompression, and media type mapping is described in
+[internals.md](/components/occystrap/internals/#layer-compression).
+
 ### Out-of-Order Layer Delivery
 
 The pipeline supports out-of-order layer delivery to maximize throughput
@@ -536,6 +678,10 @@ This is particularly beneficial for the registry-to-registry pipeline,
 where layers can start uploading as soon as they finish downloading
 rather than waiting for earlier layers to complete first.
 
+Per-output ordering requirements and the reasons behind them are
+tabulated in
+[internals.md](/components/occystrap/internals/#out-of-order-layer-delivery).
+
 ### Pipeline Reuse in Proxy Mode
 
 The `proxy` command demonstrates that the pipeline is fully reusable.
@@ -553,6 +699,10 @@ Proxy receives image push
     └── Decrement refcounts, delete blobs at refcount 0
     └── Return 201/500 to client
 ```
+
+The proxy's own internals — pull-through caching, per-image locking and
+the filtering rules — are in
+[internals.md](/components/occystrap/internals/#filtering-registry-proxy).
 
 `PipelineBuilder.build_pipeline()` creates new input/output/filter
 instances on each call with no shared mutable state, so running the
