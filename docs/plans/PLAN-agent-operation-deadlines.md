@@ -352,7 +352,17 @@ The if/elif chain in `_execute_inner()` (`execute` / `put-blob` /
 
 - `reports_progress` (bool) — whether the progress timeout applies
   while this command is in flight;
-- its dispatch method and reply handler(s).
+- `retryable` (bool) — whether phase 5 may retry it;
+- its dispatch method.
+
+The registry does not own reply handling. Replies are dispatched on
+the protobuf field they carry rather than on a command name, and the
+two do not map one-to-one — `file_chunk_reply` acks put-blob chunks
+while `file_chunk` carries get-file payloads, and the same handler
+serves whichever command is in flight. Phase 4's `observe_progress()`
+calls therefore go inside the existing reply handlers, and the
+registry answers only "may this command's progress be timed out, and
+may it be retried".
 
 The registry makes "does this command support progress, and where
 would I observe it?" a question with an obvious answer for the next
@@ -484,7 +494,7 @@ the slot at all.
 | Phase | Plan | Status | Content |
 |-------|------|--------|---------|
 | 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Complete | Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan |
-| 1 | | Not started | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change) |
+| 1 | [PLAN-agent-operation-deadlines-phase-01-groundwork.md](PLAN-agent-operation-deadlines-phase-01-groundwork.md) | Planning | Field mask for `update_agent_operation_attributes`; command dispatch registry refactor (no behaviour change); initialising the get-file transfer state so its existing guard can fire |
 | 2 | | Not started | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
 | 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
 | 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check) |
