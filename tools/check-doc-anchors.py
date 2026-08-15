@@ -2,22 +2,29 @@
 
 # Copyright 2026 Michael Still and contributors
 
-"""Check that intra-documentation anchor links resolve.
+"""Check that documentation links and their anchors resolve.
 
 A link like `[network](#network)` or
 `[object states](/developer_guide/state_machine/#upload)` fails silently when
 its target anchor does not exist: mkdocs does not warn, the link still renders,
 and the reader is dropped at the top of the page instead. A heading rename
-therefore breaks every inbound link to it without anything noticing.
+therefore breaks every inbound link to it without anything noticing. A link
+whose target *file* is gone fails just as quietly.
 
-This checker resolves each anchored link's target file, collects the anchors
-that file actually defines (both generated heading slugs and explicit `{#id}`
-attributes, which the attr_list extension honours), and reports the links whose
+This checker resolves each link's target file, reports the ones that do not
+exist, and for anchored links collects the anchors that the target file
+actually defines (both generated heading slugs and explicit `{#id}`
+attributes, which the attr_list extension honours) and reports the links whose
 anchor is absent.
 
-`docs/plans/` and `docs/components/` are excluded: plans are point-in-time
-records which are not maintained after they land, and components are
-synchronised in from other repositories.
+Sources are every page under `docs/` plus the root markdown files, which
+`ROOT_FILES` names. The root files are now indexes into `docs/` rather than
+documents in their own right, so their links are the ones a heading rename is
+most likely to break, and mkdocs never sees them at all.
+
+`docs/plans/` and `docs/components/` are excluded as sources: plans are
+point-in-time records which are not maintained after they land, and components
+are synchronised in from other repositories. Both remain valid link targets.
 """
 
 import os
@@ -31,9 +38,16 @@ EXCLUDED_PREFIXES = (
     os.path.join(DOCS_DIR, 'components'),
 )
 
+# Root markdown files which link into docs/. These are not part of the mkdocs
+# site, so nothing else validates them.
+ROOT_FILES = ('AGENTS.md', 'ARCHITECTURE.md', 'CLAUDE.md', 'README.md')
+
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.*?)\s*$')
 ATTR_ID_RE = re.compile(r'\{#([^}]+)\}')
 LINK_RE = re.compile(r'\]\(([^)\s]+)\)')
+# Anything addressed by scheme (https:, mailto:, ftp:) or protocol-relative
+# (//host/path) leaves the repository, so there is nothing here to resolve.
+EXTERNAL_RE = re.compile(r'^([a-z][a-z0-9+.-]*:|//)', re.IGNORECASE)
 
 
 def slugify(text):
@@ -65,7 +79,23 @@ def anchors_in(path):
     return found
 
 
-def markdown_files(docs_dir=DOCS_DIR):
+def repo_root_for(docs_dir):
+    """The directory the root markdown files live in.
+
+    Kept relative when docs_dir is, so a reported problem names
+    `AGENTS.md` rather than an absolute path into somebody's checkout.
+    """
+    return os.path.dirname(docs_dir) or os.curdir
+
+
+def markdown_files(docs_dir=DOCS_DIR, root_dir=None):
+    if root_dir is None:
+        root_dir = repo_root_for(docs_dir)
+    for filename in ROOT_FILES:
+        path = os.path.normpath(os.path.join(root_dir, filename))
+        if os.path.isfile(path):
+            yield path
+
     for dirpath, dirnames, filenames in os.walk(docs_dir):
         dirnames.sort()
         for filename in sorted(filenames):
@@ -97,30 +127,33 @@ def resolve_target(source, target_path, docs_dir=DOCS_DIR):
     return None
 
 
-def check_anchors(docs_dir=DOCS_DIR):
+def check_anchors(docs_dir=DOCS_DIR, root_dir=None):
     """Return a sorted list of human readable problem descriptions."""
     problems = []
     cache = {}
 
-    for source in markdown_files(docs_dir):
+    for source in markdown_files(docs_dir, root_dir=root_dir):
         with open(source, errors='replace') as f:
             content = f.read()
 
         for match in LINK_RE.finditer(content):
             link = match.group(1)
-            if link.startswith(('http://', 'https://', 'mailto:')):
-                continue
-            if '#' not in link:
+            if EXTERNAL_RE.match(link):
                 continue
 
-            target_path, anchor = link.split('#', 1)
-            if not anchor:
+            target_path, _, anchor = link.partition('#')
+            # A bare '#' is a deliberate no-op link, and an anchor-only link
+            # names the source file itself.
+            if not target_path and not anchor:
                 continue
 
             target = resolve_target(source, target_path, docs_dir=docs_dir)
             if not target:
                 problems.append(
                     f'{source}: {link} -> no such file')
+                continue
+
+            if not anchor:
                 continue
 
             if target not in cache:
@@ -137,7 +170,7 @@ def main():
     for problem in problems:
         print(problem)
     if problems:
-        print(f'\n{len(problems)} broken documentation anchor link(s).')
+        print(f'\n{len(problems)} broken documentation link(s).')
         return 1
     return 0
 

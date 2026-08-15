@@ -94,7 +94,7 @@ includes at minimum:
 | `node` | Name of the node that emitted the event |
 
 Note: the `event_uuid` field was named `correlation_id` in
-releases prior to phase 4 of the events-on-MariaDB migration.
+releases before the events-on-MariaDB migration completed.
 Clients that introspect either key need updating; clients that
 pass through the response dict opaquely need no change.
 
@@ -200,5 +200,5 @@ The new spool files live under `/srv/shakenfist/spool/eventlog/`
 and are managed automatically by the spool module.
 
 See [Database Architecture](database.md) for the broader
-MariaDB schema, and [ARCHITECTURE.md](../../ARCHITECTURE.md)
-for the full daemon picture.
+MariaDB schema, and `ARCHITECTURE.md` in the source repository for
+the full daemon picture.

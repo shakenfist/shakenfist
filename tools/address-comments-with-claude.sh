@@ -437,7 +437,11 @@ You are addressing a specific review comment on PR #${pr_number} for the Shaken 
 
 ## Context
 
-First, read AGENTS.md and ARCHITECTURE.md to understand the project structure.
+First, read AGENTS.md and ARCHITECTURE.md to understand the project
+structure, and follow their links into docs/developer_guide/ -- in
+particular coding_rules.md and standards.md -- before changing code.
+Both root files are indexes, so the rules themselves live behind
+those links.
 
 ## The Review Item to Address
 

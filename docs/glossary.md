@@ -7,10 +7,10 @@ names the sibling meaning so that a reader who arrived by search is not misled.
 Other documents should link here rather than redefining these terms.
 
 Definitions describe what the code does *today*. Entries which once carried a
-*(planned)* marker for the workload identity federation work have lost it: as
-of phase 3 of [PLAN-auth-federation](plans/PLAN-auth-federation.md), trusted
-issuers, mapping rules, identity tokens and scopes all exist and are described
-here as they behave. Should a future entry describe something not yet built, it
+*(planned)* marker for the workload identity federation work have lost it:
+trusted issuers, mapping rules, identity tokens and scopes all exist now and
+are described here as they behave. See
+[PLAN-auth-federation](plans/PLAN-auth-federation.md) for the design. Should a future entry describe something not yet built, it
 will say so explicitly.
 
 Entries are alphabetical. Each carries a short definition, a "Defined in"
@@ -60,8 +60,8 @@ access in Shaken Fist. The authorization noun is [scope](#scope).
 
 **cluster operation**{#cluster-operation} -- The internal work-queue object that
 tracks a unit of cluster-wide work through its own state machine. Defined in
-`ARCHITECTURE.md` ("Cluster Operation Tracking" and "Cluster Operation Storage
-and Work Queues"). Not to be confused with an *agent operation*, which is
+`docs/developer_guide/database_internals.md` ("Cluster Operation Tracking" and
+"Cluster Operation Storage and Work Queues"). Not to be confused with an *agent operation*, which is
 executed by the in-guest [agent](#agent) rather than by cluster daemons.
 
 **credential**{#credential} -- In the documentation this word appears mainly for
@@ -102,8 +102,9 @@ and the exchange in `shakenfist/external_api/auth.py`.
 VM with disks, network interfaces, and a lifecycle. Defined in
 `shakenfist/instance.py` and `docs/developer_guide/api_reference/instances.md`.
 Not to be confused with the generic "daemon instance" / "replica" sense used in
-`ARCHITECTURE.md` and `docs/operator_guide/database.md`, where "instance" means
-one running copy of the `sf-database` daemon.
+`docs/developer_guide/database_internals.md` and
+`docs/operator_guide/database.md`, where "instance" means one running copy of
+the `sf-database` daemon.
 
 **key**{#key} -- Primary sense: a [namespace key](#namespace-key). Other in-tree
 senses of the word that a reader may land on: the inter-node *service keys* used
@@ -183,11 +184,13 @@ which are configuration, not object types:
   (`docs/operator_guide/installation.md`).
 * *network node* -- the elected, singular ingress and egress point for all
   virtual networks, where floating IPs live; one per cluster
-  (`docs/operator_guide/installation.md`, `ARCHITECTURE.md`).
+  (`docs/operator_guide/installation.md`,
+  `docs/developer_guide/network_dispatcher.md`).
 * *hypervisor node* -- a node that runs virtual machine instances
   (`docs/operator_guide/installation.md`).
 * *database-tier node* -- a node running an `sf-database` daemon against the
-  shared MariaDB; none is elected (`ARCHITECTURE.md`,
+  shared MariaDB; none is elected
+  (`docs/developer_guide/database_internals.md`,
   `docs/operator_guide/database.md`).
 * *storage-only node* -- a node that stores blobs but runs no VMs, used to hold
   blobs that are not needed by currently running instances (`docs/features.md`).

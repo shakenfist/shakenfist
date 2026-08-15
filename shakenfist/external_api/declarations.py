@@ -352,8 +352,9 @@ def request_args_parameters(fn: ast.FunctionDef,
     ``ClusterOperationsEndpoint.get`` accepts its target parameters as
     body keys, via the ``log_request`` merge, but falls back to
     ``flask.request.args.get()`` for each so a raw ``?target_...=`` GET
-    keeps working -- the form AGENTS.md documents. A parameter read this
-    way is a query parameter whatever else it also is.
+    keeps working -- the form ``docs/developer_guide/writing_an_endpoint.md``
+    documents. A parameter read this way is a query parameter whatever
+    else it also is.
 
     Only two read forms are recognised: a ``.get()`` call with a
     literal key, and a literal subscript. Anything else touching

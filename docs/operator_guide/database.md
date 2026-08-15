@@ -168,7 +168,7 @@ each have their own single-column index on the type table.
 **When to use which entry point.**
 
 Name lookups from REST handlers should call the per-type `from_db_by_ref(name, namespace=ns)` class method
-(e.g. `Artifact.from_db_by_ref(ref, namespace=ns)`). This override was added in phases 2 and 3 and pushes
+(e.g. `Artifact.from_db_by_ref(ref, namespace=ns)`). The override pushes
 the name equality predicate to SQL.
 
 Bulk iteration scoped by state and/or namespace should use the iterator constructor directly:
@@ -186,7 +186,7 @@ The `network_interfaces` table has no `namespace` or `name` column. `find_networ
 strips both fields from the criteria before building the query; they are silently ignored. State pushdown
 still works. The two FK filter fields `network_uuid` and `instance_uuid` *are* honoured — they map to
 indexed columns on the `network_interfaces` table, and they are how `Network.networkinterfaces` and
-`Instance.interfaces` resolve their per-parent NI list (phase 7 of the SQL-pushdown plan: those properties
+`Instance.interfaces` resolve their per-parent NI list (those properties
 return hydrated `NetworkInterface` objects rather than the cached UUID list that used to live on the
 attribute table). The other `find_*` helpers leave the FK fields at their default of `None` because the
 underlying tables have no matching column.
@@ -539,8 +539,7 @@ second upsert cycle repopulates every live node — no backfill needed for a
 table whose rows are ephemeral by design.
 
 The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and
-`cluster_capacity`) belong to scheduler-reservations phase 2 and are
-maintained solely by a reconciler that runs every five minutes on the
+`cluster_capacity`) are maintained solely by a reconciler that runs every five minutes on the
 elected cluster node. Each pass is a single `ReconcileSchedulerCapacity`
 RPC which expires stale claims, re-derives each hypervisor's limits from
 the typed `node_metrics` columns (deliberately mirroring the scheduler's
@@ -550,7 +549,7 @@ recomputes the decaying expected-demand signal, and rebuilds the
 ensure-mariadb-schema` (run it before rolling the daemons after an
 upgrade, as always). In this release nothing consumes them for admission —
 the scheduler still admits directly from `node_metrics`; guarded-UPDATE
-admission against these counters arrives in a later release (phase 3 of
+admission against these counters arrives in a later release (see
 `docs/plans/PLAN-scheduler-reservations.md`). Operator-facing
 observability is the `scheduler_capacity_*` family of prometheus metrics
 (per-node limit/used/expected-demand gauges, cluster-row gauges, and
@@ -856,9 +855,10 @@ CREATE TABLE node_attributes (
 
 Cached lists of *child* object UUIDs are deliberately not stored on
 the parent attribute table — querying the child table by an indexed
-FK column is the source of truth. Phase 7 of the SQL-pushdown plan
-removed the last two such caches (`network_attributes.networkinterfaces`
-and `instance_attributes.interfaces`); see `PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md`.
+FK column is the source of truth. The last two such caches
+(`network_attributes.networkinterfaces` and
+`instance_attributes.interfaces`) have been removed; see
+`docs/plans/PLAN-sql-pushdown-filtering.md`.
 
 This approach:
 

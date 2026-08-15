@@ -97,15 +97,18 @@ repos:
         pass_filenames: false
 
       - id: check-doc-anchors
-        name: Check documentation anchor links resolve
+        name: Check documentation links and anchors resolve
         description: >-
           An intra-documentation link to an anchor which does not exist still
           renders, and silently drops the reader at the top of the target page.
           Neither mkdocs nor the docs-tests workflow notices, so a renamed
           heading breaks inbound links invisibly. Check them here instead.
+          The root markdown files are covered too: they are indexes into
+          docs/ and are not part of the mkdocs site, so nothing else looks
+          at their links at all.
         entry: python3 tools/check-doc-anchors.py
         language: system
-        files: ^docs/.*\.md$
+        files: ^(docs/.*\.md|AGENTS\.md|ARCHITECTURE\.md|CLAUDE\.md|README\.md)$
         pass_filenames: false
 
   # Type checking with mypy (incremental rollout via tox)

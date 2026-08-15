@@ -7,8 +7,9 @@ controls defer timing.
 
 ## Queue families
 
-Network operations are split across two queue families (see `ARCHITECTURE.md`
-for the full topology):
+Network operations are split across two queue families (see
+[sf-net daemon topology](#sf-net-daemon-topology) below for which node
+drains which):
 
 - **Per-node** (`{node_uuid}-network-{priority}`) — hypervisor-local operations
   such as `create_on_hypervisor` and `ensure_mesh`. The net-worker on that node
@@ -18,10 +19,22 @@ for the full topology):
   `add_floating_ip`, and `route_address`. Only the elected network node's
   net-worker drains these.
 
+A caller chooses the family with the `family` keyword argument of
+`enqueue_cluster_operation()` (`shakenfist/schema/operations/util.py`),
+which builds the queue name as `{target}-{family}-{priority}`. Passing
+`family='network'` with a node uuid as the target produces the per-node
+`{node_uuid}-network-{priority}` queues; the default
+`family='clusteroperation'` with `target='networknode'` produces the
+network-node queues.
+
 ## Dequeue and terminal-state check
 
-On each loop iteration the worker calls `mariadb.dequeue_work_item()` for each
-queue name in priority order, stopping at the first hit. Before executing the
+On each loop iteration the worker makes a single
+`mariadb.dequeue_work_items()` call passing all of its queue names in
+priority order, which claims up to `BATCH_SIZE` items in one round trip —
+see
+[Batched, priority-aware dequeue](database_internals.md#batched-priority-aware-dequeue)
+for the server side. Before executing each
 dequeued op it checks whether the op is already in a terminal state
 (`abort`, `complete`, `deleted`, or `error`). If so, the op is skipped
 (with an audit event) rather than executed — this prevents a stale
@@ -158,9 +171,9 @@ typed exception:
 Typed `except` branches in `dispatch_task` exist only where additional
 behaviour beyond the report is needed (e.g. logging at a different severity).
 
-## Phase 3 additions — floating-IP and route operations
+## Floating-IP and route operations
 
-After Phase 3, the following `Network` methods enqueue cluster operations and
+The following `Network` methods enqueue cluster operations and
 return op handles rather than performing host mutations inline:
 
 | Method | Op type | Queue family |
@@ -197,10 +210,10 @@ was received; the dispatch-time event records when the work actually ran and
 on which worker node. The two events are correlated by the shared op UUID
 present in both.
 
-## Phase 4 additions — dnsmasq operations
+## dnsmasq operations
 
-Phase 4 migrates all dnsmasq-related `Network` methods. The full set of
-migrated methods now spans:
+The dnsmasq-related `Network` methods are queue-dispatched too. The full set
+of migrated methods spans:
 
 | Method | Op type | Queue family |
 |--------|---------|--------------|
@@ -218,7 +231,7 @@ migrated methods now spans:
 
 ### New NetOp task types
 
-Two new task constants were added in Phase 4:
+Two task constants serve the dnsmasq path:
 
 - **`network_apply_update_dnsmasq` (9)** — applies a dnsmasq configuration
   refresh on the network node, used by both `update_dnsmasq` and
@@ -228,7 +241,7 @@ Two new task constants were added in Phase 4:
 
 The historical `network_update_dnsmasq` (3) and `network_remove_dnsmasq` (4)
 task constants remain in place for the broader reconciliation path used by
-`maintain.py`. Phase 6's `maintain.py` rewrite will retire them.
+`maintain.py`.
 
 ### In-worker sibling call pattern
 
@@ -257,18 +270,17 @@ BridgedVXLanNetwork(self)._apply_remove_dnsmasq(context)
 
 This keeps all host mutation inside `BridgedVXLanNetwork` (the worker-only
 mutation surface), avoids a queue round-trip, and eliminates the
-deadlock-by-timeout. The Phase 3 incarnation of these callers used the old
-inline mutation path; Phase 4 adopted this pattern when dnsmasq methods
-migrated, fixing the latent deadlock at the same time.
+deadlock-by-timeout. Earlier incarnations of these callers used the old
+inline mutation path, which carried a latent deadlock.
 
 The general rule: **never call `Network.X()` from inside a dispatcher handler
 if `X()` enqueues to the same queue family**. Always use
 `BridgedVXLanNetwork(self)._apply_X()` instead.
 
-## Phase 5 additions — lifecycle operations
+## Lifecycle operations
 
-Phase 5 migrates the four remaining host-mutating `Network` lifecycle methods,
-completing the full migration of all 15 host-mutating methods.
+The four `Network` lifecycle methods are queue-dispatched, completing the
+migration of all 15 host-mutating methods.
 
 ### Method-to-queue-family mapping
 
@@ -324,23 +336,22 @@ The existing `network_deploy` (5), `network_destroy` (6 — network-node variant
 and `network_update_dnsmasq` (3) task constants on `NetOp` continue to do
 broader reconciliation: `network_deploy` calls `create_on_network_node` +
 `ensure_mesh` for all cluster nodes; `network_update_dnsmasq` refreshes dnsmasq
-across the cluster. These reconciliation paths are used by `maintain.py` and will
-be revisited during the Phase 6 `maintain.py` rewrite.
+across the cluster. These reconciliation paths are used by `maintain.py`.
 
 ### In-class `_apply_X` cleanup
 
 `_apply_create_on_network_node` and `_apply_delete_on_network_node` call other
 `_apply_*` helpers directly on `self` (e.g. `self._apply_enable_nat`,
 `self._apply_update_dnsmasq`, `self._apply_remove_dnsmasq`) rather than going
-through `Network.X()`. This replaces the Phase 3-era pattern of late imports and
-the Phase 4-era workaround of constructing a fresh `BridgedVXLanNetwork(self)`
-inside the handler. The in-class call is cleaner, avoids the redundant wrapper
-construction, and makes the call graph explicit.
+through `Network.X()`. This replaces two earlier patterns — late imports, and
+constructing a fresh `BridgedVXLanNetwork(self)` inside the handler. The
+in-class call is cleaner, avoids the redundant wrapper construction, and makes
+the call graph explicit.
 
-## Phase 6: maintain.py and the discovery-only model
+## maintain.py and the discovery-only model
 
-Phase 6 rewrites `shakenfist/daemons/network/maintain.py` so that the maintain
-thread is **discovery-only**: it detects drift and enqueues reconciliation ops,
+`shakenfist/daemons/network/maintain.py` is **discovery-only**: the maintain
+thread detects drift and enqueues reconciliation ops,
 but never waits for them to complete. All `raise_for_error()` calls have been
 removed from the maintain loop. The net-worker dispatcher handles async
 reconciliation; the maintain thread's only job is to notice drift and express
@@ -562,7 +573,7 @@ it. Stray vxlans are the least urgent thing maintain does, so they fail alone.
 
 ### The `get_recent_terminal_op_states_for_target` MariaDB helper
 
-A new three-layer helper was added in Phase 6:
+A three-layer helper supports this:
 
 ```python
 mariadb.get_recent_terminal_op_states_for_target(
@@ -604,15 +615,15 @@ stops enqueuing reconciliation ops for it. The quiescence resolves automatically
 There is no separate "reset" command. The circuit-breaker is a read-only
 assessment of recent history — it never mutates state.
 
-## Phase 7: REST contract
+## REST contract
 
-Phase 7 completes the user-facing REST contract changes that make the async
+The user-facing REST contract reflects the async
 queue-based dispatch visible at the API boundary.
 
 ### 202+poll response shape for the two delete endpoints
 
 `DELETE /networks/<uuid>` and `DELETE /networks` now return HTTP 202 (Accepted)
-instead of 200. The delete work has always been queue-based after Phase 5, but
+instead of 200. The delete work is queue-based, but
 the previous response shape falsely implied synchronous completion. The new shapes
 are:
 
@@ -682,17 +693,17 @@ GET /clusteroperations?target_object_type=network&target_uuid=abc123...
   ]
 ```
 
-The new MariaDB helper `list_cluster_operations_for_target` (added in Phase 7)
+The MariaDB helper `list_cluster_operations_for_target`
 follows the same three-layer pattern (Python helper → gRPC → MariaDB) as the
 existing `has_pending_cluster_operation` and `get_recent_terminal_op_states_for_target`
-helpers from Phase 6.
+helpers described above.
 
 ### redirect_to_network_node — three sites removed, one retained
 
 The `@api_base.redirect_to_network_node` decorator proxied HTTP requests from
 the receiving API server to the network node's gunicorn on port 13000. After
-Phases 2–5 moved all host-mutating work into the queue, the decorator is no
-longer needed on most endpoints. Phase 7 removed it from three sites:
+all host-mutating work now goes through the queue, the decorator is no
+longer needed on most endpoints. It has been removed from three sites:
 
 | Endpoint | Reason for removal |
 |----------|--------------------|
@@ -762,13 +773,13 @@ hanging or producing unhandled exceptions. Operators who see `STATE_ERROR` on on
 of these task types after a rolling upgrade can safely re-deploy the affected
 network via the standard `Network.create_on_network_node()` / `ensure_mesh()` API.
 
-## Phase 8: NodeLock removal
+## NodeLock removal
 
-Phase 8 removed the 13 `NodeLock(global_scope=False)` wrappers from all
+The 13 `NodeLock(global_scope=False)` wrappers are gone from all
 `BridgedVXLanNetwork._apply_*` methods (commit `277b0572`). Those wrappers were
 added by stability-branch commit `bd9e1869` as a short-term guard against
 concurrent callers from four daemons (`sf-net`, `sf-queues`, `sf-api`, and
-`instance.py`). With Phases 2–7 landed, the dispatcher loop in this file is the
+`instance.py`). With the queue migration complete, the dispatcher loop is the
 **only** caller of every `_apply_*` method, and it is single-threaded by
 construction. The load-bearing invariant is the single-worker safety property
 documented in the "Single-worker safety invariant" section above (and in the
@@ -783,4 +794,110 @@ An important scope note: all 13 removed locks used `global_scope=False`, making
 them per-node `NodeLock`s, not `ClusterLock`s. The single-threaded-dispatcher
 argument covers per-node serialisation only. `ClusterLock`s serialise across the
 whole cluster via a different mechanism and remain in use for operations that
-require cluster-wide exclusion; the Phase 8 reasoning does not apply to them.
+require cluster-wide exclusion; the reasoning above does not apply to them.
+
+## sf-net daemon topology
+
+`sf-net` runs a `net-worker` job on **every** cluster node (not only the
+elected network node). Each node's worker drains its own per-node
+`{node_uuid}-network-*` queues for hypervisor-local operations
+(`create_on_hypervisor`, `ensure_mesh`). Additionally, the elected network
+node's worker also drains the cluster-wide `networknode-clusteroperation-*`
+queues for network-node-only operations (`create_on_network_node`,
+`add_floating_ip`, etc.). This two-family design means per-hypervisor network
+mutations are parallelised across nodes while network-node-singleton operations
+remain serialised.
+
+## Network facade architecture
+
+**Worker-only mutation surface.** `BridgedVXLanNetwork`
+(`shakenfist/network/bridged_vxlan_network.py`) is the only place that
+mutates host network state for a network which exists (the one exception,
+reaping devices belonging to networks which no longer exist, is described
+under "maintain is discovery-only" below). Its constructor is called
+exclusively from the
+single-threaded net-worker dispatcher
+(`shakenfist/daemons/network/workitem.py`) — making re-entrancy through
+the queue structurally impossible. External callers always hold `Network`;
+the dispatcher constructs `BridgedVXLanNetwork` and calls `_apply_*`
+methods on it. The single-worker-per-queue invariant (see the comment
+block at `self._defer_delays` in workitem.py) is a load-bearing property:
+it is why the dispatcher's in-memory exponential back-off map is correct,
+and why cross-daemon serialisation can be queue-based rather than
+lock-based. All `NodeLock(global_scope=False)` wrappers that formerly
+existed inside `_apply_*` methods have been removed — only `sf-net`
+dequeues and executes network work, so concurrent invocation across
+daemons cannot happen by construction. The cancellation check on dequeue
+runs before the `_apply_*` call; if the op is already cancelled, the
+worker skips execution and transitions the op to `STATE_ABORT`.
+
+**Network methods enqueue; maintain is discovery-only.** All 15
+host-mutating `Network` methods enqueue a cluster operation and return an
+op handle rather than mutating state directly. `shakenfist/daemons/network/maintain.py`
+is discovery-only: it never blocks on `raise_for_error()`. Each maintain
+pass applies a five-guard pipeline before enqueueing any reconciliation op
+at `PRIORITY.background` — (1) queue-depth safety, (2) per-network gating
+via `has_pending_cluster_operation`, (3) cooldown on recent errors,
+(4) circuit-breaker on repeated errors, (5) enqueue. The config knobs
+controlling maintain are `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50),
+`MAINTAIN_RECONCILE_COOLDOWN_SECONDS` (default 60),
+`MAINTAIN_RECONCILE_CIRCUIT_K` (default 5) and
+`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS` (default 300, see below).
+
+**The one exception: reaping stray vxlans.** Maintain deletes orphaned
+vxlan devices (`_handle_stray_vxlans()`) directly, on the maintain thread,
+rather than through the queue. This is deliberate and is the only
+host-mutating code outside the net-worker. The exception is kept exactly
+as wide as the argument for it: it covers *only* devices whose network
+object no longer exists, because for those the queue path is unavailable
+by construction — an operation has to target an object, and there is no
+object left to target. The neighbouring case, where the network still
+exists but no instance on this node uses it, *is* enqueued: it becomes a
+`node_net_op` `network_destroy` targeting (this node, that network), so
+it stays inside the dispatcher and serialises against any concurrent
+create for the same network.
+
+Three properties make the direct case safe. First, the networks row is
+written before any device is created, so a device whose vxid has no row
+can never be a network under construction — it can only be residue.
+Second, neither mutating branch commits until the host agrees: if a
+device Shaken Fist did not create is still enslaved to `br-vxlan-<vxid>`
+then a domain is attached to that bridge right now, whatever the
+database records say, and the stray is protected instead. A bridge
+which does not exist answers that question with "nothing" rather than
+failing to answer it — teardown deletes the bridge before the vxlan
+interface and rediscovery keys on the interface, so a vxlan device with
+no bridge is the commonest stray shape and must stay reapable. Third,
+deletion is idempotent and guarded by `check_for_interface()`, so
+racing the net-worker's own `network_destroy` teardown of the same device
+is harmless; each device is deleted inside its own `try`/`except` which
+logs and re-arms the grace period rather than killing the maintain
+thread. Devices are only touched after they have been stray for
+`MAINTAIN_STRAY_VXLAN_GRACE_SECONDS` (default 300). A stray which is
+*not* actionable is warned about once per episode rather than on every
+pass — see issue #3597 for the log storm that motivated this.
+
+**REST API surface.** The two network delete endpoints
+(`DELETE /networks/<uuid>` and `DELETE /networks`) return HTTP 202
+(Accepted) with an op-handle body; callers poll
+`GET /clusteroperations/<op_uuid>` for completion. Two discovery endpoints
+are available: `GET /clusteroperations/<op_uuid>/chain` (transitive
+`depends_on` ancestor closure, namespace-scoped) and
+`GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>`
+(ops targeting an object, SQL-layer namespace filtering). The only
+surviving `@redirect_to_network_node` is on `NetworkPingEndpoint.get`
+because the ping handler runs `ip netns exec` directly on the network
+node; migrating it to queue-based requires op-output infrastructure not
+yet built (deferred future work).
+
+**Error handling.** `ErrorReport` (`shakenfist/operations/error_report.py`)
+is the on-the-wire shape for failed cluster operations: fields `code`,
+`message`, `details`, `origin_class`, `traceback`. Errors are data, never
+rehydrated Python exception types. The `_EXCEPTION_CODE_REGISTRY` dict
+maps typed exceptions to stable string codes (e.g.
+`'network.ensure_mesh.failed'`). The op carries `error_report` in its
+`external_view`; `op.raise_for_error(timeout=None)` polls until terminal
+and raises `NetworkOperationFailed` if the op ended in `STATE_ERROR`,
+letting callers that want exception-flow control use a familiar `try/raise`
+pattern without the error type being load-bearing across process
+boundaries.
