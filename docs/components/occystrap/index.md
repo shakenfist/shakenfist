@@ -43,14 +43,24 @@ occystrap process registry://docker.io/library/python:3.11 tar://python.tar \
   URI schemes, and filters
 - [Pipeline Architecture](/components/occystrap/pipeline/) - Understanding inputs, filters, and
   outputs
+- [Docker Tarball Formats](/components/occystrap/docker-tarball-formats/) - Docker save tarball
+  format reference
+- [Choosing a Tar Format](/components/occystrap/tar-format-selection/) - Which tar format suits a
+  given destination
 
 ### Guides
 
+- [Implementation Internals](/components/occystrap/internals/) - Quay discovery, the Docker
+  daemon and registry integrations, the filtering proxy, parallelism and
+  caching, and the HTTP layer
 - [Use Cases](/components/occystrap/use-cases/) - Common scenarios and examples
 - [Performance Tuning](/components/occystrap/performance/) - Parallelism flags, connection
   efficiency, and recommended settings
 - [Development](/components/occystrap/development/) - Setup, tests, releasing, and the PR
   bot commands
+
+Design and phase plans, current and historical, live in
+[plans/](plans/).
 
 ## Key Concepts
 

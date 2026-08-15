@@ -282,6 +282,7 @@ nav:
             - "Command Reference": components/occystrap/command-reference.md
             - "Development": components/occystrap/development.md
             - "Docker Tarball Format Reference": components/occystrap/docker-tarball-formats.md
+            - "Implementation internals": components/occystrap/internals.md
             - "Installation": components/occystrap/installation.md
             - "Performance Tuning": components/occystrap/performance.md
             - "Pipeline Architecture": components/occystrap/pipeline.md
