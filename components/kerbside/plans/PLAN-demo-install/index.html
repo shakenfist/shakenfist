@@ -11527,7 +11527,11 @@ configuration and a database. In full, the page omits:</p>
   exist.</strong> <code>etc/</code> contains only
   <code>example-static-sources.yaml</code> and
   <code>kolla-ci-globals-overlay.yml</code>. There are no systemd units
-  either.</li>
+  either. Note that <code>etc/</code> does not ship in the wheel — the
+  same file-finder rule that stranded the migrations applies
+  — so phase 2 treats the example as documentation served by
+  <code>docs/</code>, not as an artifact a wheel install can find. See
+  decision 1 of that phase.</li>
 <li><strong>The migrations are not packaged.</strong> Verified by building
   a wheel from <code>98bef5c</code> and listing it: <code>kerbside/api/</code>
   (68 files of templates and static assets) and
@@ -11756,8 +11760,8 @@ anything to wait on.</p>
 </tr>
 <tr>
 <td>2. <code>etc/kerbside.conf.example</code></td>
-<td>PLAN-demo-install-phase-02-conf-example.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/">PLAN-demo-install-phase-02-conf-example.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. The compose demo</td>
@@ -11827,7 +11831,7 @@ passes:</p>
 </tr>
 <tr>
 <td>2</td>
-<td>A unit test asserts every field on <code>Config</code> appears in <code>etc/kerbside.conf.example</code>, so a new setting cannot be added without documenting it</td>
+<td>A unit test asserts every field on <code>Config</code> appears in <code>etc/kerbside.conf.example</code>, so a new setting cannot be added without documenting it, and the converse so a rename leaves no orphan key. The test is demonstrated to fail before it is trusted. Further assertions that no pasteable value for <code>auth_secret_seed</code>, <code>sql_url</code> or <code>public_fqdn</code> appears, and a separate test that an existing environment variable survives <code>load_ini_settings()</code></td>
 </tr>
 <tr>
 <td>3</td>

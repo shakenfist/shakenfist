@@ -11673,6 +11673,21 @@ transcript.</p>
 <li><code>.claude/CLAUDE.md</code>'s Key Files table — add <code>demo/</code> if the
   table is the right granularity for it. Judgement call; a
   demo directory is arguably not a key file.</li>
+<li><code>etc/kerbside.conf.example</code> — <strong>candidate rename</strong> to
+  <code>etc/kerbside.ini.example</code>. Raised in the phase 2 review:
+  the example's extension differs from the path it must be
+  installed at (<code>/etc/kerbside/kerbside.ini</code>), which is a
+  trap for anyone copying by pattern rather than reading the
+  header, and is plausibly where AGENTS.md's since-corrected
+  <code>/etc/kerbside/kerbside.conf</code> came from. Deliberately not
+  done in phase 2, because <code>docs/configuration.md:5</code> and
+  <code>ARCHITECTURE.md:345</code> both name <code>kerbside.conf.example</code> and
+  phase 2 decision 6 forbade editing either file. This phase
+  revisits both, so it is the cheapest place to do it — but
+  it is optional, and the file's header already carries the
+  weight in its first sentence. If renaming, <code>git grep -l
+  'kerbside\.conf\.example'</code> finds every reference,
+  including the tests, which locate the file by name.</li>
 </ul>
 <h3 id="what-not-to-do">What not to do<a class="headerlink" href="#what-not-to-do" title="Permanent link">&para;</a></h3>
 <p>Do not document Shaken Fist, OpenStack, or oVirt setup on
