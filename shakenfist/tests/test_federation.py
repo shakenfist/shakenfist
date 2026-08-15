@@ -517,6 +517,23 @@ class TokenIdentityTestCase(FederationTestCase):
 
 
 class RateLimitTestCase(FederationTestCase):
+    def setUp(self):
+        super().setUp()
+
+        # Pin the clock the rate limiter sees to the middle of a
+        # window, so every call in a test lands in the same window by
+        # construction rather than by luck: on the real clock, two
+        # calls straddling a minute boundary get separate counters and
+        # the limit never trips (issue 3769). The federation module's
+        # time reference is replaced rather than time.time itself, so
+        # nothing else sees the frozen clock.
+        self.frozen_time = 1700000010.0  # a window boundary plus 30s
+        self.mock_time = mock.Mock(
+            time=mock.Mock(return_value=self.frozen_time))
+        patcher = mock.patch.object(federation, 'time', self.mock_time)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_under_the_limit_is_allowed(self):
         with mock.patch.object(
                 federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 5):
@@ -566,9 +583,23 @@ class RateLimitTestCase(FederationTestCase):
 
         [(_, window)] = self.mock_mariadb.federation_rate_limits
         self.assertEqual(0, window % federation.RATE_LIMIT_WINDOW_SECONDS)
-        self.assertLessEqual(window, time.time())
+        self.assertLessEqual(window, self.frozen_time)
         self.assertGreater(
-            window + federation.RATE_LIMIT_WINDOW_SECONDS, time.time())
+            window + federation.RATE_LIMIT_WINDOW_SECONDS, self.frozen_time)
+
+    def test_a_new_window_is_a_clean_slate(self):
+        # The rollover the fixed window promises: the counter does not
+        # follow the caller into the next window.
+        with mock.patch.object(
+                federation.config, 'FEDERATION_RATE_LIMIT_PER_MINUTE', 1):
+            federation.enforce_rate_limit('10.0.0.1')
+            self.assertRaises(
+                exceptions.RateLimited,
+                federation.enforce_rate_limit, '10.0.0.1')
+
+            self.mock_time.time.return_value = (
+                self.frozen_time + federation.RATE_LIMIT_WINDOW_SECONDS)
+            federation.enforce_rate_limit('10.0.0.1')
 
     def test_a_database_failure_propagates_rather_than_allowing(self):
         with mock.patch.object(

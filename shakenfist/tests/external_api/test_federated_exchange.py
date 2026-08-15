@@ -591,6 +591,24 @@ class ReplayRefusalTestCase(FederatedExchangeTestCase):
 
 
 class RateLimitTestCase(FederatedExchangeTestCase):
+    def setUp(self):
+        super().setUp()
+
+        # Pin the clock the rate limiter sees to the middle of a
+        # window, so every exchange in a test lands in the same window
+        # by construction rather than by luck: on the real clock, two
+        # calls straddling a minute boundary get separate counters and
+        # the limit never trips (issue 3769). The federation module's
+        # time reference is replaced rather than time.time itself, so
+        # token generation, validation and logging still see the real
+        # clock.
+        self.frozen_time = 1700000010.0  # a window boundary plus 30s
+        self.mock_time = mock.Mock(
+            time=mock.Mock(return_value=self.frozen_time))
+        patcher = mock.patch.object(federation, 'time', self.mock_time)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_the_limit_trips_and_then_recovers(self):
         self._rate_limit(3)
 
@@ -599,9 +617,10 @@ class RateLimitTestCase(FederatedExchangeTestCase):
         self.assertEqual(429, self._exchange().status_code)
 
         # A new window is a clean slate. Rather than sleep a minute,
-        # move the recorded window into the past the way time passing
-        # would.
-        self.mock_mariadb.federation_rate_limits.clear()
+        # advance the frozen clock into the next window the way time
+        # passing would.
+        self.mock_time.time.return_value = (
+            self.frozen_time + federation.RATE_LIMIT_WINDOW_SECONDS)
         self.assertEqual(200, self._exchange().status_code)
 
     def test_the_limit_counts_unverifiable_tokens_too(self):
