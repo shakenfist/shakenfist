@@ -26,6 +26,7 @@ developer. The component map is [ARCHITECTURE.md](ARCHITECTURE.md).
 | How does authentication work? | [docs/developer_guide/authentication.md](docs/developer_guide/authentication.md) |
 | How do object state machines work? | [docs/developer_guide/state_machine.md](docs/developer_guide/state_machine.md) |
 | How do I update the documentation? | [docs/developer_guide/updating_docs.md](docs/developer_guide/updating_docs.md) |
+| What work is already planned for the code I am about to change? | [docs/plans/index.md](docs/plans/index.md) |
 
 Anything not in that table is still in `docs/`. The complete list of
 pages, in reading order, is the `nav:` section of
@@ -101,6 +102,14 @@ metrics. The headlines:
 - **Node error never clears automatically.** `sf-ctl clear-node-error` is
   the operator recovery path; see
   [docs/operator_guide/node_health.md](docs/operator_guide/node_health.md).
+
+- **An unlanded plan may already own the code you are changing.** A fix
+  landed across a partially implemented plan has to be unpicked later,
+  which is why the automated fixer reads `docs/plans/` before writing
+  code and declines when an outstanding phase is the proper home for
+  the change. Check
+  [docs/plans/index.md](docs/plans/index.md) first; the reasoning is in
+  [docs/developer_guide/ci.md](docs/developer_guide/ci.md).
 
 ## Documentation
 

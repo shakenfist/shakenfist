@@ -48,7 +48,7 @@ Shaken Fist runs several daemons on each cluster node:
 | `sf-cluster` | Cluster maintenance | - |
 | `sf-net` | Network daemon | - |
 | `sf-queues` | Job queue processing | - |
-| `sf-resources` | Resource tracking; also drives `node.state` from storage health (node resource health) | - |
+| `sf-resources` | Resource tracking; also drives `node.state` from storage health ([node resource health](docs/developer_guide/subsystem_internals.md#node-resource-health)) | - |
 | `sf-transfers` | Blob transfers | - |
 | `sf-privexec` | Privileged execution | - |
 
@@ -185,8 +185,8 @@ for the full pipeline, the configuration knobs, and how to diagnose a
 placement decision from audit events. Atomic reservation-table scheduling
 is being built in phases per `docs/plans/PLAN-scheduler-reservations.md`:
 the capacity tables and their reconciler exist (observable-but-inert; see
-the cluster daemon material above) but the scheduler does not yet consult
-them.
+[Cluster Operation Storage and Work Queues](docs/developer_guide/database_internals.md#cluster-operation-storage-and-work-queues))
+but the scheduler does not yet consult them.
 
 ## State Machines
 
