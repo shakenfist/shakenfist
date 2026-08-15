@@ -71,7 +71,11 @@ Two supporting defects compound it:
   exist.** `etc/` contains only
   `example-static-sources.yaml` and
   `kolla-ci-globals-overlay.yml`. There are no systemd units
-  either.
+  either. Note that `etc/` does not ship in the wheel — the
+  same file-finder rule that stranded the migrations applies
+  — so phase 2 treats the example as documentation served by
+  `docs/`, not as an artifact a wheel install can find. See
+  decision 1 of that phase.
 - **The migrations are not packaged.** Verified by building
   a wheel from `98bef5c` and listing it: `kerbside/api/`
   (68 files of templates and static assets) and
@@ -319,7 +323,7 @@ anything to wait on.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Package migrations, `kerbside db upgrade` | [PLAN-demo-install-phase-01-db-upgrade.md](/components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/) | Complete |
-| 2. `etc/kerbside.conf.example` | PLAN-demo-install-phase-02-conf-example.md | Not started |
+| 2. `etc/kerbside.conf.example` | [PLAN-demo-install-phase-02-conf-example.md](/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/) | Complete |
 | 3. The compose demo | PLAN-demo-install-phase-03-compose-demo.md | Not started |
 | 4. CI lane for the demo | PLAN-demo-install-phase-04-ci-lane.md | Not started |
 | 5. Rewrite installation.md | PLAN-demo-install-phase-05-docs.md | Not started |
@@ -371,7 +375,7 @@ passes:
 | Phase | Check |
 |-------|-------|
 | 1 | Build a wheel, list it, assert the migration tree is inside; install the wheel into a clean venv against a scratch MariaDB and run `kerbside db upgrade`. Unit-test every `kerbside demo token` refusal path, since the guards are the whole value of that command |
-| 2 | A unit test asserts every field on `Config` appears in `etc/kerbside.conf.example`, so a new setting cannot be added without documenting it |
+| 2 | A unit test asserts every field on `Config` appears in `etc/kerbside.conf.example`, so a new setting cannot be added without documenting it, and the converse so a rename leaves no orphan key. The test is demonstrated to fail before it is trusted. Further assertions that no pasteable value for `auth_secret_seed`, `sql_url` or `public_fqdn` appears, and a separate test that an existing environment variable survives `load_ini_settings()` |
 | 3 | `docker compose up` from a clean checkout reaches a proxied SPICE session |
 | 4 | The lane is green, and red when the demo is broken deliberately |
 | 5 | Every command in the page has been executed, in order, on a clean machine, by the agent writing it |

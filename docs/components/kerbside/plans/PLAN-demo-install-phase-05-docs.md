@@ -141,6 +141,21 @@ transcript.
 - `.claude/CLAUDE.md`'s Key Files table — add `demo/` if the
   table is the right granularity for it. Judgement call; a
   demo directory is arguably not a key file.
+- `etc/kerbside.conf.example` — **candidate rename** to
+  `etc/kerbside.ini.example`. Raised in the phase 2 review:
+  the example's extension differs from the path it must be
+  installed at (`/etc/kerbside/kerbside.ini`), which is a
+  trap for anyone copying by pattern rather than reading the
+  header, and is plausibly where AGENTS.md's since-corrected
+  `/etc/kerbside/kerbside.conf` came from. Deliberately not
+  done in phase 2, because `docs/configuration.md:5` and
+  `ARCHITECTURE.md:345` both name `kerbside.conf.example` and
+  phase 2 decision 6 forbade editing either file. This phase
+  revisits both, so it is the cheapest place to do it — but
+  it is optional, and the file's header already carries the
+  weight in its first sentence. If renaming, `git grep -l
+  'kerbside\.conf\.example'` finds every reference,
+  including the tests, which locate the file by name.
 
 ### What not to do
 
