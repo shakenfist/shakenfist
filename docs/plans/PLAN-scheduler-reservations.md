@@ -678,6 +678,39 @@ because the following statements will be true:
   rows (if phase 0 adopts it). Validate the model offline
   first — an analysis report over recorded sfcbr metrics —
   before anything trusts it in the placement path.
+- **Nothing treats a capacity refusal as transient.** A create
+  that finds no node with capacity fails immediately with a
+  507, even though in CI the capacity it wanted frees within
+  minutes as other tests delete their instances. This plan
+  makes admission correct and race-free; it does not make a
+  full cluster not-full, so a suite that bursts past cluster
+  capacity still fails rather than waits. Where the retry
+  belongs is undecided: the client SDK (`client-python`), the
+  CI base class (`shakenfist_ci`), or server-side admission
+  queueing — the hold-until-fittable bullet above is the
+  server-side end of the same question, but scoped to batch
+  creates only. Deliberately *not* bundled with phase 3: a
+  retry would mask whether atomic admission actually reduced
+  the failure rate, so this should wait until issue #3772 has
+  soak data from a `develop` carrying that phase.
+- **CI tier topology and sizing as a capacity consumer.** The
+  Debian 12 tier runs three "hypervisors", of which `primary`
+  is also the network *and* database node and `sf1` is also a
+  database node. With `NODE_CPU_RESERVATION_THREADS=4` each
+  has a `cpu_schedulable` of 1-2, so at the default overcommit
+  `limit_cpus` is 3 and three 1-vCPU instances fill a node —
+  while the suite runs at stestr concurrency 5 and several of
+  the tests that fail this way use `force_placement`, which by
+  construction cannot fall back to another node. The per-host
+  reservations are arithmetically right; they just make an
+  already small cluster genuinely small, which is why the
+  role-awareness work landed in phase 00a made these failures
+  *more* likely rather than less. Open questions, none of them
+  scheduler code: whether infra-role nodes should host
+  instances at all in CI, whether the tier needs a fourth
+  node, and whether suite concurrency should be denominated in
+  cluster capacity rather than runner cores. Tracked with the
+  bullet above under issue #3772.
 
 ### Bugs fixed during this work
 
