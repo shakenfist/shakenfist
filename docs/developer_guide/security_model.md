@@ -205,5 +205,6 @@ row holds a newest-first, two-key window of Ed25519 keypairs; rotation
 so tokens signed by the previous key stay verifiable until the next rotation.
 `shakenfist/util/vdi_tokens.py` is the only module that parses the row.
 Per-node `spice_server_cert_subject` (published by `shakenfist/node.py`) is
-consumed by Kerbside as the enforced backend `host_subject`. See
-`docs/operator_guide/vdi_console_tokens.md` for the operator runbook.
+consumed by Kerbside as the enforced backend `host_subject`. See the
+[VDI console tokens operator guide](../operator_guide/vdi_console_tokens.md)
+for the operator runbook.

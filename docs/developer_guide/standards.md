@@ -12,7 +12,7 @@ It should also record why the choice was made.
 
 Memory is measured in MiB in Shaken Fist. All references to memory size are stored and transmitted in MiB: Gigabytes can be too big if you want a lot of small machines. Kilobytes is just too many numbers to type. The ```libvirt``` API measures memory in KiB. Therefore, interactions with the library need to be careful to convert from MiB to KiB.
 
-### Code Style
+## Code Style
 
 - Single quotes for strings, double quotes for docstrings
 - Never triple single quotes; triple double quotes instead
@@ -26,7 +26,7 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
 This page is the style guide; `CLAUDE.md` and `AGENTS.md` summarise it
 and link here.
 
-### Attribute updates use field masks
+## Attribute updates use field masks
 
 The `update_*_attributes` functions in `shakenfist/mariadb.py` require a
 `fields` argument naming exactly the model fields the caller changed;
@@ -52,7 +52,7 @@ rather than having to retrofit one. The mask travels over gRPC as
 replaced the whole row would let a caller name the wrong fields and
 still see the write it expected.
 
-### Secret-carrying fields are `SecretStr`
+## Secret-carrying fields are `SecretStr`
 
 Fields which hold a credential — `key` and `nonce` on
 `NamespaceKeyAttributesData`, and the `AUTH_SECRET_SEED`,
@@ -86,7 +86,7 @@ would silently give fresh installs `LONGTEXT` while upgraded clusters
 kept `VARCHAR(255)`, with no version change to notice. Full detail in
 [`authentication.md`](authentication.md).
 
-### Native ENUM columns and Python enums
+## Native ENUM columns and Python enums
 
 A handful of columns are native MariaDB `ENUM` types built with
 `sa.Enum(SomePythonEnum)` (e.g. `object_states.object_type`). MariaDB
@@ -102,14 +102,14 @@ widens stale columns automatically. Unit coverage lives in
 is exercised against a real MariaDB by the "Schema ENUM widening" CI
 job in `functional-tests.yml` (`tools/ci-enum-widening-test.sh`).
 
-### Documentation
+## Documentation
 
 - When a change adds, renames, or removes a user-visible concept
   (an object type, state, term, or similar), update
   [`glossary.md`](../glossary.md) in the same change so the
   glossary never drifts from the code.
 
-### In-memory only objects never touch the database
+## In-memory only objects never touch the database
 
 Objects constructed with `in_memory_only=True` (the IPAM built when
 hydrating a deleted network, blob-reference image artifacts) keep their
@@ -123,7 +123,7 @@ static-table columns store undashed CHAR(32) — SQL joining the two must
 transform one side (see the orphan reconciliation queries in
 `mariadb.py`).
 
-### API parameter declarations are enforced at import time
+## API parameter declarations are enforced at import time
 
 Every endpoint handler declares its parameters in
 `swag_from(api_base.swagger_helper(...))`, and `swagger_helper()`
@@ -153,7 +153,7 @@ and `test_parameter_declarations.py`; `test_openapi_spec.py` validates
 the generated specification itself in CI. Full reference in
 `docs/developer_guide/writing_an_endpoint.md`.
 
-### Events vs logs
+## Events vs logs
 
 Shaken Fist has two structured-record streams; choose the right
 one when emitting a message:
@@ -175,7 +175,7 @@ echo into the log stream is controlled by `LOG_EVENTS_TO_LOKI`
 [`logging.md`](../operator_guide/logging.md)
 and [`events.md`](../operator_guide/events.md).
 
-### Testing
+## Testing
 
 ```bash
 tox                              # Run all tests
@@ -185,7 +185,7 @@ tox -ecover                      # Coverage report
 stestr run {test_name}           # Run specific test
 ```
 
-### Pre-commit Hooks
+## Pre-commit Hooks
 
 The repository uses pre-commit hooks to validate code before commits:
 

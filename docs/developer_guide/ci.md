@@ -18,8 +18,8 @@ Every workflow in `.github/workflows/`:
 | `renovate.yml` | Self-hosted Renovate dependency updates | Hourly schedule, manual |
 | `export-repo-config.yml` | Export GitHub repo settings to version control, via a shared reusable workflow in the `actions/` repository | Daily schedule |
 | `pr-re-review.yml` | Re-review PR on bot command | `@shakenfist-bot please re-review` |
-| `pr-address-comments.yml` | Address review comments on bot command | The bot comment command for addressing review comments |
-| `pr-fix-tests.yml` | Fix test failures on bot command | The bot comment command for fixing tests |
+| `pr-address-comments.yml` | Address review comments on bot command | `@shakenfist-bot please address comments` |
+| `pr-fix-tests.yml` | Fix test failures on bot command | `@shakenfist-bot please attempt to fix` |
 | `test-drift-fix.yml` | Unit test fixer (called by `pr-fix-tests.yml`) | workflow_call, workflow_dispatch |
 | `issue-fix.yml` | Triage open issues, propose a fix as a draft PR | workflow_dispatch |
 | `scheduled-tests.yml` | Longer-running test sweep (schedule currently disabled) | workflow_dispatch |

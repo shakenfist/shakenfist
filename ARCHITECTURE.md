@@ -7,7 +7,12 @@ management, designed to be understood in its entirety by a single developer.
 
 This document is the map: the components, how they fit together, and the
 decisions that shaped them. Subsystem detail lives in `docs/`, indexed
-below. Working conventions are in [AGENTS.md](AGENTS.md).
+below.
+
+The table below covers the shape of the system only. Working conventions
+-- code style, the rules learned from past defects, CI and the bot
+commands -- are indexed by [AGENTS.md](AGENTS.md) instead, so the two
+tables do not need to be kept in step with each other.
 
 ## Where the detail lives
 
@@ -18,9 +23,6 @@ below. Working conventions are in [AGENTS.md](AGENTS.md).
 | Network operation dispatch, queue families, error handling | [docs/developer_guide/network_dispatcher.md](docs/developer_guide/network_dispatcher.md) |
 | REST API contracts, scheduler capacity arithmetic, node and API health surfaces, daemon watchdog, object references | [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md) |
 | Security model and trust boundaries | [docs/developer_guide/security_model.md](docs/developer_guide/security_model.md) |
-| Continuous integration and automation | [docs/developer_guide/ci.md](docs/developer_guide/ci.md) |
-| Coding rules learned from real defects | [docs/developer_guide/coding_rules.md](docs/developer_guide/coding_rules.md) |
-| Code conventions and testing | [docs/developer_guide/standards.md](docs/developer_guide/standards.md) |
 | Scheduler pipeline and placement diagnosis | [docs/operator_guide/scheduler.md](docs/operator_guide/scheduler.md) |
 | Object state machines | [docs/developer_guide/state_machine.md](docs/developer_guide/state_machine.md) |
 | Authentication and federated identity | [docs/developer_guide/authentication.md](docs/developer_guide/authentication.md) |

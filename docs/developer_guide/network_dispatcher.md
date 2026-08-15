@@ -19,10 +19,22 @@ drains which):
   `add_floating_ip`, and `route_address`. Only the elected network node's
   net-worker drains these.
 
+A caller chooses the family with the `family` keyword argument of
+`enqueue_cluster_operation()` (`shakenfist/schema/operations/util.py`),
+which builds the queue name as `{target}-{family}-{priority}`. Passing
+`family='network'` with a node uuid as the target produces the per-node
+`{node_uuid}-network-{priority}` queues; the default
+`family='clusteroperation'` with `target='networknode'` produces the
+network-node queues.
+
 ## Dequeue and terminal-state check
 
-On each loop iteration the worker calls `mariadb.dequeue_work_item()` for each
-queue name in priority order, stopping at the first hit. Before executing the
+On each loop iteration the worker makes a single
+`mariadb.dequeue_work_items()` call passing all of its queue names in
+priority order, which claims up to `BATCH_SIZE` items in one round trip —
+see
+[Batched, priority-aware dequeue](database_internals.md#batched-priority-aware-dequeue)
+for the server side. Before executing each
 dequeued op it checks whether the op is already in a terminal state
 (`abort`, `complete`, `deleted`, or `error`). If so, the op is skipped
 (with an audit event) rather than executed — this prevents a stale

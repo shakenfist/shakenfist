@@ -246,8 +246,8 @@ public view); `shakenfist/external_api/admin.py`
 public verification keys. The signing key lives in a single `cluster_config`
 row, `KERBSIDE_JWT_SIGNING_KEY` (two-key rotation window). The `sf-ctl`
 `ensure-kerbside-signing-key` / `rotate-kerbside-signing-key` subcommands
-bootstrap and rotate it. Operator runbook:
-`docs/operator_guide/vdi_console_tokens.md`.
+bootstrap and rotate it. Operator runbook: the
+[VDI console tokens operator guide](../operator_guide/vdi_console_tokens.md).
 
 ## Object References
 
