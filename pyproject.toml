@@ -141,7 +141,7 @@ dependencies = [
     "rpds-py==0.30.0",
     "six==1.17.0",
     "stevedore==5.9.0",
-    "typing-inspection==0.4.3",
+    "typing-inspection==0.4.4",
     "typing_extensions==4.16.0",
     "wrapt==2.3.0",
     "zope.event==6.2",
