@@ -347,8 +347,9 @@ running the command twice, which is why `execute` is not retried
 ### Command dispatch restructure
 
 The if/elif chain in `_execute_inner()` (`execute` / `put-blob` /
-`chmod` / `get-file`) becomes a small per-command handler registry on
-`SideChannelExecutorJob`, where each handler declares:
+`chmod` / `get-file`) becomes one handler class per command,
+instantiated once per `SideChannelExecutorJob` and looked up by
+command name, where each handler declares:
 
 - `reports_progress` (bool) — whether the progress timeout applies
   while this command is in flight;
