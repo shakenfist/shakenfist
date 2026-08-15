@@ -1407,6 +1407,21 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
             unpacked = mariadb._grpc_get_scheduler_node_capacity()
         self.assertEqual([self.EXPECTED], unpacked)
 
+    def test_the_capacity_read_uses_the_bounded_budget(self):
+        # This read sits in front of the admission RPC on the create hot
+        # path (find_candidates(), and the queues daemon preflight), so
+        # it carries the same bounded budget. An unbounded read in front
+        # of a bounded write reopens the issue-3586 watchdog window that
+        # bounding the write closed.
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call') as mock_call:
+            mock_call.return_value.rows = []
+            mariadb._grpc_get_scheduler_node_capacity()
+        self.assertEqual(mariadb.BOUNDED_QUERY_TIMEOUT,
+                         mock_call.call_args.kwargs['timeout'])
+        self.assertEqual(1, mock_call.call_args.kwargs['max_slow_failures'])
+
     def test_servicer_swallows_an_unexpected_exception(self):
         with mock.patch(
                 'shakenfist.mariadb._direct_get_scheduler_node_capacity',

@@ -216,12 +216,16 @@ A refused candidate is not a failed create: the scheduler-driven
 callers (the create path and the preflight redirect) walk to the next
 candidate on a denial, so one node being momentarily full only costs
 an extra round trip. Only once every candidate has refused does the
-request fail, with a 507 whose detail names each refused candidate
-and the dimension(s) it was refused on (`cpus`, `memory_mb`,
-`disk_gb`, or the `demand` feedforward term described below) -- the
-same audit detail the scheduler has always published, now sourced
-from the guard that actually admitted or refused the placement rather
-than a snapshot of it.
+request fail, with a 507 reporting how many candidates refused it.
+The per-candidate detail -- which node was refused, and on which
+dimension(s) (`cpus`, `memory_mb`, `disk_gb`, or the `demand`
+feedforward term described below) -- is attached to the instance's
+`schedule failed, every candidate refused by capacity guard` audit
+event rather than to the response body, so diagnosing a 507 means
+reading the instance's events. It is the same audit detail the
+scheduler has always published, now sourced from the guard that
+actually admitted or refused the placement rather than a snapshot of
+it.
 
 Ground-truth writers -- the cleaner's placement rewrites and the
 queues daemon's startup reconciliation -- do not enforce the guard,

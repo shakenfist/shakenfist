@@ -711,6 +711,28 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
 
+    def test_prefilter_reads_the_placement_attribute_once(self):
+        # The self-charge check calls placement_filter(), which reads
+        # inst.placement -- an instance_attributes fetch -- and it runs
+        # for every candidate carrying a non-zero used_cpus. The value is
+        # identical for all of them, so the decision memoises the row
+        # rather than re-fetching it per candidate.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=16, used_cpus=1)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch(
+                'shakenfist.mariadb.get_instance_attributes',
+                side_effect=(
+                    self.mock_mariadb._mariadb_get_instance_attributes
+                )) as gia:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertLessEqual(gia.call_count, 1)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
+
     def test_measurement_still_excludes_a_busy_node(self):
         # What the pre-filter does see it still acts on: a node whose
         # running domains already fill its hard maximum is dropped

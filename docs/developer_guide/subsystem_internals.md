@@ -79,10 +79,19 @@ used_cpus)` with `used_cpus` read from `scheduler_node_capacity`,
 because a node whose ledger is full measures as idle for as long as
 its instances spend fetching images. A node with no capacity row is
 charged nothing, matching the admission transaction's own fail-open on
-an unsized node. `summarize_resources()` reads the same counters, so
-`/admin/resources` advertises what admission would actually grant
-rather than a second, independently derived number. The reconciler
-maintains the
+an unsized node. `summarize_resources()` charges the same way, from the
+same counters, so `/admin/resources` is not a second, independently
+derived ledger. The two differ on the limit they measure that charge
+against: the pre-filter uses the capacity row's `limit_cpus`, because
+that is what the guard behind it will use, while `/admin/resources`
+derives the limit live from the node's metrics. The arithmetic is the
+same (`mariadb._derive_cpu_memory_limits()`), but the row refreshes
+only once a reconcile period, so the published headroom can differ from
+what admission would grant for up to that long. Both inputs to the
+charge are published (`cpu_measured`, `cpu_committed`, and
+`cpu_committed_row_present` to say whether a zero means "unsized" or
+"idle"), so which of the two binds is answerable from the response.
+The reconciler maintains the
 `scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
 tables from the elected cluster node every five minutes. Rows exist
 per *schedulable hypervisor*, not per node, because a row that

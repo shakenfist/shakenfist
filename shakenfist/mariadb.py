@@ -25668,11 +25668,22 @@ def _grpc_release_instance_placement(
 
 
 def _grpc_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
-    """Read the per-node capacity counters via the database microservice."""
+    """Read the per-node capacity counters via the database microservice.
+
+    Bounded like the admission call it runs in front of. This read is on
+    the same hot paths -- find_candidates() for an instance create, and
+    the queues daemon's preflight redirect -- so leaving it on the
+    default GRPC_RETRIES * GRPC_TIMEOUT budget would reopen the watchdog
+    window that bounding the admission closed (issue 3586). Nothing is
+    lost by failing early: the caller degrades to measurement-only
+    pre-filtering and the guard still refuses correctly.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetSchedulerNodeCapacityRequest()
-        reply = _grpc_call(stub.GetSchedulerNodeCapacity, request)
+        reply = _grpc_call(
+            stub.GetSchedulerNodeCapacity, request,
+            timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
         return [
             {
                 'node_uuid': row.node_uuid,

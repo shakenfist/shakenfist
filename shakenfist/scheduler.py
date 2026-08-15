@@ -371,7 +371,15 @@ class Scheduler:
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects, 'started scheduling')
 
-        with util_general.RecordedOperation('schedule', inst):
+        # The filter passes below read this instance's attributes once
+        # per candidate -- placement_filter() in the CPU stage, affinity
+        # in the stage after it -- and every one of those reads fetches
+        # the same instance_attributes row. Memoising for the duration of
+        # the decision makes it one fetch. Nothing in this block writes an
+        # attribute, and the memo is discarded on the way out, so no
+        # caller observes different staleness than it did before.
+        with util_general.RecordedOperation('schedule', inst), \
+                inst.attribute_memo():
             log_ctx = self.log.with_fields({'instance': inst})
 
             # Refresh metrics if its too old, or there are no nodes.

@@ -1304,6 +1304,18 @@ was passing for the right reason all along.
   (e.g. `scheduler.claim_first_available()`) as part of that
   migration, when the third caller makes the right parameterisation
   visible, rather than guessing it now from two.
+- The demand-waived second walk re-tries every candidate, including
+  those refused on `cpus`/`memory_mb`/`disk_gb`, which cannot admit on
+  the second pass either (PR review round 5, item 2). Worst case is
+  2N admission RPCs for one create. Not fixed here deliberately: the
+  narrowing has to be made identically in both copies of the walk, and
+  the entry above commits to extracting those into one helper during
+  phase 5 -- doing it now doubles the divergence risk the extraction
+  exists to remove, to save RPCs on a path that only runs when a create
+  was about to fail outright. Fix it in the extracted helper, where
+  `denials` already carries `demand_only` per candidate, and add the
+  test the reviewer asks for (the second walk skips a
+  real-dimension refusal) against that single implementation.
 - The ER_CHECKREAD invariant has structural but not behavioural CI
   coverage (PR review, item 7): the live concurrency suite only
   bites against a server with `innodb_snapshot_isolation` ON, and the
