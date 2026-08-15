@@ -303,6 +303,147 @@ class SideChannelMonitorJob(SideChannelJob):
         }).debug('Abort path set, exiting')
 
 
+class AgentCommandHandler:
+    """Dispatch and capabilities for one agent command verb."""
+
+    name: str = ''
+    reports_progress = False    # read in phase 4
+    retryable = True            # read in phase 5
+    register_as_outstanding = False
+
+    def __init__(self, job):
+        self.job = job
+
+    def dispatch(self, command_id, cmd):
+        raise NotImplementedError
+
+
+class ExecuteCommand(AgentCommandHandler):
+    name = 'execute'
+    retryable = False
+
+    def dispatch(self, command_id, cmd):
+        request = agent_pb2.HypervisorToAgentCommand(
+            command_id=command_id,
+            execute_request=common_pb2.ExecuteRequest(
+                command=cmd['commandline'],
+                io_priority=common_pb2.ExecuteRequest.NORMAL
+            )
+        )
+        self.job.command_cache[command_id] = cmd['commandline']
+        return [request]
+
+
+class PutBlobCommand(AgentCommandHandler):
+    name = 'put-blob'
+    reports_progress = True
+    register_as_outstanding = True
+
+    def dispatch(self, command_id, cmd):
+        if 'blob_uuid' not in cmd:
+            self.job.agentop.state = AgentOperation.STATE_ERROR
+            self.job.agentop.error = 'missing blob uuid'
+            return []
+
+        b = blob.Blob.from_db(cmd['blob_uuid'])
+        if not b:
+            self.job.agentop.state = AgentOperation.STATE_ERROR
+            self.job.agentop.error = 'missing blob'
+            return []
+
+        # This should already have been done by preflight, but hey
+        b.ensure_local()
+        self.job.chunk_iterator = self.job._chunk_reader(
+            command_id, cmd, blob.Blob.filepath(b.uuid))
+
+        # Try to send MAX_OUTSTANDING chunks
+        out = []
+        try:
+            for _ in range(MAX_OUTSTANDING):
+                out.append(self.job.chunk_iterator.__next__())
+        except StopIteration:
+            self.job.chunk_iterator = None
+
+        return out
+
+
+class ChmodCommand(AgentCommandHandler):
+    name = 'chmod'
+
+    def dispatch(self, command_id, cmd):
+        self.job.log.with_fields({
+            'outstanding_messages': self.job.outstanding_message_count
+        }).debug('...chmod request')
+
+        mode = None
+        try:
+            mode = int(cmd['mode'])
+        except ValueError:
+            ...
+
+        if not mode:
+            try:
+                mode = symbolicmode.symbolic_to_numeric_permissions(
+                    cmd['mode'])
+            except Exception as e:
+                self.job.log.with_fields({
+                    'outstanding_messages': self.job.outstanding_message_count
+                }).debug(f'symbolic mode conversion failed: {e}')
+
+        if not mode:
+            add_event_multi(
+                EVENT_TYPE_AUDIT, self.job.affected_objects,
+                'failed to decode chmod mode argument',
+                extra=cmd)
+            self.job.log.with_fields({
+                'outstanding_messages': self.job.outstanding_message_count,
+                'command': cmd
+            }).error('Ignoring chmod command with undecoded mode argument')
+            return
+
+        return [
+            agent_pb2.HypervisorToAgentCommand(
+                command_id=command_id,
+                chmod_request=agent_pb2.ChmodRequest(
+                    path=cmd['path'],
+                    mode=mode
+                )
+            )
+        ]
+
+
+class GetFileCommand(AgentCommandHandler):
+    name = 'get-file'
+    reports_progress = True
+
+    def dispatch(self, command_id, cmd):
+        # INFO, not debug: get-file is a known-flaky path (issues #3516, #2240)
+        # and at the daemon's default INFO level we otherwise have no journal
+        # trace of where a transfer stalled.
+        self.job.log.with_fields({
+            'path': cmd['path'],
+            'outstanding_messages': self.job.outstanding_message_count
+        }).info('Requesting file from agent')
+
+        self.job._agent_path_for_get = cmd['path']
+        self.job._blob_uuid = str(uuid4())
+        self.job._blob_partial_file = open(
+            blob.Blob.filepath(self.job._blob_uuid) + '.partial', 'wb')
+        self.job._stat_result = None
+
+        return [
+            agent_pb2.HypervisorToAgentCommand(
+                command_id=command_id,
+                get_file_request=agent_pb2.GetFileRequest(
+                    path=cmd['path']
+                )
+            )
+        ]
+
+
+AGENT_COMMAND_HANDLERS = [ExecuteCommand, PutBlobCommand, ChmodCommand, GetFileCommand]
+
+
 class SideChannelExecutorJob(SideChannelJob):
     def __init__(self, inst, agentop):
         super().__init__(inst)
@@ -315,6 +456,9 @@ class SideChannelExecutorJob(SideChannelJob):
         self.num_results = 0
         self.command_cache = {}
         self.chunk_iterator = None
+
+        self.command_handlers = {
+            cls.name: cls(self) for cls in AGENT_COMMAND_HANDLERS}
 
         self.ready = False
         self.welcomed = False
@@ -361,17 +505,6 @@ class SideChannelExecutorJob(SideChannelJob):
         }).debug('...agent welcome')
         self.ready = True
         self.welcomed = True
-
-    def _dispatch_execute(self, command_id, cmd):
-        request = agent_pb2.HypervisorToAgentCommand(
-            command_id=command_id,
-            execute_request=common_pb2.ExecuteRequest(
-                command=cmd['commandline'],
-                io_priority=common_pb2.ExecuteRequest.NORMAL
-            )
-        )
-        self.command_cache[command_id] = cmd['commandline']
-        return [request]
 
     def _handle_execute_reply(self, reply):
         self.log.with_fields({
@@ -464,98 +597,6 @@ class SideChannelExecutorJob(SideChannelJob):
                     payload=None
                 )
             )
-
-    def _dispatch_put_blob(self, command_id, cmd):
-        if 'blob_uuid' not in cmd:
-            self.agentop.state = AgentOperation.STATE_ERROR
-            self.agentop.error = 'missing blob uuid'
-            return []
-
-        b = blob.Blob.from_db(cmd['blob_uuid'])
-        if not b:
-            self.agentop.state = AgentOperation.STATE_ERROR
-            self.agentop.error = 'missing blob'
-            return []
-
-        # This should already have been done by preflight, but hey
-        b.ensure_local()
-        self.chunk_iterator = self._chunk_reader(
-            command_id, cmd, blob.Blob.filepath(b.uuid))
-
-        # Try to send MAX_OUTSTANDING chunks
-        out = []
-        try:
-            for _ in range(MAX_OUTSTANDING):
-                out.append(self.chunk_iterator.__next__())
-        except StopIteration:
-            self.chunk_iterator = None
-
-        return out
-
-    def _dispatch_chmod(self, command_id, cmd):
-        self.log.with_fields({
-            'outstanding_messages': self.outstanding_message_count
-        }).debug('...chmod request')
-
-        mode = None
-        try:
-            mode = int(cmd['mode'])
-        except ValueError:
-            ...
-
-        if not mode:
-            try:
-                mode = symbolicmode.symbolic_to_numeric_permissions(
-                    cmd['mode'])
-            except Exception as e:
-                self.log.with_fields({
-                    'outstanding_messages': self.outstanding_message_count
-                }).debug(f'symbolic mode conversion failed: {e}')
-
-        if not mode:
-            add_event_multi(
-                EVENT_TYPE_AUDIT, self.affected_objects,
-                'failed to decode chmod mode argument',
-                extra=cmd)
-            self.log.with_fields({
-                'outstanding_messages': self.outstanding_message_count,
-                'command': cmd
-            }).error('Ignoring chmod command with undecoded mode argument')
-            return
-
-        return [
-            agent_pb2.HypervisorToAgentCommand(
-                command_id=command_id,
-                chmod_request=agent_pb2.ChmodRequest(
-                    path=cmd['path'],
-                    mode=mode
-                )
-            )
-        ]
-
-    def _dispatch_get_file(self, command_id, cmd):
-        # INFO, not debug: get-file is a known-flaky path (issues #3516, #2240)
-        # and at the daemon's default INFO level we otherwise have no journal
-        # trace of where a transfer stalled.
-        self.log.with_fields({
-            'path': cmd['path'],
-            'outstanding_messages': self.outstanding_message_count
-        }).info('Requesting file from agent')
-
-        self._agent_path_for_get = cmd['path']
-        self._blob_uuid = str(uuid4())
-        self._blob_partial_file = open(
-            blob.Blob.filepath(self._blob_uuid) + '.partial', 'wb')
-        self._stat_result = None
-
-        return [
-            agent_pb2.HypervisorToAgentCommand(
-                command_id=command_id,
-                get_file_request=agent_pb2.GetFileRequest(
-                    path=cmd['path']
-                )
-            )
-        ]
 
     def _handle_stat_result(self, reply):
         self.log.with_fields({
@@ -828,25 +869,16 @@ class SideChannelExecutorJob(SideChannelJob):
                     command_id = sf_random.random_id()
 
                     try:
-                        if cmd['command'] == 'execute':
-                            requests = self._dispatch_execute(command_id, cmd)
-
-                        elif cmd['command'] == 'put-blob':
-                            requests = self._dispatch_put_blob(command_id, cmd)
-                            register_as_outstanding = True
-
-                        elif cmd['command'] == 'chmod':
-                            requests = self._dispatch_chmod(command_id, cmd)
-
-                        elif cmd['command'] == 'get-file':
-                            requests = self._dispatch_get_file(command_id, cmd)
-
-                        else:
+                        handler = self.command_handlers.get(cmd['command'])
+                        if not handler:
                             add_event_multi(
                                 EVENT_TYPE_STATUS, self.affected_objects,
                                 'unknown command', extra=cmd)
                             self.agentop.state = AgentOperation.STATE_ERROR
                             self.agentop.error = 'unknown command'
+                        else:
+                            requests = handler.dispatch(command_id, cmd)
+                            register_as_outstanding = handler.register_as_outstanding
 
                         if requests:
                             extra = copy.copy(cmd)
