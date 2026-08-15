@@ -18528,9 +18528,37 @@ def _direct_get_agent_operation_attributes(
         return None
 
 
+def _agent_operation_attributes_column_values(
+        data: AgentOperationAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map AgentOperationAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. See
+    _instance_attributes_column_values for why single-attribute
+    writers must name their field.
+    """
+    all_values: Dict[str, Any] = {
+        'results': _json_dumps(data.results),
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown agent_operation attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_agent_operation_attributes(
-        data: AgentOperationAttributesData) -> bool:
-    """Update AgentOperation attributes in MariaDB."""
+        data: AgentOperationAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update AgentOperation attributes in MariaDB.
+
+    fields is the list of model field names to write; None or empty
+    writes every column.
+    """
     engine = _get_engine()
     table = _get_agent_operation_attributes_table()
 
@@ -18539,7 +18567,7 @@ def _direct_update_agent_operation_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                results=_json_dumps(data.results))
+                **_agent_operation_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -18681,14 +18709,20 @@ def _grpc_get_agent_operation_attributes(
 
 
 def _grpc_update_agent_operation_attributes(
-        data: AgentOperationAttributesData) -> bool:
-    """Update AgentOperation attributes via the database service."""
+        data: AgentOperationAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update AgentOperation attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=_json_dumps(data.results)))
+                results_json=_json_dumps(data.results)),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -18805,18 +18839,32 @@ def get_agent_operation_attributes(
 
 
 def update_agent_operation_attributes(
-        data: AgentOperationAttributesData) -> bool:
+        data: AgentOperationAttributesData,
+        fields: Optional[List[str]]) -> bool:
     """Update AgentOperation attributes.
 
     Args:
         data: The AgentOperationAttributesData with updated values.
+        fields: The model field names to write. None or empty writes
+            every column. Callers changing one attribute should name
+            it so concurrent writers of other attributes on the same
+            row cannot lose their update to this writer's
+            read-modify-write. Unlike Network, AgentOperation re-reads
+            its attributes row on every access rather than caching it,
+            so the stale window is narrow -- but add_result() still
+            reads, merges and writes, and a writer of a different
+            column can commit inside that window.
 
     Returns:
         True if updated, False if not found or error.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _agent_operation_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_agent_operation_attributes(data)
-    return _direct_update_agent_operation_attributes(data)
+        return _grpc_update_agent_operation_attributes(data, fields=fields)
+    return _direct_update_agent_operation_attributes(data, fields=fields)
 
 
 def delete_agent_operation_attributes(aop_uuid: UUID) -> bool:

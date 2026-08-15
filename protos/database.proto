@@ -2113,6 +2113,12 @@ message GetAgentOperationAttributesReply {
 
 message UpdateAgentOperationAttributesRequest {
   AgentOperationAttributesProto data = 1;
+
+  // Field mask: the AgentOperationAttributesData field names to write. An
+  // empty list means write every column. See the equivalent comment
+  // on UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents.
+  repeated string fields = 2;
 }
 
 message DeleteAgentOperationAttributesRequest {

@@ -2470,14 +2470,24 @@ class MockMariaDB():
         return data
 
     def _mariadb_update_agent_operation_attributes(
-            self, data: AgentOperationAttributesData) -> bool:
-        """Mock implementation of mariadb.update_agent_operation_attributes()"""
+            self, data: AgentOperationAttributesData,
+            fields: Optional[List[str]] = None) -> bool:
+        """Mock implementation of mariadb.update_agent_operation_attributes()
+
+        A fields mask limits the write to the named model fields,
+        mirroring the per-column SQL UPDATE.
+        """
         key = str(data.uuid)
         if key in self.agent_operation_attributes:
-            self.agent_operation_attributes[key] = data
+            if fields:
+                stored = self.agent_operation_attributes[key]
+                for field in fields:
+                    setattr(stored, field, getattr(data, field))
+            else:
+                self.agent_operation_attributes[key] = data
             self._trace(
                 f'MockMariaDB.update_agent_operation_attributes'
-                f'({key}): updated')
+                f'({key}): updated (fields={fields})')
             return True
         self._trace(
             f'MockMariaDB.update_agent_operation_attributes'

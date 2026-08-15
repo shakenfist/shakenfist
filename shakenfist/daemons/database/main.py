@@ -4054,7 +4054,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             data = self._agentop_attrs_from_proto(request.data)
             success = (
                 mariadb._direct_update_agent_operation_attributes(
-                    data))
+                    data, fields=list(request.fields)))
             return database_pb2.StatusReply(
                 success=success, error='')
         except Exception as e:

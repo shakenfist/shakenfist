@@ -180,7 +180,7 @@ class AgentOperation(BaseOperation):
             results = dict(attrs.results)
             results[str(index)] = value
             updated = AgentOperationAttributesData(uuid=_uuid, results=results)
-            mariadb.update_agent_operation_attributes(updated)
+            mariadb.update_agent_operation_attributes(updated, fields=['results'])
 
         self.add_event(EVENT_TYPE_MUTATE, 'add result',
                        extra={'index': str(index)})
