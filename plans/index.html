@@ -10863,6 +10863,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operator_guide/database/" class="md-nav__link">
         
   
@@ -12051,9 +12079,9 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 </tr>
 <tr>
 <td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td>Phase 6: Secrets that cannot be logged by accident</td>
-<td>Not started</td>
-<td>Move key material to pydantic SecretStr, so stringifying a secret into an event renders asterisks instead</td>
+<td><a href="PLAN-auth-federation-phase-06-secret-types/">Phase 6: Secrets that cannot be logged by accident</a></td>
+<td>Complete</td>
+<td>Key material and the three secret config fields are pydantic SecretStr, so stringifying a secret renders asterisks instead. Closed two live leaks found by querying Loki for the credential rather than by review: <code>sf-queues</code> logged every config item at INFO, shipping <code>AUTH_SECRET_SEED</code> and <code>MARIADB_PASSWORD</code> off the node, and <code>BlobTransfer.external_view()</code> published the transfer authorisation token into events and log fields. Also found that <code>SecretStr</code> silently maps to LONGTEXT unless the table generator is taught otherwise, that two leak-guard tests became vacuous rather than failing when the field type changed, and that comparing a SecretStr against a string sentinel would have made the unconfigured-seed refusal unreachable</td>
 </tr>
 <tr>
 <td><a href="PLAN-auth-federation/">Auth federation</a></td>

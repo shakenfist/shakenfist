@@ -10794,6 +10794,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../database/" class="md-nav__link">
         
   
@@ -11120,6 +11148,17 @@
     <span class="md-ellipsis">
       
         API request validation findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#secrets-in-the-log-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets in the log stream
       
     </span>
   </a>
@@ -11520,6 +11559,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#secrets-in-the-log-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets in the log stream
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#events-vs-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11786,6 +11836,23 @@ entirely.</p>
 </table>
 <p>The reason codes and the measurement they feed are described in
 <code>docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md</code>.</p>
+<h2 id="secrets-in-the-log-stream">Secrets in the log stream<a class="headerlink" href="#secrets-in-the-log-stream" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist treats a credential reaching the log stream as a bug.
+The configuration options which carry secrets are typed so that
+rendering one into a log line produces asterisks rather than the
+value, and the two places which dump every configuration option
+additionally redact by option name — so an option added later is
+covered before anyone remembers to think about it.</p>
+<p>That was not always true. Releases before v0.8.0 wrote
+<code>AUTH_SECRET_SEED</code>, <code>MARIADB_PASSWORD</code> and <code>LOKI_AUTH_HEADER</code> into
+the log stream in plaintext on every <code>sf-queues</code> start. If you are
+upgrading an existing cluster, see
+<a href="../credential_rotation/#credentials-disclosed-before-v080">Credential rotation</a>
+for how to confirm the exposure and what to do about it.</p>
+<p>The standing consequence for how you run your log store: <strong>treat
+it as sensitive</strong>. Even with no credentials in it, it carries
+namespace names, instance metadata and request paths, and its
+access controls should reflect that.</p>
 <h2 id="events-vs-logs">Events vs logs<a class="headerlink" href="#events-vs-logs" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist has two structured-record streams, and they are not
 the same thing:</p>

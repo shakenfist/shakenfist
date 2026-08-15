@@ -10792,6 +10792,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../database/" class="md-nav__link">
         
   
@@ -11546,6 +11574,17 @@ confident will not return to the cluster. This is because nodes can return
 from ERROR or MISSING at the end of planned maintenance, and might be running
 and older version of Shaken Fist upon their return than other members of the
 cluster.</p>
+<div class="admonition warning">
+<p class="admonition-title">Upgrading to v0.8.0</p>
+<p>Releases before v0.8.0 wrote <code>AUTH_SECRET_SEED</code>, <code>MARIADB_PASSWORD</code>
+and <code>LOKI_AUTH_HEADER</code> into the daemon logs in plaintext on every
+<code>sf-queues</code> start, and a blob transfer's authorisation token into
+an audit event on every transfer. Upgrading stops that happening
+but cannot undo it. See
+<a href="../credential_rotation/#credentials-disclosed-before-v080">Credential rotation</a>
+for how to confirm the exposure on your own cluster, and what to
+rotate.</p>
+</div>
 <h2 id="upgrade-process">Upgrade process<a class="headerlink" href="#upgrade-process" title="Permanent link">&para;</a></h2>
 <p>First off, upgrade the python packages in each node's virtualenv manually. This
 is explicitly a non-goal of our deploy tooling as we believe different

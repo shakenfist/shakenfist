@@ -10600,6 +10600,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Secrets and the event log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#secret-carrying-fields-are-typed-not-just-handled-carefully" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secret-carrying fields are typed, not just handled carefully
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -11098,6 +11115,34 @@
     
   
     Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
   
 
     
@@ -11783,6 +11828,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Secrets and the event log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#secret-carrying-fields-are-typed-not-just-handled-carefully" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secret-carrying fields are typed, not just handled carefully
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -12297,6 +12359,65 @@ debugging, does not log bodies for any route under <code>/auth</code>. Those rou
 plaintext key secrets inbound and minted tokens outbound. The request URL is
 still recorded, so the trace retains the namespace and the key name and loses
 only the credential.</p>
+<h3 id="secret-carrying-fields-are-typed-not-just-handled-carefully">Secret-carrying fields are typed, not just handled carefully<a class="headerlink" href="#secret-carrying-fields-are-typed-not-just-handled-carefully" title="Permanent link">&para;</a></h3>
+<p>Every credential leak found so far had the same shape -- <code>extra={'token':
+token}</code>, or an f-string, with the logging or event layer coercing the value to a
+string on the way out. Nothing in the type system objected, and review caught
+them one at a time, repeatedly. So the types object now.</p>
+<p>Fields which carry a credential are <code>pydantic.SecretStr</code>. <code>str()</code>, <code>repr()</code>,
+f-strings and <code>%s</code> formatting of one all yield <code>**********</code>, and the real value
+comes back only from an explicit <code>.get_secret_value()</code> call. That call is the
+point of the design: each one is somewhere a reviewer can stop and ask whether
+the plaintext belongs there, and there are few enough to read in one sitting.</p>
+<p>The wrapped fields are <code>NamespaceKeyAttributesData.key</code> and <code>.nonce</code>, and the
+configuration options <code>AUTH_SECRET_SEED</code>, <code>MARIADB_PASSWORD</code> and
+<code>LOKI_AUTH_HEADER</code>. The unwrap sites are the bcrypt comparison in <code>/auth</code>, the
+nonce comparison in <code>verify_token()</code>, the JWT claim in <code>create_token()</code>, the two
+SQL writes and the gRPC encoder for key attributes, the JWT signing key in
+<code>external_api/app.py</code>, the database connection URL, and the Loki push header.</p>
+<p>Three consequences are worth knowing before touching this code.</p>
+<p><strong><code>SecretStr</code> never compares equal to a <code>str</code>.</strong> <code>SecretStr('x') == 'x'</code> is
+<code>False</code>, so a comparison against a bare string literal is silently always false
+rather than a type error. <code>config.py</code> keeps the value it compares
+<code>AUTH_SECRET_SEED</code> against as a named constant,
+<code>UNCONFIGURED_AUTH_SECRET_SEED</code>, and unwraps for the comparison: getting this
+wrong makes the "you must configure a seed" refusal unreachable and lets a
+cluster sign every token in its zone with the default shipped in the source.</p>
+<p><strong>Assertions about secrets must compare <code>.get_secret_value()</code>.</strong> Both obvious
+alternatives are broken, and neither fails loudly.
+<code>assertNotIn(attrs.key, haystack)</code> <em>cannot</em> fail: <code>SecretStr</code> implements no
+<code>__contains__</code>, so the containment raises <code>TypeError</code>, and <code>testtools</code>'
+<code>Contains</code> matcher catches <code>TypeError</code> and reports "does not contain".
+<code>assertNotIn(str(attrs.key), haystack)</code> asserts that the literal <code>**********</code>
+is absent, which is true of an event which leaked the real secret. Either
+spelling turns a leak guard into a test which passes while checking nothing.</p>
+<p>Wrapping the key fields did exactly that to six existing guards across three
+files, and not one of them failed to announce it — every one was found by going
+looking. So <code>ShakenFistTestCase</code> now raises <code>TypeError</code> when either operand of
+<code>assertIn</code>/<code>assertNotIn</code> is a <code>SecretStr</code>, which makes the shape impossible to
+write silently. <code>test_testcase_secret_guard.py</code> pins that check, including that
+it leaves ordinary assertions alone, and <code>test_namespace_key_object.py</code> routes
+its own guards through a single unwrapping helper whose ability to fail is
+itself tested.</p>
+<p><strong>The schema generator needs an explicit column mapping.</strong> <code>SecretStr</code> maps to
+<code>VARCHAR(255)</code> in <code>PYTHON_TO_SQLALCHEMY</code> (<code>shakenfist/schema/sqlalchemy.py</code>),
+identically to <code>str</code>, so wrapping an existing field needs no migration. Without
+that entry the generator's unknown-type fallback only logs a warning and returns
+<code>LONGTEXT</code> -- and because tables are created from the model only when they are
+absent, that would diverge fresh installs from every upgraded cluster with no
+schema version change to notice it.</p>
+<p>Type safety does not replace the structural protections around it. The <code>/auth</code>
+body redaction covers a credential which arrives before any model exists, and
+the two places which dump every configuration option — the <code>sf-queues</code> startup
+banner and <code>_config_failure()</code> — redact by configuration <em>key name</em>, because
+they iterate every option including ones which do not carry a <code>SecretStr</code> yet.
+Both route through <code>config.redacted_config_items()</code> so they cannot disagree
+about which names are secret. Each mechanism covers a gap the others do not, so
+do not remove one as redundant.</p>
+<p>Finally, a serialised view is not a safe home for a credential.
+<code>external_view()</code> on both <code>NamespaceKey</code> and <code>BlobTransfer</code> deliberately omits
+the secret material, because those views are passed directly into events and
+log fields.</p>
 
 
 

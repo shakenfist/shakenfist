@@ -2417,6 +2417,10 @@
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/operator_guide/credential_rotation/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/operator_guide/database/</loc>
          <lastmod>2026-08-15</lastmod>
     </url>
@@ -2542,6 +2546,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-05-oidc-plan-refresh/</loc>
+         <lastmod>2026-08-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-06-secret-types/</loc>
          <lastmod>2026-08-15</lastmod>
     </url>
     <url>
