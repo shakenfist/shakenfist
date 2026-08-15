@@ -727,7 +727,13 @@ def verify_token(func):
                 _reject_token('JWT token uses non-existent key',
                               ns_name=ns_name, key_name=key_name, ns=ns)
 
-            nonce = key.nonce
+            # lookup_key() returns the attributes model, so the nonce is
+            # a SecretStr. It is unwrapped for the comparison because the
+            # claim side is a plain string out of the token, and
+            # SecretStr never compares equal to a str -- leaving it
+            # wrapped would reject every request rather than fail open,
+            # but it would still be wrong.
+            nonce = key.nonce.get_secret_value()
             if 'nonce' not in jwt_data:
                 _reject_token('JWT token lacks nonce', ns_name=ns_name,
                               key_name=key_name, ns=ns)

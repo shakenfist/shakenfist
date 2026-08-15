@@ -13,6 +13,7 @@ from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.blob import Blob
 from shakenfist.config import config
+from shakenfist.config import redacted_config_items
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
@@ -245,7 +246,7 @@ def startup_tasks():
     n.add_event(EVENT_TYPE_AUDIT, f'node is running v{version}')
 
     # Log configuration on startup
-    for key, value in config.model_dump().items():
+    for key, value in redacted_config_items():
         LOG.info(f'Configuration item {key} = {value}')
 
     daemon.set_log_level(LOG, 'main')

@@ -187,6 +187,27 @@ Each line carries:
 The reason codes and the measurement they feed are described in
 `docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md`.
 
+## Secrets in the log stream
+
+Shaken Fist treats a credential reaching the log stream as a bug.
+The configuration options which carry secrets are typed so that
+rendering one into a log line produces asterisks rather than the
+value, and the two places which dump every configuration option
+additionally redact by option name — so an option added later is
+covered before anyone remembers to think about it.
+
+That was not always true. Releases before v0.8.0 wrote
+`AUTH_SECRET_SEED`, `MARIADB_PASSWORD` and `LOKI_AUTH_HEADER` into
+the log stream in plaintext on every `sf-queues` start. If you are
+upgrading an existing cluster, see
+[Credential rotation](credential_rotation.md#credentials-disclosed-before-v080)
+for how to confirm the exposure and what to do about it.
+
+The standing consequence for how you run your log store: **treat
+it as sensitive**. Even with no credentials in it, it carries
+namespace names, instance metadata and request paths, and its
+access controls should reflect that.
+
 ## Events vs logs
 
 Shaken Fist has two structured-record streams, and they are not

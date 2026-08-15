@@ -619,13 +619,12 @@ groundwork exists, and lives mostly outside this repository.
 | 3. Federated exchange and scope enforcement | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Complete |
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Complete |
-| 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
+| 6. Secrets that cannot be logged by accident | [PLAN-auth-federation-phase-06-secret-types.md](PLAN-auth-federation-phase-06-secret-types.md) | Complete |
 | 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
 
-Phase plans for phases 6–7 have not been drafted yet; the
-open questions above should be resolved (or explicitly
-carried into the relevant phase plan) before each phase is
-cut.
+The phase 7 plan has not been drafted yet; the open questions
+above should be resolved (or explicitly carried into it)
+before it is cut.
 
 Phases 6 and 7 came out of phase 2's step 2g, which removed
 five separate sites that wrote credentials into audit
@@ -636,6 +635,24 @@ named field was gone. Two rounds of the same bug in one
 phase is the argument for both: phase 6 makes the mistake
 hard to make, phase 7 makes it detectable when it is made
 anyway.
+
+Phase 6 found two more sites, both worse than the five, and
+found both by querying log aggregation for the credential —
+which is the mechanism phase 7 proposes, used by hand.
+Planning it found the sixth: `sf-queues` logs every
+configuration item at INFO on startup, so `AUTH_SECRET_SEED`
+and `MARIADB_PASSWORD` were written out in full and shipped
+to Loki on every daemon start. Executing it found the
+seventh, in the sweep step: `BlobTransfer.external_view()`
+published the transfer's authorisation token, and every
+caller of that method passes the result into an audit event
+or a log line, so a live credential left the cluster on every
+blob transfer. Both are fixed. See phase 6's survey and its
+step 6f for the evidence.
+
+That two of the seven were found by a standing query and
+none by review is the strongest argument this plan has for
+phase 7, and for building the log-sink half of it first.
 
 Neither blocks phases 3–5. There was an ordering hazard here
 — phase 7's secret format needed to be settled before phase
@@ -877,22 +894,30 @@ render themselves.
 `repr()` of one yield `'**********'`, and the real value
 comes back only from an explicit `.get_secret_value()` call.
 The codebase is pydantic throughout, so this is a change of
-field type rather than a new dependency or a new idiom.
+field type rather than a new dependency. It is a new idiom
+though: the phase 6 survey found no existing `SecretStr` use
+anywhere in the tree.
 
 * `NamespaceKeyAttributesData.key` and `.nonce` become
   `SecretStr`. So does anything else the sweep below turns
-  up — `AUTH_SECRET_SEED` in `config.py` is the obvious
-  other candidate.
+  up — the secret-carrying config fields are
+  `AUTH_SECRET_SEED`, `MARIADB_PASSWORD` and
+  `LOKI_AUTH_HEADER`.
 * `schema/sqlalchemy.py`'s table generator learns that
   `SecretStr` maps to a string column, and the three-layer
   accessors unwrap on write and re-wrap on read, so the
   secret is wrapped everywhere above the database boundary.
+  This mapping is not optional bookkeeping: the generator's
+  fallback for an unrecognised type only logs a warning and
+  returns `LONGTEXT`, so omitting it silently changes the
+  table's DDL.
 * Call sites unwrap explicitly at the points that genuinely
-  need the plaintext: the bcrypt comparison in `/auth`, the
-  nonce comparison in `verify_token`, and the JWT claim in
-  `create_token`. Each unwrap is a place a reviewer can look
-  at and ask "should this value be here?", which is the
-  whole point.
+  need the plaintext. The phase 6 survey enumerates six, not
+  the three originally listed here: `verify_token`'s nonce
+  comparison, `/auth`'s bcrypt comparison, `create_token`'s
+  JWT claim, two SQL writes and the gRPC converter pair.
+  Each unwrap is a place a reviewer can look at and ask
+  "should this value be here?", which is the whole point.
 * A sweep for other unwrapped secret-carrying fields, and a
   test that a `SecretStr` field survives a round trip
   through the database without being stringified on the way.
@@ -900,13 +925,18 @@ field type rather than a new dependency or a new idiom.
 Scope note: this would have caught four of step 2g's five
 sites. It would *not* have caught the fifth, which logged
 the raw HTTP request body before any model existed — that
-one is structural and stays fixed by the path check in
-`external_api/app.py`. Type safety and the request-tracing
-redaction are complementary, not alternatives.
+one is structural and stays fixed by `handles_credentials()`
+in `external_api/base.py`, a predicate over the request path
+which both body loggers in `external_api/app.py` consult.
+Type safety and the request-tracing redaction are
+complementary, not alternatives.
 
-This phase is deliberately independent of the federation
-work and could be done at any time, including by someone
-who is not otherwise following this plan.
+This phase is independent of the rest of the federation work
+and could be executed by someone who is not otherwise
+following this plan. It is *not* discretionary in timing, as
+this section previously implied: it closes a live credential
+leak (see the Execution section above), and its first step
+exists to stop that leak ahead of the type work.
 
 ### Phase 7: Leak detection
 
@@ -1127,6 +1157,73 @@ implemented because the following statements will be true:
   in-tree consumers, so it needs a compatibility design of
   its own rather than an edit to the handler. That is why
   phase 4 documented the gap instead of closing it.
+* **Rotating the credentials phase 6's survey found in Loki.**
+  `AUTH_SECRET_SEED` and `MARIADB_PASSWORD` have been shipped
+  to log aggregation in plaintext by every `sf-queues`
+  startup, so they must be treated as disclosed to anyone
+  with log read access. Phase 6 stops the leak; it cannot
+  un-leak them. Rotating the seed invalidates every
+  outstanding token cluster-wide, which is a deliberate
+  operator action rather than something a phase does, and
+  purging the existing log entries is a Loki retention
+  question.
+
+  The **guidance** half of this is now written.
+  `docs/operator_guide/credential_rotation.md` records the
+  disclosure, gives the LogQL to confirm it on a given
+  cluster, and covers the rotation procedure and blast
+  radius for each of the three affected options; it is
+  linked from `upgrades.md` and `logging.md` so an upgrading
+  operator meets it. That was added while addressing review
+  on the phase 6 PR, on the argument that a plan file's
+  Future work list does not reach operators. What remains
+  outstanding is the **act** of rotating on any given
+  deployment, which is the deployer's call.
+* **`BlobTransfer.token` as a `SecretStr`.** Phase 6's sweep
+  found this field is a bearer credential -- the transfers
+  daemon compares it against what an inbound connection
+  presents before sending blob data -- and that
+  `external_view()` published it into two audit events and
+  the transfers daemon's log fields, so it was reaching Loki
+  on every blob transfer. Phase 6 removed it from
+  `external_view()`, which closes every path it was
+  escaping by, and stopped there: wrapping the field itself
+  touches about fourteen sites across `mariadb.py`, the
+  database daemon, `blob.py` and the transfers daemon, which
+  is a change the size of phase 6's own step 6c and not what
+  the sweep step was scoped for. Worth doing for the same
+  reason the namespace key fields were done, just not as an
+  afterthought to a documentation step.
+* **Secret material in `util/vdi_tokens.py`.** The Kerbside
+  signing key's private PEM is handled as plain strings
+  inside a dict stored in a `cluster_config` row. It is
+  protected today by convention plus the row name ending in
+  `_KEY` so `SECRET_CONFIG_KEY_RE` masks it in
+  `show-config`, and its module docstring is explicit that
+  private key material must never be logged, evented or
+  served. Nothing found it leaking. Wrapping it means
+  restructuring that dict rather than changing a field type,
+  hence deferred. Note separately that `load_cluster_config()`
+  pushes every `cluster_config` row into the environment of
+  every daemon, so the private key is present in each
+  daemon's environ -- a different exposure surface from
+  logging, and one this plan has not examined.
+* **Wrapping the minted plaintext key secret.** Phase 6
+  Decision 6 leaves `credentials.generate()`'s output a plain
+  `str`. It is the one value in the system which is an actual
+  bearer credential rather than a hash, but it must reach the
+  HTTP response body, and an unwrap in the response
+  serialiser fails by rendering `**********` into the
+  operator's only copy of the credential — silent and
+  destructive. Revisit if the response path ever gains a
+  typed serialiser where the unwrap can be made structural.
+* **mypy coverage for the authentication modules.**
+  `namespace.py`, `namespace_key.py` and
+  `external_api/auth.py` are absent from the mypy rollout in
+  `tox.ini`, which is why phase 6's field conversion has to
+  be verified by reading rather than by the type checker.
+  These three carry the credential paths and are good
+  candidates for the next tranche of the rollout.
 * **Token introspection / jti denylist** if bounded-delay
   revocation of *scoped keys themselves* (as opposed to
   their derived tokens) ever proves insufficient.

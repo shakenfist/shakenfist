@@ -151,9 +151,13 @@ class NamespaceExternalViewTestCase(base.ShakenFistTestCase):
         self.assertIsInstance(view['keys'], list)
         self.assertEqual(sorted(['key1', 'deploy']), sorted(view['keys']))
 
-        # No hash or nonce material appears anywhere in the serialised view.
+        # No hash or nonce material appears anywhere in the serialised
+        # view. The legacy nonced_keys dict carries SecretStr values
+        # through unchanged, so these needles must be unwrapped -- a
+        # SecretStr is never a substring of a string, and the assertion
+        # would otherwise pass however much of the key the view leaked.
         stored = self.mock_mariadb.namespace_attributes['banana'].keys['nonced_keys']
         serialised = json.dumps(view)
         for keyname, entry in stored.items():
-            self.assertNotIn(entry['key'], serialised)
-            self.assertNotIn(entry['nonce'], serialised)
+            self.assertNotIn(entry['key'].get_secret_value(), serialised)
+            self.assertNotIn(entry['nonce'].get_secret_value(), serialised)

@@ -156,6 +156,40 @@ rather than having to retrofit one. The mask travels over gRPC as
 replaced the whole row would let a caller name the wrong fields and
 still see the write it expected.
 
+### Secret-carrying fields are `SecretStr`
+
+Fields which hold a credential — `key` and `nonce` on
+`NamespaceKeyAttributesData`, and the `AUTH_SECRET_SEED`,
+`MARIADB_PASSWORD` and `LOKI_AUTH_HEADER` configuration options — are
+`pydantic.SecretStr`, so stringifying one yields `**********` rather
+than the value. Unwrapping with `.get_secret_value()` happens only at
+named boundaries (the SQL writes, the gRPC encoder, the bcrypt
+compare, the JWT claim), and each of those sites carries a comment
+saying what breaks if the unwrap is missed. Do not add an unwrap to
+make an error go away; move the value, or wrap the other side.
+
+Two traps, both of which have already caused real bugs:
+
+- **A `SecretStr` never compares equal to a `str`.** `SecretStr('x')
+  == 'x'` is `False`, silently. Any comparison against a literal must
+  unwrap — see `UNCONFIGURED_AUTH_SECRET_SEED` in `config.py`, which is
+  a named constant precisely so the comparison is written once.
+- **Assertions about secrets pass vacuously if you get them wrong.**
+  `assertNotIn(attrs.key, some_string)` does not raise on a non-string
+  needle under `testtools`, it just passes, always. And
+  `assertNotIn(str(attrs.key), ...)` asserts that `'**********'` is
+  absent, which is true of an event that leaked the real secret.
+  Compare `.get_secret_value()`, and see `_assert_no_secret_material()`
+  in `shakenfist/tests/test_namespace_key_object.py`, which is guarded
+  by two tests proving it can still fail.
+
+`SecretStr` maps to `VARCHAR(255)` in `schema/sqlalchemy.py`, the same
+column `str` produces, so wrapping an existing field needs no
+migration and no schema version bump. Deleting that mapping entry
+would silently give fresh installs `LONGTEXT` while upgraded clusters
+kept `VARCHAR(255)`, with no version change to notice. Full detail in
+[`docs/developer_guide/authentication.md`](docs/developer_guide/authentication.md).
+
 ### Native ENUM columns and Python enums
 
 A handful of columns are native MariaDB `ENUM` types built with

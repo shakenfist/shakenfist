@@ -3,7 +3,6 @@ import importlib
 import json
 import logging
 import os
-import re
 import uuid as uuid_module
 from dataclasses import dataclass
 from dataclasses import field
@@ -149,14 +148,6 @@ def cli(ctx: click.Context, verbose: Optional[bool] = None) -> None:
         LOG.setLevel(logging.DEBUG)
 
 
-# Cluster config keys whose values are secrets. show-config redacts matches
-# by default so its output is safe to log; set-config avoids echoing their
-# values. Match generously -- under-matching leaks a credential, while
-# over-matching merely hides a value behind --show-secrets.
-SECRET_CONFIG_KEY_RE = re.compile(
-    r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)')
-
-
 def _read_stdin_value() -> str:
     # Trailing newlines are stripped because callers (including ansible's
     # command module) routinely append one; other whitespace is preserved
@@ -194,7 +185,7 @@ def show_config(show_secrets: bool) -> None:
     config_data = mariadb.get_cluster_config()
     if not show_secrets:
         for key in config_data:
-            if SECRET_CONFIG_KEY_RE.search(key):
+            if sf_config.SECRET_CONFIG_KEY_RE.search(key):
                 config_data[key] = '<redacted>'
     click.echo(json.dumps(config_data, indent=4, sort_keys=True))
 
@@ -231,7 +222,7 @@ def set_config(flag: str, value: Optional[str],
         except ValueError:
             pass
 
-    if value_from_stdin or SECRET_CONFIG_KEY_RE.search(flag):
+    if value_from_stdin or sf_config.SECRET_CONFIG_KEY_RE.search(flag):
         click.echo(f'Setting {flag} to {type(converted_value)}(<redacted>)')
     else:
         click.echo(

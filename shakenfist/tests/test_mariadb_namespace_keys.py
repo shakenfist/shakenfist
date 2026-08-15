@@ -11,6 +11,8 @@
 from unittest import mock
 from uuid import UUID
 
+from pydantic import SecretStr
+
 from shakenfist import mariadb
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
@@ -566,7 +568,16 @@ class DirectFindNamespaceKeysTestCase(base.ShakenFistTestCase):
         first_static, first_attrs = results[0]
         self.assertEqual('first', first_static.name)
         self.assertEqual('banana', first_static.namespace)
-        self.assertEqual('aGFzaC1vbmU=', first_attrs.key)
+        self.assertEqual(
+            'aGFzaC1vbmU=', first_attrs.key.get_secret_value())
+
+        # The decoder re-wraps explicitly rather than relying on
+        # pydantic to coerce the plain string off the row. Asserted
+        # rather than left implied by get_secret_value() above, so that
+        # the wrap is what this test pins and not a side effect of it.
+        self.assertIsInstance(first_attrs.key, SecretStr)
+        self.assertIsInstance(first_attrs.nonce, SecretStr)
+
         self.assertIsNone(first_attrs.expiry)
         self.assertIsNone(first_attrs.scopes)
         self.assertIsNone(first_attrs.provenance)
@@ -637,7 +648,14 @@ class DirectGetNamespaceKeyByNameTestCase(base.ShakenFistTestCase):
         static_data, attrs = row
         self.assertEqual('keyname', static_data.name)
         self.assertEqual('banana', static_data.namespace)
-        self.assertEqual('nonce-one', attrs.nonce)
+        self.assertEqual('nonce-one', attrs.nonce.get_secret_value())
+
+        # As above: the explicit re-wrap on the read path, pinned as
+        # itself. This is the accessor token validation calls once per
+        # request, so it is the one most likely to be optimised later.
+        self.assertIsInstance(attrs.key, SecretStr)
+        self.assertIsInstance(attrs.nonce, SecretStr)
+
         self.assertEqual(2000.0, attrs.expiry)
         self.assertEqual(['read'], attrs.scopes)
         self.assertEqual({'source': 'oidc'}, attrs.provenance)
@@ -982,3 +1000,76 @@ class NamespaceKeyProtoRoundTripTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(
             attrs, mariadb._namespace_key_attrs_from_proto(proto))
+
+
+# ---------------------------------------------------------------------------
+# Secret material must cross each storage boundary as plaintext
+# ---------------------------------------------------------------------------
+
+class SecretMaterialBoundaryTestCase(base.ShakenFistTestCase):
+    """The hash and the nonce must be unwrapped on the way out.
+
+    These fields are SecretStr on the model, which is what stops them
+    being stringified into a log line by accident. The flip side is that
+    a missed unwrap on a write path would persist the literal
+    '**********' -- the key would silently stop matching any secret, and
+    every token minted from it would stop validating. That failure is
+    quiet at the point it happens and only shows up later as an
+    authentication outage, so each boundary is asserted directly rather
+    than through a round trip which could mask a symmetric mistake.
+    """
+
+    MASK = '**********'
+
+    def _executed_params(self, method, data):
+        conn = _MockConnection(_MockResult(rowcount=1))
+        with mock.patch.object(mariadb, '_get_engine',
+                               return_value=_MockEngine(conn)):
+            method(data)
+        self.assertEqual(1, len(conn.executed))
+        return conn.executed[0].compile().params
+
+    def test_insert_binds_plaintext_not_the_mask(self):
+        params = self._executed_params(
+            mariadb._direct_create_namespace_key_attributes, _SAMPLE_ATTRS)
+
+        self.assertEqual('JDJiJDEyJGZha2VoYXNo', params['key'])
+        self.assertEqual('deadbeef', params['nonce'])
+        self.assertIsInstance(params['key'], str)
+        self.assertIsInstance(params['nonce'], str)
+        self.assertNotEqual(self.MASK, params['key'])
+        self.assertNotEqual(self.MASK, params['nonce'])
+
+    def test_update_binds_plaintext_not_the_mask(self):
+        params = self._executed_params(
+            mariadb._direct_update_namespace_key_attributes, _SAMPLE_ATTRS)
+
+        self.assertEqual('JDJiJDEyJGZha2VoYXNo', params['key'])
+        self.assertEqual('deadbeef', params['nonce'])
+        self.assertNotEqual(self.MASK, params['key'])
+        self.assertNotEqual(self.MASK, params['nonce'])
+
+    def test_proto_carries_plaintext_on_the_wire(self):
+        # The existing round-trip tests above would catch a symmetric
+        # mistake, but not one where both sides agreed on the mask. This
+        # looks at the proto field itself.
+        proto = mariadb._namespace_key_attrs_to_proto(_SAMPLE_ATTRS)
+
+        self.assertEqual('JDJiJDEyJGZha2VoYXNo', proto.key)
+        self.assertEqual('deadbeef', proto.nonce)
+        self.assertNotEqual(self.MASK, proto.key)
+        self.assertNotEqual(self.MASK, proto.nonce)
+
+    def test_decoded_model_rewraps_the_secret(self):
+        # And the other direction: values arriving from the wire come back
+        # wrapped, so nothing downstream of the transport holds a bare
+        # string it could log.
+        attrs = mariadb._namespace_key_attrs_from_proto(
+            mariadb._namespace_key_attrs_to_proto(_SAMPLE_ATTRS))
+
+        self.assertIsInstance(attrs.key, SecretStr)
+        self.assertIsInstance(attrs.nonce, SecretStr)
+        self.assertEqual('JDJiJDEyJGZha2VoYXNo', attrs.key.get_secret_value())
+        self.assertEqual('deadbeef', attrs.nonce.get_secret_value())
+        # ...and rendering it gives the mask, which is the whole point.
+        self.assertEqual(self.MASK, str(attrs.key))

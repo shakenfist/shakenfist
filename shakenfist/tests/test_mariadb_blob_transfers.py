@@ -295,3 +295,53 @@ class DeleteBlobTransfersForBlobTestCase(base.ShakenFistTestCase):
 
         # -1 indicates error
         self.assertEqual(result, -1)
+
+
+class BlobTransferExternalViewTestCase(base.ShakenFistTestCase):
+    """external_view() must not carry the transfer's authorisation token.
+
+    Every caller puts the result somewhere a credential must not go: two
+    audit events in blob.py, and the log fields in
+    daemons/transfers/main.py. Events reach MariaDB and the log stream,
+    and the log stream ships to Loki, so while the token was included a
+    live credential left the cluster on every blob transfer. Found by the
+    phase 6 sweep for secret-carrying fields; see
+    docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+    """
+
+    def _transfer(self):
+        return BlobTransfer(
+            source_node='sf-1',
+            transfer_name='test-transfer-123',
+            requesting_node='192.168.1.100',
+            blob_uuid='blob-uuid-456',
+            token='auth-token-789',
+            server_state='initial',
+            port=None,
+            percentage=0.0,
+            created_at=1234567890.0,
+            updated_at=1234567890.0
+        )
+
+    def test_external_view_omits_the_token(self):
+        view = self._transfer().external_view()
+
+        self.assertNotIn('token', view)
+        self.assertNotIn('auth-token-789', str(view))
+
+    def test_external_view_keeps_the_diagnostic_fields(self):
+        # The events and log lines this feeds are how a transfer is
+        # debugged, so removing the credential must not have cost the
+        # fields which make the rest of it useful.
+        view = self._transfer().external_view()
+
+        for field in ['source_node', 'transfer_name', 'requesting_node',
+                      'blob_uuid', 'server_state', 'port', 'percentage',
+                      'created_at', 'updated_at']:
+            self.assertIn(field, view)
+
+    def test_the_token_is_still_reachable_on_the_model(self):
+        # The transfers daemon authenticates the inbound connection with
+        # it, so removing it from the serialised view must not have made
+        # it unavailable where it is actually needed.
+        self.assertEqual('auth-token-789', self._transfer().token)

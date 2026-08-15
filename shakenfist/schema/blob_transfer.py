@@ -81,18 +81,42 @@ class BlobTransfer(BaseModel):
     updated_at: float  # Unix timestamp of last update
 
     def external_view(self) -> dict[str, Any]:
-        """Serialize BlobTransfer for JSON API responses.
+        """Serialize BlobTransfer for events and log fields.
+
+        Named external_view() to match the objects which really do
+        serialise into API responses, but no REST endpoint consumes
+        this one -- the three callers below are all event or logging
+        sites, which is what makes the omission below a correctness fix
+        rather than an API change.
+
+        Deliberately without the token. ``token`` authorises the inbound
+        connection to the transfer server -- the transfers daemon
+        compares it against what the client presents before sending a
+        byte of blob data -- so it is a bearer credential rather than
+        metadata about the transfer.
+
+        Every caller of this method put the result somewhere a credential
+        must not go: two audit events in blob.py, and the log fields in
+        daemons/transfers/main.py. Events are written to MariaDB and also
+        emitted to the log stream, which ships to Loki, so until this
+        field was removed a live transfer token left the cluster on every
+        blob transfer -- in exactly the ``extra={'token': token}`` shape
+        phase 2's step 2g removed five times over in the authentication
+        code. Found while sweeping for secret-carrying fields in phase 6.
+
+        Nothing needed it here; the daemon reads ``.token`` from the model
+        directly. This mirrors NamespaceKey.external_view(), which omits
+        the hash and the nonce for the same reason.
 
         Returns:
-            A dictionary suitable for JSON serialization containing all fields
-            of the BlobTransfer.
+            A dictionary suitable for JSON serialization containing the
+            non-secret fields of the BlobTransfer.
         """
         return {
             'source_node': self.source_node,
             'transfer_name': self.transfer_name,
             'requesting_node': self.requesting_node,
             'blob_uuid': self.blob_uuid,
-            'token': self.token,
             'server_state': self.server_state,
             'port': self.port,
             'percentage': self.percentage,

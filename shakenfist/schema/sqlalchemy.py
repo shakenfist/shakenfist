@@ -42,6 +42,7 @@ from typing import Optional
 from typing import Union
 
 from pydantic import BaseModel
+from pydantic import SecretStr
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 from sqlalchemy.dialects.mysql import mariadb
@@ -252,8 +253,22 @@ def _get_compound_indexes(model: type[BaseModel]) -> list[tuple[str, ...]]:
 # Mapping from Python types to SQLAlchemy column types. Note that we use
 # mysql.LONGTEXT for JSON because MariaDB's JSON type is an alias for LONGTEXT
 # with JSON validation, and we want explicit control.
+#
+# SecretStr must have an explicit entry here, and it is load bearing
+# rather than bookkeeping. SecretStr is not a BaseModel subclass, so
+# _is_complex_type() declines it, and 'uuid' does not appear in its
+# str() so _is_uuid_type() declines it too -- without an entry it falls
+# through to the unknown-type fallback below, which only logs a warning
+# and returns LONGTEXT. Because the _ensure_*_schema() functions in
+# mariadb.py create tables from the model only when the table is absent,
+# and have no ALTER path, that would give a fresh install LONGTEXT while
+# every upgraded cluster kept VARCHAR(255), with no schema version
+# change for verify_schema_versions() to complain about. Mapping it to
+# the same String(255) as str keeps the generated DDL byte-identical, so
+# wrapping an existing column's field in SecretStr needs no migration.
 PYTHON_TO_SQLALCHEMY: dict[type[Any], sa.types.TypeEngine[Any]] = {
     str: sa.String(255),
+    SecretStr: sa.String(255),
     int: sa.BigInteger(),
     float: sa.Double(),
     bool: sa.Boolean(),
@@ -353,9 +368,12 @@ def _get_sqlalchemy_type(
     if _is_complex_type(annotation):
         return mysql.LONGTEXT()
 
-    # Check for SQLLongText marker on str fields
-    if annotation is str and field_metadata and _has_longtext_marker(
-            field_metadata):
+    # Check for SQLLongText marker on str fields. SecretStr honours the
+    # marker too, so that a secret too long for VARCHAR(255) -- a PEM
+    # private key, say -- does not silently get a 255 byte column when it
+    # has been marked otherwise.
+    if annotation in (str, SecretStr) and field_metadata and (
+            _has_longtext_marker(field_metadata)):
         return mysql.LONGTEXT()
 
     # Basic Python types

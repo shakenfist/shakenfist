@@ -1,9 +1,12 @@
 # Copyright 2019 Michael Still
 import json
 import os
+import re
 import socket
 import sys
+from collections.abc import Iterator
 from typing import Annotated
+from typing import Any
 from typing import Literal
 from typing import NoReturn
 from typing import Optional
@@ -11,8 +14,52 @@ from typing import Optional
 from pydantic import AnyHttpUrl
 from pydantic import BeforeValidator
 from pydantic import Field
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 from pydantic_settings import NoDecode
+
+
+# Configuration keys whose values are secrets, matched by name.
+#
+# Three callers need the same answer and must not disagree about it,
+# which is why this lives here rather than in any one of them: sf-ctl's
+# show-config redacts matches by default so its output is safe to log
+# (and set-config avoids echoing their values), and both sites which
+# dump every configuration item -- the daemon startup banner in
+# daemons/queues/startup_tasks.py and _config_failure() below -- render
+# through redacted_config_items(). The banner writes its lines at INFO,
+# and INFO and above is shipped to Loki, so a secret which reaches it
+# leaves the cluster. The same reasoning puts handles_credentials() in
+# external_api/base.py rather than in app.py.
+#
+# Match generously -- under-matching leaks a credential, while
+# over-matching merely hides a value behind --show-secrets. It does in
+# fact over-match today, catching the integer API_TOKEN_DURATION,
+# FEDERATION_MAX_TOKEN_BYTES and KERBSIDE_TOKEN_DURATION, which is the
+# harmless direction.
+#
+# This is deliberately belt-and-braces with the SecretStr types on the
+# secret-carrying fields themselves. The dumping sites iterate every
+# configuration item rather than named ones, so a name check is what
+# covers a secret option which does not exist yet; the types are what
+# cover every other way a field might be stringified. Removing either
+# one re-opens a hole the other does not close. See
+# docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+SECRET_CONFIG_KEY_RE = re.compile(
+    r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)')
+
+
+# The sentinel AUTH_SECRET_SEED carries until an operator sets one, which
+# verify_config() refuses to start on.
+#
+# Named rather than written twice because the field is a SecretStr, and
+# SecretStr('x') == 'x' is False. Comparing the field against a bare
+# string literal is therefore always false, silently, which would turn
+# that refusal into a cluster happily signing tokens with the shipped
+# default. The comparison must unwrap, and there are exactly two places
+# which legitimately read this value: verify_config() below, and
+# external_api/app.py where it becomes JWT_SECRET_KEY.
+UNCONFIGURED_AUTH_SECRET_SEED = '~~unconfigured~~'
 
 
 def get_node_name() -> str:
@@ -159,8 +206,13 @@ class SFConfig(BaseSettings):
             'gunicorn graceful_timeout.'
         )
     )
-    AUTH_SECRET_SEED: str = Field(
-        '~~unconfigured~~',
+    # SecretStr so that dumping the configuration -- which the sf-queues
+    # startup banner does for every field -- renders asterisks rather
+    # than the seed every JWT in the cluster is signed with. Read the
+    # real value with .get_secret_value(); there are two such reads,
+    # both listed on UNCONFIGURED_AUTH_SECRET_SEED below.
+    AUTH_SECRET_SEED: SecretStr = Field(
+        SecretStr(UNCONFIGURED_AUTH_SECRET_SEED),
         description='A random string to seed auth secrets with.'
     )
     API_TOKEN_DURATION: int = Field(
@@ -617,8 +669,11 @@ class SFConfig(BaseSettings):
             'blank).'
         )
     )
-    LOKI_AUTH_HEADER: str = Field(
-        '',
+    # A SecretStr, so "treat as a secret" is enforced by the type rather
+    # than left as an instruction to the next reader. Unwrapped once,
+    # where the push request's headers are assembled.
+    LOKI_AUTH_HEADER: SecretStr = Field(
+        SecretStr(''),
         description=(
             'Opaque value sent verbatim as the Authorization header on '
             'every Loki push (for example "Bearer <token>" or a Basic '
@@ -863,8 +918,10 @@ class SFConfig(BaseSettings):
         'shakenfist',
         description='Username for MariaDB connections.'
     )
-    MARIADB_PASSWORD: str = Field(
-        '',
+    # SecretStr for the same reason as AUTH_SECRET_SEED. Unwrapped once,
+    # where the SQLAlchemy connection URL is built in mariadb.py.
+    MARIADB_PASSWORD: SecretStr = Field(
+        SecretStr(''),
         description='Password for MariaDB connections.'
     )
     MARIADB_DATABASE: str = Field(
@@ -880,11 +937,51 @@ load_cluster_config()
 config = SFConfig()
 
 
+def redacted_config_items() -> Iterator[tuple[str, Any]]:
+    """The configuration as (key, value) pairs, with secrets masked.
+
+    Both callers dump every configuration item. The sf-queues startup
+    banner writes them at INFO, and INFO and above is shipped off the
+    node to Loki (see shakenfist/logship.py), so a secret which reaches
+    that loop leaves the cluster and lands in log aggregation.
+    AUTH_SECRET_SEED and MARIADB_PASSWORD did exactly that until this
+    was added. _config_failure() below prints them to the operator's
+    terminal, and to the journal when a daemon is what failed.
+
+    The test is on the key name rather than the value's type because
+    this iterates *every* configuration item, including options which
+    do not exist yet. The secret-carrying fields are separately typed
+    SecretStr, which covers every other path one might be stringified
+    on; the two mechanisms are complementary rather than redundant, and
+    removing either re-opens a hole the other does not close. See
+    docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+
+    The predicate over-matches by design -- it is shared with
+    sf-ctl show-config, where hiding a value behind --show-secrets costs
+    nothing. Neither caller here has such an escape hatch, so numbers
+    are exempted: API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES and
+    KERBSIDE_TOKEN_DURATION all match the name pattern, none of them can
+    be a credential, and all three are tunables an operator reads this
+    output to confirm. A credential is always a string (or a SecretStr,
+    which is not an int either, so it is still masked here as well as
+    rendering as asterisks on its own).
+
+    Field order is deliberately left as the model reports it, because
+    operators grep this output.
+    """
+    for key, value in config.model_dump().items():
+        numeric = isinstance(value, (bool, int, float))
+        if SECRET_CONFIG_KEY_RE.search(key) and not numeric:
+            yield key, '<redacted>'
+        else:
+            yield key, value
+
+
 def _config_failure(failures: list[str]) -> NoReturn:
     print('Configuration failed validation!')
     print()
     print('Configuration as read:')
-    for key, value in config.dict().items():
+    for key, value in redacted_config_items():
         print(f'    {key} = {value}')
     print()
     print('Errors:')
@@ -897,7 +994,15 @@ def verify_config(skip_auth_seed: bool = False) -> None:
     failures: list[str] = []
 
     if not skip_auth_seed:
-        if config.AUTH_SECRET_SEED == '~~unconfigured~~':
+        # get_secret_value() is required, not stylistic. AUTH_SECRET_SEED
+        # is a SecretStr, and SecretStr('x') == 'x' is False, so
+        # comparing the field directly against the sentinel would be
+        # false for every possible configuration -- including an
+        # unconfigured one -- and this refusal would never fire again.
+        # The failure mode is a cluster signing every token in its zone
+        # with the value shipped in this file.
+        if (config.AUTH_SECRET_SEED.get_secret_value()
+                == UNCONFIGURED_AUTH_SECRET_SEED):
             failures.append('You must configure AUTH_SECRET_SEED!')
 
     if failures:
