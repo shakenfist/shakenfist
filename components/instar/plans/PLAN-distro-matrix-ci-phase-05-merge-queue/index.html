@@ -11564,6 +11564,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes-risks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11713,50 +11724,74 @@ wants the gate complete from the first merge.</p>
 <td>low</td>
 <td>(operator)</td>
 <td>none</td>
-<td>Confirm <code>GITLAB_TESTDATA_TOKEN</code> and any registry credentials are available to <code>merge_group</code> runs (the master-plan risk item). A queue run that can't fetch testdata fails opaquely.</td>
+<td><strong>Done 2026-08-14.</strong> Confirmed by execution rather than inspection: both queue runs fetched testdata and ran the full stestr suite in all seven containers, so <code>GITLAB_TESTDATA_TOKEN</code> reaches <code>merge_group</code> events. The failures in the first run were the glibc regression, not credential failures — Rocky 9 reported <code>nothing provides libc.so.6(GLIBC_2.39)(64bit)</code> at package-install time. No registry credentials are needed; the distro base images are public.</td>
 </tr>
 <tr>
 <td>5c</td>
 <td>low</td>
 <td>(operator)</td>
 <td>none</td>
-<td>Verification merge: take a trivial no-op PR through the queue end-to-end. Confirm the matrix runs in the <code>merge_group</code> context and the seven distros report, and that a <code>pull_request</code> push does NOT run the matrix (PR latency unchanged). <strong>Then add <code>Can merge</code> to the ruleset's required checks</strong> (recipe in <code>docs/development.md</code>) — until that is done the matrix runs in the queue but does not gate it, so this step is not finished when the first queue run goes green.</td>
+<td><strong>Done 2026-08-15.</strong> The verification merge was #493 (a pre-commit pin bump, chosen as the trivial PR). It exercised the queue end-to-end: the matrix ran in <code>merge_group</code>, all seven distros reported, and the <code>pull_request</code> path left the matrix skipped so PR latency is unchanged. It also <em>found a live regression on <code>develop</code></em> — Renovate's #488 had reverted phase 1's <code>debian:bullseye</code> pin to <code>trixie</code>, raising the shipped binary's glibc floor to 2.39 and breaking Rocky 9, Ubuntu 22.04 and Debian 12. Fixed in #496, whose own queue run then went 7/7 green. <code>Can merge</code> was added to the required checks on 2026-08-15, after the context existed. See the two-step note in <code>docs/development.md</code> for why the order matters and what the gap let through.</td>
 </tr>
 <tr>
 <td>5d</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Docs close-out: mark the master plan Complete in <code>docs/plans/index.md</code> (+ <code>order.yml</code> if adding rows), add the CHANGELOG entry for merge-queue matrix CI, and record the enabled-settings snapshot (queue config, required checks) in <code>docs/development.md</code> so the configuration is reproducible if the repo is re-created. <strong>Partly done 2026-08-11</strong>: the settings snapshot and the queue/required-check rationale are in <code>docs/development.md</code> ("Merge queue and the <code>develop</code> ruleset"), and the CHANGELOG entry landed with phase 4. Remaining: mark the master plan Complete once 5a-5c are done.</td>
+<td>Docs close-out: mark the master plan Complete in <code>docs/plans/index.md</code> (+ <code>order.yml</code> if adding rows), add the CHANGELOG entry for merge-queue matrix CI, and record the enabled-settings snapshot (queue config, required checks) in <code>docs/development.md</code> so the configuration is reproducible if the repo is re-created. <strong>Done 2026-08-15</strong>: the settings snapshot and the queue/required-check rationale landed 2026-08-11 in <code>docs/development.md</code> ("Merge queue and the <code>develop</code> ruleset"), and the CHANGELOG entry landed with phase 4. This step updated the snapshot for the second required check, replaced the <code>Can merge</code> recipe (the old one PUT the <code>GET</code> response back, which is not valid input), recorded what the one-required-check window let through, and marked the master plan and <code>docs/plans/index.md</code> Complete. <code>order.yml</code> needs no change — it registers master plans only.</td>
 </tr>
 <tr>
 <td>5e</td>
 <td>low</td>
 <td>(operator)</td>
 <td>none</td>
-<td>After 5a lands, confirm the next nightly <code>export-repo-config</code> run proposes the new "Develop branch" ruleset — that is the export doing its job, and it makes the queue configuration reproducible without relying on the table in <code>docs/development.md</code>. (An earlier draft made this a defect report against the export; that was based on a stale checkout and is withdrawn.)</td>
+<td><strong>Done 2026-08-14.</strong> The nightly export proposed the ruleset in #495, which added <code>.github/exported-config/ruleset-develop-branch.json</code> and the <code>rulesets-summary.json</code> row; merged 04:37Z. The next export after 5c will propose the <code>Can merge</code> addition, which is the same mechanism confirming itself. Original brief: after 5a lands, confirm the next nightly <code>export-repo-config</code> run proposes the new "Develop branch" ruleset — that is the export doing its job, and it makes the queue configuration reproducible without relying on the table in <code>docs/development.md</code>. (An earlier draft made this a defect report against the export; that was based on a stale checkout and is withdrawn.)</td>
 </tr>
 </tbody>
 </table>
 <h2 id="acceptance">Acceptance<a class="headerlink" href="#acceptance" title="Permanent link">&para;</a></h2>
+<p>All met as of 2026-08-15.</p>
 <ul>
-<li>Merge queue enabled on <code>develop</code> (and <code>main</code> if applicable), with the
-  matrix as a required check.</li>
-<li>A real PR observed merging through the queue, gated by the matrix.</li>
-<li><code>pull_request</code> events do not run the matrix.</li>
-<li>Master plan marked Complete; index/order/CHANGELOG updated.</li>
+<li>~~Merge queue enabled on <code>develop</code> (and <code>main</code> if applicable), with the
+  matrix as a required check.~~ Enabled on <code>develop</code>; <code>main</code> is not
+  applicable, it only receives release merges. <code>Can merge</code> — the
+  aggregate over the matrix, not the individual entries — is required.</li>
+<li>~~A real PR observed merging through the queue, gated by the matrix.~~
+  Two: #493 and #496. The gating is only true of merges from 2026-08-15;
+  see 5c and the <code>docs/development.md</code> note for what the earlier window
+  let through.</li>
+<li>~~<code>pull_request</code> events do not run the matrix.~~ Confirmed on both
+  PRs — the matrix and <code>Can merge</code> show <code>skipped</code> on the PR path.</li>
+<li>~~Master plan marked Complete; index/order/CHANGELOG updated.~~ Done
+  in 5d. <code>order.yml</code> registers master plans only and needed no change.</li>
 </ul>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>The queue paid for itself on its first run. #493 was chosen as a
+deliberately trivial verification merge, and the matrix it triggered
+found a regression that had been sitting on <code>develop</code> for a day:
+Renovate's #488 bumped the release image's base from <code>debian:bullseye</code>
+to <code>trixie</code>, which raised the shipped binary's glibc floor from 2.30 to
+2.39 and silently dropped Rocky 9, Ubuntu 22.04 and Debian 12 —
+precisely the compatibility phase 1 existed to buy. Nothing in the
+pull-request CI could have caught it: every job there runs on a single
+modern distro where a 2.39 floor is invisible. That is the argument for
+this whole programme, arriving unprompted on day one.</p>
 <h2 id="notes-risks">Notes / risks<a class="headerlink" href="#notes-risks" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Merge-queue flakiness cascade (master plan): before enabling, be
+<li>~~Merge-queue flakiness cascade (master plan): before enabling, be
   confident the matrix is stable — a flaky entry blocks ALL merges.
   Consider running the matrix in a non-gating "report-only" mode for a
-  week (via <code>workflow_dispatch</code> / a temporary non-required check)
-  before making it required, to measure flake rate on real load.</li>
-<li>The export-repo-config workflow (<code>export-repo-config.yml</code>) may need to
-  learn the new branch-protection/queue settings so the exported repo
-  config stays authoritative — check whether it captures merge-queue
-  configuration and extend it if not.</li>
+  week.~~ This is what happened, though not by design: the two-step
+  required-check order (5a, then 5c) left the matrix reporting but not
+  gating across two queue runs. Fourteen entries ran, and the seven
+  failures were all one real regression rather than flake. That is a
+  thin sample — the flakiness cascade remains a live risk, and the
+  master plan's mitigation (temporary <code>continue-on-error</code> on an entry
+  that fails twice consecutively, rather than holding the queue) is now
+  the operative one.</li>
+<li>~~The export-repo-config workflow may need to learn the new
+  branch-protection/queue settings.~~ It already did; no change was
+  needed. See 5e.</li>
 </ul>
 
 

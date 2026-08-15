@@ -2972,10 +2972,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-phases-13-and-2b-complete-phases-45-drafted" class="md-nav__link">
+  <a href="#status-complete-2026-08-15-all-phases" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Phases 1–3 and 2b complete; phases 4–5 drafted
+        Status: Complete 2026-08-15 (all phases)
       
     </span>
   </a>
@@ -11649,10 +11649,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-phases-13-and-2b-complete-phases-45-drafted" class="md-nav__link">
+  <a href="#status-complete-2026-08-15-all-phases" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Phases 1–3 and 2b complete; phases 4–5 drafted
+        Status: Complete 2026-08-15 (all phases)
       
     </span>
   </a>
@@ -11775,7 +11775,13 @@
 
 
 <h1 id="plan-multi-distro-install-qemu-img-differential-ci">Plan: Multi-distro install + qemu-img differential CI<a class="headerlink" href="#plan-multi-distro-install-qemu-img-differential-ci" title="Permanent link">&para;</a></h1>
-<h2 id="status-phases-13-and-2b-complete-phases-45-drafted">Status: Phases 1–3 and 2b complete; phases 4–5 drafted<a class="headerlink" href="#status-phases-13-and-2b-complete-phases-45-drafted" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete-2026-08-15-all-phases">Status: Complete 2026-08-15 (all phases)<a class="headerlink" href="#status-complete-2026-08-15-all-phases" title="Permanent link">&para;</a></h2>
+<p>Every merge to <code>develop</code> now installs a freshly built <code>.deb</code> or <code>.rpm</code>
+on Debian 12/13, Ubuntu 22.04/24.04, Fedora and Rocky 9/10 and runs the
+full integration suite against each distribution's own <code>qemu-img</code>
+(6.2 through 10.2), and cannot merge unless all seven pass. Pull-request
+latency is unchanged — the matrix runs only in the merge queue.</p>
+<p>It found a regression on its first real run: see the phase 5 outcome.</p>
 <p>Rewritten 2026-08-08 from the original 2026-05-08 draft. The v0.3.0
 release has shipped and the <code>package-smoke</code> job in
 <code>.github/workflows/functional-tests.yml</code> has been stable, so the
@@ -12029,12 +12035,12 @@ logical change; at minimum one commit per phase.</p>
 <tr>
 <td>4. Workflow integration (merge_group package-matrix job)</td>
 <td>PLAN-distro-matrix-ci-phase-04-workflow.md</td>
-<td><strong>Code complete 2026-08-11</strong> (4a-4g). <code>package-build</code> + <code>package-matrix</code> + the <code>can_merge</code> gate are in <code>functional-tests.yml</code>; three <code>tools/ci/</code> scripts keep the steps declarative. Verified locally: per-event job graph (PR unchanged), both package families end-to-end with live qemu versions reported, summariser degradation, actionlint/shellcheck. Remaining: a <code>workflow_dispatch</code> dry run for real wall-clock, the merge_group token check, and the first seven-wide fan-out — all phase-5 prerequisites. Original plan detail: The plan is grounded in the sibling repo's merge-queue implementation and corrects the original sketch, whose step 4e would have broken PR CI: this repo has no aggregate gate today, and the <code>needs:</code> list the sketch pointed at belongs to <code>automated_reviewer</code>. Phase 4 creates a <code>can_merge</code> gate instead. Both open operator questions were closed 2026-08-11: the <code>xl</code> runners are started on demand, so the matrix fans out seven-wide with no <code>max-parallel</code> and no cross-entry KVM contention, and the testdata token is available to merge CI.</td>
+<td><strong>Code complete 2026-08-11</strong> (4a-4g). <code>package-build</code> + <code>package-matrix</code> + the <code>can_merge</code> gate are in <code>functional-tests.yml</code>; three <code>tools/ci/</code> scripts keep the steps declarative. Verified locally: per-event job graph (PR unchanged), both package families end-to-end with live qemu versions reported, summariser degradation, actionlint/shellcheck. All three remaining items closed in phase 5 by real queue runs rather than a dry run: the token reaches <code>merge_group</code>, the seven-wide fan-out works, and the wall-clock is measured. The seven-wide fan-out itself is consistently ~76 minutes across both runs (first entry home at ~46, Rocky 9 last); total queue-entry-to-<code>Can merge</code> was 1h39m and 3h15m, the difference being entirely the preceding build, which ranged from 24 to 116 minutes depending on cache state. Original plan detail: The plan is grounded in the sibling repo's merge-queue implementation and corrects the original sketch, whose step 4e would have broken PR CI: this repo has no aggregate gate today, and the <code>needs:</code> list the sketch pointed at belongs to <code>automated_reviewer</code>. Phase 4 creates a <code>can_merge</code> gate instead. Both open operator questions were closed 2026-08-11: the <code>xl</code> runners are started on demand, so the matrix fans out seven-wide with no <code>max-parallel</code> and no cross-entry KVM contention, and the testdata token is available to merge CI.</td>
 </tr>
 <tr>
 <td>5. Enable the GitHub merge queue + live verification</td>
 <td>PLAN-distro-matrix-ci-phase-05-merge-queue.md</td>
-<td>Not started</td>
+<td><strong>Complete 2026-08-15</strong> (5a-5e). Ruleset "Develop branch" (id <code>20783686</code>) gates <code>develop</code> through the merge queue; required checks are the two aggregate jobs <code>Can enqueue</code> and <code>Can merge</code>, never the individual matrix entries. <code>Can merge</code> had to be added second — it only exists once a merge group has run — and <code>docs/development.md</code> records why, plus what the one-check window let through: both #493 and #496 merged thirty one seconds after the skipped <code>Can enqueue</code> satisfied the gate, with the matrix still running. The verification merge (#493, a trivial pin bump) found a live regression: Renovate's #488 had reverted phase 1's <code>debian:bullseye</code> base to <code>trixie</code>, raising the shipped binary's glibc floor to 2.39 and breaking Rocky 9, Ubuntu 22.04 and Debian 12. #496 fixed it and its queue run went 7/7 green. The testdata token reaches <code>merge_group</code> (5b, confirmed by seven full suite runs, not by inspection) and the nightly config export picked the ruleset up unprompted (5e, #495).</td>
 </tr>
 </tbody>
 </table>
