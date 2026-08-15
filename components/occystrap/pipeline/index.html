@@ -6801,6 +6801,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../installation/" class="md-nav__link">
         
   
@@ -7023,6 +7051,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-diff_id-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The diff_id contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#filter-capabilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7071,6 +7110,17 @@
   
     <nav class="md-nav" aria-label="Output Writers">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#driving-the-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Driving the pipeline
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#tarball-output" class="md-nav__link">
@@ -7345,10 +7395,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_10" id="__nav_3_8_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_11" id="__nav_3_8_11_label" tabindex="0">
             
   
   
@@ -7366,8 +7416,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11661,6 +11711,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-diff_id-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The diff_id contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#filter-capabilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11709,6 +11770,17 @@
   
     <nav class="md-nav" aria-label="Output Writers">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#driving-the-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Driving the pipeline
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#tarball-output" class="md-nav__link">
@@ -11945,6 +12017,7 @@ document explains how the pipeline works and how its components interact.</p>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>           <span class="c1"># Filename or digest hash</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">data</span><span class="p">:</span> <span class="nb">object</span>        <span class="c1"># File-like object or None (skipped)</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">layer_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Manifest position</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">temp_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>    <span class="c1"># Backing temp file, if any</span>
 </code></pre></div>
 <table>
 <thead>
@@ -11968,12 +12041,84 @@ document explains how the pipeline works and how its components interact.</p>
 processing without loading entire images into memory. The <code>layer_index</code>
 field is set when layers are delivered out of order (see
 <a href="#out-of-order-layer-delivery">Out-of-Order Delivery</a> below).</p>
+<p><code>temp_path</code> names the temp file backing <code>data</code>, when the input had to spill
+the layer to disk. An output writer may <code>os.rename()</code> that file into place
+instead of copying bytes out of the file handle, which on the same
+filesystem avoids the copy entirely.</p>
+<p><strong>The hand-off rule:</strong> an input only sets <code>temp_path</code> when it is willing to
+give the file away — <code>inputs/docker.py</code> passes it only for the last
+reference to a buffered layer, since an earlier reference still needs the
+file for a later yield. The input then unlinks the path in a <code>finally</code>
+block guarded by <code>os.path.exists()</code>, so an output that renamed the file
+away turns that cleanup into a no-op rather than an error.</p>
+<p>Two rules follow for anyone writing either half. An output must not move a
+file that has no <code>temp_path</code>, and must not touch <code>temp_path</code> after
+<code>process_image_element()</code> returns — the input frees it as soon as the call
+unwinds. An input must not set <code>temp_path</code> on a file it still needs, and
+must keep its unlink existence-guarded rather than unconditional.
+<code>outputs/directory.py</code> is the reference implementation of the output half,
+including the <code>shutil.move()</code> fallback for a cross-filesystem rename.</p>
 <h2 id="input-sources">Input Sources<a class="headerlink" href="#input-sources" title="Permanent link">&para;</a></h2>
-<p>Input sources implement the <code>ImageInput</code> interface and provide image elements
-from various sources.</p>
+<p>Input sources implement the <code>ImageInput</code> interface (<code>inputs/base.py</code>) and
+provide image elements from various sources.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ImageInput</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">image</span><span class="p">:</span> <span class="nb">str</span>    <span class="c1"># abstract property, the image name</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span>      <span class="c1"># abstract property, the image tag</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fetch_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Yield ImageElement instances.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_manifest</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+</code></pre></div>
+<p><code>fetch()</code> is the only abstract method. <code>fetch_callback</code> takes a layer
+digest and returns False to skip that layer, in which case the element is
+still yielded but with <code>data=None</code>. <code>ordered=True</code> yields layers in
+manifest order; <code>ordered=False</code> yields them as they become available with
+<code>layer_index</code> set (see
+<a href="#out-of-order-layer-delivery">Out-of-Order Delivery</a>).</p>
+<p><code>get_manifest()</code> and <code>get_config()</code> are optional metadata accessors that
+must not download layer blobs. They are what the read-only <code>info</code> and
+<code>check</code> commands consume. Both default to returning <code>None</code>, and <strong><code>None</code>
+means "this source cannot answer", not "the image has no such data"</strong> — so
+a caller has to handle the null case rather than assume it is a failure:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th><code>get_manifest()</code></th>
+<th><code>get_config()</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>registry://</code>, <code>quay://</code></td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>docker://</code></td>
+<td><code>None</code> — the daemon exposes no distribution manifest</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>tar://</code></td>
+<td><code>None</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>dockerpush://</code></td>
+<td><code>None</code></td>
+<td><code>None</code> — nothing is known until Docker pushes</td>
+</tr>
+</tbody>
+</table>
+<p><code>_build_info()</code> in <code>main.py</code> is the reference for degrading gracefully
+across all four cases.</p>
 <h3 id="registry-input">Registry Input<a class="headerlink" href="#registry-input" title="Permanent link">&para;</a></h3>
 <p>Fetches images from Docker/OCI registries using the HTTP API.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>registry://HOST/IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>registry://HOST/IMAGE:TAG
 </code></pre></div>
 <p>Capabilities:
 - Token-based and basic authentication
@@ -11983,12 +12128,12 @@ from various sources.</p>
 - Parallel layer downloads for improved throughput</p>
 <p><strong>Parallel Downloads:</strong></p>
 <p>Layer blobs are downloaded in parallel using a thread pool:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>fetch() generator
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    └── Yield config file first (synchronous)
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    └── Submit all layer downloads to thread pool
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    └── If ordered=True: yield layers in manifest order
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    └── If ordered=False: yield layers as downloads complete
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        (each with layer_index for reordering)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>fetch() generator
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    └── Yield config file first (synchronous)
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    └── Submit all layer downloads to thread pool
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    └── If ordered=True: yield layers in manifest order
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    └── If ordered=False: yield layers as downloads complete
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        (each with layer_index for reordering)
 </code></pre></div>
 <p>Key aspects:
 - All layers download simultaneously to maximize throughput
@@ -11999,7 +12144,7 @@ from various sources.</p>
 - Default parallelism is 4 threads, configurable via <code>--parallel</code></p>
 <h3 id="docker-daemon-input">Docker Daemon Input<a class="headerlink" href="#docker-daemon-input" title="Permanent link">&para;</a></h3>
 <p>Fetches images from local Docker or Podman daemons.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker://IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker://IMAGE:TAG
 </code></pre></div>
 <p>Uses the Docker Engine API over Unix socket to stream the image tarball
 (equivalent to <code>docker save</code>).</p>
@@ -12007,22 +12152,15 @@ from various sources.</p>
 no way to fetch individual layers separately. This is a limitation of the API
 design.</p>
 <p><strong>Hybrid Streaming:</strong></p>
-<p>To minimize disk usage for large images, the Docker input uses a hybrid
-streaming approach:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>fetch() generator
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    └── Stream tarball sequentially (mode=&#39;r|&#39;)
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    └── Read manifest.json to get expected layer order
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    └── For each file in stream:
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        ├── If next expected layer: yield directly (zero disk I/O)
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        └── If out-of-order: buffer to temp file for later
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    └── After stream: yield remaining buffered layers in order
-</code></pre></div>
-<p>Key aspects:
-- In the optimistic case (layers in order), no temp files are used
-- Out-of-order layers are buffered to individual temp files
-- Temp files are deleted immediately after yielding
-- For a 26GB image with in-order layers, disk usage is near zero
-- Temp file location is configurable via <code>--temp-dir</code> option</p>
+<p>To minimize disk usage for large images, the Docker input streams the
+tarball sequentially and only buffers to a temp file when a layer arrives
+out of order. In the optimistic case no temp files are used at all, so a
+26GB image with in-order layers costs near zero disk. Temp file location
+is configurable via <code>--temp-dir</code>.</p>
+<p>The mechanism — the inspect API call that pre-computes the manifest,
+tarball format detection, and the zero-buffering path for Docker 25+ — is
+described in
+<a href="/components/occystrap/internals/#docker-daemon-hybrid-streaming">internals.md</a>.</p>
 <h3 id="docker-push-input">Docker Push Input<a class="headerlink" href="#docker-push-input" title="Permanent link">&para;</a></h3>
 <p>Fetches images from local Docker or Podman daemons using an embedded registry.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>dockerpush://IMAGE:TAG
@@ -12123,6 +12261,50 @@ to transform or inspect elements. They inherit from <code>ImageFilter</code>.</p
 <p>Filters propagate the <code>requires_ordered_layers</code> property from their
 wrapped output, so the pipeline respects the final output's ordering
 needs.</p>
+<h3 id="the-diff_id-contract">The diff_id contract<a class="headerlink" href="#the-diff_id-contract" title="Permanent link">&para;</a></h3>
+<p>A filter that changes layer content invalidates the <code>rootfs.diff_ids</code> list
+in the image config, and the config normally arrives <em>before</em> the layers it
+describes. <code>ImageFilter</code> in <code>filters/base.py</code> resolves that ordering
+problem with four helpers, and a content-modifying filter must use all of
+them rather than forwarding the config itself:</p>
+<table>
+<thead>
+<tr>
+<th>Helper</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_buffer_config(element)</code></td>
+<td>Hold the <code>CONFIG_FILE</code> back instead of forwarding it</td>
+</tr>
+<tr>
+<td><code>_record_new_diff_id(sha256_hex, layer_index, original_hex=None)</code></td>
+<td>Record the digest of a rewritten layer</td>
+</tr>
+<tr>
+<td><code>_skip_layer(layer_index)</code></td>
+<td>Advance the layer counter for a layer left untouched</td>
+</tr>
+<tr>
+<td><code>_forward_buffered_config()</code></td>
+<td>Rewrite <code>diff_ids</code> and forward the config</td>
+</tr>
+</tbody>
+</table>
+<p><code>finalize()</code> calls <code>_forward_buffered_config()</code> for you, so the config is
+emitted last with the corrected digests. <code>_skip_layer()</code> matters because
+under ordered delivery <code>layer_index</code> is <code>None</code> and the base class is
+counting positions itself — a filter that silently drops a layer without
+calling it leaves every later diff_id attributed to the wrong position.</p>
+<p><code>original_hex</code> is what makes the mapping usable across images. When it is
+supplied and differs from the new digest, the <code>original -&gt; filtered</code> pair
+is recorded in the shared <code>diff_id_map</code>. Content-modifying filters must
+therefore accept a <code>diff_id_map</code> kwarg and forward it to the base class,
+and <code>PipelineBuilder.build_filter()</code> must be taught to pass it. Proxy mode
+depends on this: a layer already rewritten for one image is recognised when
+a second image references the original digest.</p>
 <h3 id="filter-capabilities">Filter Capabilities<a class="headerlink" href="#filter-capabilities" title="Permanent link">&para;</a></h3>
 <p>Filters can:</p>
 <ul>
@@ -12156,22 +12338,129 @@ it between other filters to observe and measure their effect on layers.</p>
 </code></pre></div>
 <p>Each filter wraps the next, forming a chain that processes elements in order.</p>
 <h2 id="output-writers">Output Writers<a class="headerlink" href="#output-writers" title="Permanent link">&para;</a></h2>
-<p>Output writers implement the <code>ImageOutput</code> interface and handle the final
-destination of processed elements.</p>
-<p>All output writers log a summary line at the end of processing.</p>
-<p>The registry output provides a detailed breakdown of where time was spent:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
+<p>Output writers implement the <code>ImageOutput</code> interface (<code>outputs/base.py</code>)
+and handle the final destination of processed elements.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ImageOutput</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="nd">@property</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">requires_ordered_layers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">digest</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_image_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">verify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span> <span class="k">return</span> <span class="n">CheckResults</span><span class="p">()</span>
 </code></pre></div>
-<p>This shows:
-- <strong>compress</strong> - total CPU time spent compressing layers (summed across threads)
-- <strong>upload</strong> - total time spent on upload HTTP requests (summed across threads)
-- <strong>upload_skipped</strong> - number of blobs that already existed in the registry
-- <strong>MB in / MB out</strong> - uncompressed input size vs compressed output size
-- <strong>ratio</strong> - compression ratio (compressed / uncompressed as percentage)</p>
-<p>Other outputs log a simpler summary:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Processed 12345678 bytes in 5 layers in 3.2 seconds
+<p><code>fetch_callback()</code> returns False for a layer the destination already has,
+which is how a writer avoids paying for a download it would discard.
+<code>requires_ordered_layers</code> tells the driver whether this writer can cope
+with out-of-order delivery; the driver passes it straight to <code>fetch()</code> as
+<code>ordered</code>. <code>finalize()</code> runs once after the last element and is where
+manifests get written and files closed.</p>
+<p><code>verify()</code> is optional and runs <em>after</em> <code>finalize()</code> and after any
+post-processing step such as <code>write_bundle()</code>. The base implementation
+returns an empty, passing <code>CheckResults</code>. <code>full=False</code> is the fast path —
+check that blobs and files exist and are the right size; <code>full=True</code>
+re-reads and revalidates the data. Record what you expect during
+<code>process_image_element()</code> and assert it in <code>verify()</code>; <code>DirWriter</code> is the
+reference implementation. <code>RegistryWriter.verify()</code> is the case worth
+knowing about, because <code>finalize()</code> closes every HTTP client, so it has to
+build a fresh one rather than reusing the pooled clients.</p>
+<h3 id="driving-the-pipeline">Driving the pipeline<a class="headerlink" href="#driving-the-pipeline" title="Permanent link">&para;</a></h3>
+<p><code>_fetch()</code> in <code>main.py</code> is the driver that connects the two halves:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">ordered</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">requires_ordered_layers</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">with</span> <span class="n">redirect_logging</span><span class="p">():</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">img</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>            <span class="n">fetch_callback</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">fetch_callback</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>            <span class="n">ordered</span><span class="o">=</span><span class="n">ordered</span><span class="p">):</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="n">output</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">output</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </code></pre></div>
+<p>The <code>redirect_logging()</code> context manager comes from <code>progress.py</code> and
+routes log records around any active progress bar, so log lines do not
+interleave with the bar's redraws. <code>_fetch()</code> also attaches a
+<code>util.RequestStats</code> to the input if it has a <code>stats</code> attribute, and
+returns the byte, layer, retry and rate-limit counters for the caller to
+report.</p>
+<p>All output writers log a structured summary line at the end of processing,
+emitted with <code>LOG.with_fields()</code> so the fields survive into log
+aggregation rather than being baked into a sentence.</p>
+<p><code>ImageOutput._log_summary()</code> in <code>outputs/base.py</code> produces the common
+form, logged as <code>Processing complete</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bytes</code></td>
+<td>Total bytes seen by the writer</td>
+</tr>
+<tr>
+<td><code>layers</code></td>
+<td>Number of <code>IMAGE_LAYER</code> elements written</td>
+</tr>
+<tr>
+<td><code>elapsed_s</code></td>
+<td>Wall clock seconds, to one decimal place</td>
+</tr>
+</tbody>
+</table>
+<p>The registry output overrides this in <code>RegistryWriter.finalize()</code> with a
+detailed breakdown of where time was spent, logged as <code>Push complete</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>layers</code></td>
+<td>Number of layers in the pushed manifest</td>
+</tr>
+<tr>
+<td><code>elapsed_s</code></td>
+<td>Wall clock seconds for the whole push</td>
+</tr>
+<tr>
+<td><code>compress_s</code></td>
+<td>CPU time spent compressing layers, summed across threads</td>
+</tr>
+<tr>
+<td><code>upload_s</code></td>
+<td>Time spent on upload HTTP requests, summed across threads</td>
+</tr>
+<tr>
+<td><code>upload_skipped</code></td>
+<td>Blobs that already existed in the registry</td>
+</tr>
+<tr>
+<td><code>cache_hits</code></td>
+<td>Layers served from the cross-invocation layer cache</td>
+</tr>
+<tr>
+<td><code>input_mb</code></td>
+<td>Uncompressed input size</td>
+</tr>
+<tr>
+<td><code>output_mb</code></td>
+<td>Compressed output size</td>
+</tr>
+<tr>
+<td><code>ratio_pct</code></td>
+<td>Compression ratio, output over input, as a percentage</td>
+</tr>
+</tbody>
+</table>
 <h3 id="tarball-output">Tarball Output<a class="headerlink" href="#tarball-output" title="Permanent link">&para;</a></h3>
 <p>Creates docker-loadable tarballs in v1.2 format.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>tar:///path/to/output.tar
@@ -12314,6 +12603,9 @@ and <code>exclude</code> to maximize layer deduplication:</p>
 </ol>
 <p>This means that if two images share identical layers (after filtering),
 the second push will skip uploading those layers entirely.</p>
+<p>The <code>compression.py</code> module that implements format detection, streaming
+compression and decompression, and media type mapping is described in
+<a href="/components/occystrap/internals/#layer-compression">internals.md</a>.</p>
 <h3 id="out-of-order-layer-delivery">Out-of-Order Layer Delivery<a class="headerlink" href="#out-of-order-layer-delivery" title="Permanent link">&para;</a></h3>
 <p>The pipeline supports out-of-order layer delivery to maximize throughput
 when the output doesn't require manifest ordering. Each output declares
@@ -12331,6 +12623,9 @@ its ordering needs via the <code>requires_ordered_layers</code> property:</p>
 <p>This is particularly beneficial for the registry-to-registry pipeline,
 where layers can start uploading as soon as they finish downloading
 rather than waiting for earlier layers to complete first.</p>
+<p>Per-output ordering requirements and the reasons behind them are
+tabulated in
+<a href="/components/occystrap/internals/#out-of-order-layer-delivery">internals.md</a>.</p>
 <h3 id="pipeline-reuse-in-proxy-mode">Pipeline Reuse in Proxy Mode<a class="headerlink" href="#pipeline-reuse-in-proxy-mode" title="Permanent link">&para;</a></h3>
 <p>The <code>proxy</code> command demonstrates that the pipeline is fully reusable.
 Each received image gets a fresh pipeline built by <code>PipelineBuilder</code>,
@@ -12345,6 +12640,9 @@ and multiple images can be processed concurrently:</p>
 <a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    └── Decrement refcounts, delete blobs at refcount 0
 <a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>    └── Return 201/500 to client
 </code></pre></div>
+<p>The proxy's own internals — pull-through caching, per-image locking and
+the filtering rules — are in
+<a href="/components/occystrap/internals/#filtering-registry-proxy">internals.md</a>.</p>
 <p><code>PipelineBuilder.build_pipeline()</code> creates new input/output/filter
 instances on each call with no shared mutable state, so running the
 pipeline multiple times in one process is safe. The proxy keeps a
