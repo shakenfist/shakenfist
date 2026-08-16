@@ -209,6 +209,60 @@ it as sensitive**. Even with no credentials in it, it carries
 namespace names, instance metadata and request paths, and its
 access controls should reflect that.
 
+### Detecting a leaked credential
+
+Prevention is not detection, and the interesting leak is the one
+nobody predicted. Key secrets the cluster mints for itself are
+therefore shaped to be found: they begin with `sfk_` and end with
+a checksum, which is what makes them greppable in a way a random
+string is not. The format is described in the
+[user guide](../user_guide/authentication.md).
+
+To check a cluster once, ask Loki for anything of that shape:
+
+```logql
+{job="shakenfist"} |~ "sfk_[A-Za-z0-9]{38}"
+```
+
+Match on the shape rather than on `sfk_` alone. Log lines
+legitimately mention the prefix — key creation refuses an
+operator-supplied secret that carries it, and says so in the
+error — and a check which fires on its own documentation is one
+you learn to ignore.
+
+To check continuously, install
+[`examples/loki-secret-alert.yaml`](https://github.com/shakenfist/shakenfist/blob/develop/examples/loki-secret-alert.yaml)
+into your Loki ruler. The file carries its own installation
+instructions, including the tenant trap: a rule filed under a
+tenant other than your `loki_tenant` loads without error and
+never fires, which is indistinguishable from having nothing to
+report.
+
+On a cluster which is not shipping to Loki, the same check
+against the local journal on each node is:
+
+```bash
+journalctl -u 'sf-*' --no-pager | grep -E 'sfk_[A-Za-z0-9]{38}'
+```
+
+That is per-node and only covers the journal's retention, which
+is why it is the fallback rather than the recommendation.
+
+If any of these finds something, the credential is disclosed to
+everyone with read access to your log store — treat it that way
+even if the match is old, and do not copy the matched line into a
+ticket or a chat channel, which only spreads it further. Rotation
+procedures and their blast radius are in
+[Credential rotation](credential_rotation.md).
+
+Shaken Fist's own functional CI runs this same query against a
+live cluster on every run, and fails the build if it matches. It
+is worth knowing how that test is built, because the shape
+generalises: it emits a token of the credential shape first and
+requires the query to find *that* before it will assert that
+nothing else matched. A detector which has never been observed
+firing is not evidence of anything.
+
 ## Events vs logs
 
 Shaken Fist has two structured-record streams, and they are not
