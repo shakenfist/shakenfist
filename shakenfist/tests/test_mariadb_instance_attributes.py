@@ -186,7 +186,7 @@ class ArtifactColumnValuesTestCase(base.ShakenFistTestCase):
 NODE_ALL_COLUMNS = {
     'last_seen', 'installed_version', 'spice_server_cert_subject',
     'is_etcd_master', 'is_hypervisor', 'is_network_node', 'is_eventlog_node',
-    'is_database_node', 'instances', 'daemons', 'daemon_states',
+    'is_database_node', 'daemons', 'daemon_states',
     'qemu_version', 'libvirt_version', 'python_version',
     'python_implementation', 'dependency_versions', 'process_metrics',
 }

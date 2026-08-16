@@ -3,6 +3,7 @@
 # part of their role is to combine foundational baseobjects into something more
 # useful.
 import base64
+import copy
 import io
 import json
 import os
@@ -62,10 +63,8 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_reference import references_to_grouped_dict
-from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import exceptions as util_exceptions
@@ -970,28 +969,237 @@ class Instance(dbowo):
                 self.add_event(
                     EVENT_TYPE_STATUS, 'libvirt reports domain undefined')
 
-    def place_instance(self, location):
+    @property
+    def _capacity_claim(self):
+        """This instance's resource claim, as the capacity ledger counts it.
+
+        The three dimensions come from static values, so they are stable
+        for the life of the instance and readable right up until
+        hard_delete() removes the row. Disk is the summed *virtual* size
+        of the disk spec, computed by the reconciler's own reference
+        implementation so acquire and release cannot drift from the
+        counters the reconciler recomputes from ground truth.
+        """
+        return (self.cpus, self.memory,
+                mariadb.disk_spec_virtual_gb(self.disk_spec))
+
+    def _admit_placement(self, location, old_location, placement, enforce,
+                         enforce_demand):
+        """Draw down capacity for a placement and write it, atomically.
+
+        One RPC performs the guarded counter updates, the placement
+        attribute write and the placement reference rewrite in a single
+        database transaction (D1). Returns the reply so the caller can
+        emit events from it.
+
+        When ``enforce`` is False the guard must not refuse -- these are
+        the ground-truth writers recording where a libvirt domain
+        already is (P5) -- but P5 also wants a loud event when such a
+        write pushes a node past its limits, and the reply of a
+        non-enforced admission cannot say whether it did: it carries the
+        post-admit counters but not the limits they were compared
+        against. So the guarded call is made first and used as the
+        probe. If it admits, the placement is recorded and within
+        limits, at the cost of no extra RPC. If it is denied, nothing
+        was written (the denial rolls its transaction back), the denial
+        detail names the dimensions which would have been exceeded, and
+        the placement is then recorded unguarded. The over-limit event is
+        emitted only once that unguarded write has actually succeeded --
+        an event claiming a placement was recorded, followed by a failed
+        recording, would be an audit trail which lies.
+
+        The probe waives the D13 demand clause: demand is a spreader,
+        never a capacity bound (P9), so a demand-only refusal is not an
+        over-limit condition and must not emit the event -- on the small
+        or busy clusters where demand runs hot, it would fire on routine
+        ground-truth writes and cost each one a second RPC. (When
+        ``enforce`` is True this same call is the admission rather than
+        a probe, and ``enforce_demand`` is honoured as passed.)
+        """
+        cpus, memory_mb, disk_gb = self._capacity_claim
+        # NOTE(mikal): the RPC writes the placement column itself, so the
+        # caller has to hand it the same bytes the generic attribute
+        # write path would have stored -- hence mariadb's own serializer
+        # rather than util_json's (which indents and sorts).
+        placement_json = mariadb.json_dumps(placement)
+
+        result = mariadb.admit_instance_placement(
+            str(self.uuid), self.namespace, location, cpus, memory_mb,
+            disk_gb, placement_json, old_node_uuid=old_location,
+            enforce=True,
+            enforce_demand=(enforce_demand and enforce))
+
+        if not enforce and result['success'] and not result['admitted']:
+            denial = result
+            result = mariadb.admit_instance_placement(
+                str(self.uuid), self.namespace, location, cpus, memory_mb,
+                disk_gb, placement_json, old_node_uuid=old_location,
+                enforce=False, enforce_demand=enforce_demand)
+            if result['success']:
+                self._event_admission_over_limit(location, denial)
+
+        return result
+
+    def _event_admission_over_limit(self, location, result):
+        """Record that a ground-truth placement write exceeded a guard (P5)."""
+        self.log.with_fields({
+            'node': location,
+            'failing_stage': result['failing_stage'],
+            'dimensions': result['dimensions']}).warning(
+                'Recording a placement which exceeds the capacity guard')
+        self.add_event(
+            EVENT_TYPE_AUDIT,
+            'placement recorded despite exceeding capacity guard',
+            extra={
+                'node': location,
+                'failing_stage': result['failing_stage'],
+                'dimensions': result['dimensions']
+            }, log_as_error=True)
+
+    def place_instance(self, location, enforce=True, enforce_demand=True):
+        """Place this instance on a node, claiming its capacity to do so.
+
+        The placement attribute, the capacity counters and the
+        INSTANCE_LOCATION reference rows are written by a single
+        database transaction (D1), so a placement can no longer be
+        recorded without the capacity it consumes, and two concurrent
+        placements cannot both take the last slot on a node.
+
+        ``enforce`` (P5) is True for the scheduler-driven callers, where
+        a denial is a genuine reschedule and raises
+        CapacityAdmissionDenied so the caller can walk to its next
+        candidate. It is False for the ground-truth writers -- the
+        cleaner and the startup reconciliation -- which record where a
+        libvirt domain already is: a guard cannot refuse reality, and
+        refusing to record it would leave the ledger wrong, which is
+        strictly worse. Those writers get a loud event instead.
+
+        ``enforce_demand=False`` waives only the D13 demand feedforward
+        clause, keeping every real capacity dimension guarded. It is for
+        a walker's second pass after a first walk admitted nowhere and
+        was refused somewhere on demand alone: demand exists to spread
+        bursts across nodes, and when there is no quieter node to
+        spread to it must not refuse a cluster whose real capacity is
+        free (the smoke CI single-node lockout of 2026-08-14).
+        """
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
-            placement = self.placement
+            #
+            # _db_get_attribute() can return the dict an enclosing
+            # attribute_memo() block is caching, so the proposed
+            # placement is built on a copy. Mutating in place would let a
+            # denial -- which writes nothing -- still leave that memo (and
+            # anything else holding the same dict) reading the refused
+            # node with a bumped attempt count.
+            placement = copy.deepcopy(self.placement)
             old_location = placement.get('node')
             if old_location == location:
+                # This early-out means place_instance() is not a repair
+                # path: an instance whose attribute already names this
+                # node but which is missing its INSTANCE_LOCATION row
+                # (and so its capacity charge) is left as-is here. The
+                # queues daemon's restore_instances() owns that repair,
+                # via _reconcile_placement() precisely because it cannot
+                # go through this method.
                 return
 
             placement['node'] = location
             placement['placement_attempts'] = placement.get(
                 'placement_attempts', 0) + 1
-            self._db_set_attribute('placement', placement)
 
-            # Record instance in node caches
-            if old_location:
-                n = Node.from_db(old_location)
-                if n:
-                    n.remove_instance(self.uuid)
-            if location:
-                n = Node.from_db(location)
-                if n:
-                    n.add_instance(self.uuid)
+            result = self._admit_placement(
+                location, old_location or '', placement, enforce,
+                enforce_demand)
+
+            if not result['success']:
+                # The database could not be reached, or refused the
+                # write for a reason which is not a capacity denial.
+                # This is not "the cluster is full", so it must not read
+                # as one to a caller walking candidate nodes.
+                self.log.with_fields({
+                    'node': location,
+                    'error': result['error']}).error(
+                        'Instance placement write failed')
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance placement write failed',
+                    extra={'node': location, 'error': result['error']},
+                    log_as_error=True)
+                if enforce:
+                    raise exceptions.WriteException(
+                        f'could not place instance {self.uuid} on '
+                        f'{location}: {result["error"]}')
+                return
+
+            if not result['admitted']:
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance placement denied',
+                    extra={
+                        'node': location,
+                        'failing_stage': result['failing_stage'],
+                        'dimensions': result['dimensions'],
+                        'enforce': enforce
+                    })
+                if not enforce:
+                    # _admit_placement() retries a denial unguarded, so
+                    # the only way here is the retry's own key-only
+                    # UPDATE matching nothing: the capacity row vanished
+                    # between the probe and the write (the reconciler
+                    # dropped a node which stopped being a schedulable
+                    # hypervisor mid-pass). That is a benign abort, not
+                    # a capacity denial, and a ground-truth writer has
+                    # no candidate to walk to -- raising would abort the
+                    # rest of the caller's pass. Nothing was written;
+                    # the next cleaner pass retries.
+                    return
+                raise exceptions.CapacityAdmissionDenied(
+                    result['failing_stage'], result['dimensions'])
+
+            # The RPC wrote the placement column behind this object's
+            # back, so do what _db_set_attribute() would have done
+            # around that write: drop any memo of the attributes row so
+            # an enclosing attribute_memo() block cannot keep serving
+            # the pre-placement value, and log the mutation event.
+            self.__attribute_memo = None
+            self._log_attribute_mutation('placement', placement)
+
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'instance placed',
+                extra={
+                    'node': location,
+                    'previous_node': old_location,
+                    'placement_attempts': placement['placement_attempts'],
+                    'enforce': enforce,
+                    'enforce_demand': enforce_demand,
+                    'cpus': self.cpus,
+                    'memory_mb': self.memory,
+                    'node_used_cpus': result['node_used_cpus'],
+                    'node_used_memory_mb': result['node_used_memory_mb'],
+                    'node_used_disk_gb': result['node_used_disk_gb'],
+                    'node_expected_demand': result['node_expected_demand']
+                })
+
+            if result['unguarded']:
+                # P7: a node whose capacity row the reconciler has not
+                # created yet admits without a guard rather than
+                # refusing every create mid-upgrade.
+                self.log.with_fields({'node': location}).warning(
+                    'Instance placed without a capacity guard')
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance placed without capacity guard',
+                    extra={'node': location}, log_as_error=True)
+
+            if result['clamped']:
+                # A counter would have gone negative releasing the old
+                # node's share, which means the ledger and ground truth
+                # had already diverged. The reconciler repairs it.
+                self.log.with_fields({
+                    'node': location,
+                    'previous_node': old_location}).warning(
+                        'Capacity counter clamped at zero during placement')
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'capacity counter clamped at zero',
+                    extra={'node': location, 'previous_node': old_location},
+                    log_as_error=True)
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):
@@ -1123,11 +1331,15 @@ class Instance(dbowo):
 
         self.deallocate_instance_ports()
 
-        # Remove this instance from the cache of instances on a node
-        if self.placement:
-            n = Node.from_db(self.placement['node'])
-            if n:
-                n.remove_instance(self.uuid)
+        # Give this instance's capacity back and drop its placement
+        # references (P6). This is where the reconciler's ground truth
+        # stops counting the instance -- it excludes instances in state
+        # deleted, which is set at the end of this method -- so the
+        # explicit decrement belongs here rather than at hard delete.
+        # An instance which never placed has nothing to release.
+        placement_node = self.placement.get('node')
+        if placement_node:
+            self._release_placement(placement_node)
 
         # Find any agent operations for this instance and remove them
         for agentop in AgentOperations(
@@ -1144,22 +1356,67 @@ class Instance(dbowo):
         self._delete_on_hypervisor()
         self._delete_globally()
 
+    def _release_placement(self, node_uuid=''):
+        """Return this instance's capacity and drop its placement rows (P6).
+
+        An empty ``node_uuid`` releases wherever the instance's
+        placement references point, which is what the sweep in
+        hard_delete() wants: it knows the instance rather than its node.
+        A named node *filters* those references rather than replacing
+        them, so a repeat call is a no-op in either form -- which matters
+        here, because the node name comes from the ``placement``
+        attribute, which is never cleared (P8), and an instance which
+        ends in state ``error`` passes delete()'s re-entrancy guard on
+        every subsequent delete attempt.
+        """
+        cpus, memory_mb, disk_gb = self._capacity_claim
+        result = mariadb.release_instance_placement(
+            str(self.uuid), self.namespace, cpus, memory_mb, disk_gb,
+            node_uuid=node_uuid)
+
+        if not result['success']:
+            self.log.with_fields({
+                'node': node_uuid,
+                'error': result['error']}).error(
+                    'Instance placement release failed')
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'instance placement release failed',
+                extra={'node': node_uuid, 'error': result['error']},
+                log_as_error=True)
+            return result
+
+        if result['clamped']:
+            # A counter would have gone negative, so the ledger and
+            # ground truth had already diverged. The reconciler repairs
+            # it within a pass; record that it happened.
+            self.log.with_fields({'node': node_uuid}).warning(
+                'Capacity counter clamped at zero during placement release')
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'capacity counter clamped at zero',
+                extra={'node': node_uuid, 'released': result['released']},
+                log_as_error=True)
+
+        if result['released']:
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'instance placement released',
+                extra={'node': node_uuid})
+
+        return result
+
     def hard_delete(self):
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
 
-        # Remove any INSTANCE_LOCATION references targeting this
-        # instance. _delete_globally removes the placement node's
-        # reference on the normal path, but this backstop covers the
-        # cases it can miss (node row gone, placement lost, or a
-        # partial earlier delete) so a hard-deleted instance can never
-        # linger in a node's instance list.
-        for ref in mariadb.get_references_to(
-                ObjectType.INSTANCE, self.uuid,
-                RelationshipType.INSTANCE_LOCATION):
-            mariadb.remove_relationship(
-                ref.source_object_type, ref.source_uuid,
-                ref.relationship, ref.relationship_value,
-                ref.target_object_type, ref.target_uuid)
+        # Release any capacity this instance still holds and remove any
+        # INSTANCE_LOCATION references targeting it. _delete_globally()
+        # releases on the normal path, but this backstop covers the
+        # cases it can miss (node row gone, placement lost, or a partial
+        # earlier delete) so a hard-deleted instance can never linger in
+        # a node's instance list. It runs before the attribute and
+        # static rows are deleted because the release needs this
+        # instance's cpus, memory and disk spec to know how much to give
+        # back. A double release is a no-op: with no reference rows left
+        # there is nothing to release.
+        self._release_placement()
 
         mariadb.delete_instance_attributes(_uuid)
         mariadb.delete_instance(_uuid)

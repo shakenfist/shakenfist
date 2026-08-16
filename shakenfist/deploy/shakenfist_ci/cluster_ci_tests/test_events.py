@@ -65,7 +65,30 @@ class TestEvents(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
-        events = self.test_client.get_instance_events(inst1['uuid'])
+        # The admission primitive emits an "instance placed" audit event
+        # from Instance._admit_placement() on every successful
+        # placement, carrying the node it landed on and the node's
+        # post-admit capacity counters. Poll for it rather than reading
+        # once: events are eventually consistent (see the comment in
+        # test_network_events), and _await_instance_ready() returning
+        # does not imply the audit event has reached sf-eventlog.
+        events = []
+        placed = []
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            events = self.test_client.get_instance_events(inst1['uuid'])
+            placed = [e for e in events
+                      if str(e.get('message', '')) == 'instance placed']
+            if placed:
+                break
+            time.sleep(1)
+
         self.addDetail('events', content.text_content(json.dumps(
             events, indent=4, sort_keys=True)))
         self.assertNotEqual(0, len(events))
+        # Tolerant of extra events, and of more than one placement: a
+        # preflight redirect or a cleaner rewrite-to-local legitimately
+        # places the same instance again.
+        self.assertNotEqual(
+            0, len(placed),
+            'instance create emitted no "instance placed" audit event')

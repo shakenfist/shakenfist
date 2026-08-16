@@ -25,6 +25,8 @@ a placement decision can be reconstructed after the fact (see
    per-domain vCPU maximum on that node.
 3. **CPU admission** -- allocated vCPUs (including this request)
    must stay under `schedulable threads x CPU_OVERCOMMIT_RATIO`.
+   The node is charged whichever is larger of its measured running
+   vCPUs and the `used_cpus` its capacity counters already record.
    See [CPU overcommit](#cpu-overcommit).
 4. **RAM admission** -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
@@ -42,21 +44,27 @@ a placement decision can be reconstructed after the fact (see
 8. **Disk bandwidth** -- nodes whose disks are saturated (busy
    more than 120% of wall time across spindles) are excluded.
 9. **Load ordering and weighted selection** -- the survivors are
-   ranked by load and a weighted-random choice spreads work
-   across similar nodes. See below.
+   ordered by load, best first, and a weighted-random shuffle
+   spreads work across similar nodes. No node is dropped here.
+   See below.
 
-Stages 1 to 5 are **admission**: they answer whether a node can
-host the instance at all. Stages 7 and 8 are **load shedding**:
-they answer whether a node is a good idea right now. Affinity sits
-between the two deliberately. A busy node is still a node the user
-asked for, so load shedding may narrow the winning affinity group
-but never moves placement out of it -- if queue health and disk
-bandwidth would eliminate every member of that group, they are
-ignored and an audit event `schedule keeping affinity despite
-transient load` is recorded. Admission is never overridden this
-way: a node that cannot fit the instance is not scored for
-affinity in the first place. If load shedding eliminates *all*
-candidates, the schedule still fails with a 507 as before.
+Stages 1 to 5 are **pre-filters**: they answer, from a metrics
+snapshot up to a minute stale, whether a node probably can host the
+instance. They are not the admission decision -- that is a separate,
+atomic capacity claim made once a candidate is chosen (see [Admission
+is a guarded capacity claim](#admission-is-a-guarded-capacity-claim)
+below), so a node that survives every pre-filter here can still be
+refused there if another concurrent create took the last slot first.
+Stages 7 and 8 are **load shedding**: they answer whether a node is a
+good idea right now. Affinity sits between the two deliberately. A
+busy node is still a node the user asked for, so load shedding may
+narrow the winning affinity group but never moves placement out of it
+-- if queue health and disk bandwidth would eliminate every member of
+that group, they are ignored and an audit event `schedule keeping
+affinity despite transient load` is recorded. The pre-filters are
+never overridden this way: a node that cannot fit the instance is not
+scored for affinity in the first place. If load shedding eliminates
+*all* candidates, the schedule still fails with a 507 as before.
 
 Before this ordering, a momentary IO burst on the node an instance
 was affine to silently placed it anywhere with headroom, and the
@@ -114,11 +122,19 @@ are informational and nothing in scheduling consumes them yet.
 
 Candidate nodes that survive the hard filters are bucketed by
 **load per schedulable thread** (`cpu_load_1 / cpu_schedulable`)
-in coarse 0.25-wide bands, and only the lowest band continues.
-Normalising by size is what lets a cluster of differently sized
-machines compare fairly: an idle 24-thread node and a struggling
-12-thread node no longer look equivalent just because both have a
-load average under 1.0.
+in coarse 0.25-wide bands, and the list is ordered lowest band
+first. Normalising by size is what lets a cluster of differently
+sized machines compare fairly: an idle 24-thread node and a
+struggling 12-thread node no longer look equivalent just because
+both have a load average under 1.0.
+
+This stage **orders** the candidate list; it does not shorten it. A
+band says a node looks busier right now, not that it cannot host the
+instance -- every node reaching this stage has already passed every
+pre-filter. Because admission is a guarded claim that can refuse the
+node at the head of the list, a caller that runs out of candidates
+fails a create the cluster had room for, so the busier nodes stay in
+the list behind the preferred ones for the walk to fall through to.
 
 The bands are deliberately coarse. The metrics snapshot can be up
 to a minute stale, so a burst of instance creates is scheduled
@@ -127,15 +143,15 @@ send the entire burst to whichever node looked best at the last
 refresh. Coarse bands keep genuinely similar nodes interchangeable
 so a burst spreads across them.
 
-Within the winning band, selection is a weighted shuffle rather
-than a uniform one. A node's weight is its load headroom toward
+Within a band, ordering is a weighted shuffle rather than a uniform
+one. A node's weight is its load headroom toward
 `SCHEDULER_TARGET_LOAD` (default 0.75 per schedulable thread):
 
     weight = max(0.1, SCHEDULER_TARGET_LOAD x cpu_schedulable - cpu_load_1)
 
 A machine with twice the headroom draws roughly twice the share of
-a burst. The whole candidate list is weighted-shuffled (not just
-the first choice), because callers fall through to later candidates
+a burst. Every band is shuffled this way, not just the first choice
+from the best one, because callers fall through to later candidates
 when a placement fails.
 
 ## CPU overcommit
@@ -157,31 +173,85 @@ Note that on a cluster already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes are
 refused until they drain.
 
-What a node is charged for is the larger of two numbers: the
-`cpu_total_instance_vcpus` its resources daemon measured from
-*running* libvirt domains, and the vCPUs of every instance placed on
-it. The measurement alone lags reality badly -- it is republished
-once a minute, and an instance which is still fetching its image has
-no domain to measure at all -- so a burst of creates would otherwise
-all see the same idle node, all land on it, and only discover the
-overshoot once they booted. Placement is recorded synchronously as
-each create is admitted, so counting it closes that window.
+This is a pre-filter, not the admission decision, but it is sized
+from both of the figures admission cares about. A node is charged
+whichever is larger of `cpu_total_instance_vcpus` -- the resources
+daemon's count of *running* libvirt domains, republished roughly once
+a minute -- and `used_cpus` from that node's capacity counters. The
+measurement alone lags reality, because an instance still fetching
+its image has no domain to measure yet, so a node whose capacity is
+fully claimed can measure as completely idle for minutes. Reading the
+counters here means such a node leaves the candidate list at this
+stage instead of surviving to be refused by the guard. RAM and disk
+pre-filters remain sized from published measurements alone.
 
-Because that charge only ever removes capacity, an instance is
-counted only while it agrees it is on the node and has not been
-deleted. A placement record can outlive what it describes -- a node
-which dies mid-teardown leaves one behind, and an instance which
-moves can leave one on the node it left -- and charging a node for a
-stale record would take capacity away from it with nothing to give it
-back. A node reporting far more `cpu_committed` than its instance
-list accounts for is the shape of problem to look for.
+An instance being rescheduled is not charged for itself on the node
+it is already placed on, and a node with no capacity row -- one
+mid-upgrade, or one the reconciler declined to size -- is charged
+nothing, because admission will let it through unguarded too.
 
-RAM and disk admission are deliberately unchanged: they still size a
-node from its published measurements alone, and so keep the burst
-window that CPU admission has closed. Closing it for all three is the
-job of the scheduler-reservations work, which replaces this
-per-schedule walk with the maintained counters in
-`scheduler_node_capacity` rather than extending it.
+See [Admission is a guarded capacity
+claim](#admission-is-a-guarded-capacity-claim) for the check that
+actually admits or refuses a placement, and closes the burst window
+a pre-filter cannot.
+
+## Admission is a guarded capacity claim
+
+The pipeline above orders and prunes candidates from a metrics
+snapshot (and, for CPU, the counters below); it is not what admits
+an instance. Once a candidate is
+chosen, `Instance.place_instance()` makes one atomic claim against the
+allocation-denominated counters in `scheduler_node_capacity` (and,
+once the claims API exists, `namespace_claims`) -- the same database
+transaction that writes the `placement` attribute and the node's
+`instance_location` reference row. Two concurrent creates racing the
+last slot on a node cannot therefore both be admitted, and RAM and
+disk are protected the same way CPU is: all three dimensions are
+checked against the allocation ledger, not just the pre-filters'
+measurements above. See
+[`docs/operator_guide/database.md`](database.md) for the RPCs and the
+tables they draw down.
+
+A refused candidate is not a failed create: the scheduler-driven
+callers (the create path and the preflight redirect) walk to the next
+candidate on a denial, so one node being momentarily full only costs
+an extra round trip. Only once every candidate has refused does the
+request fail, with a 507 reporting how many candidates refused it.
+The per-candidate detail -- which node was refused, and on which
+dimension(s) (`cpus`, `memory_mb`, `disk_gb`, or the `demand`
+feedforward term described below) -- is attached to the instance's
+`schedule failed, every candidate refused by capacity guard` audit
+event rather than to the response body, so diagnosing a 507 means
+reading the instance's events. It is the same audit detail the
+scheduler has always published, now sourced from the guard that
+actually admitted or refused the placement rather than a snapshot of
+it.
+
+Ground-truth writers -- the cleaner's placement rewrites and the
+queues daemon's startup reconciliation -- do not enforce the guard,
+because they record where a libvirt domain already *is*: refusing to
+record reality would just leave the counters wrong. A write that
+pushes a node over its limit this way still updates every counter and
+is recorded loudly in the instance's events, rather than silently
+absorbed.
+
+Of those two, only the startup reconciliation repairs a missing
+`instance_location` row: the cleaner's per-domain rewrite early-outs
+when the placement attribute already names the right node, so an
+instance whose attribute is correct but whose reference row (and so
+capacity charge) is missing stays under-counted until the node's
+queues daemon next restarts. No current write path can produce that
+divergence -- the attribute and the row are written by one transaction
+-- so if you ever see a persistent under-count of a node's committed
+resources, the remedy is a restart of that node's Shaken Fist
+services, and the interesting question is what deleted the row.
+
+`/admin/resources` (`summarize_resources()`) publishes `cpu_committed`
+sourced from these same counters rather than a separate walk,
+alongside `cpu_committed_row_present`: a node the reconciler has not
+yet sized reports `cpu_committed` as zero *and*
+`cpu_committed_row_present` as false, which distinguishes a genuinely
+idle node from one that is admitting unguarded.
 
 ## Configuration reference
 
@@ -212,12 +282,43 @@ decays linearly to zero over `SCHEDULER_DEMAND_DECAY_SECONDS` of
 instance age. The purpose is to stop a burst of placements all choosing
 the same node because none of them have started doing any work yet.
 
-In this release they only shape the `expected_demand` column the
-capacity reconciler writes to `scheduler_node_capacity`, and the
-matching `scheduler_capacity_node_expected_demand` metric — **they do
-not affect placement**. The defaults are also provisional, pending an
-analysis of accumulated cluster data, so expect them to change. There is
-no reason to tune them yet.
+Since scheduler-reservations phase 3 they do affect placement: each
+successful admission adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` to the
+target node's `expected_demand` counter in the same transaction, and
+the admission guard refuses a node whose `cpu_load_1 + expected_demand`
+would exceed `SCHEDULER_TARGET_LOAD × cpu_schedulable` -- a denial on
+this clause is reported as the `demand` dimension. The capacity
+reconciler still owns the decay: it recomputes each node's
+`expected_demand` from placement ages every five minutes, and also
+publishes the matching `scheduler_capacity_node_expected_demand`
+metric. A refusal on `demand` behaves like any other guard denial: the
+caller walks to the next candidate. Setting `SCHEDULER_TARGET_LOAD` to
+zero or below disables the demand clause entirely rather than refusing
+every placement, which matters for a mid-upgrade caller whose request
+carries an unset field. The defaults are provisional, pending an
+analysis of accumulated cluster data, so expect them to change. There
+is no reason to tune them yet.
+
+Unlike the real dimensions, demand alone can never fail a create. The
+term exists to spread correlated bursts across nodes, not to bound
+capacity, so when a walk admits nowhere but at least one candidate was
+refused *only* on `demand` (every real dimension had room), the caller
+walks the candidates a second time with the demand clause waived and
+the placement proceeds on real capacity. Both walks are visible in the
+instance's audit events (`waiving demand guard`), and the waived
+admission still accumulates its demand contribution so later enforced
+admissions see it. Without this, a small or single-node cluster under
+rapid create churn -- CI being the canonical case -- would refuse
+creates indefinitely while sitting essentially idle.
+
+Note the steady-state cost on a cluster that stays demand-saturated
+(sustained churn against a small node count): because each waived
+admission still adds demand, every create pays both walks -- twice the
+admission RPCs and an extra pair of audit events -- until churn slows
+enough for the reconciler's decay to catch up. That is the accepted
+trade (a second walk is cheaper than a failed create), and frequent
+`waiving demand guard` events are the signal that the demand constants
+are mis-sized for the cluster rather than that anything is wrong.
 
 ## Diagnosing a placement decision
 
@@ -227,13 +328,13 @@ tells the whole story:
 
 - `schedule inputs` records what was asked for (vCPUs, memory,
   disk, affinity, namespace) and the age of the metrics snapshot.
-- Each filter stage emits `schedule at stage <name>` with the
+- Each pre-filter stage emits `schedule at stage <name>` with the
   surviving candidates and a `dropped` map giving each excluded
-  node's reason dict -- for CPU admission that includes the
+  node's reason dict -- for the CPU pre-filter that includes the
   schedulable base used, whether it came from the `cpu_schedulable`
-  field or the pre-reservation fallback, and both `measured_cpus`
-  and `committed_cpus` so it is clear which of the two bound; for
-  RAM it includes the reservation subtracted.
+  field or the pre-reservation fallback, and the measured vCPU count
+  compared against the hard maximum; for RAM it includes the
+  reservation subtracted.
 - `schedule have highest affinity` includes the winning score and
   a per-candidate `affinity_detail` breakdown of which neighbouring
   instances contributed what. `schedule keeping affinity despite
@@ -244,20 +345,26 @@ tells the whole story:
   the bucket.
 - `schedule final candidates` records the weighted ordering and
   each node's selection weight.
-- A schedule with no survivors raises an error recorded as
-  `schedule has no candidates at stage <name>, aborting` -- the
-  stage name plus the previous event's `dropped` map identify
+- Once a candidate is walked for admission, `schedule candidate
+  refused by capacity guard` records the failing stage (`cluster`,
+  `claim` or `node`) and dimension(s) from the guarded capacity
+  claim itself -- distinct from, and later than, the pre-filters'
+  `dropped` reasons above. `schedule failed, every candidate refused
+  by capacity guard` follows if every candidate is refused.
+- A schedule with no surviving pre-filter candidates raises an error
+  recorded as `schedule has no candidates at stage <name>, aborting`
+  -- the stage name plus the previous event's `dropped` map identify
   exactly which constraint eliminated the last node.
 
 The admin resources API (`/admin/resources`, surfaced by
 `get_cluster_resources()` in the client) reports per-node
 `cpu_schedulable`, `memory_reserved_mb`, `cpu_available` and RAM
-headroom using the same arithmetic as admission, so what it
-reports as available is what the scheduler would actually admit. It
-also breaks the CPU decision out into `cpu_hard_max`,
-`cpu_measured` and `cpu_committed`, which is how you tell a node
-that is genuinely busy from one that has simply been placed with
-work it has not started yet.
+headroom using the same pre-filter arithmetic as the pipeline above.
+It also breaks the CPU decision out into `cpu_hard_max`,
+`cpu_measured` and `cpu_committed` -- see [Admission is a guarded
+capacity claim](#admission-is-a-guarded-capacity-claim) for what
+`cpu_committed` and its `cpu_committed_row_present` companion actually
+mean.
 
 ## Mixed-version clusters
 

@@ -118,14 +118,13 @@ class Job(util_concurrency.Job):
         uuid, which is what this used to do, made that permanent cost
         proportional to the node's instance count.
 
-        The query reads only the reference rows, not the transition-only
-        ``node_attributes.instances`` column ``Node.instances`` still
-        unions in. That is safe here because the placements which matter
-        are this node's own, and this node's queues daemon reconciles
-        them into references on startup (see
-        ``queues.startup_tasks.restore_instances``) -- so by the time
-        sf-net is running this code after an upgrade, the references are
-        complete.
+        The query reads the INSTANCE_LOCATION reference rows, which have
+        been the sole record of instance placement since phase 3 of the
+        scheduler reservations work removed the legacy
+        ``node_attributes.instances`` column, its dual-write and the
+        read-side union. Placements are now written by the admission RPC
+        in the same transaction as the ``placement`` attribute, so there
+        is no second source to consult.
 
         Note that a database failure is not caught here.
         ``mariadb.get_node_instance_vxids()`` deliberately propagates

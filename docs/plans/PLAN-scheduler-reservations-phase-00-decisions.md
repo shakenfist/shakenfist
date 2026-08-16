@@ -452,6 +452,18 @@ actuation-to-observation gap for correlated CI bursts; the
 per-namespace learned demand value replaces the constant
 later without schema change.
 
+*Amendment (2026-08-14, phase 3):* the demand clause is a
+spreader, not a capacity bound, and is never allowed to fail
+a create on its own. When a candidate walk admits nowhere
+and at least one candidate was refused on demand alone
+(every real dimension had room), the walker re-walks with
+the demand clause waived and the placement proceeds. Without
+this the clause acts as a hard rate limit on small clusters:
+phase 3's first smoke CI run locked its single node out
+permanently (`expected_demand` 8–12 against a bound of
+`0.75 × 8 = 6`) while the node sat essentially idle, failing
+13 tests with 507s. See the phase 3 plan's decision P9.
+
 ### Namespace-claim questions 14-19
 
 **D14 (claims vs per-decision reservations): the per-decision
@@ -616,12 +628,19 @@ and the multinode job 3.4 TB against a 5.5 TB cluster whose
 worst observed *actual* per-job fill is 49 GB. Claiming
 virtual size against physical disk would reject today's
 routine concurrency outright while the disks sit ~98% empty.
-Phase 3 must therefore admit disk against
-`physical × SCHEDULER_DISK_OVERCOMMIT`, provisional seed
-**5.0** — enough to admit the observed concurrent mix with
-about 2× margin, while still bounding runaway growth two
-orders of magnitude below the virtual sum the guests could
-theoretically write. The physical backstop remains
+Phase 3 must therefore overcommit disk admission by
+`SCHEDULER_DISK_OVERCOMMIT`, provisional seed **5.0** —
+enough to admit the observed concurrent mix with about 2×
+margin, while still bounding runaway growth two orders of
+magnitude below the virtual sum the guests could
+theoretically write. *(Mechanism refined during phase 3
+planning, 2026-08-13: there is no total-physical-disk metric,
+and phase 2's `_derive_disk_limit_gb()` already sets
+`limit = used_virtual + free-space headroom`, so the constant
+multiplies the headroom term of that derivation rather than a
+raw physical total — see decision P3 in
+PLAN-scheduler-reservations-phase-03-primitive.md. A full
+disk still admits nothing.)* The physical backstop remains
 `NODE_DISK_RESERVATION_GB` plus the reconciler's drift
 correction; virtual size stays the claimed quantity because
 it is the only number known at admission time.

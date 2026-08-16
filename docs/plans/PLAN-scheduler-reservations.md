@@ -352,7 +352,7 @@ table entirely (decision D8).
 | 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3) |
 | 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
 | 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
-| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Not started |
+| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Implemented — on branch scheduler-reservations-phase-03, awaiting operator review and sfcbr soak (2026-08-14) |
 | 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
@@ -392,11 +392,14 @@ preflight-redirect and cleaner placement-rewrite paths moved
 onto the primitive, the demand feedforward term (D13), and
 the scheduler's pick-then-claim loop (D7). The concurrent-
 scheduling test from the review checklist lands here. Disk
-admission uses `physical × SCHEDULER_DISK_OVERCOMMIT`
-(provisional 5.0): the step 3 addendum measured virtual
-disk claims at 40–140× actual usage, so admitting virtual
-size against raw physical capacity would reject routine CI
-concurrency (see the phase 0 decisions document's addendum).
+admission is overcommitted by `SCHEDULER_DISK_OVERCOMMIT`
+(provisional 5.0), applied to the free-space headroom term of
+phase 2's `_derive_disk_limit_gb()` — there is no
+total-physical-disk metric to multiply: the step 3 addendum
+measured virtual disk claims at 40–140× actual usage, so
+admitting a burst's summed virtual size against unscaled
+free space would reject routine CI concurrency (see the
+addendum and phase 3 decision P3).
 
 Phase 3 also **inherits and removes** the CPU stopgap landed
 for issue 3498 (PR 3724): `Scheduler._committed_vcpus()`
@@ -407,12 +410,17 @@ tables. It closed the burst window on sfcbr while phase 3 was
 unwritten, and it must be deleted by the change which
 introduces the guarded UPDATE, not left underneath it: two
 ledgers over the same ground truth will eventually disagree,
-and the Python one is the unmaintained one. Its exclusions
-(skip deleted instances; charge an instance only to the node
-its own placement attribute names) were written to match
-`_RECONCILE_USAGE_SQL`, so they are also the working answer
-to the phase 4 obligation to de-duplicate usage by instance
-uuid. Two smaller consequences to pick up: RAM and disk
+and the Python one is the unmaintained one. Of its two
+exclusions, only the first (skip deleted instances) matches
+`_RECONCILE_USAGE_SQL`; the second (charge an instance only
+to the node its own placement attribute names) has no
+reconciler counterpart — the usage query charges every node
+holding an `INSTANCE_LOCATION` row, and documents duplicate
+counting as an open hazard. The phase 4 de-duplication
+obligation is therefore answered by phase 3 making duplicate
+placement rows unproducible (the atomic move deletes all
+prior rows), not by the stopgap's filter, which dies with the
+stopgap. Two smaller consequences to pick up: RAM and disk
 admission were knowingly left measurement-denominated, so
 phase 3 closes their burst window for the first time; and
 `summarize_resources()` gained the same walk, unconditionally,
@@ -432,6 +440,16 @@ advisory-mode ceiling enforcement with structured events
 (D16), opt-in semantics and best-effort accounting for
 unclaimed namespaces (D14/D17). The conductor-side
 integration (D18) lands in private-ci once this phase ships.
+Prerequisite from phase 3 review: the admission
+transaction's P7 fail-open (`guarded = enforce and
+node_present`) currently drops *every* guard when the
+target node has no capacity row, including the
+namespace-claim branch, whose limits are
+namespace-denominated and node-independent. Harmless while
+`namespace_claims` is empty; phase 4 must split the flag
+(claim guard enforced whenever `enforce` is true and a
+claim row exists) before advisory enforcement means
+anything on an unsized node.
 
 **Phase 5 — caller migration and hard ceiling.** Migrate the
 three `Scheduler()` call sites per D11 (queue worker to the
@@ -666,6 +684,39 @@ because the following statements will be true:
   rows (if phase 0 adopts it). Validate the model offline
   first — an analysis report over recorded sfcbr metrics —
   before anything trusts it in the placement path.
+- **Nothing treats a capacity refusal as transient.** A create
+  that finds no node with capacity fails immediately with a
+  507, even though in CI the capacity it wanted frees within
+  minutes as other tests delete their instances. This plan
+  makes admission correct and race-free; it does not make a
+  full cluster not-full, so a suite that bursts past cluster
+  capacity still fails rather than waits. Where the retry
+  belongs is undecided: the client SDK (`client-python`), the
+  CI base class (`shakenfist_ci`), or server-side admission
+  queueing — the hold-until-fittable bullet above is the
+  server-side end of the same question, but scoped to batch
+  creates only. Deliberately *not* bundled with phase 3: a
+  retry would mask whether atomic admission actually reduced
+  the failure rate, so this should wait until issue #3772 has
+  soak data from a `develop` carrying that phase.
+- **CI tier topology and sizing as a capacity consumer.** The
+  Debian 12 tier runs three "hypervisors", of which `primary`
+  is also the network *and* database node and `sf1` is also a
+  database node. With `NODE_CPU_RESERVATION_THREADS=4` each
+  has a `cpu_schedulable` of 1-2, so at the default overcommit
+  `limit_cpus` is 3 and three 1-vCPU instances fill a node —
+  while the suite runs at stestr concurrency 5 and several of
+  the tests that fail this way use `force_placement`, which by
+  construction cannot fall back to another node. The per-host
+  reservations are arithmetically right; they just make an
+  already small cluster genuinely small, which is why the
+  role-awareness work landed in phase 00a made these failures
+  *more* likely rather than less. Open questions, none of them
+  scheduler code: whether infra-role nodes should host
+  instances at all in CI, whether the tier needs a fourth
+  node, and whether suite concurrency should be denominated in
+  cluster capacity rather than runner cores. Tracked with the
+  bullet above under issue #3772.
 
 ### Bugs fixed during this work
 

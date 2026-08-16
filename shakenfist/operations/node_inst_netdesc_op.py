@@ -5,6 +5,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.eventlog import add_event_multi
+from shakenfist.exceptions import CapacityAdmissionDenied
 from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import LowResourceException
@@ -177,7 +178,68 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     candidates.append(node)
 
             candidates = s.find_candidates(inst, candidates=candidates)
-            inst.place_instance(candidates[0])
+
+            # The scheduler's list is a preference; the guarded capacity
+            # claim inside place_instance() is the admission, so walk the
+            # candidates until one takes the instance (D7). Exhausting
+            # the list is the same outcome as the scheduler finding no
+            # candidates at all, so it is raised as one.
+            #
+            # This walk (including the P9 demand-only re-walk below)
+            # also exists in external_api/instance.py's create path;
+            # until phase 5 extracts a shared helper, a semantic change
+            # here must be made there too.
+            denials = {}
+
+            def place_walk(enforce_demand):
+                for candidate in candidates:
+                    try:
+                        inst.place_instance(
+                            candidate, enforce_demand=enforce_demand)
+                        return candidate
+                    except CapacityAdmissionDenied as e:
+                        denials[candidate] = {
+                            'failing_stage': e.failing_stage,
+                            'dimensions': e.dimensions,
+                            'demand_only': e.demand_only,
+                        }
+                        add_event_multi(
+                            EVENT_TYPE_AUDIT, [self, inst],
+                            'reschedule candidate refused by capacity guard',
+                            extra={
+                                'node': candidate,
+                                'failing_stage': e.failing_stage,
+                                'dimensions': e.dimensions,
+                                'enforce_demand': enforce_demand,
+                            })
+                return None
+
+            target = place_walk(True)
+
+            # The D13 demand term spreads correlated bursts across
+            # nodes; it is not a capacity bound. The first pass already
+            # gave demand-quiet nodes their preference, so if nothing
+            # admitted and at least one candidate was refused on demand
+            # alone, walk again with the clause waived rather than
+            # aborting a start the cluster has real capacity for.
+            if target is None and any(
+                    d['demand_only'] for d in denials.values()):
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [self, inst],
+                    'no candidate admitted and some refused on demand '
+                    'alone, waiving demand guard',
+                    extra={'candidates': candidates, 'denials': denials})
+                target = place_walk(False)
+
+            if target is None:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [self, inst],
+                    'reschedule failed, every candidate refused by capacity '
+                    'guard',
+                    extra={'candidates': candidates, 'denials': denials})
+                raise LowResourceException(
+                    'No node had capacity for this instance, '
+                    f'{len(denials)} candidates refused it')
 
             # The artifact fetches minted at create time targeted the
             # original placement, so the redirect target's image cache has
@@ -185,20 +247,20 @@ class NodeInstNetdescOp(BaseClusterOperation):
             # for the new node and make the redirected start depend on
             # them, exactly as create time does.
             fetch_dependencies = inst.enqueue_disk_fetches(
-                candidates[0], self.priority, request_id=self.request_id,
+                target, self.priority, request_id=self.request_id,
                 artifact_event='fetch requested by instance start redirect')
 
             # Cluster operations are created in database transactions and
             # do not have .new() methods; the schema-layer helper is the
             # only way to mint one.
             schema.create_and_enqueue(
-                candidates[0], self.instance_uuid, self.net_desc,
+                target, self.instance_uuid, self.net_desc,
                 self.tasks, self.priority, self.request_id,
                 depends_on=fetch_dependencies or None)
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, inst],
                 'instance start redirected to another node',
-                extra={'target_node': candidates[0]})
+                extra={'target_node': target})
 
             try:
                 self.state = NodeInstNetdescOp.STATE_ABORT

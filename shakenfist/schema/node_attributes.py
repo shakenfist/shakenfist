@@ -33,7 +33,6 @@ class NodeAttributesData(BaseModel):
     Consolidates many separate etcd attributes into a single row:
     - observed (at, release) -> last_seen, installed_version
     - roles -> is_etcd_master, is_hypervisor, etc.
-    - instances -> instances (JSON list)
     - daemons -> daemons (JSON list)
     - daemon:{name} -> daemon_states (JSON dict)
     - version tuples -> qemu_version, libvirt_version, etc.
@@ -53,15 +52,6 @@ class NodeAttributesData(BaseModel):
         is_hypervisor: Whether this node runs instances.
         is_network_node: Whether this node handles networking.
         is_eventlog_node: Whether this node runs eventlog.
-        instances: Legacy list of instance UUIDs on this node (JSON).
-            Instance placement now lives in object_references as
-            INSTANCE_LOCATION rows, because a JSON list maintained by
-            full-row read-modify-write lost updates to concurrent
-            writers. For one transition release this column is still
-            dual-written (masked, under the instances lock) and
-            unioned into Node.instances reads so rolling upgrade and
-            rollback both see fresh placements; it is dropped in the
-            next release.
         daemons: List of registered daemon names (JSON).
         daemon_states: Legacy per-daemon state info (JSON dict). No
             longer read or written (see node_daemon_states); retained
@@ -100,9 +90,6 @@ class NodeAttributesData(BaseModel):
     is_network_node: bool = False
     is_eventlog_node: bool = False
     is_database_node: bool = False
-
-    # Instance tracking (list of instance UUID strings)
-    instances: list[str] = Field(default_factory=list)
 
     # Daemon management
     daemons: list[str] = Field(default_factory=list)

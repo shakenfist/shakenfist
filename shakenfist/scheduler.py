@@ -4,7 +4,6 @@ import random
 import time
 import uuid
 from collections import defaultdict
-from typing import Optional
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -147,13 +146,33 @@ class Scheduler:
         return self.metrics[node].get(
             'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
 
+    def _capacity_by_node(self):
+        """The materialised capacity counters, keyed by node uuid.
+
+        Read fresh on every scheduling decision rather than cached
+        beside the metrics: the counters move on every admission, and a
+        burst of concurrent creates -- precisely the case a cached
+        snapshot gets wrong -- is what reading them is for. Only
+        hypervisors the reconciler considers schedulable have a row, so
+        an absent node is not an error (P7).
+
+        An unreadable table returns empty rather than raising, which
+        degrades a caller to whatever measurement it also holds. That
+        is the right direction for a pre-filter -- the guard still
+        refuses correctly, only the cheap pruning in front of it is
+        lost -- but it is another reason this is not the admission
+        decision.
+        """
+        return {row['node_uuid']: row
+                for row in mariadb.get_scheduler_node_capacity()}
+
     def _placed_instances(self, node, memo):
         """The instances placed on a node, as (uuid, Instance or None) pairs.
 
-        Memoised into the caller's dict, because CPU admission and the
-        affinity pass both walk a candidate's placements and a scheduling
-        decision should only fetch them once. Returns None if the node's
-        row has gone away.
+        Memoised into the caller's dict, because the affinity pass can
+        consider a node more than once and a scheduling decision should
+        only fetch its placements once. Returns None if the node's row
+        has gone away.
         """
         if node not in memo:
             n = Node.from_db(node)
@@ -165,105 +184,66 @@ class Scheduler:
                     for instance_uuid in n.instances]
         return memo[node]
 
-    def _committed_vcpus(self, node: str, memo: dict,
-                         exclude_uuid: Optional[str] = None,
-                         verified: bool = False) -> int:
-        """The vCPUs a node has already been committed to by placement.
+    def _has_sufficient_cpu(self, log_ctx, inst, node, capacity):
+        """A cheap CPU pre-filter (P2), denominated in both ledgers.
 
-        A node's metrics count the vCPUs of its *running* libvirt domains
-        and are republished only once a minute, so an instance which has
-        been placed but has not booted yet -- in practice the whole time
-        it spends fetching its image -- is invisible to
-        cpu_total_instance_vcpus. Every create in a burst therefore sees
-        the same idle node, all of them are admitted onto it, and it ends
-        up well past its hard maximum once they do start, at which point
-        every later request naming that node is refused (issue 3498).
-        place_instance() writes the placement row synchronously as each
-        create is admitted, so counting placements closes the window that
-        the measurement alone leaves open.
+        This is not the admission decision. Since phase 3 of the
+        scheduler-reservations plan the real guard is the atomic
+        UPDATE that ``Instance.place_instance()`` makes against
+        ``scheduler_node_capacity``, which cannot admit two concurrent
+        creates into one remaining slot. This filter's job is to prune
+        the candidate list cheaply so that the guard misses less often.
 
-        exclude_uuid is the instance being scheduled: the preflight path
-        reschedules an instance which is already placed here, and it must
-        not be charged for itself twice. It is the dashed uuid form, which
-        is what object_references stores (see the REPLACE() in
-        _RECONCILE_USAGE_SQL, which joins the two forms) and what
-        str(Instance.uuid) produces.
+        It has to see what the guard sees to do that. The measurement
+        alone cannot: ``cpu_total_instance_vcpus`` counts *running*
+        libvirt domains and is republished only once a minute, so a
+        node whose ledger is full still measures as idle for the whole
+        time its instances spend fetching images. Filtering on the
+        measurement alone let such a node stay in the candidate list,
+        win the load ordering below, and then be refused by the guard
+        -- which cost merge CI a whole suite of creates on 2026-08-14
+        (the walk had been narrowed to that one node, so the refusal
+        was a 507 rather than a fall-through). The counters are
+        therefore read alongside the metrics and the node is charged
+        whichever of the two is larger, which is the same arithmetic
+        summarize_resources() publishes.
 
-        Unlike the affinity pass, which only mis-scores a node when it
-        reads a reference which should not be there, this charge is
-        fail-closed: a reference outliving its instance subtracts capacity
-        from a node with nothing to put it back. Two exclusions bound
-        that, both matching the reconciler's usage query
-        (_RECONCILE_USAGE_SQL) so the two ledgers cannot disagree:
-
-        - Deleted instances are skipped. A delete which never reached
-          _delete_globally() -- a node which died mid-teardown is the
-          obvious case -- leaves the reference behind until hard_delete()
-          sweeps it. An instance with no state row at all is charged, as
-          the reconciler's NULL handling does.
-        - Only instances whose own placement attribute names this node
-          are charged. place_instance() removes the old node's reference
-          on a best-effort basis and skips a node whose row has gone, so
-          an instance which moved can leave a reference on the node it
-          left. Placement is the authority for where an instance actually
-          is, which also makes the transition release's union of the
-          legacy node_attributes.instances column harmless here.
-
-        Both exclusions cost a database read per placed instance which
-        the static object cache does not serve -- states and attributes
-        are excluded from it by design -- so without ``verified`` they
-        are skipped and the return value is an *upper bound* computed
-        from cached static values alone. That is the useful shape: an
-        exclusion can only ever lower the charge, so a node which is
-        admitted against the upper bound would be admitted against the
-        exact figure too, and only a node about to be rejected has to
-        pay to find out whether the reason is real. On a cluster whose
-        nodes are not near their caps that is no extra reads at all.
+        ``capacity`` is the counters keyed by node uuid. A node with no
+        row is charged nothing and measured against the live figure: it
+        is a node mid-upgrade, or one the reconciler declined to size
+        (P7), and admission will let it through unguarded, so this
+        filter must not refuse on a ledger which does not exist.
         """
-        placed = self._placed_instances(node, memo)
-        if not placed:
-            return 0
-
-        committed = 0
-        for instance_uuid, i in placed:
-            if i is None or instance_uuid == exclude_uuid:
-                continue
-            if verified:
-                state = i.state
-                if state and state.value == instance.Instance.STATE_DELETED:
-                    continue
-                if not instance.placement_filter(node, i):
-                    continue
-            committed += i.cpus
-        return committed
-
-    def _has_sufficient_cpu(self, log_ctx, inst, node, memo):
         cpu_base, from_fallback = self._schedulable_threads(node)
         hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
         measured_cpus = self.metrics[node].get('cpu_total_instance_vcpus', 0)
-        committed_cpus = self._committed_vcpus(
-            node, memo, exclude_uuid=str(inst.uuid))
-        current_cpu = max(measured_cpus, committed_cpus)
         cpus = inst.cpus
 
-        # The cheap ledger over-counts, so a node it would reject gets a
-        # second look at the price of the reads the first pass skipped.
-        # Only worth paying when the ledger is what binds: if the
-        # measurement is already the larger number, excluding placements
-        # cannot lower the total.
-        if (current_cpu + cpus > hard_max_cpus
-                and committed_cpus > measured_cpus):
-            committed_cpus = self._committed_vcpus(
-                node, memo, exclude_uuid=str(inst.uuid), verified=True)
-            current_cpu = max(measured_cpus, committed_cpus)
+        # A node with a capacity row is guarded by that row's own limit,
+        # so test the guard's arithmetic exactly rather than a live
+        # re-derivation which can differ from it by a floor().
+        row = capacity.get(node)
+        limit_cpus = row['limit_cpus'] if row else hard_max_cpus
+        committed_cpus = row['used_cpus'] if row else 0
 
-        if current_cpu + cpus > hard_max_cpus:
+        # An instance already placed here is in used_cpus, and a
+        # reschedule which lands it back on the same node does not
+        # charge it a second time (place_instance() early-outs on an
+        # unchanged placement), so neither does this filter.
+        if committed_cpus and instance.placement_filter(node, inst):
+            committed_cpus = max(0, committed_cpus - cpus)
+
+        current_cpu = max(measured_cpus, committed_cpus)
+
+        if current_cpu + cpus > limit_cpus:
             reason = {
                 'reason': 'would exceed hard max CPUs',
                 'current_cpus': current_cpu,
                 'measured_cpus': measured_cpus,
                 'committed_cpus': committed_cpus,
+                'capacity_row_present': row is not None,
                 'requested_cpus': cpus,
+                'limit_cpus': limit_cpus,
                 'hard_max_cpus': hard_max_cpus,
                 'cpu_schedulable': cpu_base,
                 'cpu_schedulable_from_fallback': from_fallback,
@@ -391,7 +371,15 @@ class Scheduler:
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects, 'started scheduling')
 
-        with util_general.RecordedOperation('schedule', inst):
+        # The filter passes below read this instance's attributes once
+        # per candidate -- placement_filter() in the CPU stage, affinity
+        # in the stage after it -- and every one of those reads fetches
+        # the same instance_attributes row. Memoising for the duration of
+        # the decision makes it one fetch. Nothing in this block writes an
+        # attribute, and the memo is discarded on the way out, so no
+        # caller observes different staleness than it did before.
+        with util_general.RecordedOperation('schedule', inst), \
+                inst.attribute_memo():
             log_ctx = self.log.with_fields({'instance': inst})
 
             # Refresh metrics if its too old, or there are no nodes.
@@ -466,13 +454,14 @@ class Scheduler:
                 related_objects, 'cpu_max_per_instance', candidates,
                 dropped=dropped)
 
-            # Do we have enough idle CPU? Placements are memoised here and
-            # reused by the affinity pass below, which walks the same lists.
-            placements = {}
+            # Do we have enough idle CPU? This reads the capacity
+            # counters as well as the metrics, because a node whose
+            # ledger is full measures as idle until its instances boot.
+            capacity = self._capacity_by_node()
             dropped = {}
             for c in list(candidates):
                 ok, reason = self._has_sufficient_cpu(
-                    log_ctx, inst, c, placements)
+                    log_ctx, inst, c, capacity)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
@@ -512,6 +501,9 @@ class Scheduler:
             by_affinity = defaultdict(list)
             requested_affinity = inst.affinity
             affinity_detail = {}
+            # Each candidate's placements are read once and memoised, so
+            # a node considered twice in this pass is only fetched once.
+            placements = {}
 
             for c in list(candidates):
                 node_instances = self._placed_instances(c, placements)
@@ -659,32 +651,48 @@ class Scheduler:
                 by_load[bucket].append(c)
 
             lowest_load = sorted(by_load)[0]
-            candidates = by_load[lowest_load]
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule have lowest cpu load',
                 extra={
-                    'candidates': candidates,
+                    'candidates': by_load[lowest_load],
                     'lowest_load': lowest_load,
                     'load_detail': load_detail,
                 })
 
-            # Return a weighted shuffle of the winning bucket, where a
-            # node's weight is its load headroom toward the target
-            # sustained load -- so bigger or idler machines draw a
-            # proportionally larger share of a burst. This is weighted
-            # sampling without replacement (Efraimidis-Spirakis A-Res):
-            # callers walk the list on failure, so the tail order matters
-            # as much as the head.
+            # Return every candidate, ordered best bucket first, and
+            # within a bucket a weighted shuffle where a node's weight
+            # is its load headroom toward the target sustained load --
+            # so bigger or idler machines draw a proportionally larger
+            # share of a burst. This is weighted sampling without
+            # replacement (Efraimidis-Spirakis A-Res).
+            #
+            # The bucketing orders rather than filters, because a
+            # bucket says a node looks busier right now, not that it
+            # cannot host the instance -- every node still here has
+            # passed every admission filter above. Since phase 3 the
+            # caller walks this list against a capacity guard which can
+            # refuse the head of it, so discarding the rest turns one
+            # refusal into a failed create on a cluster with room: in
+            # merge CI on 2026-08-14 three viable nodes were cut to one,
+            # that one was refused, and five tests got a 507 apiece.
+            # Callers walk the list on failure, so the tail order
+            # matters as much as the head.
             weights = {}
-            for c in candidates:
-                raw_load = self.metrics[c].get('cpu_load_1', 0)
-                weights[c] = max(
-                    0.1,
-                    config.SCHEDULER_TARGET_LOAD * denominators[c] - raw_load)
-            candidates.sort(
-                key=lambda c: random.random() ** (1.0 / weights[c]),
-                reverse=True)
+            ordered = []
+            for bucket in sorted(by_load):
+                tier = by_load[bucket]
+                for c in tier:
+                    raw_load = self.metrics[c].get('cpu_load_1', 0)
+                    weights[c] = max(
+                        0.1,
+                        (config.SCHEDULER_TARGET_LOAD * denominators[c] -
+                         raw_load))
+                tier.sort(
+                    key=lambda c: random.random() ** (1.0 / weights[c]),
+                    reverse=True)
+                ordered.extend(tier)
+            candidates = ordered
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule final candidates',
@@ -697,8 +705,14 @@ class Scheduler:
         if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
             self.refresh_metrics()
 
+        # The capacity counters are what admission actually draws down,
+        # so they are read once here rather than recomputed per node --
+        # publishing a second, independently derived ledger beside the
+        # real one is how the two come to disagree. This is the same
+        # read the CPU pre-filter makes, through the same helper.
+        capacity = self._capacity_by_node()
+
         # Only hypervisors with reasonable queue lengths are candidates
-        placements = {}
         resources = {
             'total': {
                 'cpu_available': 0,
@@ -717,9 +731,17 @@ class Scheduler:
 
             resources['per_node'][n] = {}
 
-            # CPU. This must use the same arithmetic as
-            # _has_sufficient_cpu() so that the resources this API reports
-            # agree with what admission would actually allow.
+            # CPU. The charge is max(measured, committed), exactly as
+            # the pre-filter computes it (_has_sufficient_cpu()), so the
+            # headroom published here is bounded by whichever of the two
+            # binds -- which is what a create would be allowed. The two
+            # differ in one respect: the pre-filter measures that charge
+            # against the capacity row's own limit_cpus, because that is
+            # what the guard it is standing in front of will use. The
+            # counters derive that limit by the same arithmetic
+            # (mariadb._derive_cpu_memory_limits()) but refresh only
+            # once a reconcile period, where the metrics here are live,
+            # so this report publishes the live figure.
             resources['per_node'][n]['cpu_max_per_instance'] = \
                 self.metrics[n].get('cpu_max_per_instance', 0)
 
@@ -727,13 +749,16 @@ class Scheduler:
             resources['per_node'][n]['cpu_schedulable'] = cpu_base
             hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
             measured_cpus = self.metrics[n].get('cpu_total_instance_vcpus', 0)
-            # Verified, unlike admission's first pass: there is no request
-            # size here to decide whether the difference matters, and a
-            # published headroom which disagrees with what admission would
-            # grant is worse than the reads it costs on a low-frequency
-            # admin endpoint.
-            committed_cpus = self._committed_vcpus(n, placements,
-                                                   verified=True)
+            # A node the reconciler has not given a capacity row -- one
+            # mid-upgrade, or one it declined to size (P7) -- is charged
+            # nothing, because it is also guarded by nothing: admission
+            # will let it through. The flag says which of those a zero
+            # is, so "why is this node's committed total zero?" is
+            # answerable from the response alone.
+            row = capacity.get(n)
+            committed_cpus = row['used_cpus'] if row else 0
+            resources['per_node'][n]['cpu_committed_row_present'] = \
+                row is not None
             # Both inputs to the admission decision are published, because
             # "this node measures as idle but is refusing work" is only
             # diagnosable if you can see which of the two is binding.

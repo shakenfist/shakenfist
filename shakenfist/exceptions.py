@@ -98,6 +98,57 @@ class LowResourceException(SchedulerException):
     ...
 
 
+class CapacityAdmissionDenied(SchedulerException):
+    """The atomic placement admission refused to place an instance.
+
+    Raised by ``Instance.place_instance()`` when
+    ``mariadb.admit_instance_placement()`` reports a guarded capacity
+    UPDATE which matched no row: the instance was not placed and no
+    counter moved. ``failing_stage`` names the guard which refused
+    ('cluster', 'claim' or 'node') and ``dimensions`` carries the
+    per-dimension limit/used/requested numbers read back after the
+    rollback, so a caller walking the scheduler's candidate list can
+    say why each candidate was refused.
+
+    A denial is not a failure: it means the cluster is full, not that
+    the database was unreachable. Those are told apart by the RPC's
+    separate ``success`` and ``admitted`` fields, and the unreachable
+    case raises WriteException instead."""
+
+    def __init__(self, failing_stage: str,
+                 dimensions: list[dict[str, Any]]) -> None:
+        super().__init__(failing_stage)
+        self.failing_stage = failing_stage
+        self.dimensions = dimensions
+
+    def __str__(self) -> str:
+        exceeded = [d['dimension'] for d in self.dimensions
+                    if d.get('exceeded')]
+        if not exceeded:
+            exceeded = [d['dimension'] for d in self.dimensions]
+        if not exceeded:
+            return f'{self.failing_stage} capacity guard refused placement'
+        return (f'{self.failing_stage} capacity guard refused placement: '
+                f'{", ".join(exceeded)}')
+
+    @property
+    def demand_only(self) -> bool:
+        """True when only the D13 demand feedforward refused this node.
+
+        The demand term exists to spread correlated placement bursts
+        across nodes, not to bound capacity, so a walker whose every
+        candidate was refused on demand alone may retry the walk with
+        the demand clause waived: real capacity was free everywhere,
+        and there is no quieter node to spread to. A denial with any
+        real dimension exceeded (or from the cluster or claim stage,
+        which have no demand term) must never be waived."""
+        if self.failing_stage != 'node':
+            return False
+        exceeded = {d['dimension'] for d in self.dimensions
+                    if d.get('exceeded')}
+        return exceeded == {'demand'}
+
+
 # Database
 class DatabaseException(Exception):
     ...

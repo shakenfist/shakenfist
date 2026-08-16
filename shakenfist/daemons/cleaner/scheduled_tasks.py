@@ -118,7 +118,10 @@ def update_power_states(pet_watchdog=None):
                         _delete_with_kill(instance_uuid, None)
                     continue
 
-                inst.place_instance(config.NODE_UUID)
+                # P5: the cleaner records where a libvirt domain
+                # already is, so its placement writes do not enforce
+                # the capacity guard -- a guard cannot refuse reality.
+                inst.place_instance(config.NODE_UUID, enforce=False)
                 seen.append(domain.name())
 
                 db_state = inst.state
@@ -267,7 +270,9 @@ def update_power_states(pet_watchdog=None):
                             inst.state = dbo.STATE_DELETED
                         continue
 
-                    inst.place_instance(config.NODE_UUID)
+                    # P5 again: ground truth, not a scheduling
+                    # decision, so the guard is not enforced.
+                    inst.place_instance(config.NODE_UUID, enforce=False)
 
                     db_power = inst.power_state
                     log_ctx.debug(

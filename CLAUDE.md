@@ -551,14 +551,20 @@ performance. This is required for all deployments - MariaDB must be configured.
   capacity claim (limits, usage, state, server-side `expires_at`) and
   is empty until the claims API lands in phase 4; `cluster_capacity` is
   a singleton (id always 1) of total/claimed/unclaimed-used sums.
-  Maintained solely by the reconciler (a single
+  Recomputed wholesale from ground truth by the reconciler (a single
   `ReconcileSchedulerCapacity` RPC run every 5 minutes on the elected
-  cluster node) which recomputes every counter from ground truth. The
-  `used_*` counters are allocation ledgers over placed, non-deleted
-  instances, so they deliberately differ from the resources daemon's
-  active-domain measurements whenever instances are powered off.
-  Nothing consumes these tables for admission until phase 3's
-  guarded-UPDATE path (`docs/plans/PLAN-scheduler-reservations.md`).
+  cluster node); as of scheduler-reservations phase 3 also drawn down
+  and released incrementally on every placement by the
+  `AdmitInstancePlacement`/`ReleaseInstancePlacement` RPCs, each of
+  which performs a guarded `UPDATE` against these counters in the same
+  transaction as the placement write (see the Instance placement
+  bullet below and `docs/plans/PLAN-scheduler-reservations.md`). The
+  reconciler's job since phase 3 is drift correction rather than the
+  sole write path. The `used_*` counters are allocation ledgers over
+  placed, non-deleted instances, so they deliberately differ from the
+  resources daemon's active-domain measurements whenever instances are
+  powered off. The issue-3498 Python stopgap in the scheduler was
+  deleted by the same change that wired admission onto these counters.
 - **Per-daemon state** (`node_daemon_states` table): One row per
   `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
   and optional `message`. Replaces the JSON `daemon_states` dict that
@@ -571,16 +577,20 @@ performance. This is required for all deployments - MariaDB must be configured.
   release cycle as a rollback fallback.
 - **Instance placement** (`object_references` table): Which instances
   are on which node is recorded as `instance_location` reference rows
-  (source: node UUID, target: instance UUID), written by
-  `Instance.place_instance()` via `Node.add_instance()` /
-  `remove_instance()`. This replaced the `instances` JSON list on
+  (source: node UUID, target: instance UUID). They are written only by
+  the atomic `admit_instance_placement()` and
+  `release_instance_placement()` RPCs, which move the capacity
+  counters, write the `placement` attribute and rewrite the reference
+  rows in one transaction; `Instance.place_instance()` is the sole
+  caller for placement, and `Node` has no placement-writing helpers.
+  This replaced the `instances` JSON list on
   `node_attributes`, whose full-row read-modify-write maintenance lost
   updates to concurrent writers (observed as scheduler affinity
-  failures in CI). For one transition release the legacy column is
-  dual-written (masked, under the `instances` lock) and unioned into
-  `Node.instances` reads, so rolling upgrades and rollback both see
-  fresh placements; column, dual-write and union all go away next
-  release.
+  failures in CI). Reference rows are now the sole record of
+  placement; the dual-write and the union in `Node.instances` were
+  removed in scheduler-reservations phase 3, while the column itself
+  remains in place (nullable, unread) as a rollback fallback until a
+  later release drops it.
 - **Cluster Locks** (`cluster_locks` table): Distributed locks with
   a server-side `expires_at TIMESTAMP`. Holders refresh the lease
   every ~20s while alive; if a holder dies (or is partitioned for

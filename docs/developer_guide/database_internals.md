@@ -260,11 +260,14 @@ The elected cluster node also runs
 claims, re-derives per-hypervisor limits from the typed
 `node_metrics` columns, recomputes usage counters from placed
 instances and the decaying expected-demand signal, and rebuilds
-the `cluster_capacity` singleton. In this release the reconciler
-is the only writer of the three capacity tables
-(`scheduler_node_capacity`, `namespace_claims`,
-`cluster_capacity`) and nothing consumes them for admission (that
-arrives with the guarded-UPDATE path). Observability is the
+the `cluster_capacity` singleton. The reconciler recomputes the
+three capacity tables (`scheduler_node_capacity`,
+`namespace_claims`, `cluster_capacity`) wholesale; as of
+scheduler-reservations phase 3 the atomic admission and release
+RPCs also write them incrementally, and are the sole *drawdown*
+path against them, so a divergence between what the reconciler
+computes and what the counters hold is drift, healed on the next
+pass rather than expected steady state. Observability is the
 `scheduler_capacity_*` gauges and counters exported on
 `CLUSTER_METRICS_PORT`, plus one structured log line per pass.
 

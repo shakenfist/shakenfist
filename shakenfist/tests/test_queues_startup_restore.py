@@ -14,6 +14,7 @@ so its waits complete once the main loop is consuming.
 """
 
 import contextlib
+import json
 import threading
 from unittest import mock
 
@@ -35,6 +36,15 @@ class FakeInstance:
         self.fail_restore = fail_restore
         self.restored = False
         self.delete_errors = []
+
+        # The placement reconciliation at the end of restore_instances()
+        # records where each instance is through the admission RPC, which
+        # needs the instance's namespace and its resource sizes.
+        self.namespace = 'unittest'
+        self.cpus = 1
+        self.memory = 1024
+        self.disk_spec = [{'base': 'cirros', 'size': 8}]
+        self.placement = {'node': 'fake-node-uuid', 'placement_attempts': 1}
 
     def get_lock(self, timeout=None, op=None, global_scope=False):
         return contextlib.nullcontext()
@@ -89,6 +99,15 @@ class RestoreInstancesErrorPathTestCase(base.ShakenFistTestCase):
                 startup_tasks, 'Node', fake_node_class))
             mock_ignore = stack.enter_context(mock.patch.object(
                 startup_tasks.util_exceptions, 'ignore_exception'))
+            admit = stack.enter_context(mock.patch.object(
+                startup_tasks.mariadb, 'admit_instance_placement',
+                return_value={'success': True, 'error': '',
+                              'admitted': True, 'unguarded': False,
+                              'clamped': False, 'failing_stage': '',
+                              'dimensions': [], 'node_used_cpus': 0,
+                              'node_used_memory_mb': 0,
+                              'node_used_disk_gb': 0,
+                              'node_expected_demand': 0.0}))
 
             startup_tasks.restore_instances()
 
@@ -101,6 +120,13 @@ class RestoreInstancesErrorPathTestCase(base.ShakenFistTestCase):
         # ...and the failure did not stop later instances being restored.
         self.assertTrue(healthy.restored)
         self.assertEqual([], healthy.delete_errors)
+
+        # Both instances had their placement reference rows repaired
+        # through the admission RPC, without enforcing the capacity
+        # guard (P5).
+        self.assertEqual(2, admit.call_count)
+        for call in admit.call_args_list:
+            self.assertFalse(call.kwargs['enforce'])
 
 
 class StartupRestoreThreadTestCase(base.ShakenFistTestCase):
@@ -176,3 +202,123 @@ class StartupRestoreThreadTestCase(base.ShakenFistTestCase):
         mock_ignore.assert_called_once()
         self.assertEqual(
             'startup instance restore', mock_ignore.call_args.args[0])
+
+
+class RestorePlacementReconciliationTestCase(base.ShakenFistTestCase):
+    """The startup placement reconciliation goes through the RPCs.
+
+    It used to write INSTANCE_LOCATION reference rows directly, which
+    could leave an instance recorded on two nodes at once. Every write
+    now goes through the admission and release RPCs, whose
+    delete-all-then-insert makes duplicate placement rows unproducible,
+    and none of them enforce the capacity guard (P5): this path records
+    where libvirt domains already are.
+    """
+
+    NODE_UUID = 'fake-node-uuid'
+
+    def _run(self, restored=None, current=None, known=None):
+        fake_config = mock.MagicMock()
+        fake_config.NODE_NAME = 'fake-node'
+
+        fake_instance_module = mock.MagicMock()
+        fake_instance_module.Instances.return_value = restored or []
+        fake_instance_module.Instance.STATE_INITIAL = 'initial'
+        fake_instance_module.Instance.TERMINAL_STATES = {'deleted'}
+        fake_instance_module.Instance.from_db.side_effect = (
+            lambda u: (known or {}).get(u))
+
+        fake_node = mock.MagicMock()
+        fake_node.instances = current or []
+        fake_node.uuid = self.NODE_UUID
+        fake_node_class = mock.MagicMock()
+        fake_node_class.from_db.return_value = fake_node
+
+        admit_reply = {
+            'success': True, 'error': '', 'admitted': True,
+            'unguarded': False, 'clamped': False, 'failing_stage': '',
+            'dimensions': [], 'node_used_cpus': 0, 'node_used_memory_mb': 0,
+            'node_used_disk_gb': 0, 'node_expected_demand': 0.0}
+        release_reply = {
+            'success': True, 'error': '', 'released': True, 'clamped': False}
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'config', fake_config))
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'instance', fake_instance_module))
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'interfaces_for_instance', return_value=[]))
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'Node', fake_node_class))
+            admit = stack.enter_context(mock.patch.object(
+                startup_tasks.mariadb, 'admit_instance_placement',
+                return_value=admit_reply))
+            release = stack.enter_context(mock.patch.object(
+                startup_tasks.mariadb, 'release_instance_placement',
+                return_value=release_reply))
+
+            startup_tasks.restore_instances()
+
+        return admit, release
+
+    def test_a_missing_reference_is_recorded_here(self):
+        inst = FakeInstance('uuid-here')
+        inst.placement = {'node': self.NODE_UUID, 'placement_attempts': 3}
+        admit, release = self._run(restored=[inst])
+
+        admit.assert_called_once()
+        args, kwargs = admit.call_args
+        self.assertEqual(
+            ('uuid-here', 'unittest', self.NODE_UUID, 1, 1024, 8), args[:6])
+        self.assertEqual('', kwargs['old_node_uuid'])
+        self.assertFalse(kwargs['enforce'])
+        self.assertFalse(release.called)
+
+        # The placement attribute is the authority here and is rewritten
+        # unchanged -- this is a repair, not a new placement attempt.
+        self.assertEqual(
+            {'node': self.NODE_UUID, 'placement_attempts': 3},
+            json.loads(args[6]))
+
+    def test_a_stale_reference_moves_to_the_real_node(self):
+        # The instance is alive but placed elsewhere, so our reference
+        # row is stale. Recording it where it really is removes our row
+        # as a side effect of the admission's delete-all-then-insert.
+        elsewhere = FakeInstance('uuid-moved')
+        elsewhere.placement = {'node': 'other-node-uuid',
+                               'placement_attempts': 2}
+        elsewhere.state = mock.MagicMock()
+        elsewhere.state.value = 'created'
+
+        admit, release = self._run(
+            current=['uuid-moved'], known={'uuid-moved': elsewhere})
+
+        args, kwargs = admit.call_args
+        self.assertEqual('other-node-uuid', args[2])
+        self.assertEqual(self.NODE_UUID, kwargs['old_node_uuid'])
+        self.assertFalse(kwargs['enforce'])
+        self.assertFalse(release.called)
+
+    def test_a_deleted_instance_has_its_capacity_released(self):
+        gone = FakeInstance('uuid-gone')
+        gone.placement = {'node': self.NODE_UUID, 'placement_attempts': 1}
+        gone.state = mock.MagicMock()
+        gone.state.value = 'deleted'
+
+        admit, release = self._run(
+            current=['uuid-gone'], known={'uuid-gone': gone})
+
+        self.assertFalse(admit.called)
+        release.assert_called_once_with(
+            'uuid-gone', 'unittest', 1, 1024, 8, node_uuid=self.NODE_UUID)
+
+    def test_a_vanished_instance_has_its_reference_dropped(self):
+        # No instance row at all, so there is nothing to read resource
+        # sizes from: drop the row and let the capacity reconciler
+        # recompute the counters rather than guessing at amounts.
+        admit, release = self._run(current=['uuid-vanished'])
+
+        self.assertFalse(admit.called)
+        release.assert_called_once_with(
+            'uuid-vanished', '', 0, 0, 0, node_uuid=self.NODE_UUID)

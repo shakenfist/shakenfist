@@ -6,10 +6,10 @@ the operator-facing pages they link to.
 ## Scheduler and node capacity metrics
 
 Atomic reservation-table scheduling is being built per
-[PLAN-scheduler-reservations](../plans/PLAN-scheduler-reservations.md);
-the capacity tables and their reconciler exist but are inert, and the
-notes below describe both what runs today and the constraints on
-switching admission over to them.
+[PLAN-scheduler-reservations](../plans/PLAN-scheduler-reservations.md).
+The capacity tables, their reconciler and the guarded-UPDATE admission
+path that draws them down have all landed; a namespace claims API and
+further SQL pushdown are still to come.
 
 The scheduler ranks hypervisors by load per schedulable thread and
 admits against reservation-adjusted capacity. The reservation
@@ -47,34 +47,51 @@ placed, non-deleted instance, whereas the resources daemon's
 only active libvirt domains. A powered-off instance holds its
 reservation in the ledger and is absent from the measurement, so the
 two legitimately disagree, and any counter-based admission has to
-choose between them explicitly rather than assume parity. Today's CPU admission has
-already made that choice for itself, without the reconciler's tables:
-`Scheduler._committed_vcpus()` walks each candidate's
-`INSTANCE_LOCATION` rows and charges the node `max(measured,
-committed)`, because the measurement cannot see an instance which has
-been placed but has not booted (issue 3498). That walk applies the
-same two exclusions as `_RECONCILE_USAGE_SQL` -- skip deleted
-instances, and count an instance only against the node its own
-placement attribute names -- so the Python and SQL ledgers cannot
-disagree about what "placed" means. Neither exclusion is served by the
-static object cache (states and attributes are excluded from it), so
-they are applied only on demand: the first pass sums cached static
-values into an *upper bound*, and since an exclusion can only lower
-the charge, only a node that bound would be rejected pays to find out
-whether the reason is real. It is a stopgap for the CPU stage
-only. When the guarded UPDATE against `scheduler_node_capacity` lands
-it **replaces** this, and must delete `_committed_vcpus()` in the same
-change rather than layer the counters on top of it, or admission ends
-up consulting two ledgers which can drift apart. The
-ledger also reads only
-`INSTANCE_LOCATION` rows in `object_references`: during the one
-transition release where `Node.instances` still unions in the legacy
-`node_attributes.instances` JSON column, a placement written by a
-pre-cutover node exists only in that column and is invisible to the
-ledger, so mid-rolling-upgrade the `used_*` counters under-count — the
-non-conservative direction for an admission guard, so the counter guard
-must not be enabled until the legacy column and its union are
-removed. The reconciler maintains the
+choose between them explicitly rather than assume parity. Phase 3 chose
+the ledger. Admission is the guarded UPDATE the
+`AdmitInstancePlacement` RPC makes against `scheduler_node_capacity`,
+in the same transaction that writes the `placement` attribute and
+rewrites the instance's `INSTANCE_LOCATION` reference rows — so a
+placement cannot be recorded without the capacity it consumes, two
+concurrent creates racing one remaining slot admit exactly once, and
+duplicate placement rows cannot be produced.
+`Instance.place_instance()` is the sole caller. A refusal raises
+`exceptions.CapacityAdmissionDenied`, and every scheduler-driven
+caller answers it by walking to its next candidate (the create path in
+`external_api/instance.py` and the preflight redirect in
+`operations/node_inst_netdesc_op.py`); an exhausted candidate list is
+the ordinary "cluster full" outcome (507 on create,
+`LowResourceException` in preflight). Ground-truth writers — the
+cleaner's placement rewrites and the queues daemon's reference
+reconciliation — pass `enforce=False`: they record where a libvirt
+domain already is, which a guard cannot refuse.
+
+There used to be a second ledger here: `Scheduler._committed_vcpus()`,
+a Python walk over each candidate's `INSTANCE_LOCATION` rows added as
+a stopgap for the CPU stage (issue 3498). It was deleted by the same
+change that added the guard, because admission consulting two ledgers
+is exactly how they come to disagree. The in-Python filters in
+`Scheduler.find_candidates()` remain cheap pre-filters that prune and
+order the candidate list so the guard misses less often — they are not
+the decision, and they are allowed to be up to a minute stale — but
+the CPU one is denominated in both ledgers, charging `max(measured,
+used_cpus)` with `used_cpus` read from `scheduler_node_capacity`,
+because a node whose ledger is full measures as idle for as long as
+its instances spend fetching images. A node with no capacity row is
+charged nothing, matching the admission transaction's own fail-open on
+an unsized node. `summarize_resources()` charges the same way, from the
+same counters, so `/admin/resources` is not a second, independently
+derived ledger. The two differ on the limit they measure that charge
+against: the pre-filter uses the capacity row's `limit_cpus`, because
+that is what the guard behind it will use, while `/admin/resources`
+derives the limit live from the node's metrics. The arithmetic is the
+same (`mariadb._derive_cpu_memory_limits()`), but the row refreshes
+only once a reconcile period, so the published headroom can differ from
+what admission would grant for up to that long. Both inputs to the
+charge are published (`cpu_measured`, `cpu_committed`, and
+`cpu_committed_row_present` to say whether a zero means "unsized" or
+"idle"), so which of the two binds is answerable from the response.
+The reconciler maintains the
 `scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
 tables from the elected cluster node every five minutes. Rows exist
 per *schedulable hypervisor*, not per node, because a row that
@@ -97,9 +114,11 @@ toward neither the total nor the unclaimed-used side (a claim's
 `used_*` stays namespace-wide — a quota covers a namespace's instances
 wherever they are stranded). If you add a capacity consumer, it
 inherits these filters by reading the tables — do not re-derive
-capacity from `node_metrics` directly. In this release nothing
-consumes the tables for admission
-(`docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md`).
+capacity from `node_metrics` directly. The tables are consumed for
+admission as of phase 3
+(`docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md`);
+`namespace_claims` stays empty until the claims API lands in phase 4,
+so the transaction's claim branch is exercised only by unit tests.
 The SQL itself is covered by
 `shakenfist/tests/test_mariadb_capacity_reconcile_live.py`, which runs
 against a real MariaDB in the "Schema ENUM widening" CI job (whose
@@ -291,12 +310,20 @@ sentinels' 15-second `observe_this_node()` heartbeat) could silently revert
 a placement. References are single-row inserts and deletes, needing no
 cross-writer coordination. `Node.instances` queries them via
 `mariadb.get_references_from()` filtered by `INSTANCE_LOCATION`. Unlike
-`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. For one
-transition release the legacy column is dual-written (masked, under the
-`instances` lock) and unioned into `Node.instances` reads, so placements
-written by not-yet-upgraded nodes mid-roll stay visible and a rollback
-still reads fresh data; each node's queues-daemon startup reconciliation
-converges the two stores, and the column is dropped next release.
+`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. The dual-write and the
+read-side union were removed in scheduler-reservations phase 3, once every
+placement writer had moved onto the atomic admission primitive; the column
+itself remains declared in the table (nullable, no longer read or written)
+so upgraded databases keep a rollback fallback, and is dropped in a later
+release — the same treatment as the legacy `daemon_states` column.
+
+Placement rows are written only by two `sf-database` RPCs,
+`AdmitInstancePlacement` and `ReleaseInstancePlacement`, each performing its
+guarded capacity-counter update, the `placement` attribute write and the
+`INSTANCE_LOCATION` row rewrite in a single database transaction, so a
+placement can never be recorded without the capacity it consumes.
+`Instance.place_instance()` is the sole caller; `Node` carries no
+placement-writing methods.
 
 The `last_active` column is updated whenever a reference is observed to still
 be valid (e.g., when a node's cleaner daemon calls `observe()` on local blobs).

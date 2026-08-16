@@ -75,7 +75,7 @@ TEST_TABLES = [
 # those); the second has a null size, a sizeless CD-ROM style disk, and
 # two fractional sizes (no current write path produces those, but the
 # JSON-number-to-BIGINT cast rounds half away from zero -- 2.5 -> 3,
-# '1.5' -> 2 -- and _disk_spec_virtual_gb must agree with the SQL on
+# '1.5' -> 2 -- and disk_spec_virtual_gb must agree with the SQL on
 # them or the oracle assertion below is not an oracle); the third is
 # not a list at all.
 DISK_SPEC_NORMAL = [{'size': 20}, {'size': '8'}]
@@ -312,7 +312,7 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
             conn.commit()
 
     def _reconcile(self):
-        result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600)
+        result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
         self.assertIsNotNone(result, 'reconcile pass failed')
         return result
 
@@ -365,15 +365,15 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, by_node[str(self.node_b)]['used_disk_gb'])
 
     def test_disk_spec_reference_agrees_with_the_sql(self):
-        # _disk_spec_virtual_gb documents the SQL's intended semantics.
+        # disk_spec_virtual_gb documents the SQL's intended semantics.
         # Assert it really is an oracle rather than stale prose.
         by_node = self._by_node(self._reconcile())
         self.assertEqual(
-            mariadb._disk_spec_virtual_gb(DISK_SPEC_NORMAL)
-            + mariadb._disk_spec_virtual_gb(DISK_SPEC_MESSY),
+            mariadb.disk_spec_virtual_gb(DISK_SPEC_NORMAL)
+            + mariadb.disk_spec_virtual_gb(DISK_SPEC_MESSY),
             by_node[str(self.node_a)]['used_disk_gb'])
         self.assertEqual(
-            mariadb._disk_spec_virtual_gb(DISK_SPEC_NOT_A_LIST),
+            mariadb.disk_spec_virtual_gb(DISK_SPEC_NOT_A_LIST),
             by_node[str(self.node_b)]['used_disk_gb'])
 
     def test_deleted_instance_does_not_count(self):

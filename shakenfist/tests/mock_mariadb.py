@@ -5,6 +5,7 @@
 # Python dictionaries. This class was previously named MockEtcd, because
 # it originally backed the (now-removed) shakenfist.etcd module too.
 #
+import json
 import os
 import time
 from collections import defaultdict
@@ -12,6 +13,7 @@ from itertools import count
 from typing import List, Optional
 from unittest import mock
 
+from shakenfist.config import config
 from shakenfist.constants import get_object_class
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
@@ -124,6 +126,11 @@ class MockMariaDB():
         self.cluster_operation_targets = {}  # Mock MariaDB cluster op targets
         self._cot_sequence = count(1)  # AUTO_INCREMENT mock
         self.node_metrics_store = {}  # Mock MariaDB node metrics
+        # Mock scheduler_node_capacity rows, keyed by node uuid. Empty
+        # by default, which is the phase 3 fail-open case (P7): a node
+        # with no capacity row admits unguarded. Tests which want the
+        # guard to bite seed a row with set_node_capacity().
+        self.node_capacity = {}
         self.cluster_operations_store = {}  # Mock MariaDB cluster op headers
         self.work_queue_store = []  # Mock MariaDB work_queue rows (list to keep order)
         self._work_queue_next_id = count(1)  # AUTO_INCREMENT mock
@@ -848,6 +855,28 @@ class MockMariaDB():
         self.mariadb_delete_instance_attributes.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_instance_attributes.stop)
+
+        # MariaDB atomic placement admission and release
+        self.mariadb_admit_instance_placement = mock.patch(
+            'shakenfist.mariadb.admit_instance_placement',
+            side_effect=self._mariadb_admit_instance_placement)
+        self.mariadb_admit_instance_placement.start()
+        self.test_obj.addCleanup(
+            self.mariadb_admit_instance_placement.stop)
+
+        self.mariadb_release_instance_placement = mock.patch(
+            'shakenfist.mariadb.release_instance_placement',
+            side_effect=self._mariadb_release_instance_placement)
+        self.mariadb_release_instance_placement.start()
+        self.test_obj.addCleanup(
+            self.mariadb_release_instance_placement.stop)
+
+        self.mariadb_get_scheduler_node_capacity = mock.patch(
+            'shakenfist.mariadb.get_scheduler_node_capacity',
+            side_effect=self._mariadb_get_scheduler_node_capacity)
+        self.mariadb_get_scheduler_node_capacity.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_scheduler_node_capacity.stop)
 
         # Mock MariaDB functions for object metadata
         self.mariadb_get_object_metadata = mock.patch(
@@ -2642,6 +2671,234 @@ class MockMariaDB():
             f'MockMariaDB.delete_instance_attributes({key}): '
             f'not found')
         return False
+
+    #
+    # Mock MariaDB atomic placement admission and release
+    #
+
+    def set_node_capacity(self, node_uuid, limit_cpus=0, limit_memory_mb=0,
+                          limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
+                          used_disk_gb=0, expected_demand=0.0,
+                          demand_limit=None):
+        """Seed a scheduler_node_capacity row for a node.
+
+        No node has one by default, which is the phase 3 fail-open case
+        (P7): admission proceeds unguarded and says so. Seeding a row
+        makes the guard apply to that node.
+
+        ``demand_limit`` is the mock's stand-in for the real D13 bound
+        of ``SCHEDULER_TARGET_LOAD x cpu_schedulable`` (the mock has no
+        node_metrics table; fold any measured load into
+        ``expected_demand``). ``None``, the default, leaves the demand
+        clause out of the guard entirely, as a real deployment with
+        ``SCHEDULER_TARGET_LOAD`` at or below zero would.
+        """
+        self.node_capacity[str(node_uuid)] = {
+            'limit_cpus': limit_cpus,
+            'limit_memory_mb': limit_memory_mb,
+            'limit_disk_gb': limit_disk_gb,
+            'used_cpus': used_cpus,
+            'used_memory_mb': used_memory_mb,
+            'used_disk_gb': used_disk_gb,
+            'expected_demand': expected_demand,
+            'demand_limit': demand_limit,
+        }
+        return self.node_capacity[str(node_uuid)]
+
+    def _mariadb_get_scheduler_node_capacity(self):
+        """Mock implementation of mariadb.get_scheduler_node_capacity()
+
+        Only nodes seeded with set_node_capacity() have a row, which is
+        what the real table looks like too: the reconciler writes a row
+        per schedulable hypervisor and declines to guess for the rest.
+        ``demand_limit`` is mock-internal configuration, not a column,
+        so it is not returned.
+        """
+        return [
+            {k: v for k, v in dict(row, node_uuid=node_uuid).items()
+             if k != 'demand_limit'}
+            for node_uuid, row in self.node_capacity.items()]
+
+    def _decrement_node_capacity(self, node_uuid, cpus, memory_mb, disk_gb):
+        """Floored decrement of one node's counters, as the RPC does (P6).
+
+        Returns True if any dimension had to be clamped at zero, which
+        means the ledger and ground truth had already diverged.
+        """
+        row = self.node_capacity.get(str(node_uuid))
+        if row is None:
+            return False
+        clamped = False
+        for field, amount in (('used_cpus', cpus),
+                              ('used_memory_mb', memory_mb),
+                              ('used_disk_gb', disk_gb)):
+            if row[field] < amount:
+                clamped = True
+                row[field] = 0
+            else:
+                row[field] -= amount
+        return clamped
+
+    def _mariadb_admit_instance_placement(
+            self, instance_uuid, namespace, node_uuid, cpus, memory_mb,
+            disk_gb, placement_json, old_node_uuid='', enforce=True,
+            enforce_demand=True):
+        """Mock implementation of mariadb.admit_instance_placement()
+
+        The counters are a simple in-memory ledger, but the reply shape,
+        the fail-open behaviour of a node with no capacity row (P7), the
+        move's floored decrement of the old node (P6) and -- most
+        importantly for the callers under test -- the atomic combination
+        of the placement attribute write with the delete-all-then-insert
+        of the INSTANCE_LOCATION reference rows all match the real
+        implementation. The D13 demand clause applies only to nodes
+        seeded with a ``demand_limit`` (see set_node_capacity()), is
+        waived by ``enforce_demand=False`` exactly as the real guard
+        waives it for a zero target load, and every admission
+        accumulates the placement's demand contribution whether or not
+        the clause was enforced -- also like the real UPDATE.
+        """
+        result = {
+            'success': True, 'error': '', 'admitted': False,
+            'unguarded': False, 'clamped': False, 'failing_stage': '',
+            'dimensions': [], 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
+
+        attrs = self.instance_attributes.get(str(instance_uuid))
+        if attrs is None:
+            result['success'] = False
+            result['error'] = (
+                f'instance {instance_uuid} has no instance_attributes row')
+            self._trace(
+                f'MockMariaDB.admit_instance_placement({instance_uuid}): '
+                f'no attributes row')
+            return result
+
+        demand_add = cpus * config.SCHEDULER_DEMAND_PER_VCPU
+        row = self.node_capacity.get(str(node_uuid))
+        if row is None:
+            result['unguarded'] = True
+        elif enforce:
+            dimensions = []
+            for dimension, requested in (('cpus', cpus),
+                                         ('memory_mb', memory_mb),
+                                         ('disk_gb', disk_gb)):
+                limit = row['limit_' + dimension]
+                used = row['used_' + dimension]
+                dimensions.append({
+                    'dimension': dimension,
+                    'limit': float(limit),
+                    'used': float(used),
+                    'requested': float(requested),
+                    'exceeded': used + requested > limit})
+            if enforce_demand and row['demand_limit'] is not None:
+                dimensions.append({
+                    'dimension': 'demand',
+                    'limit': float(row['demand_limit']),
+                    'used': float(row['expected_demand']),
+                    'requested': float(demand_add),
+                    'exceeded': (row['expected_demand'] + demand_add
+                                 > row['demand_limit'])})
+            if any(d['exceeded'] for d in dimensions):
+                result['failing_stage'] = 'node'
+                result['dimensions'] = dimensions
+                self._trace(
+                    f'MockMariaDB.admit_instance_placement('
+                    f'{instance_uuid}, {node_uuid}): denied')
+                return result
+
+        if row is not None:
+            row['used_cpus'] += cpus
+            row['used_memory_mb'] += memory_mb
+            row['used_disk_gb'] += disk_gb
+            row['expected_demand'] += demand_add
+
+        if old_node_uuid and str(old_node_uuid) != str(node_uuid):
+            result['clamped'] = self._decrement_node_capacity(
+                old_node_uuid, cpus, memory_mb, disk_gb)
+
+        attrs.placement = json.loads(placement_json)
+
+        self._delete_instance_location_rows(instance_uuid)
+        self._mariadb_record_relationship(
+            ObjectType.NODE, str(node_uuid),
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, str(instance_uuid))
+
+        if row is not None:
+            result['node_used_cpus'] = row['used_cpus']
+            result['node_used_memory_mb'] = row['used_memory_mb']
+            result['node_used_disk_gb'] = row['used_disk_gb']
+            result['node_expected_demand'] = row['expected_demand']
+
+        result['admitted'] = True
+        self._trace(
+            f'MockMariaDB.admit_instance_placement({instance_uuid}, '
+            f'{node_uuid}): admitted')
+        return result
+
+    def _mariadb_release_instance_placement(
+            self, instance_uuid, namespace, cpus, memory_mb, disk_gb,
+            node_uuid=''):
+        """Mock implementation of mariadb.release_instance_placement()
+
+        Release is reference-gated in both call forms, as the real
+        implementation is: the INSTANCE_LOCATION rows are the only
+        record of what is charged, and node_uuid filters them rather
+        than replacing them. So a release naming a node the instance
+        holds no reference on releases nothing and reports
+        released=False, which is what makes a repeat delete of an
+        errored instance -- whose never-cleared placement attribute
+        keeps naming its old node -- a no-op instead of a second
+        decrement.
+        """
+        result = {
+            'success': True, 'error': '', 'released': False, 'clamped': False}
+
+        nodes = [
+            r.source_uuid for r in self.object_references.values()
+            if r.relationship == RelationshipType.INSTANCE_LOCATION
+            and r.target_uuid == str(instance_uuid)]
+        if node_uuid:
+            nodes = [n for n in nodes if str(n) == str(node_uuid)]
+
+        if not nodes:
+            self._trace(
+                f'MockMariaDB.release_instance_placement({instance_uuid}): '
+                f'nothing to release')
+            return result
+
+        for node in sorted(set(nodes)):
+            if self._decrement_node_capacity(node, cpus, memory_mb, disk_gb):
+                result['clamped'] = True
+
+        # As in the real implementation, the rows deleted are exactly
+        # the rows credited back: a named release leaves a row on
+        # another node alone, charge and all.
+        self._delete_instance_location_rows(instance_uuid, source_nodes=nodes)
+        result['released'] = True
+        self._trace(
+            f'MockMariaDB.release_instance_placement({instance_uuid}): '
+            f'released from {nodes}')
+        return result
+
+    def _delete_instance_location_rows(self, instance_uuid,
+                                       source_nodes=None):
+        """Remove INSTANCE_LOCATION reference rows for an instance.
+
+        Every row when source_nodes is None (the admission form), or
+        only the named sources' rows (the release form).
+        """
+        doomed = [
+            key for key, r in self.object_references.items()
+            if r.relationship == RelationshipType.INSTANCE_LOCATION
+            and r.target_uuid == str(instance_uuid)
+            and (source_nodes is None or
+                 str(r.source_uuid) in {str(n) for n in source_nodes})]
+        for key in doomed:
+            del self.object_references[key]
+        return len(doomed)
 
     #
     # Mock MariaDB object metadata functions

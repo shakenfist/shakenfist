@@ -191,6 +191,36 @@ class CleanerTestCase(base.ShakenFistTestCase):
     @mock.patch('time.time', return_value=7)
     @mock.patch('os.listdir', return_value=[])
     @mock.patch('os.unlink')
+    def test_update_power_states_does_not_enforce_capacity(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """The cleaner's placement writes are ground truth (P5).
+
+        It records where a libvirt domain already is, so the capacity
+        guard must not be able to refuse it -- refusing would leave the
+        ledger disagreeing with reality, which is strictly worse than a
+        node briefly over its limit.
+        """
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in ['running', 'shutoff']:
+            inst = self.mock_mariadb.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+
+        with mock.patch.object(
+                instance.Instance, 'place_instance') as place:
+            cleaner_st.update_power_states()
+
+        self.assertTrue(place.called)
+        for call in place.call_args_list:
+            self.assertFalse(call.kwargs['enforce'])
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
     def test_update_power_states_pets_watchdog(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
         """The per-domain loops must pet the systemd watchdog.

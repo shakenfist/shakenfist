@@ -845,11 +845,9 @@ class InstancesEndpoint(api_base.Resource):
             # Have we been placed?
             if not placed_on:
                 candidates = SCHEDULER.find_candidates(inst)
-                placement = candidates[0]
-
             else:
-                SCHEDULER.find_candidates(inst, candidates=[placed_on])
-                placement = placed_on
+                candidates = SCHEDULER.find_candidates(
+                    inst, candidates=[placed_on])
 
         except exceptions.LowResourceException as e:
             inst.add_event(
@@ -864,8 +862,75 @@ class InstancesEndpoint(api_base.Resource):
             inst.enqueue_delete_due_error('scheduling failed')
             return sf_api.error(404, 'node not found: %s' % e, suppress_traceback=True)
 
-        # Record placement
-        inst.place_instance(placement)
+        # Record placement, by claiming the capacity to do so. The
+        # scheduler's filters run against a metrics snapshot up to a
+        # minute stale, so its ordered candidate list is a preference,
+        # not a decision: the guarded capacity claim inside
+        # place_instance() is what actually admits the instance, and a
+        # refusal means some other create took the slot between the two.
+        # So walk the list (D7). A WriteException is deliberately not
+        # caught -- an unreachable database is not a full cluster, and
+        # trying the next node would only ask it the same question.
+        #
+        # This walk (including the P9 demand-only re-walk below) also
+        # exists in node_inst_netdesc_op.py's _instance_preflight();
+        # until phase 5 extracts a shared helper, a semantic change here
+        # must be made there too.
+        denials = {}
+
+        def place_walk(enforce_demand):
+            for candidate in candidates:
+                try:
+                    inst.place_instance(
+                        candidate, enforce_demand=enforce_demand)
+                    return candidate
+                except exceptions.CapacityAdmissionDenied as e:
+                    denials[candidate] = {
+                        'failing_stage': e.failing_stage,
+                        'dimensions': e.dimensions,
+                        'demand_only': e.demand_only,
+                    }
+                    inst.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'schedule candidate refused by capacity guard',
+                        extra={
+                            'node': candidate,
+                            'failing_stage': e.failing_stage,
+                            'dimensions': e.dimensions,
+                            'enforce_demand': enforce_demand,
+                        })
+            return None
+
+        placement = place_walk(True)
+
+        # The D13 demand term spreads correlated bursts across nodes; it
+        # is not a capacity bound. The first pass already gave
+        # demand-quiet nodes their preference, so if nothing admitted
+        # and at least one candidate was refused on demand alone, the
+        # only alternative to a second pass with the clause waived is
+        # failing a create the cluster has real capacity for -- which
+        # would turn a spreading heuristic into a user-visible rate
+        # limit (the smoke CI single-node lockout of 2026-08-14).
+        if placement is None and any(
+                d['demand_only'] for d in denials.values()):
+            inst.add_event(
+                EVENT_TYPE_AUDIT,
+                'no candidate admitted and some refused on demand alone, '
+                'waiving demand guard',
+                extra={'candidates': candidates, 'denials': denials})
+            placement = place_walk(False)
+
+        if placement is None:
+            inst.add_event(
+                EVENT_TYPE_AUDIT,
+                'schedule failed, every candidate refused by capacity guard',
+                extra={'candidates': candidates, 'denials': denials})
+            inst.enqueue_delete_due_error('scheduling failed')
+            return sf_api.error(
+                507,
+                'no node had capacity for this instance, %d candidates '
+                'refused it' % len(denials),
+                suppress_traceback=True)
 
         # Request the artifact fetches immediately, then the instance start
         instance_start_dependencies = inst.enqueue_disk_fetches(

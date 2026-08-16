@@ -99,7 +99,8 @@ class TestNodes(base.BaseNamespacedTestCase):
         # well past its hard maximum -- after which every later request
         # naming that node is refused with a 507 (issue 3498). Placement
         # must be charged immediately, which /admin/resources exposes as
-        # cpu_committed.
+        # cpu_committed -- read from the scheduler_node_capacity counters
+        # the placement drew down inside its admission transaction.
         resources = self.system_client.get_cluster_resources()
         candidates = [
             n for n in self._hypervisor_nodes()
@@ -127,6 +128,14 @@ class TestNodes(base.BaseNamespacedTestCase):
             self.addDetail('resources after', content.text_content(json.dumps(
                 resources, indent=4, sort_keys=True)))
             per_node = resources['per_node'][node['uuid']]
+
+            # A node the capacity reconciler has not written a row for
+            # yet -- a cluster whose first reconcile pass has not run --
+            # is charged nothing because it is guarded by nothing (P7).
+            # There is no ledger to assert against in that window.
+            if not per_node.get('cpu_committed_row_present', True):
+                self.skipTest(
+                    'Node has no scheduler_node_capacity row yet')
 
             # Our instance is placed here and not deleted, so the node's
             # committed total must account for at least its one vCPU

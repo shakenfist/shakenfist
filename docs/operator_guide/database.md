@@ -419,6 +419,19 @@ Operators must run this command (or ensure their deployment automation runs
 it) before starting `sf-database` whenever an SF upgrade includes schema
 changes.
 
+Daemon upgrade ordering matters too: **upgrade the `sf-database` tier before
+`sf-api` and the queue daemons**. Instance placement is admitted by a
+database-service RPC (`AdmitInstancePlacement`) which has no client-side
+fallback -- a new `sf-api` calling an old `sf-database` receives gRPC
+UNIMPLEMENTED, which is deliberately treated as a failed write rather than
+as "the cluster is full", so every instance create returns HTTP 500 until
+the database tier catches up. The error string names the condition
+(`database service predates AdmitInstancePlacement`). A deployment that
+rolls every node in one pass keeps this window to minutes at most, but a
+staged rollout that upgrades API nodes and leaves the database tier on
+the old release stays broken until the tier is upgraded -- do the
+database tier first.
+
 ### initialise-node
 
 Creates a node record in the database. By default, it uses the local node's
@@ -539,23 +552,87 @@ second upsert cycle repopulates every live node — no backfill needed for a
 table whose rows are ephemeral by design.
 
 The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and
-`cluster_capacity`) are maintained solely by a reconciler that runs every five minutes on the
-elected cluster node. Each pass is a single `ReconcileSchedulerCapacity`
+`cluster_capacity`) are recomputed wholesale from ground truth by a
+reconciler that runs every five minutes on the elected cluster node, and —
+since phase 3, described below — are also drawn down and released
+incrementally by the placement admission and release RPCs between those
+passes. The reconciler is therefore the drift corrector rather than the
+only writer. Each pass is a single `ReconcileSchedulerCapacity`
 RPC which expires stale claims, re-derives each hypervisor's limits from
 the typed `node_metrics` columns (deliberately mirroring the scheduler's
 admission arithmetic), recomputes usage counters from placed instances,
 recomputes the decaying expected-demand signal, and rebuilds the
 `cluster_capacity` singleton. The tables are created by `sf-ctl
 ensure-mariadb-schema` (run it before rolling the daemons after an
-upgrade, as always). In this release nothing consumes them for admission —
-the scheduler still admits directly from `node_metrics`; guarded-UPDATE
-admission against these counters arrives in a later release (see
-`docs/plans/PLAN-scheduler-reservations.md`). Operator-facing
-observability is the `scheduler_capacity_*` family of prometheus metrics
-(per-node limit/used/expected-demand gauges, cluster-row gauges, and
-reconcile pass/failure counters, last-success timestamp and duration)
-exported from the cluster daemon's metrics port (`CLUSTER_METRICS_PORT`,
-default `13007`), plus one structured log line per reconcile pass.
+upgrade, as always).
+
+As of scheduler-reservations phase 3 the counters are consumed for
+admission, not just observed. Instance placement goes through two
+`sf-database` RPCs, `AdmitInstancePlacement` and
+`ReleaseInstancePlacement`, each performing its guarded counter update,
+the `placement` attribute write and the `instance_location` reference
+rewrite in a single transaction, so a placement can never be recorded
+without the capacity it consumes and two concurrent creates racing one
+remaining slot admit exactly once. A denial names the failing stage —
+the cluster or claim row, or a specific node's row — and the dimension(s)
+that would have been exceeded (`cpus`, `memory_mb`, `disk_gb`, or the
+`demand` feedforward term); the scheduler-driven callers (first
+placement, the preflight redirect) walk to the next candidate on a
+denial and, once every candidate is exhausted, return the ordinary 507
+"cluster full" response with the denial detail attached to the audit
+event. The `demand` term alone can never produce that 507: if the walk
+admits nowhere but some candidate was refused only on demand, the
+caller walks again with the demand clause waived, since demand exists
+to spread bursts across nodes rather than to bound capacity (see the
+scheduler operator guide). Not every writer enforces the guard: the cleaner's placement
+rewrites and the queues daemon's startup reconciliation pass
+`enforce=False`, because they record where a libvirt domain already
+*is* — a guard cannot refuse reality, and refusing to record it would
+just leave the ledger wrong. A non-enforced write that pushes a node
+over its limit still updates every counter and emits a loud audit
+event (`placement recorded despite exceeding capacity guard`) so the
+overage is visible rather than silently absorbed. One exception: the
+queues daemon's startup reconciliation records placements without
+probing for the overage first, so it does not emit that event — the
+cleaner probes and events, the startup repair records, and the
+reconciler's next pass surfaces any excess in the drift figures. A node or the
+cluster singleton missing its capacity row — mid-upgrade, or a cluster
+whose reconciler has never run — fails open: placement proceeds
+unguarded, an `instance placed without capacity guard` event records
+it, and the reconciler's next pass creates the missing row. In every
+case — enforced denial, unenforced overage, or fail-open admission —
+the reconciler is the drift healer: whatever the guard let through or
+refused, the next five-minute pass recomputes every counter from
+placed, non-deleted instances and corrects it.
+
+The admission and release transactions are compatible with
+`innodb_snapshot_isolation` ON, the default from MariaDB 11.6.2 (what
+Debian 13, Ubuntu 24.04 and every recent container tag ship). That took
+moving every plain `SELECT` a transaction needs ahead of opening it, so
+the transaction's first statement is always a guarded `UPDATE` — see
+[the developer guide](../developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement)
+for why a `SELECT` ahead of the `UPDATE` reintroduces ER_CHECKREAD
+(1020) transaction aborts under that setting.
+
+Operator-facing observability is the `scheduler_capacity_*` family of
+prometheus metrics (per-node limit/used/expected-demand gauges, cluster-row
+gauges, and reconcile pass/failure counters, last-success timestamp and
+duration) exported from the cluster daemon's metrics port
+(`CLUSTER_METRICS_PORT`, default `13007`), plus one structured log line
+per reconcile pass.
+
+Disk capacity is claimed at virtual size, which the phase 0 step 3
+addendum measured at 40-140x actual usage (median ~65x) for sparse
+qcow2 images, so a within-period burst of virtual claims would be
+rejected against last-observed actual free space.
+`SCHEDULER_DISK_OVERCOMMIT` (default 5.0) multiplies the free-space
+headroom term of each node's derived disk limit — `used + max(0,
+floor(free/GiB) - reservation) x SCHEDULER_DISK_OVERCOMMIT` — never
+the used (drawdown) term and never a physical-disk total, since no
+such metric exists. A genuinely full disk still admits nothing:
+headroom goes to zero with free space regardless of the ratio. A
+value at or below zero (including an unset field from a mid-upgrade
+caller) falls back to 1.0, the pre-ratio arithmetic.
 
 A node only has a capacity row while it could actually be scheduled
 onto, so expect rows to appear and disappear as nodes change state. A
@@ -739,7 +816,7 @@ dedicated attribute tables:
 | Table | Object Type | Key Fields |
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
-| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; for one transition release the legacy `instances` JSON column is dual-written and unioned into reads so rolling upgrade and rollback both see fresh placements |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads were removed in scheduler-reservations phase 3; the legacy `instances` JSON column itself remains in place (nullable, unread) as a rollback fallback until a later release drops it |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
 | `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
 | `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri, audience |

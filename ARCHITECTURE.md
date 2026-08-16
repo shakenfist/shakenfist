@@ -166,27 +166,38 @@ HTTP push; otherwise it logs to the local systemd journal. See
 
 The scheduler (`shakenfist/scheduler.py`) is in-process in each `sf-api`
 worker; there is no scheduler daemon. It filters candidate hypervisors
-against the `node_metrics` table (hard constraints: hypervisor role, queue
-health, CPU/RAM/disk admission, disk bandwidth), scores affinity, then
+against the `node_metrics` table (hard pre-filters: hypervisor role, queue
+health, CPU/RAM/disk headroom, disk bandwidth), scores affinity, then
 ranks by **load per schedulable thread** in coarse buckets with
 headroom-weighted selection so differently sized machines share work
-proportionally.
+proportionally. These pre-filters order and prune the candidate list from
+a metrics snapshot up to a minute stale; they are not themselves the
+admission decision.
+
+Admission is a separate, atomic step. Once the pipeline has picked a
+candidate, `Instance.place_instance()` makes one guarded capacity claim
+against the `scheduler_node_capacity` counters, in the same database
+transaction that writes the placement — so a placement cannot be recorded
+without the capacity it consumes. A refusal walks the caller to its next
+candidate; every candidate refusing is the ordinary 507 outcome.
 
 Capacity is reservation-aware: the resources daemon reserves hardware
 threads and RAM for the operating system on every hypervisor, and
 publishes the schedulable remainder (`cpu_schedulable`,
-`memory_reserved_mb`) in `node_metrics`. Admission and the
+`memory_reserved_mb`) in `node_metrics`. The pre-filters and the
 `/admin/resources` API share the same arithmetic through common helpers.
 `CPU_OVERCOMMIT_RATIO` is denominated in vCPUs per schedulable thread
 (default 3.0, measured on a CI-dominated cluster).
 
 See [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md)
-for the full pipeline, the configuration knobs, and how to diagnose a
-placement decision from audit events. Atomic reservation-table scheduling
-is being built in phases per `docs/plans/PLAN-scheduler-reservations.md`:
-the capacity tables and their reconciler exist (observable-but-inert; see
-[Cluster Operation Storage and Work Queues](docs/developer_guide/database_internals.md#cluster-operation-storage-and-work-queues))
-but the scheduler does not yet consult them.
+for the full pipeline, the configuration knobs, the admission RPCs at the
+bottom of it, and how to diagnose a placement decision from audit events.
+Atomic reservation-table scheduling is being built in phases per
+`docs/plans/PLAN-scheduler-reservations.md`; the capacity tables and their
+reconciler are described under
+[Cluster Operation Storage and Work Queues](docs/developer_guide/database_internals.md#cluster-operation-storage-and-work-queues).
+Placement admission consumes them as of phase 3; later phases add a
+namespace claims API and move more pre-filter logic into SQL.
 
 ## State Machines
 
