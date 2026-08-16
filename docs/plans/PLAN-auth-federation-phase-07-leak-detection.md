@@ -198,6 +198,12 @@ three characters `foo` between them. (Quoted by description rather
 than by example, because the stock rule matches those delimiters
 wherever they appear, this document included.)
 
+**Superseded during implementation.** The baseline was obtained
+after all, without sudo: `apt-get download gitleaks` fetches the
+`.deb` as an ordinary user, and `dpkg-deb -x` extracts the binary
+without installing it. What it found is in "Baseline results" below,
+and it is worse than this section anticipated.
+
 These are placeholders, but gitleaks' stock `private-key` rule
 matches the delimiters and not the contents, so it will very likely
 flag them — and `gitleaks detect` scans history by default, so
@@ -428,3 +434,79 @@ Two gates need agreement before the work they belong to starts:
    being replaced may have been minted by a real cluster. Confirm
    whether the operator wants it treated as a live credential
    requiring rotation, in addition to being replaced in the page.
+
+## Baseline results
+
+Step 7e's brief said to baseline before landing the workflow, and to
+stop and report rather than allowlist if any finding turned out to be
+a real credential. One did, so the workflow has not landed and this
+section is the report.
+
+The scan was `gitleaks detect --source . --config .gitleaks.toml
+--redact` with gitleaks 8.16.0 — the Debian trixie package, obtained
+with `apt-get download` and unpacked with `dpkg-deb -x`, so no
+installation was needed and the version is exactly what a `debian-13`
+runner will execute. 6620 commits, 4m57s, **163 findings**.
+
+Of those, 104 are duplicates of the same content on refs which are not
+ancestors of `develop`. The 59 reachable from `develop` are:
+
+| Rule | Where | Count | Verdict |
+|------|-------|-------|---------|
+| `private-key` | `ansible/files/id_rsa`, `deploy/ansible-ci/tests/files/id_rsa` | 2 | **Real.** See below. |
+| `private-key` | `search/search_index.json`, `plans/.../index.html` | 31 | Built documentation site, committed to history. Mirrors of the two entries below. |
+| `private-key` | `shakenfist/util/vdi_tokens.py`, `docs/plans/PLAN-kerbside-vdi-tokens-phase-01-signing-key.md` | 2 | False positive. Both show the PEM delimiters in a docstring or a schema example with no key material between them. |
+| `shakenfist-key-secret` | `search/search_index.json`, `user_guide/authentication/index.html` | 15 | Built documentation site again, indexing the example key step 7c replaced. |
+| `shakenfist-key-secret` | `docs/user_guide/authentication.md` | 1 | The example key step 7c replaced. Fixed going forward; still in history. |
+| `generic-api-key` | `ansible/files/grafana/grafana.ini` (×2 paths) | 2 | False positive. `;secret_key = ...` is a *commented-out* line in Grafana's own shipped sample configuration. |
+| `generic-api-key` | `shakenfist/external_api/auth.py`, `shakenfist/tests/test_mariadb_namespace_keys.py`, three authentication documents | 6 | False positive. `key_name": "..."` in a response example, and a test fixture. |
+
+### The real one
+
+`ansible/files/id_rsa`, added 2020-04-14, and
+`deploy/ansible-ci/tests/files/id_rsa`, added 2020-10-04, are the same
+3072-bit RSA private key — identical SHA256, comment `mikal@marvin`,
+fingerprint `SHA256:mz2lj7UcnApwOkzsnaEhMb+l4gbQQWTah06Vvmi9QCs`.
+
+Neither path exists on `develop` today; they were removed by
+`09ada8e7f` and `058cd2cea`. That removes them from the working tree
+and from nothing else. This repository is public, so the private key
+has been world-readable since April 2020 and is in every clone, every
+fork and every mirror. Deleting a file does not unpublish it, and
+rewriting the history of a public repository does not either — the
+old objects survive in forks and in GitHub's own reflog.
+
+**The only remediation which works is to ensure the key authorises
+nothing.** That is an operator action on whatever still trusts it, not
+a change to this repository, and it is why this step stopped rather
+than adding an allowlist entry. Suppressing the finding without
+retiring the key would leave the scanner asserting a clean history
+while a published private key stayed live — precisely the vacuous
+detector this phase exists to avoid.
+
+### What this means for the workflow
+
+`gitleaks detect` with no `--log-opts` scans history, so on this
+repository it exits non-zero regardless of what the current tree
+contains. A job that cannot go green is a job whose failure carries no
+information, so the workflow needs a scope decision which the master
+plan's section did not anticipate:
+
+* **Scan the commits the pull request adds** (`--log-opts
+  "origin/develop..HEAD"`). Lands green, blocks every *new* leak,
+  which is the accident this phase is trying to prevent. Says nothing
+  about 2020. Verified working: the range scan of this branch
+  completes in 65ms against ~5 minutes for full history.
+* **Scan everything and allowlist the backlog** by commit SHA. Keeps
+  the historical claim honest, at the cost of an allowlist which grows
+  a permanent entry for the SSH key — the thing that should not be
+  suppressed.
+* **Scan everything and accept a red job** until the history is dealt
+  with. Not viable: nothing forces the backlog to shrink, and people
+  learn to ignore it.
+
+The first is recommended and is what the workflow should implement,
+with this section as the record of what it deliberately does not
+cover. That is a real narrowing of the phase's "repository detector"
+deliverable and should be agreed rather than assumed — hence the back
+brief gate.
