@@ -4,14 +4,14 @@ Cutting a release is a two-phase operation so the version bump
 goes through the normal PR review gate rather than landing
 directly on `develop`:
 
-1. **Phase 1 — propose:**
+1. **Stage 1 — propose:**
    [tools/propose-release.sh](../tools/propose-release.sh)
    (wrapped by `make propose-release X.Y.Z`) creates a
    `release-X.Y.Z` branch from `develop`, bumps the workspace
    version, runs tests, and pushes the branch. You open a PR
    from it into `develop` and get it reviewed and merged like
    any other change.
-2. **Phase 2 — tag:** after the PR has merged,
+2. **Stage 2 — tag:** after the PR has merged,
    [tools/tag-release.sh](../tools/tag-release.sh) (wrapped by
    `make tag-release X.Y.Z`) fetches `develop`, verifies its
    tip has the expected workspace version, creates an annotated
@@ -121,13 +121,13 @@ since they only depend on `sign-tag`, not on the PyPI publishers.
 ### Host tools
 
 Both scripts orchestrate from the operator's host. The
-workspace test compile in phase 1 is delegated to `make test`,
+workspace test compile in stage 1 is delegated to `make test`,
 which runs inside the devcontainer, so the host's rustc does
 not need to satisfy the dependency tree's MSRV. Everything
 else runs on the host and requires:
 
 - `cargo-release` — `cargo install --locked cargo-release`.
-  Used for the workspace-wide version bump in phase 1. The
+  Used for the workspace-wide version bump in stage 1. The
   bump only edits `Cargo.toml` files and does not need to
   match the workspace's MSRV. If your host toolchain is older
   than 1.91 (for example Debian's packaged cargo 1.85), pin
@@ -137,14 +137,14 @@ else runs on the host and requires:
   `scripts/check-rust.sh`) to run the Rust toolchain in the
   devcontainer.
 - `gh` — the GitHub CLI, signed in (`gh auth login`). Used in
-  phase 2 to watch the release workflow and open the release
+  stage 2 to watch the release workflow and open the release
   page on completion.
 - `jq`, `curl`, `git`, `pre-commit`, `make` — standard dev
   tooling.
 
 ## Release process
 
-### Phase 1: propose the release
+### Stage 1: propose the release
 
 From a clean checkout of `develop`, up to date with origin:
 
@@ -182,7 +182,7 @@ Once the script finishes, open a PR from `release-0.2.0` into
 usual merge strategy. No release artefacts are produced yet —
 this PR is the audit trail for the version bump itself.
 
-### Phase 2: tag the merged commit
+### Stage 2: tag the merged commit
 
 After the PR has merged:
 
@@ -315,8 +315,7 @@ git push
 ## First release after crate name reservations
 
 The three sub-crates currently sit on crates.io as `0.0.0`
-placeholder reservations from Phase 2 of the crate extraction
-plan. The first release cut after the unified-versioning change
+placeholder name reservations. The first release cut after the unified-versioning change
 lands will be their first real publish, at the workspace
 version (e.g. `0.1.4`), not `0.1.0`. The `0.0.0` placeholders
 remain on crates.io; the Rust Forge crate ownership policy

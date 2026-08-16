@@ -39,7 +39,7 @@ exchanges SDP via `POST /offer`, and starts streaming.
 
 ## Reconnect behaviour
 
-Phase 6 makes `--web` mode resilient to browser disconnects.
+`--web` mode is resilient to browser disconnects.
 
 ### Browser tab close → reopen
 
@@ -273,7 +273,7 @@ pattern.
 ### "Click to reconnect" loop
 
 The browser retries automatically five times with
-exponential backoff, then shows a manual button (Phase 6).
+exponential backoff, then shows a manual button.
 If the button appears every time you reconnect, check
 ryll's logs for:
 
@@ -285,7 +285,7 @@ ryll and file a bug with the full log.
 
 ### High CPU when no browser is connected
 
-This should not happen on Phase 6+ ryll. The bridge reaper
+This should not happen. The bridge reaper
 drops the H.264 encoder when the browser disconnects, so
 CPU usage returns to near-idle. If you observe sustained
 high CPU with no active browser session, check that the
@@ -327,12 +327,13 @@ trust the issuing CA. Options:
 - Accept the browser warning for one-off / diagnostic
   access (the media path is still DTLS-SRTP encrypted).
 
-### Ctrl-C ignored (historic, pre-Phase 6)
+### Ctrl-C ignored (historic)
 
-Phase 6's `with_graceful_shutdown` / `Handle::graceful_shutdown`
-path fixed a race where Ctrl-C was delivered before the
-axum server was ready to drain. If you see this on a
-current ryll build, file a bug. Update to ryll ≥ Phase 6.
+Old ryll builds had a race where Ctrl-C was delivered before
+the axum server was ready to drain. The
+`with_graceful_shutdown` / `Handle::graceful_shutdown` path
+fixed it. If you see this on a current ryll build, file a
+bug; otherwise, update.
 
 ## Security note
 
@@ -413,7 +414,7 @@ The URL includes the token and is valid until the service restarts.
 ### Graceful shutdown
 
 `KillSignal=SIGTERM` causes `systemctl stop ryll-web` to send SIGTERM.
-This engages Phase 6's graceful-shutdown path (`with_graceful_shutdown`
+This engages the graceful-shutdown path (`with_graceful_shutdown`
 / `Handle::graceful_shutdown`), which drains in-flight HTTP requests
 and tears down any active WebRTC bridge cleanly. `TimeoutStopSec=10s`
 is a generous ceiling; normal shutdown completes within ~5 seconds.

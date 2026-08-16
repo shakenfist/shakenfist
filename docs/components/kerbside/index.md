@@ -191,10 +191,13 @@ Guides for deploying and configuring Kerbside:
 
 Guides for working on Kerbside itself:
 
-- [Development](/components/kerbside/development/) - Database migrations and vendored web assets
+- [Development](/components/kerbside/development/) - Database migrations, building and
+  packaging the Rust proxy, dependency pinning, review tracking,
+  vendored web assets, and debugging
 
-- [Testing](/components/kerbside/testing/) - CI lanes, the Ryll-based harnesses, the oVirt
-  console probe, the Tempest plugin, and the load-test container images
+- [Testing](/components/kerbside/testing/) - Running the test suite, the CI tiers and lane
+  mechanics, the Ryll-based harnesses, the oVirt console probe, the
+  Tempest plugin, and the load-test container images
 
 - [Direct-qemu Harness](/components/kerbside/direct-qemu-harness/) - Exercising the Rust
   proxy locally against qemu with a mock control plane: end-to-end

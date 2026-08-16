@@ -322,14 +322,21 @@ nav:
             - "Continuous integration": components/ryll/ci.md
             - "Control Socket Protocol — Version 1.1": components/ryll/control-socket-protocol.md
             - "Development": components/ryll/development.md
+            - "Device redirection": components/ryll/device-redirection.md
+            - "Diagnostics and instrumentation": components/ryll/diagnostics.md
             - "Features": components/ryll/features.md
             - "Installation": components/ryll/installation.md
+            - "Key design decisions": components/ryll/design-decisions.md
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md
             - "macOS runtime-metrics verification runbook": components/ryll/macos-metrics-verification.md
             - "Multi-mode feature parity": components/ryll/multi-mode-parity.md
             - "Releasing": components/ryll/releasing.md
+            - "Rendering and audio pipeline": components/ryll/rendering-pipeline.md
             - "ryll --web operator guide": components/ryll/web-frontend.md
+            - "Session lifecycle": components/ryll/session-lifecycle.md
+            - "SPICE protocol handling": components/ryll/spice-protocol.md
             - "Troubleshooting": components/ryll/troubleshooting.md
+            - "Web mode internals": components/ryll/web-mode-internals.md
             - Plans:
                 - "Plans index": components/ryll/plans/index.md
                 - "Initial porting plan": components/ryll/plans/PLAN-initial.md

@@ -90,7 +90,14 @@ both ends of the traffic through the proxy. This would allow:
 - [Installation](/components/ryll/installation/) - Pre-built packages, pip, and building from source
 - [Configuration](/components/ryll/configuration/) - CLI options and .vv file format
 - [Web frontend](/components/ryll/web-frontend/) - Operator guide for `--web` mode
-- [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools
+- [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools, and how the socket is implemented
+- [Key design decisions](/components/ryll/design-decisions/) - Why ryll is shaped the way it is
+- [SPICE protocol handling](/components/ryll/spice-protocol/) - Channels, handshake, image encodings, scancodes
+- [Rendering and audio pipeline](/components/ryll/rendering-pipeline/) - Surfaces, window sizing, multi-monitor, audio, notifications
+- [Device redirection](/components/ryll/device-redirection/) - USB, WebDAV folder sharing, paste-as-keystrokes
+- [Diagnostics and instrumentation](/components/ryll/diagnostics/) - Capture, statistics, snapshots, bug reports
+- [Session lifecycle](/components/ryll/session-lifecycle/) - Reconnection and graceful shutdown
+- [Web mode internals](/components/ryll/web-mode-internals/) - Encoder, WebRTC bridge, and the `--web` relays
 - [Multi-mode feature parity](/components/ryll/multi-mode-parity/) - Which features work in GUI, headless, and web modes
 - [Development](/components/ryll/development/) - Building, testing, and contributing
 - [macOS Development](/components/ryll/development-macos/) - Build and test locally on macOS
@@ -104,5 +111,5 @@ both ends of the traffic through the proxy. This would allow:
 ## Project Files
 
 - [README](/components/ryll/../README/) - Quick start and usage
-- [ARCHITECTURE](/components/ryll/../ARCHITECTURE/) - Technical design details
+- [ARCHITECTURE](/components/ryll/../ARCHITECTURE/) - The crate map, code organisation, and concurrency model
 - [AGENTS](/components/ryll/../AGENTS/) - Guide for AI coding assistants

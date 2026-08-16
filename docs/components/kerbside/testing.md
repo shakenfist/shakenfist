@@ -1,8 +1,32 @@
 # Testing
 
-How Kerbside is tested: the CI lanes, the Ryll-based harnesses, the
-oVirt console probe, the Tempest plugin, and the load-test container
-images.
+How Kerbside is tested: running the suite locally, the CI lanes, the
+Ryll-based harnesses, the oVirt console probe, the Tempest plugin, and
+the load-test container images.
+
+## Running the test suite
+
+```bash
+tox -e py3      # unit tests
+tox -e flake8   # style checks on changes since HEAD~
+tox -e cover    # coverage report into cover/
+tox -e bindep   # OS dependency check
+```
+
+`py3`, `flake8` and `cover` are the default `envlist`, so a bare `tox`
+runs all three.
+
+Test locations:
+
+- Unit tests: `kerbside/tests/unit/`
+- Functional tests: `kerbside/tests/functional/`
+- Tempest plugin: `tempest-plugin/kerbside_tempest_plugin/` (a separate
+  releasable, driven via `tools/run-tempest-tests` and the
+  `openstack_matrix` job in `.github/workflows/functional-tests.yml`)
+  - `tests/api/test_spice_via_kerbside.py` — OpenStack lane only;
+    requires a live cloud.
+  - `tests/scenario/test_sextant_scenario.py` — direct-qemu lane; see
+    [Sextant scenario test](#sextant-scenario-test-direct-qemu-lane).
 
 ## CI tiers
 
@@ -59,6 +83,12 @@ tier; what never runs against the merged tree is `clippy` and
 
 The direct-qemu lane also runs nightly, because the merge queue
 does not re-run it against the merged tree.
+
+Two behaviours only matter when driving CI by hand: on a
+`workflow_dispatch` run of `functional-tests.yml` an unselected target
+skips cleanly via a job-level `if:` (it does not report red), and
+instance readiness in the `shakenfist/actions` provisioning playbook
+gates on cloud-init completion, not just an open SSH port.
 
 ### Gate jobs and required checks
 
@@ -185,6 +215,48 @@ which CI checks out alongside this one:
 - `tools/ovirt-gather-artifacts.sh` — collects RPM lists and logs for
   CI artifacts
 
+## The direct-qemu lane
+
+The direct-qemu lane publishes a `Can enqueue: direct-qemu` gate job,
+which is a required status check; see
+[Gate jobs and required checks](#gate-jobs-and-required-checks).
+
+### The proxy wheel is installed the way a deployment installs it
+
+The direct-qemu Rust leg builds and installs the `kerbside-proxy`
+wheel into the kerbside venv (`install-proxy-wheel.sh` →
+`build-proxy-wheel.sh --native`), so `find_proxy_bin()` resolves it via
+`shutil.which` on `PATH` — the real install path, which is what gives
+this lane its coverage value. `start-kerbside.sh` pre-checks the proxy
+binary through `find_proxy_bin()` for the same reason.
+
+### Live termination
+
+`verify-terminate-live.sh` (Rust leg only) runs on an isolated lane:
+it calls the REST terminate endpoint and asserts the in-flight
+connection drops, via the proxy log line `session terminated by
+control plane`. This exercises the DB→`ProxyControl` bridge end to
+end rather than the mock.
+
+### The latency loadtest
+
+Both legs run `run-loadtest.sh` (non-gating, `continue-on-error`). It
+drives `loadtests/latency/orchestrator.py` to sample keypress-to-screen
+latency — real `send_key` events timed against the `surface_drawn`
+they produce — through the leg's proxy, and records p50/p95 as an
+artifact; the Python-versus-Rust comparison is read off the two legs.
+
+It boots the purpose-built `tests/fixtures/uefi-latency-guest.qcow2`,
+which repaints on every keypress, rather than the Sextant scenario
+fixture, which leaves its Awaiting screen on the first key and freezes
+at the bootloader prompt. Like `verify-terminate-live.sh` it brings up
+its own isolated lane (separate WORKDIR, `QCOW2` overridden) and tears
+it down before the shared scenario lane starts.
+
+This is distinct from the local mock harness
+([direct-qemu-harness.md](/components/kerbside/direct-qemu-harness/)), which needs no
+daemon and no database.
+
 ## The Shaken Fist end-to-end lane (`sf-e2e`)
 
 `.github/workflows/sf-e2e-functional.yml` is the only lane that
@@ -240,11 +312,28 @@ cluster that will host the VM, which is the constraint the engine
 actually enforces; `_resolve_vnic_profile` is covered by
 `kerbside/tests/unit/test_create_ovirt_vnc_vm.py`.
 
+That generalises: **anything that looks up an oVirt object by name must
+scope the lookup to the `test` cluster or its datacenter** (issue #283).
+A bare name match fails only when the engine happens to list the wrong
+one first, and this code runs in the merge tier only — so a smoke-green
+PR proves nothing about it.
+
 The runner-side scripts live in `tools/ovirt-e2e/` and are
 documented in `tools/ovirt-e2e/README.md`.
 The lane is a worked example of the deployment described in
 [use-cases/ovirt.md](/components/kerbside/use-cases/ovirt/), which is the operator-facing
 version of what it proves.
+
+### Log-derived oracles
+
+`drive-console.py` asserts against the proxy's log text. It strips
+ANSI before matching, and keeps "the field would not parse" separate
+from "the field was empty" — the first is a harness fault, the second
+is a real unpinned TLS leg. Conflating them (issue #272) reported a
+broken parser as a security failure for two days. Any new
+log-derived oracle should draw the same distinction. Proxy log
+colouring is described in
+[proxy-architecture.md](/components/kerbside/proxy-architecture/).
 
 ## Tempest tests against a Kolla-Ansible deployment
 

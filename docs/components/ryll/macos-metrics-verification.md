@@ -1,7 +1,7 @@
 # macOS runtime-metrics verification runbook
 
 This runbook is the user-side acceptance test for the macOS
-runtime-metrics implementation landed in phases 1–3 of
+runtime-metrics implementation described by
 [`PLAN-macos-runtime-metrics.md`](/components/ryll/plans/PLAN-macos-runtime-metrics/).
 It is addressed at a maintainer running ryll on a real Mac
 (or at the future macOS CI matrix once
@@ -21,8 +21,8 @@ RSS vs. real memory usage, port-leak safety over hours).
 
 The six tests in this runbook plus the soak procedure
 together verify all five acceptance criteria from the master
-plan and the additional port-leak safety property called out
-in its phase-3 brief.
+plan and the additional port-leak safety property it calls
+out.
 
 ## Prerequisites
 
@@ -129,12 +129,12 @@ triggers (within a few hundred ms).
 being reinitialised between samples (impossible with a
 `LazyLock<Instant>` — flag as a bug).
 
-**Bonus pass (phase-3 specific):** the first bug report
-filed within a few seconds of `ryll` startup should already
-show a small-but-non-zero `uptime_secs` (e.g. ≥ 1.0).
-Phase 1 had a caveat that the first report could report ~0;
-phase 3's `init_at_startup` call from `main()` closes that
-gap. If the first report shows a value matching the
+**Bonus pass:** the first bug report filed within a few
+seconds of `ryll` startup should already show a
+small-but-non-zero `uptime_secs` (e.g. ≥ 1.0). The
+`init_at_startup` call from `main()` is what makes this
+true — without it the first report can read ~0. If the
+first report shows a value matching the
 real time since `ryll` started, `init_at_startup` is wired
 correctly.
 
@@ -225,9 +225,8 @@ If the count grows monotonically with sample count:
 
 - First suspect: `MachThreadList::drop` is not running.
   Audit whether any code path between `task_threads` and the
-  `MachThreadList { … }` literal could panic. As of phase 2
-  there is no such path (the only operations are
-  infallible).
+  `MachThreadList { … }` literal could panic. There is no
+  such path today (the only operations are infallible).
 - Second suspect: `mach_port_deallocate` is failing
   silently. The current code ignores the return value
   because `Drop` cannot meaningfully recover. Temporarily
@@ -243,15 +242,15 @@ If the count grows monotonically with sample count:
 | Symptom | Most likely cause | Where to look |
 |---------|-------------------|---------------|
 | Test 1 fails with `"freebsd"` etc. | `cfg` dispatch wrong | `metrics::sample` in `metrics.rs` |
-| Test 2 fails | Mach syscall returned non-KERN_SUCCESS | Phase-1/2 `take_snapshot` / `take_thread_snapshots` |
+| Test 2 fails | Mach syscall returned non-KERN_SUCCESS | `take_snapshot` / `take_thread_snapshots` |
 | Test 3 fails | Unit mistake | `time_value_to_us`, `process_cpu_percent` |
-| Test 4 fails | Memory unit / field semantics | `task_info` field read in phase-1 `take_snapshot` |
+| Test 4 fails | Memory unit / field semantics | `task_info` field read in `take_snapshot` |
 | Test 5 fails | `PROCESS_START` reinit | Impossible by construction; flag as bug |
 | Test 5 bonus fails | `init_at_startup` not called | `ryll/src/main.rs` top of `main()` |
-| Test 6 empty array | `task_threads` returned 0 | Phase 2 `take_thread_snapshots` error path |
-| Test 6 all names empty | `pthread_*_np` API change | Phase 2 `read_thread_name` |
-| Test 6 unsorted | Sort step removed | Phase 2 `compute_thread_metrics` |
-| Soak fails | Port leak | Phase 2 `MachThreadList::drop` |
+| Test 6 empty array | `task_threads` returned 0 | `take_thread_snapshots` error path |
+| Test 6 all names empty | `pthread_*_np` API change | `read_thread_name` |
+| Test 6 unsorted | Sort step removed | `compute_thread_metrics` |
+| Soak fails | Port leak | `MachThreadList::drop` |
 
 After fixing, re-run the failing test plus any subsequent
 test that depends on it. Tests 1–6 are largely independent;
