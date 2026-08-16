@@ -88,6 +88,7 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         # Clear the module-level queue between tests
         while not st.BLOB_CHECKS_QUEUE.empty():
             st.BLOB_CHECKS_QUEUE.get(block=False)
+        st._FILL_FAILURE_STREAK.clear()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -100,8 +101,31 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         st._fill_per_blob_queue()
 
         mock_get_by_state.assert_called_once_with(
-            ObjectType.BLOB, [Blob.STATE_CREATED])
+            ObjectType.BLOB, [Blob.STATE_CREATED], updated_before=None)
         self.assertEqual(2, st.BLOB_CHECKS_QUEUE.qsize())
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_fill_failure_is_visible_not_empty(
+            self, mock_get_by_state, mock_from_db):
+        """A failed read is not an empty work list.
+
+        This sweep shares the deleted-object sweep's failure mode: with
+        `or []` a failed read produced a silent no-op pass which looked
+        exactly like a healthy cluster with nothing to check (#3638).
+        """
+        mock_get_by_state.return_value = None
+
+        st._fill_per_blob_queue()
+
+        mock_from_db.assert_not_called()
+        self.assertEqual(0, st.BLOB_CHECKS_QUEUE.qsize())
+        self.assertEqual(
+            {('per_blob', 'blob'): 1}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_blob', 'object_type': 'blob'}))
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -122,6 +146,33 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
 
         mock_from_db.assert_not_called()
         self.assertEqual(0, st.BLOB_CHECKS_QUEUE.qsize())
+
+
+class FillPerInstanceQueueTestCase(base.ShakenFistTestCase):
+    """The per-instance sweep must also distinguish None from []."""
+
+    def setUp(self):
+        super().setUp()
+        while not st.INSTANCE_CHECKS_QUEUE.empty():
+            st.INSTANCE_CHECKS_QUEUE.get(block=False)
+        st._FILL_FAILURE_STREAK.clear()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Instance.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_fill_failure_is_visible_not_empty(
+            self, mock_get_by_state, mock_from_db):
+        mock_get_by_state.return_value = None
+
+        st._fill_per_instance_queue()
+
+        mock_from_db.assert_not_called()
+        self.assertEqual(0, st.INSTANCE_CHECKS_QUEUE.qsize())
+        self.assertEqual(
+            {('per_instance', 'instance'): 1}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_instance', 'object_type': 'instance'}))
 
 
 class ProcessPerBlobQueueTestCase(base.ShakenFistTestCase):
@@ -618,11 +669,12 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([('blob', BLOB_UUID_1)],
                          list(st.DELETED_OBJECTS_QUEUE.queue))
-        self.assertEqual({'network': 1}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            {('deleted_object', 'network'): 1}, st._FILL_FAILURE_STREAK)
         self.assertEqual(
             1, REGISTRY.get_sample_value(
-                'cluster_deleted_object_fill_failure_streak',
-                {'object_type': 'network'}))
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'deleted_object', 'object_type': 'network'}))
 
     @mock.patch('shakenfist.mariadb.get_objects_by_state')
     def test_fill_failure_streak_counts_and_resets(self, mock_get_by_state):
@@ -634,11 +686,12 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         mock_get_by_state.side_effect = failing
         st._fill_per_deleted_object_queue()
         st._fill_per_deleted_object_queue()
-        self.assertEqual({'network': 2}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            {('deleted_object', 'network'): 2}, st._FILL_FAILURE_STREAK)
         self.assertEqual(
             2, REGISTRY.get_sample_value(
-                'cluster_deleted_object_fill_failure_streak',
-                {'object_type': 'network'}))
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'deleted_object', 'object_type': 'network'}))
 
         mock_get_by_state.side_effect = (
             lambda objtype, states, updated_before=None: [])
@@ -646,8 +699,8 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual({}, st._FILL_FAILURE_STREAK)
         self.assertEqual(
             0, REGISTRY.get_sample_value(
-                'cluster_deleted_object_fill_failure_streak',
-                {'object_type': 'network'}))
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'deleted_object', 'object_type': 'network'}))
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_process_hard_deletes_old_final_objects(self, mock_get_class):

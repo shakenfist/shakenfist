@@ -337,6 +337,34 @@ class GetActiveBlobUuidsTestCase(base.ShakenFistTestCase):
         mock_get_by_state.assert_called_once_with(
             ObjectType.BLOB, ['initial', 'created'], updated_before=None)
 
+    @mock.patch('shakenfist.mariadb._direct_get_objects_by_state')
+    def test_failed_read_raises_rather_than_returning_empty(
+            self, mock_get_by_state):
+        """A failed read must not be indistinguishable from no blobs.
+
+        The underlying accessor returns None when the read failed, which
+        this function used to flatten with `or []`. Its callers include
+        the cleaner, which deletes every blob file not named in the
+        list, so "the read failed" arriving as "nothing is active" is an
+        instruction to empty the node's blob store (#3638).
+        """
+        from shakenfist import exceptions
+        from shakenfist import mariadb
+
+        mock_get_by_state.return_value = None
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, mariadb.get_active_blob_uuids)
+
+    @mock.patch('shakenfist.mariadb._direct_get_objects_by_state')
+    def test_genuinely_empty_is_not_an_error(self, mock_get_by_state):
+        """[] still means what it says: there are no active blobs."""
+        from shakenfist import mariadb
+
+        mock_get_by_state.return_value = []
+
+        self.assertEqual([], mariadb.get_active_blob_uuids())
+
 
 class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
     """observe_local_blobs() must only treat UUID-named files as blobs.

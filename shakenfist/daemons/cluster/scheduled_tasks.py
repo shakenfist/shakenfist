@@ -44,15 +44,51 @@ REAPER_REJECTED = Counter(
     'Stuck cluster operation work items that exceeded '
     'max_attempts and were rejected.')
 
-# The deleted-object GC's failure mode is silence: a pass that cannot
-# read its work list for an object type does nothing for that type, and
-# nothing else ever retries on its behalf (#3638). Track consecutive
-# failed passes per object type so operators can alert on the streak.
-DELETED_OBJECT_FILL_FAILURE_STREAK = Gauge(
-    'cluster_deleted_object_fill_failure_streak',
-    'Consecutive deleted-object GC passes unable to read the work list, '
-    'by object type.', ['object_type'])
-_FILL_FAILURE_STREAK: dict = {}
+# Every sweep in this module shares a failure mode: silence. A pass
+# that cannot read its work list does nothing, and nothing else ever
+# retries on its behalf (#3638). Track consecutive failed passes per
+# sweep and object type so operators can alert on the streak.
+SWEEP_WORK_LIST_FAILURE_STREAK = Gauge(
+    'cluster_sweep_work_list_failure_streak',
+    'Consecutive scheduled-task passes unable to read their work list, '
+    'by sweep and object type.', ['sweep', 'object_type'])
+_FILL_FAILURE_STREAK: dict[tuple[str, str], int] = {}
+
+
+def _sweep_work_list(sweep, object_type, state_values, updated_before=None):
+    """Read a sweep's work list, treating a failed read as visible.
+
+    ``mariadb.get_objects_by_state`` returns None when the read failed,
+    which is distinct from [] for "no matches". Collapsing the two with
+    ``or []`` turns the sweep off silently: it reports a successful pass
+    over an empty queue while the backlog it exists to drain keeps
+    growing, and grows the very reply that could not be read (#3638).
+
+    Returns the uuid list, or None when the read failed. A None return
+    means "skip this pass", never "there was nothing to do".
+    """
+    obj_uuids = mariadb.get_objects_by_state(
+        object_type, state_values, updated_before=updated_before)
+    key = (sweep, str(object_type))
+
+    if obj_uuids is None:
+        streak = _FILL_FAILURE_STREAK.get(key, 0) + 1
+        _FILL_FAILURE_STREAK[key] = streak
+        SWEEP_WORK_LIST_FAILURE_STREAK.labels(
+            sweep=sweep, object_type=str(object_type)).set(streak)
+        LOG.with_fields({
+            'sweep': sweep,
+            'object_type': str(object_type),
+            'consecutive_failures': streak}).warning(
+            'Scheduled sweep could not read its work list; this pass is '
+            'skipped and its backlog is not being drained')
+        return None
+
+    if _FILL_FAILURE_STREAK.pop(key, None):
+        SWEEP_WORK_LIST_FAILURE_STREAK.labels(
+            sweep=sweep, object_type=str(object_type)).set(0)
+    return obj_uuids
+
 
 # Scheduler capacity reconciler metrics (phase 2, D5). Per-node gauges are
 # labelled by node uuid and resource dimension; the resource label values
@@ -122,9 +158,11 @@ def per_blob_checks():
 
 
 def _fill_per_blob_queue():
-    blob_uuids = mariadb.get_objects_by_state(
-        ObjectType.BLOB, [Blob.STATE_CREATED])
-    for blob_uuid in (blob_uuids or []):
+    blob_uuids = _sweep_work_list(
+        'per_blob', ObjectType.BLOB, [Blob.STATE_CREATED])
+    if blob_uuids is None:
+        return
+    for blob_uuid in blob_uuids:
         b = Blob.from_db(blob_uuid)
         if not b:
             continue
@@ -239,9 +277,11 @@ def per_instance_checks_and_usage():
 
 
 def _fill_per_instance_queue():
-    instance_uuids = mariadb.get_objects_by_state(
-        ObjectType.INSTANCE, [Instance.STATE_CREATED])
-    for instance_uuid in (instance_uuids or []):
+    instance_uuids = _sweep_work_list(
+        'per_instance', ObjectType.INSTANCE, [Instance.STATE_CREATED])
+    if instance_uuids is None:
+        return
+    for instance_uuid in instance_uuids:
         inst = Instance.from_db(instance_uuid, suppress_failure_audit=True)
         if not inst:
             continue
@@ -567,30 +607,18 @@ def _fill_per_deleted_object_queue():
     # young to hard delete are never fetched at all.
     now = time.time()
     for objtype in OBJECT_NAMES_TO_CLASSES:
-        obj_uuids = mariadb.get_objects_by_state(
-            ObjectType(objtype), FINAL_OBJECT_STATES,
+        # A failed read for one object type must not stop the sweep for
+        # the rest: the failure is per-reply, and the other types are
+        # still collectable. This is the site where collapsing None into
+        # [] silently turned garbage collection off for node_inst_op
+        # while its uncollected backlog made each subsequent reply
+        # larger still (#3638).
+        obj_uuids = _sweep_work_list(
+            'deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
             updated_before=(now - _deleted_object_delay(objtype)))
         if obj_uuids is None:
-            # None means the work-list read failed, which is distinct
-            # from [] for "no matches". Collapsing the two silently
-            # turned the GC off for node_inst_op while the uncollected
-            # backlog grew each subsequent reply even larger (#3638);
-            # a failed pass must be visible, not indistinguishable
-            # from an empty one.
-            streak = _FILL_FAILURE_STREAK.get(objtype, 0) + 1
-            _FILL_FAILURE_STREAK[objtype] = streak
-            DELETED_OBJECT_FILL_FAILURE_STREAK.labels(
-                object_type=objtype).set(streak)
-            LOG.with_fields({
-                'object_type': objtype,
-                'consecutive_failures': streak}).warning(
-                'Deleted-object sweep could not read its work list; '
-                'garbage collection for this object type is stalled')
             continue
 
-        if _FILL_FAILURE_STREAK.pop(objtype, None):
-            DELETED_OBJECT_FILL_FAILURE_STREAK.labels(
-                object_type=objtype).set(0)
         for obj_uuid in obj_uuids:
             DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
 

@@ -211,7 +211,21 @@ class Monitor(daemon.Daemon):
 
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
-        for blob_uuid in mariadb.get_active_blob_uuids():
+        #
+        # This pass only ever iterates the list, so an unreadable one
+        # degrades to "no reaping or rebalancing this time" -- unlike
+        # the cleaner's complement-set use of the same call, where the
+        # equivalent failure would delete blobs off disk (#3638). Skip
+        # just this section so the rest of the cleanup still runs.
+        try:
+            active_blob_uuids = mariadb.get_active_blob_uuids()
+        except exceptions.DatabaseUnavailable as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read the active blob list, skipping blob reaping '
+                'and replication this pass')
+            active_blob_uuids = []
+
+        for blob_uuid in active_blob_uuids:
             self.pet_watchdog()
 
             b = Blob.from_db(blob_uuid)

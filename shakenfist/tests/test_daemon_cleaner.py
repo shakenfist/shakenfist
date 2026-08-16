@@ -7,6 +7,7 @@ from unittest import mock
 import schedule
 
 from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import node
 from shakenfist.config import BaseSettings
@@ -383,6 +384,54 @@ class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
         self.assertFalse(os.path.exists(cache_orphan))
         self.assertFalse(os.path.lexists(dangling_removed))
         self.assertTrue(os.path.lexists(dangling_kept))
+
+    @mock.patch('shakenfist.daemons.cleaner.main.Blob')
+    @mock.patch('shakenfist.daemons.cleaner.main.mariadb')
+    @mock.patch('shakenfist.daemons.cleaner.main.node')
+    def test_unreadable_active_list_deletes_nothing(
+            self, mock_node, mock_mariadb, mock_blob):
+        """An unreadable active-blob list must not empty the blob store.
+
+        _maintain_blobs uses the active list as a complement set: every
+        blob file whose uuid is absent from it is unlinked. While
+        get_active_blob_uuids() flattened a failed read to [] (#3638), a
+        single oversized RESOURCE_EXHAUSTED reply therefore read as "no
+        blobs are active" and instructed this pass to delete every blob
+        on the node. The pass must be skipped instead.
+        """
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        blob_dir = os.path.join(tempdir.name, 'blobs')
+        cache_dir = os.path.join(tempdir.name, 'image_cache')
+        shard = os.path.join(blob_dir, 'ab')
+        os.makedirs(shard)
+        os.makedirs(cache_dir)
+
+        # A healthy blob, old enough to be collected had it genuinely
+        # been absent from the active list.
+        live_blob_uuid = '12345678-1234-4321-8234-123456789012'
+        live_blob = os.path.join(shard, live_blob_uuid)
+        with open(live_blob, 'w') as f:
+            f.write('...')
+        os.utime(live_blob, (0, 0))
+
+        mock_mariadb.get_active_blob_uuids.side_effect = (
+            exceptions.DatabaseUnavailable(
+                'could not read the list of active blobs'))
+        fake_node = mock.MagicMock()
+        fake_node.blobs = [live_blob_uuid]
+        mock_node.Node.from_db.return_value = fake_node
+        mock_blob.from_db.return_value = None
+
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        with mock.patch('shakenfist.daemons.cleaner.main.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            m._maintain_blobs()
+
+        self.assertTrue(os.path.exists(live_blob))
 
 
 class ResilientJobTestCase(base.ShakenFistTestCase):

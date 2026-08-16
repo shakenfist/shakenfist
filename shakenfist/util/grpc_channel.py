@@ -39,11 +39,22 @@ _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
     # an object's whole (limit-capped, but limits reach 1000) event
     # history -- and on sfcbr they crossed gRPC's default 4MiB receive
     # cap (#3638, observed up to ~7.2MB), turning routine reads into
-    # opaque RESOURCE_EXHAUSTED failures and silently wedging the
-    # deleted-object GC. 100MiB is >10x the largest observed payload;
-    # truly bounding these replies (cursor pagination / streaming) is
-    # filed as future work in PLAN-eventlog-direct-mariadb.
-    ('grpc.max_receive_message_length', 100 * 1024 * 1024),
+    # opaque RESOURCE_EXHAUSTED failures.
+    #
+    # 32MiB is deliberately not "large enough that this can never
+    # happen again". Raising the cap only moves the cliff, and moving
+    # it too far changes where the failure lands: sf-database has to
+    # serialise whatever it sends, so an arbitrarily generous client
+    # cap converts a fast, loud, client-side RESOURCE_EXHAUSTED into
+    # memory pressure and latency on the database tier -- which this
+    # cluster has already been hurt by (the gateway watchdog SIGABRTs
+    # of issue 3586). 32MiB is ~4.5x the largest payload observed in
+    # the wild, which clears today's traffic with room to spare while
+    # keeping a cliff close enough that we still hear about growth.
+    #
+    # The durable fix is to stop sending unbounded replies at all; see
+    # docs/plans/PLAN-grpc-bounded-replies.md.
+    ('grpc.max_receive_message_length', 32 * 1024 * 1024),
     # Disable gRPC's default behaviour of honouring the HTTP_PROXY /
     # HTTPS_PROXY environment variables. SF nodes that sit behind an
     # outbound HTTP proxy (CI runners, corporate networks) would

@@ -7155,11 +7155,27 @@ def get_active_blob_uuids() -> list[str]:
 
     Active states are 'initial' and 'created' (not 'deleted' or 'error').
 
+    Raises exceptions.DatabaseUnavailable if the read failed, and never
+    returns [] to mean "the read did not happen". The distinction is
+    load bearing: the cleaner uses this list as a *complement* set and
+    unlinks every blob file on disk that is not in it, so a read
+    failure flattened to an empty list is an instruction to delete the
+    node's entire blob store. This used to be `... or []`, which is
+    exactly that bug -- an oversized reply (#3638) is a non-retryable
+    RESOURCE_EXHAUSTED, so it is raised as-is by _grpc_call, mapped to
+    None by _grpc_get_objects_by_state, and was then read as "no blobs
+    are active". Callers that can tolerate a skipped pass must catch
+    DatabaseUnavailable explicitly.
+
     Returns:
-        List of blob UUID strings in active states (empty on error).
+        List of blob UUID strings in active states.
     """
     active_states = ['initial', 'created']
-    return get_objects_by_state(ObjectType.BLOB, active_states) or []
+    result = get_objects_by_state(ObjectType.BLOB, active_states)
+    if result is None:
+        raise exceptions.DatabaseUnavailable(
+            'could not read the list of active blobs')
+    return result
 
 
 # =============================================================================

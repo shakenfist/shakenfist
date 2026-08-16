@@ -6,6 +6,7 @@ import time
 import schedule
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist import node
@@ -48,7 +49,20 @@ class Monitor(daemon.Daemon):
         cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
         os.makedirs(cache_path, exist_ok=True)
 
-        active_blob_uuids = mariadb.get_active_blob_uuids()
+        # This list is used below as a complement set: any blob file on
+        # disk whose uuid is absent from it is deleted. That makes an
+        # unreadable list actively dangerous rather than merely
+        # unhelpful, so skip the pass entirely -- the blobs are still
+        # there next time round, and a delayed sweep costs nothing that
+        # a wrongly emptied blob store does not cost far more of.
+        try:
+            active_blob_uuids = mariadb.get_active_blob_uuids()
+        except exceptions.DatabaseUnavailable as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read the active blob list, skipping blob '
+                'maintenance this pass')
+            return
+
         n = node.Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
         if not n:
             # We have not started up enough yet to exist in the database.

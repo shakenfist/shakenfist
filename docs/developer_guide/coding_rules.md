@@ -228,6 +228,43 @@ than inferring one, and write the test that returns the empty-error reply and
 asserts the refusal. The invariant is not that today's code produces a message;
 it is that no reply can be mistaken for a permissive one.
 
+## `or []` is a decision about what a failed read means
+
+`mariadb.get_objects_by_state()` returns `None` when the read failed and `[]`
+when nothing matched, and says so in its docstring. Every `or []` at a call
+site erases that distinction, and the erasure is not neutral: it asserts that
+the caller treats "we could not find out" and "there is nothing" the same way.
+Sometimes that is true. Decide it deliberately, because for one caller in this
+codebase it was catastrophically false.
+
+`get_active_blob_uuids()` ended in `or []`. The cleaner uses its result as a
+*complement* set -- it unlinks every blob file on disk whose uuid is not in the
+list -- so a failed read arrived as "no blobs are active", which is an
+instruction to delete the node's entire blob store. The trigger was not exotic:
+an oversized `GetObjectsByState` reply (issue 3638) is a non-retryable
+`RESOURCE_EXHAUSTED`, raised as-is by `_grpc_call`, mapped to `None` by the
+client wrapper, and flattened to `[]` one line later. The same call in the
+cluster daemon only ever *iterates* the list, so there the empty list was
+merely a skipped pass. One accessor, two callers, opposite consequences.
+
+So the rule is about the caller, not the accessor. Before collapsing an error
+into a value, ask what each caller does with it. A caller that iterates can
+usually tolerate a skipped pass -- catch explicitly, log, and move on. A caller
+that complements, gates, or diffs against the list cannot, and must see the
+failure. `get_active_blob_uuids()` now raises `exceptions.DatabaseUnavailable`,
+which is the same shape as the fix for issue 3373 (an unreachable database must
+not be indistinguishable from a missing object) and gets the REST path a clean
+503 for free via `handle_database_unavailable`.
+
+A sweep that reads a work list has a quieter version of the same problem: it
+does not delete anything wrongly, it just does nothing, reports a healthy pass
+over an empty queue, and lets the backlog grow -- which in issue 3638 grew the
+very reply that could not be read. `_sweep_work_list()` in the cluster daemon's
+scheduled tasks is the shared answer: a failed read returns `None`, is counted
+into `cluster_sweep_work_list_failure_streak`, and is logged as a skipped pass.
+The general form: **silence is not success, and an empty result set is not the
+absence of an answer.**
+
 ## Cluster CI tests only run in the merge queue
 
 The `(collection)` matrix in `Functional tests` -- everything under
