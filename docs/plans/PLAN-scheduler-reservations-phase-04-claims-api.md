@@ -211,9 +211,18 @@ slower and the exact shape the codebase has been burned by.
 To stop the two lying to each other they must never encode
 the same fact: an expired claim is still a `created` object,
 a deleted claim has no row at all, and `external_view()`
-publishes both fields under distinct names (`state` for
-coverage, and the standard object state where every other
-object publishes it).
+publishes both fields under distinct names: `state` carries
+existence, where `_external_view()` already puts it for every
+other object, and coverage is published beside it as
+`coverage_state`.
+
+*(Corrected during step 5. This decision originally read
+"`state` for coverage, and the standard object state where
+every other object publishes it", which is self-contradictory
+-- the standard place **is** `state`. Existence keeps it,
+because taking it away would make this one object's
+`external_view()` disagree with every other object's for a
+reason no caller could guess.)*
 
 **D3. Creating a claim migrates the namespace's existing
 drawdown into it; deleting one migrates it back.** Survey

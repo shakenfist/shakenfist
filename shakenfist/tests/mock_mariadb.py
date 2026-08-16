@@ -133,11 +133,18 @@ class MockMariaDB():
         # with no capacity row admits unguarded. Tests which want the
         # guard to bite seed a row with set_node_capacity().
         self.node_capacity = {}
-        # Mock namespace_claims rows, keyed by namespace name. Empty by
-        # default, which is the unclaimed namespace: the claim stage is
-        # skipped entirely and nothing about it appears in the reply.
-        # Tests which want the claim stage seed a row with
-        # set_namespace_claim().
+        # Mock namespace_claims rows, keyed by claim uuid, as the real
+        # table is. Empty by default, which is the unclaimed namespace:
+        # the claim stage is skipped entirely and nothing about it
+        # appears in the reply. Tests which want the claim stage seed a
+        # row with set_namespace_claim().
+        #
+        # Keyed by uuid rather than by namespace because a namespace can
+        # genuinely hold more than one claim: the "one active claim per
+        # namespace" rule is enforced by a probe outside the transaction,
+        # so two concurrent creates can both commit. Anything which needs
+        # "the namespace's claim" asks _claim_for_namespace(), which
+        # resolves it the way admission does.
         self.namespace_claims = {}
         # Make every claim create or grow refuse with this reason. The
         # mock does not model the cluster_capacity singleton, so a
@@ -2780,8 +2787,9 @@ class MockMariaDB():
         failing_stage='claim'.
         """
         now = time.time()
-        self.namespace_claims[str(namespace)] = {
-            'uuid': str(claim_uuid) if claim_uuid else str(uuid4()),
+        claim_uuid = str(claim_uuid) if claim_uuid else str(uuid4())
+        self.namespace_claims[claim_uuid] = {
+            'uuid': claim_uuid,
             'namespace': str(namespace),
             'limit_cpus': limit_cpus,
             'limit_memory_mb': limit_memory_mb,
@@ -2793,7 +2801,7 @@ class MockMariaDB():
             'expires_at': now + expires_in,
             'updated_at': now,
         }
-        return self.namespace_claims[str(namespace)]
+        return self.namespace_claims[claim_uuid]
 
     def refuse_namespace_claims(self, reason):
         """Make every subsequent claim create or grow refuse.
@@ -2813,17 +2821,24 @@ class MockMariaDB():
         self.namespace_claim_refusal = reason
 
     def _claim_by_uuid(self, claim_uuid):
-        """The seeded claim row with this uuid, or None.
+        """The seeded claim row with this uuid, or None."""
+        return self.namespace_claims.get(str(claim_uuid))
 
-        The mock keys claims by namespace, because that is the lookup
-        the admission path makes and the admission mock came first. The
-        CRUD paths look up by uuid, and a scan is exact and free at the
-        handful of rows a unit test seeds.
+    def _claim_for_namespace(self, namespace):
+        """The claim admission would draw a namespace's placement down.
+
+        The real branch select filters on active and unexpired coverage
+        and takes the lowest uuid when a namespace somehow holds more
+        than one; this resolves it the same way, so a test which seeds
+        two claims for one namespace sees the same one admission would.
         """
-        for row in self.namespace_claims.values():
-            if row['uuid'] == str(claim_uuid):
-                return row
-        return None
+        candidates = [row for row in self.namespace_claims.values()
+                      if row['namespace'] == str(namespace)
+                      and row['state'] == 'active'
+                      and row['expires_at'] > time.time()]
+        if not candidates:
+            return None
+        return sorted(candidates, key=lambda r: r['uuid'])[0]
 
     def _claim_row(self, row):
         """One claim row in the shape mariadb's claim reads return."""
@@ -2857,7 +2872,7 @@ class MockMariaDB():
         if self.namespace_claim_refusal:
             result['refused_reason'] = self.namespace_claim_refusal
             return result
-        if str(namespace) in self.namespace_claims:
+        if self._claim_for_namespace(namespace) is not None:
             result['refused_reason'] = 'exists'
             return result
 
@@ -2877,8 +2892,8 @@ class MockMariaDB():
     def _mariadb_get_namespace_claims(self, namespace=''):
         """Mock implementation of mariadb.get_namespace_claims()"""
         return [self._claim_row(row)
-                for name, row in sorted(self.namespace_claims.items())
-                if not namespace or name == str(namespace)]
+                for _, row in sorted(self.namespace_claims.items())
+                if not namespace or row['namespace'] == str(namespace)]
 
     def _mariadb_update_namespace_claim(
             self, claim_uuid, fields, limit_cpus=0, limit_memory_mb=0,
@@ -2942,7 +2957,7 @@ class MockMariaDB():
         if row is None:
             return result
 
-        del self.namespace_claims[row['namespace']]
+        del self.namespace_claims[row['uuid']]
         result['deleted'] = True
         if row['state'] == 'active':
             result['returned_cpus'] = row['used_cpus']
@@ -2980,7 +2995,7 @@ class MockMariaDB():
         implementation credits the cluster's unclaimed sums instead,
         which this mock does not model.
         """
-        row = self.namespace_claims.get(str(namespace))
+        row = self._claim_for_namespace(namespace)
         return self._decrement_capacity_row(row, cpus, memory_mb, disk_gb)
 
     def _decrement_capacity_row(self, row, cpus, memory_mb, disk_gb):
@@ -3063,7 +3078,7 @@ class MockMariaDB():
         # The claim stage, evaluated before the node stage exactly as the
         # real transaction orders its statements -- so when both stages
         # would refuse, the claim is the stage reported.
-        claim = None if is_move else self.namespace_claims.get(str(namespace))
+        claim = None if is_move else self._claim_for_namespace(namespace)
         if claim is not None and enforce and mariadb.CLAIM_ENFORCEMENT_HARD:
             dimensions = []
             for dimension, requested in (('cpus', cpus),

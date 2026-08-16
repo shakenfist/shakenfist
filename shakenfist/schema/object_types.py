@@ -150,3 +150,8 @@ class ObjectType(str, Enum):
     TRUSTED_ISSUER = ObjectTypeValue(
         string='trusted_issuer', proto_id=30)
     MAPPING_RULE = ObjectTypeValue(string='mapping_rule', proto_id=31)
+
+    # Scheduler capacity objects. A claim is a namespace's promise of
+    # aggregate capacity from the cluster; see
+    # docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+    NAMESPACE_CLAIM = ObjectTypeValue(string='namespace_claim', proto_id=32)

@@ -23312,6 +23312,7 @@ _STATIC_TABLE_GETTERS: dict[str, tuple[Callable[[], sa.Table], str]] = {
     # unrepairable while the expiry sweep re-evented every one of them
     # every pass, ~380k junk audit events/day (issue 3588).
     ObjectType.NAMESPACE_KEY.value: (_get_namespace_keys_table, 'uuid'),
+    ObjectType.NAMESPACE_CLAIM.value: (_get_namespace_claims_table, 'uuid'),
     ObjectType.NETWORK.value: (_get_networks_table, 'uuid'),
     ObjectType.NODE.value: (_get_nodes_table, 'uuid'),
     ObjectType.UPLOAD.value: (_get_uploads_table, 'uuid'),

@@ -9,6 +9,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import exceptions
 from shakenfist import mapping_rule
 from shakenfist import mariadb
+from shakenfist import namespace_claim
 from shakenfist import namespace_key
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -353,6 +354,17 @@ class Namespace(dbo):
         # trust they never asked for.
         for rule in mapping_rule.rules_in_namespace(self.uuid):
             rule.hard_delete()
+
+        # Capacity claims are owned the same way, and leaving one behind
+        # is worse than leaving a key or a rule behind: a claim holds
+        # cluster capacity in cluster_capacity.claimed_*, and with its
+        # namespace gone nothing would ever release it. The cluster would
+        # simply have less capacity than it has, permanently, with no
+        # object left to explain why. Deleting through the claim object
+        # rather than the row is what returns the capacity -- see
+        # NamespaceClaim.hard_delete().
+        for claim in namespace_claim.claims_in_namespace(self.uuid):
+            claim.hard_delete()
 
         mariadb.delete_namespace_attributes(self.uuid)
         mariadb.delete_namespace(self.uuid)
