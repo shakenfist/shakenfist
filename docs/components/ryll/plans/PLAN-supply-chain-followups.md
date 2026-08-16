@@ -195,6 +195,44 @@ No individual action item for this — review the list
 quarterly and pick off easy wins (e.g. crates where
 upgrading one direct dep resolves the duplicate).
 
+## Accepted risk: the `rtc` 0.20.x transport stack
+
+Recorded here so the acceptance lives with the scanning
+policy rather than only in the plan that caused it.
+
+The webrtc-rs 0.20 port
+(`docs/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump.md`)
+replaced `dtls`, `webrtc-srtp`, `webrtc-sctp`, `stun`, `turn`
+and `webrtc-ice` 0.17.2 with the `rtc-*` 0.20.2 family plus
+`sansio` 1.0.1 — a sans-io reimplementation of the whole
+DTLS/SRTP/SCTP/STUN transport, at a version released days
+before it was adopted. That code parses untrusted network
+input from any peer that can reach the bound UDP sockets,
+which by design is every non-loopback address on the host,
+and none of this repo's own parser hardening (`BoundedReader`,
+the fuzz targets, the deterministic scanners) reaches a
+vendored third-party stack.
+
+Accepted rather than mitigated, and the reasoning is that the
+alternative is worse for the same threat: 0.17.x is an
+abandoned line that will never receive a security fix.
+Staying put means carrying known-unfixable transport code
+indefinitely.
+
+What this costs us in scanner terms, all currently reported
+rather than fatal because `multiple-versions = "warn"`:
+`rtc-shared` pulls in `winapi` 0.3 and `bitflags` 1.3.2, and
+`quinn-udp` arrives at a duplicate major. No new
+`[advisories].ignore` entries were needed in `deny.toml` and
+`.cargo/audit.toml` needed no change — confirmed by the
+`cargo audit` and `cargo deny` lanes both passing on the
+ported tree (CI run 31910156843) rather than by inspection.
+
+Action: treat `rtc-*` as a watch item on the weekly
+`cargo audit` run. The first advisory against this family
+should be triaged as though it were our own code, because in
+practice it is the most exposed parser surface we ship.
+
 ## Success criteria
 
 This plan is complete when:

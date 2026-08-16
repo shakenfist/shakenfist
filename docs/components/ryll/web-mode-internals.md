@@ -60,26 +60,51 @@ is one specific delivery mechanism.
 
 ### `WebrtcBridge`
 
-Wraps an `RTCPeerConnection` and owns:
+Wraps an `Arc<dyn PeerConnection>` (webrtc-rs 0.20's builder
+hands back an unnameable `impl PeerConnection`, so the bridge
+stores it behind the trait object) and owns:
 
 - A video `TrackLocalStaticRTP` (H.264, 90 kHz clock rate).
 - An audio `TrackLocalStaticRTP` (Opus, 48 kHz clock rate).
-- A "control" `RTCDataChannel` (ordered + reliable).
+- A "control" datachannel (`Arc<dyn DataChannel>`, ordered +
+  reliable — 0.20 has no `RTCDataChannel` user type).
 - An `mpsc::Sender<EncoderControl>` to request keyframes.
 
-Construction via `WebrtcBridge::new(WebrtcBridgeConfig)`:
-builds the PC via webrtc-rs's `APIBuilder` + `MediaEngine`
-pattern, registers H.264 and Opus codecs, creates both tracks,
-adds them to the PC, creates the control DC, and registers three
-callbacks — connection state change, ICE gathering state change,
-and control-DC message — all delegating to one `BridgeEvents`
-struct. `BridgeEvents` is deliberately the shape of webrtc-rs
-0.20's `PeerConnectionEventHandler` trait, so the 0.20 port adds
-an `impl` and deletes the closures without the bodies moving.
+Construction via `WebrtcBridge::new(WebrtcBridgeConfig)`: builds
+a `MediaEngine` and registers H.264 and Opus codecs, enumerates
+the host's bindable UDP addresses (`bind_addrs::host_udp_bind_addrs`;
+see the UDP bind addresses subsection below), then builds the peer
+connection through `PeerConnectionBuilder`, supplying the media
+engine, the interceptor registry, the UDP addresses, and — the one
+mandatory builder call, `build()` errors without it — a single
+`BridgeHandler` wrapping one `BridgeEvents` struct. Only after the
+peer connection exists does `new` create both tracks (with explicit
+SSRC and codec `codings`) and add them, then create the control
+datachannel and spawn a task that pumps its events into
+`BridgeEvents::on_control_message`.
+
+`BridgeEvents` holds the shared state and the callback bodies;
+`BridgeHandler` is a thin newtype around `Arc<BridgeEvents>`
+implementing 0.20's `PeerConnectionEventHandler` trait, which
+replaces 0.17's four separate callback registrations with one
+object supplied to the builder *before* the peer connection
+exists. Every method on it is awaited inline by the peer
+connection's driver event loop, so none of them may block — see
+the WebRTC conventions section of AGENTS.md. `BridgeHandler`
+implements three methods: `on_connection_state_change` and
+`on_ice_gathering_state_change` delegate straight to
+`BridgeEvents`; `on_data_channel` (fired when the remote peer
+opens a datachannel — see the Control datachannel section below
+for when that actually happens) spawns another pump task for that
+channel rather than looping inline. Both the control DC's own pump
+and any spawned from `on_data_channel` share one `JoinHandle` list
+so `WebrtcBridge::close` can abort whichever pumps are still
+running after `pc.close()`.
 
 The state-change handler shadows the latest
-`RTCPeerConnectionState` (the inherent accessor does not survive
-the 0.20 port) and raises the sticky `dead` signal on the first
+`RTCPeerConnectionState` in a `Mutex` (the inherent accessor does
+not survive the 0.20 port — there is no replacement on the trait
+or the core) and raises the sticky `dead` signal on the first
 terminal transition. The gathering handler raises the sticky
 `gathered` signal on `Complete`. Both signals are
 `StickySignal`s (`sticky.rs`): a `Notify` + sticky `AtomicBool`
@@ -89,6 +114,29 @@ the WebRTC conventions section of AGENTS.md for why a bare
 
 `WebrtcBridgeConfig` carries the ICE server list (empty for
 LAN-only use) and the `EncoderControl` sender.
+
+#### UDP bind addresses
+
+webrtc-rs 0.17 bound its own sockets and enumerated the host's
+interfaces internally; 0.20 inverts that — the caller binds the
+sockets and hands the bound addresses to
+`PeerConnectionBuilder::with_udp_addrs`, and those addresses are
+the *only* input to ICE host-candidate generation. Binding the
+obvious placeholder, `0.0.0.0:0`, succeeds and then produces a
+literal `a=candidate:... 0.0.0.0 ...` in the answer SDP, which
+every browser discards — and is invisible to the in-process test
+suite, since two Rust peers on one host agree about the bogus
+address and connect happily.
+`shakenfist-spice-webrtc/src/bind_addrs.rs` reproduces what 0.17
+did internally: `host_udp_bind_addrs()` enumerates the host's
+network interface addresses via the `if-addrs` crate and returns
+one ephemeral-port `SocketAddr` per address, skipping loopback,
+unspecified, and IPv6 link-local addresses. `WebrtcBridge::new`
+rejects an empty result rather than building a peer connection
+that could only ever offer unroutable candidates. This is
+independent of the `--web-host` flag, which only controls the
+HTTP/HTTPS signalling listener; see `docs/web-frontend.md`'s
+reverse-proxy callout for the operator-facing consequences.
 
 ### SDP flow
 
@@ -117,7 +165,10 @@ video track:
 
 - Consumes `EncodedFrame`s from the encoder output channel.
 - Strips Annex-B start codes from each NAL.
-- Payloads raw NALs via `H264Payloader` (from `rtp::codecs::h264`).
+- Payloads raw NALs via `H264Payloader` (from
+  `rtc::rtp::codec::h264` — the sans-io core's payloader, not the
+  abandoned standalone `rtp` crate; see the webrtc entry in
+  `docs/development.md`'s dependency list).
 - Sets the `marker` bit on the last RTP packet of each access unit
   (per RFC 6184 §5.1 — decoder pacing depends on this).
 - Derives RTP timestamps from `EncodedFrame::timestamp_us` at
@@ -135,6 +186,21 @@ smoke testing, input events (scancodes, pointer coordinates), and
 cursor overlay updates. `send_control(&[u8])` and `control_rx()`
 are the public API.
 
+A datachannel's SCTP stream id is assigned from the DTLS role at
+creation time, and there is no role before the handshake, so any
+datachannel created ahead of negotiation — on both sides — lands
+on stream 1. Our `control` datachannel and the browser shell's
+`control-seed` (`ryll/src/web/assets/app.js`) are both created
+ahead of negotiation, so in the common case they collide on the
+same stream: each side's channel is already in its own id map when
+the peer's DCEP open arrives, the driver does not announce it, and
+`on_data_channel` never fires. The remote peer's messages instead
+surface on our *own* `control_dc`, pumped as `"local-dc"` — which
+is harmless here, since both directions still work, but it means
+the `on_data_channel` path (pumped as `"remote-dc"`) is dead in
+normal operation. What is left for it is a datachannel the peer
+opens *after* negotiation, where the stream ids no longer collide.
+
 `spawn_synthetic_audio_pump()` remains available for testing
 without a SPICE server: it emits a 440 Hz sine wave encoded as
 Opus at 50 fps (20 ms per frame, 960 samples at 48 kHz), through
@@ -143,15 +209,37 @@ path uses.
 
 ### Keyframe-on-attach
 
-The bridge sends `EncoderControl::RequestKeyframe` when the
-`RTCPeerConnection` transitions to the `Connected` state, so the
-first frame the browser sees is always a full IDR. A PLI
-(Picture Loss Indication) RTCP handler is also registered for
-the same purpose when a viewer requests a refresh.
+The bridge sends `EncoderControl::RequestKeyframe` when the peer
+connection transitions to the `Connected` state, so the first
+frame the browser sees is always a full IDR. There is currently
+no RTCP PLI (Picture Loss Indication) handler requesting a
+keyframe on a viewer-initiated refresh — the phase 3 plan allowed
+stubbing it, and it was never implemented; `bridge.rs` registers
+no `on_rtcp_packet`-equivalent handling.
 
-### webrtc-rs convention: `on_track` must spawn a task
+### webrtc-rs convention: handler methods must never block
 
-See the "WebRTC conventions" section in `AGENTS.md` for the normative rule regarding `on_track` and `read_rtp`.
+See the "WebRTC conventions" section in `AGENTS.md` for the
+normative rule. In short: webrtc-rs 0.20 awaits every
+`PeerConnectionEventHandler` method inline in the peer
+connection's driver event loop, so a handler method that loops
+(like a datachannel or track read loop) or blocks on a slow
+consumer stalls the whole connection. `bridge.rs` has no
+`on_track` implementation — the bridge only sends media, it does
+not receive any — but the same rule is why `on_data_channel`
+spawns a pump task instead of polling inline, and why
+`BridgeEvents::on_state_change` uses `try_send` rather than
+`send().await`.
+
+The rule follows the dispatch path, not the type. Only the
+methods reached from `BridgeHandler` run inline.
+`on_control_message` lives on the same struct but is called from
+the spawned `run_dc_pump` loops, so awaiting there parks one
+datachannel's poll loop and nothing else — which is why it
+awaits. That is the right trade for an ordered, reliable channel
+carrying input: back-pressure onto SCTP costs latency, whereas a
+dropped key-up leaves a modifier stuck down in the guest and
+never gets redelivered.
 
 ## SPICE wire-up
 
@@ -214,7 +302,7 @@ rather than the video encoder path.
 ### Audio adapter
 
 `ryll/src/web/audio.rs` — `WebOpusSink` implements
-`OpusPacketSink`. When the `RTCPeerConnection` reaches
+`OpusPacketSink`. When the peer connection reaches
 `Connected`, the bridge activates the audio pump; `WebOpusSink`
 routes each incoming Opus packet to the bridge's audio track
 via the WebRTC audio pump. PCM-only SPICE servers do not
@@ -248,10 +336,10 @@ Browser (RTCPeerConnection)
     └─ datachannel: cursor overlay + input events
 ```
 
-The `on_track`-must-spawn-a-task webrtc-rs idiom (documented
+The handler-methods-must-never-block webrtc-rs rule (documented
 above) and the rustls `CryptoProvider` init (required once at
 process start, before any TLS handshake) both apply to the
-`--web` mode and are handled in `ryll/src/main.rs` before
+`--web` mode; the latter is handled in `ryll/src/main.rs` before
 `run_web()` is called.
 
 ## Bridge lifecycle
@@ -259,17 +347,25 @@ process start, before any TLS handshake) both apply to the
 ### Bridge dead signal
 
 `WebrtcBridge` carries a `dead: Arc<StickySignal>` field —
-raised exactly once when the `RTCPeerConnection` reaches
-`Failed`, `Disconnected`, or `Closed`. `StickySignal`
-(`sticky.rs`) pairs a `Notify` with a sticky `AtomicBool`, so
-late callers do not wait on an already-dead bridge and a raise
-landing mid-subscribe is not lost.
+raised at most once, when the *peer* goes away: `Failed`,
+`Disconnected`, or a `Closed` observed from the remote side.
+`StickySignal` (`sticky.rs`) pairs a `Notify` with a sticky
+`AtomicBool`, so late callers do not wait on an already-dead
+bridge and a raise landing mid-subscribe is not lost.
+
+A locally-initiated `close()` usually does **not** raise it. On
+webrtc-rs 0.20 `close()` consumes the driver before it dispatches
+the queued `Closed` transition, and a stopped driver cannot
+deliver an ICE or DTLS event either. So `dead` means "the peer
+went away", not "the bridge is finished" — anything that needs
+the latter must observe it another way. The reaper below is the
+consumer this matters to.
 
 Public API:
 
 - `wait_for_dead(&self) -> impl Future` — resolves when the
-  PC reaches a terminal state. Returns immediately if the
-  signal is already raised (late-subscriber safety).
+  signal is raised, per the qualification above. Returns
+  immediately if it already is (late-subscriber safety).
 - `dead_signal(&self) -> Arc<StickySignal>` — exposes the
   signal for consumers that hold their own clone without
   keeping a reference to the bridge; `handle.wait().await`
@@ -283,12 +379,23 @@ task spawned from `run_web`. Its loop:
 1. Clones the active bridge's `dead_signal()` without
    holding the slot lock for long.
 2. If no bridge is active, sleeps 500 ms and retries.
-3. Awaits the dead signal.
-4. Takes the bridge out of `bridge_slot`, calls
+3. Awaits either the dead signal or `WebState::bridge_replaced`,
+   which `POST /offer` raises after installing a new bridge. The
+   second arm is required, not an optimisation: the task watches
+   one bridge at a time, and a bridge closed by `/offer` does not
+   raise its own dead signal (above), so waiting on `dead` alone
+   parks it for the life of the process the first time a viewer
+   reloads.
+4. Re-checks that the bridge is genuinely dead, and that the
+   generation counter has not moved. A wake is not evidence of
+   death — `notify_one` stores a permit when nothing is parked,
+   which is exactly the state `/offer` finds the reaper in — so
+   the reap is gated on the signal itself.
+5. Takes the bridge out of `bridge_slot`, calls
    `bridge.close().await`.
-5. Calls `EncoderInfra::stop()` — sends `EncoderControl::Stop`
+6. Calls `EncoderInfra::stop()` — sends `EncoderControl::Stop`
    and awaits the encoder task handle (2-second ceiling).
-6. Clears `opus_active_tx`.
+7. Clears `opus_active_tx`.
 
 The SPICE session (`run_connection`) is left completely
 untouched. A subsequent `/offer` from the browser rebuilds

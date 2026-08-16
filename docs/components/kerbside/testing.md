@@ -71,6 +71,7 @@ live on the queue entry for PR 304.
 | `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `rust.yml` | push and pull_request, path-filtered to `rust/**` and the proto | neither (advisory) |
+| `dev-proxy-wheel.yml` | push to develop, path-filtered to the proxy binary's inputs; workflow_dispatch (dry-run by default) | neither |
 | `codeql-analysis.yml` | push, pull_request, weekly | neither |
 | `prune-reviews.yml` | push to develop | neither |
 | `pin-indirect-dependencies.yml` | daily, and on PRs touching the pinning script | neither |

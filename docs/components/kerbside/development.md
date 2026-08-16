@@ -347,19 +347,30 @@ described in
 [How the binary gets there: packaging](/components/kerbside/proxy-architecture/#how-the-binary-gets-there-packaging).
 Three things about it only matter while developing:
 
-- **A dev checkout deliberately carries no `kerbside-proxy` pin.** The
-  sibling package is not on PyPI at a dev version, so pinning it would
-  make the tree uninstallable. `tools/stamp-proxy-version.sh <version>`
-  inserts the `kerbside-proxy==<version>` pin before the
-  `# KERBSIDE_PROXY_PIN` marker in `pyproject.toml` at release time
-  only; `find_proxy_bin()` uses the cargo build tree or
-  `KERBSIDE_PROXY_BIN` in the meantime.
-- **`rust.yml` builds a wheel on pull requests as a packaging guard**,
-  so a change that breaks the maturin build is caught before the
-  release tag rather than during it.
+- **A dev checkout carries a dev-inclusive `kerbside-proxy` FLOOR**
+  (`kerbside-proxy>=X.Y.Z.dev0`), not an exact pin: naming a `.dev`
+  version opts pip into pre-release resolution, so a git install
+  resolves the newest proxy wheel on PyPI — a tagged release or a
+  rolling dev wheel published by `dev-proxy-wheel.yml` when the
+  binary's inputs change. `tools/stamp-proxy-version.sh <version>`
+  REPLACES the floor with the exact `kerbside-proxy==<version>` pin at
+  release time (anchored on the `# KERBSIDE_PROXY_PIN` marker), and
+  also writes a static version into the crate's pyproject — which is
+  how `tools/build-proxy-wheel.sh` knows not to dev-stamp a
+  release-stamped tree. A unit test pins the floor's dev-inclusive
+  property. `find_proxy_bin()` still prefers `KERBSIDE_PROXY_BIN` and
+  the cargo build tree for local work, and the daemon verifies the
+  binary's gRPC contract hash at launch either way.
+- **`rust.yml` verifies wheel stamping on pull requests as a packaging
+  guard** (`tools/verify-wheel-stamping.sh`: an unstamped tree must
+  produce a dev-versioned wheel, a release-stamped tree an
+  exactly-versioned one), so a change that breaks the maturin build or
+  the stamping surfaces before the release tag rather than during it.
 - `release.yml` runs the cross-compiled matrix build and publishes both
-  packages, proxy first, from a single `v*` tag. See `RELEASE-SETUP.md`
-  for the two trusted publishers.
+  packages, proxy first, from a single `v*` tag; `dev-proxy-wheel.yml`
+  publishes dev wheels of the proxy (only), unattended. See
+  `RELEASE-SETUP.md` for the trusted publishers and the dev-release
+  trust posture.
 
 ### Validating the firewall against a real client
 
