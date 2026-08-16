@@ -13,6 +13,7 @@ from itertools import count
 from typing import List, Optional
 from unittest import mock
 
+from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import get_object_class
 from shakenfist.instance import Instance
@@ -131,6 +132,12 @@ class MockMariaDB():
         # with no capacity row admits unguarded. Tests which want the
         # guard to bite seed a row with set_node_capacity().
         self.node_capacity = {}
+        # Mock namespace_claims rows, keyed by namespace name. Empty by
+        # default, which is the unclaimed namespace: the claim stage is
+        # skipped entirely and nothing about it appears in the reply.
+        # Tests which want the claim stage seed a row with
+        # set_namespace_claim().
+        self.namespace_claims = {}
         self.cluster_operations_store = {}  # Mock MariaDB cluster op headers
         self.work_queue_store = []  # Mock MariaDB work_queue rows (list to keep order)
         self._work_queue_next_id = count(1)  # AUTO_INCREMENT mock
@@ -2705,6 +2712,40 @@ class MockMariaDB():
         }
         return self.node_capacity[str(node_uuid)]
 
+    def set_namespace_claim(self, namespace, limit_cpus=0, limit_memory_mb=0,
+                            limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
+                            used_disk_gb=0):
+        """Seed an active namespace_claims row for a namespace.
+
+        No namespace has one by default, which is the unclaimed case:
+        admission skips the claim stage and charges the cluster's
+        unclaimed sums instead (which this mock does not model, because
+        nothing caller-side can observe them). Seeding a row makes the
+        claim stage apply to every placement in that namespace.
+
+        The row is always active and unexpired -- expiry is coverage
+        state the admission path resolves before it gets here, via the
+        branch select this mock stands in for, so a seeded claim is by
+        definition one that select would have returned.
+
+        Whether the claim's limits can *refuse* a placement is not a
+        property of the row: mariadb.CLAIM_ENFORCEMENT_HARD decides that
+        for the whole cluster, and it is False for D16's advisory
+        release. With it False, seeding a claim smaller than what is
+        placed produces claim_over_limit and the offending dimensions on
+        an admitted placement; with it True the same seed produces
+        failing_stage='claim'.
+        """
+        self.namespace_claims[str(namespace)] = {
+            'limit_cpus': limit_cpus,
+            'limit_memory_mb': limit_memory_mb,
+            'limit_disk_gb': limit_disk_gb,
+            'used_cpus': used_cpus,
+            'used_memory_mb': used_memory_mb,
+            'used_disk_gb': used_disk_gb,
+        }
+        return self.namespace_claims[str(namespace)]
+
     def _mariadb_get_scheduler_node_capacity(self):
         """Mock implementation of mariadb.get_scheduler_node_capacity()
 
@@ -2726,6 +2767,24 @@ class MockMariaDB():
         means the ledger and ground truth had already diverged.
         """
         row = self.node_capacity.get(str(node_uuid))
+        return self._decrement_capacity_row(row, cpus, memory_mb, disk_gb)
+
+    def _decrement_namespace_claim(self, namespace, cpus, memory_mb, disk_gb):
+        """Floored decrement of a namespace's claim, as the RPC does (P6).
+
+        An unclaimed namespace has nothing to decrement here: the real
+        implementation credits the cluster's unclaimed sums instead,
+        which this mock does not model.
+        """
+        row = self.namespace_claims.get(str(namespace))
+        return self._decrement_capacity_row(row, cpus, memory_mb, disk_gb)
+
+    def _decrement_capacity_row(self, row, cpus, memory_mb, disk_gb):
+        """Floored decrement of one row's used_* counters.
+
+        Returns True if any dimension had to be clamped at zero, which
+        means the ledger and ground truth had already diverged.
+        """
         if row is None:
             return False
         clamped = False
@@ -2758,11 +2817,23 @@ class MockMariaDB():
         accumulates the placement's demand contribution whether or not
         the clause was enforced -- also like the real UPDATE.
 
-        There is no claim stage here: the mock models the node stage
-        only, so ``claim_over_limit`` and ``claim_dimensions`` are
-        present with inert defaults purely so callers see the same keys
-        the real implementation returns. Phase 4 step 3 seeds a real
-        claim row and gives them behaviour.
+        The claim stage applies to namespaces seeded with
+        set_namespace_claim(), and matches the real implementation's
+        semantics rather than approximating them: it is skipped by a
+        move (which changes node, never namespace, so consumes nothing
+        on the namespace side), it is guarded only when
+        mariadb.CLAIM_ENFORCEMENT_HARD is True (D6's third flag, read at
+        call time so a phase 5 test can patch it), and when it is not
+        guarded an over-claim placement is *admitted* and reported --
+        ``claim_over_limit`` with only the dimensions actually over in
+        ``claim_dimensions``, each carrying the usage the claim held
+        *before* this admission (D5's read-back). A denial at any stage
+        charges nothing at all, as the real transaction's rollback does,
+        so a denied reply can never carry an exceedance.
+
+        The cluster singleton is still not modelled: an unclaimed
+        namespace's charge has no caller-observable effect, so there is
+        nothing for a caller-side test to assert about it.
         """
         result = {
             'success': True, 'error': '', 'admitted': False,
@@ -2783,6 +2854,33 @@ class MockMariaDB():
             return result
 
         demand_add = cpus * config.SCHEDULER_DEMAND_PER_VCPU
+        is_move = bool(old_node_uuid) and str(old_node_uuid) != str(node_uuid)
+
+        # The claim stage, evaluated before the node stage exactly as the
+        # real transaction orders its statements -- so when both stages
+        # would refuse, the claim is the stage reported.
+        claim = None if is_move else self.namespace_claims.get(str(namespace))
+        if claim is not None and enforce and mariadb.CLAIM_ENFORCEMENT_HARD:
+            dimensions = []
+            for dimension, requested in (('cpus', cpus),
+                                         ('memory_mb', memory_mb),
+                                         ('disk_gb', disk_gb)):
+                limit = claim['limit_' + dimension]
+                used = claim['used_' + dimension]
+                dimensions.append({
+                    'dimension': dimension,
+                    'limit': float(limit),
+                    'used': float(used),
+                    'requested': float(requested),
+                    'exceeded': used + requested > limit})
+            if any(d['exceeded'] for d in dimensions):
+                result['failing_stage'] = 'claim'
+                result['dimensions'] = dimensions
+                self._trace(
+                    f'MockMariaDB.admit_instance_placement('
+                    f'{instance_uuid}, {node_uuid}): denied by claim')
+                return result
+
         row = self.node_capacity.get(str(node_uuid))
         if row is None:
             result['unguarded'] = True
@@ -2815,13 +2913,34 @@ class MockMariaDB():
                     f'{instance_uuid}, {node_uuid}): denied')
                 return result
 
+        # Nothing can refuse from here on, so the counters are charged --
+        # the namespace side first, in the real transaction's order.
+        if claim is not None:
+            for dimension, requested in (('cpus', cpus),
+                                         ('memory_mb', memory_mb),
+                                         ('disk_gb', disk_gb)):
+                limit = claim['limit_' + dimension]
+                used = claim['used_' + dimension]
+                claim['used_' + dimension] = used + requested
+                # used is what the claim held *before* this admission, so
+                # the triple reads exactly as a denial's does, and only
+                # the dimensions actually over are reported.
+                if used + requested > limit:
+                    result['claim_dimensions'].append({
+                        'dimension': dimension,
+                        'limit': float(limit),
+                        'used': float(used),
+                        'requested': float(requested),
+                        'exceeded': True})
+            result['claim_over_limit'] = bool(result['claim_dimensions'])
+
         if row is not None:
             row['used_cpus'] += cpus
             row['used_memory_mb'] += memory_mb
             row['used_disk_gb'] += disk_gb
             row['expected_demand'] += demand_add
 
-        if old_node_uuid and str(old_node_uuid) != str(node_uuid):
+        if is_move:
             result['clamped'] = self._decrement_node_capacity(
                 old_node_uuid, cpus, memory_mb, disk_gb)
 
@@ -2875,6 +2994,14 @@ class MockMariaDB():
                 f'MockMariaDB.release_instance_placement({instance_uuid}): '
                 f'nothing to release')
             return result
+
+        # The namespace side is charged once per instance however many
+        # nodes hold a reference for it, so it is credited back once too
+        # -- the real implementation says the same, in the same order
+        # (namespace, then nodes).
+        if self._decrement_namespace_claim(
+                namespace, cpus, memory_mb, disk_gb):
+            result['clamped'] = True
 
         for node in sorted(set(nodes)):
             if self._decrement_node_capacity(node, cpus, memory_mb, disk_gb):

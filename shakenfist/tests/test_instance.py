@@ -1338,6 +1338,159 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             'placement recorded despite exceeding capacity guard', messages)
         self.assertIn('instance placed', messages)
 
+    #
+    # D16 advisory claim accounting. CLAIM_ENFORCEMENT_HARD is False for
+    # this release, so a placement which draws its namespace past the
+    # claim it declared is admitted and evented rather than refused.
+    #
+    CLAIM_EVENT = 'placement admitted over namespace capacity claim'
+    NODE_EVENT = 'placement recorded despite exceeding capacity guard'
+
+    def _claim_events(self, add_event):
+        """The advisory claim events emitted, as their extra dicts."""
+        return [c.kwargs['extra'] for c in add_event.call_args_list
+                if c.args[1] == self.CLAIM_EVENT]
+
+    def test_an_over_claim_create_is_admitted_and_evented(self):
+        claim = self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+
+        # Advisory means the create happens: the claim is drawn past its
+        # limit rather than defended.
+        self.assertEqual(self.node2, self.inst.placement['node'])
+        self.assertEqual([self.node2], self._placed_on())
+        self.assertEqual(2, claim['used_cpus'])
+
+        extras = self._claim_events(add_event)
+        self.assertEqual(1, len(extras))
+        self.assertEqual(self.node2, extras[0]['node'])
+        self.assertEqual('unittest', extras[0]['namespace'])
+        # Only the dimension actually over is reported, and its usage is
+        # what the claim held before this admission.
+        self.assertEqual(
+            [{'dimension': 'cpus', 'limit': 1.0, 'used': 0.0,
+              'requested': 2.0, 'exceeded': True}],
+            extras[0]['claim_dimensions'])
+
+    def test_a_create_within_the_claim_is_not_evented(self):
+        self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+
+        messages = [c.args[1] for c in add_event.call_args_list]
+        self.assertNotIn(self.CLAIM_EVENT, messages)
+        self.assertIn('instance placed', messages)
+
+    def test_a_node_denial_does_not_event_the_claim(self):
+        # The two events must not cross-fire: a refused placement charged
+        # no claim, so there is no exceedance to report.
+        claim = self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.assertRaises(
+                exceptions.CapacityAdmissionDenied,
+                self.inst.place_instance, self.node2)
+
+        self.assertEqual([], self._claim_events(add_event))
+        self.assertEqual(0, claim['used_cpus'])
+
+    def test_both_over_limit_events_can_fire_for_one_placement(self):
+        # A ground-truth write into an over-claim namespace, onto a node
+        # which is itself over its guard: the two conditions are
+        # independent and neither event suppresses the other.
+        self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2, enforce=False)
+
+        messages = [c.args[1] for c in add_event.call_args_list]
+        self.assertIn(self.NODE_EVENT, messages)
+        self.assertIn(self.CLAIM_EVENT, messages)
+
+    def test_the_claim_event_fires_once_from_the_recording_reply(self):
+        # The enforce=False probe-then-force path makes two RPCs. The
+        # first is a probe whose denial rolled back, charging no claim;
+        # the second is the write which actually recorded the placement
+        # and charged it. The event must come from the second, exactly
+        # once -- an event per RPC would double count an exceedance, and
+        # an event from the probe would report a drawdown that was undone.
+        claim = self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch(
+                'shakenfist.mariadb.admit_instance_placement',
+                side_effect=(
+                    self.mock_mariadb._mariadb_admit_instance_placement)) as a:
+            with mock.patch.object(self.inst, 'add_event') as add_event:
+                self.inst.place_instance(self.node2, enforce=False)
+
+        self.assertEqual(
+            2, a.call_count,
+            'this test is only meaningful on the probe-then-force path')
+        extras = self._claim_events(add_event)
+        self.assertEqual(
+            1, len(extras),
+            'the advisory claim event must fire exactly once, from the '
+            f'reply which recorded the placement, got {extras}')
+        # The claim was charged exactly once too, so the reported
+        # exceedance is the one the surviving write produced.
+        self.assertEqual(2, claim['used_cpus'])
+        self.assertEqual(
+            [{'dimension': 'cpus', 'limit': 1.0, 'used': 0.0,
+              'requested': 2.0, 'exceeded': True}],
+            extras[0]['claim_dimensions'])
+
+    def test_the_mock_can_produce_a_claim_stage_denial(self):
+        # Not a test of enforcement, which does not exist: it is a test
+        # that the fixture can produce the reply shape phase 5's callers
+        # will have to handle, which is the gap the phase 3 plan recorded
+        # against mock_mariadb. Patching the constant here is what keeps
+        # the mock and mariadb.py flipping together.
+        self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch('shakenfist.mariadb.CLAIM_ENFORCEMENT_HARD', True):
+            exc = self.assertRaises(
+                exceptions.CapacityAdmissionDenied,
+                self.inst.place_instance, self.node2)
+
+        self.assertEqual('claim', exc.failing_stage)
+        self.assertEqual(
+            ['cpus'], [d['dimension'] for d in exc.dimensions
+                       if d['exceeded']])
+        self.assertEqual([], self._placed_on())
+
     def test_an_unguarded_placement_is_loud(self):
         # P7: no capacity row for this node yet, mid-upgrade.
         with mock.patch.object(self.inst, 'add_event') as add_event:
@@ -1491,6 +1644,27 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(8, row['used_cpus'])
         self.assertEqual(8192, row['used_memory_mb'])
         self.assertEqual(32, row['used_disk_gb'])
+
+    def test_delete_returns_the_capacity_to_the_claim(self):
+        # Admission charges the namespace's claim, so release has to
+        # credit it back or every create-and-delete cycle leaks a claim.
+        claim = self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        self.inst.place_instance(self.node2)
+        self.assertEqual(2, claim['used_cpus'])
+        self.assertEqual(2048, claim['used_memory_mb'])
+        self.assertEqual(8, claim['used_disk_gb'])
+
+        self.inst._delete_globally()
+
+        self.assertEqual(0, claim['used_cpus'])
+        self.assertEqual(0, claim['used_memory_mb'])
+        self.assertEqual(0, claim['used_disk_gb'])
 
     def test_release_is_skipped_when_never_placed(self):
         with mock.patch('shakenfist.mariadb.release_instance_placement') as r:

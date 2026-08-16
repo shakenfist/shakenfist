@@ -1295,6 +1295,14 @@ was passing for the right reason all along.
   branch is dormant; **phase 4 makes it necessary**, since the claims API
   is the first thing that can produce a `claim`-stage denial in
   production and its callers will want unit coverage of that path.
+  *Mostly discharged.* The demand term landed with the D13 guard later
+  in this phase, and phase 4's step 3 added the claim stage: a
+  `set_namespace_claim()` helper, the advisory over-limit reply fields,
+  a symmetric release decrement, and a `claim`-stage denial under
+  `mariadb.CLAIM_ENFORCEMENT_HARD`. The cluster singleton is still not
+  modelled, deliberately: an unclaimed namespace's charge against it has
+  no caller-observable effect, so there is nothing for a caller-side
+  test to assert about it.
 - The pick-then-claim walk (the `place_walk` closure, the P9
   demand-only re-walk and the exhaustion branch) exists verbatim in
   `shakenfist/external_api/instance.py` and
