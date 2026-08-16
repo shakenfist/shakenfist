@@ -11334,6 +11334,35 @@ rather than having to retrofit one. The mask travels over gRPC as
 <code>shakenfist/tests/mock_mariadb.py</code> honours it too — a mock that
 replaced the whole row would let a caller name the wrong fields and
 still see the write it expected.</p>
+<h2 id="a-guarded-update-must-be-the-transactions-first-statement">A guarded UPDATE must be the transaction's first statement<a class="headerlink" href="#a-guarded-update-must-be-the-transactions-first-statement" title="Permanent link">&para;</a></h2>
+<p><code>innodb_snapshot_isolation</code> defaults ON from MariaDB 11.6.2, which is
+what Debian 13, Ubuntu 24.04 and every recent container tag ship. Under
+it, a REPEATABLE READ transaction whose read view was established by a
+plain <code>SELECT</code> does not block and re-evaluate a later <code>UPDATE</code> whose
+target row has moved since — it aborts the whole transaction with
+ER_CHECKREAD (1020). When the guarded <code>UPDATE</code> is instead the
+transaction's <em>first</em> statement, the read view is established by the DML
+itself, there is no stale-snapshot window, and a contending writer
+blocks on the row lock and then re-evaluates its <code>WHERE</code>, which is the
+behaviour every guarded-counter design in <code>shakenfist/mariadb.py</code>
+depends on.</p>
+<p>So in <code>_direct_admit_instance_placement()</code> and
+<code>_direct_release_instance_placement()</code> the branch selects and presence
+probes run on a separate autocommit connection <em>before</em> <code>engine.begin()</code>
+(<code>_probe_admission_rows()</code>, <code>_probe_release_rows()</code>). Reads that happen
+<em>after</em> the transaction's own writes are fine, because those rows are
+already locked by them, and a subquery carried inside a guarded <code>UPDATE</code>
+is fine because it is part of the DML that establishes the read view.
+Moving a probe back inside the transaction re-introduces the failure: it
+was measured as 46 of 50 concurrent admissions exhausting the retry
+budget and turning an instance create into an HTTP 500.</p>
+<p>The structural regression tests are <code>SnapshotIsolationInvariantTestCase</code>
+in <code>shakenfist/tests/test_mariadb_capacity_admission.py</code>; the
+behavioural one is <code>PlacementAdmissionConcurrencyLiveTestCase</code> in the
+matching <code>_live</code> module, which only bites against a server with the
+variable ON — CI's <code>debian-12</code> runner has MariaDB 10.11, where it does
+not exist, so this is a rule CI cannot enforce for you. See
+<code>docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md</code> step 6a.</p>
 <h2 id="secret-carrying-fields-are-secretstr">Secret-carrying fields are <code>SecretStr</code><a class="headerlink" href="#secret-carrying-fields-are-secretstr" title="Permanent link">&para;</a></h2>
 <p>Fields which hold a credential — <code>key</code> and <code>nonce</code> on
 <code>NamespaceKeyAttributesData</code>, and the <code>AUTH_SECRET_SEED</code>,

@@ -11593,11 +11593,14 @@ orphan are otherwise invisible to every state-driven iterator.</p>
 claims, re-derives per-hypervisor limits from the typed
 <code>node_metrics</code> columns, recomputes usage counters from placed
 instances and the decaying expected-demand signal, and rebuilds
-the <code>cluster_capacity</code> singleton. In this release the reconciler
-is the only writer of the three capacity tables
-(<code>scheduler_node_capacity</code>, <code>namespace_claims</code>,
-<code>cluster_capacity</code>) and nothing consumes them for admission (that
-arrives with the guarded-UPDATE path). Observability is the
+the <code>cluster_capacity</code> singleton. The reconciler recomputes the
+three capacity tables (<code>scheduler_node_capacity</code>,
+<code>namespace_claims</code>, <code>cluster_capacity</code>) wholesale; as of
+scheduler-reservations phase 3 the atomic admission and release
+RPCs also write them incrementally, and are the sole <em>drawdown</em>
+path against them, so a divergence between what the reconciler
+computes and what the counters hold is drift, healed on the next
+pass rather than expected steady state. Observability is the
 <code>scheduler_capacity_*</code> gauges and counters exported on
 <code>CLUSTER_METRICS_PORT</code>, plus one structured log line per pass.</p>
 <h2 id="batched-priority-aware-dequeue">Batched, Priority-Aware Dequeue<a class="headerlink" href="#batched-priority-aware-dequeue" title="Permanent link">&para;</a></h2>
