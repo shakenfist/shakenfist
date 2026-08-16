@@ -23,8 +23,10 @@ against new ``apiclient`` methods would not pass in CI until a client
 release exists, and no server pull request can produce one. Phase 4's
 decision D7 (docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md)
 therefore puts client verbs out of scope and puts functional coverage on
-the raw request path, and asks for a companion issue against
-shakenfist/client-python for the verbs themselves.
+the raw request path.
+
+The verbs themselves are shakenfist/client-python issue 364, which
+carries the endpoint and payload detail a client implementation needs.
 
 So: do not "fix" this into ``self.system_client.create_namespace_claim(...)``
 until that client release has actually shipped. When it has, this file

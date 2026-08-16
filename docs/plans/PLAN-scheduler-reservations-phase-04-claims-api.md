@@ -709,15 +709,27 @@ defect in the tree:
   without waiting an hour.
 * **`TRUSTED_ISSUER` and `MAPPING_RULE` are missing from
   `_STATIC_TABLE_GETTERS`** (found in step 5), although both
-  own static tables. This is issue 3588's defect -- the orphan
-  reconciler cannot repair their zombie rows, and the expiry
-  sweep re-events them every pass -- live in two more object
-  types. Out of scope here and deliberately not fixed in this
-  phase's commits; it needs its own issue and its own commit,
-  and the same pairing this phase used, since
-  `_STATIC_TABLE_GETTERS` without
-  `constants.OBJECT_NAMES_TO_CLASSES` trades one leak for
-  another.
+  own static tables. This is issue 3588's defect live in two
+  more object types: `ORPHAN_RECONCILABLE_OBJECT_TYPES` is
+  derived from that dict and
+  `reconcile_orphaned_objects()` iterates it twice, so absence
+  disables phantom removal *and* zombie repair for both types.
+  Now issue 3788. Out of scope here and deliberately not fixed
+  in this phase's commits; it needs its own commit.
+
+  Two corrections to what was first written here, both made
+  when the issue was drafted and the code read rather than
+  recalled. There is no expiry sweep over issuers or rules, so
+  3588's headline symptom -- every orphan re-evented every pass
+  -- does not reproduce; the cost is unreapable rows, not an
+  event storm. And the pairing with
+  `constants.OBJECT_NAMES_TO_CLASSES` is not needed here, since
+  both types are already registered there; that registry is
+  consumed downstream, when the deleted-object sweep hydrates
+  what zombie repair marked. The fix is the one dict, plus an
+  assertion that the two registries have equal key sets --
+  which they do, exactly, once it lands, so the invariant needs
+  no exemption list.
 
 ## Back brief
 
