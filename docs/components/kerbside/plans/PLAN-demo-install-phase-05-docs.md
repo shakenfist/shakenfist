@@ -141,6 +141,17 @@ transcript.
 - `.claude/CLAUDE.md`'s Key Files table — add `demo/` if the
   table is the right granularity for it. Judgement call; a
   demo directory is arguably not a key file.
+- **Inbound links to `demo/`.** Raised in the phase 3
+  review: `demo/README.md` links outward to
+  `docs/installation.md`, but nothing links inward. Neither
+  the top-level `README.md`, nor `docs/index.md`, nor
+  `docs/installation.md` mentions `demo/` at all, so a
+  reader arriving at the repository has no path to the thing
+  phase 3 built. This phase owns the fix, and it is
+  explicitly in scope rather than implied by "rewrite
+  installation.md": `docs/index.md` needs an entry, and
+  `README.md` may take the one sentence `readme-discipline`
+  allows, since the install story genuinely changed.
 - `etc/kerbside.conf.example` — **candidate rename** to
   `etc/kerbside.ini.example`. Raised in the phase 2 review:
   the example's extension differs from the path it must be
