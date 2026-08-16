@@ -472,11 +472,22 @@ it gets a comment and a named test rather than a discovery.
 
 Falsifiable, and mostly runnable:
 
-* `POST /auth/namespaces/<ns>/claims` creates a claim; a
+* `POST /auth/namespaces/<ns>/claims` creates a claim and a
   subsequent instance create in that namespace increments
-  `namespace_claims.used_cpus` and leaves
-  `cluster_capacity.unclaimed_used_cpus` unchanged (step 7
-  live assertion).
+  `namespace_claims.used_cpus` (step 7, functional). That the
+  same create leaves `cluster_capacity.unclaimed_used_cpus`
+  unchanged is asserted by step 4's live suite against the
+  database directly.
+
+  *(Corrected during step 7. This bullet asked step 7 to assert
+  both halves functionally, which is not possible: no REST
+  surface publishes the `cluster_capacity` singleton, so a
+  functional test cannot see the unclaimed sums at all. The
+  claim charge and the unclaimed charge are mutually exclusive
+  branches of one `elif` in `_direct_admit_instance_placement()`,
+  so observing the first is indirect evidence of the second --
+  but the direct assertion belongs where the test can read the
+  table, which is the live suite.)*
 * Creating a claim for a namespace that already holds
   instances seeds `used_*` with that drawdown and reduces
   `unclaimed_used_*` by the same amounts, in one transaction
@@ -622,6 +633,25 @@ Falsifiable, and mostly runnable:
   `issuer` and `rule`, both of which shipped before this phase.
   Unrelated to claims, so step 8 should fix the list rather
   than only appending to it.
+* **Nothing publishes the `cluster_capacity` singleton** (found
+  in step 7). `/admin/resources` reports per-node capacity, but
+  the cluster totals, `claimed_*` and `unclaimed_used_*` are
+  visible only to something that can read the table. That makes
+  the whole cluster side of this phase's accounting
+  unobservable to an operator, unassertable by a functional
+  test, and invisible to D18's dashboard, which wants claimed
+  versus unclaimed at a glance. Adding the singleton to
+  `/admin/resources` is a small, self-contained change and is
+  probably the right home for it.
+* **The namespace `hard_delete()` cascade cannot be covered
+  functionally** (found in step 7). `DELETE
+  /auth/namespaces/<ns>` is a soft delete; the cascade runs
+  when the cluster daemon collects the namespace a
+  `CLEANER_DELAY` later, which is an hour. So the claim
+  cascade's real cluster-side decrement is asserted only at the
+  mock boundary (step 5) and by inspection. A live test that
+  drives `Namespace.hard_delete()` directly would close it
+  without waiting an hour.
 * **`TRUSTED_ISSUER` and `MAPPING_RULE` are missing from
   `_STATIC_TABLE_GETTERS`** (found in step 5), although both
   own static tables. This is issue 3588's defect -- the orphan
