@@ -144,6 +144,33 @@ the master plan's future work if a periodic check of the
 PyPI path seems worth adding later — a nightly would be the
 natural home.
 
+### Carried over from the phase 3 review
+
+**shellcheck over `demo/` has no CI enforcement.** Phase 3
+extended the pre-commit hook to `^(tools|demo)/`, which is
+the right scope, but `grep -rn pre-commit .github/workflows
+tox.ini` shows pre-commit is never invoked by any workflow or
+tox environment -- the only hits are comments in
+`pr-address-comments.yml` explaining why it is deliberately
+skipped there. So the demo's four shell scripts are checked
+only on machines where a developer installed the hooks.
+
+This phase should close that, and it is the natural owner
+because it is already adding the lane that runs the demo.
+Either add a shellcheck step to the new lane covering
+`tools/` and `demo/`, or add a `tox -e shellcheck`
+environment and call it from `sanity_checks`. Prefer the
+former: `sanity_checks` is a gate job feeding a required
+check, and `docs/testing.md` is the authority on what may
+change there.
+
+**A cheap smoke check ahead of the full lane.**
+`docker compose config` validates the compose schema and
+`docker compose build` catches Dockerfile syntax, both in
+seconds and without bringing anything up. Worth running as
+the lane's first step so a schema typo fails fast rather
+than after a multi-minute image build and stack start.
+
 ## Execution
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |

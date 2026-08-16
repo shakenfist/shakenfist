@@ -312,6 +312,18 @@ a form, a wrong password, the theme toggle, logout -- still need a
 browser against a running kerbside, or a hand-check of the relevant
 `fetch` calls.
 
+One of those `fetch` calls is worth flagging in advance: a terminate
+click (`templates/includes/two-step-terminate.html`) fires a JSON
+POST carrying an `X-CSRF-TOKEN` header, read from the non-HttpOnly
+`csrf_access_token` cookie, because flask-jwt-extended requires the
+double-submit header on cookie-authenticated POSTs. The JWT cookie
+is also set `SameSite=Lax`. If a live terminate against a running
+kerbside returns an unexpected 401, check for that header before
+suspecting the JWT itself -- a missing or stale cookie is the usual
+cause. `Authorization: Bearer` callers, such as the CI drivers under
+`tools/`, never hit this check; flask-jwt-extended only applies CSRF
+protection to cookie-borne tokens.
+
 ## Building the Rust proxy
 
 The Rust SPICE proxy lives in `rust/kerbside-proxy/` (its own crate;

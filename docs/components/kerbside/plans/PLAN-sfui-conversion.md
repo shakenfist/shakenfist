@@ -213,12 +213,27 @@ All five were decided by the operator on 2026-08-08:
    Issue #133 documents the CSRF exposure: terminate
    actions are GET, and flask-jwt-extended's cookie CSRF
    protection does not cover GET. **Decided: yes, convert
-   them** (phase 8): browser actions become POST (forms or
-   `fetch` with the CSRF double-submit header), the JSON
-   API moves to POST with it, and the CI lane scripts
-   (`tools/direct-qemu/verify-terminate-live.sh`,
-   `lane-up.sh`) plus the tempest plugin and any docs
-   examples are updated in the same phase. Closes #133.
+   them** (phase 8): browser actions become POST (`fetch`
+   with the CSRF double-submit header), the JSON API moves
+   to POST with it, and the out-of-browser callers plus any
+   docs examples are updated in the same phase. Closes
+   #133.
+
+   **Corrected in phase 8 planning**, against the tree at
+   `aa7e5da`: the callers are
+   `tools/direct-qemu/verify-terminate-live.sh`,
+   `tools/sf-e2e/drive-happy-path.py:253` and
+   `tools/ovirt-e2e/drive-console.py:494` — the latter two
+   were missing from this list. `lane-up.sh` only mints the
+   JWT and contains no terminate call, and the tempest
+   plugin never touches these endpoints; both were named
+   here in error. Forms were dropped as an option because
+   `JWT_CSRF_CHECK_FORM` defaults to `False`. Issue #133
+   also covers a *third* destructive GET this phase does
+   not convert — `ConsolesProxyVirtViewer` writes a ticket
+   and mints a token while returning a `.vv` file — which
+   is mitigated by a `SameSite=Lax` cookie and tracked
+   separately as #319.
 5. **Confirmation on terminate?** **Decided: a lightweight
    two-step** ("Terminate → Confirm?" state on the button
    itself) rather than a modal; it fixes the unconfirmed
@@ -242,7 +257,7 @@ locally-running kerbside.
 | 5. Consoles page | PLAN-sfui-conversion-phase-05-consoles.md | Done |
 | 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Done |
 | 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Done |
-| 8. Terminate actions to POST (#133) | PLAN-sfui-conversion-phase-08-terminate-post.md | Not started |
+| 8. Terminate actions to POST (#133) | PLAN-sfui-conversion-phase-08-terminate-post.md | Done |
 | 9. Teardown, docs and issue closure | PLAN-sfui-conversion-phase-09-teardown.md | Not started |
 
 Phase notes, dependencies and recommended planning effort:
@@ -348,8 +363,11 @@ Phase notes, dependencies and recommended planning effort:
    an armed terminate button entirely); the phase 6 stable
    ids are what make morphdom match the right elements.
 8. **Terminate actions to POST** (plan at high effort).
-   Routes, templates, CSRF double-submit wiring, CI lane
-   scripts, tempest plugin, docs; closes #133.
+   Routes, templates, CSRF double-submit wiring, the three
+   out-of-browser callers, docs; closes #133. See the
+   correction under open question 4: not the tempest
+   plugin, not `lane-up.sh`, and the `.vv` ticket write is
+   mitigated rather than converted (#319).
 9. **Teardown, docs and issue closure** (plan at medium
    effort). Delete the old `base.html` (renaming
    `base-sfui.html` into place), Bootstrap (all 40+ files),
@@ -614,7 +632,13 @@ issues going in:
 * #244 — the admin UI rewrite/style pass: resolved by this
   plan as a whole.
 * #133 — destructive admin actions on GET (blind CSRF):
-  fixed by phase 8.
+  fixed by phase 8 for both terminate routes, which are now
+  POST behind the `X-CSRF-TOKEN` double submit. The third
+  destructive GET it names, the `.vv` ticket write, cannot
+  become a POST without replacing a browser-native download
+  on the console handoff path; it is mitigated by the
+  `SameSite=Lax` cookie phase 8 sets, and its residual is
+  #319.
 * The markup defect catalogue in the Situation section
   (unclosed `<tr>`s, `</span>` closing a `<p>`, `<font>`,
   duplicate `id="data"`, dead Bootstrap 4 utilities, the

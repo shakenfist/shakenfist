@@ -234,7 +234,7 @@ binary through `find_proxy_bin()` for the same reason.
 ### Live termination
 
 `verify-terminate-live.sh` (Rust leg only) runs on an isolated lane:
-it calls the REST terminate endpoint and asserts the in-flight
+it POSTs the REST terminate endpoint and asserts the in-flight
 connection drops, via the proxy log line `session terminated by
 control plane`. This exercises the DB→`ProxyControl` bridge end to
 end rather than the mock.
