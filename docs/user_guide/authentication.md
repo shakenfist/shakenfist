@@ -40,8 +40,14 @@ If your administrator asked Shaken Fist to generate your key rather than
 choosing one, it will look like this:
 
 ```
-sfk_QKLZzvTtHM8fVc7XmoVe5ohIorW9Se6JDMUCWH
+sfk_e57SPWpK3JGmyhuYLrcUtSwhtdJlONiXzzzzzz
 ```
+
+That example is deliberately not a usable key. The last six characters
+are a checksum, and `zzzzzz` is a larger number than any checksum the
+cluster can produce, so the example fails validation before anything
+tries it. A real key ends in six characters which look as random as the
+rest of it.
 
 The `sfk_` prefix is there so that a leaked credential is easy to find --
 in a log file, in a repository, or by an automated secret scanner. Treat it
