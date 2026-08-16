@@ -40,6 +40,7 @@ Version history:
 11. [Error model](#error-model)
 12. [Versioning](#versioning)
 13. [End-to-end worked example](#end-to-end-worked-example)
+14. [Implementation](#implementation)
 
 ---
 
@@ -1044,3 +1045,111 @@ Key observations from this transcript:
   original `paste` request.
 - The connection can be torn down by either side simply closing the
   socket. No explicit disconnect verb is required.
+
+---
+
+## Implementation
+
+Everything above this point is the contract. This section describes
+how ryll implements it, and is not binding on other implementations.
+
+The control socket is exposed by headless mode via the
+`--control-socket <path>` CLI flag. The flag is only valid when
+`--headless` is also present; combining it with the GUI or `--web`
+flag is a CLI error caught before the SPICE session starts.
+
+**Module layout.** The control surface lives entirely under
+`shakenfist-spice-renderer/src/control/`:
+
+| File | Role |
+|------|------|
+| `mod.rs` | Public re-exports: `Server`, `StatusProvider` |
+| `protocol.rs` | Wire-level types: `Request`, `Response`, `Event`, verb params and result structs, serialisation helpers |
+| `server.rs` | `Server::run` — the tokio task that binds the socket, accepts one client at a time, and dispatches verbs |
+
+**Runtime shape.** `Server::run` binds a `tokio::net::UnixListener`
+at the supplied path with file mode `0600` (owner read/write only).
+File permissions are the sole access-control mechanism; no
+authentication is performed on the wire. Exactly one client is
+accepted at a time; a second connection attempt while a client is
+active receives a `{"ok": false, "error": {"code": "busy", ...}}`
+line and is immediately closed.
+
+**Architectural integration.**
+
+- `session.rs` fans the existing per-channel event mpsc into a
+  `tokio::sync::broadcast::Sender<ChannelEvent>`. Subscribers on
+  this broadcast bus include `HeadlessStats`, the headless-mode
+  `SurfaceMirror`-apply task, and the control server's per-client
+  event-translator task.
+- The control server holds `Arc<tokio::sync::Mutex<SurfaceMirror>>`
+  for two purposes: answering `screenshot` requests synchronously
+  (locks, snapshots pixel buffer, encodes) and enumerating live
+  surfaces in the `status` verb response.
+- The control server is given an `Arc<dyn StatusProvider>` so
+  `status` can query SPICE-connection state and agent presence
+  without coupling `server.rs` to `session.rs` internals.
+- Per-client outbound events use a two-task pipeline: an
+  event-translator task (subscribes to the broadcast bus, filters by
+  the client's subscription set, converts `ChannelEvent` to JSON)
+  feeds a 256-slot mpsc into a writer task (drains the mpsc, writes
+  newline-terminated lines to the socket). When the mpsc is full, the
+  translator drops the **oldest** queued events and increments a
+  drop counter; when the queue next drains, a single `dropped` event
+  is emitted with the cumulative count. The SPICE session is never
+  back-pressured by a slow control-socket client. This is the
+  mechanism behind the [Backpressure](#backpressure) contract above.
+
+**How the v1.1 events are produced.** Both sit on top of the v1.0
+verb/event surface, implemented by extending `translate_event` (the
+per-client broadcast filter) — no new `ChannelEvent` variants were
+required on the SPICE side, and no new module on the control-server
+side:
+
+- `surface_drawn` fires once per display draw command
+  (`ImageReady`, `ImageReadyChroma`, `ImageReadyAlpha`,
+  `FillRect`, `CopyBits`, `Invert`).  Renderer-internal
+  `produced_at_secs` flows through unchanged; the event carries
+  a fresh `wallclock_us` captured at translation time so cross-
+  process consumers (the kerbside loadtest orchestrator) can
+  compute keypress-to-screen latency against wallclock-recorded
+  keypress times.
+- `digest_updated` lives behind the `digest-decode` Cargo
+  feature.  Off in production builds.  When enabled,
+  `crate::digest::run_digest_poller` ticks every 100 ms,
+  snapshots the primary surface RGBA, runs
+  `shakenfist-visual-digest::decode_qr_rgba` followed by
+  `decode`, deduplicates by `frame_counter`, and broadcasts a
+  `ChannelEvent::DigestUpdated`.  The translator converts that
+  to a `digest_updated` wire event.  The hello / subscribe
+  paths both gate on `protocol::supported_events()`, which only
+  advertises `digest_updated` when the feature is on.
+
+Both events are pushed to subscribers via the same broadcast
+bus / per-client mpsc / drop-oldest backpressure path the v1.0
+events use.
+
+**Future work.** The following items are explicitly out of
+scope for v1 and will be addressed by follow-up plans:
+
+- Mouse-click and pointer-move verbs (requires Sextant pointer
+  collector, which is marked deferred in its own `ARCHITECTURE.md`).
+- USB-redirection and WebDAV verbs.
+- Authentication or encryption on the socket beyond Unix file
+  permissions.
+- Multi-client concurrency (the v1 single-client model is
+  intentional and adequate for the harness use-case).
+- Out-of-band (non-JSON) screenshot transport for low-latency
+  digest-assertion loops.
+- Synchronous paste (the async model was chosen deliberately; a
+  synchronous convenience wrapper belongs in the client, not the
+  server).
+- Rate-limit knobs for `digest_updated` (currently a fixed
+  100 ms tick; add a `--digest-min-interval-ms` if the Sextant
+  scenarios produce too many events for slow consumers).
+- Cross-platform CI matrix for the new feature combinations;
+  only Linux is verified today.
+
+The design rationale for the control socket and the v1.1
+additions lives in the kerbside test-harness master plan,
+`shakenfist/kerbside/docs/plans/PLAN-test-harness.md`.

@@ -59,8 +59,8 @@ This document records the baseline; it does not propose fixes. There
 is no standing gap-closure plan — gaps get closed by mode-specific
 work (the [web frontend plan](/components/ryll/plans/PLAN-web-frontend/) closed the
 Web column's MVP set; the control socket work gave headless an
-interactive driving surface). Last full audit: post-Phase-8 web
-frontend sweep; control-socket cells refreshed 2026-07-30.
+interactive driving surface). Last full audit: the web frontend
+sweep; control-socket cells refreshed 2026-07-30.
 
 ## Parity matrix
 
@@ -83,22 +83,22 @@ frontend sweep; control-socket cells refreshed 2026-07-30.
 | SPICE streaming / MJPEG | available | partial (decoded messages counted as frames, not rendered) | available (inherited) |
 | Display capabilities advertisement (COMPOSITE, MONITORS_CONFIG, etc.) | available | available | available |
 | Window auto-resize to surface size | available | n/a — intrinsic (no window; resize channel exists but resize_tx is never connected to a window, `ryll/src/app.rs:3391`) | n/a — intrinsic (browser viewport is user-controlled) |
-| Obey guest size hints toggle (`--no-obey-guest-size` / hamburger toggle) | available | n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, `ryll/src/main.rs:195`) | missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is Phase 5a of PLAN-web-frontend.md) |
+| Obey guest size hints toggle (`--no-obey-guest-size` / hamburger toggle) | available | n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, `ryll/src/main.rs:195`) | missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned) |
 | Guest resolution follows viewport (`VDAgentMonitorsConfig`) | available | missing (`ryll/src/app.rs:3391` — `_resize_tx` is created but never used to drive resize logic in headless) | available |
 | **Cursor** | | | |
-| Server cursor rendering (SET/INIT) | available | missing (`ryll/src/app.rs:3563` — `CursorChannel` runs, events arrive, but headless event loop has no handler for `CursorImage`/`CursorPos` events) | available (MVP; datachannel CSS overlay, Phase 5b) |
+| Server cursor rendering (SET/INIT) | available | missing (`ryll/src/app.rs:3563` — `CursorChannel` runs, events arrive, but headless event loop has no handler for `CursorImage`/`CursorPos` events) | available (MVP; datachannel CSS overlay) |
 | Cursor position tracking | available | missing (same as above) | available (MVP) |
 | Cursor hide/show | available | missing (same as above) | available (MVP) |
 | Default arrow fallback cursor | available | n/a — intrinsic (no display) | available |
 | **Audio** | | | |
-| Audio playback (PCM and Opus decoding) | available | partial (`ryll/src/channels/playback.rs:156-292` — `PlaybackChannel` connects and decodes, but spawns a cpal thread that will fail silently if no audio device is present; no headless-safe "discard" path exists) | available (MVP; Opus passthrough preferred, PCM→Opus fallback, Phase 5c) |
+| Audio playback (PCM and Opus decoding) | available | partial (`ryll/src/channels/playback.rs:156-292` — `PlaybackChannel` connects and decodes, but spawns a cpal thread that will fail silently if no audio device is present; no headless-safe "discard" path exists) | available (MVP; Opus passthrough preferred, PCM→Opus fallback) |
 | Volume control (slider + mute) | available | missing (`ryll/src/app.rs:1843-1856` — `VolumeControl` Arc is wired in but no CLI flag, stdout interface, or control-socket verb exposes it in headless) | missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP) |
 | Audio volume/mute persisted across reconnect | available | n/a — intrinsic (no GUI; VolumeControl is re-created on reconnect anyway) | missing (out of MVP scope) |
 | **Keyboard / Mouse Input** | | | |
-| Keyboard input (key down/up, scancodes) | available | available (via the control socket `send_key` verb — down/up/press with AT-set-1 scancodes; without `--control-socket` only cadence and `--paste-text` generate input) | available (MVP; browser-side scancode table, Phase 5a) |
-| Mouse input (position and buttons) | available | missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless) | available (MVP; Phase 5a) |
+| Keyboard input (key down/up, scancodes) | available | available (via the control socket `send_key` verb — down/up/press with AT-set-1 scancodes; without `--control-socket` only cadence and `--paste-text` generate input) | available (MVP; browser-side scancode table) |
+| Mouse input (position and buttons) | available | missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless) | available (MVP) |
 | Mouse mode negotiation (CLIENT/SERVER) | available | available (negotiation runs in `MainChannel` regardless of mode) | available (absolute coordinates only in MVP without Pointer Lock; see PLAN-web-frontend.md §Resolutions §9) |
-| Extended key prefix (E0 for nav cluster) | available | available (the control socket `send_key` verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space) | available (browser shell builds its own AT table; Phase 5a) |
+| Extended key prefix (E0 for nav cluster) | available | available (the control socket `send_key` verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space) | available (browser shell builds its own AT table) |
 | Modifier state tracking (Ctrl/Shift/Alt) | available | partial (`ryll/src/channels/inputs.rs:77-82` — tracked internally but only used by paste state machine; cadence does not restore modifiers) | available (MVP) |
 | **Cadence mode** | | | |
 | Cadence mode (`--cadence`) | available | available | missing (out of MVP scope; no test-automation use case in browser) |
@@ -154,11 +154,11 @@ frontend sweep; control-socket cells refreshed 2026-07-30.
 | SPICE_MSG_NOTIFY surfacing | available | partial (stored in notification store; printed nowhere in headless event loop unless captured by `--pedantic`) | missing (out of MVP scope) |
 | Gap observer notification feed | available | partial (registered in headless at `ryll/src/app.rs:3431`; notifications accumulate in store but are never printed to stdout) | missing (out of MVP scope) |
 | **Reconnect / Lifecycle** | | | |
-| Reconnect on disconnect (Reconnect button) | available | n/a — intrinsic (no GUI; headless exits when main channel disconnects) | available (Phase 6 complete; SPICE session held while PeerConnection is dead; browser auto-reconnects with 1 s/2 s/4 s/8 s/16 s backoff, max 5 attempts then a manual button) |
+| Reconnect on disconnect (Reconnect button) | available | n/a — intrinsic (no GUI; headless exits when main channel disconnects) | available (SPICE session held while PeerConnection is dead; browser auto-reconnects with 1 s/2 s/4 s/8 s/16 s backoff, max 5 attempts then a manual button) |
 | State preserved across reconnect (disks, share dir, paste toggle) | available | n/a — intrinsic (headless does not reconnect) | partial (SPICE session continuity is preserved — the bridge is reaped and rebuilt, leaving the SPICE channels untouched; per-tab UI state is browser-managed) |
 | Notification history preserved across reconnect | available | n/a — intrinsic | n/a — intrinsic (browser tab holds its own page state) |
 | Disconnect dialog | available | n/a — intrinsic (no GUI) | missing (not in MVP scope; browser tab closure is the UX) |
-| Graceful Ctrl+C shutdown | available | available | available (Phase 6 complete; SIGTERM/Ctrl-C drains axum then explicitly closes the active bridge so DTLS/SRTP tears down cleanly before the process exits) |
+| Graceful Ctrl+C shutdown | available | available | available (SIGTERM/Ctrl-C drains axum then explicitly closes the active bridge so DTLS/SRTP tears down cleanly before the process exits) |
 | Cancel superseded connection attempt | available | n/a — intrinsic (headless does not reconnect) | n/a — intrinsic (single-session MVP) |
 | **Window / Session Persistence** | | | |
 | Window size/position persistence (eframe persistence) | available | n/a — intrinsic (no window) | n/a — intrinsic (browser manages its own viewport) |
@@ -175,15 +175,15 @@ frontend sweep; control-socket cells refreshed 2026-07-30.
 | VDAgent connection status (agent_connected flag) | available | available (AgentConnected event handled and logged; also a control-socket event and `status` field) | available (wired through same channel path) |
 | TCP keepalive on all channel sockets | available | available | available (inherited from SpiceClient) |
 | **Authentication / Session Token** | | | |
-| Per-launch URL token (web mode only) | n/a — intrinsic (no HTTP server) | n/a — intrinsic (no HTTP server) | available (MVP; random 32-byte token printed to stdout, Phase 4) |
-| TLS for browser-facing endpoint | n/a — intrinsic | n/a — intrinsic | available (Phase 8a; `--web-tls-cert` / `--web-tls-key` flags; axum-server with rustls) |
+| Per-launch URL token (web mode only) | n/a — intrinsic (no HTTP server) | n/a — intrinsic (no HTTP server) | available (MVP; random 32-byte token printed to stdout) |
+| TLS for browser-facing endpoint | n/a — intrinsic | n/a — intrinsic | available (`--web-tls-cert` / `--web-tls-key` flags; axum-server with rustls) |
 | **Web frontend (--web mode)** | | | |
-| HTTP server with per-launch URL token | n/a — intrinsic | n/a — intrinsic | available (Phase 4; `ryll/src/web/server.rs`) |
-| Embedded browser shell (HTML/JS/CSS via include_bytes!) | n/a — intrinsic | n/a — intrinsic | available (Phase 4) |
-| WebRTC SDP signalling endpoint (`POST /offer`) | n/a — intrinsic | n/a — intrinsic | available (Phase 4) |
-| Synthetic video stream over WebRTC (test pattern) | n/a — intrinsic | n/a — intrinsic | available (Phase 4; SyntheticFrameSource) |
-| Synthetic audio stream over WebRTC (440 Hz tone) | n/a — intrinsic | n/a — intrinsic | available (Phase 4) |
-| Real SPICE display frames over WebRTC | available (egui paint loop) | n/a — intrinsic (no encoder driven from real frames) | available (Phase 5b; RealFrameSource over SurfaceMirror) |
+| HTTP server with per-launch URL token | n/a — intrinsic | n/a — intrinsic | available (`ryll/src/web/server.rs`) |
+| Embedded browser shell (HTML/JS/CSS via include_bytes!) | n/a — intrinsic | n/a — intrinsic | available |
+| WebRTC SDP signalling endpoint (`POST /offer`) | n/a — intrinsic | n/a — intrinsic | available |
+| Synthetic video stream over WebRTC (test pattern) | n/a — intrinsic | n/a — intrinsic | available (SyntheticFrameSource) |
+| Synthetic audio stream over WebRTC (440 Hz tone) | n/a — intrinsic | n/a — intrinsic | available |
+| Real SPICE display frames over WebRTC | available (egui paint loop) | n/a — intrinsic (no encoder driven from real frames) | available (RealFrameSource over SurfaceMirror) |
 | Real SPICE audio over WebRTC (Opus passthrough) | available (cpal sink) | n/a — intrinsic (no audio sink) | available (Opus path; PCM-only servers fall back to silent audio with a warn) |
-| Browser-side keyboard/mouse input over datachannel | available (egui inputs) | n/a — intrinsic (no input device) | available (Phase 5c) |
-| Browser-side cursor overlay (datachannel) | available (egui overlay) | n/a — intrinsic | available (Phase 5d) |
+| Browser-side keyboard/mouse input over datachannel | available (egui inputs) | n/a — intrinsic (no input device) | available |
+| Browser-side cursor overlay (datachannel) | available (egui overlay) | n/a — intrinsic | available |

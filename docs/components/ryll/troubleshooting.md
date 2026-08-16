@@ -489,9 +489,8 @@ changed while you were typing the description.
 When a Display bug report is submitted because video appears to
 stutter or fall behind, these fields in `channel-state.json` tell
 you which part of the pipeline was slow without re-running the
-session. They were added by the master plan
-[`PLAN-video-keeping-up.md`](/components/ryll/../docs/plans/PLAN-video-keeping-up/)
-phase 1.
+session. They come from the master plan
+[`PLAN-video-keeping-up.md`](/components/ryll/../docs/plans/PLAN-video-keeping-up/).
 
 - `decode_total_count`, `decode_failed_count`,
   `decode_from_cache_count` — cumulative decode counters since
@@ -523,7 +522,7 @@ phase 1.
   value implicates disk speed (or anything else slowing the
   writer task) rather than decode CPU or socket-read pacing;
   the rest of the SPICE pipeline keeps running because the
-  enqueue is non-blocking. Added in phase 2.
+  enqueue is non-blocking.
 
 In `session.json` (a sibling artefact in the same zip):
 
@@ -533,7 +532,6 @@ In `session.json` (a sibling artefact in the same zip):
   is active. A non-zero value implicates encoder CPU (or MP4
   write speed) rather than the SPICE pipeline; the egui frame
   loop stays responsive because the enqueue is non-blocking.
-  Added in phase 3.
 - `image_ready_lag_recent_{min,max,mean}_us` and
   `display_mark_lag_recent_{min,max,mean}_us` — microseconds
   spent waiting in the renderer→app mpsc queue, computed
@@ -546,11 +544,10 @@ In `session.json` (a sibling artefact in the same zip):
   long-running synchronous operation inside `App::update`
   starving the event drain. `max` is the most informative
   single number; within-batch samples are correlated so
-  `mean` is biased by batch size. Added in phase 4.
+  `mean` is biased by batch size.
 
-**MP4 finalisation note (phase 3 trade-off).** With phase 3
-the MP4 moov atom is written by the encoder task after the
-sender drops, not synchronously by `CaptureSession::close()`.
+**MP4 finalisation trade-off.** The MP4 moov atom is written
+by the encoder task after the sender drops, not synchronously by `CaptureSession::close()`.
 In practice the encoder task finalises within milliseconds of
 close, but a bug report assembled in a very short window
 after a disconnect — or in the SIGINT abrupt-shutdown path —
@@ -741,8 +738,8 @@ The rolling cap is enforced by age (oldest files pruned first), so disk usage
 stays bounded. At the default cap of 20 zips with typical sizes (~1 MiB each),
 you'll use ~20 MiB total.
 
-See the [README section on auto-snapshot mode](/components/ryll/../README/#auto-snapshot-mode)
-for more details on what each field means.
+See [auto-snapshot mode](/components/ryll/diagnostics/#auto-snapshot-mode---auto-snapshot-interval)
+in the diagnostics guide for more details on what each field means.
 
 ## Display image cache pressure
 
@@ -810,16 +807,16 @@ the client to remember (`IMAGE_FLAGS_CACHE_ME` on the originating
 Glz/ZlibGlz payload). The shared GLZ dictionary holds those decoded
 entries client-side so subsequent back-references resolve.
 
-Until phase 12E the GLZ dictionary was an unbounded
+The GLZ dictionary was originally an unbounded
 `Mutex<HashMap<u64, Vec<u8>>>` — entries were appended on every
 `CACHE_ME` payload and removed only on explicit server-driven
 `inval_*` messages. Workloads where the server never sent `inval_*`
 (notably the full-frame ZlibGlzRgb video fallback observed in
 sessions 003a and 004d-g) leaked memory at roughly 30 MiB/s and drove
-the multi-GiB RSS runaway that originally motivated phase 12. This
+the multi-GiB RSS runaway that motivated capping it. This
 also produced one of the more confusing snapshot readings of the
 project: a 5 GiB `image_cache_bytes` value against a 256 MiB cap,
-because the pre-12F snapshot summed the two caches together (see the
+because the snapshot then summed the two caches together (see the
 schema-change note below).
 
 The `--glz-dictionary-cap-mib` flag (default 256 MiB; see
@@ -827,24 +824,26 @@ The `--glz-dictionary-cap-mib` flag (default 256 MiB; see
 same byte-capped LRU as the image cache: when total entry bytes exceed
 the cap, oldest entries are evicted until the cap is satisfied.
 
-### Schema change (phase 12F)
+### Schema change: caches reported separately
 
-Prior to phase 12F, `image_cache_bytes`, `image_cache_entries`, and
-`image_cache_ids` summed the renderer's `BoundedImageCache` together
+Bug reports written by older ryll builds summed two caches into one
+set of fields: `image_cache_bytes`, `image_cache_entries`, and
+`image_cache_ids` covered the renderer's `BoundedImageCache` together
 with the SPICE `GlzDictionary` decompression cache. This made bug
 reports ambiguous: a 5 GiB `image_cache_bytes` reading against a
 256 MiB cap (as seen in session 003a) actually came from the GLZ
 dictionary, not the image cache, but nothing in the snapshot
 distinguished the two.
 
-After 12F, the `image_cache_*` fields reflect only the
+Current builds report the two separately: the `image_cache_*`
+fields reflect only the
 `BoundedImageCache` (CACHE_ME-flagged decoded RGBA frames). The GLZ
 dictionary's state is reported separately under the new
 `glz_dictionary_*` fields described below. As a result,
-`image_cache_bytes` in a bug report from a 12F-or-later ryll build
-will be roughly an order of magnitude smaller than the same field
-from a pre-12F bug report under an equivalent workload; if you need
-the pre-12F sum, add `image_cache_bytes + glz_dictionary_bytes`.
+`image_cache_bytes` in a current bug report will be roughly an order
+of magnitude smaller than the same field in an older report under an
+equivalent workload; to compare against an older report, add
+`image_cache_bytes + glz_dictionary_bytes`.
 
 ### Interpreting GLZ dictionary statistics in a bug report
 

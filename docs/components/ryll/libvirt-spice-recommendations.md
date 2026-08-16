@@ -103,9 +103,9 @@ re-engagement. So:
 - **VRAM does affect the OOM rate**, which appears to affect
   stream *survival* and *re-engagement* indirectly. We have
   not yet measured whether bumping `vram` reduces OOM
-  frequency enough to keep streams alive (phase 13B of
-  `PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md`
-  will quantify this).
+  frequency enough to keep streams alive; see
+  [`PLAN-stream-caps-and-flap.md`](/components/ryll/plans/PLAN-stream-caps-and-flap/)
+  for the work that will quantify this.
 
 Net: don't undersize `vram` on QXL guests intended for
 video workloads, but don't expect a `vram` bump alone to be
@@ -118,7 +118,8 @@ fallback and use both client-side caps — `--image-cache-cap-mib`
 for the renderer's decoded-RGBA cache and `--glz-dictionary-cap-mib`
 for the GLZ decompression dictionary — to keep the resulting
 `CACHE_ME` pressure bounded. The GLZ dictionary in particular was
-the dominant RSS contributor in this failure mode pre-phase-12E;
+the dominant RSS contributor in this failure mode before it was
+capped;
 see [Glz dictionary pressure](/components/ryll/troubleshooting/#glz-dictionary-pressure)
 in the troubleshooting guide.
 
@@ -159,8 +160,7 @@ Silicon).
 `auto_lz` switches the server's default to plain LZ, which is much
 faster to decode (~10–20 ms for the same payload) at the cost of a
 slightly worse compression ratio. Combined with ryll's advertised
-`LZ4_COMPRESSION` capability (phase 2 of the stream-caps work), the
-server will pick LZ4 — even faster — for any frames that benefit
+`LZ4_COMPRESSION` capability, the server will pick LZ4 — even faster — for any frames that benefit
 from it.
 
 If you actually need glz (e.g. you are bandwidth-constrained over a
@@ -179,8 +179,10 @@ Older libvirt templates often include:
 
 The `always` setting forces the server's "wan" code path on every
 image, regardless of what the client advertises. This is what causes
-ryll's `LZ4_COMPRESSION` and (once phase 7 lands) `PREF_COMPRESSION`
-hints to be silently ignored — the server has been told "I don't care
+ryll's `LZ4_COMPRESSION` hints (and the `PREF_COMPRESSION` hints
+planned in
+[`PLAN-stream-caps-and-flap.md`](/components/ryll/plans/PLAN-stream-caps-and-flap/))
+to be silently ignored — the server has been told "I don't care
 what the client wants, always use this."
 
 Use `auto` instead so the server picks dynamically based on the
@@ -205,7 +207,7 @@ extremes are wrong for typical desktop workloads:
   for everything else. This is the right answer for almost every
   workload.
 
-As of ryll Phase 6, both MJPEG and H.264 streams are decoded client-side.
+Ryll decodes both MJPEG and H.264 streams client-side.
 For sustained video playback with `streaming-video=filter`, the server will
 prefer H.264 when available, which is typically more bandwidth-efficient than
 MJPEG and results in cheaper sustained-video transmission.
@@ -280,8 +282,9 @@ in the guest (`apt install spice-vdagent` on Debian/Ubuntu;
   guest-side resolution change) does not work.
 
 Ryll's bug-report `MainSnapshot::agent_request_count` and related
-fields (phase 9 of the stream-caps work, when it lands) report
-whether the agent is responding to probes. A `0` agent reply count
+fields (planned in
+[`PLAN-stream-caps-and-flap.md`](/components/ryll/plans/PLAN-stream-caps-and-flap/))
+report whether the agent is responding to probes. A `0` agent reply count
 in a bug report usually means `spice-vdagent` is not installed or
 not running.
 
@@ -457,8 +460,10 @@ The server makes the encoding decisions. Ryll can:
 
 - Advertise capabilities (`LZ4_COMPRESSION`, `STREAM_REPORT`, etc.)
   so the server *can* use efficient paths.
-- Send preference hints (`PREF_COMPRESSION`, `PREF_VIDEO_CODEC_TYPE`
-  — phase 7 of the stream-caps work) to bias server choices.
+- Send preference hints (`PREF_COMPRESSION`, `PREF_VIDEO_CODEC_TYPE`,
+  planned in
+  [`PLAN-stream-caps-and-flap.md`](/components/ryll/plans/PLAN-stream-caps-and-flap/))
+  to bias server choices.
 - Decode whatever arrives as fast as the host hardware allows.
 
 But ryll cannot override a server config that says

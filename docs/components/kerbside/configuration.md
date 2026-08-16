@@ -2,8 +2,9 @@
 
 Kerbside is configured via environment variables (prefixed with `KERBSIDE_`) or
 an INI configuration file at `/etc/kerbside/kerbside.ini`. Environment variables
-take priority over INI file settings. See `etc/kerbside.conf.example` for a
-complete configuration example.
+take priority over INI file settings. That path is hardcoded as `INI_PATH` in
+`kerbside/config.py`; there is no setting which relocates it. See
+`etc/kerbside.conf.example` for a complete configuration example.
 
 **Note**: This documentation should match `kerbside/config.py`. If you find
 discrepancies, the source code in `config.py` is authoritative.

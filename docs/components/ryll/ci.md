@@ -71,7 +71,7 @@ aarch64-specific. The msvc triple cannot be checked from Linux
 without an MSVC toolchain, because `cargo check` still runs
 build scripts and `aws-lc-sys` compiles vendored BoringSSL C for
 the target. See
-[PLAN-two-stage-ci-phase-02-windows-check.md](/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/).
+[PLAN-two-stage-ci.md](/components/ryll/plans/PLAN-two-stage-ci/).
 
 ## The three gates
 
@@ -281,6 +281,58 @@ The self-hosted fleet runs `MAX_WORKERS = 6` across every
 Shaken Fist repository, and the `l` pool is its scarcest
 resource: without a concurrency group a superseded run can hold
 an `l` slot for its full 45-minute timeout while its replacement
-queues behind it. The convention, including the different group
-key needed for comment-triggered workflows, is documented in
-[AGENTS.md](https://github.com/shakenfist/ryll/blob/develop/AGENTS.md).
+queues behind it.
+
+Use the job-level form rather than the workflow-level one, so
+that unrelated jobs in the same workflow do not cancel each
+other:
+
+```yaml
+jobs:
+  my-job:
+    runs-on: [self-hosted, vm, debian-12, s]
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-my-job
+      cancel-in-progress: true
+```
+
+Comment-triggered workflows (`pr-retest`, `pr-re-review`,
+`pr-address-comments`) need a different group key:
+
+```yaml
+      group: pr-retest-${{ github.event.issue.number }}
+```
+
+`github.ref` points at the default branch for `issue_comment`
+events, so it does not distinguish one pull request from
+another. The PR number does.
+
+Scheduled, push-to-default, and release workflows must **not**
+enable `cancel-in-progress`. Cancelling a release mid-publish,
+or a renovate run mid-PR-creation, leaves partial state behind.
+
+## Supply-chain policy
+
+The scanner jobs above enforce policy that lives in files at the
+repository root, and changing that policy has rules the files
+themselves do not state:
+
+- **Ignoring a RustSec advisory** requires adding the advisory
+  ID to *both* `deny.toml` and `.cargo/audit.toml`, with an
+  inline comment on each entry giving the rationale. Both
+  scanners run on every pull request and both must pass, so the
+  two ignore lists have to stay in sync — editing only
+  `deny.toml` produces a red `cargo audit` job. Ignores are debt
+  and should not accumulate silently.
+- **Allowing a new licence** means adding a permissive SPDX
+  identifier to `deny.toml`'s `licenses.allow` array. The
+  `licenses.exceptions` array is for a narrower case: a single
+  crate declaring a licence that is not on the general allowlist,
+  scoped so the grant does not apply repository-wide. The
+  `epaint_default_fonts` / `Ubuntu-font-1.0` entry is the
+  canonical example.
+- **Suppressing a gitleaks false positive** goes in
+  `.gitleaksignore`, with a comment explaining the pattern and
+  why it is safe. ryll runs the upstream gitleaks binary
+  directly rather than `gitleaks-action`, which requires a paid
+  licence for organisation repositories.

@@ -3,7 +3,7 @@
 This is the detailed feature catalogue for ryll. For a quick overview
 see the [README](https://github.com/shakenfist/ryll/blob/develop/README.md);
 for how each subsystem works internally see
-[ARCHITECTURE.md](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md).
+[docs/index.md](/components/ryll/index/).
 
 ## Rendering and display
 
@@ -36,7 +36,7 @@ for how each subsystem works internally see
 ## Connectivity and sessions
 
 - **TLS support** - Secure connections with inline CA certificates from .vv files.
-- **Reconnect on disconnect** - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See ARCHITECTURE.md "Reconnection" for the full lifecycle.
+- **Reconnect on disconnect** - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See [session-lifecycle.md](/components/ryll/session-lifecycle/) "Reconnection" for the full lifecycle.
 - **Ticket lifecycle handling** - Honours `delete-this-file=1` (single-use ticket: auto-reconnect suppressed) and the ryll extension key `ticket-valid-until` (expiry warning and modal) in .vv files. See [configuration.md](/components/ryll/configuration/) for the full key reference.
 - **Graceful Ctrl+C shutdown** - Cross-platform signal handling via `ctrlc` crate; the GUI and headless event loops check a flag and shut down cleanly, ensuring capture files are finalized.
 

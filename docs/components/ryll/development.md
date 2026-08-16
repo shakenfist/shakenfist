@@ -85,6 +85,28 @@ The slim test-harness binary is built with
 [control-socket-protocol.md](/components/ryll/control-socket-protocol/)
 for the `surface_drawn` and `digest_updated` event shapes.
 
+## Workspace dependency convention
+
+Every workspace crate carries `version.workspace = true`, so
+the single version in the root `Cargo.toml` is the only place
+a release bump has to happen.
+
+Dependencies between workspace crates must declare **both** a
+path and a version:
+
+```toml
+shakenfist-spice-renderer = { path = "../shakenfist-spice-renderer", version = "0.1.7" }
+```
+
+The path wins for local builds, so day-to-day development sees
+the working tree rather than a published crate. The version is
+what `cargo publish` requires — a path-only dependency cannot
+be published to crates.io. Omitting it therefore costs nothing
+until release day, and then fails the publish, which is why it
+is easy to get wrong. Bump the version alongside the workspace
+version whenever the depended-on crate is released; see
+[releasing.md](/components/ryll/releasing/).
+
 ## Debugging async hangs
 
 A set of diagnostic hooks exists for debugging tokio task hangs
@@ -225,3 +247,87 @@ still surface only in the merge tier.
   pump in the webrtc crate; `audiopus_sys` builds libopus from
   source in the devcontainer
 - **ctrlc** - Cross-platform Ctrl+C handling for graceful shutdown
+
+## Test suite specifics
+
+Beyond `make test`, a few tests are worth knowing about individually:
+
+- **Decompression unit tests** cover the LZ / GLZ / LZ4 / QUIC
+  algorithms directly.
+- **Encoder smoke test** (`shakenfist-spice-renderer/tests/encoder_smoke.rs`)
+  runs for ~3 seconds and writes `target/encoder_smoke.h264`. Run
+  `ffplay target/encoder_smoke.h264` after `make test` to visually
+  verify encoder output.
+- **WebRTC H.264 packetiser test**
+  (`shakenfist-spice-renderer/tests/webrtc_h264_smoke.rs`) verifies
+  `H264Payloader` accepts the encoder's Annex-B NAL output.
+- **Loopback integration test** (`shakenfist-spice-webrtc/tests/loopback.rs`)
+  creates two in-process `RTCPeerConnection`s and asserts video, audio
+  and datachannel all flow end to end.
+- **Control socket integration tests**
+  (`shakenfist-spice-renderer/tests/control_socket.rs`) exercise every v1
+  verb and event without a real SPICE session, using a stub
+  `StatusProvider` and an in-process broadcast channel. New verbs or
+  events should ship with a matching test here.
+- **ICE gathering soak**: `RYLL_GATHERING_SOAK=1 make test` runs the
+  20-iteration invariant-candidate-count soak in
+  `accept_offer_answer_carries_all_candidates`. Off by default because
+  exact cross-run candidate-count equality is coupled to host interface
+  churn (docker/veth appearing, IPv6 temporary addresses rotating). Run
+  it on a quiet host when touching the ICE gathering signal.
+
+Integration testing against real traffic needs a SPICE server;
+`make test-qemu` starts one locally. Headless mode is what CI uses for
+protocol-level testing.
+
+## Helper tools
+
+### Inspecting a `--capture` pcap
+
+`tools/pcap-inspect.py` is a pure-Python helper (no tshark
+or scapy dependency) for sifting through a ryll capture.
+Three subcommands:
+
+```
+tools/pcap-inspect.py opcodes   <path>                 # histogram of SPICE message types
+tools/pcap-inspect.py draw-copy <path>                 # DRAW_COPY breakdown by surface / image type
+tools/pcap-inspect.py timeline  <path> [--since-last N]  # server-side messages in order
+```
+
+Typical use: when investigating a rendering artefact,
+`opcodes` tells you whether the problem window even
+contains the draw ops you thought it did (this is how we
+established that a "static" artefact was 100% DRAW_COPY
+rather than missing draw ops); `draw-copy` narrows further
+to the image types involved; `timeline --since-last 5`
+dumps the last five seconds of traffic when the user has
+pressed F8 right after seeing the artefact.
+
+ryll's pcap files are big-endian libpcap format carrying
+synthetic TCP frames around the raw post-link SPICE
+stream. The helper handles that without any extra flags.
+
+### Smoke-testing `--web` mode
+
+`tools/web-smoke.sh` verifies that `ryll --web` starts,
+binds the HTTP server, and shuts down cleanly on SIGTERM.
+Usage:
+
+```
+tools/web-smoke.sh [path-to-ryll-binary]
+```
+
+Defaults to `target/release/ryll`; `WEB_PORT` env var
+overrides the port (default `18080`). The script creates a
+temporary stub `.vv`, launches ryll, waits 3 seconds,
+SIGTERMs, and asserts clean exit within 5 seconds. CI runs
+this in the `build-linux` job via `make web-smoke` and
+`make web-smoke-tls`, inside the devcontainer.
+
+### Example control-socket client
+
+`examples/control-socket-demo.py` is a stdlib-only Python script,
+runnable directly, demonstrating the full hello → status → subscribe
+→ send_key → paste → screenshot → disconnect sequence. It is the
+starting point for downstream test-harness drivers. The wire contract
+it implements is [`control-socket-protocol.md`](/components/ryll/control-socket-protocol/).
