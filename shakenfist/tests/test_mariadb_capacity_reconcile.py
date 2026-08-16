@@ -296,6 +296,60 @@ class DiskSpecReferenceTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, mariadb.disk_spec_virtual_gb(None))
 
 
+class ClaimUsageStatementTestCase(base.ShakenFistTestCase):
+    """_RECONCILE_CLAIM_USAGE_SQL's shape.
+
+    The behaviour these assertions stand in for is proven against a real
+    server in test_mariadb_capacity_reconcile_live.py -- a mock can not
+    show that a duplicated placement row counts once. What they do catch
+    is somebody editing the statement into a shape that quietly loses
+    one of its two load-bearing properties.
+    """
+
+    def test_placements_are_deduplicated_by_instance(self):
+        text = str(mariadb._RECONCILE_CLAIM_USAGE_SQL)
+        # A namespace quota must charge an instance once however many
+        # placement rows point at it, and a stale INSTANCE_LOCATION row
+        # left behind by a lost node is how it gets two.
+        self.assertIn('SELECT DISTINCT r.target_uuid', text)
+
+    def test_claims_without_instances_are_zeroed_not_skipped(self):
+        text = str(mariadb._RECONCILE_CLAIM_USAGE_SQL)
+        # An inner join would leave a claim whose namespace has no
+        # instances at whatever its counters last were, forever.
+        self.assertIn('UPDATE namespace_claims c\n      LEFT JOIN', text)
+        self.assertIn('c.used_cpus = COALESCE(u.used_cpus, 0)', text)
+        self.assertIn('c.used_memory_mb = COALESCE(u.used_memory_mb, 0)',
+                      text)
+        self.assertIn('c.used_disk_gb = COALESCE(u.used_disk_gb, 0)', text)
+
+    def test_only_active_claims_are_touched(self):
+        self.assertIn("WHERE c.state = 'active'",
+                      str(mariadb._RECONCILE_CLAIM_USAGE_SQL))
+
+    def test_same_ground_truth_conventions_as_the_node_query(self):
+        text = str(mariadb._RECONCILE_CLAIM_USAGE_SQL)
+        # Pitfall 6 again: the dashed reference-side uuid is transformed
+        # so the join lands on the undashed instances primary key, while
+        # object_states.object_uuid is dashed and compares directly.
+        self.assertIn("REPLACE(p.target_uuid, '-', '')", text)
+        self.assertIn('s.object_uuid = p.target_uuid', text)
+        self.assertIn('JSON_TABLE', text)
+        self.assertIn("JSON_TYPE(i2.disk_spec) = 'ARRAY'", text)
+        self.assertIn('s.state_value IS NULL', text)
+        self.assertIn("s.state_value != 'deleted'", text)
+
+    def test_reference_params_spell_each_convention(self):
+        # Shared with _reconcile_fetch_usage(), so both aggregations
+        # agree on which column holds a member name and which a value.
+        self.assertEqual({
+            'instance_object_type': 'INSTANCE',
+            'instance_ref_type': 'instance',
+            'node_object_type': 'node',
+            'instance_location': 'instance_location',
+        }, mariadb._reconcile_reference_params())
+
+
 class FetchUsageTestCase(base.ShakenFistTestCase):
     """_reconcile_fetch_usage() statement shape and row folding."""
 
@@ -706,20 +760,40 @@ class ReconcileScenarioTestCase(_ReconcileRouterMixin, base.ShakenFistTestCase):
         self.assertEqual(1, len(deletes))
         self.assertIn('DELETE FROM scheduler_node_capacity', deletes[0])
 
-        # The active claim's usage was recomputed from the ns1 sums.
+        # The per-claim usage recompute is one set-based statement, so
+        # the only constructed UPDATE against namespace_claims in the
+        # whole pass is the expiry sweep. A regression to one UPDATE per
+        # claim -- N round trips holding write locks inside the pass's
+        # transaction -- shows up here as a second entry.
         claim_updates = []
         for call in conn.execute.call_args_list:
             stmt = call.args[0]
             if not isinstance(stmt, sa.sql.expression.Update):
                 continue
             compiled = stmt.compile(dialect=MYSQL_DIALECT)
-            if ('namespace_claims' in str(compiled) and
-                    'used_cpus' in compiled.params):
+            if 'namespace_claims' in str(compiled):
                 claim_updates.append(compiled.params)
         self.assertEqual(1, len(claim_updates))
-        self.assertEqual(2, claim_updates[0]['used_cpus'])
-        self.assertEqual(2048, claim_updates[0]['used_memory_mb'])
-        self.assertEqual(30, claim_updates[0]['used_disk_gb'])
+        self.assertEqual('expired', claim_updates[0]['state'])
+
+    def test_claim_usage_recompute_runs_once_with_both_conventions(self):
+        _, conn = self._run_scenario()
+
+        recomputes = [
+            call for call in conn.execute.call_args_list
+            if isinstance(call.args[0], sa.sql.elements.TextClause)
+            and 'UPDATE namespace_claims' in str(call.args[0])]
+        self.assertEqual(1, len(recomputes),
+                         'the per-claim recompute is one statement')
+
+        # The bindings span the same two enum storage conventions as
+        # _RECONCILE_USAGE_SQL, and getting one wrong silently matches
+        # nothing under a case-sensitive collation rather than erroring.
+        params = recomputes[0].args[1]
+        self.assertEqual('INSTANCE', params['instance_object_type'])
+        self.assertEqual('instance', params['instance_ref_type'])
+        self.assertEqual('node', params['node_object_type'])
+        self.assertEqual('instance_location', params['instance_location'])
 
     def test_node_upserts_have_on_duplicate_key_update(self):
         _, conn = self._run_scenario()

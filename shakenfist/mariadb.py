@@ -23797,14 +23797,14 @@ def disk_spec_virtual_gb(disk_spec: Any) -> int:
 #
 # Duplicated placements are the other way this ledger is inexact: a
 # lost node's INSTANCE_LOCATION row can survive place_instance()'s
-# best-effort removal, so one instance appears on two nodes. The
-# cluster row is protected because the unclaimed fold is restricted to
-# nodes holding a capacity row, but the per-claim used_* recompute
-# deliberately folds the namespace-wide total, so a duplicate counts an
-# instance twice there. Inert while namespace_claims is empty; before
-# used_* becomes a quota, phase 4 must either de-duplicate by instance
-# uuid in this query (one placement row per target_uuid) or rely on
-# phase 3 having eliminated stale placement rows.
+# best-effort removal, so one instance appears on two nodes. This
+# node-scoped query counts such an instance once per node, which is
+# what a per-node ledger should say, and the cluster row is protected
+# because the unclaimed fold is restricted to nodes holding a capacity
+# row. The namespace-wide per-claim recompute is the case that can not
+# tolerate a duplicate, and it no longer folds this result: it has its
+# own statement, _RECONCILE_CLAIM_USAGE_SQL, which de-duplicates by
+# instance uuid before summing.
 #
 # Disk sums virtual sizes from the disk_spec JSON list via JSON_TABLE
 # (available since MariaDB 10.6, below the MIN_MARIADB_VERSION floor).
@@ -23878,6 +23878,109 @@ _RECONCILE_USAGE_SQL = sa.text('''
 ''')
 
 
+# The per-claim usage recompute: one set-based statement that rewrites
+# used_* on every active claim from the same ground truth
+# _RECONCILE_USAGE_SQL reads. It replaces a loop of one UPDATE per
+# active claim over a Python fold of that query's rows, which would
+# have cost N round trips holding write locks inside the pass's
+# transaction once claims became real.
+#
+# Every convention documented above _RECONCILE_USAGE_SQL applies here
+# unchanged, and for the same reasons: the two uuid storage conventions
+# (pitfall 6 -- the REPLACE() transform on the dashed reference-side
+# uuid so the lookup lands on the undashed instances primary key, and
+# the direct comparison against the equally dashed
+# object_states.object_uuid), the two enum storage conventions
+# (object_states.object_type is a native sa.Enum holding member names,
+# the object_references type and relationship columns are String(64)
+# holding member values, and the two spellings differ only in case so a
+# mismatch is silent under a case-insensitive collation), and the
+# JSON_TABLE derived table's handling of a malformed disk_spec.
+#
+# Two things differ from the node-scoped query, both deliberate.
+#
+# The placement set is de-duplicated by instance uuid before anything
+# is summed. place_instance()'s removal of an old INSTANCE_LOCATION row
+# is best-effort, so a lost node can leave a stale row behind and one
+# instance then appears on two nodes. A per-node ledger should count
+# that instance on both, and does; a namespace-wide quota must count it
+# once, because the namespace is holding one instance's worth of
+# resources however many placement rows point at it. The SELECT
+# DISTINCT is the whole of that fix and is load bearing exactly when a
+# placement row is stale -- which is the condition nobody reproduces
+# while reading the query. Do not simplify it into a plain join.
+#
+# The join to namespace_claims is a LEFT JOIN with COALESCE(..., 0)
+# rather than an inner one, so a claim whose namespace holds no
+# instances is zeroed rather than skipped. An inner join would leave
+# such a claim's counters at whatever they last were, forever, which is
+# the state a namespace reaches by deleting its last instance.
+#
+# The statement is namespace-wide by design: unlike the cluster
+# singleton's unclaimed fold it is not restricted to nodes holding a
+# capacity row, because a namespace quota covers the namespace's
+# instances wherever they are stranded.
+_RECONCILE_CLAIM_USAGE_SQL = sa.text('''
+    UPDATE namespace_claims c
+      LEFT JOIN (
+               SELECT i.namespace AS namespace,
+                      COALESCE(SUM(i.cpus), 0) AS used_cpus,
+                      COALESCE(SUM(i.memory), 0) AS used_memory_mb,
+                      COALESCE(SUM(d.disk_gb), 0) AS used_disk_gb
+                 FROM (SELECT DISTINCT r.target_uuid AS target_uuid
+                         FROM object_references r
+                        WHERE r.relationship = :instance_location
+                          AND r.source_object_type = :node_object_type
+                          AND r.target_object_type = :instance_ref_type) p
+                 JOIN instances i
+                   ON i.uuid = REPLACE(p.target_uuid, '-', '')
+                 LEFT JOIN (
+                          SELECT i2.uuid AS instance_uuid,
+                                 COALESCE(SUM(jt.size_gb), 0) AS disk_gb
+                            FROM instances i2,
+                                 JSON_TABLE(i2.disk_spec, '$[*]'
+                                     COLUMNS (size_gb BIGINT PATH '$.size'
+                                              DEFAULT '0' ON EMPTY
+                                              DEFAULT '0' ON ERROR)) jt
+                           WHERE JSON_TYPE(i2.disk_spec) = 'ARRAY'
+                           GROUP BY i2.uuid) d
+                   ON d.instance_uuid = i.uuid
+                 LEFT JOIN object_states s
+                   ON s.object_uuid = p.target_uuid
+                  AND s.object_type = :instance_object_type
+                WHERE (s.state_value IS NULL OR s.state_value != 'deleted')
+                GROUP BY i.namespace) u
+        ON u.namespace = c.namespace
+       SET c.used_cpus = COALESCE(u.used_cpus, 0),
+           c.used_memory_mb = COALESCE(u.used_memory_mb, 0),
+           c.used_disk_gb = COALESCE(u.used_disk_gb, 0),
+           c.updated_at = NOW()
+     WHERE c.state = 'active'
+''')
+
+
+def _reconcile_reference_params() -> dict[str, str]:
+    """The bound parameters both reconcile aggregations need.
+
+    Each is spelt in its own column's storage convention, and the two
+    conventions differ. object_states.object_type is a native
+    sa.Enum(ObjectType), which SQLAlchemy persists as the member *name*;
+    the object_references type and relationship columns are plain
+    String(64) written by _direct_record_relationship() as str(member),
+    which for these str-subclass enums is the member *value*. The two
+    spellings differ only in case, so a mismatch is papered over by a
+    case-insensitive collation and silently matches nothing under a
+    _bin or _cs one -- see the comment block above _RECONCILE_USAGE_SQL,
+    and the live suite, which runs under utf8mb4_bin for this reason.
+    """
+    return {
+        'instance_object_type': ObjectType.INSTANCE.name,
+        'instance_ref_type': ObjectType.INSTANCE.value,
+        'node_object_type': ObjectType.NODE.value,
+        'instance_location': RelationshipType.INSTANCE_LOCATION.value,
+    }
+
+
 def _reconcile_fetch_usage(
         conn: sa.Connection) -> dict[tuple[UUID, str], tuple[int, int, int]]:
     """Recompute usage from ground truth, grouped by (node, namespace).
@@ -23887,19 +23990,8 @@ def _reconcile_fetch_usage(
     not be attributed to a capacity row anyway).
     """
     usage: dict[tuple[UUID, str], tuple[int, int, int]] = {}
-    rows = conn.execute(_RECONCILE_USAGE_SQL, {
-        # object_states.object_type is a native sa.Enum, which persists
-        # member names.
-        'instance_object_type': ObjectType.INSTANCE.name,
-        # The object_references type and relationship columns are plain
-        # String(64) written by _direct_record_relationship() as
-        # str(member), i.e. the enum *value*. Do not rely on a
-        # case-insensitive collation to bridge the two conventions --
-        # see the comment block above _RECONCILE_USAGE_SQL.
-        'instance_ref_type': ObjectType.INSTANCE.value,
-        'node_object_type': ObjectType.NODE.value,
-        'instance_location': RelationshipType.INSTANCE_LOCATION.value,
-    }).fetchall()
+    rows = conn.execute(
+        _RECONCILE_USAGE_SQL, _reconcile_reference_params()).fetchall()
     for row in rows:
         try:
             node_uuid = UUID(str(row.node_uuid))
@@ -23995,10 +24087,19 @@ def _direct_reconcile_scheduler_capacity(
     shares, unlike the demand parameters and ``disk_overcommit`` which
     ride in from the caller.
 
-    Nothing else writes these tables until phase 3, so the
-    per-statement writes need no enclosing transaction; the single
-    commit at the end simply keeps a failed pass from leaving a partial
-    write behind.
+    Since phase 3 this pass is not the only writer of these tables: the
+    placement admission and release transactions update
+    cluster_capacity, namespace_claims and scheduler_node_capacity on
+    the instance hot path, concurrently with a pass. The reconciler is
+    still the authority on every counter it writes, because it
+    recomputes each one from ground truth -- the placement rows and the
+    instances they point at -- rather than adjusting it incrementally.
+    An admission that commits while a pass is running may fall outside
+    the snapshot the pass computed from, in which case its increment is
+    overwritten here and reinstated by the next pass, which sees its
+    placement row. So the single commit at the end bounds a *failed*
+    pass -- an error part way through leaves no partial rewrite behind
+    -- rather than isolating the pass from those other writers.
 
     Returns the summary dict the reply is built from (counts, per-node
     rows with previous-vs-new used deltas, the cluster row), or None on
@@ -24126,16 +24227,18 @@ def _direct_reconcile_scheduler_capacity(
             demand = _reconcile_fetch_demand(
                 conn, now, demand_per_vcpu, demand_decay_seconds)
 
+            # The per-node counters fold the (node, namespace) rows back
+            # up by node. There is deliberately no by-namespace fold
+            # here: summing these rows across nodes would count an
+            # instance with a stale duplicate placement row twice, so
+            # the per-claim recompute below does its own aggregation in
+            # SQL, de-duplicated by instance uuid.
             usage_by_node: dict[UUID, list[int]] = {}
-            usage_by_namespace: dict[str, list[int]] = {}
-            for (node_uuid, namespace), used_row in usage.items():
-                for totals in (usage_by_node.setdefault(
-                                   node_uuid, [0, 0, 0]),
-                               usage_by_namespace.setdefault(
-                                   namespace, [0, 0, 0])):
-                    totals[0] += used_row[0]
-                    totals[1] += used_row[1]
-                    totals[2] += used_row[2]
+            for (node_uuid, _namespace), used_row in usage.items():
+                totals = usage_by_node.setdefault(node_uuid, [0, 0, 0])
+                totals[0] += used_row[0]
+                totals[1] += used_row[1]
+                totals[2] += used_row[2]
 
             # (2) Refresh node rows. A node has a capacity row while it
             # is an active hypervisor with fresh metrics and a row in the
@@ -24250,33 +24353,31 @@ def _direct_reconcile_scheduler_capacity(
                     sa.delete(capacity).where(
                         capacity.c.node_uuid.in_(removals))).rowcount)
 
-            # Per-claim usage recompute over the same instance set,
-            # grouped by namespace. Empty in production this phase (the
-            # claims API is phase 4), but the machinery must be proven.
-            #
-            # phase 4: this loop is one UPDATE per active claim, inside
-            # the pass's transaction. Fine at zero claims; N round trips
-            # holding write locks once claims are real. Fold it into a
-            # single set-based UPDATE ... JOIN over the namespace usage
-            # aggregation rather than inheriting the loop.
+            # Read the active claims. Their limits and namespaces feed
+            # the cluster rebuild below, which is the only reason this
+            # read exists: the usage recompute that follows needs no
+            # per-claim data, because it does the whole job in one
+            # set-based statement.
             claimed_limits = [0, 0, 0]
             claimed_namespaces = set()
-            active_claims = conn.execute(sa.select(claims).where(
-                claims.c.state == 'active')).fetchall()
-            for claim_row in active_claims:
-                ns_used = usage_by_namespace.get(
-                    claim_row.namespace, [0, 0, 0])
-                conn.execute(sa.update(claims).where(
-                    claims.c.uuid == claim_row.uuid
-                ).values(
-                    used_cpus=ns_used[0],
-                    used_memory_mb=ns_used[1],
-                    used_disk_gb=ns_used[2],
-                    updated_at=sa.func.now()))
-                claimed_limits[0] += claim_row.limit_cpus
-                claimed_limits[1] += claim_row.limit_memory_mb
-                claimed_limits[2] += claim_row.limit_disk_gb
-                claimed_namespaces.add(claim_row.namespace)
+            for row in conn.execute(sa.select(claims).where(
+                    claims.c.state == 'active')).fetchall():
+                claimed_limits[0] += row.limit_cpus
+                claimed_limits[1] += row.limit_memory_mb
+                claimed_limits[2] += row.limit_disk_gb
+                claimed_namespaces.add(row.namespace)
+
+            # Per-claim usage recompute: one statement rewrites used_*
+            # on every active claim, including zeroing a claim whose
+            # namespace no longer holds an instance. It aggregates a
+            # placement set de-duplicated by instance uuid, so a stale
+            # duplicate placement row can not charge one instance to a
+            # namespace quota twice -- see the comment block above
+            # _RECONCILE_CLAIM_USAGE_SQL, which is also where the two
+            # uuid and two enum storage conventions the bound parameters
+            # have to satisfy are recorded.
+            conn.execute(_RECONCILE_CLAIM_USAGE_SQL,
+                         _reconcile_reference_params())
 
             # (5) Rebuild the cluster_capacity singleton: node limit
             # sums, active claim limit sums, and usage by instances in
