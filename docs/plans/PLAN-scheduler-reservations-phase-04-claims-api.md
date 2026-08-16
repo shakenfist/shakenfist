@@ -426,7 +426,7 @@ it gets a comment and a named test rather than a discovery.
 | 6 | REST endpoints in `shakenfist/external_api/auth.py` beside the namespace key and rule endpoints (`AuthNamespaceKeysEndpoint`, `:466`), routed in `app.py` at `/auth/namespaces/<namespace>/claims` and `/auth/namespaces/<namespace>/claims/<claim_ref>`, admin-only. Every handler carries a `swag_from(swagger_helper(...))` -- the declarations are validated at import time and sf-api will not start if one is malformed; read `docs/developer_guide/writing_an_endpoint.md` first and run `tools/fix-api-parameter-locations.py --apply` before committing. Decorator order matters; the comments in `external_api/app.py` are the authority. Register any structured or bounded parameter in `STRUCTURED_PARAMETERS` (`shakenfist/tests/external_api/test_openapi_spec.py:104`), whose completeness CI derives from the published specification and fails without | medium | sonnet | worktree | Complete — five endpoints; refusals map to 507/503/409 split on whether the condition is durable or transient, and an unrecognised reason is a 500 rather than the caller's fault |
 | 7 | Functional CI coverage in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`: create a claim for a namespace, create an instance in it, assert the drawdown appears on the claim and not on the cluster's unclaimed sums, exceed the claim and assert the create still succeeds and the advisory event is present, shrink below usage and assert refusal, delete the claim and assert the capacity returns. Drive the endpoints through `apiclient._request_url()` with a comment explaining D7 -- the client has no claim verbs and CI installs the released client from PyPI. Note in the test what it cannot assert without them | medium | sonnet | worktree | Complete — three tests. Two Definition of done items could not be met as written (no REST surface publishes the `cluster_capacity` singleton; the namespace cascade only runs a `CLEANER_DELAY` after the soft delete) and were corrected rather than faked; both are now Future work |
 | 8 | Documentation: `docs/operator_guide/database.md` for the schema and the two new RPC families, `docs/operator_guide/scheduler.md` for what a claim is and what advisory mode does and does not do, `docs/developer_guide/subsystem_internals.md` for the claim admission transaction beside the placement one, the CLAUDE.md capacity paragraph, `ARCHITECTURE.md`/`AGENTS.md` only if the object inventory or a convention actually changed. Update the master plan Execution table and `docs/plans/index.md`. Every fact about claims must read identically wherever it appears | low | sonnet | worktree | Complete — `ARCHITECTURE.md` needed a one-clause correction (its roadmap sentence still promised the claims API as future work) and `docs/developer_guide/state_machine.md` a new section, since the claim object's comment already pointed at one. `AGENTS.md` and `README.md` untouched: no convention and no pitch changed. Also fixed the pre-existing stale scope family list in `docs/developer_guide/authentication.md` |
-| 9 | Management-session code review against the checklist below | medium | management session | none | Not started |
+| 9 | Management-session code review against the checklist below | medium | management session | none | Complete — every item checked by running it rather than reading it; see the review notes below |
 | 10 | Operator review and PR; deploy to sfcbr and soak with a real claim on a real namespace | — | operator | — | Not started |
 
 ## Risks and mitigations
@@ -538,24 +538,78 @@ Falsifiable, and mostly runnable:
 
 ## Review checklist (management session, step 9)
 
-- [ ] Every new transaction opens with a guarded `UPDATE`
+- [x] Every new transaction opens with a guarded `UPDATE`
       and follows the canonical write order.
-- [ ] The D3 probe runs outside its transaction, on its own
+- [x] The D3 probe runs outside its transaction, on its own
       connection.
-- [ ] The advisory read-back is after the write it reads,
+- [x] The advisory read-back is after the write it reads,
       and the reason is in a comment.
-- [ ] No 403, no enforcement knob, no hard-mode branch.
-- [ ] Two states stay two facts: nothing writes coverage
+- [x] No 403, no enforcement knob, no hard-mode branch.
+- [x] Two states stay two facts: nothing writes coverage
       into `object_states` or existence into
       `namespace_claims.state`.
-- [ ] Parameter declarations validate at import time and the
+- [x] Parameter declarations validate at import time and the
       openapi spec table is updated.
-- [ ] `hard_delete()` accounts for capacity return, and
+- [x] `hard_delete()` accounts for capacity return, and
       double delete is harmless.
-- [ ] Tests that claim to prove a fix have been mutated to
+- [x] Tests that claim to prove a fix have been mutated to
       confirm they fail without it.
-- [ ] Diff contains no phase 5/6/7 material.
-- [ ] mypy clean; single quotes; 120-char lines.
+- [x] Diff contains no phase 5/6/7 material.
+- [x] mypy clean; single quotes; 120-char lines.
+
+### Review notes (step 9, 2026-08-16)
+
+Every box above was checked by running something, not by
+reading code and believing it.
+
+* **Transaction invariant.** All three new transactions were
+  inspected for their first statement. Two open with the
+  guarded `cluster_capacity` UPDATE. The third --
+  `_direct_update_namespace_claim()` -- opens with it
+  *conditionally*, since a pure expiry change or a shrink
+  touches no cluster counter; when the condition is false the
+  first statement is the guarded claim UPDATE, which is
+  equally DML and equally takes its row lock first. The
+  invariant holds either way and the code says so.
+* **The grow guard passes `migrated=0` explicitly**, which is
+  what stops a later "simplification" from crediting a
+  drawdown twice. Confirmed at the call site.
+* **Scope guards.** `git grep` for the old single guard flag
+  and the per-claim UPDATE loop both return nothing outside
+  this document. The two `403` matches in the diff are a
+  comment naming phase 5's future refusal path and a
+  generated protobuf offset that contains the digits; neither
+  is a code path. `shakenfist/scheduler.py` is untouched, so
+  no pre-filter removal leaked in from phase 5, and the diff
+  contains no occurrence of "affinity" outside documentation,
+  so none of phase 6 did either. There is no config knob.
+* **Two states stay two facts.** `namespace_claim.py`'s state
+  targets carry only existence (`initial`, `created`,
+  `deleted`); coverage is read from the row and published
+  separately as `coverage_state`. Nothing writes either into
+  the other.
+* **Mutation testing** was carried out and reported for every
+  step that changed behaviour (1 through 6). Step 7 is
+  functional and cannot run outside a deployed cluster; step
+  8 is documentation. The step 4 guard fix was mutation
+  tested after the correction, not before it.
+* **Suite**: 3,241 unit tests, 3,138 passed, 103 skipped (the
+  live modules, which need a MariaDB DSN), 0 failed.
+  `pre-commit run --all-files` passes all nine hooks.
+
+Two process notes worth keeping, because both nearly put a
+defect in the tree:
+
+* A sub-agent's report described the migration-aware guard as
+  an open question *after* it had been told to fix it. The
+  fix had not been applied; reading the `WHERE` clause is
+  what established that. Reports describe intent, the tree
+  describes fact.
+* The same step's file mtimes were then misread as evidence
+  that verification had been skipped, when the timestamp in
+  question was the *restore* at the end of a mutation cycle.
+  Checking is right; concluding from a single indirect signal
+  is not.
 
 ## Future work
 
