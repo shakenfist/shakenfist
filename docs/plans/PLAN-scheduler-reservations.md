@@ -442,8 +442,14 @@ release after phase 4 (D16).
 
 **Phase 6 — affinity rework.** Binary soft affinity plus
 hard require constraints, weighted-form deprecation mapping,
-ranking precedence above load ordering (D6). Closes the
-issue-3565 flake class.
+ranking precedence above load ordering (D6). Also takes the
+decision D6 deferred: whether a soft affinity preference may
+bid against a hard admission ceiling. Issue 3565 turns on
+that decision and not on the ranking precedence, which
+already landed as PR 3722 — see the D6 correction of
+2026-08-16 in the phase 0 decisions document for the audit
+trail and the three positions on offer. Phase 6 closes 3565
+only if it picks one of them.
 
 **Phase 7 — diagnostics.** Failure-path verbose diagnostic
 against the same snapshot, success-path drawdown events,

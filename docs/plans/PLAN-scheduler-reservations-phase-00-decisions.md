@@ -319,11 +319,61 @@ instance. Existing weighted specs map mechanically (positive
 weight → prefer_with, negative → prefer_without) for one
 transition release, then the weighted form is removed. Soft
 affinity is applied as the ranking term **above** load
-ordering (hard filters → affinity score → load), which also
-resolves the issue-3565 class of flake where soft affinity
-loses to CPU-headroom ordering. *Operator confirmation
-requested: is anything beyond the CI suite using numeric
-weights?*
+ordering (hard filters → affinity score → load). *Operator
+confirmation requested: is anything beyond the CI suite using
+numeric weights?*
+
+**Correction, 2026-08-16: this decision does not close issue
+3565, and the earlier text here claiming it did was wrong.**
+The ranking precedence described above already landed, as PR
+3722 (`scheduler.py:611-631`), and 3565 has recurred five
+times since. The audit trail from the 2026-08-15 occurrence
+([run 31911823880](https://github.com/shakenfist/shakenfist/actions/runs/31911823880))
+shows why: the node affinity wanted was removed by
+`sufficient_idle_cpu`, an **admission** filter at
+`scheduler.py:473-481`, thirty lines before affinity scoring
+begins at `scheduler.py:505`. Ranking cannot rank a candidate
+that is no longer in the candidate list. "Hard filters →
+affinity score → load" is already the ordering; the
+hard-filter step is what eats the node.
+
+Closing 3565 therefore needs a decision this document has not
+taken: **may a soft affinity preference bid against a hard
+admission ceiling?** Today `hard_max_cpus` is absolute
+(`scheduler.py:260`). Three positions, for phase 6 to choose
+between:
+
+1. **Hard require only.** `require_with_tag` turns silent
+   mis-placement into an explicit no-candidate refusal.
+   Honest and diagnosable, but a co-location request against
+   a node at its ceiling still fails rather than succeeding.
+2. **Soften the ceiling above a threshold affinity score.**
+   Admission consults the affinity score, so a strongly
+   preferred node may be admitted past `hard_max_cpus` by
+   some bounded margin. This is the only option that makes
+   the co-location case work. It costs the property that
+   admission is a pure capacity question, and needs a bound
+   nobody has chosen.
+3. **Accept that co-location is not guaranteed under
+   concurrency**, and change what `test_affinity` asserts.
+
+Two things that look like they should help and do not.
+Namespace claims (D14) guarantee aggregate capacity and
+explicitly carry no node affinity, so they close the 3772
+507 family without touching this. And the CPU committed
+ledger (PR 3724) made admission *more* accurate, which moves
+this failure mode in the wrong direction.
+
+Independently of the decision above, the CI tier topology is
+sized well below the concurrency it runs at: the occurrence
+above recorded `cpu_schedulable: 1` on a nested hypervisor,
+so with `CPU_OVERCOMMIT_RATIO` 3.0 each node admits three
+vCPUs and the three-hypervisor tier admits nine, against a
+suite at `concurrency=5`. That is why the affinity target is
+reliably full rather than occasionally full. The topology
+lives in the `shakenfist/actions` repository and is out of
+scope for this plan, but no scheduler change will make
+`test_affinity` reliable while it stands.
 
 **D7 (Q7, SQL vs Python split): filter and order in SQL,
 score affinity and tie-break in Python, admit via guarded
