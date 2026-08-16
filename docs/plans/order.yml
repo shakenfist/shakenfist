@@ -38,3 +38,4 @@
 - PLAN-database-load-reduction.md: Reduce steady-state MariaDB load from the sf-database tier
 - PLAN-agent-operation-deadlines.md: Agent operation deadlines and progress detection
 - PLAN-agent-operation-dependencies.md: Dependency-aware agent operations
+- PLAN-grpc-bounded-replies.md: Bound the size of DatabaseService gRPC replies
