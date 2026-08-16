@@ -606,6 +606,33 @@ Falsifiable, and mostly runnable:
   generated column that is the namespace when active and NULL
   otherwise, uniquely indexed -- the latter is probably right,
   and is a schema change rather than step 4 work.
+* **The claim endpoints derive the `auth` scope family** (found
+  in step 6), because they live under `/auth/namespaces/...`
+  like the keys and rules beside them. A claim is a capacity
+  concept rather than an auth one, so a `claim` family is
+  arguably more correct -- but the families are a vocabulary
+  operators write into mapping rules, pinned by
+  `EXPECTED_FAMILIES` in `test_scopes.py`, and adding a word to
+  it is a compatibility decision this phase was not authorised
+  to make. `cluster-admin` is the gate that actually matters
+  either way. Worth deciding deliberately rather than
+  inheriting.
+* **`docs/developer_guide/authentication.md`'s scope family
+  list is already stale** (noticed in step 6): it is missing
+  `issuer` and `rule`, both of which shipped before this phase.
+  Unrelated to claims, so step 8 should fix the list rather
+  than only appending to it.
+* **`TRUSTED_ISSUER` and `MAPPING_RULE` are missing from
+  `_STATIC_TABLE_GETTERS`** (found in step 5), although both
+  own static tables. This is issue 3588's defect -- the orphan
+  reconciler cannot repair their zombie rows, and the expiry
+  sweep re-events them every pass -- live in two more object
+  types. Out of scope here and deliberately not fixed in this
+  phase's commits; it needs its own issue and its own commit,
+  and the same pairing this phase used, since
+  `_STATIC_TABLE_GETTERS` without
+  `constants.OBJECT_NAMES_TO_CLASSES` trades one leak for
+  another.
 
 ## Back brief
 

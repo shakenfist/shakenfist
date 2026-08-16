@@ -37,11 +37,15 @@ from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
+from shakenfist.namespace_claim import ClaimRefused
+from shakenfist.namespace_claim import NamespaceClaim
+from shakenfist.namespace_claim import NamespaceClaims
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
 from shakenfist.util import credentials
+from shakenfist.util import general as util_general
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util.access_tokens import request_namespace
 
@@ -1185,6 +1189,440 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'delete mapping rule request from REST API')
         rule.delete()
         return rule.external_view()
+
+
+# Namespace capacity claims (scheduler reservations phase 4).
+#
+# A claim is a namespace's promise of aggregate cluster capacity, so
+# every verb here is a cluster administration operation even though the
+# resource hangs off a namespace: capacity promised to one namespace is
+# capacity refused to every other one. That is why these carry
+# caller_is_admin, where the sibling key and rule endpoints are gated on
+# namespace ownership alone -- a namespace administering its own
+# credentials or its own federation affects nobody else. Delegated
+# (non-admin) claim creation is named as future work by D15 of
+# docs/plans/PLAN-scheduler-reservations-phase-00-decisions.md.
+#
+# The scope family is the derived 'auth', deliberately not an override.
+# A new family is an addition to the vocabulary operators write in
+# mapping rules, and cluster-admin is the gate that actually matters
+# here: a token needs both that and the derived scope.
+
+claim_example = """{
+    "uuid": "0b2b4f76-0a1b-4d0f-8b3f-6f1a2c4d5e6f",
+    "namespace": "ci",
+    "state": "created",
+    "coverage_state": "active",
+    "limit_cpus": 40,
+    "limit_memory_mb": 81920,
+    "limit_disk_gb": 2000,
+    "used_cpus": 12,
+    "used_memory_mb": 24576,
+    "used_disk_gb": 600,
+    "expires_at": 1755300000.0,
+    "updated_at": 1755213600.0
+}
+"""
+
+
+# How a claim refusal becomes an HTTP status.
+#
+# A refusal is not a failure: the guarded transaction ran and decided
+# no, so the response has to say which kind of no it was.
+#
+# * 'capacity' is 507, which is what this API already answers for every
+#   other capacity exhaustion -- instance scheduling, network address
+#   exhaustion, floating address exhaustion. The cluster is full and no
+#   change to the request will help until something is released.
+# * 'no_cluster_capacity' and 'conflict' are 503, the code api_base
+#   already answers when the database tier is unreachable, because both
+#   are transient and the correct client behaviour is to retry. The
+#   first means the reconciler has not built the cluster capacity
+#   singleton yet; the second means the claim row kept moving under a
+#   concurrent writer until the optimistic retry budget ran out.
+#   Deliberately not 409: nothing about the request is wrong, and a
+#   caller that read it as a durable conflict would abandon a claim it
+#   could have had a second later.
+# * 'exists', 'below_usage' and 'not_active' are 409, which is what
+#   this API already answers when a request conflicts with the durable
+#   state of a resource (a duplicate mapping rule name). The caller has
+#   to change something -- delete the claim it already has, ask for a
+#   smaller shrink, replace the expired claim -- before it can succeed.
+# * 'not_found' is 404, and is only reachable as a race: the claim
+#   resolved through arg_is_claim_ref and was deleted before the
+#   mutation reached it.
+CLAIM_REFUSAL_STATUS = {
+    'capacity': 507,
+    'no_cluster_capacity': 503,
+    'conflict': 503,
+    'exists': 409,
+    'below_usage': 409,
+    'not_active': 409,
+    'not_found': 404
+}
+
+CLAIM_REFUSAL_MESSAGE = {
+    'capacity': 'the cluster does not have the capacity to promise this claim',
+    'no_cluster_capacity': (
+        'the cluster capacity accounting is not available yet, please retry'),
+    'conflict': (
+        'this claim was being changed concurrently and the update gave up, '
+        'please retry'),
+    'exists': 'this namespace already holds an active claim',
+    'below_usage': (
+        'a claim cannot be shrunk below what it is already using'),
+    'not_active': (
+        'this claim is no longer active and cannot be changed, delete it and '
+        'create a new one'),
+    'not_found': 'namespace claim not found'
+}
+
+
+def _claim_number(value):
+    """Render one dimension number.
+
+    The per-dimension detail is float on the wire, because it shares a
+    shape with the scheduler's node denials where a decayed demand
+    figure really is fractional. Claim limits are whole cpus, megabytes
+    and gigabytes, so print them as such rather than as "40.0".
+    """
+    if float(value).is_integer():
+        return '%d' % int(value)
+    return '%s' % value
+
+
+def _claim_dimension_detail(dimensions):
+    """The dimensions a guard refused on, rendered for a caller.
+
+    The point of a capacity guard that reports per-dimension detail is
+    that the caller finds out which dimension did not fit, so it
+    reaches the response body rather than only the logs. sf_api.error()
+    carries a message and nothing else, so the detail goes in the
+    message.
+
+    Only the dimensions which actually failed, when the reply says
+    which; the whole set otherwise, because a refusal with no exceeded
+    dimension means the read-back after the rollback could not
+    reconstruct which one it was and reporting nothing would be worse.
+    """
+    exceeded = [d for d in dimensions if d.get('exceeded')] or list(dimensions)
+    return ', '.join(
+        '%s (limit %s, used %s, requested %s)'
+        % (d['dimension'], _claim_number(d['limit']),
+           _claim_number(d['used']), _claim_number(d['requested']))
+        for d in exceeded)
+
+
+def _claim_refusal(refusal):
+    """Turn a ClaimRefused into the response a caller can act on."""
+    status = CLAIM_REFUSAL_STATUS.get(refusal.reason)
+    if status is None:
+        # The database layer grew a refusal reason this module has not
+        # been taught. That is a server side gap, so it must not be
+        # reported as the caller's fault.
+        LOG.with_fields({'reason': refusal.reason}).error(
+            'Unrecognised namespace claim refusal reason')
+        return sf_api.error(
+            500, 'namespace claim refused for an unrecognised reason: %s'
+                 % refusal.reason, suppress_traceback=True)
+
+    message = CLAIM_REFUSAL_MESSAGE[refusal.reason]
+    detail = _claim_dimension_detail(refusal.dimensions)
+    if detail:
+        message = '%s: %s' % (message, detail)
+    return sf_api.error(status, message, suppress_traceback=True)
+
+
+def _claim_limit(name, value):
+    """One claim limit from the request body, or an error response.
+
+    Returns (value, error), exactly one of which is None. bool is
+    rejected explicitly because it is an int in Python, and a body
+    saying `"limit_cpus": true` would otherwise quietly claim one cpu.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None, sf_api.error(400, '%s is not an integer' % name)
+    if value < 0:
+        return None, sf_api.error(400, '%s cannot be negative' % name)
+    return value, None
+
+
+def _claim_expiry(value):
+    """The claim duration from the request body, or an error response.
+
+    A duration in seconds, not an absolute time, for the same reason
+    the database layer takes one: the expiry sweep only ever compares
+    against the cluster's own clock, so a client computed timestamp
+    would be evaluated against a clock the client never saw. Accepting
+    one would mean documenting a skew the API cannot measure.
+
+    Zero and negatives are refused rather than clamped. A claim which
+    is already expired the moment it is created holds no capacity for
+    anybody and cannot be grown (an inactive claim is refused), so it
+    is a trap rather than a shorthand.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None, sf_api.error(400, 'expires_in_seconds is not an integer')
+    if value < 1:
+        return None, sf_api.error(400, 'expires_in_seconds must be positive')
+    return value, None
+
+
+def arg_is_claim_ref(func):
+    """Resolve a claim, scoped to the namespace in the route.
+
+    A claim has no name, so the reference is always a uuid. A uuid on
+    its own would let a caller address a claim through any namespace's
+    URL, which would make the namespace segment decorative -- and the
+    day D15's delegated claim creation lands, decorative is a
+    cross-tenant read. The namespace in the path is therefore checked
+    against the claim's own, and a mismatch answers the same 404 a
+    missing claim does, so the URL does not disclose which claims exist
+    in namespaces the caller was not asking about.
+    """
+    def wrapper(*args, **kwargs):
+        claim_ref = kwargs.get('claim_ref')
+        if not claim_ref:
+            return sf_api.error(400, 'missing claim in request')
+
+        if not util_general.valid_uuid4(claim_ref):
+            # There is no name to fall back to, so this cannot name a
+            # claim at all.
+            return sf_api.error(404, 'namespace claim not found')
+
+        c = NamespaceClaim.from_db(claim_ref, suppress_failure_audit=True)
+        if not c or c.state.value == dbo.STATE_DELETED:
+            return sf_api.error(404, 'namespace claim not found')
+
+        if c.namespace != kwargs.get('namespace'):
+            LOG.with_fields({
+                'namespace': kwargs.get('namespace'),
+                'claim': claim_ref,
+                'claim_namespace': c.namespace
+            }).info('Namespace claim not found, it belongs to another '
+                    'namespace')
+            return sf_api.error(404, 'namespace claim not found')
+
+        kwargs['claim_from_db'] = c
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class AuthNamespaceClaimsEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List the capacity claims held by a namespace.',
+        [('namespace', 'path', 'string', 'The namespace.', True)],
+        [(200, 'The namespace\'s capacity claims.', '[%s]' % claim_example),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, namespace_from_db=None):
+        # Every claim the namespace holds, whatever its coverage state.
+        # An expired claim still has a row, still has to be deleted by
+        # hand, and is the only claim whose existence explains why a
+        # namespace's placements stopped being charged to it -- so
+        # hiding it would hide the one thing an operator can act on.
+        return [c.external_view() for c in NamespaceClaims(namespace=namespace)]
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Claim aggregate cluster capacity for a namespace.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('limit_cpus', 'body', 'unsignedinteger',
+             'The number of vCPUs this namespace may hold at once.', True),
+            ('limit_memory_mb', 'body', 'unsignedinteger',
+             'The instance memory, in megabytes, this namespace may hold '
+             'at once.', True),
+            ('limit_disk_gb', 'body', 'unsignedinteger',
+             'The instance disk, in gigabytes, this namespace may hold at '
+             'once.', True),
+            # A duration, not a timestamp, and positive: see
+            # _claim_expiry(), which is what backs both halves of that.
+            ('expires_in_seconds', 'body', 'integer',
+             'How long this claim covers placements for, in seconds from '
+             'now. A duration rather than a timestamp: the expiry is '
+             'computed from the cluster\'s clock, which is the only clock '
+             'the expiry sweep ever compares against. Must be positive.',
+             True, {'minimum': 1})
+        ],
+        [(200, 'The claim as created.', claim_example),
+         (400, 'A required field is missing or malformed.', None),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace not found.', None),
+         (409, 'This namespace already holds an active claim.', None),
+         (503, 'The cluster capacity accounting is not available yet. '
+               'Retry.', None),
+         (507, 'The cluster does not have the capacity to promise this '
+               'claim.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def post(self, namespace=None, limit_cpus=None, limit_memory_mb=None,
+             limit_disk_gb=None, expires_in_seconds=None,
+             namespace_from_db=None):
+        limits = {}
+        for name, value in [('limit_cpus', limit_cpus),
+                            ('limit_memory_mb', limit_memory_mb),
+                            ('limit_disk_gb', limit_disk_gb)]:
+            if value is None:
+                return sf_api.error(400, 'no %s specified' % name)
+            limits[name], err = _claim_limit(name, value)
+            if err:
+                return err
+
+        if expires_in_seconds is None:
+            return sf_api.error(400, 'no expires_in_seconds specified')
+        expiry, err = _claim_expiry(expires_in_seconds)
+        if err:
+            return err
+
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'create namespace claim request from REST API',
+            extra=dict(limits, expires_in_seconds=expiry))
+
+        try:
+            c = NamespaceClaim.new(
+                namespace, limits['limit_cpus'], limits['limit_memory_mb'],
+                limits['limit_disk_gb'], expiry)
+        except ClaimRefused as e:
+            return _claim_refusal(e)
+
+        return c.external_view()
+
+
+class AuthNamespaceClaimEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Fetch a capacity claim.',
+        [('namespace', 'path', 'string', 'The namespace.', True),
+         ('claim_ref', 'path', 'uuid', 'The claim UUID.', True)],
+        [(200, 'The claim.', claim_example),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace or claim not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @arg_is_claim_ref
+    @api_base.log_token_use
+    def get(self, namespace=None, claim_ref=None, namespace_from_db=None,
+            claim_from_db=None):
+        return claim_from_db.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Grow, shrink or re-date a capacity claim.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('claim_ref', 'path', 'uuid', 'The claim UUID.', True),
+            ('limit_cpus', 'body', 'unsignedinteger',
+             'Optional. The new vCPU limit. Growing is an admission '
+             'decision against the cluster; shrinking is permitted down to '
+             'what the claim is already using and no further.', False),
+            ('limit_memory_mb', 'body', 'unsignedinteger',
+             'Optional. The new memory limit, in megabytes.', False),
+            ('limit_disk_gb', 'body', 'unsignedinteger',
+             'Optional. The new disk limit, in gigabytes.', False),
+            ('expires_in_seconds', 'body', 'integer',
+             'Optional. A new expiry, in seconds from now. A duration '
+             'rather than a timestamp, computed from the cluster\'s clock. '
+             'Must be positive.', False, {'minimum': 1})
+        ],
+        [(200, 'The updated claim.', claim_example),
+         (400, 'A field is malformed, or nothing was asked for.', None),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace or claim not found.', None),
+         (409, 'The claim is not active, or the requested limit is below '
+               'what the claim is already using.', None),
+         (503, 'The cluster capacity accounting is not available yet, or '
+               'the claim was contended. Retry.', None),
+         (507, 'The cluster does not have the capacity to grow this '
+               'claim.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @arg_is_claim_ref
+    @api_base.log_token_use
+    def put(self, namespace=None, claim_ref=None, limit_cpus=None,
+            limit_memory_mb=None, limit_disk_gb=None, expires_in_seconds=None,
+            namespace_from_db=None, claim_from_db=None):
+        # A field mask, exactly as the database layer requires: without
+        # one there is no way to tell a deliberate zero from an argument
+        # the caller never sent, and an unmasked write would shrink
+        # every dimension the caller did not mention to nothing
+        # (CLAUDE.md pitfall 3).
+        fields = []
+        values = {'limit_cpus': 0, 'limit_memory_mb': 0, 'limit_disk_gb': 0,
+                  'expires_in_seconds': 0}
+
+        for name, value in [('limit_cpus', limit_cpus),
+                            ('limit_memory_mb', limit_memory_mb),
+                            ('limit_disk_gb', limit_disk_gb)]:
+            if value is None:
+                continue
+            values[name], err = _claim_limit(name, value)
+            if err:
+                return err
+            fields.append(name)
+
+        if expires_in_seconds is not None:
+            values['expires_in_seconds'], err = _claim_expiry(
+                expires_in_seconds)
+            if err:
+                return err
+            fields.append('expires_in_seconds')
+
+        if not fields:
+            return sf_api.error(400, 'no claim fields to update specified')
+
+        try:
+            claim_from_db.update(fields=fields, **values)
+        except ClaimRefused as e:
+            return _claim_refusal(e)
+
+        return claim_from_db.external_view()
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Delete a capacity claim, returning its capacity to the '
+                'cluster.',
+        [('namespace', 'path', 'string', 'The namespace.', True),
+         ('claim_ref', 'path', 'uuid', 'The claim UUID.', True)],
+        [(200, 'The claim as it was immediately before deletion.',
+          claim_example),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace or claim not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @arg_is_claim_ref
+    @api_base.log_token_use
+    def delete(self, namespace=None, claim_ref=None, namespace_from_db=None,
+               claim_from_db=None):
+        # Recorded against the namespace rather than the claim.
+        # hard_delete() removes the claim's own events along with the
+        # claim, so an event written here would be destroyed by the call
+        # it exists to explain -- and "who asked for my namespace's
+        # claim to go" is exactly the question that outlives it. The
+        # claim's own hard_delete() records the outcome the same way.
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete namespace claim request from REST API',
+            extra={'claim': str(claim_from_db.uuid)})
+
+        # Read the view before deleting rather than after. A claim has
+        # no soft delete -- hard_delete() removes the row inside the
+        # transaction which gives its capacity back -- so afterwards
+        # there is nothing left to describe, and the sibling rule
+        # endpoint's return-the-view-after-delete shape would answer
+        # with a body full of nulls.
+        view = claim_from_db.external_view()
+        claim_from_db.hard_delete()
+        return view
 
 
 federated_example = """{
