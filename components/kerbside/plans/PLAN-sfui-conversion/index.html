@@ -6490,6 +6490,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 8: terminate actions to POST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -12232,19 +12260,33 @@ canonical HEAD, and issue #244 closes.</p>
    Issue #133 documents the CSRF exposure: terminate
    actions are GET, and flask-jwt-extended's cookie CSRF
    protection does not cover GET. <strong>Decided: yes, convert
-   them</strong> (phase 8): browser actions become POST (forms or
-   <code>fetch</code> with the CSRF double-submit header), the JSON
-   API moves to POST with it, and the CI lane scripts
-   (<code>tools/direct-qemu/verify-terminate-live.sh</code>,
-   <code>lane-up.sh</code>) plus the tempest plugin and any docs
-   examples are updated in the same phase. Closes #133.</li>
-<li><strong>Confirmation on terminate?</strong> <strong>Decided: a lightweight
+   them</strong> (phase 8): browser actions become POST (<code>fetch</code>
+   with the CSRF double-submit header), the JSON API moves
+   to POST with it, and the out-of-browser callers plus any
+   docs examples are updated in the same phase. Closes
+   #133.</li>
+</ol>
+<p><strong>Corrected in phase 8 planning</strong>, against the tree at
+   <code>aa7e5da</code>: the callers are
+   <code>tools/direct-qemu/verify-terminate-live.sh</code>,
+   <code>tools/sf-e2e/drive-happy-path.py:253</code> and
+   <code>tools/ovirt-e2e/drive-console.py:494</code> — the latter two
+   were missing from this list. <code>lane-up.sh</code> only mints the
+   JWT and contains no terminate call, and the tempest
+   plugin never touches these endpoints; both were named
+   here in error. Forms were dropped as an option because
+   <code>JWT_CSRF_CHECK_FORM</code> defaults to <code>False</code>. Issue #133
+   also covers a <em>third</em> destructive GET this phase does
+   not convert — <code>ConsolesProxyVirtViewer</code> writes a ticket
+   and mints a token while returning a <code>.vv</code> file — which
+   is mitigated by a <code>SameSite=Lax</code> cookie and tracked
+   separately as #319.
+5. <strong>Confirmation on terminate?</strong> <strong>Decided: a lightweight
    two-step</strong> ("Terminate → Confirm?" state on the button
    itself) rather than a modal; it fixes the unconfirmed
    destructive click without new components. One day this
    may be replaced by a notification-toast pattern instead
-   (see Future work).</li>
-</ol>
+   (see Future work).</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <p>Each phase gets its own plan file before implementation
 starts, per the Prompt section. Phases 4–7 each end with a
@@ -12297,7 +12339,7 @@ locally-running kerbside.</p>
 <tr>
 <td>8. Terminate actions to POST (#133)</td>
 <td>PLAN-sfui-conversion-phase-08-terminate-post.md</td>
-<td>Not started</td>
+<td>Done</td>
 </tr>
 <tr>
 <td>9. Teardown, docs and issue closure</td>
@@ -12409,8 +12451,11 @@ locally-running kerbside.</p>
    an armed terminate button entirely); the phase 6 stable
    ids are what make morphdom match the right elements.</li>
 <li><strong>Terminate actions to POST</strong> (plan at high effort).
-   Routes, templates, CSRF double-submit wiring, CI lane
-   scripts, tempest plugin, docs; closes #133.</li>
+   Routes, templates, CSRF double-submit wiring, the three
+   out-of-browser callers, docs; closes #133. See the
+   correction under open question 4: not the tempest
+   plugin, not <code>lane-up.sh</code>, and the <code>.vv</code> ticket write is
+   mitigated rather than converted (#319).</li>
 <li><strong>Teardown, docs and issue closure</strong> (plan at medium
    effort). Delete the old <code>base.html</code> (renaming
    <code>base-sfui.html</code> into place), Bootstrap (all 40+ files),
@@ -12654,7 +12699,13 @@ issues going in:</p>
   plan as a whole.</li>
 <li>
 <h1 id="133-destructive-admin-actions-on-get-blind-csrf">133 — destructive admin actions on GET (blind CSRF):<a class="headerlink" href="#133-destructive-admin-actions-on-get-blind-csrf" title="Permanent link">&para;</a></h1>
-  fixed by phase 8.</li>
+  fixed by phase 8 for both terminate routes, which are now
+  POST behind the <code>X-CSRF-TOKEN</code> double submit. The third
+  destructive GET it names, the <code>.vv</code> ticket write, cannot
+  become a POST without replacing a browser-native download
+  on the console handoff path; it is mitigated by the
+  <code>SameSite=Lax</code> cookie phase 8 sets, and its residual is
+  #319.</li>
 <li>The markup defect catalogue in the Situation section
   (unclosed <code>&lt;tr&gt;</code>s, <code>&lt;/span&gt;</code> closing a <code>&lt;p&gt;</code>, <code>&lt;font&gt;</code>,
   duplicate <code>id="data"</code>, dead Bootstrap 4 utilities, the

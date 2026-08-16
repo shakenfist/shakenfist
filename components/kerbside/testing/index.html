@@ -6539,6 +6539,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 8: terminate actions to POST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -12397,7 +12425,7 @@ this lane its coverage value. <code>start-kerbside.sh</code> pre-checks the prox
 binary through <code>find_proxy_bin()</code> for the same reason.</p>
 <h3 id="live-termination">Live termination<a class="headerlink" href="#live-termination" title="Permanent link">&para;</a></h3>
 <p><code>verify-terminate-live.sh</code> (Rust leg only) runs on an isolated lane:
-it calls the REST terminate endpoint and asserts the in-flight
+it POSTs the REST terminate endpoint and asserts the in-flight
 connection drops, via the proxy log line <code>session terminated by
 control plane</code>. This exercises the DB→<code>ProxyControl</code> bridge end to
 end rather than the mock.</p>

@@ -6335,6 +6335,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 8: terminate actions to POST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -11780,7 +11808,7 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-sfui-conversion/">Convert the admin UI to sfui</a></td>
 <td>Make kerbside the second sfui consumer: vendor sfui into the static assets, rebuild the six templates on tokens and sfui components (theme toggle, tab-strip nav, brand chrome, details disclosures, morphdom polling), drop Bootstrap/jQuery/axios, fix the accumulated markup defects, and add template smoke tests; resolves #244 and #133</td>
 <td>In progress</td>
-<td><a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/">phase 1</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/">phase 2</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/">phase 3</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/">phase 4</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/">phase 5</a> (done — consoles page: disclosures, flattened connect actions, two-step terminate, inline theme-aware icons; sfui gained the .sf-btn underline suppression), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/">phase 6</a> (done — sessions/sources/audit pages: disclosure-panel accordion, CA cert disclosure, total_events footnote, shared two-step terminate include; all five pages now on base-sfui.html, template-only phase), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-07-polling/">phase 7</a> (done — meta refresh replaced by a 30s fetch-and-morph poll with an onBeforeElUpdated hook preserving open disclosures and the armed terminate button; failed polls pin a stale-since stamp instead of reloading), phases 8-9 not yet planned</td>
+<td><a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/">phase 1</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/">phase 2</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/">phase 3</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/">phase 4</a> (done), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/">phase 5</a> (done — consoles page: disclosures, flattened connect actions, two-step terminate, inline theme-aware icons; sfui gained the .sf-btn underline suppression), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/">phase 6</a> (done — sessions/sources/audit pages: disclosure-panel accordion, CA cert disclosure, total_events footnote, shared two-step terminate include; all five pages now on base-sfui.html, template-only phase), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-07-polling/">phase 7</a> (done — meta refresh replaced by a 30s fetch-and-morph poll with an onBeforeElUpdated hook preserving open disclosures and the armed terminate button; failed polls pin a stale-since stamp instead of reloading), <a href="/components/kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/">phase 8</a> (done — both terminate routes are POST behind the <code>X-CSRF-TOKEN</code> double-submit header, with a <code>SameSite=Lax</code> cookie covering the one destructive GET that cannot convert; the survey found two CI callers the master plan missed, cleared two it named in error, and split that remaining GET out as #319), phase 9 not yet planned</td>
 </tr>
 <tr>
 <td>2026-08-14</td>

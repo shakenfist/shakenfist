@@ -5619,6 +5619,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#carried-over-from-the-phase-3-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Carried over from the phase 3 review
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6398,6 +6409,34 @@
     
   
     sfui conversion phase 7: morphdom polling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 8: terminate actions to POST
   
 
     
@@ -11838,6 +11877,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#carried-over-from-the-phase-3-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Carried over from the phase 3 review
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -12009,6 +12059,29 @@ is covered at release time and by the evaluator. Record it in
 the master plan's future work if a periodic check of the
 PyPI path seems worth adding later — a nightly would be the
 natural home.</p>
+<h3 id="carried-over-from-the-phase-3-review">Carried over from the phase 3 review<a class="headerlink" href="#carried-over-from-the-phase-3-review" title="Permanent link">&para;</a></h3>
+<p><strong>shellcheck over <code>demo/</code> has no CI enforcement.</strong> Phase 3
+extended the pre-commit hook to <code>^(tools|demo)/</code>, which is
+the right scope, but <code>grep -rn pre-commit .github/workflows
+tox.ini</code> shows pre-commit is never invoked by any workflow or
+tox environment -- the only hits are comments in
+<code>pr-address-comments.yml</code> explaining why it is deliberately
+skipped there. So the demo's four shell scripts are checked
+only on machines where a developer installed the hooks.</p>
+<p>This phase should close that, and it is the natural owner
+because it is already adding the lane that runs the demo.
+Either add a shellcheck step to the new lane covering
+<code>tools/</code> and <code>demo/</code>, or add a <code>tox -e shellcheck</code>
+environment and call it from <code>sanity_checks</code>. Prefer the
+former: <code>sanity_checks</code> is a gate job feeding a required
+check, and <code>docs/testing.md</code> is the authority on what may
+change there.</p>
+<p><strong>A cheap smoke check ahead of the full lane.</strong>
+<code>docker compose config</code> validates the compose schema and
+<code>docker compose build</code> catches Dockerfile syntax, both in
+seconds and without bringing anything up. Worth running as
+the lane's first step so a schema typo fails fast rather
+than after a multi-minute image build and stack start.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

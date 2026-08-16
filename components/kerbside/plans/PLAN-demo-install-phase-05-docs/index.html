@@ -6418,6 +6418,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 8: terminate actions to POST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -12009,6 +12037,17 @@ transcript.</p>
 <li><code>.claude/CLAUDE.md</code>'s Key Files table — add <code>demo/</code> if the
   table is the right granularity for it. Judgement call; a
   demo directory is arguably not a key file.</li>
+<li><strong>Inbound links to <code>demo/</code>.</strong> Raised in the phase 3
+  review: <code>demo/README.md</code> links outward to
+  <code>docs/installation.md</code>, but nothing links inward. Neither
+  the top-level <code>README.md</code>, nor <code>docs/index.md</code>, nor
+  <code>docs/installation.md</code> mentions <code>demo/</code> at all, so a
+  reader arriving at the repository has no path to the thing
+  phase 3 built. This phase owns the fix, and it is
+  explicitly in scope rather than implied by "rewrite
+  installation.md": <code>docs/index.md</code> needs an entry, and
+  <code>README.md</code> may take the one sentence <code>readme-discipline</code>
+  allows, since the install story genuinely changed.</li>
 <li><code>etc/kerbside.conf.example</code> — <strong>candidate rename</strong> to
   <code>etc/kerbside.ini.example</code>. Raised in the phase 2 review:
   the example's extension differs from the path it must be

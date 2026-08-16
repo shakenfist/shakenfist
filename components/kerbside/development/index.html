@@ -6544,6 +6544,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 8: terminate actions to POST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -12385,6 +12413,17 @@ construction and needs no special handling.</p>
 a form, a wrong password, the theme toggle, logout -- still need a
 browser against a running kerbside, or a hand-check of the relevant
 <code>fetch</code> calls.</p>
+<p>One of those <code>fetch</code> calls is worth flagging in advance: a terminate
+click (<code>templates/includes/two-step-terminate.html</code>) fires a JSON
+POST carrying an <code>X-CSRF-TOKEN</code> header, read from the non-HttpOnly
+<code>csrf_access_token</code> cookie, because flask-jwt-extended requires the
+double-submit header on cookie-authenticated POSTs. The JWT cookie
+is also set <code>SameSite=Lax</code>. If a live terminate against a running
+kerbside returns an unexpected 401, check for that header before
+suspecting the JWT itself -- a missing or stale cookie is the usual
+cause. <code>Authorization: Bearer</code> callers, such as the CI drivers under
+<code>tools/</code>, never hit this check; flask-jwt-extended only applies CSRF
+protection to cookie-borne tokens.</p>
 <h2 id="building-the-rust-proxy">Building the Rust proxy<a class="headerlink" href="#building-the-rust-proxy" title="Permanent link">&para;</a></h2>
 <p>The Rust SPICE proxy lives in <code>rust/kerbside-proxy/</code> (its own crate;
 <code>.gitignore</code>d <code>target/</code>). Builds are wrapped in Docker via the crate's
