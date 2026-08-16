@@ -8099,6 +8099,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#supply-chain-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supply-chain policy
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -8171,6 +8182,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../features/" class="md-nav__link">
         
   
@@ -8207,6 +8274,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8339,6 +8434,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8347,6 +8470,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8394,6 +8573,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8403,10 +8610,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8424,8 +8631,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11615,6 +11822,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#supply-chain-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supply-chain policy
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -11764,7 +11982,7 @@ aarch64-specific. The msvc triple cannot be checked from Linux
 without an MSVC toolchain, because <code>cargo check</code> still runs
 build scripts and <code>aws-lc-sys</code> compiles vendored BoringSSL C for
 the target. See
-<a href="/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/">PLAN-two-stage-ci-phase-02-windows-check.md</a>.</p>
+<a href="/components/ryll/plans/PLAN-two-stage-ci/">PLAN-two-stage-ci.md</a>.</p>
 <h2 id="the-three-gates">The three gates<a class="headerlink" href="#the-three-gates" title="Permanent link">&para;</a></h2>
 <p>The <code>develop</code> ruleset requires exactly three status checks, and
 none of them builds anything — they are aggregators over the
@@ -12000,9 +12218,52 @@ The self-hosted fleet runs <code>MAX_WORKERS = 6</code> across every
 Shaken Fist repository, and the <code>l</code> pool is its scarcest
 resource: without a concurrency group a superseded run can hold
 an <code>l</code> slot for its full 45-minute timeout while its replacement
-queues behind it. The convention, including the different group
-key needed for comment-triggered workflows, is documented in
-<a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md">AGENTS.md</a>.</p>
+queues behind it.</p>
+<p>Use the job-level form rather than the workflow-level one, so
+that unrelated jobs in the same workflow do not cancel each
+other:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">my-job</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-12</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">s</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.workflow }}-${{ github.ref }}-my-job</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>Comment-triggered workflows (<code>pr-retest</code>, <code>pr-re-review</code>,
+<code>pr-address-comments</code>) need a different group key:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pr-retest-${{ github.event.issue.number }}</span>
+</code></pre></div>
+<p><code>github.ref</code> points at the default branch for <code>issue_comment</code>
+events, so it does not distinguish one pull request from
+another. The PR number does.</p>
+<p>Scheduled, push-to-default, and release workflows must <strong>not</strong>
+enable <code>cancel-in-progress</code>. Cancelling a release mid-publish,
+or a renovate run mid-PR-creation, leaves partial state behind.</p>
+<h2 id="supply-chain-policy">Supply-chain policy<a class="headerlink" href="#supply-chain-policy" title="Permanent link">&para;</a></h2>
+<p>The scanner jobs above enforce policy that lives in files at the
+repository root, and changing that policy has rules the files
+themselves do not state:</p>
+<ul>
+<li><strong>Ignoring a RustSec advisory</strong> requires adding the advisory
+  ID to <em>both</em> <code>deny.toml</code> and <code>.cargo/audit.toml</code>, with an
+  inline comment on each entry giving the rationale. Both
+  scanners run on every pull request and both must pass, so the
+  two ignore lists have to stay in sync — editing only
+  <code>deny.toml</code> produces a red <code>cargo audit</code> job. Ignores are debt
+  and should not accumulate silently.</li>
+<li><strong>Allowing a new licence</strong> means adding a permissive SPDX
+  identifier to <code>deny.toml</code>'s <code>licenses.allow</code> array. The
+  <code>licenses.exceptions</code> array is for a narrower case: a single
+  crate declaring a licence that is not on the general allowlist,
+  scoped so the grant does not apply repository-wide. The
+  <code>epaint_default_fonts</code> / <code>Ubuntu-font-1.0</code> entry is the
+  canonical example.</li>
+<li><strong>Suppressing a gitleaks false positive</strong> goes in
+  <code>.gitleaksignore</code>, with a comment explaining the pattern and
+  why it is safe. ryll runs the upstream gitleaks binary
+  directly rather than <code>gitleaks-action</code>, which requires a paid
+  licence for organisation repositories.</li>
+</ul>
 
 
 

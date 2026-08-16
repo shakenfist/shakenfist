@@ -7975,6 +7975,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../features/" class="md-nav__link">
         
   
@@ -8011,6 +8067,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8234,6 +8318,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8242,6 +8354,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8289,6 +8457,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8298,10 +8494,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8319,8 +8515,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11521,8 +11717,8 @@ what is reachable in each mode today.</p>
 is no standing gap-closure plan — gaps get closed by mode-specific
 work (the <a href="/components/ryll/plans/PLAN-web-frontend/">web frontend plan</a> closed the
 Web column's MVP set; the control socket work gave headless an
-interactive driving surface). Last full audit: post-Phase-8 web
-frontend sweep; control-socket cells refreshed 2026-07-30.</p>
+interactive driving surface). Last full audit: the web frontend
+sweep; control-socket cells refreshed 2026-07-30.</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -11640,7 +11836,7 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Obey guest size hints toggle (<code>--no-obey-guest-size</code> / hamburger toggle)</td>
 <td>available</td>
 <td>n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, <code>ryll/src/main.rs:195</code>)</td>
-<td>missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is Phase 5a of PLAN-web-frontend.md)</td>
+<td>missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned)</td>
 </tr>
 <tr>
 <td>Guest resolution follows viewport (<code>VDAgentMonitorsConfig</code>)</td>
@@ -11658,7 +11854,7 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Server cursor rendering (SET/INIT)</td>
 <td>available</td>
 <td>missing (<code>ryll/src/app.rs:3563</code> — <code>CursorChannel</code> runs, events arrive, but headless event loop has no handler for <code>CursorImage</code>/<code>CursorPos</code> events)</td>
-<td>available (MVP; datachannel CSS overlay, Phase 5b)</td>
+<td>available (MVP; datachannel CSS overlay)</td>
 </tr>
 <tr>
 <td>Cursor position tracking</td>
@@ -11688,7 +11884,7 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Audio playback (PCM and Opus decoding)</td>
 <td>available</td>
 <td>partial (<code>ryll/src/channels/playback.rs:156-292</code> — <code>PlaybackChannel</code> connects and decodes, but spawns a cpal thread that will fail silently if no audio device is present; no headless-safe "discard" path exists)</td>
-<td>available (MVP; Opus passthrough preferred, PCM→Opus fallback, Phase 5c)</td>
+<td>available (MVP; Opus passthrough preferred, PCM→Opus fallback)</td>
 </tr>
 <tr>
 <td>Volume control (slider + mute)</td>
@@ -11712,13 +11908,13 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Keyboard input (key down/up, scancodes)</td>
 <td>available</td>
 <td>available (via the control socket <code>send_key</code> verb — down/up/press with AT-set-1 scancodes; without <code>--control-socket</code> only cadence and <code>--paste-text</code> generate input)</td>
-<td>available (MVP; browser-side scancode table, Phase 5a)</td>
+<td>available (MVP; browser-side scancode table)</td>
 </tr>
 <tr>
 <td>Mouse input (position and buttons)</td>
 <td>available</td>
 <td>missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless)</td>
-<td>available (MVP; Phase 5a)</td>
+<td>available (MVP)</td>
 </tr>
 <tr>
 <td>Mouse mode negotiation (CLIENT/SERVER)</td>
@@ -11730,7 +11926,7 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Extended key prefix (E0 for nav cluster)</td>
 <td>available</td>
 <td>available (the control socket <code>send_key</code> verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space)</td>
-<td>available (browser shell builds its own AT table; Phase 5a)</td>
+<td>available (browser shell builds its own AT table)</td>
 </tr>
 <tr>
 <td>Modifier state tracking (Ctrl/Shift/Alt)</td>
@@ -12066,7 +12262,7 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Reconnect on disconnect (Reconnect button)</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI; headless exits when main channel disconnects)</td>
-<td>available (Phase 6 complete; SPICE session held while PeerConnection is dead; browser auto-reconnects with 1 s/2 s/4 s/8 s/16 s backoff, max 5 attempts then a manual button)</td>
+<td>available (SPICE session held while PeerConnection is dead; browser auto-reconnects with 1 s/2 s/4 s/8 s/16 s backoff, max 5 attempts then a manual button)</td>
 </tr>
 <tr>
 <td>State preserved across reconnect (disks, share dir, paste toggle)</td>
@@ -12090,7 +12286,7 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Graceful Ctrl+C shutdown</td>
 <td>available</td>
 <td>available</td>
-<td>available (Phase 6 complete; SIGTERM/Ctrl-C drains axum then explicitly closes the active bridge so DTLS/SRTP tears down cleanly before the process exits)</td>
+<td>available (SIGTERM/Ctrl-C drains axum then explicitly closes the active bridge so DTLS/SRTP tears down cleanly before the process exits)</td>
 </tr>
 <tr>
 <td>Cancel superseded connection attempt</td>
@@ -12192,13 +12388,13 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Per-launch URL token (web mode only)</td>
 <td>n/a — intrinsic (no HTTP server)</td>
 <td>n/a — intrinsic (no HTTP server)</td>
-<td>available (MVP; random 32-byte token printed to stdout, Phase 4)</td>
+<td>available (MVP; random 32-byte token printed to stdout)</td>
 </tr>
 <tr>
 <td>TLS for browser-facing endpoint</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 8a; <code>--web-tls-cert</code> / <code>--web-tls-key</code> flags; axum-server with rustls)</td>
+<td>available (<code>--web-tls-cert</code> / <code>--web-tls-key</code> flags; axum-server with rustls)</td>
 </tr>
 <tr>
 <td><strong>Web frontend (--web mode)</strong></td>
@@ -12210,37 +12406,37 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>HTTP server with per-launch URL token</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 4; <code>ryll/src/web/server.rs</code>)</td>
+<td>available (<code>ryll/src/web/server.rs</code>)</td>
 </tr>
 <tr>
 <td>Embedded browser shell (HTML/JS/CSS via include_bytes!)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 4)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>WebRTC SDP signalling endpoint (<code>POST /offer</code>)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 4)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>Synthetic video stream over WebRTC (test pattern)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 4; SyntheticFrameSource)</td>
+<td>available (SyntheticFrameSource)</td>
 </tr>
 <tr>
 <td>Synthetic audio stream over WebRTC (440 Hz tone)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 4)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>Real SPICE display frames over WebRTC</td>
 <td>available (egui paint loop)</td>
 <td>n/a — intrinsic (no encoder driven from real frames)</td>
-<td>available (Phase 5b; RealFrameSource over SurfaceMirror)</td>
+<td>available (RealFrameSource over SurfaceMirror)</td>
 </tr>
 <tr>
 <td>Real SPICE audio over WebRTC (Opus passthrough)</td>
@@ -12252,13 +12448,13 @@ frontend sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Browser-side keyboard/mouse input over datachannel</td>
 <td>available (egui inputs)</td>
 <td>n/a — intrinsic (no input device)</td>
-<td>available (Phase 5c)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>Browser-side cursor overlay (datachannel)</td>
 <td>available (egui overlay)</td>
 <td>n/a — intrinsic</td>
-<td>available (Phase 5d)</td>
+<td>available</td>
 </tr>
 </tbody>
 </table>

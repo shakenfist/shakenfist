@@ -7975,6 +7975,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../features/" class="md-nav__link">
         
   
@@ -8011,6 +8067,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8356,6 +8440,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8364,6 +8476,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8411,6 +8579,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8420,10 +8616,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8441,8 +8637,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11672,7 +11868,7 @@
 
 <h1 id="macos-runtime-metrics-verification-runbook">macOS runtime-metrics verification runbook<a class="headerlink" href="#macos-runtime-metrics-verification-runbook" title="Permanent link">&para;</a></h1>
 <p>This runbook is the user-side acceptance test for the macOS
-runtime-metrics implementation landed in phases 1–3 of
+runtime-metrics implementation described by
 <a href="/components/ryll/plans/PLAN-macos-runtime-metrics/"><code>PLAN-macos-runtime-metrics.md</code></a>.
 It is addressed at a maintainer running ryll on a real Mac
 (or at the future macOS CI matrix once
@@ -11689,8 +11885,8 @@ shape end-to-end on a real Mac, but they don't cover the
 RSS vs. real memory usage, port-leak safety over hours).</p>
 <p>The six tests in this runbook plus the soak procedure
 together verify all five acceptance criteria from the master
-plan and the additional port-leak safety property called out
-in its phase-3 brief.</p>
+plan and the additional port-leak safety property it calls
+out.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>A Mac with a debug or release ryll build.</li>
@@ -11766,12 +11962,12 @@ triggers (within a few hundred ms).</p>
 <p><strong>Fail:</strong> the second value is <em>less</em> → <code>PROCESS_START</code> is
 being reinitialised between samples (impossible with a
 <code>LazyLock&lt;Instant&gt;</code> — flag as a bug).</p>
-<p><strong>Bonus pass (phase-3 specific):</strong> the first bug report
-filed within a few seconds of <code>ryll</code> startup should already
-show a small-but-non-zero <code>uptime_secs</code> (e.g. ≥ 1.0).
-Phase 1 had a caveat that the first report could report ~0;
-phase 3's <code>init_at_startup</code> call from <code>main()</code> closes that
-gap. If the first report shows a value matching the
+<p><strong>Bonus pass:</strong> the first bug report filed within a few
+seconds of <code>ryll</code> startup should already show a
+small-but-non-zero <code>uptime_secs</code> (e.g. ≥ 1.0). The
+<code>init_at_startup</code> call from <code>main()</code> is what makes this
+true — without it the first report can read ~0. If the
+first report shows a value matching the
 real time since <code>ryll</code> started, <code>init_at_startup</code> is wired
 correctly.</p>
 <h3 id="test-6-threads-populated-sorted-named-where-applicable">Test 6 — <code>threads</code> populated, sorted, named where applicable<a class="headerlink" href="#test-6-threads-populated-sorted-named-where-applicable" title="Permanent link">&para;</a></h3>
@@ -11850,9 +12046,8 @@ single-digit growth over a one-hour session.</p>
 <ul>
 <li>First suspect: <code>MachThreadList::drop</code> is not running.
   Audit whether any code path between <code>task_threads</code> and the
-  <code>MachThreadList { … }</code> literal could panic. As of phase 2
-  there is no such path (the only operations are
-  infallible).</li>
+  <code>MachThreadList { … }</code> literal could panic. There is no
+  such path today (the only operations are infallible).</li>
 <li>Second suspect: <code>mach_port_deallocate</code> is failing
   silently. The current code ignores the return value
   because <code>Drop</code> cannot meaningfully recover. Temporarily
@@ -11881,7 +12076,7 @@ single-digit growth over a one-hour session.</p>
 <tr>
 <td>Test 2 fails</td>
 <td>Mach syscall returned non-KERN_SUCCESS</td>
-<td>Phase-1/2 <code>take_snapshot</code> / <code>take_thread_snapshots</code></td>
+<td><code>take_snapshot</code> / <code>take_thread_snapshots</code></td>
 </tr>
 <tr>
 <td>Test 3 fails</td>
@@ -11891,7 +12086,7 @@ single-digit growth over a one-hour session.</p>
 <tr>
 <td>Test 4 fails</td>
 <td>Memory unit / field semantics</td>
-<td><code>task_info</code> field read in phase-1 <code>take_snapshot</code></td>
+<td><code>task_info</code> field read in <code>take_snapshot</code></td>
 </tr>
 <tr>
 <td>Test 5 fails</td>
@@ -11906,22 +12101,22 @@ single-digit growth over a one-hour session.</p>
 <tr>
 <td>Test 6 empty array</td>
 <td><code>task_threads</code> returned 0</td>
-<td>Phase 2 <code>take_thread_snapshots</code> error path</td>
+<td><code>take_thread_snapshots</code> error path</td>
 </tr>
 <tr>
 <td>Test 6 all names empty</td>
 <td><code>pthread_*_np</code> API change</td>
-<td>Phase 2 <code>read_thread_name</code></td>
+<td><code>read_thread_name</code></td>
 </tr>
 <tr>
 <td>Test 6 unsorted</td>
 <td>Sort step removed</td>
-<td>Phase 2 <code>compute_thread_metrics</code></td>
+<td><code>compute_thread_metrics</code></td>
 </tr>
 <tr>
 <td>Soak fails</td>
 <td>Port leak</td>
-<td>Phase 2 <code>MachThreadList::drop</code></td>
+<td><code>MachThreadList::drop</code></td>
 </tr>
 </tbody>
 </table>

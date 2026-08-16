@@ -13,10 +13,10 @@
         <link rel="canonical" href="https://shakenfist.com/components/ryll/web-frontend/">
       
       
-        <link rel="prev" href="../releasing/">
+        <link rel="prev" href="../rendering-pipeline/">
       
       
-        <link rel="next" href="../troubleshooting/">
+        <link rel="next" href="../session-lifecycle/">
       
       
         
@@ -7975,6 +7975,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../features/" class="md-nav__link">
         
   
@@ -8011,6 +8067,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8123,6 +8207,34 @@
     
   
     Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
   
 
     
@@ -8447,10 +8559,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ctrl-c-ignored-historic-pre-phase-6" class="md-nav__link">
+  <a href="#ctrl-c-ignored-historic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ctrl-C ignored (historic, pre-Phase 6)
+        Ctrl-C ignored (historic)
       
     </span>
   </a>
@@ -8605,6 +8717,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../troubleshooting/" class="md-nav__link">
         
   
@@ -8613,6 +8781,34 @@
     
   
     Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
   
 
     
@@ -8641,10 +8837,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8662,8 +8858,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11949,10 +12145,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ctrl-c-ignored-historic-pre-phase-6" class="md-nav__link">
+  <a href="#ctrl-c-ignored-historic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ctrl-C ignored (historic, pre-Phase 6)
+        Ctrl-C ignored (historic)
       
     </span>
   </a>
@@ -12147,7 +12343,7 @@ exchanges SDP via <code>POST /offer</code>, and starts streaming.</p>
 <li>Ctrl-C cleanly stops the binary.</li>
 </ul>
 <h2 id="reconnect-behaviour">Reconnect behaviour<a class="headerlink" href="#reconnect-behaviour" title="Permanent link">&para;</a></h2>
-<p>Phase 6 makes <code>--web</code> mode resilient to browser disconnects.</p>
+<p><code>--web</code> mode is resilient to browser disconnects.</p>
 <h3 id="browser-tab-close-reopen">Browser tab close → reopen<a class="headerlink" href="#browser-tab-close-reopen" title="Permanent link">&para;</a></h3>
 <p>When the browser tab is closed (or the network between the
 browser and ryll drops), the server-side bridge reaper
@@ -12367,7 +12563,7 @@ The proxy carries only the HTTP signalling page and the
 </ul>
 <h3 id="click-to-reconnect-loop">"Click to reconnect" loop<a class="headerlink" href="#click-to-reconnect-loop" title="Permanent link">&para;</a></h3>
 <p>The browser retries automatically five times with
-exponential backoff, then shows a manual button (Phase 6).
+exponential backoff, then shows a manual button.
 If the button appears every time you reconnect, check
 ryll's logs for:</p>
 <div class="highlight"><pre><span></span><code>bridge reaper: bridge died, reaping
@@ -12376,7 +12572,7 @@ ryll's logs for:</p>
 or the bridge is not reaching a terminal state. Restart
 ryll and file a bug with the full log.</p>
 <h3 id="high-cpu-when-no-browser-is-connected">High CPU when no browser is connected<a class="headerlink" href="#high-cpu-when-no-browser-is-connected" title="Permanent link">&para;</a></h3>
-<p>This should not happen on Phase 6+ ryll. The bridge reaper
+<p>This should not happen. The bridge reaper
 drops the H.264 encoder when the browser disconnects, so
 CPU usage returns to near-idle. If you observe sustained
 high CPU with no active browser session, check that the
@@ -12417,11 +12613,12 @@ trust the issuing CA. Options:</p>
 <li>Accept the browser warning for one-off / diagnostic
   access (the media path is still DTLS-SRTP encrypted).</li>
 </ul>
-<h3 id="ctrl-c-ignored-historic-pre-phase-6">Ctrl-C ignored (historic, pre-Phase 6)<a class="headerlink" href="#ctrl-c-ignored-historic-pre-phase-6" title="Permanent link">&para;</a></h3>
-<p>Phase 6's <code>with_graceful_shutdown</code> / <code>Handle::graceful_shutdown</code>
-path fixed a race where Ctrl-C was delivered before the
-axum server was ready to drain. If you see this on a
-current ryll build, file a bug. Update to ryll ≥ Phase 6.</p>
+<h3 id="ctrl-c-ignored-historic">Ctrl-C ignored (historic)<a class="headerlink" href="#ctrl-c-ignored-historic" title="Permanent link">&para;</a></h3>
+<p>Old ryll builds had a race where Ctrl-C was delivered before
+the axum server was ready to drain. The
+<code>with_graceful_shutdown</code> / <code>Handle::graceful_shutdown</code> path
+fixed it. If you see this on a current ryll build, file a
+bug; otherwise, update.</p>
 <h2 id="security-note">Security note<a class="headerlink" href="#security-note" title="Permanent link">&para;</a></h2>
 <p>ryll supports native HTTPS via <code>--web-tls-cert</code> /
 <code>--web-tls-key</code> — this is the recommended deployment for
@@ -12482,7 +12679,7 @@ captured there:</p>
 <p>The URL includes the token and is valid until the service restarts.</p>
 <h3 id="graceful-shutdown_1">Graceful shutdown<a class="headerlink" href="#graceful-shutdown_1" title="Permanent link">&para;</a></h3>
 <p><code>KillSignal=SIGTERM</code> causes <code>systemctl stop ryll-web</code> to send SIGTERM.
-This engages Phase 6's graceful-shutdown path (<code>with_graceful_shutdown</code>
+This engages the graceful-shutdown path (<code>with_graceful_shutdown</code>
 / <code>Handle::graceful_shutdown</code>), which drains in-flight HTTP requests
 and tears down any active WebRTC bridge cleanly. <code>TimeoutStopSec=10s</code>
 is a generous ceiling; normal shutdown completes within ~5 seconds.</p>

@@ -8415,6 +8415,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -8439,6 +8450,62 @@
     
   
     Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
   
 
     
@@ -8495,6 +8562,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8627,6 +8722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8635,6 +8758,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8682,6 +8861,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8691,10 +8898,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8712,8 +8919,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -12191,6 +12398,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -12250,6 +12468,7 @@ whole document before writing a client or implementing a verb.</p>
 <li><a href="#error-model">Error model</a></li>
 <li><a href="#versioning">Versioning</a></li>
 <li><a href="#end-to-end-worked-example">End-to-end worked example</a></li>
+<li><a href="#implementation">Implementation</a></li>
 </ol>
 <hr />
 <h2 id="scope-and-non-goals">Scope and non-goals<a class="headerlink" href="#scope-and-non-goals" title="Permanent link">&para;</a></h2>
@@ -13535,6 +13754,122 @@ listening for the next client.</p>
 <li>The connection can be torn down by either side simply closing the
   socket. No explicit disconnect verb is required.</li>
 </ul>
+<hr />
+<h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
+<p>Everything above this point is the contract. This section describes
+how ryll implements it, and is not binding on other implementations.</p>
+<p>The control socket is exposed by headless mode via the
+<code>--control-socket &lt;path&gt;</code> CLI flag. The flag is only valid when
+<code>--headless</code> is also present; combining it with the GUI or <code>--web</code>
+flag is a CLI error caught before the SPICE session starts.</p>
+<p><strong>Module layout.</strong> The control surface lives entirely under
+<code>shakenfist-spice-renderer/src/control/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mod.rs</code></td>
+<td>Public re-exports: <code>Server</code>, <code>StatusProvider</code></td>
+</tr>
+<tr>
+<td><code>protocol.rs</code></td>
+<td>Wire-level types: <code>Request</code>, <code>Response</code>, <code>Event</code>, verb params and result structs, serialisation helpers</td>
+</tr>
+<tr>
+<td><code>server.rs</code></td>
+<td><code>Server::run</code> — the tokio task that binds the socket, accepts one client at a time, and dispatches verbs</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Runtime shape.</strong> <code>Server::run</code> binds a <code>tokio::net::UnixListener</code>
+at the supplied path with file mode <code>0600</code> (owner read/write only).
+File permissions are the sole access-control mechanism; no
+authentication is performed on the wire. Exactly one client is
+accepted at a time; a second connection attempt while a client is
+active receives a <code>{"ok": false, "error": {"code": "busy", ...}}</code>
+line and is immediately closed.</p>
+<p><strong>Architectural integration.</strong></p>
+<ul>
+<li><code>session.rs</code> fans the existing per-channel event mpsc into a
+  <code>tokio::sync::broadcast::Sender&lt;ChannelEvent&gt;</code>. Subscribers on
+  this broadcast bus include <code>HeadlessStats</code>, the headless-mode
+  <code>SurfaceMirror</code>-apply task, and the control server's per-client
+  event-translator task.</li>
+<li>The control server holds <code>Arc&lt;tokio::sync::Mutex&lt;SurfaceMirror&gt;&gt;</code>
+  for two purposes: answering <code>screenshot</code> requests synchronously
+  (locks, snapshots pixel buffer, encodes) and enumerating live
+  surfaces in the <code>status</code> verb response.</li>
+<li>The control server is given an <code>Arc&lt;dyn StatusProvider&gt;</code> so
+  <code>status</code> can query SPICE-connection state and agent presence
+  without coupling <code>server.rs</code> to <code>session.rs</code> internals.</li>
+<li>Per-client outbound events use a two-task pipeline: an
+  event-translator task (subscribes to the broadcast bus, filters by
+  the client's subscription set, converts <code>ChannelEvent</code> to JSON)
+  feeds a 256-slot mpsc into a writer task (drains the mpsc, writes
+  newline-terminated lines to the socket). When the mpsc is full, the
+  translator drops the <strong>oldest</strong> queued events and increments a
+  drop counter; when the queue next drains, a single <code>dropped</code> event
+  is emitted with the cumulative count. The SPICE session is never
+  back-pressured by a slow control-socket client. This is the
+  mechanism behind the <a href="#backpressure">Backpressure</a> contract above.</li>
+</ul>
+<p><strong>How the v1.1 events are produced.</strong> Both sit on top of the v1.0
+verb/event surface, implemented by extending <code>translate_event</code> (the
+per-client broadcast filter) — no new <code>ChannelEvent</code> variants were
+required on the SPICE side, and no new module on the control-server
+side:</p>
+<ul>
+<li><code>surface_drawn</code> fires once per display draw command
+  (<code>ImageReady</code>, <code>ImageReadyChroma</code>, <code>ImageReadyAlpha</code>,
+  <code>FillRect</code>, <code>CopyBits</code>, <code>Invert</code>).  Renderer-internal
+  <code>produced_at_secs</code> flows through unchanged; the event carries
+  a fresh <code>wallclock_us</code> captured at translation time so cross-
+  process consumers (the kerbside loadtest orchestrator) can
+  compute keypress-to-screen latency against wallclock-recorded
+  keypress times.</li>
+<li><code>digest_updated</code> lives behind the <code>digest-decode</code> Cargo
+  feature.  Off in production builds.  When enabled,
+  <code>crate::digest::run_digest_poller</code> ticks every 100 ms,
+  snapshots the primary surface RGBA, runs
+  <code>shakenfist-visual-digest::decode_qr_rgba</code> followed by
+  <code>decode</code>, deduplicates by <code>frame_counter</code>, and broadcasts a
+  <code>ChannelEvent::DigestUpdated</code>.  The translator converts that
+  to a <code>digest_updated</code> wire event.  The hello / subscribe
+  paths both gate on <code>protocol::supported_events()</code>, which only
+  advertises <code>digest_updated</code> when the feature is on.</li>
+</ul>
+<p>Both events are pushed to subscribers via the same broadcast
+bus / per-client mpsc / drop-oldest backpressure path the v1.0
+events use.</p>
+<p><strong>Future work.</strong> The following items are explicitly out of
+scope for v1 and will be addressed by follow-up plans:</p>
+<ul>
+<li>Mouse-click and pointer-move verbs (requires Sextant pointer
+  collector, which is marked deferred in its own <code>ARCHITECTURE.md</code>).</li>
+<li>USB-redirection and WebDAV verbs.</li>
+<li>Authentication or encryption on the socket beyond Unix file
+  permissions.</li>
+<li>Multi-client concurrency (the v1 single-client model is
+  intentional and adequate for the harness use-case).</li>
+<li>Out-of-band (non-JSON) screenshot transport for low-latency
+  digest-assertion loops.</li>
+<li>Synchronous paste (the async model was chosen deliberately; a
+  synchronous convenience wrapper belongs in the client, not the
+  server).</li>
+<li>Rate-limit knobs for <code>digest_updated</code> (currently a fixed
+  100 ms tick; add a <code>--digest-min-interval-ms</code> if the Sextant
+  scenarios produce too many events for slow consumers).</li>
+<li>Cross-platform CI matrix for the new feature combinations;
+  only Linux is verified today.</li>
+</ul>
+<p>The design rationale for the control socket and the v1.1
+additions lives in the kerbside test-harness master plan,
+<code>shakenfist/kerbside/docs/plans/PLAN-test-harness.md</code>.</p>
 
 
 

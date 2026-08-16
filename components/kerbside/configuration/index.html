@@ -8121,6 +8121,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/features/" class="md-nav__link">
         
   
@@ -8157,6 +8213,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8289,6 +8373,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -8297,6 +8409,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8344,6 +8512,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../ryll/web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8353,10 +8549,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8374,8 +8570,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11539,8 +11735,9 @@
 <h1 id="configuring-kerbside">Configuring Kerbside<a class="headerlink" href="#configuring-kerbside" title="Permanent link">&para;</a></h1>
 <p>Kerbside is configured via environment variables (prefixed with <code>KERBSIDE_</code>) or
 an INI configuration file at <code>/etc/kerbside/kerbside.ini</code>. Environment variables
-take priority over INI file settings. See <code>etc/kerbside.conf.example</code> for a
-complete configuration example.</p>
+take priority over INI file settings. That path is hardcoded as <code>INI_PATH</code> in
+<code>kerbside/config.py</code>; there is no setting which relocates it. See
+<code>etc/kerbside.conf.example</code> for a complete configuration example.</p>
 <p><strong>Note</strong>: This documentation should match <code>kerbside/config.py</code>. If you find
 discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <h2 id="basic-settings">Basic Settings<a class="headerlink" href="#basic-settings" title="Permanent link">&para;</a></h2>

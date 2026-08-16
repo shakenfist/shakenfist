@@ -1537,11 +1537,23 @@
          <lastmod>2026-08-16</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/ryll/design-decisions/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/ryll/development-macos/</loc>
          <lastmod>2026-08-16</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/development/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/device-redirection/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/diagnostics/</loc>
          <lastmod>2026-08-16</lastmod>
     </url>
     <url>
@@ -1573,11 +1585,27 @@
          <lastmod>2026-08-16</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/ryll/rendering-pipeline/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/session-lifecycle/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/spice-protocol/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/ryll/troubleshooting/</loc>
          <lastmod>2026-08-16</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/web-frontend/</loc>
+         <lastmod>2026-08-16</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/web-mode-internals/</loc>
          <lastmod>2026-08-16</lastmod>
     </url>
     <url>

@@ -16,7 +16,7 @@
         <link rel="prev" href="../control-socket-protocol/">
       
       
-        <link rel="next" href="../features/">
+        <link rel="next" href="../device-redirection/">
       
       
         
@@ -8040,6 +8040,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workspace-dependency-convention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspace dependency convention
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#debugging-async-hangs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8111,10 +8122,127 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#test-suite-specifics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test suite specifics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Helper tools
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helper tools">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-a-capture-pcap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a --capture pcap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smoke-testing-web-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoke-testing --web mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-control-socket-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example control-socket client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -8163,6 +8291,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8295,6 +8451,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8303,6 +8487,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8350,6 +8590,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8359,10 +8627,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8380,8 +8648,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11456,6 +11724,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workspace-dependency-convention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspace dependency convention
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#debugging-async-hangs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11524,6 +11803,67 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-suite-specifics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test suite specifics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Helper tools
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helper tools">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-a-capture-pcap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a --capture pcap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smoke-testing-web-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoke-testing --web mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-control-socket-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example control-socket client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -11619,6 +11959,22 @@ out at build time:</p>
 <code>cargo build --release --no-default-features -p ryll</code>.  See
 <a href="/components/ryll/control-socket-protocol/">control-socket-protocol.md</a>
 for the <code>surface_drawn</code> and <code>digest_updated</code> event shapes.</p>
+<h2 id="workspace-dependency-convention">Workspace dependency convention<a class="headerlink" href="#workspace-dependency-convention" title="Permanent link">&para;</a></h2>
+<p>Every workspace crate carries <code>version.workspace = true</code>, so
+the single version in the root <code>Cargo.toml</code> is the only place
+a release bump has to happen.</p>
+<p>Dependencies between workspace crates must declare <strong>both</strong> a
+path and a version:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">shakenfist-spice-renderer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;../shakenfist-spice-renderer&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;0.1.7&quot;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>The path wins for local builds, so day-to-day development sees
+the working tree rather than a published crate. The version is
+what <code>cargo publish</code> requires — a path-only dependency cannot
+be published to crates.io. Omitting it therefore costs nothing
+until release day, and then fails the publish, which is why it
+is easy to get wrong. Bump the version alongside the workspace
+version whenever the depended-on crate is released; see
+<a href="/components/ryll/releasing/">releasing.md</a>.</p>
 <h2 id="debugging-async-hangs">Debugging async hangs<a class="headerlink" href="#debugging-async-hangs" title="Permanent link">&para;</a></h2>
 <p>A set of diagnostic hooks exists for debugging tokio task hangs
 and channel wedges. They were built during the K1 idle-wedge
@@ -11663,15 +12019,15 @@ variables override the defaults, and the test sets
 and the historical wedge fingerprint shows up there regardless.</p>
 <h2 id="pre-commit-hooks">Pre-commit hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>The project uses pre-commit hooks to enforce code quality:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Install pre-commit hooks</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pre-commit<span class="w"> </span>install
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Run checks manually on all files</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Or use the script directly</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>./scripts/check-rust.sh<span class="w"> </span>check<span class="w">   </span><span class="c1"># Check mode</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>./scripts/check-rust.sh<span class="w"> </span>fix<span class="w">     </span><span class="c1"># Auto-fix mode</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Install pre-commit hooks</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pre-commit<span class="w"> </span>install
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Run checks manually on all files</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Or use the script directly</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>./scripts/check-rust.sh<span class="w"> </span>check<span class="w">   </span><span class="c1"># Check mode</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>./scripts/check-rust.sh<span class="w"> </span>fix<span class="w">     </span><span class="c1"># Auto-fix mode</span>
 </code></pre></div>
 <p>The pre-commit hooks run:</p>
 <ul>
@@ -11747,6 +12103,74 @@ still surface only in the merge tier.</p>
   source in the devcontainer</li>
 <li><strong>ctrlc</strong> - Cross-platform Ctrl+C handling for graceful shutdown</li>
 </ul>
+<h2 id="test-suite-specifics">Test suite specifics<a class="headerlink" href="#test-suite-specifics" title="Permanent link">&para;</a></h2>
+<p>Beyond <code>make test</code>, a few tests are worth knowing about individually:</p>
+<ul>
+<li><strong>Decompression unit tests</strong> cover the LZ / GLZ / LZ4 / QUIC
+  algorithms directly.</li>
+<li><strong>Encoder smoke test</strong> (<code>shakenfist-spice-renderer/tests/encoder_smoke.rs</code>)
+  runs for ~3 seconds and writes <code>target/encoder_smoke.h264</code>. Run
+  <code>ffplay target/encoder_smoke.h264</code> after <code>make test</code> to visually
+  verify encoder output.</li>
+<li><strong>WebRTC H.264 packetiser test</strong>
+  (<code>shakenfist-spice-renderer/tests/webrtc_h264_smoke.rs</code>) verifies
+  <code>H264Payloader</code> accepts the encoder's Annex-B NAL output.</li>
+<li><strong>Loopback integration test</strong> (<code>shakenfist-spice-webrtc/tests/loopback.rs</code>)
+  creates two in-process <code>RTCPeerConnection</code>s and asserts video, audio
+  and datachannel all flow end to end.</li>
+<li><strong>Control socket integration tests</strong>
+  (<code>shakenfist-spice-renderer/tests/control_socket.rs</code>) exercise every v1
+  verb and event without a real SPICE session, using a stub
+  <code>StatusProvider</code> and an in-process broadcast channel. New verbs or
+  events should ship with a matching test here.</li>
+<li><strong>ICE gathering soak</strong>: <code>RYLL_GATHERING_SOAK=1 make test</code> runs the
+  20-iteration invariant-candidate-count soak in
+  <code>accept_offer_answer_carries_all_candidates</code>. Off by default because
+  exact cross-run candidate-count equality is coupled to host interface
+  churn (docker/veth appearing, IPv6 temporary addresses rotating). Run
+  it on a quiet host when touching the ICE gathering signal.</li>
+</ul>
+<p>Integration testing against real traffic needs a SPICE server;
+<code>make test-qemu</code> starts one locally. Headless mode is what CI uses for
+protocol-level testing.</p>
+<h2 id="helper-tools">Helper tools<a class="headerlink" href="#helper-tools" title="Permanent link">&para;</a></h2>
+<h3 id="inspecting-a-capture-pcap">Inspecting a <code>--capture</code> pcap<a class="headerlink" href="#inspecting-a-capture-pcap" title="Permanent link">&para;</a></h3>
+<p><code>tools/pcap-inspect.py</code> is a pure-Python helper (no tshark
+or scapy dependency) for sifting through a ryll capture.
+Three subcommands:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
+</code></pre></div>
+<p>Typical use: when investigating a rendering artefact,
+<code>opcodes</code> tells you whether the problem window even
+contains the draw ops you thought it did (this is how we
+established that a "static" artefact was 100% DRAW_COPY
+rather than missing draw ops); <code>draw-copy</code> narrows further
+to the image types involved; <code>timeline --since-last 5</code>
+dumps the last five seconds of traffic when the user has
+pressed F8 right after seeing the artefact.</p>
+<p>ryll's pcap files are big-endian libpcap format carrying
+synthetic TCP frames around the raw post-link SPICE
+stream. The helper handles that without any extra flags.</p>
+<h3 id="smoke-testing-web-mode">Smoke-testing <code>--web</code> mode<a class="headerlink" href="#smoke-testing-web-mode" title="Permanent link">&para;</a></h3>
+<p><code>tools/web-smoke.sh</code> verifies that <code>ryll --web</code> starts,
+binds the HTTP server, and shuts down cleanly on SIGTERM.
+Usage:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
+</code></pre></div>
+<p>Defaults to <code>target/release/ryll</code>; <code>WEB_PORT</code> env var
+overrides the port (default <code>18080</code>). The script creates a
+temporary stub <code>.vv</code>, launches ryll, waits 3 seconds,
+SIGTERMs, and asserts clean exit within 5 seconds. CI runs
+this in the <code>build-linux</code> job via <code>make web-smoke</code> and
+<code>make web-smoke-tls</code>, inside the devcontainer.</p>
+<h3 id="example-control-socket-client">Example control-socket client<a class="headerlink" href="#example-control-socket-client" title="Permanent link">&para;</a></h3>
+<p><code>examples/control-socket-demo.py</code> is a stdlib-only Python script,
+runnable directly, demonstrating the full hello → status → subscribe
+→ send_key → paste → screenshot → disconnect sequence. It is the
+starting point for downstream test-harness drivers. The wire contract
+it implements is <a href="/components/ryll/control-socket-protocol/"><code>control-socket-protocol.md</code></a>.</p>
 
 
 

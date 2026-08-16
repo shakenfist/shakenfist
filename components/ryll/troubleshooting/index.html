@@ -13,10 +13,10 @@
         <link rel="canonical" href="https://shakenfist.com/components/ryll/troubleshooting/">
       
       
-        <link rel="prev" href="../web-frontend/">
+        <link rel="prev" href="../spice-protocol/">
       
       
-        <link rel="next" href="../plans/">
+        <link rel="next" href="../web-mode-internals/">
       
       
         
@@ -7975,6 +7975,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../features/" class="md-nav__link">
         
   
@@ -8011,6 +8067,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
   
 
     
@@ -8143,6 +8227,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8151,6 +8263,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8798,10 +8966,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#schema-change-phase-12f" class="md-nav__link">
+  <a href="#schema-change-caches-reported-separately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schema change (phase 12F)
+        Schema change: caches reported separately
       
     </span>
   </a>
@@ -8861,6 +9029,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8870,10 +9066,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8891,8 +9087,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -12501,10 +12697,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#schema-change-phase-12f" class="md-nav__link">
+  <a href="#schema-change-caches-reported-separately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schema change (phase 12F)
+        Schema change: caches reported separately
       
     </span>
   </a>
@@ -12968,9 +13164,8 @@ changed while you were typing the description.</p>
 <p>When a Display bug report is submitted because video appears to
 stutter or fall behind, these fields in <code>channel-state.json</code> tell
 you which part of the pipeline was slow without re-running the
-session. They were added by the master plan
-<a href="/components/ryll/../docs/plans/PLAN-video-keeping-up/"><code>PLAN-video-keeping-up.md</code></a>
-phase 1.</p>
+session. They come from the master plan
+<a href="/components/ryll/../docs/plans/PLAN-video-keeping-up/"><code>PLAN-video-keeping-up.md</code></a>.</p>
 <ul>
 <li><code>decode_total_count</code>, <code>decode_failed_count</code>,
   <code>decode_from_cache_count</code> — cumulative decode counters since
@@ -13002,7 +13197,7 @@ phase 1.</p>
   value implicates disk speed (or anything else slowing the
   writer task) rather than decode CPU or socket-read pacing;
   the rest of the SPICE pipeline keeps running because the
-  enqueue is non-blocking. Added in phase 2.</li>
+  enqueue is non-blocking.</li>
 </ul>
 <p>In <code>session.json</code> (a sibling artefact in the same zip):</p>
 <ul>
@@ -13011,8 +13206,7 @@ phase 1.</p>
   egui frame loop tried to enqueue. Zero unless <code>--capture</code>
   is active. A non-zero value implicates encoder CPU (or MP4
   write speed) rather than the SPICE pipeline; the egui frame
-  loop stays responsive because the enqueue is non-blocking.
-  Added in phase 3.</li>
+  loop stays responsive because the enqueue is non-blocking.</li>
 <li><code>image_ready_lag_recent_{min,max,mean}_us</code> and
   <code>display_mark_lag_recent_{min,max,mean}_us</code> — microseconds
   spent waiting in the renderer→app mpsc queue, computed
@@ -13025,11 +13219,10 @@ phase 1.</p>
   long-running synchronous operation inside <code>App::update</code>
   starving the event drain. <code>max</code> is the most informative
   single number; within-batch samples are correlated so
-  <code>mean</code> is biased by batch size. Added in phase 4.</li>
+  <code>mean</code> is biased by batch size.</li>
 </ul>
-<p><strong>MP4 finalisation note (phase 3 trade-off).</strong> With phase 3
-the MP4 moov atom is written by the encoder task after the
-sender drops, not synchronously by <code>CaptureSession::close()</code>.
+<p><strong>MP4 finalisation trade-off.</strong> The MP4 moov atom is written
+by the encoder task after the sender drops, not synchronously by <code>CaptureSession::close()</code>.
 In practice the encoder task finalises within milliseconds of
 close, but a bug report assembled in a very short window
 after a disconnect — or in the SIGINT abrupt-shutdown path —
@@ -13230,8 +13423,8 @@ encode the UTC timestamp and session uptime:</p>
 <p>The rolling cap is enforced by age (oldest files pruned first), so disk usage
 stays bounded. At the default cap of 20 zips with typical sizes (~1 MiB each),
 you'll use ~20 MiB total.</p>
-<p>See the <a href="/components/ryll/../README/#auto-snapshot-mode">README section on auto-snapshot mode</a>
-for more details on what each field means.</p>
+<p>See <a href="/components/ryll/diagnostics/#auto-snapshot-mode---auto-snapshot-interval">auto-snapshot mode</a>
+in the diagnostics guide for more details on what each field means.</p>
 <h2 id="display-image-cache-pressure">Display image cache pressure<a class="headerlink" href="#display-image-cache-pressure" title="Permanent link">&para;</a></h2>
 <p>The SPICE server flags certain decoded image frames with <code>CACHE_ME</code> to
 reduce bandwidth on future repeated use. Ryll caches these decoded RGBA
@@ -13293,37 +13486,39 @@ can reference back-window entries from earlier frames the server told
 the client to remember (<code>IMAGE_FLAGS_CACHE_ME</code> on the originating
 Glz/ZlibGlz payload). The shared GLZ dictionary holds those decoded
 entries client-side so subsequent back-references resolve.</p>
-<p>Until phase 12E the GLZ dictionary was an unbounded
+<p>The GLZ dictionary was originally an unbounded
 <code>Mutex&lt;HashMap&lt;u64, Vec&lt;u8&gt;&gt;&gt;</code> — entries were appended on every
 <code>CACHE_ME</code> payload and removed only on explicit server-driven
 <code>inval_*</code> messages. Workloads where the server never sent <code>inval_*</code>
 (notably the full-frame ZlibGlzRgb video fallback observed in
 sessions 003a and 004d-g) leaked memory at roughly 30 MiB/s and drove
-the multi-GiB RSS runaway that originally motivated phase 12. This
+the multi-GiB RSS runaway that motivated capping it. This
 also produced one of the more confusing snapshot readings of the
 project: a 5 GiB <code>image_cache_bytes</code> value against a 256 MiB cap,
-because the pre-12F snapshot summed the two caches together (see the
+because the snapshot then summed the two caches together (see the
 schema-change note below).</p>
 <p>The <code>--glz-dictionary-cap-mib</code> flag (default 256 MiB; see
 <a href="/components/ryll/configuration/">configuration.md</a>) bounds the dictionary with the
 same byte-capped LRU as the image cache: when total entry bytes exceed
 the cap, oldest entries are evicted until the cap is satisfied.</p>
-<h3 id="schema-change-phase-12f">Schema change (phase 12F)<a class="headerlink" href="#schema-change-phase-12f" title="Permanent link">&para;</a></h3>
-<p>Prior to phase 12F, <code>image_cache_bytes</code>, <code>image_cache_entries</code>, and
-<code>image_cache_ids</code> summed the renderer's <code>BoundedImageCache</code> together
+<h3 id="schema-change-caches-reported-separately">Schema change: caches reported separately<a class="headerlink" href="#schema-change-caches-reported-separately" title="Permanent link">&para;</a></h3>
+<p>Bug reports written by older ryll builds summed two caches into one
+set of fields: <code>image_cache_bytes</code>, <code>image_cache_entries</code>, and
+<code>image_cache_ids</code> covered the renderer's <code>BoundedImageCache</code> together
 with the SPICE <code>GlzDictionary</code> decompression cache. This made bug
 reports ambiguous: a 5 GiB <code>image_cache_bytes</code> reading against a
 256 MiB cap (as seen in session 003a) actually came from the GLZ
 dictionary, not the image cache, but nothing in the snapshot
 distinguished the two.</p>
-<p>After 12F, the <code>image_cache_*</code> fields reflect only the
+<p>Current builds report the two separately: the <code>image_cache_*</code>
+fields reflect only the
 <code>BoundedImageCache</code> (CACHE_ME-flagged decoded RGBA frames). The GLZ
 dictionary's state is reported separately under the new
 <code>glz_dictionary_*</code> fields described below. As a result,
-<code>image_cache_bytes</code> in a bug report from a 12F-or-later ryll build
-will be roughly an order of magnitude smaller than the same field
-from a pre-12F bug report under an equivalent workload; if you need
-the pre-12F sum, add <code>image_cache_bytes + glz_dictionary_bytes</code>.</p>
+<code>image_cache_bytes</code> in a current bug report will be roughly an order
+of magnitude smaller than the same field in an older report under an
+equivalent workload; to compare against an older report, add
+<code>image_cache_bytes + glz_dictionary_bytes</code>.</p>
 <h3 id="interpreting-glz-dictionary-statistics-in-a-bug-report">Interpreting GLZ dictionary statistics in a bug report<a class="headerlink" href="#interpreting-glz-dictionary-statistics-in-a-bug-report" title="Permanent link">&para;</a></h3>
 <p>When you file a Display bug report (F12), the <code>channel-state.json</code>
 includes five GLZ-related fields under the display channel entry:</p>

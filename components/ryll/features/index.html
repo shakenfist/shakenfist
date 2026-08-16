@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/ryll/features/">
       
       
-        <link rel="prev" href="../development/">
+        <link rel="prev" href="../diagnostics/">
       
       
         <link rel="next" href="../installation/">
@@ -7972,6 +7972,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../device-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics and instrumentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -8238,6 +8294,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key design decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../libvirt-spice-recommendations/" class="md-nav__link">
         
   
@@ -8350,6 +8434,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rendering-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rendering and audio pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -8358,6 +8470,62 @@
     
   
     ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../session-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE protocol handling
   
 
     
@@ -8405,6 +8573,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../web-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -8414,10 +8610,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_24" id="__nav_3_9_24_label" tabindex="0">
             
   
   
@@ -8435,8 +8631,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11662,7 +11858,7 @@
 <p>This is the detailed feature catalogue for ryll. For a quick overview
 see the <a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README</a>;
 for how each subsystem works internally see
-<a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">ARCHITECTURE.md</a>.</p>
+<a href="/components/ryll/index/">docs/index.md</a>.</p>
 <h2 id="rendering-and-display">Rendering and display<a class="headerlink" href="#rendering-and-display" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Immediate mode rendering</strong> - Uses egui for efficient display rendering without accumulating objects.</li>
@@ -11694,7 +11890,7 @@ for how each subsystem works internally see
 <h2 id="connectivity-and-sessions">Connectivity and sessions<a class="headerlink" href="#connectivity-and-sessions" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>TLS support</strong> - Secure connections with inline CA certificates from .vv files.</li>
-<li><strong>Reconnect on disconnect</strong> - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See ARCHITECTURE.md "Reconnection" for the full lifecycle.</li>
+<li><strong>Reconnect on disconnect</strong> - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See <a href="/components/ryll/session-lifecycle/">session-lifecycle.md</a> "Reconnection" for the full lifecycle.</li>
 <li><strong>Ticket lifecycle handling</strong> - Honours <code>delete-this-file=1</code> (single-use ticket: auto-reconnect suppressed) and the ryll extension key <code>ticket-valid-until</code> (expiry warning and modal) in .vv files. See <a href="/components/ryll/configuration/">configuration.md</a> for the full key reference.</li>
 <li><strong>Graceful Ctrl+C shutdown</strong> - Cross-platform signal handling via <code>ctrlc</code> crate; the GUI and headless event loops check a flag and shut down cleanly, ensuring capture files are finalized.</li>
 </ul>
