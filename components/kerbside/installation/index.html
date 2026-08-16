@@ -5756,6 +5756,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -11610,16 +11750,24 @@ the daemon that supervises the proxy) and the Rust <code>kerbside-proxy</code>
 (the SPICE proxy itself, <code>rust/kerbside-proxy/</code> in the source tree).</p>
 <p><code>kerbside-proxy</code> is published to PyPI as a separate maturin
 <code>bindings = "bin"</code> wheel that carries the compiled binary and lands it
-on <code>PATH</code>. <code>kerbside</code> exact-pins <code>kerbside-proxy</code> at the same version,
-so <code>pip install kerbside</code> installs a matching proxy automatically (the
-daemon finds it via <code>shutil.which('kerbside-proxy')</code>); you do not
-build or install it separately. Both packages are released in lockstep
-from a single <code>v*</code> tag, and prebuilt manylinux wheels are published
-for x86_64 and aarch64 (no source distribution — an unsupported
-platform gets a clean pip error).</p>
+on <code>PATH</code> (the daemon finds it via <code>shutil.which('kerbside-proxy')</code>);
+you do not build or install it separately. A release install —
+<code>pip install kerbside==X.Y.Z</code> — gets the exact-pinned <code>kerbside-proxy</code>
+release it was built and tested against: the two packages release in
+lockstep from a single <code>v*</code> tag. A git or dev install of <code>kerbside</code>
+instead resolves whatever <code>kerbside-proxy</code> is newest on PyPI, which may
+be a rolling dev wheel rather than a tagged release. Prebuilt manylinux
+wheels are published for x86_64 and aarch64 (no source distribution —
+an unsupported platform gets a clean pip error).</p>
 <p>For development you can instead point <code>KERBSIDE_PROXY_BIN</code> at a
 locally built binary, or let the daemon pick up the in-repo
 <code>cargo build</code> output.</p>
+<p>At startup, the daemon runs <code>kerbside-proxy --contract-hash</code> and
+refuses to launch a binary whose gRPC contract does not match this
+<code>kerbside</code> version's — the error names both hashes and lists the ways
+to fix it. <code>KERBSIDE_SKIP_CONTRACT_CHECK=1</code> is the explicit, unsupported
+escape hatch that downgrades the refusal to a logged warning. See
+<a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a> for how the check works.</p>
 <h2 id="checking-os-package-dependencies">Checking OS package dependencies<a class="headerlink" href="#checking-os-package-dependencies" title="Permanent link">&para;</a></h2>
 <p>Kerbside requires certain OS-level packages to be installed. You can
 check for missing dependencies using bindep via tox:</p>

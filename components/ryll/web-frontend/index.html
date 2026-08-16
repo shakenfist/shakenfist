@@ -5674,6 +5674,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -8530,6 +8670,17 @@
     <span class="md-ellipsis">
       
         High CPU when no browser is connected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-offer-returns-500-on-a-host-with-no-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every /offer returns 500 on a host with no network
       
     </span>
   </a>
@@ -12123,6 +12274,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#every-offer-returns-500-on-a-host-with-no-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every /offer returns 500 on a host with no network
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cert-load-errors-at-startup" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12510,16 +12672,24 @@ The proxy carries only the HTTP signalling page and the
 <code>POST /offer</code> request.</p>
 <p>Consequences:</p>
 <ul>
-<li><strong>ryll's UDP port range must be reachable from the
-  browser.</strong> Open the relevant firewall ports on ryll's
-  host. The ephemeral RTP port range is chosen by the OS
-  (typically 32768–60999 on Linux).</li>
-<li><strong>Bind ryll to the public-facing IP, not loopback,</strong>
-  when the proxy listens on a different IP. Use
-  <code>--web-host 0.0.0.0</code> or the specific public IP.
-  If ryll is bound to <code>127.0.0.1</code>, the ICE candidates
-  it advertises will be loopback-only and the browser
-  cannot reach them.</li>
+<li><strong>ryll's UDP ports must be reachable from the browser.</strong>
+  At startup ryll enumerates the host's non-loopback
+  network interface addresses and binds one ephemeral UDP
+  socket per address; the OS assigns the actual port per
+  socket (typically from 32768–60999 on Linux). Open the
+  relevant firewall ports on ryll's host. Pinning a specific
+  port is not configurable yet — that lands in a later
+  phase, so a static firewall rule currently has to open the
+  OS's whole ephemeral range rather than a single port.</li>
+<li><strong>ryll advertises a candidate for every non-loopback
+  interface address on the host, independent of
+  <code>--web-host</code>.</strong> <code>--web-host</code> controls only the HTTP/HTTPS
+  signalling listener (<code>GET /</code>, <code>POST /offer</code>); it has no
+  effect on which addresses WebRTC binds or advertises. If
+  the host has more than one non-loopback interface (for
+  example a public IP and a private LAN IP), ryll binds and
+  advertises candidates for all of them — there is currently
+  no way to select or restrict which addresses are used.</li>
 </ul>
 </blockquote>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
@@ -12578,6 +12748,21 @@ CPU usage returns to near-idle. If you observe sustained
 high CPU with no active browser session, check that the
 reaper task is reaching the dead-bridge signal in the logs.
 If it is absent, file a bug with ryll version and log.</p>
+<h3 id="every-offer-returns-500-on-a-host-with-no-network">Every <code>/offer</code> returns 500 on a host with no network<a class="headerlink" href="#every-offer-returns-500-on-a-host-with-no-network" title="Permanent link">&para;</a></h3>
+<p><code>--web</code> needs at least one non-loopback interface address, even
+when you are browsing from the same machine. WebRTC binds its own
+UDP sockets and advertises their addresses as ICE candidates;
+loopback is excluded because a candidate a remote browser cannot
+reach is worse than a clear failure. On a host with networking
+down, or a network-isolated container, <code>WebrtcBridge::new</code> has
+nothing to bind and fails the request rather than handing the
+browser an answer it can never connect to.</p>
+<p>The error mentions ICE candidates and interface enumeration,
+which does not obviously translate to "bring up a network
+interface" — that is what it means. Connecting any interface,
+including a bridge or a VPN tunnel, is enough. There is no
+opt-in for loopback-only operation today; whether to add one is
+a question for the phase 03 configuration surface.</p>
 <h3 id="cert-load-errors-at-startup">Cert load errors at startup<a class="headerlink" href="#cert-load-errors-at-startup" title="Permanent link">&para;</a></h3>
 <p>ryll prints a clear error chain on cert-load failure, for
 example:</p>

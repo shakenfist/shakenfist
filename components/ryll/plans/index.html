@@ -5674,6 +5674,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -11816,7 +11956,7 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade/">webrtc-rs 0.20 upgrade</a></td>
 <td>Port <code>shakenfist-spice-webrtc</code> from webrtc-rs 0.17.1 to 0.20.x. 0.20 re-homes the crate on a sans-io <code>rtc</code> core behind a thin async layer, moving <code>RTCPeerConnection</code>'s operations onto a trait, collapsing the per-object callbacks into a single <code>PeerConnectionEventHandler</code>, dropping <code>gathering_complete_promise</code> and <code>connection_state</code>, and requiring explicit UDP bind addresses. Deferred from Renovate PR #245, which was repurposed to carry the <code>&lt; 0.18</code> pin and this plan.</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">1. Pre-work on 0.17</a> (complete), 2. Atomic bump, 3. Socket binding config, 4. Soak and docs (phases 2-4 plans pending)</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">1. Pre-work on 0.17</a> (complete), <a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">2. Atomic bump</a> (code complete on <code>webrtc = "0.20.2"</code>, both Renovate rules gone; <code>rtc</code> is now a direct dependency, the standalone <code>rtp</code> and <code>rustls</code> dependencies are gone, datachannels and remote tracks became poll loops, and UDP sockets bind enumerated interface addresses because <code>0.0.0.0</code> passes every test and reaches no browser. Awaiting the browser session, which is the only check that can catch a wrong bind address), 3. Socket binding config, 4. Soak and docs (phases 3-4 plans pending)</td>
 </tr>
 <tr>
 <td>2026-08-09</td>

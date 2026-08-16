@@ -5674,6 +5674,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -12095,9 +12235,14 @@ still surface only in the merge tier.</p>
 <li><strong>nusb</strong> - USB device access (pure Rust, no libusb)</li>
 <li><strong>dav-server</strong> - WebDAV server (RFC 4918, LocalFs backend)</li>
 <li><strong>hyper</strong> - HTTP/1.1 framing for WebDAV byte-stream transport</li>
-<li><strong>webrtc = "0.17.1"</strong> - DTLS/SRTP/ICE/SCTP/STUN stack for
-  <code>shakenfist-spice-webrtc</code> (browser-bridge crate; also pulls
-  in <code>rtp = "0.17.1"</code> for H.264 RTP packetisation)</li>
+<li><strong>webrtc = "0.20.2"</strong> - DTLS/SRTP/ICE/SCTP/STUN stack for
+  <code>shakenfist-spice-webrtc</code> (browser-bridge crate); an async
+  shim over the sans-io <code>rtc = "0.20.2"</code> core, which is a
+  direct dependency in its own right because webrtc's public
+  API takes <code>rtc</code> types it does not re-export. <code>if-addrs</code>
+  enumerates host interfaces to pick UDP bind addresses, and
+  <code>async-trait</code> is required to implement
+  <code>PeerConnectionEventHandler</code>.</li>
 <li><strong>opus = "0.3"</strong> - libopus bindings for the synthetic Opus
   pump in the webrtc crate; <code>audiopus_sys</code> builds libopus from
   source in the devcontainer</li>
@@ -12116,8 +12261,11 @@ still surface only in the merge tier.</p>
   (<code>shakenfist-spice-renderer/tests/webrtc_h264_smoke.rs</code>) verifies
   <code>H264Payloader</code> accepts the encoder's Annex-B NAL output.</li>
 <li><strong>Loopback integration test</strong> (<code>shakenfist-spice-webrtc/tests/loopback.rs</code>)
-  creates two in-process <code>RTCPeerConnection</code>s and asserts video, audio
-  and datachannel all flow end to end.</li>
+  drives a production <code>WebrtcBridge</code> against a <code>TestPeer</code> in one process
+  and asserts video, audio and datachannel all flow end to end. A second
+  case offers a narrow codec set (one H.264 fmtp, browser-chosen payload
+  numbers) to prove the pumps stamp the <em>negotiated</em> payload type rather
+  than a constant.</li>
 <li><strong>Control socket integration tests</strong>
   (<code>shakenfist-spice-renderer/tests/control_socket.rs</code>) exercise every v1
   verb and event without a real SPICE session, using a stub

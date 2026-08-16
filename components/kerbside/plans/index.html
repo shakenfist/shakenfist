@@ -5747,6 +5747,146 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -11648,6 +11788,13 @@ repo root. For pre-push audits of our own work see
 <td><code>docs/installation.md</code> stops at acquisition, so a reader who follows it has software and no running system: it never mentions the two processes, the database, the TLS material, or a console source. Package the migrations and add <code>kerbside db upgrade</code> (a wheel install currently cannot create its own schema), write the missing <code>etc/kerbside.conf.example</code>, build a <code>docker compose</code> demo with a CI lane, and rewrite the page around it; resolves #3</td>
 <td>In progress</td>
 <td><a href="/components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/">phase 1</a> (done 2026-08-14 — migrations moved into the package, <code>kerbside db upgrade</code>/<code>downgrade</code> and <code>kerbside demo token</code> added; verified from an installed wheel run outside any checkout. Fixed two logging defects found on the failure path, including alembic's env.py disabling every kerbside logger), <a href="/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/">phase 2</a> (done 2026-08-15 — <code>etc/kerbside.conf.example</code> covers all 34 <code>Config</code> fields, 8 live and 26 commented at their defaults, with no value that would work if pasted; tests pin coverage in both directions and the environment-beats-INI precedence that nothing previously held, both demonstrated to fail before being trusted. Verified from the real <code>/etc/kerbside/kerbside.ini</code> path in a container. Found and filed #313: a malformed INI exits zero, and percent-encoded database passwords reach it through configparser interpolation), <a href="/components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/">phase 3</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/">phase 4</a> (not started), <a href="/components/kerbside/plans/PLAN-demo-install-phase-05-docs/">phase 5</a> (not started)</td>
+</tr>
+<tr>
+<td>2026-08-14</td>
+<td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases/">Rolling kerbside-proxy dev releases</a></td>
+<td>Publish PEP 440 dev releases of the kerbside-proxy wheel to PyPI when the binary's inputs change (path-filtered: rust/**, kerbside.proto), commit a dev-inclusive version specifier so unreleased git installs (notably upstream Kolla image builds) resolve a working binary with no upstream kolla changes, and add a proto-hash contract handshake between daemon and binary as the skew backstop</td>
+<td>In progress</td>
+<td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/">phase 1</a> (implemented on branch; single PR at plan end), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/">phase 2</a> (implemented on branch), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/">phase 3</a> (implemented on branch — committed proto-hash constant, --contract-hash flag, startup refusal with KERBSIDE_SKIP_CONTRACT_CHECK escape hatch), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">phase 4</a> (planned — docs truth pass now; patch175 simplification and Gerrit recheck gated post-merge), phase 5 not yet planned</td>
 </tr>
 </tbody>
 </table>

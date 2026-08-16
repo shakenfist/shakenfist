@@ -5956,6 +5956,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -12273,19 +12413,30 @@ described in
 <a href="/components/kerbside/proxy-architecture/#how-the-binary-gets-there-packaging">How the binary gets there: packaging</a>.
 Three things about it only matter while developing:</p>
 <ul>
-<li><strong>A dev checkout deliberately carries no <code>kerbside-proxy</code> pin.</strong> The
-  sibling package is not on PyPI at a dev version, so pinning it would
-  make the tree uninstallable. <code>tools/stamp-proxy-version.sh &lt;version&gt;</code>
-  inserts the <code>kerbside-proxy==&lt;version&gt;</code> pin before the
-  <code># KERBSIDE_PROXY_PIN</code> marker in <code>pyproject.toml</code> at release time
-  only; <code>find_proxy_bin()</code> uses the cargo build tree or
-  <code>KERBSIDE_PROXY_BIN</code> in the meantime.</li>
-<li><strong><code>rust.yml</code> builds a wheel on pull requests as a packaging guard</strong>,
-  so a change that breaks the maturin build is caught before the
-  release tag rather than during it.</li>
+<li><strong>A dev checkout carries a dev-inclusive <code>kerbside-proxy</code> FLOOR</strong>
+  (<code>kerbside-proxy&gt;=X.Y.Z.dev0</code>), not an exact pin: naming a <code>.dev</code>
+  version opts pip into pre-release resolution, so a git install
+  resolves the newest proxy wheel on PyPI — a tagged release or a
+  rolling dev wheel published by <code>dev-proxy-wheel.yml</code> when the
+  binary's inputs change. <code>tools/stamp-proxy-version.sh &lt;version&gt;</code>
+  REPLACES the floor with the exact <code>kerbside-proxy==&lt;version&gt;</code> pin at
+  release time (anchored on the <code># KERBSIDE_PROXY_PIN</code> marker), and
+  also writes a static version into the crate's pyproject — which is
+  how <code>tools/build-proxy-wheel.sh</code> knows not to dev-stamp a
+  release-stamped tree. A unit test pins the floor's dev-inclusive
+  property. <code>find_proxy_bin()</code> still prefers <code>KERBSIDE_PROXY_BIN</code> and
+  the cargo build tree for local work, and the daemon verifies the
+  binary's gRPC contract hash at launch either way.</li>
+<li><strong><code>rust.yml</code> verifies wheel stamping on pull requests as a packaging
+  guard</strong> (<code>tools/verify-wheel-stamping.sh</code>: an unstamped tree must
+  produce a dev-versioned wheel, a release-stamped tree an
+  exactly-versioned one), so a change that breaks the maturin build or
+  the stamping surfaces before the release tag rather than during it.</li>
 <li><code>release.yml</code> runs the cross-compiled matrix build and publishes both
-  packages, proxy first, from a single <code>v*</code> tag. See <code>RELEASE-SETUP.md</code>
-  for the two trusted publishers.</li>
+  packages, proxy first, from a single <code>v*</code> tag; <code>dev-proxy-wheel.yml</code>
+  publishes dev wheels of the proxy (only), unattended. See
+  <code>RELEASE-SETUP.md</code> for the trusted publishers and the dev-release
+  trust posture.</li>
 </ul>
 <h3 id="validating-the-firewall-against-a-real-client">Validating the firewall against a real client<a class="headerlink" href="#validating-the-firewall-against-a-real-client" title="Permanent link">&para;</a></h3>
 <p>To exercise the L0+L1 firewall without risking a broken session, run

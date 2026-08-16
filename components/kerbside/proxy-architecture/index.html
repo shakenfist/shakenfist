@@ -5136,6 +5136,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="How the binary gets there: packaging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-grpc-contract-handshake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gRPC contract handshake
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -6014,6 +6031,146 @@
     
   
     Phase 8: OpenStack CI lane disposition + oVirt provisioning flake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
   
 
     
@@ -12084,6 +12241,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="How the binary gets there: packaging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-grpc-contract-handshake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gRPC contract handshake
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -12426,14 +12600,33 @@ what resolves the binary in a real deployment. The crate is published to
 PyPI as a separate <code>kerbside-proxy</code> package: a maturin
 <code>bindings = "bin"</code> wheel (<code>rust/kerbside-proxy/pyproject.toml</code>) whose
 compiled binary is laid into the wheel's <code>*.data/scripts/</code> directory,
-which pip installs onto <code>PATH</code>.
-<code>kerbside</code> exact-pins <code>kerbside-proxy</code> at the same version, so <code>pip install
-kerbside</code> transitively installs a matching proxy and the gRPC contract
-matches by construction.</p>
-<p>The two packages are released in lockstep from a single <code>v*</code> tag:
-<code>setuptools_scm</code> gives <code>kerbside</code> its version, and
+which pip installs onto <code>PATH</code>.</p>
+<p>The committed <code>pyproject.toml</code> does not carry an exact pin. It carries a
+dev-inclusive FLOOR — <code>kerbside-proxy&gt;=0.4.0.dev0</code> — anchored on the
+<code># KERBSIDE_PROXY_PIN</code> marker. Naming a <code>.dev0</code> version in the specifier
+is what opts pip into pre-release resolution: without it, pip would
+never consider a dev wheel a valid match for a plain <code>&gt;=</code> floor. This
+means a <code>pip install</code> from a git checkout of <code>kerbside</code> (not a tagged
+release) resolves whatever <code>kerbside-proxy</code> is newest on PyPI at install
+time — a tagged release, or a rolling dev wheel.</p>
+<p>Unreleased <code>kerbside</code> still needs a working proxy to test against, which
+is what <code>.github/workflows/dev-proxy-wheel.yml</code> provides: it builds and
+publishes a PEP 440 dev wheel of <code>kerbside-proxy</code> (e.g. <code>0.4.1.dev163</code>,
+versioned by <code>setuptools_scm</code>) to PyPI, unattended, on pushes to
+<code>develop</code> that are path-filtered to the binary's inputs (<code>rust/**</code>,
+<code>kerbside/rpc/kerbside.proto</code>, <code>tools/build-proxy-wheel.sh</code>,
+<code>tools/stamp-dev-proxy-version.sh</code>, <code>tools/gen-protos.sh</code>, and the
+workflow file itself). Dev
+wheels carry build provenance attestations, the same as tagged releases,
+but they are <strong>not</strong> Sigstore tag-signed — there is no <code>v*</code> tag for a
+dev build to sign. See "Configure Dev Release Publishing" and "Dev
+releases" in <code>RELEASE-SETUP.md</code>.</p>
+<p>At release time the two packages release in lockstep from a single <code>v*</code>
+tag: <code>setuptools_scm</code> gives <code>kerbside</code> its version, and
 <code>tools/stamp-proxy-version.sh</code> stamps that same version into the crate
-(for maturin) and into the <code>kerbside</code> dependency pin.
+(for maturin) and REPLACES the committed floor line in <code>pyproject.toml</code>
+with the exact <code>kerbside-proxy==&lt;version&gt;</code> pin. A stamped release tree
+is exact-pinned; the <code>develop</code> branch is not.
 <code>tools/build-proxy-wheel.sh</code> builds prebuilt manylinux_2_28 wheels for
 <strong>x86_64 and aarch64</strong> (the latter cross-compiled with maturin <code>--zig</code>, so
 no aarch64 build host is required); no source distribution is published, so
@@ -12441,6 +12634,34 @@ an unsupported platform gets a clean pip error rather than a doomed source
 build. In development you bypass all of this: <code>find_proxy_bin()</code> falls
 through to the in-repo <code>cargo build</code> output, or you set
 <code>KERBSIDE_PROXY_BIN</code> explicitly. See <code>RELEASE-SETUP.md</code>.</p>
+<h4 id="the-grpc-contract-handshake">The gRPC contract handshake<a class="headerlink" href="#the-grpc-contract-handshake" title="Permanent link">&para;</a></h4>
+<p>Because the committed tree is not exact-pinned, an installed
+<code>kerbside-proxy</code> binary is not guaranteed to speak the same gRPC
+contract as the <code>kerbside</code> it is paired with — the pin only guarantees
+that at release time. The handshake is the backstop for every other
+case (dev installs, a stale local build, an operator mismatching
+versions by hand):</p>
+<ul>
+<li><code>tools/gen-protos.sh</code> (run via <code>tox -egenprotos</code>, whenever
+  <code>kerbside/rpc/kerbside.proto</code> changes) writes the sha256 of the
+  proto's raw bytes to a generated constant, <code>CONTRACT_HASH</code>, in the
+  committed <code>kerbside/rpc/contract.py</code>.</li>
+<li><code>rust/kerbside-proxy/build.rs</code> computes the same sha256 from its copy
+  of <code>kerbside.proto</code> at compile time and embeds it in the binary; the
+  binary prints it and exits when run with <code>--contract-hash</code>.</li>
+<li>Before launching the proxy, <code>launch_rust_proxy()</code>
+  (<code>kerbside/proxy_supervisor.py</code>) calls <code>check_contract()</code>, which runs
+  the resolved binary with <code>--contract-hash</code> and compares the result to
+  <code>CONTRACT_HASH</code>. A mismatch — including a binary that predates the
+  <code>--contract-hash</code> flag entirely, which reports as "unknown" rather
+  than a hash — raises <code>RuntimeError</code> naming both hashes and four
+  remediations (upgrade the wheel, rebuild the local Rust tree, point
+  <code>KERBSIDE_PROXY_BIN</code> at a matching binary, or bypass the check).</li>
+<li><code>KERBSIDE_SKIP_CONTRACT_CHECK</code> is that bypass: set it to a
+  recognised truthy value (<code>1</code>, <code>true</code>, <code>yes</code>, or <code>on</code>, case-insensitively)
+  and the mismatch is logged as a warning instead of refused. It exists
+  for debugging only and is not a supported deployment posture.</li>
+</ul>
 <h3 id="session-termination-dropping-in-flight-connections">Session termination: dropping in-flight connections<a class="headerlink" href="#session-termination-dropping-in-flight-connections" title="Permanent link">&para;</a></h3>
 <p>Removing or expiring the DB token blocks a <strong>new</strong> connection attempt, but
 it does nothing to a client that is already connected: that client keeps

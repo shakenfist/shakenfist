@@ -5674,6 +5674,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 1: the publish workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 2: the committed dev specifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 3: the contract handshake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling kerbside-proxy dev releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
@@ -9068,6 +9208,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#accepted-risk-the-rtc-020x-transport-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepted risk: the rtc 0.20.x transport stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#success-criteria" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11770,6 +11921,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#accepted-risk-the-rtc-020x-transport-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepted risk: the rtc 0.20.x transport stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#success-criteria" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12005,6 +12167,38 @@ later goal once we understand the baseline.</p>
 <p>No individual action item for this — review the list
 quarterly and pick off easy wins (e.g. crates where
 upgrading one direct dep resolves the duplicate).</p>
+<h2 id="accepted-risk-the-rtc-020x-transport-stack">Accepted risk: the <code>rtc</code> 0.20.x transport stack<a class="headerlink" href="#accepted-risk-the-rtc-020x-transport-stack" title="Permanent link">&para;</a></h2>
+<p>Recorded here so the acceptance lives with the scanning
+policy rather than only in the plan that caused it.</p>
+<p>The webrtc-rs 0.20 port
+(<code>docs/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump.md</code>)
+replaced <code>dtls</code>, <code>webrtc-srtp</code>, <code>webrtc-sctp</code>, <code>stun</code>, <code>turn</code>
+and <code>webrtc-ice</code> 0.17.2 with the <code>rtc-*</code> 0.20.2 family plus
+<code>sansio</code> 1.0.1 — a sans-io reimplementation of the whole
+DTLS/SRTP/SCTP/STUN transport, at a version released days
+before it was adopted. That code parses untrusted network
+input from any peer that can reach the bound UDP sockets,
+which by design is every non-loopback address on the host,
+and none of this repo's own parser hardening (<code>BoundedReader</code>,
+the fuzz targets, the deterministic scanners) reaches a
+vendored third-party stack.</p>
+<p>Accepted rather than mitigated, and the reasoning is that the
+alternative is worse for the same threat: 0.17.x is an
+abandoned line that will never receive a security fix.
+Staying put means carrying known-unfixable transport code
+indefinitely.</p>
+<p>What this costs us in scanner terms, all currently reported
+rather than fatal because <code>multiple-versions = "warn"</code>:
+<code>rtc-shared</code> pulls in <code>winapi</code> 0.3 and <code>bitflags</code> 1.3.2, and
+<code>quinn-udp</code> arrives at a duplicate major. No new
+<code>[advisories].ignore</code> entries were needed in <code>deny.toml</code> and
+<code>.cargo/audit.toml</code> needed no change — confirmed by the
+<code>cargo audit</code> and <code>cargo deny</code> lanes both passing on the
+ported tree (CI run 31910156843) rather than by inspection.</p>
+<p>Action: treat <code>rtc-*</code> as a watch item on the weekly
+<code>cargo audit</code> run. The first advisory against this family
+should be triaged as though it were our own code, because in
+practice it is the most exposed parser surface we ship.</p>
 <h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
 <p>This plan is complete when:</p>
 <ul>
