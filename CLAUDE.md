@@ -548,13 +548,14 @@ performance. This is required for all deployments - MariaDB must be configured.
   scheduler reservations. `scheduler_node_capacity` has one row per
   hypervisor (limit and used counters for cpus/memory_mb/disk_gb plus a
   decaying `expected_demand`); `namespace_claims` has one row per
-  capacity claim (limits, usage, state, server-side `expires_at`) and
-  is empty until the claims API lands in phase 4; `cluster_capacity` is
-  a singleton (id always 1) of total/claimed/unclaimed-used sums.
-  Recomputed wholesale from ground truth by the reconciler (a single
-  `ReconcileSchedulerCapacity` RPC run every 5 minutes on the elected
-  cluster node); as of scheduler-reservations phase 3 also drawn down
-  and released incrementally on every placement by the
+  capacity claim (limits, usage, coverage state, server-side
+  `expires_at`) and is also the `NamespaceClaim` object's
+  static-values table; `cluster_capacity` is a singleton (id always 1)
+  of total/claimed/unclaimed-used sums. Recomputed wholesale from
+  ground truth by the reconciler (a single `ReconcileSchedulerCapacity`
+  RPC run every 5 minutes on the elected cluster node); as of
+  scheduler-reservations phase 3 also drawn down and released
+  incrementally on every placement by the
   `AdmitInstancePlacement`/`ReleaseInstancePlacement` RPCs, each of
   which performs a guarded `UPDATE` against these counters in the same
   transaction as the placement write (see the Instance placement
@@ -565,6 +566,23 @@ performance. This is required for all deployments - MariaDB must be configured.
   resources daemon's active-domain measurements whenever instances are
   powered off. The issue-3498 Python stopgap in the scheduler was
   deleted by the same change that wired admission onto these counters.
+  Phase 4 added the five `*NamespaceClaim` RPCs behind admin-only REST
+  at `/auth/namespaces/<namespace>/claims`. Creating or growing a claim
+  is itself a guarded admission against the cluster singleton
+  (`claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total`,
+  per dimension); creation migrates the namespace's existing drawdown
+  onto the claim and deletion migrates it back, so the same capacity is
+  never counted on both sides. Claim ceilings are **advisory** this
+  release: an instance placement that exceeds its namespace's claim is
+  admitted and reported through the reply's `claim_over_limit` /
+  `claim_dimensions` fields as a `placement admitted over namespace
+  capacity claim` audit event, never refused. `CLAIM_ENFORCEMENT_HARD`
+  in `mariadb.py` is the constant phase 5 flips; do not add an
+  enforcement knob or a 403 path before it does. A claim carries two
+  states which are two different facts: `state` is object existence in
+  `object_states`, `coverage_state` (`active`/`expired`) lives in the
+  claim row. See `docs/operator_guide/scheduler.md` and
+  `docs/developer_guide/subsystem_internals.md`.
 - **Per-daemon state** (`node_daemon_states` table): One row per
   `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
   and optional `message`. Replaces the JSON `daemon_states` dict that

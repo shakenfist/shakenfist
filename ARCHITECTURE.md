@@ -196,8 +196,10 @@ Atomic reservation-table scheduling is being built in phases per
 `docs/plans/PLAN-scheduler-reservations.md`; the capacity tables and their
 reconciler are described under
 [Cluster Operation Storage and Work Queues](docs/developer_guide/database_internals.md#cluster-operation-storage-and-work-queues).
-Placement admission consumes them as of phase 3; later phases add a
-namespace claims API and move more pre-filter logic into SQL.
+Placement admission consumes them as of phase 3, and phase 4 added
+per-namespace capacity claims whose ceilings are advisory this release;
+later phases enforce those ceilings and move more pre-filter logic into
+SQL.
 
 ## State Machines
 

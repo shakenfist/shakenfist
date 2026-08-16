@@ -3520,10 +3520,10 @@ def _get_namespace_claims_table() -> sa.Table:
     One row per capacity claim: the claiming namespace (indexed, because
     phase 3 admission looks claims up by namespace; the column matches
     the namespaces table's name primary key), the claimed limits, the
-    materialised usage counters, the claim state, and its expiry. The
-    table is created empty in this phase -- the claims API is phase 4 --
-    and is maintained solely by the reconciler; the guarded-UPDATE
-    admission path arrives in phase 3.
+    materialised usage counters, the claim's coverage state, and its
+    expiry. Written by the reconciler (phase 2), by the guarded-UPDATE
+    admission path (phase 3) and by the claim CRUD RPCs (phase 4), and
+    it doubles as the static values table for the NamespaceClaim object.
 
     ``expires_at`` and ``updated_at`` follow the cluster_locks TIMESTAMP
     idiom: server-side timestamps so the expiry sweep compares against
@@ -24984,8 +24984,9 @@ def _active_claim_for_namespace(
     runs it on its own connection outside any write transaction --
     _admission_denial_dimensions() -- is fine.
 
-    Returns None until phase 4 lands the claims API, since nothing can
-    create a claim row before then (P4).
+    Returns None for a namespace with no claim, which is most of them:
+    claims are opt in, and a namespace without one is accounted against
+    the cluster singleton's unclaimed sums instead.
     """
     claims = _get_namespace_claims_table()
     return conn.execute(sa.select(claims).where(sa.and_(

@@ -201,8 +201,9 @@ The pipeline above orders and prunes candidates from a metrics
 snapshot (and, for CPU, the counters below); it is not what admits
 an instance. Once a candidate is
 chosen, `Instance.place_instance()` makes one atomic claim against the
-allocation-denominated counters in `scheduler_node_capacity` (and,
-once the claims API exists, `namespace_claims`) -- the same database
+allocation-denominated counters in `scheduler_node_capacity` and, if the
+instance's namespace holds a capacity claim, `namespace_claims` (see
+[Namespace capacity claims](#namespace-capacity-claims)) -- the same database
 transaction that writes the `placement` attribute and the node's
 `instance_location` reference row. Two concurrent creates racing the
 last slot on a node cannot therefore both be admitted, and RAM and
@@ -252,6 +253,160 @@ alongside `cpu_committed_row_present`: a node the reconciler has not
 yet sized reports `cpu_committed` as zero *and*
 `cpu_committed_row_present` as false, which distinguishes a genuinely
 idle node from one that is admitting unguarded.
+
+## Namespace capacity claims
+
+A **capacity claim** is a namespace's reservation of aggregate cluster
+capacity: so many vCPUs, so much instance memory and so much instance
+disk, held for the namespace against the rest of the cluster for as long
+as the claim is active. It is a cluster-wide quantity, not a per-node
+one -- a claim says nothing about *where* the namespace's instances land,
+only how much of the cluster is set aside for them in total.
+
+Claims are administered through the REST API at
+`/auth/namespaces/<namespace>/claims`, admin-only, alongside the
+namespace's keys and mapping rules. The request and response bodies are
+published in the [OpenAPI specification](https://openapi.shakenfist.com);
+`sf-client` has no claim verbs yet, so for now a claim is created with an
+HTTP request rather than a command. A namespace holds at most one active
+claim.
+
+### Advisory this release: exceedances are recorded, not refused
+
+**Creating a claim does not stop anybody -- including the claiming
+namespace -- from exceeding it.** In this release claim ceilings are
+*advisory*: a placement that would push a namespace past the limits it
+claimed is **admitted**, and the fact that it went over is recorded. The
+refusal arrives in a later release, once operators have had a release in
+which to see real exceedances and calibrate their claims against them.
+
+Two consequences worth being explicit about, because both surprise
+people:
+
+- A claim does **not** cap the claiming namespace. `used_*` on a claim
+  can and will exceed `limit_*`.
+- What a claim *does* do immediately is reserve capacity **from everybody
+  else**. The claim's limits are added to
+  `cluster_capacity.claimed_*`, and the guard that admits instances in
+  namespaces *without* a claim only lets them use what active claims have
+  not spoken for. So an oversized claim starves unclaimed namespaces
+  today, even though it does not bind its own.
+
+The record of an exceedance is an audit event on the *instance* whose
+placement crossed the line:
+
+```
+placement admitted over namespace capacity claim
+```
+
+It is emitted at warning level and carries `node`, `namespace` and
+`claim_dimensions` -- one entry per dimension that is over, giving the
+claim's limit, what the claim held before this placement, and this
+placement's own allocation. `sf-client instance events <instance>` is
+where to find it, and a search of the cluster's logs for that message is
+how to answer "is anything over its claim". It is deliberately distinct
+from `placement recorded despite exceeding capacity guard`, which is a
+different event about a different thing: that one says a ground-truth
+writer was forced past a *node's* guard, this one says a placement was
+charged to its *namespace's* claim and the claim is now over.
+
+Because a create that exceeds a claim looks exactly like a create in a
+namespace with no claim at all, the event is the only observable
+difference between advisory mode working and advisory mode being absent.
+If you are testing a claim, assert the event.
+
+### What creating a claim does to existing usage
+
+A namespace usually already has instances when its claim is created, and
+that usage is already counted -- on the cluster's *unclaimed* side. So
+creation is a migration as well as a reservation: in the same transaction
+that adds the claim's limits to `cluster_capacity.claimed_*`, the
+namespace's existing drawdown is seeded into the new claim's `used_*` and
+subtracted from `cluster_capacity.unclaimed_used_*`. Deleting a claim
+migrates it back, returning whatever the claim still held to the
+unclaimed side.
+
+Without that migration, a namespace with running instances could place
+its whole claim a second time until the next reconcile pass -- five
+minutes, starting from the moment an operator does the thing claims exist
+for.
+
+The same migration is why a claim is granted or refused against
+
+    claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total
+
+per dimension, where `migrated` is the drawdown being moved onto the
+claim. Reading it without that term -- "is there `total - claimed -
+unclaimed_used` left?" -- makes claims look harder to get than they are:
+a namespace is not counted against its own claim on the unclaimed side,
+because the same statement is taking it off there.
+
+### Growing, shrinking, expiring and deleting
+
+Growing any dimension is a fresh admission decision against the same
+guard, with the migration term at zero (a grow moves nothing -- the
+namespace's usage is already on the claim's side of the ledger).
+Shrinking is always allowed down to what the claim is currently using and
+no further. One request may grow one dimension and shrink another.
+Nothing ever grows a claim automatically.
+
+Expiry is given as a duration in seconds, not as a timestamp, and is
+applied against the cluster's clock. That is the only clock the expiry
+sweep ever compares against, so accepting an absolute time would mean
+evaluating it against a clock the client never saw. The sweep runs as
+part of the capacity reconciler's five-minute pass.
+
+Expiry is not cleanup. A claim stops covering placements the moment it
+expires -- from then on its namespace's creates are charged to the
+cluster's unclaimed side -- and the next reconcile pass drops its limits
+out of `claimed_*` and folds its namespace's usage back into
+`unclaimed_used_*`. But the row stays, holding no capacity and covering
+nothing, until somebody deletes it, and it cannot be grown back to life:
+an expired claim must be deleted and replaced. Expired claims are
+included in the namespace's claim listing precisely because their
+existence is what explains a namespace whose placements stopped being
+charged to its claim.
+
+Deletion is immediate and has no soft-delete step: the same transaction
+that removes the row returns what it held to the cluster. A claim sitting
+in a `deleted` state while its row still held capacity would be an
+accounting lie for a whole cleaner delay -- capacity promised to a
+namespace that no longer wanted it and refused to everybody else.
+Deleting a namespace does eventually clean up after itself: the
+namespace's own hard delete, a `CLEANER_DELAY` after it is deleted,
+cascades to its claims and returns their capacity, because a claim
+outliving its namespace would hold capacity nothing can ever release.
+Deleting a namespace's claim first is the way to get that capacity back
+promptly.
+
+### The two states a claim carries
+
+A claim publishes two states, and they are two different facts:
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `state` | `created`, `deleted` | Object existence, where every other Shaken Fist object publishes it |
+| `coverage_state` | `active`, `expired` | Whether the claim still covers placements |
+
+An expired claim reads as `state: created, coverage_state: expired`. A
+deleted claim has no row at all.
+
+### When a claim cannot be made
+
+A claim request that the cluster declines is not a failure, and the
+status code says which kind of no it was:
+
+- **507** -- the cluster does not have the capacity to promise this
+  claim. The message names each dimension that did not fit, with its
+  limit, its current use and what was asked for. Nothing but releasing
+  capacity will help.
+- **503** -- retry. Either the reconciler has not built the
+  `cluster_capacity` singleton yet (which is normal for the first few
+  minutes of a cluster's life), or the claim was being changed
+  concurrently and the optimistic retry gave up.
+- **409** -- change the request. The namespace already holds an active
+  claim, or the shrink was below what the claim is already using, or the
+  claim has expired and must be replaced rather than updated.
 
 ## Configuration reference
 
@@ -351,6 +506,11 @@ tells the whole story:
   claim itself -- distinct from, and later than, the pre-filters'
   `dropped` reasons above. `schedule failed, every candidate refused
   by capacity guard` follows if every candidate is refused.
+- `placement admitted over namespace capacity claim` records that the
+  admission succeeded but drew the namespace past the claim it holds,
+  with the exceeded dimensions in `claim_dimensions`. See [Namespace
+  capacity claims](#namespace-capacity-claims); in this release that is
+  a warning, not a refusal.
 - A schedule with no surviving pre-filter candidates raises an error
   recorded as `schedule has no candidates at stage <name>, aborting`
   -- the stage name plus the previous event's `dropped` map identify

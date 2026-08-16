@@ -353,7 +353,7 @@ table entirely (decision D8).
 | 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
 | 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
 | 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Complete — merged as PR #3754, 2026-08-16. The step 9 sfcbr soak has not been run yet |
-| 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Planned — 8 implementation steps; client verbs moved out of scope (D7 in the phase plan) |
+| 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Implemented — steps 1-8 landed; management review, operator review and the sfcbr soak still outstanding. `NamespaceClaim` is a first-class object with admin-only REST CRUD at `/auth/namespaces/<namespace>/claims`; creation migrates the namespace's existing drawdown out of the cluster's unclaimed sums and onto the claim. Ceilings are **advisory** this release: an exceedance is admitted and recorded as an audit event, and phase 5 flips `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the phase plan) |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
@@ -435,21 +435,20 @@ counters, not a pattern to carry forward: phase 3 reads one
 maintained row per node and needs no such trick.
 
 **Phase 4 — namespace claims API.** The claim as a
-first-class object with REST CRUD and client verbs (D15),
-advisory-mode ceiling enforcement with structured events
-(D16), opt-in semantics and best-effort accounting for
-unclaimed namespaces (D14/D17). The conductor-side
-integration (D18) lands in private-ci once this phase ships.
-Prerequisite from phase 3 review: the admission
-transaction's P7 fail-open (`guarded = enforce and
-node_present`) currently drops *every* guard when the
-target node has no capacity row, including the
-namespace-claim branch, whose limits are
-namespace-denominated and node-independent. Harmless while
-`namespace_claims` is empty; phase 4 must split the flag
-(claim guard enforced whenever `enforce` is true and a
-claim row exists) before advisory enforcement means
-anything on an unsized node.
+first-class object with REST CRUD (D15), advisory-mode
+ceiling enforcement with structured events (D16), opt-in
+semantics and best-effort accounting for unclaimed
+namespaces (D14/D17). The conductor-side integration (D18)
+lands in private-ci once this phase ships. Superseded in
+detail by the phase plan, which moved client verbs out of
+scope (D7 there) and discharged this stub's prerequisite:
+the admission transaction's P7 fail-open (`guarded = enforce
+and node_present`) dropped *every* guard when the target
+node had no capacity row, including the namespace-claim
+branch, whose limits are namespace-denominated and
+node-independent. It is now three flags, and the claim one
+is gated on `CLAIM_ENFORCEMENT_HARD` rather than on the
+node's row.
 
 **Phase 5 — caller migration and hard ceiling.** Migrate the
 three `Scheduler()` call sites per D11 (queue worker to the

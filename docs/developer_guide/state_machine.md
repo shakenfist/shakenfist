@@ -218,6 +218,40 @@ stateDiagram-v2
   deleted --> [*]
 ```
 
+## Namespace Claims
+
+A namespace claim reserves aggregate cluster capacity for one namespace. Every
+mutation is a single guarded database transaction, so there is no error state.
+
+* `initial`: the first state for a claim. The guarded transaction has granted
+  the claim and written its row, but the object's creation is not complete.
+* `created`: the claim exists.
+* `deleted`: the claim has been deleted. Claims are never *soft* deleted --
+  the transaction which removes the claim's row is the one which returns its
+  capacity to the cluster, because a claim sitting in `deleted` while its row
+  still held capacity would promise that capacity to a namespace which no
+  longer wanted it. This state is still reachable, because the orphan
+  reconciliation sweep writes it to repair a claim row whose state row was
+  lost, after which the usual reaper collects it.
+
+Note that a claim carries a *second* state which is not this one. This state
+machine describes the claim's existence; whether the claim still covers
+placements is published separately as `coverage_state` (`active` or `expired`)
+and is owned by the capacity reconciler's expiry sweep. An expired claim is
+still a `created` object. See
+[the scheduler operator guide](../operator_guide/scheduler.md#namespace-capacity-claims).
+
+The following transitions are possible:
+
+``` mermaid
+stateDiagram-v2
+  [*] --> initial
+  initial --> created
+  initial --> deleted
+  created --> deleted
+  deleted --> [*]
+```
+
 ## Namespaces
 
 * `created`: the namespace exists.
