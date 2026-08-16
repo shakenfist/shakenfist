@@ -13,17 +13,26 @@ the daemon that supervises the proxy) and the Rust `kerbside-proxy`
 
 `kerbside-proxy` is published to PyPI as a separate maturin
 `bindings = "bin"` wheel that carries the compiled binary and lands it
-on `PATH`. `kerbside` exact-pins `kerbside-proxy` at the same version,
-so `pip install kerbside` installs a matching proxy automatically (the
-daemon finds it via `shutil.which('kerbside-proxy')`); you do not
-build or install it separately. Both packages are released in lockstep
-from a single `v*` tag, and prebuilt manylinux wheels are published
-for x86_64 and aarch64 (no source distribution — an unsupported
-platform gets a clean pip error).
+on `PATH` (the daemon finds it via `shutil.which('kerbside-proxy')`);
+you do not build or install it separately. A release install —
+`pip install kerbside==X.Y.Z` — gets the exact-pinned `kerbside-proxy`
+release it was built and tested against: the two packages release in
+lockstep from a single `v*` tag. A git or dev install of `kerbside`
+instead resolves whatever `kerbside-proxy` is newest on PyPI, which may
+be a rolling dev wheel rather than a tagged release. Prebuilt manylinux
+wheels are published for x86_64 and aarch64 (no source distribution —
+an unsupported platform gets a clean pip error).
 
 For development you can instead point `KERBSIDE_PROXY_BIN` at a
 locally built binary, or let the daemon pick up the in-repo
 `cargo build` output.
+
+At startup, the daemon runs `kerbside-proxy --contract-hash` and
+refuses to launch a binary whose gRPC contract does not match this
+`kerbside` version's — the error names both hashes and lists the ways
+to fix it. `KERBSIDE_SKIP_CONTRACT_CHECK=1` is the explicit, unsupported
+escape hatch that downgrades the refusal to a logged warning. See
+[proxy-architecture.md](/components/kerbside/proxy-architecture/) for how the check works.
 
 ## Checking OS package dependencies
 

@@ -321,14 +321,35 @@ PyPI as a separate `kerbside-proxy` package: a maturin
 `bindings = "bin"` wheel (`rust/kerbside-proxy/pyproject.toml`) whose
 compiled binary is laid into the wheel's `*.data/scripts/` directory,
 which pip installs onto `PATH`.
-`kerbside` exact-pins `kerbside-proxy` at the same version, so `pip install
-kerbside` transitively installs a matching proxy and the gRPC contract
-matches by construction.
 
-The two packages are released in lockstep from a single `v*` tag:
-`setuptools_scm` gives `kerbside` its version, and
+The committed `pyproject.toml` does not carry an exact pin. It carries a
+dev-inclusive FLOOR — `kerbside-proxy>=0.4.0.dev0` — anchored on the
+`# KERBSIDE_PROXY_PIN` marker. Naming a `.dev0` version in the specifier
+is what opts pip into pre-release resolution: without it, pip would
+never consider a dev wheel a valid match for a plain `>=` floor. This
+means a `pip install` from a git checkout of `kerbside` (not a tagged
+release) resolves whatever `kerbside-proxy` is newest on PyPI at install
+time — a tagged release, or a rolling dev wheel.
+
+Unreleased `kerbside` still needs a working proxy to test against, which
+is what `.github/workflows/dev-proxy-wheel.yml` provides: it builds and
+publishes a PEP 440 dev wheel of `kerbside-proxy` (e.g. `0.4.1.dev163`,
+versioned by `setuptools_scm`) to PyPI, unattended, on pushes to
+`develop` that are path-filtered to the binary's inputs (`rust/**`,
+`kerbside/rpc/kerbside.proto`, `tools/build-proxy-wheel.sh`,
+`tools/stamp-dev-proxy-version.sh`, `tools/gen-protos.sh`, and the
+workflow file itself). Dev
+wheels carry build provenance attestations, the same as tagged releases,
+but they are **not** Sigstore tag-signed — there is no `v*` tag for a
+dev build to sign. See "Configure Dev Release Publishing" and "Dev
+releases" in `RELEASE-SETUP.md`.
+
+At release time the two packages release in lockstep from a single `v*`
+tag: `setuptools_scm` gives `kerbside` its version, and
 `tools/stamp-proxy-version.sh` stamps that same version into the crate
-(for maturin) and into the `kerbside` dependency pin.
+(for maturin) and REPLACES the committed floor line in `pyproject.toml`
+with the exact `kerbside-proxy==<version>` pin. A stamped release tree
+is exact-pinned; the `develop` branch is not.
 `tools/build-proxy-wheel.sh` builds prebuilt manylinux_2_28 wheels for
 **x86_64 and aarch64** (the latter cross-compiled with maturin `--zig`, so
 no aarch64 build host is required); no source distribution is published, so
@@ -336,6 +357,35 @@ an unsupported platform gets a clean pip error rather than a doomed source
 build. In development you bypass all of this: `find_proxy_bin()` falls
 through to the in-repo `cargo build` output, or you set
 `KERBSIDE_PROXY_BIN` explicitly. See `RELEASE-SETUP.md`.
+
+#### The gRPC contract handshake
+
+Because the committed tree is not exact-pinned, an installed
+`kerbside-proxy` binary is not guaranteed to speak the same gRPC
+contract as the `kerbside` it is paired with — the pin only guarantees
+that at release time. The handshake is the backstop for every other
+case (dev installs, a stale local build, an operator mismatching
+versions by hand):
+
+- `tools/gen-protos.sh` (run via `tox -egenprotos`, whenever
+  `kerbside/rpc/kerbside.proto` changes) writes the sha256 of the
+  proto's raw bytes to a generated constant, `CONTRACT_HASH`, in the
+  committed `kerbside/rpc/contract.py`.
+- `rust/kerbside-proxy/build.rs` computes the same sha256 from its copy
+  of `kerbside.proto` at compile time and embeds it in the binary; the
+  binary prints it and exits when run with `--contract-hash`.
+- Before launching the proxy, `launch_rust_proxy()`
+  (`kerbside/proxy_supervisor.py`) calls `check_contract()`, which runs
+  the resolved binary with `--contract-hash` and compares the result to
+  `CONTRACT_HASH`. A mismatch — including a binary that predates the
+  `--contract-hash` flag entirely, which reports as "unknown" rather
+  than a hash — raises `RuntimeError` naming both hashes and four
+  remediations (upgrade the wheel, rebuild the local Rust tree, point
+  `KERBSIDE_PROXY_BIN` at a matching binary, or bypass the check).
+- `KERBSIDE_SKIP_CONTRACT_CHECK` is that bypass: set it to a
+  recognised truthy value (`1`, `true`, `yes`, or `on`, case-insensitively)
+  and the mismatch is logged as a warning instead of refused. It exists
+  for debugging only and is not a supported deployment posture.
 
 ### Session termination: dropping in-flight connections
 

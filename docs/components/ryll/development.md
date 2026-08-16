@@ -240,9 +240,14 @@ still surface only in the merge tier.
 - **nusb** - USB device access (pure Rust, no libusb)
 - **dav-server** - WebDAV server (RFC 4918, LocalFs backend)
 - **hyper** - HTTP/1.1 framing for WebDAV byte-stream transport
-- **webrtc = "0.17.1"** - DTLS/SRTP/ICE/SCTP/STUN stack for
-  `shakenfist-spice-webrtc` (browser-bridge crate; also pulls
-  in `rtp = "0.17.1"` for H.264 RTP packetisation)
+- **webrtc = "0.20.2"** - DTLS/SRTP/ICE/SCTP/STUN stack for
+  `shakenfist-spice-webrtc` (browser-bridge crate); an async
+  shim over the sans-io `rtc = "0.20.2"` core, which is a
+  direct dependency in its own right because webrtc's public
+  API takes `rtc` types it does not re-export. `if-addrs`
+  enumerates host interfaces to pick UDP bind addresses, and
+  `async-trait` is required to implement
+  `PeerConnectionEventHandler`.
 - **opus = "0.3"** - libopus bindings for the synthetic Opus
   pump in the webrtc crate; `audiopus_sys` builds libopus from
   source in the devcontainer
@@ -262,8 +267,11 @@ Beyond `make test`, a few tests are worth knowing about individually:
   (`shakenfist-spice-renderer/tests/webrtc_h264_smoke.rs`) verifies
   `H264Payloader` accepts the encoder's Annex-B NAL output.
 - **Loopback integration test** (`shakenfist-spice-webrtc/tests/loopback.rs`)
-  creates two in-process `RTCPeerConnection`s and asserts video, audio
-  and datachannel all flow end to end.
+  drives a production `WebrtcBridge` against a `TestPeer` in one process
+  and asserts video, audio and datachannel all flow end to end. A second
+  case offers a narrow codec set (one H.264 fmtp, browser-chosen payload
+  numbers) to prove the pumps stamp the *negotiated* payload type rather
+  than a constant.
 - **Control socket integration tests**
   (`shakenfist-spice-renderer/tests/control_socket.rs`) exercise every v1
   verb and event without a real SPICE session, using a stub
