@@ -23920,9 +23920,18 @@ _RECONCILE_USAGE_SQL = sa.text('''
 # singleton's unclaimed fold it is not restricted to nodes holding a
 # capacity row, because a namespace quota covers the namespace's
 # instances wherever they are stranded.
-_RECONCILE_CLAIM_USAGE_SQL = sa.text('''
-    UPDATE namespace_claims c
-      LEFT JOIN (
+#
+# The aggregation itself is a module-level *fragment* rather than a
+# statement, because two callers have to agree on it exactly and one of
+# them is not the reconciler. Scheduler-reservations phase 4 seeds a new
+# claim's used_* with its namespace's existing drawdown (D3), and if that
+# seeding query and this recompute could disagree by so much as a join
+# condition, every freshly created claim's counters would flap on every
+# reconcile pass -- five minutes apart, forever, and only on the clusters
+# whose data happens to expose the difference. Sharing the text is what
+# makes "the seed is what the reconciler would have computed" a property
+# of the code rather than a claim in a comment.
+_NAMESPACE_USAGE_AGGREGATION = '''
                SELECT i.namespace AS namespace,
                       COALESCE(SUM(i.cpus), 0) AS used_cpus,
                       COALESCE(SUM(i.memory), 0) AS used_memory_mb,
@@ -23949,13 +23958,46 @@ _RECONCILE_CLAIM_USAGE_SQL = sa.text('''
                    ON s.object_uuid = p.target_uuid
                   AND s.object_type = :instance_object_type
                 WHERE (s.state_value IS NULL OR s.state_value != 'deleted')
-                GROUP BY i.namespace) u
+                GROUP BY i.namespace'''
+
+
+_RECONCILE_CLAIM_USAGE_SQL = sa.text(f'''
+    UPDATE namespace_claims c
+      LEFT JOIN ({_NAMESPACE_USAGE_AGGREGATION}) u
         ON u.namespace = c.namespace
        SET c.used_cpus = COALESCE(u.used_cpus, 0),
            c.used_memory_mb = COALESCE(u.used_memory_mb, 0),
            c.used_disk_gb = COALESCE(u.used_disk_gb, 0),
            c.updated_at = NOW()
      WHERE c.state = 'active'
+''')
+
+
+# One namespace's drawdown, from the identical aggregation the per-claim
+# recompute rewrites its counters from. Phase 4's claim creation reads
+# this before it opens its transaction and seeds the new row with it
+# (D3), so that a claim created for a namespace which already holds
+# instances starts life at the figure the next reconcile pass will
+# compute, and that pass then moves nothing.
+#
+# The namespace restriction is deliberately applied *outside* the shared
+# fragment rather than inside it, so the two callers execute the same
+# text with the same bind parameters and cannot drift apart. It is still
+# pushed down to the index: ``namespace`` is the derived table's grouping
+# column, which is exactly the shape MariaDB's condition pushdown for
+# derived tables handles (on by default since 10.2, well below
+# MIN_MARIADB_VERSION), so the predicate lands inside the aggregation
+# rather than filtering a cluster-wide fold in the outer query.
+#
+# A namespace with no placed instances produces no row at all rather than
+# a row of zeroes -- the caller reads that as a zero drawdown, which is
+# what it is.
+_NAMESPACE_DRAWDOWN_SQL = sa.text(f'''
+    SELECT u.used_cpus AS used_cpus,
+           u.used_memory_mb AS used_memory_mb,
+           u.used_disk_gb AS used_disk_gb
+      FROM ({_NAMESPACE_USAGE_AGGREGATION}) u
+     WHERE u.namespace = :namespace
 ''')
 
 
@@ -23979,6 +24021,22 @@ def _reconcile_reference_params() -> dict[str, str]:
         'node_object_type': ObjectType.NODE.value,
         'instance_location': RelationshipType.INSTANCE_LOCATION.value,
     }
+
+
+def _namespace_drawdown_params(namespace: str) -> dict[str, str]:
+    """The bound parameters _NAMESPACE_DRAWDOWN_SQL needs.
+
+    The reconcile reference parameters unchanged -- and for exactly the
+    reasons _reconcile_reference_params() documents -- plus the namespace
+    being asked about. Sharing that helper is half the point of sharing
+    the SQL: two callers spelling the same aggregation but binding it
+    differently would silently return different numbers under a
+    case-sensitive collation, which is the failure this whole convention
+    exists to make loud.
+    """
+    params = _reconcile_reference_params()
+    params['namespace'] = namespace
+    return params
 
 
 def _reconcile_fetch_usage(
@@ -26002,3 +26060,1284 @@ def get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
     if _use_database_service():
         return _grpc_get_scheduler_node_capacity()
     return _direct_get_scheduler_node_capacity()
+
+
+# =============================================================================
+# Namespace Claim CRUD (MariaDB)
+#
+# Scheduler-reservations phase 4: the rows nothing could create until now,
+# which is why phase 3's claim branch was unreachable in production. See
+# docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+#
+# A claim is a promise the cluster has to be able to keep, so creating one
+# -- and growing one -- is an admission decision in its own right, against
+# the same cluster_capacity singleton an instance create draws down. D14's
+# mirror guard is _claim_capacity_guard(): claimed + requested +
+# GREATEST(0, unclaimed_used - migrated) <= total, which tests the state
+# the guarded statement's own SET produces rather than the one it started
+# from. Everything the admission primitive above had to get right applies
+# here unchanged:
+#
+# * the canonical write order, cluster_capacity then namespace_claims, so
+#   these transactions contend with instance admission rather than
+#   deadlocking against it (admission takes at most one of the two, and
+#   always before scheduler_node_capacity, so every writer of the three
+#   tables takes them in the same order),
+# * the ER_CHECKREAD invariant -- every transaction here opens with a
+#   guarded UPDATE and does its reads afterwards, on rows it holds locks
+#   on. Read the block comment above _probe_admission_rows() before
+#   changing any of them,
+# * _retry_transaction() for 1213/1205/1020, whole-transaction retry.
+#
+# Two things are new. Creation migrates the namespace's existing drawdown
+# into the claim (D3) rather than seeding zero, closing a window in which
+# a namespace could place its entire claim a second time. And an update
+# evaluates each dimension on its own terms in one transaction (D8): a
+# grow is guarded, a shrink is floored at the claim's current used_*, and
+# one request may do both. There is no auto-grow, ever (D15).
+# =============================================================================
+
+# Coverage states of a claim (D2). These are *not* the object's existence
+# state -- that lives in object_states like every other object's -- and
+# the two must never encode each other.
+CLAIM_STATE_ACTIVE = 'active'
+
+# The claim fields an update request may name in its field mask. The mask
+# is what tells a deliberate zero from an unset proto3 int, exactly as
+# the update_*_attributes field masks do (CLAUDE.md pitfall 3).
+CLAIM_UPDATE_FIELDS = (
+    'limit_cpus', 'limit_memory_mb', 'limit_disk_gb', 'expires_in_seconds')
+
+# How many times an update or delete re-probes and re-runs when a
+# concurrent writer moved the claim row between the probe and the
+# transaction. This is not the transient-error retry above: nothing
+# failed, the optimistic guard simply found the row was no longer what
+# the deltas were computed from, so the only correct response is to
+# recompute them from what is there now.
+_CLAIM_STALE_MAX_ATTEMPTS = 4
+
+
+class NamespaceClaimRow(TypedDict):
+    """One namespace_claims row, as readers of the claims API see it."""
+
+    uuid: str
+    namespace: str
+    limit_cpus: int
+    limit_memory_mb: int
+    limit_disk_gb: int
+    used_cpus: int
+    used_memory_mb: int
+    used_disk_gb: int
+    state: str
+    expires_at: float
+    updated_at: float
+
+
+class CreateNamespaceClaimResult(TypedDict):
+    """The reply _direct_create_namespace_claim builds."""
+
+    success: bool
+    error: str
+    created: bool
+    refused_reason: str
+    dimensions: list[CapacityDimensionDetailDict]
+    claim: Optional[NamespaceClaimRow]
+
+
+class UpdateNamespaceClaimResult(TypedDict):
+    """The reply _direct_update_namespace_claim builds."""
+
+    success: bool
+    error: str
+    updated: bool
+    refused_reason: str
+    dimensions: list[CapacityDimensionDetailDict]
+    claim: Optional[NamespaceClaimRow]
+
+
+class DeleteNamespaceClaimResult(TypedDict):
+    """The reply _direct_delete_namespace_claim builds."""
+
+    success: bool
+    error: str
+    deleted: bool
+    returned_cpus: int
+    returned_memory_mb: int
+    returned_disk_gb: int
+    clamped: bool
+
+
+class _ClaimRefused(Exception):
+    """This operation cannot proceed, and the caller is told why.
+
+    Carries the reason the reply reports ('capacity', 'exists',
+    'not_found', 'not_active', 'no_cluster_capacity') and, for a
+    capacity refusal, what was asked for in each dimension so the
+    reply's detail is denominated in the amount the guard actually
+    tested. Raised either from a probe before the transaction opens or
+    from inside the ``engine.begin()`` block, which rolls the
+    transaction back on the way out; the per-dimension detail is then
+    assembled from a fresh read, exactly as _AdmissionDenied's is.
+    """
+
+    def __init__(self, reason: str,
+                 requested: Optional[dict[str, int]] = None,
+                 migrated: Optional[dict[str, int]] = None) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.requested = requested or {}
+        # The drawdown the refused statement would have migrated, so the
+        # detail describes the state the guard actually tested. Zero for
+        # a grow, which migrates nothing.
+        self.migrated = migrated or {}
+
+
+class _ClaimRowStale(Exception):
+    """The claim row moved between the probe and the transaction.
+
+    Nothing failed and nothing was refused: the optimistic guard on the
+    limits the deltas were computed from simply did not match, so the
+    whole operation re-probes and runs again.
+    """
+
+
+def _empty_create_claim_result() -> CreateNamespaceClaimResult:
+    """A successful, not-yet-decided claim creation reply."""
+    return {
+        'success': True,
+        'error': '',
+        'created': False,
+        'refused_reason': '',
+        'dimensions': [],
+        'claim': None,
+    }
+
+
+def _empty_update_claim_result() -> UpdateNamespaceClaimResult:
+    """A successful, not-yet-decided claim update reply."""
+    return {
+        'success': True,
+        'error': '',
+        'updated': False,
+        'refused_reason': '',
+        'dimensions': [],
+        'claim': None,
+    }
+
+
+def _empty_delete_claim_result() -> DeleteNamespaceClaimResult:
+    """A successful, not-yet-decided claim deletion reply."""
+    return {
+        'success': True,
+        'error': '',
+        'deleted': False,
+        'returned_cpus': 0,
+        'returned_memory_mb': 0,
+        'returned_disk_gb': 0,
+        'clamped': False,
+    }
+
+
+def _claim_capacity_guard(
+        dimension: str, requested: int,
+        migrated: int) -> sa.ColumnElement[bool]:
+    """D14's mirror guard for one dimension, in its migration-aware form.
+
+    ``claimed + requested + GREATEST(0, unclaimed_used - migrated) <=
+    total``: what the singleton will hold *after* this statement commits
+    has to fit in the cluster's totals.
+
+    ``migrated`` is the drawdown this statement moves off the unclaimed
+    side and onto the claim side in the same UPDATE. It is an explicit
+    parameter precisely because it is **not** the same for every caller:
+
+    * **Creation** passes the namespace's existing drawdown (D3).
+      Without the term the guard tests a state the write cannot produce
+      -- it counts the namespace's own usage on the unclaimed side,
+      which this very statement is about to take off it -- and so
+      refuses an operator claiming capacity their namespace is already
+      holding. Concretely: 100 cpus total, 80 used by unclaimed
+      namespaces of which 40 belong to ci-1, and a 40 cpu claim for ci-1
+      lands at claimed 40 plus unclaimed_used 40, a consistent 80 of
+      100. The term-less form computed ``0 + 40 <= 100 - 80`` and
+      refused it.
+    * **A grow** passes zero, and must keep passing zero. A grow
+      migrates nothing: the namespace's usage is already on the claim
+      side of the ledger, counted in the claim's own ``used_*`` rather
+      than in ``unclaimed_used_*``, so subtracting a drawdown here would
+      credit the same capacity twice and grant a claim the cluster
+      cannot keep. Do not "simplify" this by handing a grow the
+      namespace's drawdown; there is a test pinning the term at zero.
+
+    The ``GREATEST(0, ...)`` is load bearing rather than decorative. The
+    ``unclaimed_used_*`` decrement in the same statement is floored the
+    same way, and a guard that floored differently from the write it
+    guards would be testing a state the write cannot reach. It is also
+    what keeps a drawdown larger than the singleton's unclaimed sums --
+    an instance stranded on a node with no capacity row is
+    namespace-wide usage the reconciler's unclaimed fold never counted
+    -- clamping conservatively instead of crediting capacity that was
+    never charged.
+    """
+    cluster = _get_cluster_capacity_table()
+    return (cluster.c[f'claimed_{dimension}'] + requested
+            + sa.func.greatest(
+                0, cluster.c[f'unclaimed_used_{dimension}'] - migrated)
+            <= cluster.c[f'total_{dimension}'])
+
+
+def _claim_expiry_expression(expires_in_seconds: int) -> sa.ColumnElement[Any]:
+    """An expiry ``expires_in_seconds`` from the *server's* now.
+
+    Deliberately not a client-computed datetime. ``expires_at`` is only
+    ever compared against the database's NOW() -- by the reconciler's
+    expiry sweep and by _active_claim_for_namespace() -- so a value
+    computed on a node whose clock or timezone differs expires the claim
+    at the wrong moment, or instantly, with nothing to show for it. The
+    reconciler's live suite records finding exactly that during phase 2.
+
+    UNIX_TIMESTAMP()/FROM_UNIXTIME() rather than ``NOW() + INTERVAL n
+    SECOND`` so the arithmetic is an ordinary bound integer instead of
+    interval syntax around a parameter, and so it round-trips exactly
+    with the UNIX_TIMESTAMP() read-back in _claim_select().
+    """
+    return sa.func.from_unixtime(
+        sa.func.unix_timestamp() + expires_in_seconds)
+
+
+def _claim_select() -> sa.Select[Any]:
+    """The projection every claim read returns.
+
+    The two timestamps are converted to epoch seconds server side. They
+    are DATETIME columns written from the server's own clock, so a client
+    that reinterpreted them in its own timezone would publish an expiry
+    hours away from the one the expiry sweep will use.
+    """
+    claims = _get_namespace_claims_table()
+    return sa.select(
+        claims.c.uuid, claims.c.namespace, claims.c.limit_cpus,
+        claims.c.limit_memory_mb, claims.c.limit_disk_gb,
+        claims.c.used_cpus, claims.c.used_memory_mb, claims.c.used_disk_gb,
+        claims.c.state,
+        sa.func.unix_timestamp(claims.c.expires_at).label('expires_at'),
+        sa.func.unix_timestamp(claims.c.updated_at).label('updated_at'))
+
+
+def _claim_row_to_dict(row: sa.Row[Any]) -> NamespaceClaimRow:
+    """Convert a _claim_select() row into the dict callers see."""
+    return {
+        'uuid': str(row.uuid),
+        'namespace': str(row.namespace),
+        'limit_cpus': int(row.limit_cpus),
+        'limit_memory_mb': int(row.limit_memory_mb),
+        'limit_disk_gb': int(row.limit_disk_gb),
+        'used_cpus': int(row.used_cpus),
+        'used_memory_mb': int(row.used_memory_mb),
+        'used_disk_gb': int(row.used_disk_gb),
+        'state': str(row.state),
+        'expires_at': float(row.expires_at or 0),
+        'updated_at': float(row.updated_at or 0),
+    }
+
+
+def _read_claim_row(claim_key: UUID) -> Optional[sa.Row[Any]]:
+    """Read one claim row on its own connection, outside any transaction.
+
+    Update and delete both need the claim's current limits and usage
+    *before* they open their transaction, for the same reason
+    _probe_admission_rows() does: the first statement inside the
+    transaction has to be a guarded UPDATE.
+    """
+    engine = _get_engine()
+    claims = _get_namespace_claims_table()
+    with engine.connect() as conn:
+        return conn.execute(_claim_select().where(
+            claims.c.uuid == claim_key)).first()
+
+
+class _ClaimCreateProbe(NamedTuple):
+    """What a claim creation must know before it opens its transaction.
+
+    ``drawdown`` is keyed by CAPACITY_DIMENSIONS, so the create's
+    statements can be written as a comprehension over the dimensions
+    rather than three near-identical copies.
+    """
+
+    drawdown: dict[str, int]
+    cluster_present: bool
+    claim_exists: bool
+
+
+def _probe_claim_create(namespace: str) -> _ClaimCreateProbe:
+    """Read a creation's drawdown and presence probes (D3).
+
+    Runs on its own connection, outside the write transaction, for the
+    reason in the block comment above _probe_admission_rows(): a plain
+    SELECT as the transaction's first statement re-introduces
+    ER_CHECKREAD under innodb_snapshot_isolation.
+
+    All three reads are time-of-check-to-time-of-use racy by
+    construction, and each resolves acceptably:
+
+    * The drawdown. A create or delete in this namespace between the
+      probe and the transaction moves the figure by at most one
+      instance's allocation, in one direction, and the reconciler
+      recomputes both the claim's used_* and the cluster's unclaimed
+      sums from ground truth within a pass. This is the same bargain
+      phase 3 struck for the branch probe, and D3 names it explicitly.
+    * The cluster singleton probe. Absent-then-created refuses a create
+      the operator can simply repeat; present-then-deleted makes the
+      guarded UPDATE match no row, which reads as a capacity refusal.
+      Neither writes anything.
+    * The existing-claim probe. Two creates racing for one namespace can
+      both pass it and both commit. That is not an accounting error --
+      the reconciler rebuilds claimed_* from the sum of *every* active
+      claim's limits, so both are counted -- but the namespace then has
+      two claims and admission draws down the lowest-uuid one
+      (_active_claim_for_namespace orders by uuid). An operator deletes
+      the extra. Serialising this properly needs a uniqueness constraint
+      the table does not have, which is a schema change and not this
+      step's.
+
+    None of the three can over-admit past a guard that was actually
+    evaluated, and none leaves a counter the reconciler will not repair.
+    """
+    engine = _get_engine()
+    cluster = _get_cluster_capacity_table()
+
+    with engine.connect() as conn:
+        row = conn.execute(
+            _NAMESPACE_DRAWDOWN_SQL,
+            _namespace_drawdown_params(namespace)).first()
+        drawdown = {
+            'cpus': int(row.used_cpus) if row is not None else 0,
+            'memory_mb': int(row.used_memory_mb) if row is not None else 0,
+            'disk_gb': int(row.used_disk_gb) if row is not None else 0,
+        }
+        cluster_present = conn.execute(sa.select(cluster.c.id).where(
+            cluster.c.id == 1)).first() is not None
+        claim_exists = _active_claim_for_namespace(
+            conn, namespace) is not None
+
+    return _ClaimCreateProbe(
+        drawdown=drawdown, cluster_present=cluster_present,
+        claim_exists=claim_exists)
+
+
+def _cluster_capacity_dimensions(
+        requested: dict[str, int],
+        migrated: Optional[dict[str, int]] = None
+) -> list[CapacityDimensionDetailDict]:
+    """Per-dimension detail for a mirror-guard refusal, read after rollback.
+
+    The same shape, and the same caveat, as _admission_denial_dimensions()
+    for its cluster stage: MariaDB cannot say which WHERE clause failed
+    and the transaction that knew has been rolled back, so the numbers
+    come from a follow-up read and ``exceeded`` is recomputed from what
+    was read rather than asserted.
+
+    The triple is _claim_capacity_guard() rearranged into the
+    limit/used/requested shape every other denial detail uses. D14's
+    effective limit is what active claims have not already spoken for,
+    so ``limit`` is ``total - claimed``; ``used`` is the unclaimed sums
+    *after* the migration this operation would have performed, so a
+    creation's detail describes the state it was actually refused
+    against rather than one it was never testing. ``migrated`` is
+    therefore the same figure the guard was given, and defaults to zero
+    for a grow, which migrates nothing.
+    """
+    engine = _get_engine()
+    cluster = _get_cluster_capacity_table()
+    dimensions: list[CapacityDimensionDetailDict] = []
+    migrated = migrated or {}
+
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(sa.select(cluster).where(
+                cluster.c.id == 1)).first()
+            if row is not None:
+                for dimension in CAPACITY_DIMENSIONS:
+                    dimensions.append(_capacity_dimension(
+                        dimension,
+                        (getattr(row, f'total_{dimension}')
+                         - getattr(row, f'claimed_{dimension}')),
+                        max(0, (getattr(row, f'unclaimed_used_{dimension}')
+                                - migrated.get(dimension, 0))),
+                        requested.get(dimension, 0)))
+    except OperationalError as e:
+        # Diagnostic, not load bearing: the refusal is already decided.
+        LOG.warning(f'Could not read claim refusal detail: {e}')
+
+    return dimensions
+
+
+def _direct_create_namespace_claim(
+        claim_uuid: str, namespace: str, limit_cpus: int,
+        limit_memory_mb: int, limit_disk_gb: int,
+        expires_in_seconds: int) -> CreateNamespaceClaimResult:
+    """Create a namespace claim, guarded against the cluster (D3, D14).
+
+    One transaction in D1's canonical order, retried as a whole on
+    transient contention. The steps are:
+
+    1. The drawdown and presence probes, **outside** the transaction
+       (_probe_claim_create). The drawdown comes from
+       _NAMESPACE_DRAWDOWN_SQL, which is the reconciler's own per-claim
+       aggregation restricted to one namespace, so the row this creates
+       starts at the figure the next reconcile pass will compute and
+       that pass then moves nothing.
+    2. The guarded ``cluster_capacity`` UPDATE, which is therefore the
+       transaction's first statement: ``claimed_*`` up by the new
+       limits, ``unclaimed_used_*`` down by the migrated drawdown,
+       guarded by D14's mirror of the admission guard in its
+       migration-aware form -- ``claimed + limit + GREATEST(0,
+       unclaimed_used - migrated) <= total``, which is exactly the state
+       this statement's own SET produces (see _claim_capacity_guard). A
+       rowcount of zero is the refusal -- and note the CLIENT_FOUND_ROWS
+       semantics recorded in _direct_admit_instance_placement()'s
+       docstring: it counts rows *matched*, which is what makes a
+       zero-sized claim read as "the guard passed" rather than as a
+       denial.
+    3. The ``INSERT``, with ``used_*`` seeded to the migrated drawdown
+       and coverage state 'active'.
+    4. A read-back of the row just inserted, for the reply. A read after
+       our own write, on a row this transaction holds the lock on, which
+       is what the ER_CHECKREAD invariant permits.
+
+    **A missing cluster_capacity singleton refuses rather than failing
+    open**, which is deliberately the opposite of P7's decision for an
+    instance placement, because the two are not the same bet. Admitting
+    an instance unguarded records where a machine already is, and the
+    reconciler agrees with the counters within one pass. Creating a claim
+    unguarded writes a *promise*, against totals nothing has computed
+    yet, that the cluster may have no way to keep -- and the next pass
+    will fold those limits into ``claimed_*`` whether or not they fit,
+    starving every unclaimed namespace until an operator notices. The
+    singleton exists from the first reconcile pass on any cluster with a
+    hypervisor, and a claim, unlike an instance create, can simply be
+    made again five minutes later.
+
+    The ``unclaimed_used_*`` decrement is floored at zero for the same
+    reason every decrement in this subsystem is: the drawdown is a probe,
+    and a concurrent release must not be able to drive a counter
+    negative. It is also namespace-wide where the reconciler's unclaimed
+    fold is restricted to nodes holding a capacity row, so an instance
+    stranded on an unsized node is subtracted here having never been
+    added there. Bounded by that namespace's stranded instances and
+    corrected by the next pass, and the alternative -- a second,
+    differently-restricted aggregation -- would reintroduce exactly the
+    drift that sharing one query exists to prevent.
+    """
+    result = _empty_create_claim_result()
+
+    try:
+        claim_key = UUID(claim_uuid)
+    except ValueError as e:
+        LOG.warning(f'create_namespace_claim given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    if not namespace:
+        result['success'] = False
+        result['error'] = 'namespace is required'
+        return result
+    if min(limit_cpus, limit_memory_mb, limit_disk_gb) < 0:
+        result['success'] = False
+        result['error'] = 'claim limits cannot be negative'
+        return result
+    if expires_in_seconds <= 0:
+        result['success'] = False
+        result['error'] = 'expires_in_seconds must be positive'
+        return result
+
+    engine = _get_engine()
+    claims = _get_namespace_claims_table()
+    cluster = _get_cluster_capacity_table()
+    limits = {'cpus': limit_cpus, 'memory_mb': limit_memory_mb,
+              'disk_gb': limit_disk_gb}
+
+    def _create() -> CreateNamespaceClaimResult:
+        outcome = _empty_create_claim_result()
+
+        # (1) The probes, deliberately on their own connection outside
+        # the transaction below -- see the block comment above
+        # _probe_admission_rows(). Re-run on every attempt, so a
+        # transaction that lost a race re-reads the world.
+        probe = _probe_claim_create(namespace)
+        if probe.claim_exists:
+            raise _ClaimRefused('exists')
+        if not probe.cluster_present:
+            raise _ClaimRefused('no_cluster_capacity')
+        migrated = probe.drawdown
+
+        with engine.begin() as conn:
+            # INVARIANT: the first statement executed on this connection
+            # must be a guarded UPDATE. A plain SELECT here establishes
+            # the transaction's read view early and makes every later
+            # guarded UPDATE against a contended row abort with
+            # ER_CHECKREAD (1020) under innodb_snapshot_isolation, which
+            # is ON by default from MariaDB 11.6.2. Reads after our own
+            # writes are fine -- we hold those row locks.
+
+            # (2) cluster_capacity, first in the canonical order.
+            # D14's mirror of the admission guard, per dimension, in the
+            # migration-aware form: the guard tests the state this
+            # statement's own SET produces, drawdown migration included
+            # (see _claim_capacity_guard).
+            guarded = sa.update(cluster).where(sa.and_(
+                cluster.c.id == 1, *[
+                    _claim_capacity_guard(d, limits[d], migrated[d])
+                    for d in CAPACITY_DIMENSIONS])).values(
+                updated_at=sa.func.now(), **{
+                    f'claimed_{d}': cluster.c[f'claimed_{d}'] + limits[d]
+                    for d in CAPACITY_DIMENSIONS
+                }, **{
+                    f'unclaimed_used_{d}': sa.func.greatest(
+                        0, cluster.c[f'unclaimed_used_{d}'] - migrated[d])
+                    for d in CAPACITY_DIMENSIONS
+                })
+            if conn.execute(guarded).rowcount == 0:
+                raise _ClaimRefused(
+                    'capacity', requested=limits, migrated=migrated)
+
+            # (3) namespace_claims, second in the canonical order.
+            conn.execute(sa.insert(claims).values(
+                uuid=claim_key,
+                namespace=namespace,
+                limit_cpus=limit_cpus,
+                limit_memory_mb=limit_memory_mb,
+                limit_disk_gb=limit_disk_gb,
+                used_cpus=migrated['cpus'],
+                used_memory_mb=migrated['memory_mb'],
+                used_disk_gb=migrated['disk_gb'],
+                state=CLAIM_STATE_ACTIVE,
+                expires_at=_claim_expiry_expression(expires_in_seconds),
+                updated_at=sa.func.now()))
+
+            # (4) Read back what we just wrote, for the reply.
+            row = conn.execute(_claim_select().where(
+                claims.c.uuid == claim_key)).first()
+            if row is not None:
+                outcome['claim'] = _claim_row_to_dict(row)
+
+        outcome['created'] = True
+        return outcome
+
+    try:
+        return _retry_transaction(
+            _create, f'create_namespace_claim({claim_uuid})')
+    except _ClaimRefused as refusal:
+        result['refused_reason'] = refusal.reason
+        if refusal.reason == 'capacity':
+            result['dimensions'] = _cluster_capacity_dimensions(
+                refusal.requested, refusal.migrated)
+        return result
+    except (OperationalError, IntegrityError) as e:
+        LOG.warning(
+            f'MariaDB create_namespace_claim failed for {claim_uuid}: {e}')
+        result['success'] = False
+        result['error'] = f'MariaDB error: {e}'
+        return result
+
+
+def _direct_update_namespace_claim(
+        claim_uuid: str, fields: list[str], limit_cpus: int,
+        limit_memory_mb: int, limit_disk_gb: int,
+        expires_in_seconds: int) -> UpdateNamespaceClaimResult:
+    """Grow, shrink or re-date a claim in one transaction (D8).
+
+    ``fields`` is the mask naming which of CLAIM_UPDATE_FIELDS this
+    request actually sets; anything unnamed is left exactly as it is,
+    which is how a deliberate zero is told from an unset proto3 int. Per
+    D15 there is no auto-grow: every change here is one an operator
+    asked for.
+
+    Each dimension is evaluated on its own terms, in one transaction, so
+    a single request may grow one and shrink another:
+
+    * **Grow** is an admission decision against D14's mirror guard,
+      exactly as creation is, and increments ``claimed_*`` by the delta.
+      Its migrated-drawdown term is zero and must stay zero: a grow
+      moves nothing off the cluster's unclaimed side, because the
+      namespace's usage is already counted in this claim's ``used_*``
+      (see _claim_capacity_guard).
+    * **Shrink** is always permitted down to the claim's current
+      ``used_*`` and no further. The floor is a SQL guard (``used_* <=
+      new limit``) rather than a Python comparison against the probe, so
+      an instance create that commits between the probe and the
+      transaction cannot slip the claim under its own usage.
+    * **Expiry** may be extended or shortened, and is written from the
+      server's clock (see _claim_expiry_expression).
+
+    The deltas are computed from limits read outside the transaction, so
+    the claim UPDATE also carries an optimistic guard on those limits.
+    If a concurrent writer moved them the whole operation re-probes and
+    runs again rather than applying a delta to the wrong base --
+    _ClaimRowStale, bounded by _CLAIM_STALE_MAX_ATTEMPTS and reported as
+    'conflict' if the row never stops moving.
+
+    A claim which is not in coverage state 'active' is refused
+    ('not_active'). Its limits are not in ``claimed_*`` -- the reconciler
+    sums active claims only -- so adjusting that counter on its behalf
+    would be adjusting it for capacity nobody is holding. Reviving an
+    expired claim is a delete and a create.
+    """
+    result = _empty_update_claim_result()
+
+    try:
+        claim_key = UUID(claim_uuid)
+    except ValueError as e:
+        LOG.warning(f'update_namespace_claim given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    unknown = [f for f in fields if f not in CLAIM_UPDATE_FIELDS]
+    if unknown:
+        result['success'] = False
+        result['error'] = f'unknown claim fields: {sorted(unknown)}'
+        return result
+    if not fields:
+        result['success'] = False
+        result['error'] = 'fields is required'
+        return result
+
+    requested = {'cpus': limit_cpus, 'memory_mb': limit_memory_mb,
+                 'disk_gb': limit_disk_gb}
+    changing = {d for d in CAPACITY_DIMENSIONS if f'limit_{d}' in fields}
+    if any(requested[d] < 0 for d in changing):
+        result['success'] = False
+        result['error'] = 'claim limits cannot be negative'
+        return result
+    change_expiry = 'expires_in_seconds' in fields
+    if change_expiry and expires_in_seconds <= 0:
+        result['success'] = False
+        result['error'] = 'expires_in_seconds must be positive'
+        return result
+
+    engine = _get_engine()
+    claims = _get_namespace_claims_table()
+    cluster = _get_cluster_capacity_table()
+
+    def _attempt() -> UpdateNamespaceClaimResult:
+        outcome = _empty_update_claim_result()
+
+        # The probe, on its own connection outside the transaction --
+        # see the block comment above _probe_admission_rows().
+        current = _read_claim_row(claim_key)
+        if current is None:
+            raise _ClaimRefused('not_found')
+        if current.state != CLAIM_STATE_ACTIVE:
+            raise _ClaimRefused('not_active')
+
+        old_limits = {d: int(getattr(current, f'limit_{d}'))
+                      for d in CAPACITY_DIMENSIONS}
+        new_limits = {d: (requested[d] if d in changing else old_limits[d])
+                      for d in CAPACITY_DIMENSIONS}
+        deltas = {d: new_limits[d] - old_limits[d]
+                  for d in CAPACITY_DIMENSIONS}
+
+        # A missing singleton refuses a grow for the reason
+        # _direct_create_namespace_claim() records -- an unguarded
+        # promise is worse than a refused one -- but must not stand in
+        # the way of giving capacity back or shortening a claim, neither
+        # of which can over-promise anything. Probed on its own
+        # connection, outside the transaction, like every other read
+        # here.
+        with engine.connect() as conn:
+            cluster_present = conn.execute(sa.select(cluster.c.id).where(
+                cluster.c.id == 1)).first() is not None
+        grows = {d: delta for d, delta in deltas.items() if delta > 0}
+        if grows and not cluster_present:
+            raise _ClaimRefused('no_cluster_capacity')
+
+        with engine.begin() as conn:
+            # INVARIANT: the first statement executed on this connection
+            # must be a guarded UPDATE, per the block comment above
+            # _probe_admission_rows(). When there is no singleton to
+            # adjust that is the guarded claim UPDATE below instead,
+            # which is equally DML and equally takes its row lock first.
+
+            # cluster_capacity, first in the canonical order. Only the
+            # dimensions that actually move are guarded: a pure expiry
+            # change, or a shrink, must not be refused because some
+            # *other* dimension of an already overcommitted cluster
+            # would not fit a growth nobody asked for.
+            if cluster_present and any(deltas.values()):
+                cluster_where = [cluster.c.id == 1]
+                cluster_values: dict[str, Any] = {
+                    'updated_at': sa.func.now()}
+                for dimension, delta in deltas.items():
+                    claimed = cluster.c[f'claimed_{dimension}']
+                    if delta > 0:
+                        # migrated=0, and it must stay zero: a grow
+                        # moves nothing off the unclaimed side, because
+                        # the namespace's usage is already counted in
+                        # this claim's used_*. See _claim_capacity_guard.
+                        cluster_where.append(
+                            _claim_capacity_guard(dimension, delta, 0))
+                    elif delta < 0:
+                        # Never below zero: the singleton and the claims
+                        # can disagree after a reconcile pass, and a
+                        # negative counter would hand out capacity that
+                        # does not exist.
+                        cluster_where.append(claimed >= -delta)
+                    if delta:
+                        cluster_values[f'claimed_{dimension}'] = (
+                            claimed + delta)
+                if conn.execute(sa.update(cluster).where(
+                        sa.and_(*cluster_where)).values(
+                            **cluster_values)).rowcount == 0:
+                    raise _ClaimRefused('capacity', requested=grows)
+
+            # namespace_claims, second in the canonical order. Three
+            # kinds of clause: the key, the optimistic guard on the
+            # limits the deltas were computed from, and D8's shrink
+            # floor.
+            claim_where = [claims.c.uuid == claim_key,
+                           claims.c.state == CLAIM_STATE_ACTIVE]
+            for dimension in CAPACITY_DIMENSIONS:
+                claim_where.append(
+                    claims.c[f'limit_{dimension}'] == old_limits[dimension])
+                if deltas[dimension] < 0:
+                    claim_where.append(claims.c[f'used_{dimension}']
+                                       <= new_limits[dimension])
+            claim_values: dict[str, Any] = {'updated_at': sa.func.now()}
+            for dimension in changing:
+                claim_values[f'limit_{dimension}'] = new_limits[dimension]
+            if change_expiry:
+                claim_values['expires_at'] = _claim_expiry_expression(
+                    expires_in_seconds)
+            if conn.execute(sa.update(claims).where(
+                    sa.and_(*claim_where)).values(
+                        **claim_values)).rowcount == 0:
+                # Either the shrink floor bound or the row moved. Which
+                # of the two is decided from a fresh read after the
+                # rollback, below, because MariaDB cannot say which
+                # clause failed and this transaction is about to vanish.
+                raise _ClaimRowStale()
+
+            # Read back what we just wrote, for the reply. After our own
+            # write, on a row we hold the lock on.
+            row = conn.execute(_claim_select().where(
+                claims.c.uuid == claim_key)).first()
+            if row is not None:
+                outcome['claim'] = _claim_row_to_dict(row)
+
+        outcome['updated'] = True
+        return outcome
+
+    def _blocked_by_shrink_floor() -> list[CapacityDimensionDetailDict]:
+        """Which dimensions a shrink could not get under, read fresh.
+
+        Empty means the claim UPDATE missed for some other reason -- a
+        concurrent writer moved the limits -- and the operation retries.
+        """
+        row = _read_claim_row(claim_key)
+        if row is None:
+            return []
+        dimensions = []
+        for dimension in changing:
+            used = int(getattr(row, f'used_{dimension}'))
+            if used > requested[dimension]:
+                dimensions.append(_capacity_dimension(
+                    dimension, requested[dimension], used, 0))
+        return dimensions
+
+    for _attempt_number in range(_CLAIM_STALE_MAX_ATTEMPTS):
+        try:
+            return _retry_transaction(
+                _attempt, f'update_namespace_claim({claim_uuid})')
+        except _ClaimRefused as refusal:
+            result['refused_reason'] = refusal.reason
+            if refusal.reason == 'capacity':
+                # The detail is denominated in the *delta* the grow
+                # asked for, not the new limit: what the guard tested
+                # was whether the cluster had room for the increase.
+                result['dimensions'] = _cluster_capacity_dimensions(
+                    refusal.requested, refusal.migrated)
+            return result
+        except _ClaimRowStale:
+            blocked = _blocked_by_shrink_floor()
+            if blocked:
+                result['refused_reason'] = 'below_usage'
+                result['dimensions'] = blocked
+                return result
+            continue
+        except (OperationalError, IntegrityError) as e:
+            LOG.warning(
+                f'MariaDB update_namespace_claim failed for '
+                f'{claim_uuid}: {e}')
+            result['success'] = False
+            result['error'] = f'MariaDB error: {e}'
+            return result
+
+    LOG.warning(
+        f'update_namespace_claim({claim_uuid}): the claim row kept moving '
+        f'under {_CLAIM_STALE_MAX_ATTEMPTS} attempts, giving up')
+    result['refused_reason'] = 'conflict'
+    return result
+
+
+def _direct_delete_namespace_claim(
+        claim_uuid: str) -> DeleteNamespaceClaimResult:
+    """Delete a claim and return its capacity to the cluster (D3).
+
+    The mirror of creation, floored on the way back: whatever the claim
+    still holds returns to ``cluster_capacity.unclaimed_used_*`` and its
+    limits come off ``claimed_*``, then the row goes. Canonical order,
+    and the transaction opens with that UPDATE.
+
+    Double delete is harmless by construction: the probe finds no row,
+    no transaction is opened, and the reply says ``deleted=False`` with
+    no capacity returned. The DELETE also carries an optimistic guard on
+    the counters the probe read, so a claim an instance create charged
+    between the two re-probes and runs again rather than returning a
+    stale figure to the unclaimed side.
+
+    A claim which is not in coverage state 'active' is simply removed,
+    touching no counter. The reconciler sums ``claimed_*`` over active
+    claims only, and its unclaimed fold skips only namespaces holding an
+    *active* claim -- so an expired claim's limits are already out of
+    ``claimed_*`` and its namespace's usage is already counted in
+    ``unclaimed_used_*``. Migrating either again would double it.
+    """
+    result = _empty_delete_claim_result()
+
+    try:
+        claim_key = UUID(claim_uuid)
+    except ValueError as e:
+        LOG.warning(f'delete_namespace_claim given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    engine = _get_engine()
+    claims = _get_namespace_claims_table()
+    cluster = _get_cluster_capacity_table()
+
+    def _attempt() -> DeleteNamespaceClaimResult:
+        outcome = _empty_delete_claim_result()
+
+        # The probe, outside the transaction, per the block comment
+        # above _probe_admission_rows().
+        current = _read_claim_row(claim_key)
+        if current is None:
+            return outcome
+
+        active = current.state == CLAIM_STATE_ACTIVE
+        limits = {d: int(getattr(current, f'limit_{d}'))
+                  for d in CAPACITY_DIMENSIONS}
+        used = {d: int(getattr(current, f'used_{d}'))
+                for d in CAPACITY_DIMENSIONS}
+
+        with engine.begin() as conn:
+            # INVARIANT: the first statement is DML -- the guarded
+            # cluster UPDATE, or the guarded DELETE below when there is
+            # no counter to adjust. Not a plain SELECT; see the block
+            # comment above _probe_admission_rows().
+            if active:
+                # Guarded first, clamped on a miss: the same floored
+                # idiom as _floored_namespace_decrement(), written out
+                # here because this statement both decrements claimed_*
+                # and increments unclaimed_used_* and that helper does
+                # pure decrements.
+                guarded = sa.update(cluster).where(sa.and_(
+                    cluster.c.id == 1, *[
+                        cluster.c[f'claimed_{d}'] >= limits[d]
+                        for d in CAPACITY_DIMENSIONS])).values(
+                    updated_at=sa.func.now(), **{
+                        f'claimed_{d}': cluster.c[f'claimed_{d}'] - limits[d]
+                        for d in CAPACITY_DIMENSIONS
+                    }, **{
+                        f'unclaimed_used_{d}': (
+                            cluster.c[f'unclaimed_used_{d}'] + used[d])
+                        for d in CAPACITY_DIMENSIONS
+                    })
+                if conn.execute(guarded).rowcount == 0:
+                    clamp = sa.update(cluster).where(
+                        cluster.c.id == 1).values(
+                        updated_at=sa.func.now(), **{
+                            f'claimed_{d}': sa.func.greatest(
+                                0, cluster.c[f'claimed_{d}'] - limits[d])
+                            for d in CAPACITY_DIMENSIONS
+                        }, **{
+                            f'unclaimed_used_{d}': (
+                                cluster.c[f'unclaimed_used_{d}'] + used[d])
+                            for d in CAPACITY_DIMENSIONS
+                        })
+                    if conn.execute(clamp).rowcount > 0:
+                        LOG.warning(
+                            f'Clamped claimed capacity on delete of claim '
+                            f'{claim_uuid}: the cluster singleton held less '
+                            f'than the claim it is releasing')
+                        outcome['clamped'] = True
+                    # A rowcount of zero here means there is no
+                    # singleton at all, so nothing was ever charged and
+                    # there is nothing to clamp -- the same reading
+                    # _floored_namespace_decrement() gives it.
+
+            # namespace_claims, second in the canonical order. The
+            # optimistic guard is on exactly the counters the credit
+            # above was computed from.
+            delete = sa.delete(claims).where(sa.and_(
+                claims.c.uuid == claim_key,
+                claims.c.state == current.state,
+                *[claims.c[f'limit_{d}'] == limits[d]
+                  for d in CAPACITY_DIMENSIONS],
+                *[claims.c[f'used_{d}'] == used[d]
+                  for d in CAPACITY_DIMENSIONS]))
+            if conn.execute(delete).rowcount == 0:
+                raise _ClaimRowStale()
+
+            outcome['deleted'] = True
+            if active:
+                outcome['returned_cpus'] = used['cpus']
+                outcome['returned_memory_mb'] = used['memory_mb']
+                outcome['returned_disk_gb'] = used['disk_gb']
+
+        return outcome
+
+    for _attempt_number in range(_CLAIM_STALE_MAX_ATTEMPTS):
+        try:
+            return _retry_transaction(
+                _attempt, f'delete_namespace_claim({claim_uuid})')
+        except _ClaimRowStale:
+            continue
+        except (OperationalError, IntegrityError) as e:
+            LOG.warning(
+                f'MariaDB delete_namespace_claim failed for '
+                f'{claim_uuid}: {e}')
+            result['success'] = False
+            result['error'] = f'MariaDB error: {e}'
+            return result
+
+    LOG.warning(
+        f'delete_namespace_claim({claim_uuid}): the claim row kept moving '
+        f'under {_CLAIM_STALE_MAX_ATTEMPTS} attempts, giving up')
+    result['success'] = False
+    result['error'] = 'the claim row kept changing under concurrent writers'
+    return result
+
+
+def _direct_get_namespace_claim(
+        claim_uuid: str) -> Optional[NamespaceClaimRow]:
+    """Read one claim row by uuid, or None."""
+    claims = _get_namespace_claims_table()
+
+    try:
+        claim_key = UUID(claim_uuid)
+    except ValueError as e:
+        LOG.warning(f'get_namespace_claim given a malformed uuid: {e}')
+        return None
+
+    try:
+        engine = _get_engine()
+        with engine.connect() as conn:
+            row = conn.execute(_claim_select().where(
+                claims.c.uuid == claim_key)).first()
+        return _claim_row_to_dict(row) if row is not None else None
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for namespace_claims: {e}')
+        return None
+
+
+def _direct_get_namespace_claims(
+        namespace: str) -> list[NamespaceClaimRow]:
+    """Read claim rows, optionally restricted to one namespace.
+
+    The namespace restriction is a WHERE clause on the table's own
+    ``idx_namespace_claims_namespace`` index rather than a Python filter
+    over every row, which is what the project's filter-pushdown rule
+    asks for. An empty namespace lists everything, which is what a
+    cluster-wide operator view wants.
+    """
+    claims = _get_namespace_claims_table()
+
+    try:
+        engine = _get_engine()
+        statement = _claim_select()
+        if namespace:
+            statement = statement.where(claims.c.namespace == namespace)
+        with engine.connect() as conn:
+            rows = conn.execute(
+                statement.order_by(claims.c.uuid)).fetchall()
+        return [_claim_row_to_dict(row) for row in rows]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for namespace_claims: {e}')
+        return []
+
+
+# ---------------------------------------------------------------------------
+# gRPC wrappers.
+#
+# All five use the *default* budget rather than BOUNDED_QUERY_TIMEOUT.
+# The bounded budget exists for callers upstream of a systemd watchdog
+# pet or on the instance-create hot path (issue 3586), and claim CRUD is
+# neither: it is driven by an operator's admin REST request, runs nowhere
+# in find_candidates(), the admission transaction or a daemon's
+# maintenance loop, and has no reconciler to true up a call that gave up
+# early. Failing an operator's create fast, so that they retry a request
+# which had in fact committed, would be strictly worse than making them
+# wait -- and the calls are rare enough that their worst case cannot
+# aggregate into a watchdog window the way an admission's can.
+# ---------------------------------------------------------------------------
+
+def _claim_from_proto(claim: Any) -> NamespaceClaimRow:
+    """Convert a NamespaceClaim proto message into the dict form."""
+    return {
+        'uuid': claim.uuid,
+        'namespace': claim.namespace,
+        'limit_cpus': int(claim.limit_cpus),
+        'limit_memory_mb': int(claim.limit_memory_mb),
+        'limit_disk_gb': int(claim.limit_disk_gb),
+        'used_cpus': int(claim.used_cpus),
+        'used_memory_mb': int(claim.used_memory_mb),
+        'used_disk_gb': int(claim.used_disk_gb),
+        'state': claim.state,
+        'expires_at': float(claim.expires_at),
+        'updated_at': float(claim.updated_at),
+    }
+
+
+def _grpc_create_namespace_claim(
+        claim_uuid: str, namespace: str, limit_cpus: int,
+        limit_memory_mb: int, limit_disk_gb: int,
+        expires_in_seconds: int) -> CreateNamespaceClaimResult:
+    """Create a namespace claim via the database microservice."""
+    result = _empty_create_claim_result()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNamespaceClaimRequest(
+            uuid=claim_uuid,
+            namespace=namespace,
+            limit_cpus=limit_cpus,
+            limit_memory_mb=limit_memory_mb,
+            limit_disk_gb=limit_disk_gb,
+            expires_in_seconds=expires_in_seconds)
+        reply = _grpc_call(stub.CreateNamespaceClaim, request)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['created'] = bool(reply.created)
+        result['refused_reason'] = reply.refused_reason
+        result['dimensions'] = [
+            {
+                'dimension': d.dimension,
+                'limit': float(d.limit),
+                'used': float(d.used),
+                'requested': float(d.requested),
+                'exceeded': bool(d.exceeded),
+            } for d in reply.dimensions]
+        if reply.HasField('claim'):
+            result['claim'] = _claim_from_proto(reply.claim)
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC CreateNamespaceClaim failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
+def _grpc_update_namespace_claim(
+        claim_uuid: str, fields: list[str], limit_cpus: int,
+        limit_memory_mb: int, limit_disk_gb: int,
+        expires_in_seconds: int) -> UpdateNamespaceClaimResult:
+    """Update a namespace claim via the database microservice."""
+    result = _empty_update_claim_result()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNamespaceClaimRequest(
+            uuid=claim_uuid,
+            limit_cpus=limit_cpus,
+            limit_memory_mb=limit_memory_mb,
+            limit_disk_gb=limit_disk_gb,
+            expires_in_seconds=expires_in_seconds,
+            fields=fields)
+        reply = _grpc_call(stub.UpdateNamespaceClaim, request)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['updated'] = bool(reply.updated)
+        result['refused_reason'] = reply.refused_reason
+        result['dimensions'] = [
+            {
+                'dimension': d.dimension,
+                'limit': float(d.limit),
+                'used': float(d.used),
+                'requested': float(d.requested),
+                'exceeded': bool(d.exceeded),
+            } for d in reply.dimensions]
+        if reply.HasField('claim'):
+            result['claim'] = _claim_from_proto(reply.claim)
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC UpdateNamespaceClaim failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
+def _grpc_delete_namespace_claim(
+        claim_uuid: str) -> DeleteNamespaceClaimResult:
+    """Delete a namespace claim via the database microservice."""
+    result = _empty_delete_claim_result()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNamespaceClaimRequest(uuid=claim_uuid)
+        reply = _grpc_call(stub.DeleteNamespaceClaim, request)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['deleted'] = bool(reply.deleted)
+        result['returned_cpus'] = int(reply.returned_cpus)
+        result['returned_memory_mb'] = int(reply.returned_memory_mb)
+        result['returned_disk_gb'] = int(reply.returned_disk_gb)
+        result['clamped'] = bool(reply.clamped)
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC DeleteNamespaceClaim failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
+def _grpc_get_namespace_claim(
+        claim_uuid: str) -> Optional[NamespaceClaimRow]:
+    """Read one namespace claim via the database microservice.
+
+    DatabaseUnavailable is deliberately left to propagate rather than
+    collapsed into None. CLAUDE.md's rule for this layer is that a
+    "not found" return value always means the object genuinely is not
+    there -- a claim that read as absent because the tier blinked would
+    have the object layer conclude it had been deleted.
+    """
+    stub = _get_database_stub()
+    request = database_pb2.GetNamespaceClaimRequest(uuid=claim_uuid)
+    try:
+        reply = _grpc_call(stub.GetNamespaceClaim, request)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetNamespaceClaim failed: {e}')
+        raise exceptions.DatabaseUnavailable(str(e)) from e
+    if not reply.found:
+        return None
+    return _claim_from_proto(reply.claim)
+
+
+def _grpc_get_namespace_claims(
+        namespace: str) -> list[NamespaceClaimRow]:
+    """List namespace claims via the database microservice.
+
+    An unreachable database raises rather than returning an empty list,
+    for the reason _grpc_get_namespace_claim() records.
+    """
+    stub = _get_database_stub()
+    request = database_pb2.GetNamespaceClaimsRequest(namespace=namespace)
+    try:
+        reply = _grpc_call(stub.GetNamespaceClaims, request)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetNamespaceClaims failed: {e}')
+        raise exceptions.DatabaseUnavailable(str(e)) from e
+    return [_claim_from_proto(claim) for claim in reply.claims]
+
+
+def create_namespace_claim(
+        claim_uuid: str, namespace: str, limit_cpus: int,
+        limit_memory_mb: int, limit_disk_gb: int,
+        expires_in_seconds: int) -> CreateNamespaceClaimResult:
+    """Claim aggregate capacity for a namespace, guarded (D3, D14).
+
+    The claim's ``used_*`` counters are seeded with the namespace's
+    existing drawdown, computed by the reconciler's own aggregation, and
+    the same amounts come off the cluster's unclaimed sums in the same
+    transaction. Without that migration a namespace that already held
+    instances could place its whole claim a second time, for up to one
+    reconcile period, starting from the moment an operator did the thing
+    the feature exists for.
+
+    ``expires_in_seconds`` is a duration, not a timestamp: the expiry is
+    computed from the *server's* clock, because that is the only clock
+    the expiry sweep ever compares against.
+
+    Returns:
+
+        {'success': bool, 'error': str, 'created': bool,
+         'refused_reason': '' | 'capacity' | 'no_cluster_capacity'
+                              | 'exists',
+         'dimensions': [{'dimension': str, 'limit': float, 'used': float,
+                         'requested': float, 'exceeded': bool}, ...],
+         'claim': {...} | None}
+
+    ``success`` says the RPC ran; ``created`` says what it decided.
+    """
+    if _use_database_service():
+        return _grpc_create_namespace_claim(
+            claim_uuid, namespace, limit_cpus, limit_memory_mb,
+            limit_disk_gb, expires_in_seconds)
+    return _direct_create_namespace_claim(
+        claim_uuid, namespace, limit_cpus, limit_memory_mb, limit_disk_gb,
+        expires_in_seconds)
+
+
+def update_namespace_claim(
+        claim_uuid: str, fields: list[str], limit_cpus: int = 0,
+        limit_memory_mb: int = 0, limit_disk_gb: int = 0,
+        expires_in_seconds: int = 0) -> UpdateNamespaceClaimResult:
+    """Grow, shrink or re-date a claim (D8).
+
+    ``fields`` names which of ``limit_cpus``, ``limit_memory_mb``,
+    ``limit_disk_gb`` and ``expires_in_seconds`` this call sets;
+    everything else is left alone. Growing any dimension is guarded
+    against the cluster exactly as creation is, shrinking is permitted
+    down to the claim's current usage and no further, and one call may
+    do both. Nothing here ever grows a claim the caller did not ask to
+    grow (D15).
+
+    Returns:
+
+        {'success': bool, 'error': str, 'updated': bool,
+         'refused_reason': '' | 'capacity' | 'below_usage' | 'not_found'
+                              | 'not_active' | 'no_cluster_capacity'
+                              | 'conflict',
+         'dimensions': [...], 'claim': {...} | None}
+    """
+    if _use_database_service():
+        return _grpc_update_namespace_claim(
+            claim_uuid, fields, limit_cpus, limit_memory_mb, limit_disk_gb,
+            expires_in_seconds)
+    return _direct_update_namespace_claim(
+        claim_uuid, fields, limit_cpus, limit_memory_mb, limit_disk_gb,
+        expires_in_seconds)
+
+
+def delete_namespace_claim(claim_uuid: str) -> DeleteNamespaceClaimResult:
+    """Delete a claim, returning what it held to the cluster.
+
+    Returns:
+
+        {'success': bool, 'error': str, 'deleted': bool,
+         'returned_cpus': int, 'returned_memory_mb': int,
+         'returned_disk_gb': int, 'clamped': bool}
+
+    ``deleted`` is False when there was no claim to delete, which is how
+    a repeat call is told from a real one. Deleting twice is harmless.
+    """
+    if _use_database_service():
+        return _grpc_delete_namespace_claim(claim_uuid)
+    return _direct_delete_namespace_claim(claim_uuid)
+
+
+def get_namespace_claim(claim_uuid: str) -> Optional[NamespaceClaimRow]:
+    """One claim row by uuid, or None if there is no such claim."""
+    if _use_database_service():
+        return _grpc_get_namespace_claim(claim_uuid)
+    return _direct_get_namespace_claim(claim_uuid)
+
+
+def get_namespace_claims(namespace: str = '') -> list[NamespaceClaimRow]:
+    """Every claim, or every claim in one namespace.
+
+    The namespace restriction is pushed down to SQL and served by the
+    claims table's namespace index.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace_claims(namespace)
+    return _direct_get_namespace_claims(namespace)

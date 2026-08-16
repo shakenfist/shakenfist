@@ -12,6 +12,7 @@ from collections import defaultdict
 from itertools import count
 from typing import List, Optional
 from unittest import mock
+from uuid import uuid4
 
 from shakenfist import mariadb
 from shakenfist.config import config
@@ -138,6 +139,11 @@ class MockMariaDB():
         # Tests which want the claim stage seed a row with
         # set_namespace_claim().
         self.namespace_claims = {}
+        # Make every claim create or grow refuse with this reason. The
+        # mock does not model the cluster_capacity singleton, so a
+        # caller-side test that needs a refusal asks for one; see
+        # refuse_namespace_claims().
+        self.namespace_claim_refusal = ''
         self.cluster_operations_store = {}  # Mock MariaDB cluster op headers
         self.work_queue_store = []  # Mock MariaDB work_queue rows (list to keep order)
         self._work_queue_next_id = count(1)  # AUTO_INCREMENT mock
@@ -884,6 +890,40 @@ class MockMariaDB():
         self.mariadb_get_scheduler_node_capacity.start()
         self.test_obj.addCleanup(
             self.mariadb_get_scheduler_node_capacity.stop)
+
+        # MariaDB namespace claim CRUD
+        self.mariadb_create_namespace_claim = mock.patch(
+            'shakenfist.mariadb.create_namespace_claim',
+            side_effect=self._mariadb_create_namespace_claim)
+        self.mariadb_create_namespace_claim.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_namespace_claim.stop)
+
+        self.mariadb_get_namespace_claim = mock.patch(
+            'shakenfist.mariadb.get_namespace_claim',
+            side_effect=self._mariadb_get_namespace_claim)
+        self.mariadb_get_namespace_claim.start()
+        self.test_obj.addCleanup(self.mariadb_get_namespace_claim.stop)
+
+        self.mariadb_get_namespace_claims = mock.patch(
+            'shakenfist.mariadb.get_namespace_claims',
+            side_effect=self._mariadb_get_namespace_claims)
+        self.mariadb_get_namespace_claims.start()
+        self.test_obj.addCleanup(self.mariadb_get_namespace_claims.stop)
+
+        self.mariadb_update_namespace_claim = mock.patch(
+            'shakenfist.mariadb.update_namespace_claim',
+            side_effect=self._mariadb_update_namespace_claim)
+        self.mariadb_update_namespace_claim.start()
+        self.test_obj.addCleanup(
+            self.mariadb_update_namespace_claim.stop)
+
+        self.mariadb_delete_namespace_claim = mock.patch(
+            'shakenfist.mariadb.delete_namespace_claim',
+            side_effect=self._mariadb_delete_namespace_claim)
+        self.mariadb_delete_namespace_claim.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_namespace_claim.stop)
 
         # Mock MariaDB functions for object metadata
         self.mariadb_get_object_metadata = mock.patch(
@@ -2714,7 +2754,8 @@ class MockMariaDB():
 
     def set_namespace_claim(self, namespace, limit_cpus=0, limit_memory_mb=0,
                             limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
-                            used_disk_gb=0):
+                            used_disk_gb=0, claim_uuid=None, state='active',
+                            expires_in=3600):
         """Seed an active namespace_claims row for a namespace.
 
         No namespace has one by default, which is the unclaimed case:
@@ -2723,10 +2764,12 @@ class MockMariaDB():
         nothing caller-side can observe them). Seeding a row makes the
         claim stage apply to every placement in that namespace.
 
-        The row is always active and unexpired -- expiry is coverage
+        The row defaults to active and unexpired -- expiry is coverage
         state the admission path resolves before it gets here, via the
         branch select this mock stands in for, so a seeded claim is by
-        definition one that select would have returned.
+        definition one that select would have returned. ``state`` and
+        ``expires_in`` exist for the claim CRUD callers, which do see
+        both fields.
 
         Whether the claim's limits can *refuse* a placement is not a
         property of the row: mariadb.CLAIM_ENFORCEMENT_HARD decides that
@@ -2736,15 +2779,176 @@ class MockMariaDB():
         an admitted placement; with it True the same seed produces
         failing_stage='claim'.
         """
+        now = time.time()
         self.namespace_claims[str(namespace)] = {
+            'uuid': str(claim_uuid) if claim_uuid else str(uuid4()),
+            'namespace': str(namespace),
             'limit_cpus': limit_cpus,
             'limit_memory_mb': limit_memory_mb,
             'limit_disk_gb': limit_disk_gb,
             'used_cpus': used_cpus,
             'used_memory_mb': used_memory_mb,
             'used_disk_gb': used_disk_gb,
+            'state': state,
+            'expires_at': now + expires_in,
+            'updated_at': now,
         }
         return self.namespace_claims[str(namespace)]
+
+    def refuse_namespace_claims(self, reason):
+        """Make every subsequent claim create or grow refuse.
+
+        The mock deliberately does not model the cluster_capacity
+        singleton's arithmetic. Re-implementing D14's mirror guard here
+        would be a second implementation of the thing the phase exists
+        to get right, which would then be what caller-side tests
+        actually assert against; the guard is proven against a real
+        server by test_mariadb_capacity_claims_live.py instead.
+
+        What a caller *does* have to handle is a refusal, so this seeds
+        one deterministically: pass 'capacity', 'no_cluster_capacity' or
+        any other reason the real implementation can return, and pass
+        '' to go back to accepting.
+        """
+        self.namespace_claim_refusal = reason
+
+    def _claim_by_uuid(self, claim_uuid):
+        """The seeded claim row with this uuid, or None.
+
+        The mock keys claims by namespace, because that is the lookup
+        the admission path makes and the admission mock came first. The
+        CRUD paths look up by uuid, and a scan is exact and free at the
+        handful of rows a unit test seeds.
+        """
+        for row in self.namespace_claims.values():
+            if row['uuid'] == str(claim_uuid):
+                return row
+        return None
+
+    def _claim_row(self, row):
+        """One claim row in the shape mariadb's claim reads return."""
+        return {
+            'uuid': row['uuid'],
+            'namespace': row['namespace'],
+            'limit_cpus': row['limit_cpus'],
+            'limit_memory_mb': row['limit_memory_mb'],
+            'limit_disk_gb': row['limit_disk_gb'],
+            'used_cpus': row['used_cpus'],
+            'used_memory_mb': row['used_memory_mb'],
+            'used_disk_gb': row['used_disk_gb'],
+            'state': row['state'],
+            'expires_at': row['expires_at'],
+            'updated_at': row['updated_at'],
+        }
+
+    def _mariadb_create_namespace_claim(
+            self, claim_uuid, namespace, limit_cpus, limit_memory_mb,
+            limit_disk_gb, expires_in_seconds):
+        """Mock implementation of mariadb.create_namespace_claim()
+
+        The D3 drawdown migration is not modelled: this mock has no
+        cluster singleton to migrate usage out of, so a created claim
+        starts at zero usage unless a test seeded one with
+        set_namespace_claim() first.
+        """
+        result = {
+            'success': True, 'error': '', 'created': False,
+            'refused_reason': '', 'dimensions': [], 'claim': None}
+        if self.namespace_claim_refusal:
+            result['refused_reason'] = self.namespace_claim_refusal
+            return result
+        if str(namespace) in self.namespace_claims:
+            result['refused_reason'] = 'exists'
+            return result
+
+        row = self.set_namespace_claim(
+            namespace, limit_cpus=limit_cpus,
+            limit_memory_mb=limit_memory_mb, limit_disk_gb=limit_disk_gb,
+            claim_uuid=claim_uuid, expires_in=expires_in_seconds)
+        result['created'] = True
+        result['claim'] = self._claim_row(row)
+        return result
+
+    def _mariadb_get_namespace_claim(self, claim_uuid):
+        """Mock implementation of mariadb.get_namespace_claim()"""
+        row = self._claim_by_uuid(claim_uuid)
+        return self._claim_row(row) if row is not None else None
+
+    def _mariadb_get_namespace_claims(self, namespace=''):
+        """Mock implementation of mariadb.get_namespace_claims()"""
+        return [self._claim_row(row)
+                for name, row in sorted(self.namespace_claims.items())
+                if not namespace or name == str(namespace)]
+
+    def _mariadb_update_namespace_claim(
+            self, claim_uuid, fields, limit_cpus=0, limit_memory_mb=0,
+            limit_disk_gb=0, expires_in_seconds=0):
+        """Mock implementation of mariadb.update_namespace_claim()
+
+        D8's shrink floor is modelled because it is a refusal a caller
+        has to handle and it is a property of the claim row alone. The
+        grow guard is not, for the reason refuse_namespace_claims()
+        records.
+        """
+        result = {
+            'success': True, 'error': '', 'updated': False,
+            'refused_reason': '', 'dimensions': [], 'claim': None}
+        row = self._claim_by_uuid(claim_uuid)
+        if row is None:
+            result['refused_reason'] = 'not_found'
+            return result
+        if row['state'] != 'active':
+            result['refused_reason'] = 'not_active'
+            return result
+
+        requested = {'limit_cpus': limit_cpus,
+                     'limit_memory_mb': limit_memory_mb,
+                     'limit_disk_gb': limit_disk_gb}
+        growing = any(requested[f] > row[f]
+                      for f in requested if f in fields)
+        if growing and self.namespace_claim_refusal:
+            result['refused_reason'] = self.namespace_claim_refusal
+            return result
+
+        for field, used in (('limit_cpus', 'used_cpus'),
+                            ('limit_memory_mb', 'used_memory_mb'),
+                            ('limit_disk_gb', 'used_disk_gb')):
+            if field in fields and requested[field] < row[used]:
+                result['refused_reason'] = 'below_usage'
+                return result
+
+        for field in requested:
+            if field in fields:
+                row[field] = requested[field]
+        if 'expires_in_seconds' in fields:
+            row['expires_at'] = time.time() + expires_in_seconds
+        row['updated_at'] = time.time()
+
+        result['updated'] = True
+        result['claim'] = self._claim_row(row)
+        return result
+
+    def _mariadb_delete_namespace_claim(self, claim_uuid):
+        """Mock implementation of mariadb.delete_namespace_claim()
+
+        Deleting twice is harmless, exactly as it is against a real
+        database: the second call finds no row and returns nothing.
+        """
+        result = {
+            'success': True, 'error': '', 'deleted': False,
+            'returned_cpus': 0, 'returned_memory_mb': 0,
+            'returned_disk_gb': 0, 'clamped': False}
+        row = self._claim_by_uuid(claim_uuid)
+        if row is None:
+            return result
+
+        del self.namespace_claims[row['namespace']]
+        result['deleted'] = True
+        if row['state'] == 'active':
+            result['returned_cpus'] = row['used_cpus']
+            result['returned_memory_mb'] = row['used_memory_mb']
+            result['returned_disk_gb'] = row['used_disk_gb']
+        return result
 
     def _mariadb_get_scheduler_node_capacity(self):
         """Mock implementation of mariadb.get_scheduler_node_capacity()

@@ -1164,6 +1164,31 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.GetSchedulerNodeCapacityRequest.SerializeToString,
                 response_deserializer=database__pb2.GetSchedulerNodeCapacityReply.FromString,
                 _registered_method=True)
+        self.CreateNamespaceClaim = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateNamespaceClaim',
+                request_serializer=database__pb2.CreateNamespaceClaimRequest.SerializeToString,
+                response_deserializer=database__pb2.CreateNamespaceClaimReply.FromString,
+                _registered_method=True)
+        self.GetNamespaceClaim = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNamespaceClaim',
+                request_serializer=database__pb2.GetNamespaceClaimRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNamespaceClaimReply.FromString,
+                _registered_method=True)
+        self.GetNamespaceClaims = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNamespaceClaims',
+                request_serializer=database__pb2.GetNamespaceClaimsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNamespaceClaimsReply.FromString,
+                _registered_method=True)
+        self.UpdateNamespaceClaim = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateNamespaceClaim',
+                request_serializer=database__pb2.UpdateNamespaceClaimRequest.SerializeToString,
+                response_deserializer=database__pb2.UpdateNamespaceClaimReply.FromString,
+                _registered_method=True)
+        self.DeleteNamespaceClaim = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNamespaceClaim',
+                request_serializer=database__pb2.DeleteNamespaceClaimRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteNamespaceClaimReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer:
@@ -2651,6 +2676,45 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateNamespaceClaim(self, request, context):
+        """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
+        growing and shrinking a claim are admission decisions in their own
+        right -- a claim is a promise of capacity the cluster has to be able
+        to keep -- so each writes cluster_capacity and namespace_claims in
+        one transaction, in the canonical order, opening with a guarded
+        UPDATE. Creation also migrates the namespace's existing drawdown out
+        of the cluster's unclaimed sums and into the new claim (D3), and
+        deletion migrates it back. See
+        docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNamespaceClaim(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNamespaceClaims(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateNamespaceClaim(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNamespaceClaim(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -3783,6 +3847,31 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetSchedulerNodeCapacity,
                     request_deserializer=database__pb2.GetSchedulerNodeCapacityRequest.FromString,
                     response_serializer=database__pb2.GetSchedulerNodeCapacityReply.SerializeToString,
+            ),
+            'CreateNamespaceClaim': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateNamespaceClaim,
+                    request_deserializer=database__pb2.CreateNamespaceClaimRequest.FromString,
+                    response_serializer=database__pb2.CreateNamespaceClaimReply.SerializeToString,
+            ),
+            'GetNamespaceClaim': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNamespaceClaim,
+                    request_deserializer=database__pb2.GetNamespaceClaimRequest.FromString,
+                    response_serializer=database__pb2.GetNamespaceClaimReply.SerializeToString,
+            ),
+            'GetNamespaceClaims': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNamespaceClaims,
+                    request_deserializer=database__pb2.GetNamespaceClaimsRequest.FromString,
+                    response_serializer=database__pb2.GetNamespaceClaimsReply.SerializeToString,
+            ),
+            'UpdateNamespaceClaim': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateNamespaceClaim,
+                    request_deserializer=database__pb2.UpdateNamespaceClaimRequest.FromString,
+                    response_serializer=database__pb2.UpdateNamespaceClaimReply.SerializeToString,
+            ),
+            'DeleteNamespaceClaim': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNamespaceClaim,
+                    request_deserializer=database__pb2.DeleteNamespaceClaimRequest.FromString,
+                    response_serializer=database__pb2.DeleteNamespaceClaimReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -9887,6 +9976,141 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/GetSchedulerNodeCapacity',
             database__pb2.GetSchedulerNodeCapacityRequest.SerializeToString,
             database__pb2.GetSchedulerNodeCapacityReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateNamespaceClaim(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateNamespaceClaim',
+            database__pb2.CreateNamespaceClaimRequest.SerializeToString,
+            database__pb2.CreateNamespaceClaimReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNamespaceClaim(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNamespaceClaim',
+            database__pb2.GetNamespaceClaimRequest.SerializeToString,
+            database__pb2.GetNamespaceClaimReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNamespaceClaims(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNamespaceClaims',
+            database__pb2.GetNamespaceClaimsRequest.SerializeToString,
+            database__pb2.GetNamespaceClaimsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateNamespaceClaim(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateNamespaceClaim',
+            database__pb2.UpdateNamespaceClaimRequest.SerializeToString,
+            database__pb2.UpdateNamespaceClaimReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNamespaceClaim(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNamespaceClaim',
+            database__pb2.DeleteNamespaceClaimRequest.SerializeToString,
+            database__pb2.DeleteNamespaceClaimReply.FromString,
             options,
             channel_credentials,
             insecure,

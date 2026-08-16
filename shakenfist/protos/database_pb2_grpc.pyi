@@ -417,6 +417,21 @@ class DatabaseServiceStub:
     phase 3 that is these counters rather than a Python walk over
     placement rows.
     """
+    CreateNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceClaimRequest, _database_pb2.CreateNamespaceClaimReply]
+    """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
+    growing and shrinking a claim are admission decisions in their own
+    right -- a claim is a promise of capacity the cluster has to be able
+    to keep -- so each writes cluster_capacity and namespace_claims in
+    one transaction, in the canonical order, opening with a guarded
+    UPDATE. Creation also migrates the namespace's existing drawdown out
+    of the cluster's unclaimed sums and into the new claim (D3), and
+    deletion migrates it back. See
+    docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+    """
+    GetNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimRequest, _database_pb2.GetNamespaceClaimReply]
+    GetNamespaceClaims: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimsRequest, _database_pb2.GetNamespaceClaimsReply]
+    UpdateNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceClaimRequest, _database_pb2.UpdateNamespaceClaimReply]
+    DeleteNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceClaimRequest, _database_pb2.DeleteNamespaceClaimReply]
 
 @_typing.type_check_only
 class DatabaseServiceAsyncStub(DatabaseServiceStub):
@@ -807,6 +822,21 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     phase 3 that is these counters rather than a Python walk over
     placement rows.
     """
+    CreateNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceClaimRequest, _database_pb2.CreateNamespaceClaimReply]  # type: ignore[assignment]
+    """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
+    growing and shrinking a claim are admission decisions in their own
+    right -- a claim is a promise of capacity the cluster has to be able
+    to keep -- so each writes cluster_capacity and namespace_claims in
+    one transaction, in the canonical order, opening with a guarded
+    UPDATE. Creation also migrates the namespace's existing drawdown out
+    of the cluster's unclaimed sums and into the new claim (D3), and
+    deletion migrates it back. See
+    docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+    """
+    GetNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimRequest, _database_pb2.GetNamespaceClaimReply]  # type: ignore[assignment]
+    GetNamespaceClaims: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimsRequest, _database_pb2.GetNamespaceClaimsReply]  # type: ignore[assignment]
+    UpdateNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceClaimRequest, _database_pb2.UpdateNamespaceClaimReply]  # type: ignore[assignment]
+    DeleteNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceClaimRequest, _database_pb2.DeleteNamespaceClaimReply]  # type: ignore[assignment]
 
 class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -2550,5 +2580,50 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         phase 3 that is these counters rather than a Python walk over
         placement rows.
         """
+
+    @_abc_1.abstractmethod
+    def CreateNamespaceClaim(
+        self,
+        request: _database_pb2.CreateNamespaceClaimRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.CreateNamespaceClaimReply, _abc.Awaitable[_database_pb2.CreateNamespaceClaimReply]]:
+        """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
+        growing and shrinking a claim are admission decisions in their own
+        right -- a claim is a promise of capacity the cluster has to be able
+        to keep -- so each writes cluster_capacity and namespace_claims in
+        one transaction, in the canonical order, opening with a guarded
+        UPDATE. Creation also migrates the namespace's existing drawdown out
+        of the cluster's unclaimed sums and into the new claim (D3), and
+        deletion migrates it back. See
+        docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+        """
+
+    @_abc_1.abstractmethod
+    def GetNamespaceClaim(
+        self,
+        request: _database_pb2.GetNamespaceClaimRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceClaimReply, _abc.Awaitable[_database_pb2.GetNamespaceClaimReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetNamespaceClaims(
+        self,
+        request: _database_pb2.GetNamespaceClaimsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceClaimsReply, _abc.Awaitable[_database_pb2.GetNamespaceClaimsReply]]: ...
+
+    @_abc_1.abstractmethod
+    def UpdateNamespaceClaim(
+        self,
+        request: _database_pb2.UpdateNamespaceClaimRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.UpdateNamespaceClaimReply, _abc.Awaitable[_database_pb2.UpdateNamespaceClaimReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteNamespaceClaim(
+        self,
+        request: _database_pb2.DeleteNamespaceClaimRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.DeleteNamespaceClaimReply, _abc.Awaitable[_database_pb2.DeleteNamespaceClaimReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

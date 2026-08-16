@@ -306,9 +306,14 @@ loses.
 
 **D8. Grow is guarded, shrink is floored, expiry may be
 extended, nothing auto-grows.** Growing any dimension is an
-admission decision using the same mirror guard as creation
-(`claimed + delta <= total - unclaimed_used`) and increments
-`claimed_*`. Shrinking is always permitted down to the
+admission decision using the same mirror guard as creation,
+with its migrated-drawdown term at zero
+(`claimed + delta + unclaimed_used <= total`), and increments
+`claimed_*`. The term is zero and must stay zero: a grow moves
+nothing off the unclaimed side, because the namespace's usage
+is already counted in the claim's own `used_*`, so crediting a
+drawdown here would count the same capacity twice. Shrinking
+is always permitted down to the
 claim's current `used_*` and no further, guarded by `used_*
 <= new limit` so a concurrent create cannot slip under it,
 and decrements `claimed_*`. A single update may grow one
@@ -342,18 +347,41 @@ Create, in order:
    first statement, per the ER_CHECKREAD invariant --
    incrementing `claimed_*` by the new limits and
    decrementing `unclaimed_used_*` by the migrated drawdown,
-   guarded by `claimed + limit <= total - unclaimed_used`.
+   guarded by
+   `claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total`.
    Rowcount zero is the refusal.
 3. `INSERT` the claim row with `used_*` seeded to the
    migrated drawdown, `state='active'`.
+
+**Corrected during step 4.** This plan originally wrote the
+guard as `claimed + limit <= total - unclaimed_used`, which is
+D14's formula from before D3 existed and which the planning
+pass failed to propagate the drawdown migration into. It tests
+the state the statement *started* from rather than the one its
+own `SET` produces, so it counts the namespace's usage on the
+unclaimed side that the very same statement is taking off it,
+and refuses an operator claiming capacity their namespace is
+already holding -- which is the feature's primary use case
+(the conductor sizing a runner namespace that already has
+runners). Concretely: 100 cpus total, 80 used by unclaimed
+namespaces of which 40 belong to `ci-1`; a 40 cpu claim for
+`ci-1` lands at claimed 40 plus unclaimed_used 40, a consistent
+80 of 100, and the old form computed `0 + 40 <= 100 - 80` and
+refused it. The `GREATEST(0, ...)` mirrors the flooring already
+in the `SET`; a guard which floored differently from the write
+it guards would test a state that write cannot reach.
 
 Delete is the mirror, floored on the way back (the
 `_floored_namespace_decrement()` idiom at `mariadb.py:24746`
 is the reference for what floored means here), and then the
 row is deleted.
 
-Grow/shrink is a per-dimension delta against the same guard,
-with the shrink floor as D8 describes.
+Grow/shrink is a per-dimension delta against the same guard
+with its migrated term at zero, and the shrink floor as D8
+describes. Zero is not an oversight there: a grow migrates
+nothing, because the namespace's usage is already counted in
+the claim's `used_*` rather than in the cluster's unclaimed
+sums.
 
 ### Advisory accounting on the instance path
 
@@ -444,8 +472,16 @@ Falsifiable, and mostly runnable:
   instances seeds `used_*` with that drawdown and reduces
   `unclaimed_used_*` by the same amounts, in one transaction
   (D3; live test).
-* A claim larger than `total - claimed - unclaimed_used` is
-  refused and leaves `claimed_*` unchanged.
+* A claim which does not fit once its namespace's own drawdown
+  has been migrated -- `claimed + limit + GREATEST(0,
+  unclaimed_used - drawdown) > total` -- is refused and leaves
+  `claimed_*` unchanged. Conversely, a claim which fits *only*
+  because of that migration is granted. (Corrected during step
+  4: this bullet said `A claim larger than total - claimed -
+  unclaimed_used is refused`, which restates the pre-D3 guard
+  and is not satisfiable alongside D3 -- it would refuse a
+  namespace the capacity it is already using. See the Design
+  section's correction note.)
 * Shrinking a claim below its `used_*` is refused; shrinking
   to exactly `used_*` succeeds.
 * An instance create exceeding an active claim **succeeds**
@@ -521,6 +557,46 @@ Falsifiable, and mostly runnable:
   phase adds.
 * The `SCHEDULER_DISK_OVERCOMMIT = 5.0` variability pass
   (~2026-08-26) inherited from phase 0.
+* **The two sides of the D3 migration are denominated
+  differently** (found in step 4). A claim's `used_*` must be
+  the namespace-wide figure, because that is what the
+  reconciler's per-claim recompute writes and the two have to
+  agree or a new claim's counters flap on every pass. But the
+  `unclaimed_used_*` those same amounts come off is *not*
+  namespace-wide: the reconciler's unclaimed fold is restricted
+  to nodes which hold a capacity row, so an instance stranded
+  on an unsized node is subtracted at creation having never
+  been added. The `GREATEST(0, ...)` in the guard and in the
+  `SET` keeps the result non-negative and the next reconcile
+  pass recomputes both sides from ground truth, so the error is
+  bounded by one namespace's stranded instances and lasts at
+  most one period -- but while it lasts it under-counts
+  unclaimed usage, which is the permissive direction. Fixing it
+  properly needs a second, capacity-node-restricted aggregation
+  for the cluster side, which reintroduces exactly the
+  two-queries-that-can-disagree risk that sharing one query was
+  chosen to eliminate. Worth doing only with both queries
+  derived from one fragment and both pinned by a
+  create-then-reconcile test.
+* **One active claim per namespace is enforced by a probe, not
+  a constraint** (found in step 4). `_probe_claim_create()`
+  refuses a create for a namespace that already holds an active
+  claim, but the probe runs outside the transaction, so two
+  concurrent creates for one namespace can both pass it and
+  both commit. The accounting stays consistent -- the
+  reconciler rebuilds `claimed_*` from the sum of every active
+  claim's limits, and a live test asserts the singleton agrees
+  with the rows after a concurrent burst -- but the namespace
+  then has two claims and admission draws down the lowest-uuid
+  one. A database constraint cannot express it: uniqueness
+  would have to cover *active* rows only, so that an expired
+  claim can coexist with its replacement, and MariaDB has no
+  partial or filtered index. The options are a uniqueness
+  constraint plus deleting expired rows outright instead of
+  marking them (which loses the audit trail D2 wanted), or a
+  generated column that is the namespace when active and NULL
+  otherwise, uniquely indexed -- the latter is probably right,
+  and is a schema change rather than step 4 work.
 
 ## Back brief
 

@@ -2616,6 +2616,145 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetSchedulerNodeCapacityReply()
 
     # =========================================================
+    # Namespace Claim CRUD (MariaDB)
+    #
+    # Scheduler-reservations phase 4. Creating and growing a claim are
+    # guarded admission decisions against the cluster_capacity
+    # singleton, so like the placement primitive above there is no
+    # Python-side composition to fall back to: each of these is one
+    # MariaDB transaction and nothing here does more than hand the
+    # request to the direct implementation and shape the reply.
+    # =========================================================
+
+    def _claim_message(
+        self, claim: mariadb.NamespaceClaimRow
+    ) -> database_pb2.NamespaceClaim:
+        """Build the wire form of one claim row."""
+        return database_pb2.NamespaceClaim(**claim)
+
+    def CreateNamespaceClaim(
+        self,
+        request: database_pb2.CreateNamespaceClaimRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.CreateNamespaceClaimReply:
+        """Create a namespace claim, guarded against the cluster (D3/D14).
+
+        An unexpected exception is a refusal-shaped reply with
+        ``success=False``: a caller that read only ``created`` would
+        report the claim as not made, which is the safe direction, while
+        one that checks ``success`` can tell a database problem from a
+        full cluster.
+        """
+        try:
+            self.monitor.counters['create_namespace_claim'].inc()
+            result = mariadb._direct_create_namespace_claim(
+                request.uuid, request.namespace, request.limit_cpus,
+                request.limit_memory_mb, request.limit_disk_gb,
+                request.expires_in_seconds)
+            reply = database_pb2.CreateNamespaceClaimReply(
+                success=result['success'],
+                error=result['error'],
+                created=result['created'],
+                refused_reason=result['refused_reason'])
+            for dimension in result['dimensions']:
+                reply.dimensions.add(**dimension)
+            if result['claim'] is not None:
+                reply.claim.CopyFrom(self._claim_message(result['claim']))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNamespaceClaim failed', e)
+            return database_pb2.CreateNamespaceClaimReply(
+                success=False, error=str(e))
+
+    def GetNamespaceClaim(
+        self,
+        request: database_pb2.GetNamespaceClaimRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNamespaceClaimReply:
+        """Read one claim row by uuid."""
+        try:
+            self.monitor.counters['get_namespace_claim'].inc()
+            claim = mariadb._direct_get_namespace_claim(request.uuid)
+            if claim is None:
+                return database_pb2.GetNamespaceClaimReply(found=False)
+            return database_pb2.GetNamespaceClaimReply(
+                found=True, claim=self._claim_message(claim))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNamespaceClaim failed', e)
+            return database_pb2.GetNamespaceClaimReply(found=False)
+
+    def GetNamespaceClaims(
+        self,
+        request: database_pb2.GetNamespaceClaimsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNamespaceClaimsReply:
+        """List claim rows, optionally restricted to one namespace."""
+        try:
+            self.monitor.counters['get_namespace_claims'].inc()
+            reply = database_pb2.GetNamespaceClaimsReply()
+            for claim in mariadb._direct_get_namespace_claims(
+                    request.namespace):
+                reply.claims.append(self._claim_message(claim))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNamespaceClaims failed', e)
+            return database_pb2.GetNamespaceClaimsReply()
+
+    def UpdateNamespaceClaim(
+        self,
+        request: database_pb2.UpdateNamespaceClaimRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.UpdateNamespaceClaimReply:
+        """Grow, shrink or re-date a claim in one transaction (D8)."""
+        try:
+            self.monitor.counters['update_namespace_claim'].inc()
+            result = mariadb._direct_update_namespace_claim(
+                request.uuid, list(request.fields), request.limit_cpus,
+                request.limit_memory_mb, request.limit_disk_gb,
+                request.expires_in_seconds)
+            reply = database_pb2.UpdateNamespaceClaimReply(
+                success=result['success'],
+                error=result['error'],
+                updated=result['updated'],
+                refused_reason=result['refused_reason'])
+            for dimension in result['dimensions']:
+                reply.dimensions.add(**dimension)
+            if result['claim'] is not None:
+                reply.claim.CopyFrom(self._claim_message(result['claim']))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateNamespaceClaim failed', e)
+            return database_pb2.UpdateNamespaceClaimReply(
+                success=False, error=str(e))
+
+    def DeleteNamespaceClaim(
+        self,
+        request: database_pb2.DeleteNamespaceClaimRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteNamespaceClaimReply:
+        """Delete a claim and return its capacity to the cluster."""
+        try:
+            self.monitor.counters['delete_namespace_claim'].inc()
+            result = mariadb._direct_delete_namespace_claim(request.uuid)
+            return database_pb2.DeleteNamespaceClaimReply(
+                success=result['success'],
+                error=result['error'],
+                deleted=result['deleted'],
+                returned_cpus=result['returned_cpus'],
+                returned_memory_mb=result['returned_memory_mb'],
+                returned_disk_gb=result['returned_disk_gb'],
+                clamped=result['clamped'])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNamespaceClaim failed', e)
+            return database_pb2.DeleteNamespaceClaimReply(
+                success=False, error=str(e))
+
+    # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
 
@@ -6159,6 +6298,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             # staying above zero is a standing alert rather than a
             # transient.
             'admit_instance_placement_unguarded',
+            # MariaDB namespace claim operations
+            'create_namespace_claim', 'get_namespace_claim',
+            'get_namespace_claims', 'update_namespace_claim',
+            'delete_namespace_claim',
         ]
         for op in operations:
             self.counters[op] = Counter(
