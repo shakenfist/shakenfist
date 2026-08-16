@@ -2555,9 +2555,15 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 node_used_cpus=result['node_used_cpus'],
                 node_used_memory_mb=result['node_used_memory_mb'],
                 node_used_disk_gb=result['node_used_disk_gb'],
-                node_expected_demand=result['node_expected_demand'])
+                node_expected_demand=result['node_expected_demand'],
+                claim_over_limit=result['claim_over_limit'])
             for dimension in result['dimensions']:
                 reply.dimensions.add(**dimension)
+            # The advisory over-limit detail travels in its own repeated
+            # field: dimensions means "why this was refused" and an
+            # over-claim placement was admitted (D5/D16).
+            for dimension in result['claim_dimensions']:
+                reply.claim_dimensions.add(**dimension)
             return reply
         except Exception as e:
             util_exceptions.ignore_exception(

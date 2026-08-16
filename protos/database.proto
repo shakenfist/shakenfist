@@ -2703,6 +2703,17 @@ message AdmitInstancePlacementReply {
   int64 node_used_memory_mb = 9;
   int64 node_used_disk_gb = 10;
   double node_expected_demand = 11;
+  // Advisory claim accounting (D5/D16). The admission was charged to a
+  // namespace claim and, read back inside the same transaction, that
+  // claim's used_* now stands above its limit_*. The placement was
+  // *admitted* -- claim ceilings are advisory for one release -- so this
+  // is deliberately not reported through failing_stage or dimensions,
+  // which both mean "this was refused". claim_dimensions carries only
+  // the dimensions actually over, in the same shape dimensions uses:
+  // used is what the claim held before this admission, requested is this
+  // admission's allocation, limit is the claim's ceiling.
+  bool claim_over_limit = 12;
+  repeated CapacityDimensionDetail claim_dimensions = 13;
 }
 
 message ReleaseInstancePlacementRequest {

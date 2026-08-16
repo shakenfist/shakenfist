@@ -2757,13 +2757,20 @@ class MockMariaDB():
         waives it for a zero target load, and every admission
         accumulates the placement's demand contribution whether or not
         the clause was enforced -- also like the real UPDATE.
+
+        There is no claim stage here: the mock models the node stage
+        only, so ``claim_over_limit`` and ``claim_dimensions`` are
+        present with inert defaults purely so callers see the same keys
+        the real implementation returns. Phase 4 step 3 seeds a real
+        claim row and gives them behaviour.
         """
         result = {
             'success': True, 'error': '', 'admitted': False,
             'unguarded': False, 'clamped': False, 'failing_stage': '',
             'dimensions': [], 'node_used_cpus': 0,
             'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
-            'node_expected_demand': 0.0}
+            'node_expected_demand': 0.0, 'claim_over_limit': False,
+            'claim_dimensions': []}
 
         attrs = self.instance_attributes.get(str(instance_uuid))
         if attrs is None:

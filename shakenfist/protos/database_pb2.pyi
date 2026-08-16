@@ -9156,6 +9156,8 @@ class AdmitInstancePlacementReply(_message.Message):
     NODE_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
     NODE_USED_DISK_GB_FIELD_NUMBER: _builtins.int
     NODE_EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    CLAIM_OVER_LIMIT_FIELD_NUMBER: _builtins.int
+    CLAIM_DIMENSIONS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -9180,8 +9182,21 @@ class AdmitInstancePlacementReply(_message.Message):
     node_used_memory_mb: _builtins.int
     node_used_disk_gb: _builtins.int
     node_expected_demand: _builtins.float
+    claim_over_limit: _builtins.bool
+    """Advisory claim accounting (D5/D16). The admission was charged to a
+    namespace claim and, read back inside the same transaction, that
+    claim's used_* now stands above its limit_*. The placement was
+    *admitted* -- claim ceilings are advisory for one release -- so this
+    is deliberately not reported through failing_stage or dimensions,
+    which both mean "this was refused". claim_dimensions carries only
+    the dimensions actually over, in the same shape dimensions uses:
+    used is what the claim held before this admission, requested is this
+    admission's allocation, limit is the claim's ceiling.
+    """
     @_builtins.property
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    @_builtins.property
+    def claim_dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     def __init__(
         self,
         *,
@@ -9196,10 +9211,12 @@ class AdmitInstancePlacementReply(_message.Message):
         node_used_memory_mb: _builtins.int = ...,
         node_used_disk_gb: _builtins.int = ...,
         node_expected_demand: _builtins.float = ...,
+        claim_over_limit: _builtins.bool = ...,
+        claim_dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

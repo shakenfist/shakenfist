@@ -24599,6 +24599,19 @@ _TRANSACTION_BASE_DELAY = 0.005
 # demand clause is what refused.
 CAPACITY_DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
 
+# Is a namespace claim's ceiling enforced, or merely recorded? D16 makes
+# claim ceilings advisory for one release: an admission that pushes a
+# claim's used_* past its limit_* is admitted and reported
+# (claim_over_limit plus the offending dimensions) rather than refused.
+# Phase 5 flips this to True together with the HTTP 403 refusal path.
+#
+# Deliberately a module constant and not a config option (D4): a `hard`
+# setting whose refusal path does not exist yet is a trap for the
+# operator who sets it. It is *not* folded into the node and cluster
+# fail-open either -- see the three guard flags in
+# _direct_admit_instance_placement().
+CLAIM_ENFORCEMENT_HARD = False
+
 
 class CapacityDimensionDetailDict(TypedDict):
     """One dimension's numbers at the moment a guard refused."""
@@ -24624,6 +24637,11 @@ class AdmitPlacementResult(TypedDict):
     node_used_memory_mb: int
     node_used_disk_gb: int
     node_expected_demand: float
+    # Advisory claim accounting (D5/D16), kept apart from failing_stage
+    # and dimensions because those two mean "this placement was refused"
+    # and an over-claim placement is admitted.
+    claim_over_limit: bool
+    claim_dimensions: list[CapacityDimensionDetailDict]
 
 
 class ReleasePlacementResult(TypedDict):
@@ -24748,6 +24766,8 @@ def _empty_admit_result() -> AdmitPlacementResult:
         'node_used_memory_mb': 0,
         'node_used_disk_gb': 0,
         'node_expected_demand': 0.0,
+        'claim_over_limit': False,
+        'claim_dimensions': [],
     }
 
 
@@ -25244,6 +25264,10 @@ def _direct_admit_instance_placement(
     5. The placement attribute write, masked to that one column.
     6. The placement reference rewrite: delete every instance_location
        row for the instance, then insert the new one.
+    7. Read-back of the rows this transaction wrote: the target node's
+       counters, and (when a claim was charged) the claim's advisory
+       over-limit detail. Both are reads *after* our own writes, which
+       the ER_CHECKREAD invariant permits.
 
     A guarded UPDATE matching no row aborts the transaction and returns
     ``admitted=False`` with the failing stage and per-dimension detail.
@@ -25251,6 +25275,15 @@ def _direct_admit_instance_placement(
     WHERE to its key equality, for the ground-truth writers that record
     where a libvirt domain already is -- a guard cannot refuse reality.
     A node with no capacity row admits unguarded and says so (P7).
+
+    The three guards are flagged independently (D6). The claim guard is
+    off this release because D16 makes claim ceilings advisory for one
+    release (CLAIM_ENFORCEMENT_HARD), so an admission which pushes a
+    claim past its limits is admitted and *reported*: step 7 re-reads
+    the claim row it just wrote and returns ``claim_over_limit`` with
+    the offending dimensions in ``claim_dimensions``. That is a
+    separate field from ``dimensions``, which means "why this placement
+    was refused" and must keep meaning only that.
 
     Rowcount semantics: SQLAlchemy's mysqldb dialect sets the
     ``CLIENT_FOUND_ROWS`` flag, so ``rowcount`` is the number of rows
@@ -25326,7 +25359,26 @@ def _direct_admit_instance_placement(
             # every guard, loudly, and let the reconciler create the row
             # on its next pass.
             outcome['unguarded'] = True
-        guarded = enforce and node_present
+
+        # Three guards, three flags (D6). The node and cluster guards
+        # share P7's fail-open above, because it is a statement about
+        # *this node's* limits being absent from the totals they test.
+        # The claim guard does not: a claim's limits are
+        # namespace-denominated and node-independent, so a missing node
+        # capacity row says nothing about whether the namespace has
+        # exceeded what it claimed, and dropping the claim guard for
+        # that reason would be dropping it for a reason that is not
+        # true. What does drop it, this release only, is D16's advisory
+        # period -- see CLAIM_ENFORCEMENT_HARD.
+        node_guarded = enforce and node_present
+        cluster_guarded = enforce and node_present
+        claim_guarded = enforce and CLAIM_ENFORCEMENT_HARD
+
+        # Set by the claim branch below, and the only thing that makes
+        # the advisory read-back run: a move and an unclaimed namespace
+        # both leave the claim row untouched, so there is nothing there
+        # this admission could have pushed over a limit.
+        claim_charged = False
 
         with engine.begin() as conn:
             # INVARIANT: the first statement executed on this connection
@@ -25355,8 +25407,9 @@ def _direct_admit_instance_placement(
             if old_node_key is not None:
                 pass
             elif claim_uuid is not None:
+                claim_charged = True
                 where = [claims.c.uuid == claim_uuid]
-                if guarded:
+                if claim_guarded:
                     where += [
                         claims.c.used_cpus + cpus <= claims.c.limit_cpus,
                         (claims.c.used_memory_mb + memory_mb
@@ -25374,7 +25427,7 @@ def _direct_admit_instance_placement(
                     raise _AdmissionDenied('claim')
             elif probe.cluster_present:
                 where = [cluster.c.id == 1]
-                if guarded:
+                if cluster_guarded:
                     # D14's best-effort unclaimed guard: what active
                     # claims have not spoken for is what an unclaimed
                     # namespace may use.
@@ -25417,7 +25470,7 @@ def _direct_admit_instance_placement(
                 if not node_present:
                     return
                 where = [capacity.c.node_uuid == node_key]
-                if guarded:
+                if node_guarded:
                     where += [
                         capacity.c.used_cpus + cpus <= capacity.c.limit_cpus,
                         (capacity.c.used_memory_mb + memory_mb
@@ -25500,6 +25553,41 @@ def _direct_admit_instance_placement(
                     outcome['node_used_disk_gb'] = int(row.used_disk_gb)
                     outcome['node_expected_demand'] = float(
                         row.expected_demand)
+
+            # Advisory claim accounting (D5). With claim_guarded False
+            # the increment above cannot refuse, so an over-claim
+            # namespace has just pushed its used_* past its limit_*;
+            # that has to be *recorded* rather than lost. Read the row
+            # back by primary key -- for the same reason as the node
+            # counters just above, and legally for the same reason: this
+            # is a read after our own write, on a row this transaction
+            # already holds the lock on, which is what the ER_CHECKREAD
+            # invariant permits. A second RPC would instead make every
+            # create in a claimed namespace pay a probe round trip
+            # (D5 rejects probe-then-force for exactly that).
+            if claim_charged:
+                row = conn.execute(sa.select(claims).where(
+                    claims.c.uuid == claim_uuid)).first()
+                if row is not None:
+                    requested = {'cpus': cpus, 'memory_mb': memory_mb,
+                                 'disk_gb': disk_gb}
+                    for dimension in CAPACITY_DIMENSIONS:
+                        amount = requested[dimension]
+                        # used is reported as what the claim held
+                        # *before* this admission, so the triple reads
+                        # exactly as a denial's does: limit, prior
+                        # usage, this request. exceeded then recomputes
+                        # to used_after > limit, which is the advisory
+                        # test.
+                        detail = _capacity_dimension(
+                            dimension,
+                            getattr(row, f'limit_{dimension}'),
+                            getattr(row, f'used_{dimension}') - amount,
+                            amount)
+                        if detail['exceeded']:
+                            outcome['claim_dimensions'].append(detail)
+                    outcome['claim_over_limit'] = bool(
+                        outcome['claim_dimensions'])
 
         outcome['admitted'] = True
         return outcome
@@ -25716,6 +25804,15 @@ def _grpc_admit_instance_placement(
         result['node_used_memory_mb'] = int(reply.node_used_memory_mb)
         result['node_used_disk_gb'] = int(reply.node_used_disk_gb)
         result['node_expected_demand'] = float(reply.node_expected_demand)
+        result['claim_over_limit'] = bool(reply.claim_over_limit)
+        result['claim_dimensions'] = [
+            {
+                'dimension': d.dimension,
+                'limit': float(d.limit),
+                'used': float(d.used),
+                'requested': float(d.requested),
+                'exceeded': bool(d.exceeded),
+            } for d in reply.claim_dimensions]
         return result
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC AdmitInstancePlacement failed: {e}')
@@ -25833,7 +25930,14 @@ def admit_instance_placement(
          'dimensions': [{'dimension': str, 'limit': float, 'used': float,
                          'requested': float, 'exceeded': bool}, ...],
          'node_used_cpus': int, 'node_used_memory_mb': int,
-         'node_used_disk_gb': int, 'node_expected_demand': float}
+         'node_used_disk_gb': int, 'node_expected_demand': float,
+         'claim_over_limit': bool, 'claim_dimensions': [...]}
+
+    ``claim_over_limit`` and ``claim_dimensions`` are the advisory
+    accounting of D16: the placement *was* admitted, and the namespace's
+    claim is now over its limits in the named dimensions. They are
+    separate from ``failing_stage``/``dimensions``, which describe a
+    refusal.
 
     ``success`` says the RPC ran; ``admitted`` says what it decided.
     A caller that treats a failed RPC as a denial would walk to the next

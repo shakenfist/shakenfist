@@ -460,8 +460,10 @@ Falsifiable, and mostly runnable:
   (mutation-tested, not asserted by inspection).
 * `git grep -n "for claim_row in active_claims"` returns
   nothing.
-* `git grep -n "guarded = enforce and node_present"` returns
-  nothing.
+* `git grep -nE "\bguarded = enforce"` returns nothing. (The word
+  boundary is load bearing: `node_guarded = enforce and node_present`
+  contains the old text as a substring, so the unanchored form this
+  bullet originally used can never pass. Corrected during step 2.)
 * `git grep -n 403 -- ':!docs' ':!*.md'` shows no new hit in
   the diff (scope guard for phase 5).
 * The reconciler computes zero drift after a randomised soak

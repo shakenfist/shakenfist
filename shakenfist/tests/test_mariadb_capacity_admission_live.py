@@ -557,17 +557,107 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # The claim was accounted against the cluster row when it was
         # created, so drawing it down again would double count.
         self.assertEqual(8, self._cluster().unclaimed_used_cpus)
+        # Exactly at the claim's limits, which is not over them.
+        self.assertFalse(result['claim_over_limit'])
+        self.assertEqual([], result['claim_dimensions'])
 
-    def test_a_claim_that_would_overflow_denies(self):
-        self._add_claim(limit_cpus=8, used_cpus=6)
+    def test_a_claim_that_would_overflow_is_admitted_and_reported(self):
+        # D16: claim ceilings are advisory for one release. The
+        # over-limit admission has to *land* -- counters above the limit
+        # and all -- and say so, because phase 5 flips
+        # CLAIM_ENFORCEMENT_HARD and turns this into the refusal.
+        claim_uuid = self._add_claim(
+            limit_cpus=8, used_cpus=6, limit_memory_mb=65536,
+            used_memory_mb=0, limit_disk_gb=1000, used_disk_gb=0)
         result = self._admit(self.node_b, cpus=4)
+
+        self.assertTrue(result['admitted'], result['error'])
+        # Advisory, so nothing about this reads as a refusal.
+        self.assertEqual('', result['failing_stage'])
+        self.assertEqual([], result['dimensions'])
+
+        self.assertTrue(result['claim_over_limit'])
+        detail = {d['dimension']: d for d in result['claim_dimensions']}
+        # Only the dimension actually over is named: memory and disk had
+        # room and must not be reported as if they did not.
+        self.assertEqual(['cpus'], list(detail))
+        self.assertEqual(8.0, detail['cpus']['limit'])
+        # used is what the claim held before this admission.
+        self.assertEqual(6.0, detail['cpus']['used'])
+        self.assertEqual(4.0, detail['cpus']['requested'])
+        self.assertTrue(detail['cpus']['exceeded'])
+
+        # And the row really is over its limit afterwards. This is the
+        # assertion that separates "advisory mode works" from "advisory
+        # mode does nothing", which look identical from the create.
+        claim = self._claim(claim_uuid)
+        self.assertEqual(10, claim.used_cpus)
+        self.assertGreater(claim.used_cpus, claim.limit_cpus)
+        # The node counters were still drawn down normally.
+        self.assertEqual(4, self._capacity(self.node_b).used_cpus)
+
+    def test_every_over_claim_dimension_is_reported(self):
+        self._add_claim(limit_cpus=8, used_cpus=6, limit_memory_mb=4096,
+                        used_memory_mb=4096, limit_disk_gb=1000,
+                        used_disk_gb=0)
+        result = self._admit(self.node_b, cpus=4, memory_mb=4096, disk_gb=40)
+
+        self.assertTrue(result['admitted'], result['error'])
+        self.assertTrue(result['claim_over_limit'])
+        self.assertEqual(
+            ['cpus', 'memory_mb'],
+            [d['dimension'] for d in result['claim_dimensions']])
+
+    def test_a_claim_with_room_reports_nothing(self):
+        self._add_claim(limit_cpus=64, used_cpus=0, limit_memory_mb=65536,
+                        used_memory_mb=0, limit_disk_gb=1000, used_disk_gb=0)
+        result = self._admit(self.node_b)
+
+        self.assertTrue(result['admitted'], result['error'])
+        self.assertFalse(result['claim_over_limit'])
+        self.assertEqual([], result['claim_dimensions'])
+
+    def test_a_move_in_a_claimed_namespace_reports_nothing(self):
+        # A move consumes nothing new on the namespace side (it never
+        # changes namespace), so it must neither touch the claim
+        # counters nor re-report a claim that some earlier admission
+        # left over its limits.
+        claim_uuid = self._add_claim(limit_cpus=8, used_cpus=6,
+                                     limit_memory_mb=65536, used_memory_mb=0,
+                                     limit_disk_gb=1000, used_disk_gb=0)
+        self.assertTrue(self._admit(self.node_a)['claim_over_limit'])
+        before = self._claim(claim_uuid)
+
+        result = self._admit(self.node_b, old_node=str(self.node_a))
+        self.assertTrue(result['admitted'], result['error'])
+        self.assertFalse(result['claim_over_limit'])
+        self.assertEqual([], result['claim_dimensions'])
+        after = self._claim(claim_uuid)
+        self.assertEqual(before.used_cpus, after.used_cpus)
+        self.assertEqual(before.used_memory_mb, after.used_memory_mb)
+        self.assertEqual(before.used_disk_gb, after.used_disk_gb)
+
+    def test_an_unclaimed_namespace_reports_nothing(self):
+        result = self._admit(self.node_b)
+        self.assertTrue(result['admitted'], result['error'])
+        self.assertFalse(result['claim_over_limit'])
+        self.assertEqual([], result['claim_dimensions'])
+
+    def test_the_claim_guard_binds_when_enforcement_is_turned_on(self):
+        # Phase 5's flip, exercised against a real server so its guard is
+        # known to bind before the constant moves. Also the live half of
+        # D6: the node here has a capacity row, so this says nothing
+        # about the fail-open -- the unit suite covers that half.
+        self._add_claim(limit_cpus=8, used_cpus=6)
+        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
+            result = self._admit(self.node_b, cpus=4)
 
         self.assertFalse(result['admitted'])
         self.assertEqual('claim', result['failing_stage'])
         detail = {d['dimension']: d for d in result['dimensions']}
         self.assertEqual(8.0, detail['cpus']['limit'])
-        self.assertEqual(6.0, detail['cpus']['used'])
         self.assertTrue(detail['cpus']['exceeded'])
+        self.assertFalse(result['claim_over_limit'])
         self.assertEqual(0, self._capacity(self.node_b).used_cpus)
 
     def test_an_expired_claim_falls_back_to_the_cluster_branch(self):
