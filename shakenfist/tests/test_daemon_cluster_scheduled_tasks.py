@@ -10,6 +10,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons.cluster import scheduled_tasks as st
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
@@ -26,6 +27,18 @@ NODE_FQDN_1 = 'sf-1.example.com'
 NODE_FQDN_2 = 'sf-2.example.com'
 OP_UUID_1 = 'cccc3333-cccc-4ccc-8ccc-cccccccccccc'
 KEY_UUID_1 = 'dddd4444-dddd-4ddd-8ddd-dddddddddddd'
+
+
+def _reset_sweep_failure_state():
+    """Clear both halves of the sweep failure streak state.
+
+    The dict and the gauge are separate process-global state and the
+    reset branch in _sweep_work_list() is guarded on the dict, so
+    clearing only the dict leaves the gauge carrying a value from an
+    earlier test that nothing will ever zero.
+    """
+    st._SWEEP_FAILURE_STREAK.clear()
+    st.SWEEP_WORK_LIST_FAILURE_STREAK.clear()
 
 
 class FakeBlob:
@@ -88,7 +101,7 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         # Clear the module-level queue between tests
         while not st.BLOB_CHECKS_QUEUE.empty():
             st.BLOB_CHECKS_QUEUE.get(block=False)
-        st._FILL_FAILURE_STREAK.clear()
+        _reset_sweep_failure_state()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -121,7 +134,7 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         mock_from_db.assert_not_called()
         self.assertEqual(0, st.BLOB_CHECKS_QUEUE.qsize())
         self.assertEqual(
-            {('per_blob', 'blob'): 1}, st._FILL_FAILURE_STREAK)
+            {('per_blob', 'blob'): 1}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             1, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
@@ -155,7 +168,7 @@ class FillPerInstanceQueueTestCase(base.ShakenFistTestCase):
         super().setUp()
         while not st.INSTANCE_CHECKS_QUEUE.empty():
             st.INSTANCE_CHECKS_QUEUE.get(block=False)
-        st._FILL_FAILURE_STREAK.clear()
+        _reset_sweep_failure_state()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Instance.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -168,7 +181,33 @@ class FillPerInstanceQueueTestCase(base.ShakenFistTestCase):
         mock_from_db.assert_not_called()
         self.assertEqual(0, st.INSTANCE_CHECKS_QUEUE.qsize())
         self.assertEqual(
-            {('per_instance', 'instance'): 1}, st._FILL_FAILURE_STREAK)
+            {('per_instance', 'instance'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_instance', 'object_type': 'instance'}))
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Instance.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_unavailable_database_counts_as_a_failed_read(
+            self, mock_get_by_state, mock_from_db):
+        """A tier outage is a failed read, not an exception to escape on.
+
+        The oversized-reply case returns None, but an unreachable
+        database tier exhausts the retry budget and raises
+        DatabaseUnavailable instead -- which is not an RpcError, so it
+        propagates through the mariadb wrapper. It must reach the same
+        streak, or the gauge reads zero during precisely the outage it
+        was added to make visible.
+        """
+        mock_get_by_state.side_effect = DatabaseUnavailable('tier is down')
+
+        st._fill_per_instance_queue()
+
+        mock_from_db.assert_not_called()
+        self.assertEqual(0, st.INSTANCE_CHECKS_QUEUE.qsize())
+        self.assertEqual(
+            {('per_instance', 'instance'): 1}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             1, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
@@ -624,7 +663,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         super().setUp()
         while not st.DELETED_OBJECTS_QUEUE.empty():
             st.DELETED_OBJECTS_QUEUE.get(block=False)
-        st._FILL_FAILURE_STREAK.clear()
+        _reset_sweep_failure_state()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     @mock.patch('shakenfist.mariadb.get_objects_by_state')
@@ -670,11 +709,64 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual([('blob', BLOB_UUID_1)],
                          list(st.DELETED_OBJECTS_QUEUE.queue))
         self.assertEqual(
-            {('deleted_object', 'network'): 1}, st._FILL_FAILURE_STREAK)
+            {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             1, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
-                {'sweep': 'deleted_object', 'object_type': 'network'}))
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_unavailable_database_does_not_stop_the_sweep(
+            self, mock_get_by_state):
+        # DatabaseUnavailable is not an RpcError, so it propagates out
+        # of the mariadb wrapper rather than becoming a None return. If
+        # it escapes the helper it unwinds the whole loop on the first
+        # affected type, which is exactly what the comment in
+        # _fill_per_deleted_object_queue() promises will not happen --
+        # and it takes the remaining due scheduled jobs with it.
+        def by_state(objtype, states, updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                raise DatabaseUnavailable('tier is down')
+            if objtype == ObjectType.BLOB:
+                return [BLOB_UUID_1]
+            return []
+        mock_get_by_state.side_effect = by_state
+
+        st._fill_per_deleted_object_queue()
+
+        self.assertEqual([('blob', BLOB_UUID_1)],
+                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        self.assertEqual(
+            {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_demotion_stops_publishing_the_streak(self, mock_get_by_state):
+        # Only the elected node runs these sweeps, so a demoted node
+        # holding a non-zero streak keeps a "streak > 0" alert firing
+        # against work it is no longer doing. Nothing on that node will
+        # run the reset branch again, so the clear has to be explicit.
+        mock_get_by_state.side_effect = (
+            lambda objtype, states, updated_before=None:
+            None if objtype == ObjectType.NETWORK else [])
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+        st.clear_sweep_failure_metrics()
+
+        self.assertEqual({}, st._SWEEP_FAILURE_STREAK)
+        # Removed entirely rather than zeroed: a node which is not the
+        # leader should not answer for these sweeps at all.
+        self.assertIsNone(
+            REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
     @mock.patch('shakenfist.mariadb.get_objects_by_state')
     def test_fill_failure_streak_counts_and_resets(self, mock_get_by_state):
@@ -687,20 +779,20 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         st._fill_per_deleted_object_queue()
         st._fill_per_deleted_object_queue()
         self.assertEqual(
-            {('deleted_object', 'network'): 2}, st._FILL_FAILURE_STREAK)
+            {('per_deleted_object', 'network'): 2}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             2, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
-                {'sweep': 'deleted_object', 'object_type': 'network'}))
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
         mock_get_by_state.side_effect = (
             lambda objtype, states, updated_before=None: [])
         st._fill_per_deleted_object_queue()
-        self.assertEqual({}, st._FILL_FAILURE_STREAK)
+        self.assertEqual({}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             0, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
-                {'sweep': 'deleted_object', 'object_type': 'network'}))
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_process_hard_deletes_old_final_objects(self, mock_get_class):

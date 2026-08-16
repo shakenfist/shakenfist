@@ -5944,9 +5944,22 @@ def _grpc_get_object_events(
     inverted: PruneEvents needs longer than the default, this needs a
     generous-but-not-infinite ceiling.
 
-    On RPC failure we log and return an empty list so REST callers
-    surface "no events" rather than crash; the actual error is in the
-    daemon log.
+    On RPC failure we log and return an empty list rather than raising.
+    Per docs/developer_guide/coding_rules.md that is a decision about
+    what a failed read means to each caller, so both classes of caller
+    are named here rather than left to inherit it. Display callers
+    (external_api/base.py) render whatever they are handed, so an empty
+    list surfaces "no events" rather than crashing the request. The one
+    caller that reasons about the result,
+    ``node_health.errored_node_affected_types()``, returns None when its
+    loop finds nothing, which its caller documents as "blast radius
+    unknown, do nothing and retry on a later pass" -- so an empty list
+    degrades it to inaction rather than to a wrong action. Neither
+    complements the list nor gates a destructive operation on it, which
+    is what made the same collapse dangerous in
+    ``get_active_blob_uuids()`` (#3638). A future caller that does gate
+    on this result has to revisit the choice. The actual error is in the
+    daemon log either way.
     """
     try:
         stub = _get_database_stub()

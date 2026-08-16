@@ -1,5 +1,6 @@
 import queue
 import time
+from typing import Optional
 
 from prometheus_client import Counter
 from prometheus_client import Gauge
@@ -10,6 +11,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -52,10 +54,13 @@ SWEEP_WORK_LIST_FAILURE_STREAK = Gauge(
     'cluster_sweep_work_list_failure_streak',
     'Consecutive scheduled-task passes unable to read their work list, '
     'by sweep and object type.', ['sweep', 'object_type'])
-_FILL_FAILURE_STREAK: dict[tuple[str, str], int] = {}
+_SWEEP_FAILURE_STREAK: dict[tuple[str, str], int] = {}
 
 
-def _sweep_work_list(sweep, object_type, state_values, updated_before=None):
+def _sweep_work_list(sweep: str, object_type: ObjectType,
+                     state_values: list[str],
+                     updated_before: Optional[float] = None
+                     ) -> Optional[list[str]]:
     """Read a sweep's work list, treating a failed read as visible.
 
     ``mariadb.get_objects_by_state`` returns None when the read failed,
@@ -64,30 +69,68 @@ def _sweep_work_list(sweep, object_type, state_values, updated_before=None):
     over an empty queue while the backlog it exists to drain keeps
     growing, and grows the very reply that could not be read (#3638).
 
+    A failed read arrives in two shapes and both mean the same thing
+    here. The gRPC wrapper returns None when the call itself failed --
+    the RESOURCE_EXHAUSTED oversized-reply case of #3638 -- but a
+    database tier that is down or mid rolling-restart exhausts the
+    retry budget in ``_grpc_call`` instead, which raises
+    ``DatabaseUnavailable``. That exception is deliberately not an
+    ``grpc.RpcError`` (issue 3373), so it propagates straight through
+    the wrapper; catching it here is what keeps the streak gauge
+    truthful during precisely the outage it exists to make visible,
+    and what keeps one object type's failure from unwinding the
+    deleted-object sweep for every type after it.
+
     Returns the uuid list, or None when the read failed. A None return
     means "skip this pass", never "there was nothing to do".
     """
-    obj_uuids = mariadb.get_objects_by_state(
-        object_type, state_values, updated_before=updated_before)
+    try:
+        obj_uuids = mariadb.get_objects_by_state(
+            object_type, state_values, updated_before=updated_before)
+        error = None
+    except DatabaseUnavailable as e:
+        obj_uuids = None
+        error = str(e)
     key = (sweep, str(object_type))
 
     if obj_uuids is None:
-        streak = _FILL_FAILURE_STREAK.get(key, 0) + 1
-        _FILL_FAILURE_STREAK[key] = streak
+        streak = _SWEEP_FAILURE_STREAK.get(key, 0) + 1
+        _SWEEP_FAILURE_STREAK[key] = streak
         SWEEP_WORK_LIST_FAILURE_STREAK.labels(
             sweep=sweep, object_type=str(object_type)).set(streak)
         LOG.with_fields({
             'sweep': sweep,
             'object_type': str(object_type),
-            'consecutive_failures': streak}).warning(
+            'consecutive_failures': streak,
+            'error': error}).warning(
             'Scheduled sweep could not read its work list; this pass is '
             'skipped and its backlog is not being drained')
         return None
 
-    if _FILL_FAILURE_STREAK.pop(key, None):
+    if _SWEEP_FAILURE_STREAK.pop(key, None):
         SWEEP_WORK_LIST_FAILURE_STREAK.labels(
             sweep=sweep, object_type=str(object_type)).set(0)
     return obj_uuids
+
+
+def clear_sweep_failure_metrics() -> None:
+    """Drop the sweep failure streaks when this node stops being the leader.
+
+    Only the elected cluster maintainer runs these sweeps, so a node
+    that failed a read and then lost the lock would otherwise keep
+    exporting a non-zero streak forever -- nothing on that node will
+    ever run the reset branch again, and any "streak > 0 for N minutes"
+    alert would fire indefinitely against a node that is not sweeping.
+    The newly elected node repopulates on its first failing pass. This
+    is the same reasoning as ``clear_scheduler_capacity_metrics()``.
+
+    Every label set on this gauge describes leader-only work, so the
+    whole metric goes rather than just the label sets currently at a
+    non-zero streak -- a demoted node should stop answering for these
+    sweeps entirely, not answer zero for them.
+    """
+    SWEEP_WORK_LIST_FAILURE_STREAK.clear()
+    _SWEEP_FAILURE_STREAK.clear()
 
 
 # Scheduler capacity reconciler metrics (phase 2, D5). Per-node gauges are
@@ -614,7 +657,7 @@ def _fill_per_deleted_object_queue():
         # while its uncollected backlog made each subsequent reply
         # larger still (#3638).
         obj_uuids = _sweep_work_list(
-            'deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
+            'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
             updated_before=(now - _deleted_object_delay(objtype)))
         if obj_uuids is None:
             continue

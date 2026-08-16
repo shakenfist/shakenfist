@@ -265,6 +265,17 @@ into `cluster_sweep_work_list_failure_streak`, and is logged as a skipped pass.
 The general form: **silence is not success, and an empty result set is not the
 absence of an answer.**
 
+One trap when handling this deliberately: a failed read from the `mariadb`
+client arrives in *two* shapes. The client wrappers map `grpc.RpcError` to a
+`None`/`False`/`[]` return, but `_grpc_call()` raises
+`exceptions.DatabaseUnavailable` once its retry budget is spent, and that is
+deliberately not an `RpcError` subclass (issue 3373), so it propagates through
+the wrapper untouched. Handling only the return value covers the oversized-reply
+case and misses the tier outage -- which is the more likely reason a read fails,
+and the condition an alert on the streak most needs to see. Cover both, and
+prove it with a test that sets `side_effect = DatabaseUnavailable(...)` rather
+than a `None` return.
+
 ## Cluster CI tests only run in the merge queue
 
 The `(collection)` matrix in `Functional tests` -- everything under

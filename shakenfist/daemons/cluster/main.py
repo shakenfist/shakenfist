@@ -649,8 +649,12 @@ class Monitor(daemon.Daemon):
             # No longer the leader (lock lost, or shutting down). The
             # capacity gauges describe cluster-wide singleton state, so
             # stop publishing them rather than leaving this node
-            # contradicting whichever node takes over.
+            # contradicting whichever node takes over. The sweep failure
+            # streaks go the same way: only the leader sweeps, so a
+            # demoted node holding a non-zero streak would keep an alert
+            # firing against work it is no longer doing.
             scheduled_tasks.clear_scheduler_capacity_metrics()
+            scheduled_tasks.clear_sweep_failure_metrics()
 
         # Stop being the cluster maintenance node if we were. Release
         # may raise LockNotHeld if our lease has lapsed -- swallow it,

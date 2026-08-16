@@ -419,10 +419,6 @@ class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
         mock_mariadb.get_active_blob_uuids.side_effect = (
             exceptions.DatabaseUnavailable(
                 'could not read the list of active blobs'))
-        fake_node = mock.MagicMock()
-        fake_node.blobs = [live_blob_uuid]
-        mock_node.Node.from_db.return_value = fake_node
-        mock_blob.from_db.return_value = None
 
         m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
         m.pet_watchdog = mock.MagicMock()
@@ -432,6 +428,14 @@ class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
             m._maintain_blobs()
 
         self.assertTrue(os.path.exists(live_blob))
+        # The pass is abandoned at the failed read, before any other
+        # database work happens. Asserting that is what distinguishes
+        # "skipped the pass" from "walked the store and happened to
+        # delete nothing"; the complementary case, where a genuinely
+        # empty list does delete the file, is covered by
+        # test_stale_uuid_named_files_still_deleted.
+        mock_node.Node.from_db.assert_not_called()
+        mock_blob.from_db.assert_not_called()
 
 
 class ResilientJobTestCase(base.ShakenFistTestCase):

@@ -55,8 +55,12 @@ class Monitor(daemon.Daemon):
         # unhelpful, so skip the pass entirely -- the blobs are still
         # there next time round, and a delayed sweep costs nothing that
         # a wrongly emptied blob store does not cost far more of.
+        #
+        # It is a set for the same reason: the membership test below runs
+        # once per file in the blob store, and the reply that motivated
+        # #3638 held on the order of 10^5 uuids.
         try:
-            active_blob_uuids = mariadb.get_active_blob_uuids()
+            active_blob_uuids = set(mariadb.get_active_blob_uuids())
         except exceptions.DatabaseUnavailable as e:
             LOG.with_fields({'error': str(e)}).warning(
                 'Could not read the active blob list, skipping blob '
@@ -70,7 +74,7 @@ class Monitor(daemon.Daemon):
             # failure audit is suppressed above.
             return
 
-        all_node_blobs = n.blobs
+        all_node_blobs = set(n.blobs)
 
         try:
             p = pathlib.Path(blob_path)
