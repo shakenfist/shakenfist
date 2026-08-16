@@ -573,6 +573,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         super().setUp()
         while not st.DELETED_OBJECTS_QUEUE.empty():
             st.DELETED_OBJECTS_QUEUE.get(block=False)
+        st._FILL_FAILURE_STREAK.clear()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     @mock.patch('shakenfist.mariadb.get_objects_by_state')
@@ -597,6 +598,56 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
             items.append(st.DELETED_OBJECTS_QUEUE.get(block=False))
         self.assertEqual(
             [('network', BLOB_UUID_1), ('network', BLOB_UUID_2)], items)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_fill_failure_is_visible_not_empty(self, mock_get_by_state):
+        # get_objects_by_state returns None when the read failed
+        # (e.g. a RESOURCE_EXHAUSTED oversized gRPC reply), distinct
+        # from [] for no matches. Collapsing the two silently turned
+        # the GC off for an object type forever (#3638): the failed
+        # type must be skipped visibly while other types still enqueue.
+        def by_state(objtype, states, updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                return None
+            if objtype == ObjectType.BLOB:
+                return [BLOB_UUID_1]
+            return []
+        mock_get_by_state.side_effect = by_state
+
+        st._fill_per_deleted_object_queue()
+
+        self.assertEqual([('blob', BLOB_UUID_1)],
+                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        self.assertEqual({'network': 1}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_deleted_object_fill_failure_streak',
+                {'object_type': 'network'}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_fill_failure_streak_counts_and_resets(self, mock_get_by_state):
+        # The streak counts consecutive failed passes per object type,
+        # and a successful read clears it -- the alertable signal is
+        # "still failing", not "failed once ever" (#3638).
+        def failing(objtype, states, updated_before=None):
+            return None if objtype == ObjectType.NETWORK else []
+        mock_get_by_state.side_effect = failing
+        st._fill_per_deleted_object_queue()
+        st._fill_per_deleted_object_queue()
+        self.assertEqual({'network': 2}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            2, REGISTRY.get_sample_value(
+                'cluster_deleted_object_fill_failure_streak',
+                {'object_type': 'network'}))
+
+        mock_get_by_state.side_effect = (
+            lambda objtype, states, updated_before=None: [])
+        st._fill_per_deleted_object_queue()
+        self.assertEqual({}, st._FILL_FAILURE_STREAK)
+        self.assertEqual(
+            0, REGISTRY.get_sample_value(
+                'cluster_deleted_object_fill_failure_streak',
+                {'object_type': 'network'}))
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_process_hard_deletes_old_final_objects(self, mock_get_class):

@@ -44,6 +44,16 @@ REAPER_REJECTED = Counter(
     'Stuck cluster operation work items that exceeded '
     'max_attempts and were rejected.')
 
+# The deleted-object GC's failure mode is silence: a pass that cannot
+# read its work list for an object type does nothing for that type, and
+# nothing else ever retries on its behalf (#3638). Track consecutive
+# failed passes per object type so operators can alert on the streak.
+DELETED_OBJECT_FILL_FAILURE_STREAK = Gauge(
+    'cluster_deleted_object_fill_failure_streak',
+    'Consecutive deleted-object GC passes unable to read the work list, '
+    'by object type.', ['object_type'])
+_FILL_FAILURE_STREAK: dict = {}
+
 # Scheduler capacity reconciler metrics (phase 2, D5). Per-node gauges are
 # labelled by node uuid and resource dimension; the resource label values
 # are 'cpus', 'memory_mb' and 'disk_gb'.
@@ -560,7 +570,28 @@ def _fill_per_deleted_object_queue():
         obj_uuids = mariadb.get_objects_by_state(
             ObjectType(objtype), FINAL_OBJECT_STATES,
             updated_before=(now - _deleted_object_delay(objtype)))
-        for obj_uuid in (obj_uuids or []):
+        if obj_uuids is None:
+            # None means the work-list read failed, which is distinct
+            # from [] for "no matches". Collapsing the two silently
+            # turned the GC off for node_inst_op while the uncollected
+            # backlog grew each subsequent reply even larger (#3638);
+            # a failed pass must be visible, not indistinguishable
+            # from an empty one.
+            streak = _FILL_FAILURE_STREAK.get(objtype, 0) + 1
+            _FILL_FAILURE_STREAK[objtype] = streak
+            DELETED_OBJECT_FILL_FAILURE_STREAK.labels(
+                object_type=objtype).set(streak)
+            LOG.with_fields({
+                'object_type': objtype,
+                'consecutive_failures': streak}).warning(
+                'Deleted-object sweep could not read its work list; '
+                'garbage collection for this object type is stalled')
+            continue
+
+        if _FILL_FAILURE_STREAK.pop(objtype, None):
+            DELETED_OBJECT_FILL_FAILURE_STREAK.labels(
+                object_type=objtype).set(0)
+        for obj_uuid in obj_uuids:
             DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
 
 

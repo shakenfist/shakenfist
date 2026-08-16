@@ -97,6 +97,24 @@ class MakeDatabaseChannelOptionsTestCase(base.ShakenFistTestCase):
         self.assertEqual(len(options), len(_DEFAULT_OPTIONS))
 
     @mock.patch('shakenfist.util.grpc_channel.grpc.insecure_channel')
+    def test_receive_cap_covers_unbounded_replies(self, mock_ic):
+        """The receive cap must comfortably exceed observed payloads.
+
+        GetObjectsByState and GetObjectEvents replies are unbounded by
+        design, and at gRPC's 4MiB default the sfcbr cluster saw
+        RESOURCE_EXHAUSTED on replies up to ~7.2MB -- which silently
+        wedged the deleted-object GC (#3638). Until those RPCs are
+        paginated (future work in PLAN-eventlog-direct-mariadb) the
+        client cap must stay well above anything observed in the wild.
+        """
+        mock_ic.return_value = mock.MagicMock()
+        grpc_channel.make_database_channel(['10.0.0.1'], 13005)
+        options = dict(mock_ic.call_args[1]['options'])
+        self.assertEqual(
+            100 * 1024 * 1024,
+            options.get('grpc.max_receive_message_length'))
+
+    @mock.patch('shakenfist.util.grpc_channel.grpc.insecure_channel')
     def test_reconnect_backoff_capped_below_roll_settle(self, mock_ic):
         """The reconnect backoff cap must stay below the deploy settle.
 

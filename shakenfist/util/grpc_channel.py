@@ -34,6 +34,16 @@ _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
     ('grpc.keepalive_timeout_ms', 5000),
     ('grpc.http2.max_pings_without_data', 0),
     ('grpc.keepalive_permit_without_calls', 1),
+    # Several DatabaseService replies are unbounded by design --
+    # GetObjectsByState returns every matching uuid and GetObjectEvents
+    # an object's whole (limit-capped, but limits reach 1000) event
+    # history -- and on sfcbr they crossed gRPC's default 4MiB receive
+    # cap (#3638, observed up to ~7.2MB), turning routine reads into
+    # opaque RESOURCE_EXHAUSTED failures and silently wedging the
+    # deleted-object GC. 100MiB is >10x the largest observed payload;
+    # truly bounding these replies (cursor pagination / streaming) is
+    # filed as future work in PLAN-eventlog-direct-mariadb.
+    ('grpc.max_receive_message_length', 100 * 1024 * 1024),
     # Disable gRPC's default behaviour of honouring the HTTP_PROXY /
     # HTTPS_PROXY environment variables. SF nodes that sit behind an
     # outbound HTTP proxy (CI runners, corporate networks) would

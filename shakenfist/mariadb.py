@@ -5962,7 +5962,12 @@ def _grpc_get_object_events(
         )
         reply = stub.GetObjectEvents(request, timeout=30.0)
     except grpc.RpcError as e:
-        LOG.error(f'gRPC GetObjectEvents failed: {e}')
+        # Name the object: an oversized-reply failure (#3638) can only
+        # be traced to its cause if the log identifies which object's
+        # event history blew the message cap.
+        LOG.error(
+            f'gRPC GetObjectEvents failed for {object_type}/{object_uuid} '
+            f'(limit {limit}): {e}')
         return []
 
     results: list[EventReadRow] = []
