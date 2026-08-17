@@ -131,6 +131,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'instance': 'instance.Instance',
     'ipam': 'ipam.IPAM',
     'namespace': 'namespace.Namespace',
+    'namespace_claim': 'namespace_claim.NamespaceClaim',
     'namespace_key': 'namespace_key.NamespaceKey',
     'trusted_issuer': 'trusted_issuer.TrustedIssuer',
     'mapping_rule': 'mapping_rule.MappingRule',

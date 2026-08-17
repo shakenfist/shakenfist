@@ -402,6 +402,21 @@ service DatabaseService {
   // phase 3 that is these counters rather than a Python walk over
   // placement rows.
   rpc GetSchedulerNodeCapacity (GetSchedulerNodeCapacityRequest) returns (GetSchedulerNodeCapacityReply) {}
+
+  // Scheduler-reservations phase 4: namespace claim CRUD. Creating,
+  // growing and shrinking a claim are admission decisions in their own
+  // right -- a claim is a promise of capacity the cluster has to be able
+  // to keep -- so each writes cluster_capacity and namespace_claims in
+  // one transaction, in the canonical order, opening with a guarded
+  // UPDATE. Creation also migrates the namespace's existing drawdown out
+  // of the cluster's unclaimed sums and into the new claim (D3), and
+  // deletion migrates it back. See
+  // docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+  rpc CreateNamespaceClaim (CreateNamespaceClaimRequest) returns (CreateNamespaceClaimReply) {}
+  rpc GetNamespaceClaim (GetNamespaceClaimRequest) returns (GetNamespaceClaimReply) {}
+  rpc GetNamespaceClaims (GetNamespaceClaimsRequest) returns (GetNamespaceClaimsReply) {}
+  rpc UpdateNamespaceClaim (UpdateNamespaceClaimRequest) returns (UpdateNamespaceClaimReply) {}
+  rpc DeleteNamespaceClaim (DeleteNamespaceClaimRequest) returns (DeleteNamespaceClaimReply) {}
 }
 
 // Generic status reply
@@ -2703,6 +2718,17 @@ message AdmitInstancePlacementReply {
   int64 node_used_memory_mb = 9;
   int64 node_used_disk_gb = 10;
   double node_expected_demand = 11;
+  // Advisory claim accounting (D5/D16). The admission was charged to a
+  // namespace claim and, read back inside the same transaction, that
+  // claim's used_* now stands above its limit_*. The placement was
+  // *admitted* -- claim ceilings are advisory for one release -- so this
+  // is deliberately not reported through failing_stage or dimensions,
+  // which both mean "this was refused". claim_dimensions carries only
+  // the dimensions actually over, in the same shape dimensions uses:
+  // used is what the claim held before this admission, requested is this
+  // admission's allocation, limit is the claim's ceiling.
+  bool claim_over_limit = 12;
+  repeated CapacityDimensionDetail claim_dimensions = 13;
 }
 
 message ReleaseInstancePlacementRequest {
@@ -2747,4 +2773,134 @@ message SchedulerNodeCapacityRow {
 
 message GetSchedulerNodeCapacityReply {
   repeated SchedulerNodeCapacityRow rows = 1;
+}
+
+// Namespace claim CRUD (MariaDB)
+// Scheduler-reservations phase 4 (see docs/plans/
+// PLAN-scheduler-reservations-phase-04-claims-api.md). Creating, growing
+// and shrinking a claim are themselves admission decisions against the
+// cluster_capacity singleton (D14's mirror guard), so each of them is one
+// transaction in D1's canonical order -- cluster_capacity, then
+// namespace_claims -- opening with a guarded UPDATE.
+
+// One namespace_claims row as its readers see it. The two timestamps are
+// epoch seconds computed server side with UNIX_TIMESTAMP(), because the
+// column is a DATETIME written from the server's NOW() and a client that
+// reinterpreted it in its own timezone would report an expiry hours from
+// the one the expiry sweep will actually use.
+//
+// ``state`` is *coverage* ('active' or 'expired'), not object existence
+// (D2). The claim object's baseobject-managed state lives in
+// object_states like every other object's and is not carried here.
+message NamespaceClaim {
+  string uuid = 1;       // Dashed uuid form
+  string namespace = 2;
+  int64 limit_cpus = 3;
+  int64 limit_memory_mb = 4;
+  int64 limit_disk_gb = 5;
+  int64 used_cpus = 6;
+  int64 used_memory_mb = 7;
+  int64 used_disk_gb = 8;
+  string state = 9;
+  double expires_at = 10;
+  double updated_at = 11;
+}
+
+// The expiry rides in as a duration rather than an absolute time, and is
+// applied server side as NOW() + INTERVAL. A client-computed datetime
+// silently expires the claim at the wrong moment -- or immediately -- if
+// the client's clock or timezone differs from the server's, which is the
+// same trap the reconciler's live suite records having fallen into.
+message CreateNamespaceClaimRequest {
+  string uuid = 1;       // Dashed uuid form, allocated by the caller
+  string namespace = 2;
+  int64 limit_cpus = 3;
+  int64 limit_memory_mb = 4;
+  int64 limit_disk_gb = 5;
+  int64 expires_in_seconds = 6;
+}
+
+message CreateNamespaceClaimReply {
+  bool success = 1;      // The RPC ran; false means an error, see error
+  string error = 2;
+  bool created = 3;
+  // Why a run that succeeded did not create: 'capacity' (the mirror
+  // guard refused), 'no_cluster_capacity' (the reconciler has never
+  // built the singleton, so there is nothing to guard against) or
+  // 'exists' (the namespace already holds an active claim).
+  string refused_reason = 4;
+  repeated CapacityDimensionDetail dimensions = 5;
+  NamespaceClaim claim = 6;
+}
+
+message GetNamespaceClaimRequest {
+  string uuid = 1;       // Dashed uuid form
+}
+
+message GetNamespaceClaimReply {
+  bool found = 1;
+  NamespaceClaim claim = 2;
+}
+
+// An empty namespace lists every claim; a non-empty one is pushed down
+// to the namespace index rather than filtered in Python.
+message GetNamespaceClaimsRequest {
+  string namespace = 1;
+}
+
+message GetNamespaceClaimsReply {
+  repeated NamespaceClaim claims = 1;
+}
+
+// D8: growing a dimension is an admission decision against the same
+// mirror guard creation uses, shrinking one is permitted down to the
+// claim's current used_* and no further, and one request may do both.
+// ``fields`` is the field mask naming which of limit_cpus,
+// limit_memory_mb, limit_disk_gb and expires_in_seconds this request
+// actually sets; an unnamed field is left exactly as it is, which is how
+// an unset proto3 zero is told from a deliberate zero.
+message UpdateNamespaceClaimRequest {
+  string uuid = 1;       // Dashed uuid form
+  int64 limit_cpus = 2;
+  int64 limit_memory_mb = 3;
+  int64 limit_disk_gb = 4;
+  int64 expires_in_seconds = 5;
+  repeated string fields = 6;
+}
+
+message UpdateNamespaceClaimReply {
+  bool success = 1;      // The RPC ran; false means an error, see error
+  string error = 2;
+  bool updated = 3;
+  // Why a run that succeeded did not update: 'capacity' (a grow the
+  // mirror guard refused), 'below_usage' (a shrink under the claim's
+  // current used_*), 'no_cluster_capacity' (a grow with no singleton to
+  // guard it -- a shrink or an expiry change is allowed through),
+  // 'not_active' (the claim's coverage state is not 'active', so its
+  // limits are not in claimed_* to adjust), 'not_found', or 'conflict'
+  // (concurrent writers kept taking the row out from under the attempt).
+  string refused_reason = 4;
+  repeated CapacityDimensionDetail dimensions = 5;
+  NamespaceClaim claim = 6;
+}
+
+message DeleteNamespaceClaimRequest {
+  string uuid = 1;       // Dashed uuid form
+}
+
+message DeleteNamespaceClaimReply {
+  bool success = 1;      // The RPC ran; false means an error, see error
+  string error = 2;
+  // False when there was no claim row to delete, which is how a repeat
+  // delete is told from a real one. Deleting twice is harmless: the
+  // second call finds nothing and returns no capacity.
+  bool deleted = 3;
+  // What the claim still held, returned to the cluster's unclaimed side.
+  int64 returned_cpus = 4;
+  int64 returned_memory_mb = 5;
+  int64 returned_disk_gb = 6;
+  // The claimed_* decrement had to be floored at zero, meaning the
+  // singleton and the claims disagreed before this delete. Corrected by
+  // the next reconcile pass.
+  bool clamped = 7;
 }

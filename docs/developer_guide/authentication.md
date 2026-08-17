@@ -225,11 +225,22 @@ automatic and a newly added endpoint is governed the moment it exists.
 The families in use are:
 
 `admin`, `agentoperation`, `artifact`, `auth`, `blob`,
-`clusteroperation`, `instance`, `interface`, `label`, `network`,
-`node`, `upload`
+`clusteroperation`, `instance`, `interface`, `issuer`, `label`,
+`network`, `node`, `rule`, `upload`
 
 So `GET /blobs` needs `blob.read`, and `DELETE /instances/{ref}` needs
-`instance.delete`.
+`instance.delete`. The unauthenticated endpoints (`/`, `/livez`,
+`/readyz`) derive families of their own, but `@public`
+short-circuits before enforcement so theirs are never consulted and
+they are not part of the vocabulary an operator writes.
+
+Everything under `/auth/namespaces/...` derives `auth`, including the
+namespace's keys, mapping rules and capacity claims. That the claims
+are a capacity concept rather than an auth one is a known wart: adding
+a `claim` family would be a change to the vocabulary operators have
+already written into mapping rules, so it has deliberately not been
+made. `cluster-admin` is the gate that actually matters for them
+either way.
 
 Where the derivation would mislead, a resource sets `scope_family`, or
 a method carries `@api_base.scope(...)` to override the verb. Both are

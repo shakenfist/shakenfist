@@ -522,7 +522,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
 | `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
 | `scheduler_node_capacity` | One row per schedulable hypervisor: limits derived from the typed `node_metrics` columns, materialised usage counters, and a decaying expected-demand signal |
-| `namespace_claims` | One row per namespace capacity claim: limits, usage counters, state and server-side expiry. Created empty in this release — the claims API arrives later |
+| `namespace_claims` | One row per namespace capacity claim: limits, usage counters, coverage state and server-side expiry. Also the static-values table for the `NamespaceClaim` object |
 | `cluster_capacity` | A singleton row (id always 1): cluster-wide totals, capacity claimed by active claims, and usage by namespaces without a claim |
 
 IPAM reservations are stored separately because:
@@ -684,6 +684,65 @@ that has ever held and lost the maintenance lock keeps publishing its
 own frozen value. A per-instance staleness alert would fire permanently
 on all of them. Aggregating asks the question you actually want
 answered: has *anybody* reconciled recently.
+
+As of scheduler-reservations phase 4 the `namespace_claims` table has
+writers other than the reconciler. Five `sf-database` RPCs —
+`CreateNamespaceClaim`, `GetNamespaceClaim`, `GetNamespaceClaims`,
+`UpdateNamespaceClaim` and `DeleteNamespaceClaim` — back the admin-only
+REST endpoints at `/auth/namespaces/<namespace>/claims`, and the
+`NamespaceClaim` object is persisted in this same table rather than a
+separate static-values one.
+
+Creating, growing and shrinking a claim are admission decisions in their
+own right: a claim is a promise of capacity the cluster has to be able to
+keep. Each therefore writes `cluster_capacity` and then
+`namespace_claims` in one transaction, in the same canonical order and
+with the same guarded-`UPDATE`-first discipline as instance admission, so
+the new statements compose with placement rather than deadlocking against
+it or dying of ER_CHECKREAD. A create or a grow is guarded, per
+dimension, by
+
+    claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total
+
+and a rowcount of zero is the refusal. `migrated` is the namespace's
+existing drawdown being moved onto the claim; it is zero for a grow,
+which moves nothing because the namespace's usage is already on the
+claim's side of the ledger.
+
+That migration is the reason for the term. A namespace's instances are
+counted in `cluster_capacity.unclaimed_used_*` until it has a claim, so
+creating one seeds the new row's `used_*` with the namespace's current
+drawdown and subtracts the same amounts from `unclaimed_used_*` in the
+same transaction that increments `claimed_*`. Deleting a claim migrates
+it back, floored. Seeding zero instead would let a namespace with running
+instances place its whole claim a second time until the next reconcile
+pass. The drawdown is computed by the same aggregation the reconciler
+recomputes with, so a new claim starts at the figure the next pass will
+compute and that pass then moves nothing.
+
+Two behaviours differ deliberately from instance admission:
+
+- **A missing `cluster_capacity` singleton refuses rather than failing
+  open.** Admitting an instance unguarded records where a machine already
+  is; creating a claim unguarded writes a promise against totals nothing
+  has computed, which the next pass folds into `claimed_*` whether it
+  fits or not. An instance create cannot wait five minutes; a claim can.
+  The REST layer reports this as a 503, not a 507 — the cluster is not
+  full, the reconciler simply has not built the row yet. Only the
+  statements that need a total are refused this way: a shrink or an
+  expiry change, which claim nothing, go through.
+- **Claim ceilings are advisory in this release.** The instance admission
+  transaction does not enforce the claim guard: a placement that pushes a
+  namespace past its claim is admitted, and the exceedance is detected by
+  reading the claim row back inside the same transaction and reported in
+  the reply, which `Instance` turns into a `placement admitted over
+  namespace capacity claim` audit event. See [the scheduler operator
+  guide](scheduler.md#namespace-capacity-claims) for the operator view.
+  Phase 3's single fail-open flag was split into three for this: the node
+  and cluster guards keep failing open on a node with no capacity row,
+  because that reasoning is about *this node's* limits being absent from
+  the totals, which says nothing about whether a namespace has exceeded
+  what it claimed.
 
 Cluster operation headers (`cluster_operations`) and work queue rows
 (`work_queue`) live in MariaDB so the create-and-enqueue step can run in a

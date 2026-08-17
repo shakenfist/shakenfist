@@ -167,6 +167,38 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
          'bound_claims', {'type': 'object'}),
         ('/auth/namespaces/{namespace}/rules/{rule_name}', 'put', 'key_ttl',
          {'type': 'integer', 'minimum': 1, 'maximum': 86400}),
+        # Namespace capacity claims. The three limits are counts of
+        # cpus, megabytes and gigabytes, and _claim_limit() answers 400
+        # to a negative one, so unsignedinteger's published minimum of 0
+        # is backed by the handler. Zero is deliberately accepted: a
+        # claim of no capacity in a dimension is how an operator says
+        # "this namespace places nothing here", and refusing it would be
+        # a policy decision the server does not make. There is no
+        # maximum: the cluster's own totals are the only ceiling, they
+        # change as nodes join and leave, and the guarded transaction
+        # refuses an over-large claim with a 507 -- a published bound
+        # would be wrong on the next node to arrive.
+        ('/auth/namespaces/{namespace}/claims', 'post', 'limit_cpus',
+         {'type': 'integer', 'minimum': 0}),
+        ('/auth/namespaces/{namespace}/claims', 'post', 'limit_memory_mb',
+         {'type': 'integer', 'minimum': 0}),
+        ('/auth/namespaces/{namespace}/claims', 'post', 'limit_disk_gb',
+         {'type': 'integer', 'minimum': 0}),
+        # A duration in seconds, and _claim_expiry() refuses zero as
+        # well as negatives -- a claim already expired when it is
+        # created holds capacity for nobody and cannot be grown -- so
+        # this is not unsignedinteger. Nothing caps it, so no maximum is
+        # published.
+        ('/auth/namespaces/{namespace}/claims', 'post', 'expires_in_seconds',
+         {'type': 'integer', 'minimum': 1}),
+        ('/auth/namespaces/{namespace}/claims/{claim_ref}', 'put',
+         'limit_cpus', {'type': 'integer', 'minimum': 0}),
+        ('/auth/namespaces/{namespace}/claims/{claim_ref}', 'put',
+         'limit_memory_mb', {'type': 'integer', 'minimum': 0}),
+        ('/auth/namespaces/{namespace}/claims/{claim_ref}', 'put',
+         'limit_disk_gb', {'type': 'integer', 'minimum': 0}),
+        ('/auth/namespaces/{namespace}/claims/{claim_ref}', 'put',
+         'expires_in_seconds', {'type': 'integer', 'minimum': 1}),
     ]
 
     # A published parameter is this table's business if it carries a

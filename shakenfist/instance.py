@@ -1038,6 +1038,21 @@ class Instance(dbowo):
             if result['success']:
                 self._event_admission_over_limit(location, denial)
 
+        # D16's advisory claim accounting, deliberately read from
+        # ``result`` *after* the rebinding above so it comes from
+        # whichever reply actually recorded the placement -- which is the
+        # same reasoning the P5 event's placement documents. On the
+        # probe-then-force path the probe's denial rolled its transaction
+        # back, so it charged no claim and can carry no exceedance;
+        # eventing from it would announce a claim drawdown that was
+        # undone. And ``admitted`` gates both replies, because a
+        # placement which was not recorded consumed nothing. This is not
+        # conditional on ``enforce``: a ground-truth write into an
+        # over-claim namespace is exactly as interesting as a scheduled
+        # one, and both reach here.
+        if result['admitted'] and result['claim_over_limit']:
+            self._event_claim_over_limit(location, result)
+
         return result
 
     def _event_admission_over_limit(self, location, result):
@@ -1055,6 +1070,39 @@ class Instance(dbowo):
                 'failing_stage': result['failing_stage'],
                 'dimensions': result['dimensions']
             }, log_as_error=True)
+
+    def _event_claim_over_limit(self, location, result):
+        """Record that a placement drew a namespace past its claim (D16).
+
+        Distinct from _event_admission_over_limit() in every respect that
+        matters to a reader: that one says a *ground-truth* write was
+        forced past a *node's* capacity guard, this one says a placement
+        was accounted against its *namespace's* claim and that claim is
+        now over the limits the namespace declared. The messages and the
+        ``extra`` keys differ so a log consumer never has to guess which
+        happened.
+
+        Deliberately not ``log_as_error``: advisory mode did exactly what
+        the operator asked for when this fires. CLAIM_ENFORCEMENT_HARD is
+        False for one release precisely so exceedances are *observed*
+        before they are refused, so this is a warning -- loud enough to
+        find, and to calibrate a claim against, but not a failure. Phase
+        5 turns the same condition into a refusal, which will be an error
+        because then the create does not happen.
+        """
+        self.log.with_fields({
+            'node': location,
+            'namespace': self.namespace,
+            'claim_dimensions': result['claim_dimensions']}).warning(
+                'Placement admitted over the namespace capacity claim')
+        self.add_event(
+            EVENT_TYPE_AUDIT,
+            'placement admitted over namespace capacity claim',
+            extra={
+                'node': location,
+                'namespace': self.namespace,
+                'claim_dimensions': result['claim_dimensions']
+            })
 
     def place_instance(self, location, enforce=True, enforce_demand=True):
         """Place this instance on a node, claiming its capacity to do so.

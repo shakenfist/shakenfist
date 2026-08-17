@@ -27,7 +27,11 @@ to break:
   case-insensitive collation,
 * is_hypervisor and the node-state filter against real NULL-able
   columns and a real IN-the-active-set membership test,
-* both ON DUPLICATE KEY UPDATE upserts.
+* both ON DUPLICATE KEY UPDATE upserts,
+* the per-claim usage recompute, whose whole job -- counting an
+  instance with a duplicated placement row once, and zeroing a claim
+  whose namespace has emptied -- lives in one UPDATE ... JOIN that a
+  mocked connection can only be asked about as a string.
 
 The fixture mirrors the one used for the plan's step 4 validation, so
 the assertions here are the same hand-computed numbers recorded in
@@ -319,6 +323,34 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
     def _by_node(self, result):
         return {n['node_uuid']: n for n in result['nodes']}
 
+    def _claim_rows(self):
+        claims_t = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(claims_t)).fetchall()
+
+    def _claims_by_namespace(self):
+        # Only safe where the test's claims are one per namespace; a
+        # test with two claims on one namespace reads _claim_rows().
+        return {r.namespace: r for r in self._claim_rows()}
+
+    def _add_claim(self, namespace, state='active', used=(0, 0, 0),
+                   expires='NOW() + INTERVAL 4 HOUR'):
+        """Add a claim beyond the two the fixture seeds.
+
+        The expiry is written server-relative for the reason recorded in
+        _seed(): a client-computed datetime silently does nothing if the
+        two clocks or timezones differ.
+        """
+        claims_t = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            self._insert(conn, claims_t, uuid=uuid4(), namespace=namespace,
+                         limit_cpus=32, limit_memory_mb=32768,
+                         limit_disk_gb=200, used_cpus=used[0],
+                         used_memory_mb=used[1], used_disk_gb=used[2],
+                         state=state, expires_at=sa.text(expires),
+                         updated_at=sa.func.now())
+            conn.commit()
+
     def test_only_active_hypervisors_get_rows(self):
         result = self._reconcile()
         by_node = self._by_node(result)
@@ -451,6 +483,108 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(10, rows['manual'].used_cpus)
         # With every namespace claimed, nothing is left unclaimed.
         self.assertEqual(0, result['cluster']['unclaimed_used_cpus'])
+
+    def test_duplicated_placement_counts_once_against_a_claim(self):
+        # place_instance()'s removal of an old INSTANCE_LOCATION row is
+        # best-effort, so a lost node can leave a stale row behind and
+        # one instance then appears on two nodes. A namespace quota must
+        # charge that instance once -- the namespace is holding one
+        # instance's worth of resources however many placement rows
+        # point at it -- so the per-claim aggregation de-duplicates by
+        # instance uuid before summing. Summing the node-grouped rows
+        # instead (what the reconciler did before this was fixed) counts
+        # it twice.
+        with self.engine.connect() as conn:
+            self._place(conn, self.node_b, self.instances['i1'],
+                        self.now - 100)
+            conn.commit()
+
+        self._reconcile()
+        claim = self._claims_by_namespace()['ci-1']
+        # i1 (4, 4096, 28) counted once, plus i2 (2, 2048, 5) -- exactly
+        # what the claim reads with no duplicate row present.
+        self.assertEqual(6, claim.used_cpus)
+        self.assertEqual(6144, claim.used_memory_mb)
+        self.assertEqual(33, claim.used_disk_gb)
+
+    def test_duplicated_placement_still_counts_on_both_nodes(self):
+        # The other half of the asymmetry asserted above: the per-node
+        # ledger is not de-duplicated, because an instance with a
+        # placement row on a node really is drawing that node's capacity
+        # down as far as anything scheduling onto it knows. Only the
+        # namespace-wide claim recompute needs the instance counted
+        # once, so if somebody ever "fixes" the node query to match, the
+        # duplicate stops being visible where an operator can see it.
+        with self.engine.connect() as conn:
+            self._place(conn, self.node_b, self.instances['i1'],
+                        self.now - 100)
+            conn.commit()
+
+        by_node = self._by_node(self._reconcile())
+        self.assertEqual(6, by_node[str(self.node_a)]['used_cpus'])
+        # node_b's own i3 (8 cpus) plus the duplicated i1 (4).
+        self.assertEqual(12, by_node[str(self.node_b)]['used_cpus'])
+
+    def test_claim_for_a_namespace_without_instances_is_zeroed(self):
+        # The recompute joins the claims table to the usage aggregation
+        # with a LEFT JOIN and COALESCEs the misses to zero. An inner
+        # join would leave a claim whose namespace holds no instances at
+        # whatever its counters last were -- which is the state every
+        # namespace reaches by deleting its last instance -- so seed
+        # stale non-zero counters and require them to be cleared.
+        self._add_claim('empty-ns', used=(7, 7168, 70))
+
+        self._reconcile()
+        claim = self._claims_by_namespace()['empty-ns']
+        self.assertEqual(0, claim.used_cpus)
+        self.assertEqual(0, claim.used_memory_mb)
+        self.assertEqual(0, claim.used_disk_gb)
+
+    def test_every_active_claim_gets_its_own_namespace_figure(self):
+        # One statement now updates every active claim, so the join
+        # condition is what keeps a namespace's usage on its own claim.
+        # A pass with three claims and two populated namespaces catches
+        # a join that has become a cross product or that writes the
+        # first group's figures to every row.
+        self._add_claim('manual')
+        self._add_claim('empty-ns')
+
+        self._reconcile()
+        rows = self._claims_by_namespace()
+
+        # ci-1: i1 (4, 4096, 28) and i2 (2, 2048, 5).
+        self.assertEqual((6, 6144, 33),
+                         (rows['ci-1'].used_cpus, rows['ci-1'].used_memory_mb,
+                          rows['ci-1'].used_disk_gb))
+        # manual: i3 (8, 8192, 0 -- its disk_spec is not an array) and
+        # i5 (2, 1024, 10), stranded on the deleted node_d but still the
+        # namespace's. i4 is deleted and counts for nothing.
+        self.assertEqual((10, 9216, 10),
+                         (rows['manual'].used_cpus,
+                          rows['manual'].used_memory_mb,
+                          rows['manual'].used_disk_gb))
+        self.assertEqual((0, 0, 0),
+                         (rows['empty-ns'].used_cpus,
+                          rows['empty-ns'].used_memory_mb,
+                          rows['empty-ns'].used_disk_gb))
+
+    def test_expired_claim_is_not_recomputed(self):
+        # An expired claim covers nothing, so the recompute must leave
+        # it alone -- both because rewriting it is work for no reader
+        # and because its last counters are the record of what it held
+        # when it lapsed. This claim names a namespace that does hold
+        # instances, so a recompute that ignored the state predicate
+        # would visibly overwrite the sentinel.
+        self._add_claim('ci-1', state='expired', used=(99, 9999, 999),
+                        expires='NOW() - INTERVAL 1 HOUR')
+
+        self._reconcile()
+        expired = [r for r in self._claim_rows()
+                   if r.state == 'expired' and r.namespace == 'ci-1']
+        self.assertEqual(1, len(expired))
+        self.assertEqual(99, expired[0].used_cpus)
+        self.assertEqual(9999, expired[0].used_memory_mb)
+        self.assertEqual(999, expired[0].used_disk_gb)
 
     def test_rows_are_written_and_upserted(self):
         self._reconcile()

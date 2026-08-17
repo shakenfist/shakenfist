@@ -267,7 +267,15 @@ scheduler-reservations phase 3 the atomic admission and release
 RPCs also write them incrementally, and are the sole *drawdown*
 path against them, so a divergence between what the reconciler
 computes and what the counters hold is drift, healed on the next
-pass rather than expected steady state. Observability is the
+pass rather than expected steady state. Phase 4 added the claim
+CRUD RPCs as a third writer: they move capacity between
+`namespace_claims` and `cluster_capacity` (a claim's limits into
+`claimed_*`, its namespace's existing drawdown out of
+`unclaimed_used_*` and onto the claim, and the reverse on
+deletion) but consume none, so the same drift-healing property
+holds. See
+[subsystem internals](subsystem_internals.md#the-claim-admission-transaction).
+Observability is the
 `scheduler_capacity_*` gauges and counters exported on
 `CLUSTER_METRICS_PORT`, plus one structured log line per pass.
 

@@ -9156,6 +9156,8 @@ class AdmitInstancePlacementReply(_message.Message):
     NODE_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
     NODE_USED_DISK_GB_FIELD_NUMBER: _builtins.int
     NODE_EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    CLAIM_OVER_LIMIT_FIELD_NUMBER: _builtins.int
+    CLAIM_DIMENSIONS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -9180,8 +9182,21 @@ class AdmitInstancePlacementReply(_message.Message):
     node_used_memory_mb: _builtins.int
     node_used_disk_gb: _builtins.int
     node_expected_demand: _builtins.float
+    claim_over_limit: _builtins.bool
+    """Advisory claim accounting (D5/D16). The admission was charged to a
+    namespace claim and, read back inside the same transaction, that
+    claim's used_* now stands above its limit_*. The placement was
+    *admitted* -- claim ceilings are advisory for one release -- so this
+    is deliberately not reported through failing_stage or dimensions,
+    which both mean "this was refused". claim_dimensions carries only
+    the dimensions actually over, in the same shape dimensions uses:
+    used is what the claim held before this admission, requested is this
+    admission's allocation, limit is the claim's ceiling.
+    """
     @_builtins.property
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    @_builtins.property
+    def claim_dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     def __init__(
         self,
         *,
@@ -9196,10 +9211,12 @@ class AdmitInstancePlacementReply(_message.Message):
         node_used_memory_mb: _builtins.int = ...,
         node_used_disk_gb: _builtins.int = ...,
         node_expected_demand: _builtins.float = ...,
+        claim_over_limit: _builtins.bool = ...,
+        claim_dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -9359,3 +9376,399 @@ class GetSchedulerNodeCapacityReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___GetSchedulerNodeCapacityReply: _TypeAlias = GetSchedulerNodeCapacityReply  # noqa: Y015
+
+@_typing.final
+class NamespaceClaim(_message.Message):
+    """Namespace claim CRUD (MariaDB)
+    Scheduler-reservations phase 4 (see docs/plans/
+    PLAN-scheduler-reservations-phase-04-claims-api.md). Creating, growing
+    and shrinking a claim are themselves admission decisions against the
+    cluster_capacity singleton (D14's mirror guard), so each of them is one
+    transaction in D1's canonical order -- cluster_capacity, then
+    namespace_claims -- opening with a guarded UPDATE.
+
+    One namespace_claims row as its readers see it. The two timestamps are
+    epoch seconds computed server side with UNIX_TIMESTAMP(), because the
+    column is a DATETIME written from the server's NOW() and a client that
+    reinterpreted it in its own timezone would report an expiry hours from
+    the one the expiry sweep will actually use.
+
+    ``state`` is *coverage* ('active' or 'expired'), not object existence
+    (D2). The claim object's baseobject-managed state lives in
+    object_states like every other object's and is not carried here.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    LIMIT_CPUS_FIELD_NUMBER: _builtins.int
+    LIMIT_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    LIMIT_DISK_GB_FIELD_NUMBER: _builtins.int
+    USED_CPUS_FIELD_NUMBER: _builtins.int
+    USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    STATE_FIELD_NUMBER: _builtins.int
+    EXPIRES_AT_FIELD_NUMBER: _builtins.int
+    UPDATED_AT_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """Dashed uuid form"""
+    namespace: _builtins.str
+    limit_cpus: _builtins.int
+    limit_memory_mb: _builtins.int
+    limit_disk_gb: _builtins.int
+    used_cpus: _builtins.int
+    used_memory_mb: _builtins.int
+    used_disk_gb: _builtins.int
+    state: _builtins.str
+    expires_at: _builtins.float
+    updated_at: _builtins.float
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        limit_cpus: _builtins.int = ...,
+        limit_memory_mb: _builtins.int = ...,
+        limit_disk_gb: _builtins.int = ...,
+        used_cpus: _builtins.int = ...,
+        used_memory_mb: _builtins.int = ...,
+        used_disk_gb: _builtins.int = ...,
+        state: _builtins.str = ...,
+        expires_at: _builtins.float = ...,
+        updated_at: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_at", b"expires_at", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "namespace", b"namespace", "state", b"state", "updated_at", b"updated_at", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NamespaceClaim: _TypeAlias = NamespaceClaim  # noqa: Y015
+
+@_typing.final
+class CreateNamespaceClaimRequest(_message.Message):
+    """The expiry rides in as a duration rather than an absolute time, and is
+    applied server side as NOW() + INTERVAL. A client-computed datetime
+    silently expires the claim at the wrong moment -- or immediately -- if
+    the client's clock or timezone differs from the server's, which is the
+    same trap the reconciler's live suite records having fallen into.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    LIMIT_CPUS_FIELD_NUMBER: _builtins.int
+    LIMIT_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    LIMIT_DISK_GB_FIELD_NUMBER: _builtins.int
+    EXPIRES_IN_SECONDS_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """Dashed uuid form, allocated by the caller"""
+    namespace: _builtins.str
+    limit_cpus: _builtins.int
+    limit_memory_mb: _builtins.int
+    limit_disk_gb: _builtins.int
+    expires_in_seconds: _builtins.int
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        limit_cpus: _builtins.int = ...,
+        limit_memory_mb: _builtins.int = ...,
+        limit_disk_gb: _builtins.int = ...,
+        expires_in_seconds: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_in_seconds", b"expires_in_seconds", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "namespace", b"namespace", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateNamespaceClaimRequest: _TypeAlias = CreateNamespaceClaimRequest  # noqa: Y015
+
+@_typing.final
+class CreateNamespaceClaimReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    CREATED_FIELD_NUMBER: _builtins.int
+    REFUSED_REASON_FIELD_NUMBER: _builtins.int
+    DIMENSIONS_FIELD_NUMBER: _builtins.int
+    CLAIM_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    error: _builtins.str
+    created: _builtins.bool
+    refused_reason: _builtins.str
+    """Why a run that succeeded did not create: 'capacity' (the mirror
+    guard refused), 'no_cluster_capacity' (the reconciler has never
+    built the singleton, so there is nothing to guard against) or
+    'exists' (the namespace already holds an active claim).
+    """
+    @_builtins.property
+    def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    @_builtins.property
+    def claim(self) -> Global___NamespaceClaim: ...
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        created: _builtins.bool = ...,
+        refused_reason: _builtins.str = ...,
+        dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
+        claim: Global___NamespaceClaim | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "created", b"created", "dimensions", b"dimensions", "error", b"error", "refused_reason", b"refused_reason", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateNamespaceClaimReply: _TypeAlias = CreateNamespaceClaimReply  # noqa: Y015
+
+@_typing.final
+class GetNamespaceClaimRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """Dashed uuid form"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceClaimRequest: _TypeAlias = GetNamespaceClaimRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceClaimReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    CLAIM_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def claim(self) -> Global___NamespaceClaim: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        claim: Global___NamespaceClaim | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceClaimReply: _TypeAlias = GetNamespaceClaimReply  # noqa: Y015
+
+@_typing.final
+class GetNamespaceClaimsRequest(_message.Message):
+    """An empty namespace lists every claim; a non-empty one is pushed down
+    to the namespace index rather than filtered in Python.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceClaimsRequest: _TypeAlias = GetNamespaceClaimsRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceClaimsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CLAIMS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def claims(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaim]: ...
+    def __init__(
+        self,
+        *,
+        claims: _abc.Iterable[Global___NamespaceClaim] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claims", b"claims"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceClaimsReply: _TypeAlias = GetNamespaceClaimsReply  # noqa: Y015
+
+@_typing.final
+class UpdateNamespaceClaimRequest(_message.Message):
+    """D8: growing a dimension is an admission decision against the same
+    mirror guard creation uses, shrinking one is permitted down to the
+    claim's current used_* and no further, and one request may do both.
+    ``fields`` is the field mask naming which of limit_cpus,
+    limit_memory_mb, limit_disk_gb and expires_in_seconds this request
+    actually sets; an unnamed field is left exactly as it is, which is how
+    an unset proto3 zero is told from a deliberate zero.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    LIMIT_CPUS_FIELD_NUMBER: _builtins.int
+    LIMIT_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    LIMIT_DISK_GB_FIELD_NUMBER: _builtins.int
+    EXPIRES_IN_SECONDS_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """Dashed uuid form"""
+    limit_cpus: _builtins.int
+    limit_memory_mb: _builtins.int
+    limit_disk_gb: _builtins.int
+    expires_in_seconds: _builtins.int
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        limit_cpus: _builtins.int = ...,
+        limit_memory_mb: _builtins.int = ...,
+        limit_disk_gb: _builtins.int = ...,
+        expires_in_seconds: _builtins.int = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_in_seconds", b"expires_in_seconds", "fields", b"fields", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___UpdateNamespaceClaimRequest: _TypeAlias = UpdateNamespaceClaimRequest  # noqa: Y015
+
+@_typing.final
+class UpdateNamespaceClaimReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    UPDATED_FIELD_NUMBER: _builtins.int
+    REFUSED_REASON_FIELD_NUMBER: _builtins.int
+    DIMENSIONS_FIELD_NUMBER: _builtins.int
+    CLAIM_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    error: _builtins.str
+    updated: _builtins.bool
+    refused_reason: _builtins.str
+    """Why a run that succeeded did not update: 'capacity' (a grow the
+    mirror guard refused), 'below_usage' (a shrink under the claim's
+    current used_*), 'no_cluster_capacity' (a grow with no singleton to
+    guard it -- a shrink or an expiry change is allowed through),
+    'not_active' (the claim's coverage state is not 'active', so its
+    limits are not in claimed_* to adjust), 'not_found', or 'conflict'
+    (concurrent writers kept taking the row out from under the attempt).
+    """
+    @_builtins.property
+    def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    @_builtins.property
+    def claim(self) -> Global___NamespaceClaim: ...
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        updated: _builtins.bool = ...,
+        refused_reason: _builtins.str = ...,
+        dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
+        claim: Global___NamespaceClaim | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "dimensions", b"dimensions", "error", b"error", "refused_reason", b"refused_reason", "success", b"success", "updated", b"updated"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___UpdateNamespaceClaimReply: _TypeAlias = UpdateNamespaceClaimReply  # noqa: Y015
+
+@_typing.final
+class DeleteNamespaceClaimRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """Dashed uuid form"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteNamespaceClaimRequest: _TypeAlias = DeleteNamespaceClaimRequest  # noqa: Y015
+
+@_typing.final
+class DeleteNamespaceClaimReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    DELETED_FIELD_NUMBER: _builtins.int
+    RETURNED_CPUS_FIELD_NUMBER: _builtins.int
+    RETURNED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    RETURNED_DISK_GB_FIELD_NUMBER: _builtins.int
+    CLAMPED_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    error: _builtins.str
+    deleted: _builtins.bool
+    """False when there was no claim row to delete, which is how a repeat
+    delete is told from a real one. Deleting twice is harmless: the
+    second call finds nothing and returns no capacity.
+    """
+    returned_cpus: _builtins.int
+    """What the claim still held, returned to the cluster's unclaimed side."""
+    returned_memory_mb: _builtins.int
+    returned_disk_gb: _builtins.int
+    clamped: _builtins.bool
+    """The claimed_* decrement had to be floored at zero, meaning the
+    singleton and the claims disagreed before this delete. Corrected by
+    the next reconcile pass.
+    """
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        deleted: _builtins.bool = ...,
+        returned_cpus: _builtins.int = ...,
+        returned_memory_mb: _builtins.int = ...,
+        returned_disk_gb: _builtins.int = ...,
+        clamped: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "deleted", b"deleted", "error", b"error", "returned_cpus", b"returned_cpus", "returned_disk_gb", b"returned_disk_gb", "returned_memory_mb", b"returned_memory_mb", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteNamespaceClaimReply: _TypeAlias = DeleteNamespaceClaimReply  # noqa: Y015

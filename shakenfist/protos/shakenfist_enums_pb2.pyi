@@ -96,6 +96,8 @@ class _ObjectTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_ObjectType
     """"trusted_issuer" """
     OBJECT_TYPE_MAPPING_RULE: _ObjectType.ValueType  # 31
     """"mapping_rule" """
+    OBJECT_TYPE_NAMESPACE_CLAIM: _ObjectType.ValueType  # 32
+    """"namespace_claim" """
 
 class ObjectType(_ObjectType, metaclass=_ObjectTypeEnumTypeWrapper):
     """ObjectType enum - all valid object types in Shaken Fist
@@ -165,6 +167,8 @@ OBJECT_TYPE_TRUSTED_ISSUER: ObjectType.ValueType  # 30
 """"trusted_issuer" """
 OBJECT_TYPE_MAPPING_RULE: ObjectType.ValueType  # 31
 """"mapping_rule" """
+OBJECT_TYPE_NAMESPACE_CLAIM: ObjectType.ValueType  # 32
+""""namespace_claim" """
 Global___ObjectType: _TypeAlias = ObjectType  # noqa: Y015
 
 class _ReservationType:

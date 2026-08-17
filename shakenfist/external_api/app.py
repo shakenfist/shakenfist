@@ -390,6 +390,10 @@ api.add_resource(api_auth.AuthNamespaceRulesEndpoint,
                  '/auth/namespaces/<namespace>/rules')
 api.add_resource(api_auth.AuthNamespaceRuleEndpoint,
                  '/auth/namespaces/<namespace>/rules/<rule_name>')
+api.add_resource(api_auth.AuthNamespaceClaimsEndpoint,
+                 '/auth/namespaces/<namespace>/claims')
+api.add_resource(api_auth.AuthNamespaceClaimEndpoint,
+                 '/auth/namespaces/<namespace>/claims/<claim_ref>')
 api.add_resource(api_auth.AuthMetadatasEndpoint,
                  '/auth/namespaces/<namespace>/metadata')
 api.add_resource(api_auth.AuthMetadataEndpoint,

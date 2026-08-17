@@ -391,8 +391,8 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 
 | Step | Description | Effort | Model | Isolation | Status |
 |------|-------------|--------|-------|-----------|--------|
-| 1 | Remove the legacy `node_attributes.instances` column handling per P1: delete `_dual_write_legacy_instances()` and its calls (`node.py:661,:668,:670-686`), drop the union from `Node.instances` (`node.py:626-654`), remove the field from the node-attributes schema model, update the reconciler comment block (`mariadb.py:23694-23701`) to say the precondition is now met, fix affected unit tests. Commit message records the rollback floor (P1) | medium | sonnet | worktree | Not started |
-| 2 | Add `SCHEDULER_DISK_OVERCOMMIT` (float, default 5.0) to `config.py` beside the other overcommit ratios; apply it to the headroom term in `_derive_disk_limit_gb()` per P3; thread it through the reconcile RPC request like the demand constants; unit tests for the scaled limit incl. zero-free and reservation-exceeds-free edges; document in `docs/operator_guide/database.md` | medium | sonnet | worktree | Not started |
+| 1 | Remove the legacy `node_attributes.instances` column handling per P1: delete `_dual_write_legacy_instances()` and its calls (`node.py:661,:668,:670-686`), drop the union from `Node.instances` (`node.py:626-654`), remove the field from the node-attributes schema model, update the reconciler comment block (`mariadb.py:23694-23701`) to say the precondition is now met, fix affected unit tests. Commit message records the rollback floor (P1) | medium | sonnet | worktree | Complete — `git grep _dual_write_legacy_instances` finds nothing outside this plan |
+| 2 | Add `SCHEDULER_DISK_OVERCOMMIT` (float, default 5.0) to `config.py` beside the other overcommit ratios; apply it to the headroom term in `_derive_disk_limit_gb()` per P3; thread it through the reconcile RPC request like the demand constants; unit tests for the scaled limit incl. zero-free and reservation-exceeds-free edges; document in `docs/operator_guide/database.md` | medium | sonnet | worktree | Complete — `SCHEDULER_DISK_OVERCOMMIT` is at `config.py:401` |
 | 3 | The admission and release RPCs: proto messages + `tox -e genprotos`, direct-layer implementation in `sf-database` per the Design section (canonical order, claim branch per P4, `enforce` per P5, P6 floors, P7 fail-open, named failing stage, retry on 1213/1205/1020), tri-layer wrappers in `mariadb.py`, servicer + Monitor registration in `daemons/database/main.py`. Unit tests: rowcount semantics, each guard dimension denying, claim vs unclaimed branch, move vs first placement, double release, missing node row | high | opus | worktree | Complete — see step 3 notes |
 | 4 | Wire the non-scheduling paths onto the primitive: `place_instance()` rework (sole RPC caller, typed denial exception), `_delete_globally()` / `hard_delete()` release, cleaner and startup-tasks `enforce=False` calls. Unit tests for each path; check `placement_filter()` users | high | opus | worktree | Complete — see step 4 notes |
 | 5 | Scheduler-side integration: pick-then-claim walk in the create path and preflight redirect; delete `_committed_vcpus()` and revert `_has_sufficient_cpu()`; `summarize_resources()` reads the counters. This is the commit that closes issue 3498's stopgap; "Fixes" trailers per the tracker | high | opus | worktree | Complete — see step 5 notes |
@@ -400,7 +400,7 @@ the instance's `INSTANCE_LOCATION` rows, no attribute write.
 | 6a | Fix the step 6 blocker in the primitive: move the branch select and presence probes out of both transactions so a guarded UPDATE is the first statement, per the phase 0 finding. Re-run the full live suite twice under `innodb_snapshot_isolation` ON and the concurrency class once under OFF | medium | opus | worktree | Complete — see step 6a notes |
 | 7 | Docs: `docs/operator_guide/database.md` (counters now consumed; the two RPCs), scheduler sections of `docs/`, CLAUDE.md scheduler-capacity paragraph (counters consumed as of this phase; stopgap gone), ARCHITECTURE.md/AGENTS.md if warranted; master plan and `index.md` phase rows | low | sonnet | worktree | Complete — see step 7 notes |
 | 8 | Management-session code review against the checklist below | medium | management session | none | Complete — 1 fix + 6 considers applied, 2 recorded; see step 8 notes |
-| 9 | Operator review and PR; deploy to sfcbr and soak: reconciler drift metric stays zero with admission live, no 507 regression in CI pass rates | — | operator | — | Not started |
+| 9 | Operator review and PR; deploy to sfcbr and soak: reconciler drift metric stays zero with admission live, no 507 regression in CI pass rates | — | operator | — | Partially complete — reviewed and merged as PR #3754 on 2026-08-16; the sfcbr deploy and soak have not been run |
 
 ## Risks and mitigations
 
@@ -1295,6 +1295,14 @@ was passing for the right reason all along.
   branch is dormant; **phase 4 makes it necessary**, since the claims API
   is the first thing that can produce a `claim`-stage denial in
   production and its callers will want unit coverage of that path.
+  *Mostly discharged.* The demand term landed with the D13 guard later
+  in this phase, and phase 4's step 3 added the claim stage: a
+  `set_namespace_claim()` helper, the advisory over-limit reply fields,
+  a symmetric release decrement, and a `claim`-stage denial under
+  `mariadb.CLAIM_ENFORCEMENT_HARD`. The cluster singleton is still not
+  modelled, deliberately: an unclaimed namespace's charge against it has
+  no caller-observable effect, so there is nothing for a caller-side
+  test to assert about it.
 - The pick-then-claim walk (the `place_walk` closure, the P9
   demand-only re-walk and the exhaustion branch) exists verbatim in
   `shakenfist/external_api/instance.py` and

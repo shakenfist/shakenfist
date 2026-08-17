@@ -148,14 +148,16 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                                                schema.fields[name].validators))
 
         # The rule above is vacuous if nothing is bounded, so the count
-        # is pinned. Fourteen, from two sources which both have to work:
-        # seven carrying an explicit constraints element (the five
-        # events `limit` caps and the two `key_ttl` ranges), and seven
+        # is pinned. Twenty two, from two sources which both have to
+        # work: nine carrying an explicit constraints element (the five
+        # events `limit` caps, the two `key_ttl` ranges, and the two
+        # namespace claim `expires_in_seconds` minimums), and thirteen
         # whose bound comes from the type token alone -- `minimum: 0`
         # rendered by `unsignedinteger` on max_versions, offset, blob
-        # limit, cpus and memory. A change in either is meant to fail
-        # here and be re-counted deliberately.
-        self.assertEqual(14, constrained)
+        # limit, cpus, memory and the six namespace claim limits. A
+        # change in either is meant to fail here and be re-counted
+        # deliberately.
+        self.assertEqual(22, constrained)
 
     def test_published_bounds_compile_into_validators(self):
         """The other direction: a bound which *is* declared must arrive.
