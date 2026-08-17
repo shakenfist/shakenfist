@@ -739,7 +739,13 @@ election drops the label sets entirely rather than freezing them at
 their final value, so a stale non-zero reading cannot outlive the
 leadership it describes.
 
-In steady state every label set reads zero. A sample alert:
+A label set appears only once that sweep has failed a read at least
+once, so a healthy cluster exports no samples for this gauge at all, and
+a sweep that has since recovered reads zero. Do not build an `== 0` or
+`absent()` check on it, and do not read an empty query result as a
+broken metric — that is what a cluster with nothing wrong looks like.
+The same applies immediately after a leadership change, which drops the
+label sets. A sample alert:
 
 ```
 max by (sweep, object_type) (cluster_sweep_work_list_failure_streak) > 2
@@ -753,8 +759,9 @@ is — an unreachable database tier, or a reply too large for the client's
 receive cap.
 
 Two related skips have no metric of their own and are visible only in
-logs. The cleaner's blob maintenance pass (`could not read the active
-blob list`) skips reclaiming disk on that node when the read fails, and
+logs. The cleaner's blob maintenance pass skips reclaiming disk on that
+node when either of its two reads fails — grep for `could not read the
+active blob list` or `could not read this node's blob locations` — and
 `sf-cleaner` exports no Prometheus endpoint today. The cluster daemon's
 `_cluster_wide_cleanup()` logs when it degrades to skipping just its
 blob section while continuing the rest of the pass.
