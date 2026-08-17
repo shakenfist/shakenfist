@@ -34,6 +34,27 @@ _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
     ('grpc.keepalive_timeout_ms', 5000),
     ('grpc.http2.max_pings_without_data', 0),
     ('grpc.keepalive_permit_without_calls', 1),
+    # Several DatabaseService replies are unbounded by design --
+    # GetObjectsByState returns every matching uuid and GetObjectEvents
+    # an object's whole (limit-capped, but limits reach 1000) event
+    # history -- and on sfcbr they crossed gRPC's default 4MiB receive
+    # cap (#3638, observed up to ~7.2MB), turning routine reads into
+    # opaque RESOURCE_EXHAUSTED failures.
+    #
+    # 32MiB is deliberately not "large enough that this can never
+    # happen again". Raising the cap only moves the cliff, and moving
+    # it too far changes where the failure lands: sf-database has to
+    # serialise whatever it sends, so an arbitrarily generous client
+    # cap converts a fast, loud, client-side RESOURCE_EXHAUSTED into
+    # memory pressure and latency on the database tier -- which this
+    # cluster has already been hurt by (the gateway watchdog SIGABRTs
+    # of issue 3586). 32MiB is ~4.5x the largest payload observed in
+    # the wild, which clears today's traffic with room to spare while
+    # keeping a cliff close enough that we still hear about growth.
+    #
+    # The durable fix is to stop sending unbounded replies at all; see
+    # docs/plans/PLAN-grpc-bounded-replies.md.
+    ('grpc.max_receive_message_length', 32 * 1024 * 1024),
     # Disable gRPC's default behaviour of honouring the HTTP_PROXY /
     # HTTPS_PROXY environment variables. SF nodes that sit behind an
     # outbound HTTP proxy (CI runners, corporate networks) would

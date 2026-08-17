@@ -215,6 +215,17 @@ the signature accepts body keys nothing can enumerate (`log_request`
 merges the whole JSON body into the handler's kwargs), so the audit
 refuses to proceed rather than reporting a tree it could not check.
 
+**A note on responses:** nothing validates the response list, and one
+response is not declared per endpoint at all. `handle_database_unavailable`
+sits in `Resource.method_decorators`, so **every** endpoint can answer
+`503` when the database tier is unreachable — the published
+specification declares it only on the handful of endpoints where that
+was an observable change of behaviour rather than a new failure mode
+(`GET /blobs`, which used to answer `200` with an empty list, and the
+federated token endpoint). Treat `503` as a global response when
+writing a client; declare it on your endpoint only if you have
+something endpoint-specific to say about it.
+
 ## Checking your work
 
 The audit derives the correct location for every declaration and

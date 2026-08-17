@@ -10,12 +10,14 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons.cluster import scheduled_tasks as st
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist import mariadb
 
 
 BLOB_UUID_1 = '11111111-1111-4111-8111-111111111111'
@@ -26,6 +28,22 @@ NODE_FQDN_1 = 'sf-1.example.com'
 NODE_FQDN_2 = 'sf-2.example.com'
 OP_UUID_1 = 'cccc3333-cccc-4ccc-8ccc-cccccccccccc'
 KEY_UUID_1 = 'dddd4444-dddd-4ddd-8ddd-dddddddddddd'
+
+
+def _reset_sweep_failure_state():
+    """Clear both halves of the sweep failure streak state.
+
+    The dict and the gauge are separate process-global state and the
+    reset branch in _sweep_work_list() is guarded on the dict, so
+    clearing only the dict leaves the gauge carrying a value from an
+    earlier test that nothing will ever zero.
+
+    The resume offsets are process-global for the same reason and would
+    otherwise silently rotate a later test's expected object ordering.
+    """
+    st._SWEEP_FAILURE_STREAK.clear()
+    st.SWEEP_WORK_LIST_FAILURE_STREAK.clear()
+    st._SWEEP_RESUME_AFTER.clear()
 
 
 class FakeBlob:
@@ -88,6 +106,7 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         # Clear the module-level queue between tests
         while not st.BLOB_CHECKS_QUEUE.empty():
             st.BLOB_CHECKS_QUEUE.get(block=False)
+        _reset_sweep_failure_state()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -100,8 +119,31 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         st._fill_per_blob_queue()
 
         mock_get_by_state.assert_called_once_with(
-            ObjectType.BLOB, [Blob.STATE_CREATED])
+            ObjectType.BLOB, [Blob.STATE_CREATED], updated_before=None)
         self.assertEqual(2, st.BLOB_CHECKS_QUEUE.qsize())
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_fill_failure_is_visible_not_empty(
+            self, mock_get_by_state, mock_from_db):
+        """A failed read is not an empty work list.
+
+        This sweep shares the deleted-object sweep's failure mode: with
+        `or []` a failed read produced a silent no-op pass which looked
+        exactly like a healthy cluster with nothing to check (#3638).
+        """
+        mock_get_by_state.return_value = None
+
+        st._fill_per_blob_queue()
+
+        mock_from_db.assert_not_called()
+        self.assertEqual(0, st.BLOB_CHECKS_QUEUE.qsize())
+        self.assertEqual(
+            {('per_blob', 'blob'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_blob', 'object_type': 'blob'}))
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -122,6 +164,59 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
 
         mock_from_db.assert_not_called()
         self.assertEqual(0, st.BLOB_CHECKS_QUEUE.qsize())
+
+
+class FillPerInstanceQueueTestCase(base.ShakenFistTestCase):
+    """The per-instance sweep must also distinguish None from []."""
+
+    def setUp(self):
+        super().setUp()
+        while not st.INSTANCE_CHECKS_QUEUE.empty():
+            st.INSTANCE_CHECKS_QUEUE.get(block=False)
+        _reset_sweep_failure_state()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Instance.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_fill_failure_is_visible_not_empty(
+            self, mock_get_by_state, mock_from_db):
+        mock_get_by_state.return_value = None
+
+        st._fill_per_instance_queue()
+
+        mock_from_db.assert_not_called()
+        self.assertEqual(0, st.INSTANCE_CHECKS_QUEUE.qsize())
+        self.assertEqual(
+            {('per_instance', 'instance'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_instance', 'object_type': 'instance'}))
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Instance.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_unavailable_database_counts_as_a_failed_read(
+            self, mock_get_by_state, mock_from_db):
+        """A tier outage is a failed read, not an exception to escape on.
+
+        The oversized-reply case returns None, but an unreachable
+        database tier exhausts the retry budget and raises
+        DatabaseUnavailable instead -- which is not an RpcError, so it
+        propagates through the mariadb wrapper. It must reach the same
+        streak, or the gauge reads zero during precisely the outage it
+        was added to make visible.
+        """
+        mock_get_by_state.side_effect = DatabaseUnavailable('tier is down')
+
+        st._fill_per_instance_queue()
+
+        mock_from_db.assert_not_called()
+        self.assertEqual(0, st.INSTANCE_CHECKS_QUEUE.qsize())
+        self.assertEqual(
+            {('per_instance', 'instance'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_instance', 'object_type': 'instance'}))
 
 
 class ProcessPerBlobQueueTestCase(base.ShakenFistTestCase):
@@ -573,6 +668,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         super().setUp()
         while not st.DELETED_OBJECTS_QUEUE.empty():
             st.DELETED_OBJECTS_QUEUE.get(block=False)
+        _reset_sweep_failure_state()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     @mock.patch('shakenfist.mariadb.get_objects_by_state')
@@ -597,6 +693,211 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
             items.append(st.DELETED_OBJECTS_QUEUE.get(block=False))
         self.assertEqual(
             [('network', BLOB_UUID_1), ('network', BLOB_UUID_2)], items)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_fill_failure_is_visible_not_empty(self, mock_get_by_state):
+        # get_objects_by_state returns None when the read failed
+        # (e.g. a RESOURCE_EXHAUSTED oversized gRPC reply), distinct
+        # from [] for no matches. Collapsing the two silently turned
+        # the GC off for an object type forever (#3638): the failed
+        # type must be skipped visibly while other types still enqueue.
+        def by_state(objtype, states, updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                return None
+            if objtype == ObjectType.BLOB:
+                return [BLOB_UUID_1]
+            return []
+        mock_get_by_state.side_effect = by_state
+
+        st._fill_per_deleted_object_queue()
+
+        self.assertEqual([('blob', BLOB_UUID_1)],
+                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        # Every object type was still read: a per-reply failure costs
+        # one type, not the pass.
+        self.assertEqual(
+            len(OBJECT_NAMES_TO_CLASSES), mock_get_by_state.call_count)
+        self.assertEqual(
+            {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_unavailable_database_stops_the_sweep_after_one_budget(
+            self, mock_get_by_state):
+        """A tier outage must cost one retry budget, not 28 of them.
+
+        DatabaseUnavailable is only raised once _grpc_call has spent its
+        whole budget, which is split by cost: GRPC_UNAVAILABLE_RETRIES
+        fast-failing attempts for the common shape (a dead tier, or the
+        servicer's own UNAVAILABLE for a transient MariaDB error), and up
+        to GRPC_RETRIES full GRPC_TIMEOUT deadlines for the slow one,
+        plus escalating sleeps in both. There are 28 object types in
+        this loop and
+        _run_due_scheduled_jobs() pets the watchdog only *between* jobs,
+        so continuing past a tier-wide failure multiplies this job's
+        worst case by 28 and takes it past sf-cluster's WatchdogSec.
+        That SIGABRTs the elected maintainer and costs a lock failover,
+        where previously the first DatabaseUnavailable merely ended the
+        pass. This function has blown the watchdog window once already
+        (issue 3533).
+
+        A dead tier does not become reachable on the 28th ask, so the
+        bound is the property worth pinning: one read attempt, then stop.
+        """
+        mock_get_by_state.side_effect = DatabaseUnavailable('tier is down')
+
+        st._fill_per_deleted_object_queue()
+
+        self.assertEqual(1, mock_get_by_state.call_count)
+        self.assertEqual(0, st.DELETED_OBJECTS_QUEUE.qsize())
+        # The one type we did attempt is still counted, so the gauge is
+        # not silent during exactly the outage it exists to expose.
+        first_type = next(iter(OBJECT_NAMES_TO_CLASSES))
+        self.assertEqual(
+            {('per_deleted_object', first_type): 1},
+            st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': first_type}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_unavailable_database_keeps_work_read_before_it(
+            self, mock_get_by_state):
+        # Stopping the loop must not discard the types already read.
+        # 'blob' comes before 'network' in OBJECT_NAMES_TO_CLASSES, so
+        # its work is still enqueued for this pass even though the tier
+        # goes away part way through.
+        def by_state(objtype, states, updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                raise DatabaseUnavailable('tier is down')
+            if objtype == ObjectType.BLOB:
+                return [BLOB_UUID_1]
+            return []
+        mock_get_by_state.side_effect = by_state
+
+        st._fill_per_deleted_object_queue()
+
+        self.assertEqual([('blob', BLOB_UUID_1)],
+                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        self.assertEqual(
+            types.index('network') + 1, mock_get_by_state.call_count)
+        self.assertEqual(
+            {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_a_slow_type_cannot_starve_the_types_behind_it(
+            self, mock_get_by_state):
+        """Stopping the pass must not stop it in the same place forever.
+
+        DatabaseUnavailable is not only raised for a dead tier: an
+        exhausted DEADLINE_EXCEEDED budget raises it too, which one
+        large, slow or lock-contended query can produce for a single
+        object type while the tier is otherwise healthy. With a fixed
+        starting point, `break` would mean every type after that one is
+        never swept again -- and the backlog that then accumulates makes
+        the slow type slower still. That is the #3638 ratchet rebuilt
+        one level up, so each pass resumes after wherever the last one
+        stopped.
+        """
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        slow = types[0]
+
+        def by_state(objtype, states, updated_before=None):
+            if str(objtype) == slow:
+                raise DatabaseUnavailable('this one query is too slow')
+            return []
+        mock_get_by_state.side_effect = by_state
+
+        # Pass one stops on the very first type, having read only it.
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(1, mock_get_by_state.call_count)
+
+        # Pass two starts after it and reaches every other type, rather
+        # than dying on the same query again.
+        mock_get_by_state.reset_mock()
+        st._fill_per_deleted_object_queue()
+
+        # Every other type is reached, and the slow one is retried
+        # last: one wasted budget per pass, and nothing behind it
+        # starves. The resume point then holds steady, so this is the
+        # steady state rather than a one-off recovery.
+        read = [str(c.args[0]) for c in mock_get_by_state.call_args_list]
+        self.assertEqual(types[1:] + [slow], read)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state', return_value=[])
+    def test_a_completed_pass_starts_from_the_top_again(
+            self, mock_get_by_state):
+        # Only a pass which stopped early leaves a resume offset behind.
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        st._SWEEP_RESUME_AFTER['per_deleted_object'] = types[5]
+
+        st._fill_per_deleted_object_queue()
+        self.assertNotIn('per_deleted_object', st._SWEEP_RESUME_AFTER)
+
+        mock_get_by_state.reset_mock()
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(
+            types, [str(c.args[0]) for c in mock_get_by_state.call_args_list])
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_demotion_stops_publishing_the_streak(self, mock_get_by_state):
+        # Only the elected node runs these sweeps, so a demoted node
+        # holding a non-zero streak keeps a "streak > 0" alert firing
+        # against work it is no longer doing. Nothing on that node will
+        # run the reset branch again, so the clear has to be explicit.
+        mock_get_by_state.side_effect = (
+            lambda objtype, states, updated_before=None:
+            None if objtype == ObjectType.NETWORK else [])
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+        st.clear_sweep_failure_metrics()
+
+        self.assertEqual({}, st._SWEEP_FAILURE_STREAK)
+        # Removed entirely rather than zeroed: a node which is not the
+        # leader should not answer for these sweeps at all.
+        self.assertIsNone(
+            REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_fill_failure_streak_counts_and_resets(self, mock_get_by_state):
+        # The streak counts consecutive failed passes per object type,
+        # and a successful read clears it -- the alertable signal is
+        # "still failing", not "failed once ever" (#3638).
+        def failing(objtype, states, updated_before=None):
+            return None if objtype == ObjectType.NETWORK else []
+        mock_get_by_state.side_effect = failing
+        st._fill_per_deleted_object_queue()
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(
+            {('per_deleted_object', 'network'): 2}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            2, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+
+        mock_get_by_state.side_effect = (
+            lambda objtype, states, updated_before=None: [])
+        st._fill_per_deleted_object_queue()
+        self.assertEqual({}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            0, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_process_hard_deletes_old_final_objects(self, mock_get_class):
@@ -674,6 +975,7 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         st._ZOMBIE_CANDIDATES.clear()
+        _reset_sweep_failure_state()
 
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.mariadb.set_state', return_value=True)
@@ -688,7 +990,6 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
             mock_set_state, mock_add_event):
         st.reconcile_orphaned_objects()
 
-        from shakenfist import mariadb
         deleted_types = [
             c.args[0] for c in mock_delete_orphans.call_args_list]
         self.assertEqual(
@@ -769,6 +1070,105 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
         st.reconcile_orphaned_objects()
         st.reconcile_orphaned_objects()
         mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_failed_zombie_read_is_visible_not_empty(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        """A zombie read that failed is not "there are no zombies".
+
+        `if uuids is None: continue` is the same silent skipped pass the
+        sweep streak gauge exists to expose (#3638): repair quietly does
+        nothing while the zombies it exists to fix stay invisible to
+        every state-driven iterator. A per-reply failure still costs
+        only that object type.
+        """
+        def stateless(objtype):
+            if objtype == ObjectType.NETWORK:
+                return None
+            return []
+        mock_stateless.side_effect = stateless
+
+        st.reconcile_orphaned_objects()
+
+        self.assertEqual(
+            {('reconcile_orphans', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'reconcile_orphans', 'object_type': 'network'}))
+        # Every other reconcilable type was still read.
+        self.assertEqual(
+            len([t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+                 if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES]),
+            mock_stateless.call_count)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids',
+                side_effect=DatabaseUnavailable('tier is down'))
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_unavailable_database_stops_zombie_repair_after_one_budget(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # Same bound as the deleted-object sweep, and for the same
+        # reason: this loop also runs one read per object type inside a
+        # single scheduled job whose watchdog is only petted between
+        # jobs, and each DatabaseUnavailable costs a full _grpc_call
+        # retry budget.
+        st.reconcile_orphaned_objects()
+
+        self.assertEqual(1, mock_stateless.call_count)
+        first_type = next(
+            t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+            if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES)
+        self.assertEqual(
+            {('reconcile_orphans', first_type): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'reconcile_orphans', 'object_type': first_type}))
+        mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_a_slow_type_cannot_starve_the_types_behind_it(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # Same starvation hazard as the deleted-object sweep: one slow
+        # object type must not permanently hide every type after it.
+        zombie_types = [t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+                        if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES]
+        slow = zombie_types[0]
+
+        def stateless(objtype):
+            if str(objtype) == slow:
+                raise DatabaseUnavailable('this one query is too slow')
+            return []
+        mock_stateless.side_effect = stateless
+
+        st.reconcile_orphaned_objects()
+        self.assertEqual(1, mock_stateless.call_count)
+
+        mock_stateless.reset_mock()
+        st.reconcile_orphaned_objects()
+
+        read = [str(c.args[0]) for c in mock_stateless.call_args_list]
+        self.assertEqual(zombie_types[1:] + [slow], read)
 
 
 class ReapFederationRecordsTestCase(base.ShakenFistTestCase):

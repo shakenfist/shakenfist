@@ -256,7 +256,9 @@ class BlobsEndpoint(api_base.Resource):
           'Limit results to a specific hypervisor node.', False)],
         [(200, ('A list of blob dictionaries, each containing the same '
                 'output as a GET for a blob artifact would show.'),
-          blobs_get_example)],
+          blobs_get_example),
+         (503, 'The database is unavailable, so the list of blobs could '
+               'not be read.', None)],
         requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use

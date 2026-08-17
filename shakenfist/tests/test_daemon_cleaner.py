@@ -7,6 +7,7 @@ from unittest import mock
 import schedule
 
 from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import node
 from shakenfist.config import BaseSettings
@@ -315,9 +316,8 @@ class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
             os.utime(path, (0, 0))
 
         mock_mariadb.get_active_blob_uuids.return_value = []
-        fake_node = mock.MagicMock()
-        fake_node.blobs = []
-        mock_node.Node.from_db.return_value = fake_node
+        mock_mariadb.get_node_blob_uuids.return_value = []
+        mock_node.Node.from_db.return_value = mock.MagicMock()
 
         m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
         m.pet_watchdog = mock.MagicMock()
@@ -366,9 +366,8 @@ class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
         os.symlink(os.path.join(tempdir.name, 'nonexistent'), dangling_removed)
 
         mock_mariadb.get_active_blob_uuids.return_value = []
-        fake_node = mock.MagicMock()
-        fake_node.blobs = []
-        mock_node.Node.from_db.return_value = fake_node
+        mock_mariadb.get_node_blob_uuids.return_value = []
+        mock_node.Node.from_db.return_value = mock.MagicMock()
         mock_blob.from_db.return_value = None
 
         m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
@@ -383,6 +382,109 @@ class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
         self.assertFalse(os.path.exists(cache_orphan))
         self.assertFalse(os.path.lexists(dangling_removed))
         self.assertTrue(os.path.lexists(dangling_kept))
+
+    @mock.patch('shakenfist.daemons.cleaner.main.Blob')
+    @mock.patch('shakenfist.daemons.cleaner.main.mariadb')
+    @mock.patch('shakenfist.daemons.cleaner.main.node')
+    def test_unreadable_active_list_deletes_nothing(
+            self, mock_node, mock_mariadb, mock_blob):
+        """An unreadable active-blob list must not empty the blob store.
+
+        _maintain_blobs uses the active list as a complement set: every
+        blob file whose uuid is absent from it is unlinked. While
+        get_active_blob_uuids() flattened a failed read to [] (#3638), a
+        single oversized RESOURCE_EXHAUSTED reply therefore read as "no
+        blobs are active" and instructed this pass to delete every blob
+        on the node. The pass must be skipped instead.
+        """
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        blob_dir = os.path.join(tempdir.name, 'blobs')
+        cache_dir = os.path.join(tempdir.name, 'image_cache')
+        shard = os.path.join(blob_dir, 'ab')
+        os.makedirs(shard)
+        os.makedirs(cache_dir)
+
+        # A healthy blob, old enough to be collected had it genuinely
+        # been absent from the active list.
+        live_blob_uuid = '12345678-1234-4321-8234-123456789012'
+        live_blob = os.path.join(shard, live_blob_uuid)
+        with open(live_blob, 'w') as f:
+            f.write('...')
+        os.utime(live_blob, (0, 0))
+
+        mock_mariadb.get_active_blob_uuids.side_effect = (
+            exceptions.DatabaseUnavailable(
+                'could not read the list of active blobs'))
+
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        with mock.patch('shakenfist.daemons.cleaner.main.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            m._maintain_blobs()
+
+        self.assertTrue(os.path.exists(live_blob))
+        # The pass is abandoned at the failed read, before any other
+        # database work happens. Asserting that is what distinguishes
+        # "skipped the pass" from "walked the store and happened to
+        # delete nothing"; the complementary case, where a genuinely
+        # empty list does delete the file, is covered by
+        # test_stale_uuid_named_files_still_deleted.
+        mock_node.Node.from_db.assert_not_called()
+        mock_blob.from_db.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cleaner.main.Blob')
+    @mock.patch('shakenfist.daemons.cleaner.main.mariadb')
+    @mock.patch('shakenfist.daemons.cleaner.main.node')
+    def test_unreadable_node_blob_list_deletes_nothing(
+            self, mock_node, mock_mariadb, mock_blob):
+        """The *other* operand of the deletion decision, hardened too.
+
+        The test is an OR over two lists, so hardening only the active
+        list left the store fully deletable through the node's own blob
+        locations. That read is the likelier one to fail in practice: it
+        goes to MariaDB directly, so a lock wait timeout or a dropped
+        connection breaks it while sf-database itself stays healthy and
+        answers every other request normally.
+
+        The active list deliberately succeeds here, and returns a list
+        that does *not* contain the blob, so the first operand alone
+        would still unlink it. Only the second skip can save it.
+        """
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        blob_dir = os.path.join(tempdir.name, 'blobs')
+        cache_dir = os.path.join(tempdir.name, 'image_cache')
+        shard = os.path.join(blob_dir, 'ab')
+        os.makedirs(shard)
+        os.makedirs(cache_dir)
+
+        live_blob_uuid = '12345678-1234-4321-8234-123456789012'
+        live_blob = os.path.join(shard, live_blob_uuid)
+        with open(live_blob, 'w') as f:
+            f.write('...')
+        os.utime(live_blob, (0, 0))
+
+        mock_mariadb.get_active_blob_uuids.return_value = []
+        mock_mariadb.get_node_blob_uuids.side_effect = (
+            exceptions.DatabaseUnavailable(
+                'could not read the blob locations for node sf-1'))
+        mock_node.Node.from_db.return_value = mock.MagicMock()
+
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        with mock.patch('shakenfist.daemons.cleaner.main.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            m._maintain_blobs()
+
+        self.assertTrue(os.path.exists(live_blob))
+        # As above, proving the pass was abandoned at the failed read
+        # rather than having walked the store and deleted nothing.
+        mock_blob.from_db.assert_not_called()
 
 
 class ResilientJobTestCase(base.ShakenFistTestCase):

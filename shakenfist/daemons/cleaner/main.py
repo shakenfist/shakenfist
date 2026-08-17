@@ -6,6 +6,7 @@ import time
 import schedule
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist import node
@@ -48,7 +49,39 @@ class Monitor(daemon.Daemon):
         cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
         os.makedirs(cache_path, exist_ok=True)
 
-        active_blob_uuids = mariadb.get_active_blob_uuids()
+        # This list is used below as a complement set: any blob file on
+        # disk whose uuid is absent from it is deleted. That makes an
+        # unreadable list actively dangerous rather than merely
+        # unhelpful, so skip the pass entirely -- the blobs are still
+        # there next time round, and a delayed sweep costs nothing that
+        # a wrongly emptied blob store does not cost far more of.
+        #
+        # It is a set for the same reason: the membership test below runs
+        # once per file in the blob store, and the reply that motivated
+        # #3638 held on the order of 10^5 uuids.
+        #
+        # Returning here abandons the whole pass, including the
+        # transcoded-image-cache sweep further down which does not itself
+        # need the active list. That is deliberate: the cache sweep
+        # deletes an entry when Blob.from_db() comes back falsy, which
+        # during a database outage would be a second, smaller version of
+        # the same complement-set hazard. The `if not n: return` below
+        # already skips it for the same reason.
+        #
+        # Unlike the cluster daemon's sweeps this skip has no metric, so
+        # a persistently failing read shows up only in this log line and
+        # as disk that stops being reclaimed. sf-cleaner exports no
+        # Prometheus endpoint at all today, so giving it one is its own
+        # change rather than a rider on this fix -- see the future work
+        # section of docs/plans/PLAN-grpc-bounded-replies.md.
+        try:
+            active_blob_uuids = set(mariadb.get_active_blob_uuids())
+        except exceptions.DatabaseUnavailable as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read the active blob list, skipping blob '
+                'maintenance this pass')
+            return
+
         n = node.Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
         if not n:
             # We have not started up enough yet to exist in the database.
@@ -56,7 +89,19 @@ class Monitor(daemon.Daemon):
             # failure audit is suppressed above.
             return
 
-        all_node_blobs = n.blobs
+        # The second operand of the deletion decision below, and it needs
+        # exactly the same protection as the first: the test is an OR, so
+        # an empty answer from either list unlinks the whole blob store.
+        # Node.blobs is not used here because it routes through the
+        # tolerant get_references_from(), which cannot tell a node with no
+        # blobs from a read that did not happen.
+        try:
+            all_node_blobs = set(mariadb.get_node_blob_uuids(n.fqdn))
+        except exceptions.DatabaseUnavailable as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read this node\'s blob locations, skipping blob '
+                'maintenance this pass')
+            return
 
         try:
             p = pathlib.Path(blob_path)

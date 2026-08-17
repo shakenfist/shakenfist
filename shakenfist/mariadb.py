@@ -4072,6 +4072,34 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
         return False
 
 
+def _log_failed_read(rpc: str, error: grpc.RpcError, target: str = '') -> None:
+    """Log a list-shaped read which did not happen, naming why when we can.
+
+    The wrappers which use this all collapse an RpcError to a
+    failed-read return of None. That is right for the transient codes
+    and for RESOURCE_EXHAUSTED -- the oversized reply of #3638 -- but
+    it folds INVALID_ARGUMENT in with them, and the servicers now set
+    that status when they are handed an object type they cannot
+    resolve. Such a request is a caller bug or a proto_id version skew,
+    not a database problem, and left unnamed it surfaces as a 503
+    telling an operator to retry something that will never succeed, or
+    as a sweep failure streak that never clears while somebody looks
+    for a database fault that does not exist.
+
+    The return value is deliberately unchanged: a caller which could
+    not read the list is in the same position either way, and there are
+    no callers today which can produce this status. The log line is
+    what stops the diagnosis starting in the wrong place.
+    """
+    code = getattr(error, 'code', lambda: None)()
+    context = f' for {target}' if target else ''
+    if code == grpc.StatusCode.INVALID_ARGUMENT:
+        LOG.error(f'gRPC {rpc} was rejected as malformed{context}, which is '
+                  f'a caller bug rather than a database failure: {error}')
+    else:
+        LOG.error(f'gRPC {rpc} failed{context}: {error}')
+
+
 def _grpc_get_objects_by_state(object_type: ObjectType,
                                state_values: list[str],
                                updated_before: Optional[float] = None
@@ -4091,8 +4119,7 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         reply = _grpc_call(stub.GetObjectsByState, request)
         return list(reply.object_uuids)
     except grpc.RpcError as e:
-        LOG.error(
-            f'gRPC GetObjectsByState failed for {object_type}: {e}')
+        _log_failed_read('GetObjectsByState', e, target=str(object_type))
         return None
 
 
@@ -5944,9 +5971,22 @@ def _grpc_get_object_events(
     inverted: PruneEvents needs longer than the default, this needs a
     generous-but-not-infinite ceiling.
 
-    On RPC failure we log and return an empty list so REST callers
-    surface "no events" rather than crash; the actual error is in the
-    daemon log.
+    On RPC failure we log and return an empty list rather than raising.
+    Per docs/developer_guide/coding_rules.md that is a decision about
+    what a failed read means to each caller, so both classes of caller
+    are named here rather than left to inherit it. Display callers
+    (external_api/base.py) render whatever they are handed, so an empty
+    list surfaces "no events" rather than crashing the request. The one
+    caller that reasons about the result,
+    ``node_health.errored_node_affected_types()``, returns None when its
+    loop finds nothing, which its caller documents as "blast radius
+    unknown, do nothing and retry on a later pass" -- so an empty list
+    degrades it to inaction rather than to a wrong action. Neither
+    complements the list nor gates a destructive operation on it, which
+    is what made the same collapse dangerous in
+    ``get_active_blob_uuids()`` (#3638). A future caller that does gate
+    on this result has to revisit the choice. The actual error is in the
+    daemon log either way.
     """
     try:
         stub = _get_database_stub()
@@ -5962,7 +6002,12 @@ def _grpc_get_object_events(
         )
         reply = stub.GetObjectEvents(request, timeout=30.0)
     except grpc.RpcError as e:
-        LOG.error(f'gRPC GetObjectEvents failed: {e}')
+        # Name the object: an oversized-reply failure (#3638) can only
+        # be traced to its cause if the log identifies which object's
+        # event history blew the message cap.
+        LOG.error(
+            f'gRPC GetObjectEvents failed for {object_type}/{object_uuid} '
+            f'(limit {limit}): {e}')
         return []
 
     results: list[EventReadRow] = []
@@ -7150,11 +7195,72 @@ def get_active_blob_uuids() -> list[str]:
 
     Active states are 'initial' and 'created' (not 'deleted' or 'error').
 
+    Raises exceptions.DatabaseUnavailable if the read failed, and never
+    returns [] to mean "the read did not happen". The distinction is
+    load bearing: the cleaner uses this list as a *complement* set and
+    unlinks every blob file on disk that is not in it, so a read
+    failure flattened to an empty list is an instruction to delete the
+    node's entire blob store. This used to be `... or []`, which is
+    exactly that bug -- an oversized reply (#3638) is a non-retryable
+    RESOURCE_EXHAUSTED, so it is raised as-is by _grpc_call, mapped to
+    None by _grpc_get_objects_by_state, and was then read as "no blobs
+    are active". Callers that can tolerate a skipped pass must catch
+    DatabaseUnavailable explicitly.
+
+    The exception deliberately covers two conditions that differ in how
+    retryable they are: an unreachable tier, where a retry eventually
+    works, and an oversized reply, where a retry fails identically until
+    the data shrinks. REST callers are answered 503 "please retry" for
+    both. That is the right answer for the first and an acceptable one
+    for the second -- no client can shrink the reply, so there is no
+    action the distinction would unlock, and a retrying client is still
+    better off than under the silent 200-with-[] this replaced. Phase 3
+    of docs/plans/PLAN-grpc-bounded-replies.md removes the second
+    condition rather than teaching callers to tell the two apart.
+
     Returns:
-        List of blob UUID strings in active states (empty on error).
+        List of blob UUID strings in active states.
     """
     active_states = ['initial', 'created']
-    return get_objects_by_state(ObjectType.BLOB, active_states) or []
+    result = get_objects_by_state(ObjectType.BLOB, active_states)
+    if result is None:
+        raise exceptions.DatabaseUnavailable(
+            'could not read the list of active blobs')
+    return result
+
+
+def get_node_blob_uuids(node_fqdn: str) -> list[str]:
+    """Get UUIDs of the blobs recorded as present on a node.
+
+    Raises exceptions.DatabaseUnavailable if the read failed, for the
+    same reason get_active_blob_uuids() does: these two lists are the
+    two operands of the cleaner's deletion decision
+
+        if (blob_uuid not in active_blob_uuids
+                or blob_uuid not in all_node_blobs):
+            os.unlink(entpath)
+
+    and it is an OR, so an empty answer from *either* one unlinks the
+    node's entire blob store. Hardening only the first operand left the
+    bug fully reachable through the second, which is the likelier
+    failure in practice: a MariaDB OperationalError (lock wait timeout,
+    deadlock, dropped connection) while sf-database itself is healthy.
+
+    Node.blobs deliberately keeps using the tolerant
+    get_references_from() -- its other callers only iterate.
+
+    Args:
+        node_fqdn: The fqdn of the node, as used for reference rows.
+
+    Returns:
+        List of blob UUID strings located on that node.
+    """
+    refs = _get_references_from(
+        ObjectType.NODE, node_fqdn, RelationshipType.BLOB_LOCATION)
+    if refs is None:
+        raise exceptions.DatabaseUnavailable(
+            'could not read the blob locations for node %s' % node_fqdn)
+    return [str(ref.target_uuid) for ref in refs]
 
 
 # =============================================================================
@@ -7519,7 +7625,7 @@ def _direct_get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
-) -> list[ObjectReference]:
+) -> Optional[list[ObjectReference]]:
     """Get all references from an object directly from MariaDB.
 
     Args:
@@ -7528,7 +7634,9 @@ def _direct_get_references_from(
         relationship: Optional filter by relationship type.
 
     Returns:
-        List of ObjectReference objects the source references.
+        List of ObjectReference objects the source references, or None if
+        the read failed. None and [] are different answers -- see
+        get_references_from() for which callers may collapse them.
     """
     engine = _get_engine()
     table = _get_object_references_table()
@@ -7562,7 +7670,7 @@ def _direct_get_references_from(
             return refs
     except OperationalError as e:
         LOG.warning(f'MariaDB get_references_from failed: {e}')
-        return []
+        return None
 
 
 @util_callstack.restrict_caller(
@@ -8208,8 +8316,13 @@ def _grpc_get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
-) -> list[ObjectReference]:
-    """Get references from an object via the database microservice."""
+) -> Optional[list[ObjectReference]]:
+    """Get references from an object via the database microservice.
+
+    Returns None if the read failed. DatabaseUnavailable is deliberately
+    not caught here: it is not an RpcError, so an exhausted retry budget
+    propagates to the caller rather than becoming a failed-read None.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetReferencesFromRequest(
@@ -8242,8 +8355,8 @@ def _grpc_get_references_from(
             ))
         return refs
     except grpc.RpcError as e:
-        LOG.error(f'gRPC GetReferencesFrom failed: {e}')
-        return []
+        _log_failed_read('GetReferencesFrom', e, target=str(source_uuid))
+        return None
 
 
 def _grpc_count_references_to(
@@ -8657,12 +8770,38 @@ def get_references_to(
     return _direct_get_references_to(target_type, target_uuid, relationship)
 
 
+def _get_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> Optional[list[ObjectReference]]:
+    """Route a reference read, preserving the failed-read answer.
+
+    This is the truthful form: None means the read did not happen.
+    """
+    if _use_database_service():
+        return _grpc_get_references_from(source_type, source_uuid, relationship)
+    return _direct_get_references_from(source_type, source_uuid, relationship)
+
+
 def get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
-    """Get all references from an object.
+    """Get all references from an object, treating a failed read as none.
+
+    The collapse here is deliberate and is only safe because every
+    caller of this function iterates the result: hard_delete() reference
+    cleanup, Blob.depends_on, Blob.transcoded, Node.instances. For those
+    a failed read means work is skipped and retried on the next pass.
+
+    It is *not* safe for a caller that uses the result as a complement
+    set -- "delete everything not in this list" -- because an empty list
+    then reads as "delete everything". Such a caller must use a raising
+    accessor built on _get_references_from() instead; see
+    get_node_blob_uuids(), and the rule in
+    docs/developer_guide/coding_rules.md.
 
     Args:
         source_type: The type of the source object.
@@ -8670,11 +8809,10 @@ def get_references_from(
         relationship: Optional filter by relationship type.
 
     Returns:
-        List of ObjectReference objects the source references.
+        List of ObjectReference objects the source references. Empty
+        both when there are none and when the read failed.
     """
-    if _use_database_service():
-        return _grpc_get_references_from(source_type, source_uuid, relationship)
-    return _direct_get_references_from(source_type, source_uuid, relationship)
+    return _get_references_from(source_type, source_uuid, relationship) or []
 
 
 def count_references_to(
@@ -23508,8 +23646,7 @@ def _grpc_get_stateless_object_uuids(
         reply = _grpc_call(stub.GetStatelessObjectUuids, request)
         return list(reply.object_uuids)
     except grpc.RpcError as e:
-        LOG.error(
-            f'gRPC GetStatelessObjectUuids failed for {object_type}: {e}')
+        _log_failed_read('GetStatelessObjectUuids', e, target=str(object_type))
         return None
 
 

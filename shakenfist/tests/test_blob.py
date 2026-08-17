@@ -20,8 +20,11 @@ from shakenfist.config import BaseSettings
 from shakenfist.exceptions import HashFailed
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist import blob
+from shakenfist import exceptions
+from shakenfist import mariadb
 
 
 class FakeConfig(BaseSettings):
@@ -251,8 +254,6 @@ class MariaDBBlobFunctionsTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._direct_update_blob', return_value=True)
     def test_update_blob_direct(self, mock_direct, mock_use_db):
         """Test update_blob routes to direct function."""
-        from shakenfist import mariadb
-
         data = BlobData(
             uuid='12345678-1234-4321-8234-123456789012',
             modified=1234567890.0,
@@ -269,8 +270,6 @@ class MariaDBBlobFunctionsTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._grpc_update_blob', return_value=True)
     def test_update_blob_grpc(self, mock_grpc, mock_use_db):
         """Test update_blob routes to gRPC function."""
-        from shakenfist import mariadb
-
         data = BlobData(
             uuid='12345678-1234-4321-8234-123456789012',
             modified=1234567890.0,
@@ -287,9 +286,6 @@ class MariaDBBlobFunctionsTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._direct_get_blob')
     def test_get_blob_direct(self, mock_direct, mock_use_db):
         """Test get_blob routes to direct function."""
-        from shakenfist import mariadb
-        from uuid import UUID
-
         expected_data = BlobData(
             uuid='12345678-1234-4321-8234-123456789012',
             modified=1234567890.0,
@@ -308,9 +304,6 @@ class MariaDBBlobFunctionsTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._direct_delete_blob', return_value=True)
     def test_delete_blob_direct(self, mock_direct, mock_use_db):
         """Test delete_blob routes to direct function."""
-        from shakenfist import mariadb
-        from uuid import UUID
-
         result = mariadb.delete_blob(
             UUID('12345678-1234-4321-8234-123456789012'))
 
@@ -324,9 +317,6 @@ class GetActiveBlobUuidsTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._direct_get_objects_by_state')
     def test_get_active_blob_uuids(self, mock_get_by_state):
         """Test get_active_blob_uuids returns UUIDs in active states."""
-        from shakenfist import mariadb
-        from shakenfist.schema.object_types import ObjectType
-
         mock_get_by_state.return_value = [
             'uuid-1', 'uuid-2', 'uuid-3'
         ]
@@ -336,6 +326,29 @@ class GetActiveBlobUuidsTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, ['uuid-1', 'uuid-2', 'uuid-3'])
         mock_get_by_state.assert_called_once_with(
             ObjectType.BLOB, ['initial', 'created'], updated_before=None)
+
+    @mock.patch('shakenfist.mariadb._direct_get_objects_by_state')
+    def test_failed_read_raises_rather_than_returning_empty(
+            self, mock_get_by_state):
+        """A failed read must not be indistinguishable from no blobs.
+
+        The underlying accessor returns None when the read failed, which
+        this function used to flatten with `or []`. Its callers include
+        the cleaner, which deletes every blob file not named in the
+        list, so "the read failed" arriving as "nothing is active" is an
+        instruction to empty the node's blob store (#3638).
+        """
+        mock_get_by_state.return_value = None
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, mariadb.get_active_blob_uuids)
+
+    @mock.patch('shakenfist.mariadb._direct_get_objects_by_state')
+    def test_genuinely_empty_is_not_an_error(self, mock_get_by_state):
+        """[] still means what it says: there are no active blobs."""
+        mock_get_by_state.return_value = []
+
+        self.assertEqual([], mariadb.get_active_blob_uuids())
 
 
 class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):

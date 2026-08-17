@@ -151,17 +151,66 @@ propagates through them: an unreachable database must not be
 indistinguishable from a missing object. The few hot paths that
 intentionally tolerate an unreachable database catch it explicitly --
 `Daemon.check_daemon_state()` skips the check, `ClusterLock.__enter__`
-keeps retrying inside the caller's timeout, and the queues daemon's health
-loop treats it as unhealthy and waits.
+keeps retrying inside the caller's timeout, the queues daemon's health
+loop treats it as unhealthy and waits, and (since #3638) the cleaner's
+`_maintain_blobs()` and the cluster daemon's `_cluster_wide_cleanup()`
+and sweep helpers skip the affected work for the pass.
+
+The servicer has the matching obligation. A reply whose only payload is
+a `repeated` field has nowhere to say "the read failed", so
+`GetObjectsByState`, `GetStatelessObjectUuids` and `GetReferencesFrom`
+must not answer a failed read with an empty list: when the direct
+accessor returns `None`
+(an `OperationalError` — MariaDB down, connection dropped, lock wait
+timeout, deadlock) they set `UNAVAILABLE` on the status, which
+`_grpc_call` retries and then surfaces as `DatabaseUnavailable`. An
+unexpected exception in the handler sets `INTERNAL`, which is
+non-retryable and so becomes a `None` return client-side. This matters
+because it is the failure mode where sf-database itself is healthy and
+answering, so nothing else in the stack notices.
+
+`get_active_blob_uuids()` and `get_node_blob_uuids()` are the exceptions
+to the "wrappers translate to not found" rule: they *raise*
+`DatabaseUnavailable` rather than returning
+`[]`, because the cleaner uses both lists as complement sets and unlinks
+every blob file named in neither. They are two accessors over reads that
+also have tolerant forms — `get_objects_by_state()` and
+`get_references_from()` — which keep collapsing a failed read for their
+iterate-only callers. Which form a call site needs is a property of the
+call site, so the pair exists rather than a flag on one accessor. See the
+["`or []` is a decision"](coding_rules.md) rule for how to decide which
+shape a new accessor should have, and
+[`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md)
+for the reply-size work this came out of.
+
+The object iterators are the widest consumer of all this, and they
+propagate. `DatabaseBackedObjectIterator._find()` catches nothing:
+a `DatabaseUnavailable` raised part way through `Blobs()`, `IPAMs()`
+or `AgentOperations()` unwinds into the caller mid-iteration rather
+than ending the loop quietly, because a read that did not happen must
+not present as an iteration that found nothing. Daemon loops which
+tolerate that catch it at the top of the pass, as the cluster daemon's
+cleanup does; a new caller which cannot tolerate a partially consumed
+iterator has to say so. The `None` failure shape does still truncate
+there, which is safe only while every iterator caller iterates the
+result rather than complementing it — that is recorded, with the rest
+of the audit, in the plan.
 
 The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
-timeout) to detect stale connections before they cause failures. The
-database gRPC server uses a 20-thread pool to handle concurrent requests
-from all daemons. The database client in `mariadb.py` (`_grpc_call`)
-retries `UNAVAILABLE` and `DEADLINE_EXCEEDED` failures, rebuilding the
-channel on a wedged subchannel but keeping it on a refused connection so
-`round_robin` can serve the retry from a surviving gateway. All gRPC
-failures are logged at ERROR level.
+timeout) to detect stale connections before they cause failures, and a
+32MiB client receive cap (raised from grpcio's 4MiB default in `#3638`,
+where `GetObjectEvents` and `GetObjectsByState` replies outgrew it and
+failed as `RESOURCE_EXHAUSTED`). The cap is client-side only; the server
+sets no send cap, so an oversized reply is still serialised before it
+fails, which is why the durable fix is bounding replies rather than
+raising the cap again -- see
+[`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md).
+The database gRPC server uses a 64-thread pool to handle concurrent
+requests from all daemons. The database client in `mariadb.py`
+(`_grpc_call`) retries `UNAVAILABLE` and `DEADLINE_EXCEEDED` failures,
+rebuilding the channel on a wedged subchannel but keeping it on a
+refused connection so `round_robin` can serve the retry from a surviving
+gateway. All gRPC failures are logged at ERROR level.
 
 `get_objects_by_state()` returns `None` on non-retryable errors (distinct
 from `[]` for no matches). All object iterators handle this by falling back

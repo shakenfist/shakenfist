@@ -606,20 +606,60 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.GetObjectsByStateRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.GetObjectsByStateReply:
-        """Get all object UUIDs of a given type in specified states."""
+        """Get all object UUIDs of a given type in specified states.
+
+        An empty reply must mean "no objects are in those states", never
+        "the read failed". The client cannot tell the difference -- the
+        reply carries no error field -- and one caller,
+        ``get_active_blob_uuids()``, hands its result to the cleaner as a
+        *complement* set: every blob file on disk not named in it is
+        unlinked. So a failed read answered as an empty list is an
+        instruction to delete the node's entire blob store (#3638).
+
+        Raising the client's receive cap fixed the oversized-reply route
+        into that hazard, but not this one:
+        ``_direct_get_objects_by_state()`` returns None on
+        ``OperationalError`` -- MariaDB down, connection dropped, lock
+        wait timeout, deadlock -- which is the failure an operator is
+        most likely to actually hit, because it happens while
+        sf-database itself is perfectly healthy and answering. Signal it
+        on the status instead, following ReleaseLock and RefreshLock
+        above: UNAVAILABLE is retried by ``_grpc_call`` and becomes
+        ``DatabaseUnavailable`` once the budget is spent, which is
+        exactly the shape the callers were built to handle.
+        """
         try:
             self.monitor.counters['get_objects_by_state'].inc()
             object_type = ObjectType.from_proto_id(request.object_type)
             if object_type is None:
+                # An unknown or unset object type is a bad request, not a
+                # type with no objects in it. Non-retryable, so the client
+                # wrapper maps it to None rather than to an empty list.
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(
+                    f'unknown object type id {request.object_type}')
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
             uuids = mariadb.get_objects_by_state(
                 object_type, list(request.state_values),
                 updated_before=(request.updated_before or None))
-            return database_pb2.GetObjectsByStateReply(
-                object_uuids=uuids or [])
+            if uuids is None:
+                LOG.warning(
+                    f'GetObjectsByState transient MariaDB error for '
+                    f'{object_type} in {list(request.state_values)}')
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details('object state read failed')
+                return database_pb2.GetObjectsByStateReply(object_uuids=[])
+            return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetObjectsByState failed', e)
+            # INTERNAL rather than UNAVAILABLE: an unexpected exception in
+            # this handler is a bug, not a transient outage, so retrying
+            # it wastes the caller's budget. It is non-retryable, so the
+            # client wrapper turns it into None -- a failed read -- which
+            # is the whole point.
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.GetObjectsByStateReply(object_uuids=[])
 
     def DeleteOrphanedObjectStates(
@@ -652,19 +692,41 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.GetStatelessObjectUuidsRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.GetStatelessObjectUuidsReply:
-        """List zombie static rows (no object_states row) for a type."""
+        """List zombie static rows (no object_states row) for a type.
+
+        Same contract as GetObjectsByState above, and for the same
+        reason: an empty reply means "this type has no zombies", never
+        "the read failed". The consequence here is milder -- orphan
+        reconciliation silently repairs nothing rather than deleting
+        anything -- but the caller cannot distinguish the two, and a
+        reconcile sweep that quietly stops running is how the orphans it
+        exists to fix stay invisible to every state-driven iterator.
+        """
         try:
             self.monitor.counters['get_stateless_object_uuids'].inc()
             object_type = ObjectType.from_proto_id(request.object_type)
             if object_type is None:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(
+                    f'unknown object type id {request.object_type}')
                 return database_pb2.GetStatelessObjectUuidsReply(
                     object_uuids=[])
             uuids = mariadb.get_stateless_object_uuids(object_type)
+            if uuids is None:
+                LOG.warning(
+                    'GetStatelessObjectUuids transient MariaDB error for '
+                    f'{object_type}')
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details('stateless object read failed')
+                return database_pb2.GetStatelessObjectUuidsReply(
+                    object_uuids=[])
             return database_pb2.GetStatelessObjectUuidsReply(
-                object_uuids=uuids or [])
+                object_uuids=uuids)
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetStatelessObjectUuids failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.GetStatelessObjectUuidsReply(object_uuids=[])
 
     def DeleteOrphanedArtifactAttributes(
@@ -1363,6 +1425,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             self.monitor.counters['get_references_from'].inc()
             source_type = ObjectType.from_proto_id(request.source_type)
             if source_type is None:
+                # An unknown or unset object type is a bad request, not a
+                # source with no references. Non-retryable, so the client
+                # wrapper maps it to None rather than to an empty list.
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(
+                    f'unknown object type id {request.source_type}')
                 return database_pb2.GetReferencesReply(references=[])
             relationship = None
             if request.HasField('relationship'):
@@ -1370,6 +1438,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.relationship)
             refs = mariadb._direct_get_references_from(
                 source_type, request.source_uuid, relationship)
+            if refs is None:
+                LOG.warning(
+                    f'GetReferencesFrom transient MariaDB error for '
+                    f'{source_type} {request.source_uuid}')
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details('reference read failed')
+                return database_pb2.GetReferencesReply(references=[])
             result = []
             for ref in refs:
                 result.append(database_pb2.ObjectReferenceData(
@@ -1392,6 +1467,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetReferencesFrom failed', e)
+            # INTERNAL rather than UNAVAILABLE: an unexpected exception in
+            # this handler is a bug, not a transient outage, and retrying
+            # it will not help.
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.GetReferencesReply(references=[])
 
     def CountReferencesTo(

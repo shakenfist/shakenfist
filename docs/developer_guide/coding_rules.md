@@ -228,6 +228,116 @@ than inferring one, and write the test that returns the empty-error reply and
 asserts the refusal. The invariant is not that today's code produces a message;
 it is that no reply can be mistaken for a permissive one.
 
+## `or []` is a decision about what a failed read means
+
+`mariadb.get_objects_by_state()` returns `None` when the read failed and `[]`
+when nothing matched, and says so in its docstring. Every `or []` at a call
+site erases that distinction, and the erasure is not neutral: it asserts that
+the caller treats "we could not find out" and "there is nothing" the same way.
+Sometimes that is true. Decide it deliberately, because for one caller in this
+codebase it was catastrophically false.
+
+`get_active_blob_uuids()` ended in `or []`. The cleaner uses its result as a
+*complement* set -- it unlinks every blob file on disk whose uuid is not in the
+list -- so a failed read arrived as "no blobs are active", which is an
+instruction to delete the node's entire blob store. The trigger was not exotic:
+an oversized `GetObjectsByState` reply (issue 3638) is a non-retryable
+`RESOURCE_EXHAUSTED`, raised as-is by `_grpc_call`, mapped to `None` by the
+client wrapper, and flattened to `[]` one line later. The same call in the
+cluster daemon only ever *iterates* the list, so there the empty list was
+merely a skipped pass. One accessor, two callers, opposite consequences.
+
+So the rule is about the caller, not the accessor. Before collapsing an error
+into a value, ask what each caller does with it. A caller that iterates can
+usually tolerate a skipped pass -- catch explicitly, log, and move on. A caller
+that complements, gates, or diffs against the list cannot, and must see the
+failure. `get_active_blob_uuids()` now raises `exceptions.DatabaseUnavailable`,
+which is the same shape as the fix for issue 3373 (an unreachable database must
+not be indistinguishable from a missing object) and gets the REST path a clean
+503 for free via `handle_database_unavailable`.
+
+A sweep that reads a work list has a quieter version of the same problem: it
+does not delete anything wrongly, it just does nothing, reports a healthy pass
+over an empty queue, and lets the backlog grow -- which in issue 3638 grew the
+very reply that could not be read. `_sweep_work_list()` in the cluster daemon's
+scheduled tasks is the shared answer: a failed read returns `None`, is counted
+into `cluster_sweep_work_list_failure_streak`, and is logged as a skipped pass.
+The general form: **silence is not success, and an empty result set is not the
+absence of an answer.**
+
+One trap when handling this deliberately: a failed read from the `mariadb`
+client arrives in *two* shapes. The client wrappers map `grpc.RpcError` to a
+`None`/`False`/`[]` return, but `_grpc_call()` raises
+`exceptions.DatabaseUnavailable` once its retry budget is spent, and that is
+deliberately not an `RpcError` subclass (issue 3373), so it propagates through
+the wrapper untouched. Handling only the return value covers the oversized-reply
+case and misses the tier outage -- which is the more likely reason a read fails,
+and the condition an alert on the streak most needs to see. Cover both, and
+prove it with a test that sets `side_effect = DatabaseUnavailable(...)` rather
+than a `None` return.
+
+Having covered both, do not then treat them alike inside a loop. The two shapes
+differ in blast radius. A `None` return is per-reply, so the next object type is
+still worth reading. A `DatabaseUnavailable` is tier-wide: every remaining read
+will fail identically, and each will spend a full `_grpc_call` retry budget
+before it does. Continuing therefore costs one budget per iteration, and both
+the deleted-object sweep (28 object types) and orphan reconciliation run inside
+a single scheduled job whose watchdog is only petted *between* jobs. The
+tolerant `continue` that is right for the per-reply case would turn a database
+outage into a `SIGABRT` of the elected cluster maintainer and a lock failover.
+Continue on the per-reply shape; stop the loop on the tier-wide one. The
+general form: when one read becomes N reads, recompute the caller's worst-case
+wall time rather than inheriting it.
+
+And when you stop a loop early, ask what it does to whatever is behind the stop.
+Both of those loops iterate a fixed list of object types from the start of the
+list every pass, so `break` on its own would mean a single persistently slow
+type hides every type after it forever -- and the backlog that then accumulates
+makes that type slower still, which is the #3638 ratchet rebuilt one level up.
+They keep a resume offset and begin the next pass after whichever type stopped
+the last one, so the pass stays bounded *and* every type is reached within a
+bounded number of passes.
+
+The same rule applies to the reply itself, one layer down. A gRPC reply whose
+only payload is a `repeated` field has nowhere to put "the read failed", so
+returning `object_uuids=uuids or []` from a servicer hands the client the same
+ambiguity the `or []` at a call site does -- except the client cannot even see
+that a decision was made. `DatabaseServicer.GetObjectsByState` did exactly this,
+which left the blob-store deletion hazard fully reachable through the *likelier*
+failure (MariaDB down while sf-database is up and answering) after the
+client-side half had been fixed. Signal it on the status instead:
+`context.set_code(grpc.StatusCode.UNAVAILABLE)` for a transient database error,
+which `_grpc_call` retries and converts to `DatabaseUnavailable`, and `INTERNAL`
+for a handler bug, which is non-retryable and so becomes a `None` return. When
+you fix an empty-means-failure bug, check both ends of the wire.
+
+And check every operand of the decision, not just the one that led you there.
+The cleaner's test is an *or*:
+
+```python
+if (blob_uuid not in active_blob_uuids
+        or blob_uuid not in all_node_blobs):
+    os.unlink(entpath)
+```
+
+Hardening `get_active_blob_uuids()` fixed the first operand and left the store
+exactly as deletable through the second, which reads the node's own blob
+locations and flattened failure to `[]` at all three layers. Worse, the second
+operand fails *more* often than the first, because a plain MariaDB
+`OperationalError` -- a lock wait timeout, a deadlock, a dropped connection --
+breaks it while sf-database itself stays healthy and answers everything else
+normally. A guard on one input of a multi-input decision is not a guard on the
+decision. Enumerate the inputs, and write the negative-control test for each.
+
+That said, the fix is per-caller and not per-accessor, so it does not follow
+that every accessor should raise. `get_references_from()` still collapses a
+failed read to `[]`, deliberately and with the reasoning in its docstring,
+because every one of its callers iterates. The complement-set caller gets its
+own raising accessor, `get_node_blob_uuids()`, built on the truthful internal
+`_get_references_from()`. Two accessors over one read, named for what their
+callers may assume, beats one accessor with a `raise_on_failure` flag that
+every call site has to remember to set.
+
 ## Cluster CI tests only run in the merge queue
 
 The `(collection)` matrix in `Functional tests` -- everything under

@@ -10,6 +10,7 @@
 
 from unittest import mock
 
+import grpc
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
@@ -1308,6 +1309,26 @@ class GetObjectEventsRoutingTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'b2d0e260-423f-4387-9f5e-179603c254ba',
             mock_grpc.call_args[0][1])
+
+
+class GrpcGetObjectEventsFailureLoggingTestCase(base.ShakenFistTestCase):
+    """RPC failures must name the object they were reading."""
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_rpc_failure_log_names_the_object(self, mock_stub, mock_log):
+        # A RESOURCE_EXHAUSTED oversized-reply failure (#3638) can only
+        # be traced to the object whose event history blew the message
+        # cap if the error log carries the object id.
+        mock_stub.return_value.GetObjectEvents.side_effect = grpc.RpcError()
+
+        result = mariadb._grpc_get_object_events('instance', _OBJ_UUID_X)
+
+        self.assertEqual([], result)
+        mock_log.error.assert_called_once()
+        logged = mock_log.error.call_args[0][0]
+        self.assertIn('instance', logged)
+        self.assertIn(_OBJ_UUID_X, logged)
 
 
 # ---------------------------------------------------------------------------

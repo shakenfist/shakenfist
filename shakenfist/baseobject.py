@@ -820,10 +820,27 @@ class DatabaseBackedObjectIterator:
         when the object has a Find* RPC available. The default exists
         to keep subclasses that inherit the iterator (IPAMs,
         AgentOperations) working until they get their own overrides.
+
+        A tier-wide failure -- DatabaseUnavailable, raised once
+        _grpc_call has spent its retry budget -- deliberately
+        propagates to the caller rather than being caught here.
+        Catching it would turn a read that did not happen into an
+        iteration that found nothing, which is the #3638 hazard rebuilt
+        one layer up and in the widest consumer of the database in the
+        tree. A caller that genuinely tolerates an unreadable database
+        catches it explicitly, the way the cluster daemon's cleanup
+        does.
         """
         uuids = mariadb.get_objects_by_state(
             self.base_object.object_type, criteria.states or [])
         if uuids is None:
+            # The per-reply failure shape (RESOURCE_EXHAUSTED, and
+            # anything else that is not worth a retry) still truncates
+            # to an empty iteration here. That is tolerable only
+            # because every iterator caller today iterates the result
+            # rather than complementing it; it is named in phase 1 of
+            # PLAN-grpc-bounded-replies.md so it stays a recorded
+            # judgement rather than an inherited default.
             LOG.warning(
                 'get_objects_by_state returned None for '
                 f'{self.base_object.object_type}')

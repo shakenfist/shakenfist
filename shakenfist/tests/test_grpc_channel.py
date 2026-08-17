@@ -97,6 +97,28 @@ class MakeDatabaseChannelOptionsTestCase(base.ShakenFistTestCase):
         self.assertEqual(len(options), len(_DEFAULT_OPTIONS))
 
     @mock.patch('shakenfist.util.grpc_channel.grpc.insecure_channel')
+    def test_receive_cap_is_bounded_at_both_ends(self, mock_ic):
+        """The receive cap is a band, not just a floor.
+
+        GetObjectsByState and GetObjectEvents replies are unbounded by
+        design, and at gRPC's 4MiB default the sfcbr cluster saw
+        RESOURCE_EXHAUSTED on replies up to ~7.2MB (#3638), so the cap
+        has to clear observed traffic with headroom. It must equally
+        not be raised without limit: sf-database serialises whatever it
+        sends, so a very generous client cap trades a fast client-side
+        failure for memory pressure on the database tier. Assert the
+        band rather than the constant, so a future adjustment inside
+        the band is free and one outside it has to argue its case.
+        """
+        mock_ic.return_value = mock.MagicMock()
+        grpc_channel.make_database_channel(['10.0.0.1'], 13005)
+        options = dict(mock_ic.call_args[1]['options'])
+        cap = options.get('grpc.max_receive_message_length')
+        self.assertIsNotNone(cap)
+        self.assertGreaterEqual(cap, 16 * 1024 * 1024)
+        self.assertLessEqual(cap, 64 * 1024 * 1024)
+
+    @mock.patch('shakenfist.util.grpc_channel.grpc.insecure_channel')
     def test_reconnect_backoff_capped_below_roll_settle(self, mock_ic):
         """The reconnect backoff cap must stay below the deploy settle.
 
