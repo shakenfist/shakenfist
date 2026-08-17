@@ -336,7 +336,7 @@ lands, rather than a surprise after.
 | 7b | medium | sonnet | none | Ship the production detector. Add `examples/loki-secret-alert.yaml`: a Loki ruler alerting rule using exactly the expression from step 7a (`count_over_time({job="shakenfist"} \|~ "sfk_[A-Za-z0-9]{38}" [5m]) > 0`), with a `for:` of `0m` (a credential in the log is not a condition to wait out), severity critical, and an annotation pointing at `credential_rotation.md`. Comment the file for an operator who has not used the Loki ruler: where the file goes, that the tenant must match `loki_tenant`, and how to confirm it fires. Then extend `docs/operator_guide/logging.md` — it already has a "Secrets in the log stream" section (line 191) ending with the "treat the log store as sensitive" paragraph. Add a subsection after it, "Detecting a leaked credential", covering: what the `sfk_` format is and why it is greppable (link `docs/user_guide/authentication.md`), the ad-hoc LogQL query for a one-off check, the drop-in rule file for a standing one, the `journalctl -u sf-\*` equivalent for a cluster not shipping to Loki, and a link onward to `credential_rotation.md` for what to do when it fires. Do not restate the format's internals; link the user guide. Check the doc-anchor pre-commit hook passes — it validates cross-page anchor links. Commit subject: "docs: give operators a standing credential leak alert." |
 | 7c | medium | sonnet | none | Two changes, both about credentials committed to the repository. First: `docs/user_guide/authentication.md:43` contains a 42 character literal beginning `sfk_QKLZ` which passes `credentials.looks_valid()` — replace it with an example of the same shape which is invalid by construction, and add a short parenthetical to the surrounding prose saying so. Replace the whole thing, body included: keeping the original 32 character body and changing only the checksum would leave the secret material of a possible credential published. The provable construction is a fresh random body with the six checksum characters set to `zzzzzz`, which as base62 is 56800235583 and therefore larger than any CRC32 — no input produces it, so validity fails by arithmetic rather than by luck. Read the surrounding paragraphs; the page explains the prefix's purpose and must still read naturally. Second: add `shakenfist/tests/test_no_committed_credentials.py`, which walks the repository working tree from the repo root (skip `.git`, `.tox`, `*.tgz` and any binary file — decode errors mean skip, not fail), scans each file for `sfk_[A-Za-z0-9]{38}`, and fails on any match for which `credentials.looks_valid()` is True. The failure message must name the file and line but show only the first eight characters of the match (Decision 9). Include a self-test proving the scanner can fire: run the same scanning function over a temporary file containing `credentials.generate()` output and assert it is detected — without that, the test is exactly the vacuous shape phase 6 was about. Commit subject: "test: refuse a real credential in the tree." |
 | 7d | medium | opus | none | Add `.gitleaks.toml` at the repository root with a custom rule for the Shaken Fist credential format, and the drift test which binds it to the code. **The packaged gitleaks on Debian trixie is 8.16.0** (`apt-cache policy gitleaks`), which predates the plural `[[rules.allowlists]]` schema — write the file against 8.16's schema (`[[rules]]` with `id`/`description`/`regex`/`tags`, and a singular `[rules.allowlist]` table if one is needed at all) and confirm by reading gitleaks 8.16's own documentation or source rather than current upstream docs. Extend the stock rules (`[extend] useDefault = true`) rather than replacing them. The rule's regex must match the shape only — `sfk_[A-Za-z0-9]{38}` — not the checksum, since a scanner cannot compute one. Then add to `shakenfist/tests/test_credentials.py` a drift test which reads `.gitleaks.toml` with `tomllib` (stdlib; the project requires Python >=3.11), locates the rule by its `id`, compiles the regex, and asserts (i) it matches `credentials.generate()` output over several generations, (ii) it does not match a 41- or 43-character lookalike, and (iii) the rule id is what the workflow and the tree-scan test expect. Do **not** add the workflow in this step. Commit subject: "auth: teach gitleaks the key secret format." |
-| 7e | high | opus | worktree | Baseline and land the scanner job. **Baseline first, and do not skip this**: install gitleaks (`sudo apt-get install -y gitleaks`, Debian 13 only) and run `gitleaks detect --source . --redact --verbose --no-banner` over the full history of `develop` with the `.gitleaks.toml` from step 7d. Triage every finding by hand. Known likely hits are the PEM placeholder blocks at `shakenfist/tests/test_vdi_tokens.py:152` and `shakenfist/tests/external_api/test_admin.py:63`, which are literally `-----BEGIN PRIVATE KEY-----\nfoo\n-----END PRIVATE KEY-----` and are false positives — allowlist those by path with a comment saying why. **If any finding is a real credential, stop and report it rather than allowlisting it**: rotation is an operator action and is not this step's to take. Then add `.github/workflows/supply-chain.yml`, modelled closely on `ryll/.github/workflows/supply-chain.yml` — same structure, same concurrency groups, the same two comments explaining why the action is not used and why the job runs on `debian-13`. Triggers: `pull_request` and `push` on `develop`, a weekly cron, and `workflow_dispatch`. One job for now (`gitleaks`), `runs-on: [self-hosted, vm, debian-13, s]`, `actions/checkout@v7` with `fetch-depth: 0`. Do not add it to any `needs:` list in `functional-tests.yml` (Decision 6). Verify with `actionlint`, which is already a pre-commit hook. Record the baseline result — findings triaged, allowlist entries added — in the PR description so the reviewer sees what was excepted and why. Commit subject: "ci: scan the repository for committed secrets." |
+| 7e | high | opus | worktree | Baseline and land the scanner job. **Baseline first, and do not skip this**: install gitleaks (`sudo apt-get install -y gitleaks`, Debian 13 only) and run `gitleaks detect --source . --redact --verbose --no-banner` over the full history of `develop` with the `.gitleaks.toml` from step 7d. Triage every finding by hand. Known likely hits are the PEM placeholder blocks at `shakenfist/tests/test_vdi_tokens.py:152` and `shakenfist/tests/external_api/test_admin.py:63`, which are literally `-----BEGIN PRIVATE KEY-----\nfoo\n-----END PRIVATE KEY-----` and are false positives — allowlist those by path with a comment saying why. **If any finding is a real credential, stop and report it rather than allowlisting it**: rotation is an operator action and is not this step's to take. Then add `.github/workflows/supply-chain.yml`, modelled closely on `ryll/.github/workflows/supply-chain.yml` — same structure, same concurrency groups, the same two comments explaining why the action is not used and why the job runs on `debian-13`. Triggers: `pull_request` and `push` on `develop`, a weekly cron, and `workflow_dispatch`. One job for now (`gitleaks`), `runs-on: [self-hosted, vm, debian-13, s]`, `actions/checkout@v7` with `fetch-depth: 0`. Do not add it to any `needs:` list in `functional-tests.yml` (Decision 6). Verify with `actionlint`, which is already a pre-commit hook. Record the baseline result — findings triaged, allowlist entries added — in the PR description so the reviewer sees what was excepted and why. Commit subject: "ci: scan the repository for committed secrets." **This brief was substantially overtaken by what the baseline found; read "Baseline results" below for what was actually built and why. In particular the standalone workflow, the `debian-13` runner, the apt install and the path-based allowlists were all replaced.** |
 
 ## Risks and mitigations
 
@@ -402,12 +402,16 @@ Each item is a statement someone can check and find false.
       does not arrive, and fails if a real `sfk_` credential is
       present — demonstrated by the reviewer experiment described in
       Risks, with the result recorded in the PR.
-- [ ] `gitleaks detect --source . --redact --no-banner` exits 0 on
-      the branch tip, using the committed config, with the version
-      that Debian trixie packages. The command and its version are
-      quoted in the PR.
+- [ ] `tools/gitleaks-scan.sh` exits 0 on the branch tip, using the
+      committed config and the pinned gitleaks version, having scanned
+      every commit reachable from HEAD. Its positive control passes, so
+      the exit code means "scanned and found nothing".
 - [ ] Every entry in the gitleaks allowlist carries a comment saying
-      what it excepts and why it is not a credential.
+      what it excepts and why it is not a credential, and every
+      `.gitleaksignore` entry carries a comment saying what was done
+      about the credential — the latter enforced by a unit test.
+- [ ] Re-adding an accepted finding in a new commit still fails the
+      scan, demonstrated rather than asserted.
 - [ ] `examples/loki-secret-alert.yaml` exists and uses the same
       LogQL expression as the CI detector — a grep for the expression
       finds it in both places and nowhere else.
@@ -439,27 +443,61 @@ Two gates need agreement before the work they belong to starts:
 
 Step 7e's brief said to baseline before landing the workflow, and to
 stop and report rather than allowlist if any finding turned out to be
-a real credential. One did, so the workflow has not landed and this
-section is the report.
+a real credential. One did, so this step stopped and reported. Michael's
+answer was that the key was revoked long ago, and to ignore that finding
+specifically while going red on anything else — which is what landed.
 
-The scan was `gitleaks detect --source . --config .gitleaks.toml
---redact` with gitleaks 8.16.0 — the Debian trixie package, obtained
-with `apt-get download` and unpacked with `dpkg-deb -x`, so no
-installation was needed and the version is exactly what a `debian-13`
-runner will execute. 6620 commits, 4m57s, **163 findings**.
+The scan is `tools/gitleaks-scan.sh`, which runs gitleaks 8.16.0 with
+`.gitleaks.toml`. The first baseline used the Debian trixie package,
+obtained with `apt-get download` and unpacked with `dpkg-deb -x`; the
+job now downloads the upstream release for that same version with a
+pinned sha256, because the static runner pool grants no passwordless
+sudo. Both binaries report 8.16.0 and produce identical findings.
 
-Of those, 104 are duplicates of the same content on refs which are not
-ancestors of `develop`. The 59 reachable from `develop` are:
+### Scope: reachable from HEAD, not every ref
+
+The first baseline scanned the default of every ref: 6620 commits,
+4m57s, **163 findings**. That number was almost entirely `gh-pages`,
+which carries the built documentation site. Its `search/search_index.json`
+is one enormous JSON blob quoting every code sample in the docs, so
+every finding in a documented example appears there a second time, once
+per deploy commit.
+
+Worse, and this invalidated the first triage: **gitleaks 8.16
+misattributes those findings**. It reported `search/search_index.json`
+hits against `develop` merge commits which do not contain the file at
+all — `0c7eacf48` and `0144e36ed`, for instance, whose diffs are three
+plan documents and a phase-3 scheduler change respectively. The earlier
+draft of this section reported "59 findings reachable from `develop`,
+46 of them the built site". That was wrong, and wrong in the direction
+that matters: it inflated the backlog with findings which are not in
+`develop`'s history, and it did so because the reachability test was
+run against commit hashes gitleaks had attributed incorrectly.
+
+Scoping the scan to `--log-opts="HEAD"` removes the misattribution, the
+duplication and most of the runtime at once: **5545 commits, 3 seconds,
+13 findings**, all genuinely in `develop`'s history. On a pull request
+`HEAD` reaches the branch under test *and* all of `develop`, so this is
+not a narrowing of the historical claim — it is the same claim, made
+correctly.
+
+### The 13 findings
 
 | Rule | Where | Count | Verdict |
 |------|-------|-------|---------|
-| `private-key` | `ansible/files/id_rsa`, `deploy/ansible-ci/tests/files/id_rsa` | 2 | **Real.** See below. |
-| `private-key` | `search/search_index.json`, `plans/.../index.html` | 31 | Built documentation site, committed to history. Mirrors of the two entries below. |
-| `private-key` | `shakenfist/util/vdi_tokens.py`, `docs/plans/PLAN-kerbside-vdi-tokens-phase-01-signing-key.md` | 2 | False positive. Both show the PEM delimiters in a docstring or a schema example with no key material between them. |
-| `shakenfist-key-secret` | `search/search_index.json`, `user_guide/authentication/index.html` | 15 | Built documentation site again, indexing the example key step 7c replaced. |
-| `shakenfist-key-secret` | `docs/user_guide/authentication.md` | 1 | The example key step 7c replaced. Fixed going forward; still in history. |
-| `generic-api-key` | `ansible/files/grafana/grafana.ini` (×2 paths) | 2 | False positive. `;secret_key = ...` is a *commented-out* line in Grafana's own shipped sample configuration. |
-| `generic-api-key` | `shakenfist/external_api/auth.py`, `shakenfist/tests/test_mariadb_namespace_keys.py`, three authentication documents | 6 | False positive. `key_name": "..."` in a response example, and a test fixture. |
+| `private-key` | `ansible/files/id_rsa`, `deploy/ansible-ci/tests/files/id_rsa` | 2 | **Real, and revoked.** See below. |
+| `shakenfist-key-secret` | `docs/user_guide/authentication.md` | 1 | The example key step 7c replaced. Checksum-valid. See below. |
+| `private-key` | `shakenfist/util/vdi_tokens.py`, `docs/plans/PLAN-kerbside-vdi-tokens-phase-01-signing-key.md` | 2 | False positive. PEM delimiters in a docstring and a schema example, with `...` where key material would be. |
+| `generic-api-key` | `ansible/files/grafana/grafana.ini` (×2 paths) | 2 | False positive. `;secret_key = SW2Ycw...` is a *commented-out* line of Grafana's own shipped sample configuration. |
+| `generic-api-key` | `shakenfist/external_api/auth.py`, `docs/developer_guide/api_reference/authentication.md` | 2 | False positive. The key *name* `ryll-ci-8fJ2mQ` beside a key elided to `sfk_...`. Key names are not secret. |
+| `generic-api-key` | three authentication documents | 3 | False positive. An elided JWT, `eyJhbG...IkpXVCJ9.eyJmc...wwQ`. |
+| `generic-api-key` | `shakenfist/tests/test_mariadb_namespace_keys.py` | 1 | False positive. base64 of `$2b$12$fakehash`. |
+
+The ten false positives are allowlisted by content in `.gitleaks.toml`,
+not by path and not by fingerprint. Path entries blind a whole file
+including a real credential added to it later; fingerprint entries name
+a commit, so they would need replacing every time the paragraph around
+a placeholder is edited. Content entries survive both.
 
 ### The real one
 
@@ -476,37 +514,58 @@ fork and every mirror. Deleting a file does not unpublish it, and
 rewriting the history of a public repository does not either — the
 old objects survive in forks and in GitHub's own reflog.
 
-**The only remediation which works is to ensure the key authorises
-nothing.** That is an operator action on whatever still trusts it, not
-a change to this repository, and it is why this step stopped rather
-than adding an allowlist entry. Suppressing the finding without
-retiring the key would leave the scanner asserting a clean history
-while a published private key stayed live — precisely the vacuous
-detector this phase exists to avoid.
+The only remediation which works is to ensure the key authorises
+nothing, and Michael confirms it was revoked long ago. The two findings
+are therefore accepted in `.gitleaksignore` as fingerprints, which is
+the narrowest mechanism available: each covers one occurrence in one
+commit, so the same key re-added tomorrow fails the scan again. That
+property is verified, not assumed — see below.
 
-### What this means for the workflow
+### The second one, which is still open
 
-`gitleaks detect` with no `--log-opts` scans history, so on this
-repository it exits non-zero regardless of what the current tree
-contains. A job that cannot go green is a job whose failure carries no
-information, so the workflow needs a scope decision which the master
-plan's section did not anticipate:
+`docs/user_guide/authentication.md` published a **checksum-valid** key
+secret from 2026-08-08 until step 7c replaced it. Checksum-valid means
+it came from something implementing our format: either
+`credentials.generate()` at a shell, in which case it never authorised
+anything, or a real cluster, in which case its hash is in that
+cluster's `namespace_keys` table and the plaintext has been published on
+the website for eight days.
 
-* **Scan the commits the pull request adds** (`--log-opts
-  "origin/develop..HEAD"`). Lands green, blocks every *new* leak,
-  which is the accident this phase is trying to prevent. Says nothing
-  about 2020. Verified working: the range scan of this branch
-  completes in 65ms against ~5 minutes for full history.
-* **Scan everything and allowlist the backlog** by commit SHA. Keeps
-  the historical claim honest, at the cost of an allowlist which grows
-  a permanent entry for the SSH key — the thing that should not be
-  suppressed.
-* **Scan everything and accept a red job** until the history is dealt
-  with. Not viable: nothing forces the backlog to shrink, and people
-  learn to ignore it.
+There is no way to tell which from here, and no way to remove it from
+history. It is accepted in `.gitleaksignore` with a comment saying to
+treat it as disclosed. If any namespace anywhere still holds a key with
+this value, delete it — `docs/operator_guide/credential_rotation.md`
+covers the mechanics.
 
-The first is recommended and is what the workflow should implement,
-with this section as the record of what it deliberately does not
-cover. That is a real narrowing of the phase's "repository detector"
-deliverable and should be agreed rather than assumed — hence the back
-brief gate.
+### Verification
+
+The scan is green, which is worth nothing on its own — so each
+behaviour is checked directly, in a throwaway clone, with a real commit
+for each case:
+
+| Case | Expected | Result |
+|------|----------|--------|
+| The tree and history as they stand | green | green, 5545 commits, 3s |
+| Positive control: a planted key secret and a planted SSH key | both reported | both reported, and `tools/gitleaks-scan.sh` fails the build if either is not |
+| A freshly minted credential committed to `docs/` | red | red |
+| The *ignored* RSA key re-added under a new path in a new commit | red | red |
+| A new `zzzzzz` documentation example | green | green |
+| A new PEM placeholder in a new document | green | green |
+
+The fourth case is the one that matters for the shape of this
+solution: the accepted findings are accepted as *events*, not as
+*secrets*, so ignoring them does not create a hole.
+
+### Where the job runs
+
+Decision 6 said the scanner would land as a standalone
+`supply-chain.yml`, deliberately outside `Can enqueue`, because a
+five-minute full-history scan was too expensive to gate on and would
+have been red anyway. Scoping to `HEAD` makes it a three-second job, so
+that reasoning no longer holds: it landed as a `credential_scan` job in
+`functional-tests.yml`, in both `Can enqueue`'s and `Can merge`'s
+`needs` lists, so a credential cannot be merged.
+
+It deliberately does *not* depend on `check_paths`. Every other job
+skips for documentation-only changes; this one must not, because the
+only real key secret in our history was published in the user guide.

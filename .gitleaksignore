@@ -1,0 +1,41 @@
+# Findings in git history which gitleaks is right to report and which we
+# have accepted. Each line is a fingerprint of the form
+#
+#     commit:path:rule-id:line
+#
+# and covers exactly one occurrence in exactly one commit. That
+# narrowness is the point: an entry here cannot forgive the same secret
+# appearing in a new commit, so re-adding one of these files fails the
+# scan again.
+#
+# Every entry is a claim that something is safe, and history cannot be
+# rewritten to make the claim unnecessary -- this repository is public,
+# so a secret committed here has been world-readable since the day it
+# landed. Adding an entry therefore means the credential has been dealt
+# with where it was trusted, not that it has been tidied away. Write
+# down which, and how it was dealt with.
+#
+# Placeholders and documentation examples do not belong here. They recur
+# every time the file around them is edited, which would mean a new
+# fingerprint each time; they are allowlisted by content in
+# .gitleaks.toml instead. See docs/developer_guide/ci.md.
+
+# One 3072-bit RSA private key, committed 2020-04-14 as an Ansible
+# fixture and again 2020-10-04 when the tree was reorganised (the same
+# key: both copies have SHA256 fingerprint
+# mz2lj7UcnApwOkzsnaEhMb+l4gbQQWTah06Vvmi9QCs). Removed from the tree in
+# 2021 by 09ada8e7f and 058cd2cea, which removed it from the tree and
+# from nothing else. The key was revoked long ago and authorises
+# nothing; it is left in history because deleting it from a public
+# repository's history would not unpublish it.
+0734e80ec0eec70032f1b0591e9a424fcb8ef0c6:ansible/files/id_rsa:private-key:1
+2b7666fa06584ee119ff889605e89b42c30e35df:deploy/ansible-ci/tests/files/id_rsa:private-key:1
+
+# A cluster-minted namespace key secret published as the example key in
+# the user guide on 2026-08-08, and replaced on 2026-08-16 by a
+# deliberately checksum-invalid example. It is checksum-valid, so it was
+# produced by something implementing our format -- either
+# credentials.generate() at a shell or a real cluster. Treat it as
+# disclosed: if any namespace anywhere still holds this key, delete it.
+# See docs/operator_guide/credential_rotation.md.
+0f2593b3388d04cc3b555510376b336db8d45205:docs/user_guide/authentication.md:shakenfist-key-secret:43

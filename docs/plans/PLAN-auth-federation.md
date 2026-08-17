@@ -620,7 +620,7 @@ groundwork exists, and lives mostly outside this repository.
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Complete |
 | 6. Secrets that cannot be logged by accident | [PLAN-auth-federation-phase-06-secret-types.md](PLAN-auth-federation-phase-06-secret-types.md) | Complete |
-| 7. Leak detection | [PLAN-auth-federation-phase-07-leak-detection.md](PLAN-auth-federation-phase-07-leak-detection.md) | Planned |
+| 7. Leak detection | [PLAN-auth-federation-phase-07-leak-detection.md](PLAN-auth-federation-phase-07-leak-detection.md) | In Progress |
 
 Every open question above was resolved by phases 2 and 3, so
 none needed carrying into phase 7.

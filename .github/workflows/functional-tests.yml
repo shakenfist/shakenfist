@@ -86,6 +86,43 @@ jobs:
               - '!mkdocs.yml'
               - '!mkdocs.yml.tmpl'
 
+  # Scan git history for leaked credentials. Deliberately not gated on
+  # check_paths: a credential pasted into documentation is still a
+  # credential, and the one real key secret this scan found in our own
+  # history was published in the user guide.
+  #
+  # gitleaks is downloaded rather than apt-installed because the shared
+  # static pool does not grant passwordless sudo. Version and checksum
+  # are both pinned: .gitleaks.toml is written against 8.16's schema
+  # (per-rule allowlists changed shape in a later release), and a
+  # detector which silently changes behaviour under us is worse than no
+  # detector. To move the pin, run tools/gitleaks-scan.sh against the new
+  # version locally first and check the positive control still passes.
+  credential_scan:
+    name: "Credential scan"
+    runs-on: [self-hosted, static]
+    # The scan itself is about three seconds over five and a half
+    # thousand commits. This is the backstop for the checkout.
+    timeout-minutes: 10
+    steps:
+      # fetch-depth: 0 is load bearing. The scan covers every commit
+      # reachable from HEAD, and tools/gitleaks-scan.sh refuses to run
+      # against a shallow clone rather than reporting a clean history it
+      # never looked at.
+      - name: Checkout code with full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSLo /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.16.0/gitleaks_8.16.0_linux_x64.tar.gz
+          echo "f8d4fabedaeaabd2a3e7e7b96394b8ddeff0be32941a1719aedee08fc8678601  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+
+      - name: Scan history for credentials
+        run: tools/gitleaks-scan.sh --gitleaks /tmp/gitleaks
+
   # These sanity checks used to be three separate jobs, but are now combined
   # to save a little time and reduce CI runner churn.
   #
@@ -664,6 +701,7 @@ jobs:
       - smoke_collection
       - sanity_checks
       - check_paths
+      - credential_scan
     if: always() && github.event_name != 'merge_group'
     permissions:
       actions: read
@@ -687,6 +725,7 @@ jobs:
       - node_lifecycle_collection
       - schema_enum_widening
       - check_paths
+      - credential_scan
     if: always() && github.event_name == 'merge_group'
     permissions:
       actions: read

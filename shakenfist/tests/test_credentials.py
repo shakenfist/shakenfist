@@ -127,6 +127,61 @@ class ScannerAgreementTestCase(base.ShakenFistTestCase):
             'our documentation would be looking for something other '
             'than what we mint.')
 
+    def test_accepted_findings_are_documented_and_well_formed(self):
+        """Every .gitleaksignore entry is a claim, and claims need reasons.
+
+        An entry silences a finding gitleaks was right to report, in a
+        commit nobody can now change. A malformed one silences nothing
+        and gitleaks says so only at trace level, so a typo would leave
+        the job red with no explanation; an undocumented one leaves the
+        next reader unable to tell an accepted risk from a mistake.
+        """
+        path = os.path.join(self._repository_root(), '.gitleaksignore')
+        with open(path) as f:
+            lines = f.read().splitlines()
+
+        entries = 0
+        commented = False
+        for number, line in enumerate(lines, start=1):
+            stripped = line.strip()
+            if not stripped:
+                # A blank line ends a block, so the next entry needs its
+                # own explanation rather than inheriting the last one.
+                commented = False
+                continue
+            if stripped.startswith('#'):
+                commented = True
+                continue
+
+            entries += 1
+            fields = stripped.split(':')
+            self.assertEqual(
+                4, len(fields),
+                f'.gitleaksignore line {number} is not a fingerprint of '
+                'the form commit:path:rule-id:line. gitleaks silently '
+                'ignores an entry which matches nothing, so this would '
+                'leave the scan failing with no indication why.')
+            self.assertRegex(
+                fields[0], r'^[0-9a-f]{40}$',
+                f'.gitleaksignore line {number} does not begin with a '
+                'full commit hash.')
+            self.assertTrue(
+                fields[3].isdigit(),
+                f'.gitleaksignore line {number} does not end with a line '
+                'number.')
+            self.assertTrue(
+                commented,
+                f'.gitleaksignore line {number} accepts a finding with no '
+                'comment above it explaining why it is safe and what was '
+                'done about the credential. Adding an entry is a claim; '
+                'record the basis for it.')
+
+        self.assertTrue(
+            entries,
+            '.gitleaksignore has no entries at all. If the accepted '
+            'findings have genuinely been dealt with, delete the file '
+            'rather than leaving an empty one behind.')
+
     def test_the_documented_example_is_not_a_credential(self):
         # The tail used by the documentation and by the CI detector's
         # control tokens. 'zzzzzz' in base62 is 56800235583, larger
