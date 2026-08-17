@@ -11635,6 +11635,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Scheduler and node capacity metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-claim-admission-transaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The claim admission transaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11747,9 +11764,10 @@ the operator-facing pages they link to.</p>
 <h2 id="scheduler-and-node-capacity-metrics">Scheduler and node capacity metrics<a class="headerlink" href="#scheduler-and-node-capacity-metrics" title="Permanent link">&para;</a></h2>
 <p>Atomic reservation-table scheduling is being built per
 <a href="../../plans/PLAN-scheduler-reservations/">PLAN-scheduler-reservations</a>.
-The capacity tables, their reconciler and the guarded-UPDATE admission
-path that draws them down have all landed; a namespace claims API and
-further SQL pushdown are still to come.</p>
+The capacity tables, their reconciler, the guarded-UPDATE admission
+path that draws them down and the namespace claims API have all landed;
+hard claim ceilings, caller migration and further SQL pushdown are still
+to come.</p>
 <p>The scheduler ranks hypervisors by load per schedulable thread and
 admits against reservation-adjusted capacity. The reservation
 arithmetic lives in <code>shakenfist/daemons/resources/main.py</code>
@@ -11854,9 +11872,9 @@ wherever they are stranded). If you add a capacity consumer, it
 inherits these filters by reading the tables — do not re-derive
 capacity from <code>node_metrics</code> directly. The tables are consumed for
 admission as of phase 3
-(<code>docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md</code>);
-<code>namespace_claims</code> stays empty until the claims API lands in phase 4,
-so the transaction's claim branch is exercised only by unit tests.
+(<code>docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md</code>), and
+<code>namespace_claims</code> became writable in phase 4 — see <a href="#the-claim-admission-transaction">The claim admission
+transaction</a> below.
 The SQL itself is covered by
 <code>shakenfist/tests/test_mariadb_capacity_reconcile_live.py</code>, which runs
 against a real MariaDB in the "Schema ENUM widening" CI job (whose
@@ -11871,6 +11889,99 @@ columns store member <em>values</em> (written as <code>str(member)</code>), and 
 case-sensitive collation makes a binding that confuses the two fail.
 Operator-facing documentation is
 <a href="../../operator_guide/scheduler/"><code>scheduler.md</code></a>.</p>
+<h3 id="the-claim-admission-transaction">The claim admission transaction<a class="headerlink" href="#the-claim-admission-transaction" title="Permanent link">&para;</a></h3>
+<p>Phase 4 made <code>namespace_claims</code> writable. A claim is a namespace's
+promise of aggregate cluster capacity, so creating, growing or shrinking
+one is an admission decision in its own right — against the
+<code>cluster_capacity</code> singleton rather than against a node — and the five
+CRUD RPCs (<code>CreateNamespaceClaim</code>, <code>GetNamespaceClaim</code>,
+<code>GetNamespaceClaims</code>, <code>UpdateNamespaceClaim</code>, <code>DeleteNamespaceClaim</code>)
+are built like <code>AdmitInstancePlacement</code> rather than like ordinary object
+persistence. Everything the placement transaction has to obey applies
+unchanged: probes on their own connection <em>outside</em> the transaction, a
+guarded <code>UPDATE</code> as the transaction's first statement (the ER_CHECKREAD
+invariant, <a href="../standards/#a-guarded-update-must-be-the-transactions-first-statement">standards.md</a>),
+the canonical write order <code>cluster_capacity</code> then <code>namespace_claims</code>
+then <code>scheduler_node_capacity</code>, floored decrements, and a retry on
+1213/1205/1020. A claim mutation touches the first two of those tables,
+in that order, so it composes with instance admission without a new
+deadlock class.</p>
+<p>Creation and growth are guarded per dimension by</p>
+<div class="highlight"><pre><span></span><code>claimed + limit + GREATEST(0, unclaimed_used - migrated) &lt;= total
+</code></pre></div>
+<p>where <code>migrated</code> is the namespace's existing drawdown being moved onto
+the claim, and rowcount zero is the refusal. The migration is the point
+of the third term: a namespace's instances are counted in
+<code>cluster_capacity.unclaimed_used_*</code> until it holds a claim, so
+<code>_direct_create_namespace_claim()</code> seeds the new row's <code>used_*</code> with
+that drawdown and takes the same amounts off <code>unclaimed_used_*</code> in the
+statement the guard guards. Testing the state the statement <em>started</em>
+from would count a namespace's usage against it on the unclaimed side
+while the same statement is taking it off, and would refuse an operator
+claiming capacity their namespace already holds — which is the primary
+use case. A grow passes zero for <code>migrated</code> and must keep passing zero:
+its usage is already on the claim's side of the ledger. <code>GREATEST(0,
+...)</code> mirrors the flooring in the <code>SET</code>, because a guard that floored
+differently from the write it guards would test a state that write
+cannot reach.</p>
+<p>The drawdown probe shares one SQL fragment with the reconciler's
+per-claim usage recompute rather than being written twice. Two queries
+that can disagree would make a new claim's counters flap on every
+reconcile pass, forever; a create-then-reconcile test pins that they
+cannot. The probe is time-of-check-to-time-of-use racy against a
+concurrent create in the same namespace, by at most one instance's
+allocation, in one direction, corrected by the next pass — the same
+bargain the branch probe strikes.</p>
+<p>Two decisions deliberately diverge from placement admission:</p>
+<ul>
+<li><strong>A missing <code>cluster_capacity</code> singleton refuses</strong>, where placement
+  fails open. Admitting an instance unguarded records where a machine
+  already is and the reconciler agrees within a pass; creating a claim
+  unguarded writes a promise against totals nothing has computed, which
+  the next pass folds into <code>claimed_*</code> whether it fits or not.</li>
+<li><strong>Claim ceilings are advisory</strong> for one release.
+  <code>_direct_admit_instance_placement()</code> splits phase 3's single
+  <code>guarded = enforce and node_present</code> into <code>node_guarded</code>,
+  <code>cluster_guarded</code> (both unchanged) and <code>claim_guarded = enforce and
+  CLAIM_ENFORCEMENT_HARD</code>, a module constant set <code>False</code>. The node and
+  cluster fail-open is a statement about <em>this node's</em> limits being
+  absent from the totals those guards test; a claim's limits are
+  namespace-denominated and node-independent, so a missing node capacity
+  row says nothing about whether a namespace has exceeded what it
+  claimed. Over-limit is detected by re-reading the claim row inside the
+  transaction that just wrote it — a read after our own write, on a row
+  we hold the lock on, which the invariant permits — and returned in
+  <code>claim_over_limit</code> / <code>claim_dimensions</code>, deliberately separate from
+  <code>failing_stage</code> and <code>dimensions</code>, which both mean "this was refused".
+  <code>Instance._event_claim_over_limit()</code> turns them into the audit event.
+  Read-back rather than the probe-then-force idiom beside it because
+  probe-then-force would make every create in a claimed namespace pay a
+  probe round trip, and the namespaces that want claims are the ones
+  creating instances hardest; it also leaves phase 5's flip as moving an
+  existing predicate into a <code>WHERE</code> clause.</li>
+</ul>
+<p><code>NamespaceClaim</code> (<code>shakenfist/namespace_claim.py</code>) is an ordinary
+<code>DatabaseBackedObject</code> over these rows, with two states that are two
+different facts: <code>state</code> is existence in <code>object_states</code>, like every
+other object, and <code>coverage_state</code> (<code>active</code> or <code>expired</code>) lives in the
+<code>namespace_claims</code> row and is owned by the reconciler's expiry sweep.
+Coverage is not routed through <code>object_states</code> because
+<code>_active_claim_for_namespace()</code> runs on every instance admission and
+filters <code>state = 'active' AND expires_at &gt; NOW()</code> against the claims
+table's own index; moving that predicate would make the hot probe join
+across the two uuid storage conventions (dashed <code>String(36)</code> in
+<code>object_states</code>, undashed <code>sa.Uuid</code> here). There is no soft delete: the
+transaction that removes the row is the one that returns its capacity,
+so <code>Namespace.hard_delete()</code> cascades to claims for the same reason it
+cascades to keys and rules — a claim outliving its namespace holds
+cluster capacity nothing can release.</p>
+<p>A new object type has to join more registries than is obvious. Both
+<code>mariadb._STATIC_TABLE_GETTERS</code> and <code>constants.OBJECT_NAMES_TO_CLASSES</code>
+are load bearing for the orphan reconciler: zombie repair marks the
+static row deleted and then hydrates it through <code>get_object_class()</code> to
+collect it, so registering only the first trades one leak for another.
+<code>NAMESPACE_KEY</code> missing from the first is issue 3588, and the same
+defect is still live for <code>TRUSTED_ISSUER</code> and <code>MAPPING_RULE</code>.</p>
 <h2 id="node-resource-health">Node resource health<a class="headerlink" href="#node-resource-health" title="Permanent link">&para;</a></h2>
 <p>Node storage health drives <code>node.state</code>, on a different axis from the
 daemon-liveness watchdog below. <code>shakenfist/resource_health.py</code> is the

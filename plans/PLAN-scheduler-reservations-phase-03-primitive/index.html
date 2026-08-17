@@ -12484,7 +12484,7 @@ the instance's <code>INSTANCE_LOCATION</code> rows, no attribute write.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>Not started</td>
+<td>Complete — <code>git grep _dual_write_legacy_instances</code> finds nothing outside this plan</td>
 </tr>
 <tr>
 <td>2</td>
@@ -12492,7 +12492,7 @@ the instance's <code>INSTANCE_LOCATION</code> rows, no attribute write.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>Not started</td>
+<td>Complete — <code>SCHEDULER_DISK_OVERCOMMIT</code> is at <code>config.py:401</code></td>
 </tr>
 <tr>
 <td>3</td>
@@ -12556,7 +12556,7 @@ the instance's <code>INSTANCE_LOCATION</code> rows, no attribute write.</p>
 <td>—</td>
 <td>operator</td>
 <td>—</td>
-<td>Not started</td>
+<td>Partially complete — reviewed and merged as PR #3754 on 2026-08-16; the sfcbr deploy and soak have not been run</td>
 </tr>
 </tbody>
 </table>
@@ -13527,7 +13527,15 @@ was passing for the right reason all along.</p>
   handling to one of the four denial stages. Acceptable while the claim
   branch is dormant; <strong>phase 4 makes it necessary</strong>, since the claims API
   is the first thing that can produce a <code>claim</code>-stage denial in
-  production and its callers will want unit coverage of that path.</li>
+  production and its callers will want unit coverage of that path.
+  <em>Mostly discharged.</em> The demand term landed with the D13 guard later
+  in this phase, and phase 4's step 3 added the claim stage: a
+  <code>set_namespace_claim()</code> helper, the advisory over-limit reply fields,
+  a symmetric release decrement, and a <code>claim</code>-stage denial under
+  <code>mariadb.CLAIM_ENFORCEMENT_HARD</code>. The cluster singleton is still not
+  modelled, deliberately: an unclaimed namespace's charge against it has
+  no caller-observable effect, so there is nothing for a caller-side
+  test to assert about it.</li>
 <li>The pick-then-claim walk (the <code>place_walk</code> closure, the P9
   demand-only re-walk and the exhaustion branch) exists verbatim in
   <code>shakenfist/external_api/instance.py</code> and

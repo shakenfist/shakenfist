@@ -11637,6 +11637,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#namespace-capacity-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace capacity claims
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Namespace capacity claims">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#advisory-this-release-exceedances-are-recorded-not-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advisory this release: exceedances are recorded, not refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-creating-a-claim-does-to-existing-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What creating a claim does to existing usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#growing-shrinking-expiring-and-deleting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Growing, shrinking, expiring and deleting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-states-a-claim-carries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two states a claim carries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-a-claim-cannot-be-made" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a claim cannot be made
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11836,6 +11908,78 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#namespace-capacity-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace capacity claims
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Namespace capacity claims">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#advisory-this-release-exceedances-are-recorded-not-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advisory this release: exceedances are recorded, not refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-creating-a-claim-does-to-existing-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What creating a claim does to existing usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#growing-shrinking-expiring-and-deleting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Growing, shrinking, expiring and deleting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-states-a-claim-carries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two states a claim carries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-a-claim-cannot-be-made" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a claim cannot be made
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -12091,8 +12235,9 @@ a pre-filter cannot.</p>
 snapshot (and, for CPU, the counters below); it is not what admits
 an instance. Once a candidate is
 chosen, <code>Instance.place_instance()</code> makes one atomic claim against the
-allocation-denominated counters in <code>scheduler_node_capacity</code> (and,
-once the claims API exists, <code>namespace_claims</code>) -- the same database
+allocation-denominated counters in <code>scheduler_node_capacity</code> and, if the
+instance's namespace holds a capacity claim, <code>namespace_claims</code> (see
+<a href="#namespace-capacity-claims">Namespace capacity claims</a>) -- the same database
 transaction that writes the <code>placement</code> attribute and the node's
 <code>instance_location</code> reference row. Two concurrent creates racing the
 last slot on a node cannot therefore both be admitted, and RAM and
@@ -12138,6 +12283,160 @@ alongside <code>cpu_committed_row_present</code>: a node the reconciler has not
 yet sized reports <code>cpu_committed</code> as zero <em>and</em>
 <code>cpu_committed_row_present</code> as false, which distinguishes a genuinely
 idle node from one that is admitting unguarded.</p>
+<h2 id="namespace-capacity-claims">Namespace capacity claims<a class="headerlink" href="#namespace-capacity-claims" title="Permanent link">&para;</a></h2>
+<p>A <strong>capacity claim</strong> is a namespace's reservation of aggregate cluster
+capacity: so many vCPUs, so much instance memory and so much instance
+disk, held for the namespace against the rest of the cluster for as long
+as the claim is active. It is a cluster-wide quantity, not a per-node
+one -- a claim says nothing about <em>where</em> the namespace's instances land,
+only how much of the cluster is set aside for them in total.</p>
+<p>Claims are administered through the REST API at
+<code>/auth/namespaces/&lt;namespace&gt;/claims</code>, admin-only, alongside the
+namespace's keys and mapping rules. The request and response bodies are
+published in the <a href="https://openapi.shakenfist.com">OpenAPI specification</a>;
+<code>sf-client</code> has no claim verbs yet, so for now a claim is created with an
+HTTP request rather than a command. A namespace holds at most one active
+claim.</p>
+<h3 id="advisory-this-release-exceedances-are-recorded-not-refused">Advisory this release: exceedances are recorded, not refused<a class="headerlink" href="#advisory-this-release-exceedances-are-recorded-not-refused" title="Permanent link">&para;</a></h3>
+<p><strong>Creating a claim does not stop anybody -- including the claiming
+namespace -- from exceeding it.</strong> In this release claim ceilings are
+<em>advisory</em>: a placement that would push a namespace past the limits it
+claimed is <strong>admitted</strong>, and the fact that it went over is recorded. The
+refusal arrives in a later release, once operators have had a release in
+which to see real exceedances and calibrate their claims against them.</p>
+<p>Two consequences worth being explicit about, because both surprise
+people:</p>
+<ul>
+<li>A claim does <strong>not</strong> cap the claiming namespace. <code>used_*</code> on a claim
+  can and will exceed <code>limit_*</code>.</li>
+<li>What a claim <em>does</em> do immediately is reserve capacity <strong>from everybody
+  else</strong>. The claim's limits are added to
+  <code>cluster_capacity.claimed_*</code>, and the guard that admits instances in
+  namespaces <em>without</em> a claim only lets them use what active claims have
+  not spoken for. So an oversized claim starves unclaimed namespaces
+  today, even though it does not bind its own.</li>
+</ul>
+<p>The record of an exceedance is an audit event on the <em>instance</em> whose
+placement crossed the line:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>placement admitted over namespace capacity claim
+</code></pre></div>
+<p>It is emitted at warning level and carries <code>node</code>, <code>namespace</code> and
+<code>claim_dimensions</code> -- one entry per dimension that is over, giving the
+claim's limit, what the claim held before this placement, and this
+placement's own allocation. <code>sf-client instance events &lt;instance&gt;</code> is
+where to find it, and a search of the cluster's logs for that message is
+how to answer "is anything over its claim". It is deliberately distinct
+from <code>placement recorded despite exceeding capacity guard</code>, which is a
+different event about a different thing: that one says a ground-truth
+writer was forced past a <em>node's</em> guard, this one says a placement was
+charged to its <em>namespace's</em> claim and the claim is now over.</p>
+<p>Because a create that exceeds a claim looks exactly like a create in a
+namespace with no claim at all, the event is the only observable
+difference between advisory mode working and advisory mode being absent.
+If you are testing a claim, assert the event.</p>
+<h3 id="what-creating-a-claim-does-to-existing-usage">What creating a claim does to existing usage<a class="headerlink" href="#what-creating-a-claim-does-to-existing-usage" title="Permanent link">&para;</a></h3>
+<p>A namespace usually already has instances when its claim is created, and
+that usage is already counted -- on the cluster's <em>unclaimed</em> side. So
+creation is a migration as well as a reservation: in the same transaction
+that adds the claim's limits to <code>cluster_capacity.claimed_*</code>, the
+namespace's existing drawdown is seeded into the new claim's <code>used_*</code> and
+subtracted from <code>cluster_capacity.unclaimed_used_*</code>. Deleting a claim
+migrates it back, returning whatever the claim still held to the
+unclaimed side.</p>
+<p>Without that migration, a namespace with running instances could place
+its whole claim a second time until the next reconcile pass -- five
+minutes, starting from the moment an operator does the thing claims exist
+for.</p>
+<p>The same migration is why a claim is granted or refused against</p>
+<div class="highlight"><pre><span></span><code>claimed + limit + GREATEST(0, unclaimed_used - migrated) &lt;= total
+</code></pre></div>
+<p>per dimension, where <code>migrated</code> is the drawdown being moved onto the
+claim. Reading it without that term -- "is there <code>total - claimed -
+unclaimed_used</code> left?" -- makes claims look harder to get than they are:
+a namespace is not counted against its own claim on the unclaimed side,
+because the same statement is taking it off there.</p>
+<h3 id="growing-shrinking-expiring-and-deleting">Growing, shrinking, expiring and deleting<a class="headerlink" href="#growing-shrinking-expiring-and-deleting" title="Permanent link">&para;</a></h3>
+<p>Growing any dimension is a fresh admission decision against the same
+guard, with the migration term at zero (a grow moves nothing -- the
+namespace's usage is already on the claim's side of the ledger).
+Shrinking is always allowed down to what the claim is currently using and
+no further. One request may grow one dimension and shrink another.
+Nothing ever grows a claim automatically.</p>
+<p>Expiry is given as a duration in seconds, not as a timestamp, and is
+applied against the cluster's clock. That is the only clock the expiry
+sweep ever compares against, so accepting an absolute time would mean
+evaluating it against a clock the client never saw. The sweep runs as
+part of the capacity reconciler's five-minute pass.</p>
+<p>Expiry is not cleanup. A claim stops covering placements the moment it
+expires -- from then on its namespace's creates are charged to the
+cluster's unclaimed side -- and the next reconcile pass drops its limits
+out of <code>claimed_*</code> and folds its namespace's usage back into
+<code>unclaimed_used_*</code>. But the row stays, holding no capacity and covering
+nothing, until somebody deletes it, and it cannot be grown back to life:
+an expired claim must be deleted and replaced. Expired claims are
+included in the namespace's claim listing precisely because their
+existence is what explains a namespace whose placements stopped being
+charged to its claim.</p>
+<p>Deletion is immediate and has no soft-delete step: the same transaction
+that removes the row returns what it held to the cluster. A claim sitting
+in a <code>deleted</code> state while its row still held capacity would be an
+accounting lie for a whole cleaner delay -- capacity promised to a
+namespace that no longer wanted it and refused to everybody else.
+Deleting a namespace does eventually clean up after itself: the
+namespace's own hard delete, a <code>CLEANER_DELAY</code> after it is deleted,
+cascades to its claims and returns their capacity, because a claim
+outliving its namespace would hold capacity nothing can ever release.
+Deleting a namespace's claim first is the way to get that capacity back
+promptly.</p>
+<h3 id="the-two-states-a-claim-carries">The two states a claim carries<a class="headerlink" href="#the-two-states-a-claim-carries" title="Permanent link">&para;</a></h3>
+<p>A claim publishes two states, and they are two different facts:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Values</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>state</code></td>
+<td><code>created</code>, <code>deleted</code></td>
+<td>Object existence, where every other Shaken Fist object publishes it</td>
+</tr>
+<tr>
+<td><code>coverage_state</code></td>
+<td><code>active</code>, <code>expired</code></td>
+<td>Whether the claim still covers placements</td>
+</tr>
+</tbody>
+</table>
+<p>An expired claim reads as <code>state: created, coverage_state: expired</code>. A
+deleted claim has no row at all.</p>
+<h3 id="when-a-claim-cannot-be-made">When a claim cannot be made<a class="headerlink" href="#when-a-claim-cannot-be-made" title="Permanent link">&para;</a></h3>
+<p>A claim request that the cluster declines is not a failure, and the
+status code says which kind of no it was:</p>
+<ul>
+<li><strong>507</strong> -- the cluster does not have the capacity to promise this
+  claim. The message names each dimension that did not fit, with its
+  limit, its current use and what was asked for. Nothing but releasing
+  capacity will help.</li>
+<li><strong>503</strong> -- retry. Either the reconciler has not built the
+  <code>cluster_capacity</code> singleton yet (which is normal for the first few
+  minutes of a cluster's life), or the claim was being changed
+  concurrently and the optimistic retry gave up.</li>
+<li><strong>409</strong> -- change the request. The namespace already holds an active
+  claim, or the shrink was below what the claim is already using, or the
+  claim has expired and must be replaced rather than updated.</li>
+</ul>
+<p>A <strong>503 from a read</strong>, or from a delete, means the database could not be
+reached, and is worth separating from the retryable 503 above: claim
+reads deliberately fail rather than answering "no such claim", because
+an operator (and the namespace delete cascade) would act on that absence
+as though the capacity had already been returned. A delete which cannot
+be completed answers <strong>500</strong> rather than a 200 saying capacity came
+back, and leaves the claim in place for the next attempt. In both cases
+the capacity is still held and the request can simply be repeated.</p>
 <h2 id="configuration-reference">Configuration reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h2>
 <p>Except for <code>CPU_OVERCOMMIT_RATIO</code>, <code>RAM_OVERCOMMIT_RATIO</code>,
 <code>SCHEDULER_TARGET_LOAD</code>, <code>SCHEDULER_CACHE_TIMEOUT</code> and the two
@@ -12268,6 +12567,11 @@ tells the whole story:</p>
   claim itself -- distinct from, and later than, the pre-filters'
   <code>dropped</code> reasons above. <code>schedule failed, every candidate refused
   by capacity guard</code> follows if every candidate is refused.</li>
+<li><code>placement admitted over namespace capacity claim</code> records that the
+  admission succeeded but drew the namespace past the claim it holds,
+  with the exceeded dimensions in <code>claim_dimensions</code>. See <a href="#namespace-capacity-claims">Namespace
+  capacity claims</a>; in this release that is
+  a warning, not a refusal.</li>
 <li>A schedule with no surviving pre-filter candidates raises an error
   recorded as <code>schedule has no candidates at stage &lt;name&gt;, aborting</code>
   -- the stage name plus the previous event's <code>dropped</code> map identify

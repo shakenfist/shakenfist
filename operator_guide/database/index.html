@@ -13538,7 +13538,7 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 </tr>
 <tr>
 <td><code>namespace_claims</code></td>
-<td>One row per namespace capacity claim: limits, usage counters, state and server-side expiry. Created empty in this release — the claims API arrives later</td>
+<td>One row per namespace capacity claim: limits, usage counters, coverage state and server-side expiry. Also the static-values table for the <code>NamespaceClaim</code> object</td>
 </tr>
 <tr>
 <td><code>cluster_capacity</code></td>
@@ -13694,6 +13694,61 @@ that has ever held and lost the maintenance lock keeps publishing its
 own frozen value. A per-instance staleness alert would fire permanently
 on all of them. Aggregating asks the question you actually want
 answered: has <em>anybody</em> reconciled recently.</p>
+<p>As of scheduler-reservations phase 4 the <code>namespace_claims</code> table has
+writers other than the reconciler. Five <code>sf-database</code> RPCs —
+<code>CreateNamespaceClaim</code>, <code>GetNamespaceClaim</code>, <code>GetNamespaceClaims</code>,
+<code>UpdateNamespaceClaim</code> and <code>DeleteNamespaceClaim</code> — back the admin-only
+REST endpoints at <code>/auth/namespaces/&lt;namespace&gt;/claims</code>, and the
+<code>NamespaceClaim</code> object is persisted in this same table rather than a
+separate static-values one.</p>
+<p>Creating, growing and shrinking a claim are admission decisions in their
+own right: a claim is a promise of capacity the cluster has to be able to
+keep. Each therefore writes <code>cluster_capacity</code> and then
+<code>namespace_claims</code> in one transaction, in the same canonical order and
+with the same guarded-<code>UPDATE</code>-first discipline as instance admission, so
+the new statements compose with placement rather than deadlocking against
+it or dying of ER_CHECKREAD. A create or a grow is guarded, per
+dimension, by</p>
+<div class="highlight"><pre><span></span><code>claimed + limit + GREATEST(0, unclaimed_used - migrated) &lt;= total
+</code></pre></div>
+<p>and a rowcount of zero is the refusal. <code>migrated</code> is the namespace's
+existing drawdown being moved onto the claim; it is zero for a grow,
+which moves nothing because the namespace's usage is already on the
+claim's side of the ledger.</p>
+<p>That migration is the reason for the term. A namespace's instances are
+counted in <code>cluster_capacity.unclaimed_used_*</code> until it has a claim, so
+creating one seeds the new row's <code>used_*</code> with the namespace's current
+drawdown and subtracts the same amounts from <code>unclaimed_used_*</code> in the
+same transaction that increments <code>claimed_*</code>. Deleting a claim migrates
+it back, floored. Seeding zero instead would let a namespace with running
+instances place its whole claim a second time until the next reconcile
+pass. The drawdown is computed by the same aggregation the reconciler
+recomputes with, so a new claim starts at the figure the next pass will
+compute and that pass then moves nothing.</p>
+<p>Two behaviours differ deliberately from instance admission:</p>
+<ul>
+<li><strong>A missing <code>cluster_capacity</code> singleton refuses rather than failing
+  open.</strong> Admitting an instance unguarded records where a machine already
+  is; creating a claim unguarded writes a promise against totals nothing
+  has computed, which the next pass folds into <code>claimed_*</code> whether it
+  fits or not. An instance create cannot wait five minutes; a claim can.
+  The REST layer reports this as a 503, not a 507 — the cluster is not
+  full, the reconciler simply has not built the row yet. Only the
+  statements that need a total are refused this way: a shrink or an
+  expiry change, which claim nothing, go through.</li>
+<li><strong>Claim ceilings are advisory in this release.</strong> The instance admission
+  transaction does not enforce the claim guard: a placement that pushes a
+  namespace past its claim is admitted, and the exceedance is detected by
+  reading the claim row back inside the same transaction and reported in
+  the reply, which <code>Instance</code> turns into a <code>placement admitted over
+  namespace capacity claim</code> audit event. See <a href="../scheduler/#namespace-capacity-claims">the scheduler operator
+  guide</a> for the operator view.
+  Phase 3's single fail-open flag was split into three for this: the node
+  and cluster guards keep failing open on a node with no capacity row,
+  because that reasoning is about <em>this node's</em> limits being absent from
+  the totals, which says nothing about whether a namespace has exceeded
+  what it claimed.</li>
+</ul>
 <p>Cluster operation headers (<code>cluster_operations</code>) and work queue rows
 (<code>work_queue</code>) live in MariaDB so the create-and-enqueue step can run in a
 single transaction (header row + state row + queue row). The <code>work_queue</code>

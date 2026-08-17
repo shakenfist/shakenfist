@@ -12487,10 +12487,20 @@ method and the family from the resource class, so coverage is
 automatic and a newly added endpoint is governed the moment it exists.
 The families in use are:</p>
 <p><code>admin</code>, <code>agentoperation</code>, <code>artifact</code>, <code>auth</code>, <code>blob</code>,
-<code>clusteroperation</code>, <code>instance</code>, <code>interface</code>, <code>label</code>, <code>network</code>,
-<code>node</code>, <code>upload</code></p>
+<code>clusteroperation</code>, <code>instance</code>, <code>interface</code>, <code>issuer</code>, <code>label</code>,
+<code>network</code>, <code>node</code>, <code>rule</code>, <code>upload</code></p>
 <p>So <code>GET /blobs</code> needs <code>blob.read</code>, and <code>DELETE /instances/{ref}</code> needs
-<code>instance.delete</code>.</p>
+<code>instance.delete</code>. The unauthenticated endpoints (<code>/</code>, <code>/livez</code>,
+<code>/readyz</code>) derive families of their own, but <code>@public</code>
+short-circuits before enforcement so theirs are never consulted and
+they are not part of the vocabulary an operator writes.</p>
+<p>Everything under <code>/auth/namespaces/...</code> derives <code>auth</code>, including the
+namespace's keys, mapping rules and capacity claims. That the claims
+are a capacity concept rather than an auth one is a known wart: adding
+a <code>claim</code> family would be a change to the vocabulary operators have
+already written into mapping rules, so it has deliberately not been
+made. <code>cluster-admin</code> is the gate that actually matters for them
+either way.</p>
 <p>Where the derivation would mislead, a resource sets <code>scope_family</code>, or
 a method carries <code>@api_base.scope(...)</code> to override the verb. Both are
 deliberate and greppable; <code>tools/check-endpoint-authentication.sh</code>
