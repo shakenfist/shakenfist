@@ -11841,7 +11841,7 @@ touching the metadata schema mid-flight.</p>
 </ul>
 <h2 id="grounding-whats-there-today">Grounding — what's there today<a class="headerlink" href="#grounding-whats-there-today" title="Permanent link">&para;</a></h2>
 <p><code>ReportMetadata</code> lives at
-<a href="../../ryll/src/bugreport.rs#L674-L688">ryll/src/bugreport.rs:674-688</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L674-L688">ryll/src/bugreport.rs:674-688</a>
 and looks like:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">ReportMetadata</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">ryll_version</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span>
@@ -11858,18 +11858,18 @@ and looks like:</p>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">}</span>
 </code></pre></div>
 <p>It's populated inside
-<a href="../../ryll/src/bugreport.rs#L836-L848"><code>BugReport::assemble</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L836-L848"><code>BugReport::assemble</code></a>
 which is called from two public entry points:</p>
 <ul>
-<li><a href="../../ryll/src/bugreport.rs#L715-L744"><code>BugReport::new</code></a> —
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L715-L744"><code>BugReport::new</code></a> —
   user-triggered path, runs a 2-second metrics sample then
   delegates. Called from
-  <a href="../../ryll/src/app.rs#L940"><code>app.rs::generate_bug_report</code></a>.</li>
-<li><a href="../../ryll/src/bugreport.rs#L913-L940"><code>BugReport::write_pedantic</code></a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L940"><code>app.rs::generate_bug_report</code></a>.</li>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L913-L940"><code>BugReport::write_pedantic</code></a>
   — gap-observer path, takes pre-sampled metrics because it
   runs from the observer closure. Called from the observer
   registered in
-  <a href="../../ryll/src/bugreport.rs#L1035"><code>register_pedantic_observer</code></a>.</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L1035"><code>register_pedantic_observer</code></a>.</li>
 </ul>
 <p>Both call paths terminate in the same <code>assemble()</code>, so this
 phase only has to change one struct, one function signature,

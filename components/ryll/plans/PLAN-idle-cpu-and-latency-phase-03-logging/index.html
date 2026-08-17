@@ -11705,7 +11705,7 @@
 <h1 id="phase-3-demote-protocol-logging">Phase 3: Demote protocol logging<a class="headerlink" href="#phase-3-demote-protocol-logging" title="Permanent link">&para;</a></h1>
 <p>Parent plan: <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency/">PLAN-idle-cpu-and-latency.md</a></p>
 <h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
-<p>Two cleanups in <a href="shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
+<p>Two cleanups in <a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
 and the channel handlers that call into it:</p>
 <ol>
 <li>
@@ -11804,14 +11804,14 @@ imports it.</p>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>: change <code>log_message</code> from <code>info!</code> to <code>debug!</code>; drop the leading <code>[{}]</code> and the corresponding <code>format_timestamp()</code> argument from the format string (in <code>log_message</code>, <code>log_unknown</code>, and <code>log_incomplete</code>).  Result format: <code>"playback received 12 byte opcode 4 ping"</code> instead of <code>"[1776630223.870958] playback received 12 byte opcode 4 ping"</code>.  Remove <code>format_timestamp</code> if no other call site uses it (grep first; it's unused outside this file).  Keep <code>timestamp()</code> as a public helper.  Adjust the <code>use tracing::{...}</code> import to <code>{debug, warn}</code> (drop <code>info</code>) and verify clippy doesn't complain about unused imports.</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>: change <code>log_message</code> from <code>info!</code> to <code>debug!</code>; drop the leading <code>[{}]</code> and the corresponding <code>format_timestamp()</code> argument from the format string (in <code>log_message</code>, <code>log_unknown</code>, and <code>log_incomplete</code>).  Result format: <code>"playback received 12 byte opcode 4 ping"</code> instead of <code>"[1776630223.870958] playback received 12 byte opcode 4 ping"</code>.  Remove <code>format_timestamp</code> if no other call site uses it (grep first; it's unused outside this file).  Keep <code>timestamp()</code> as a public helper.  Adjust the <code>use tracing::{...}</code> import to <code>{debug, warn}</code> (drop <code>info</code>) and verify clippy doesn't complain about unused imports.</td>
 </tr>
 <tr>
 <td>3b</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/channels/playback.rs">ryll/src/channels/playback.rs</a>: wrap the two <code>logging::log_message(...)</code> calls at lines 419 and 600 in <code>if settings::is_verbose() { ... }</code> blocks, mirroring the pattern used in every other channel.  Verify by grepping for <code>log_message</code> in <code>ryll/src/channels/</code> and confirming all sites are guarded.</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/playback.rs">ryll/src/channels/playback.rs</a>: wrap the two <code>logging::log_message(...)</code> calls at lines 419 and 600 in <code>if settings::is_verbose() { ... }</code> blocks, mirroring the pattern used in every other channel.  Verify by grepping for <code>log_message</code> in <code>ryll/src/channels/</code> and confirming all sites are guarded.</td>
 </tr>
 <tr>
 <td>3c</td>

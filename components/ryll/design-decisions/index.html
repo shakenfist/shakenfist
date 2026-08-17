@@ -11658,10 +11658,11 @@
 
 
 <h1 id="key-design-decisions">Key design decisions<a class="headerlink" href="#key-design-decisions" title="Permanent link">&para;</a></h1>
-<p>Why ryll is shaped the way it is. Each entry records a decision and the
-reasoning behind it, so a change that contradicts one is a deliberate
-choice rather than an accident. See <a href="/components/ryll/../ARCHITECTURE/">Architecture</a>
-for the structure these decisions produced.</p>
+<p>This page records why ryll is shaped the way it is. Each entry captures a
+decision and the reasoning behind it, so a change that contradicts one is
+a deliberate choice rather than an accident. See
+<a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">Architecture</a> for the structure these decisions
+produced.</p>
 <ol>
 <li>
 <p><strong>Immediate mode rendering</strong> - egui was chosen because SPICE sends bitmap
@@ -11679,8 +11680,8 @@ for the structure these decisions produced.</p>
    stack without GUI overhead. Headless is also the first evidence of the
    project's broader <strong>multi-modal client</strong> stance: the SPICE stack is
    frontend-agnostic, and additional frontends (<code>--web</code> browser mode shipped
-   end-to-end via <code>docs/plans/PLAN-web-frontend.md</code>) are first-class peers of
-   the GUI rather than retrofits. When you add or modify a feature, ask which
+   end-to-end via the <a href="/components/ryll/plans/PLAN-web-frontend/">web frontend plan</a>) are
+   first-class peers of the GUI rather than retrofits. When you add or modify a feature, ask which
    modes it should be reachable from; if a mode physically cannot host the
    feature, say so in the docs rather than leaving the gap unstated.</p>
 </li>
@@ -11882,7 +11883,8 @@ for the structure these decisions produced.</p>
     captured at the moment of failure. A 60 s cooldown is enforced
     via <code>RyllApp::last_disconnect_report_at</code> and is updated even on
     write failure to avoid retry storms. Output directory resolution
-    (shared with the manual F8 button via <code>manual_bug_report_dir</code>):
+    (shared with the manual F12 / Menu → Report path via
+    <code>manual_bug_report_dir</code>):
     <code>--bug-report-dir</code> → <code>&lt;--capture&gt;/bug-reports/</code> → CWD. The
     <code>--pedantic-dir</code> flag falls back through the same chain when
     unspecified: <code>--pedantic-dir</code> → <code>--bug-report-dir</code> →

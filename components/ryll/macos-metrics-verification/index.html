@@ -12035,26 +12035,30 @@
 
 
 <h1 id="macos-runtime-metrics-verification-runbook">macOS runtime-metrics verification runbook<a class="headerlink" href="#macos-runtime-metrics-verification-runbook" title="Permanent link">&para;</a></h1>
-<p>This runbook is the user-side acceptance test for the macOS
-runtime-metrics implementation described by
-<a href="/components/ryll/plans/PLAN-macos-runtime-metrics/"><code>PLAN-macos-runtime-metrics.md</code></a>.
-It is addressed at a maintainer running ryll on a real Mac
-(or at the future macOS CI matrix once
-<a href="/components/ryll/plans/PLAN-ci-platform-matrix/"><code>PLAN-ci-platform-matrix.md</code></a>
-lands).</p>
+<p>This runbook is the manual test suite for ryll's macOS
+runtime-metrics implementation. It is addressed at a
+maintainer running ryll on a real Mac. Re-run it whenever
+<code>shakenfist-spice-renderer/src/metrics.rs</code> changes, and
+before a release where macOS bug reports matter.</p>
 <h2 id="why-this-exists">Why this exists<a class="headerlink" href="#why-this-exists" title="Permanent link">&para;</a></h2>
-<p>The Mach FFI surface in <code>shakenfist-spice-renderer/src/metrics.rs</code>
-cannot be compiled on the Linux devcontainer, so the
-platform-independent unit tests for delta math and JSON shape
-do not catch FFI-level mistakes. The
-<code>#[cfg(target_os = "macos")]</code>-gated tests cover the FFI
-shape end-to-end on a real Mac, but they don't cover the
-"plausibility" of the values (CPU% vs. Activity Monitor,
-RSS vs. real memory usage, port-leak safety over hours).</p>
-<p>The six tests in this runbook plus the soak procedure
-together verify all five acceptance criteria from the master
-plan and the additional port-leak safety property it calls
-out.</p>
+<p>The Mach FFI surface in <code>metrics.rs</code> cannot be compiled on
+the Linux devcontainer, so the platform-independent unit
+tests for delta math and JSON shape do not catch FFI-level
+mistakes. The <code>#[cfg(target_os = "macos")]</code>-gated tests do
+cover the FFI shape end-to-end, and CI does run them: the
+macOS cell of the build matrix in
+<code>.github/workflows/ci.yml</code> runs <code>cargo test --workspace</code>
+with no <code>runner.os</code> guard. That job is in the merge tier,
+though, so its <code>if:</code> restricts it to <code>merge_group</code> and
+<code>workflow_dispatch</code> events — the macOS test signal arrives
+when a change is enqueued to land, not on every push to a
+pull request.</p>
+<p>What no automated test can do is judge whether the values
+are <em>plausible</em>: CPU% against Activity Monitor, RSS
+against real memory usage, port-leak safety over hours.
+That judgement is the whole point of the six tests and the
+soak below, so they stay worth running even though the FFI
+shape itself is covered automatically.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>A Mac with a debug or release ryll build.</li>
@@ -12067,8 +12071,9 @@ out.</p>
 </ul>
 <h2 id="acceptance-tests">Acceptance tests<a class="headerlink" href="#acceptance-tests" title="Permanent link">&para;</a></h2>
 <h3 id="test-1-macos-variant-is-produced">Test 1 — MacOS variant is produced<a class="headerlink" href="#test-1-macos-variant-is-produced" title="Permanent link">&para;</a></h3>
-<p>Start ryll, connect to the SPICE server, trigger an F12 bug
-report, save the zip, and parse:</p>
+<p>Start ryll, connect to the SPICE server, file a bug report
+(F12 or Menu → Report, then submit), save the zip, and
+parse:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.platform&#39;</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.threads | length&#39;</span>
 </code></pre></div>
@@ -12183,8 +12188,8 @@ behaviour over many calls.</p>
    <code>task_threads</code> + <code>MachThreadList::drop</code>. If the cap is
    hit early in the soak, leak detection still works
    (constant port count once sampling stops); for a longer
-   stress, F8-trigger bug reports manually every few
-   minutes to keep <code>sample()</code> firing.</li>
+   stress, file bug reports manually (F12, then submit)
+   every few minutes to keep <code>sample()</code> firing.</li>
 <li>Record the initial Mach port count for the ryll process:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nv">RYLL_PID</span><span class="o">=</span><span class="k">$(</span>pgrep<span class="w"> </span>ryll<span class="k">)</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>vmmap<span class="w"> </span>-summary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RYLL_PID</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s2">&quot;Mach Ports&quot;</span>

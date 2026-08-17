@@ -12180,14 +12180,15 @@ dependency fails the gate.</p>
 and GitHub treats a skipped required check as satisfied. That is
 why <code>Can merge</code> being skipped does not block a pull request, and
 <code>Can enqueue</code> being skipped does not block a merge group.</p>
-<blockquote>
-<p><strong>Adding a job means editing a gate.</strong> A new job is not
-really required until it is in a gate's <code>needs</code> list. Add
-smoke-tier jobs to <code>can_enqueue</code> (and, if the automated
-reviewer should wait for them, to <code>automated_reviewer</code>); add
-merge-tier jobs to <code>can_merge</code>. A job that no gate depends on
-can fail without blocking anything.</p>
-</blockquote>
+<div class="admonition warning">
+<p class="admonition-title">Adding a job means editing a gate</p>
+<p>A new job is not really required until it is in a gate's
+<code>needs</code> list. Add smoke-tier jobs to <code>can_enqueue</code> (and, if
+the automated reviewer should wait for them, to
+<code>automated_reviewer</code>); add merge-tier jobs to <code>can_merge</code>. A
+job that no gate depends on can fail without blocking
+anything.</p>
+</div>
 <h2 id="the-life-of-a-pull-request">The life of a pull request<a class="headerlink" href="#the-life-of-a-pull-request" title="Permanent link">&para;</a></h2>
 <ol>
 <li>You push a branch and open a pull request against <code>develop</code>.</li>

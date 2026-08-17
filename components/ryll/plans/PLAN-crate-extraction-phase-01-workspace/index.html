@@ -11905,16 +11905,16 @@ layout is:</p>
 ~30 dependencies, and the <code>[package.metadata.deb]</code> and
 <code>[package.metadata.generate-rpm]</code> blocks used by the packaging
 workflow.</p>
-<p>CI (<a href="../../.github/workflows/ci.yml">.github/workflows/ci.yml</a>)
+<p>CI (<a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/ci.yml">.github/workflows/ci.yml</a>)
 runs <code>cargo fmt --check</code>, <code>cargo clippy -- -D warnings</code>,
 <code>cargo build --release</code>, <code>cargo test</code>, <code>cargo deb --no-build</code>,
 and <code>cargo generate-rpm</code> from the repo root, with no <code>-p</code> or
 <code>--workspace</code> flags. The release workflow
-(<a href="../../.github/workflows/release.yml">.github/workflows/release.yml</a>)
+(<a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml">.github/workflows/release.yml</a>)
 does the same and additionally <code>grep</code>s <code>^version =</code> from the
 top-level <code>Cargo.toml</code> to verify the git tag matches.</p>
 <p>The pre-commit script
-(<a href="../../scripts/check-rust.sh">scripts/check-rust.sh</a>) runs
+(<a href="https://github.com/shakenfist/ryll/blob/develop/scripts/check-rust.sh">scripts/check-rust.sh</a>) runs
 <code>cargo fmt --check</code> and <code>cargo clippy -- -D warnings</code> inside the
 ryll-dev docker image, with the repo mounted at <code>/workspace</code>.</p>
 <p>The Makefile has <code>build</code>, <code>release</code>, <code>test</code>, <code>lint</code>, <code>lint-fix</code>
@@ -11923,9 +11923,9 @@ at <code>/workspace</code>.</p>
 <p><code>renovate.json</code> has no path-specific configuration; modern
 Renovate auto-discovers Cargo workspace members, so no change
 is needed there.</p>
-<p><a href="/components/ryll/AGENTS/">AGENTS.md</a> and
-<a href="/components/ryll/ARCHITECTURE/">ARCHITECTURE.md</a> have ~16 references to
-<code>src/...</code> paths between them; <a href="/components/ryll/README/">README.md</a> has
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md">AGENTS.md</a> and
+<a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">ARCHITECTURE.md</a> have ~16 references to
+<code>src/...</code> paths between them; <a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README.md</a> has
 one. Historical phase plans in <code>docs/plans/</code> reference <code>src/</code>
 ~84 times across 20 files; those are historical records of
 completed work and should NOT be rewritten.</p>
@@ -12046,7 +12046,7 @@ mechanical commit; the benefit accrues forever.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <p>Each step below is one commit unless explicitly noted.</p>
 <h3 id="step-1-pre-flight-ci-updates">Step 1: Pre-flight CI updates<a class="headerlink" href="#step-1-pre-flight-ci-updates" title="Permanent link">&para;</a></h3>
-<p>Update <a href="../../.github/workflows/ci.yml">.github/workflows/ci.yml</a>
+<p>Update <a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/ci.yml">.github/workflows/ci.yml</a>
 to use workspace-aware cargo flags throughout:</p>
 <ul>
 <li><code>cargo fmt --check</code> → <code>cargo fmt --all --check</code> (the <code>--all</code>
@@ -12067,7 +12067,7 @@ to use workspace-aware cargo flags throughout:</p>
 <li><code>cargo generate-rpm</code> → <code>cargo generate-rpm -p ryll</code>.</li>
 </ul>
 <p>Apply the same updates to
-<a href="../../.github/workflows/release.yml">.github/workflows/release.yml</a>.
+<a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml">.github/workflows/release.yml</a>.
 Additionally, the release workflow's version-check step uses
 <code>grep '^version = ' Cargo.toml</code>. After the structural commit,
 the top-level <code>Cargo.toml</code> will be a workspace manifest with no
@@ -12086,7 +12086,7 @@ work with the new flags on the unchanged single-package layout.</p>
 <p>Use workspace-aware cargo flags in CI.</p>
 </blockquote>
 <h3 id="step-2-pre-flight-script-and-makefile-updates">Step 2: Pre-flight script and Makefile updates<a class="headerlink" href="#step-2-pre-flight-script-and-makefile-updates" title="Permanent link">&para;</a></h3>
-<p>Update <a href="../../scripts/check-rust.sh">scripts/check-rust.sh</a>:</p>
+<p>Update <a href="https://github.com/shakenfist/ryll/blob/develop/scripts/check-rust.sh">scripts/check-rust.sh</a>:</p>
 <ul>
 <li><code>cargo fmt --check</code> → <code>cargo fmt --all --check</code></li>
 <li><code>cargo fmt</code> → <code>cargo fmt --all</code></li>
@@ -12096,7 +12096,7 @@ work with the new flags on the unchanged single-package layout.</p>
   <code>cargo clippy --fix --allow-dirty --workspace --all-targets
   -- -D warnings</code></li>
 </ul>
-<p>Update <a href="../../Makefile">Makefile</a> targets <code>build</code>, <code>release</code>,
+<p>Update <a href="https://github.com/shakenfist/ryll/blob/develop/Makefile">Makefile</a> targets <code>build</code>, <code>release</code>,
 <code>test</code>, <code>lint</code>, <code>lint-fix</code> to use the same workspace-aware
 flags:</p>
 <ul>
@@ -12155,7 +12155,7 @@ moved is not buildable.</p>
 <a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">repository</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://github.com/shakenfist/ryll&quot;</span>
 </code></pre></div></li>
 <li>Update the version-check step in
-   <a href="../../.github/workflows/release.yml">.github/workflows/release.yml</a>:
+   <a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml">.github/workflows/release.yml</a>:
    <code>grep '^version = ' Cargo.toml</code> →
    <code>grep '^version = ' ryll/Cargo.toml</code>. This must happen in
    the same commit as the file move so release tagging works
@@ -12187,11 +12187,11 @@ moved is not buildable.</p>
 <p>Update the live docs that reference <code>src/</code> paths to use
 <code>ryll/src/</code>:</p>
 <ul>
-<li><a href="/components/ryll/README/">README.md</a> — 1 occurrence.</li>
-<li><a href="/components/ryll/AGENTS/">AGENTS.md</a> — ~8 occurrences. Many of these
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README.md</a> — 1 occurrence.</li>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md">AGENTS.md</a> — ~8 occurrences. Many of these
   are in build/development sections that may also benefit from
   noting the new workspace layout briefly.</li>
-<li><a href="/components/ryll/ARCHITECTURE/">ARCHITECTURE.md</a> — ~8 occurrences.
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">ARCHITECTURE.md</a> — ~8 occurrences.
   The architecture description should mention that ryll is now
   a workspace member at <code>ryll/</code>, with a brief note that the
   workspace exists in preparation for extracted crates per
@@ -12200,7 +12200,7 @@ moved is not buildable.</p>
 <p>Do <strong>not</strong> rewrite historical plan files in <code>docs/plans/</code>. They
 document past work where the <code>src/</code> paths were accurate at the
 time. Their function is historical, not navigational.</p>
-<p><a href="/components/ryll/STYLEGUIDE/">STYLEGUIDE.md</a> had no <code>src/</code> references in
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md">STYLEGUIDE.md</a> had no <code>src/</code> references in
 the audit and does not need updating.</p>
 <p>Verify <code>pre-commit run --all-files</code> still passes (it has no
 docs hooks, but run it anyway to be safe).</p>
@@ -12246,7 +12246,7 @@ docs hooks, but run it anyway to be safe).</p>
 </li>
 <li>
 <p><strong>CodeQL workflow.</strong> Not audited in detail. If
-   <a href="../../.github/workflows/codeql-analysis.yml">.github/workflows/codeql-analysis.yml</a>
+   <a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/codeql-analysis.yml">.github/workflows/codeql-analysis.yml</a>
    has hardcoded paths or build commands, they may also need
    the workspace-aware-flag treatment. Audit this file as part
    of Step 1; if it needs changes, include them in Step 1's

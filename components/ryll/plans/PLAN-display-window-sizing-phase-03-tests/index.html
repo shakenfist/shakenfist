@@ -11864,7 +11864,7 @@ sibling repo just landed.</p>
 </ul>
 <h2 id="grounding-whats-there-today">Grounding — what's there today<a class="headerlink" href="#grounding-whats-there-today" title="Permanent link">&para;</a></h2>
 <p><code>maybe_send_monitors_resize</code> lives at
-<a href="../../ryll/src/app.rs#L1557-L1588">ryll/src/app.rs:1557-1588</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1557-L1588">ryll/src/app.rs:1557-1588</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">viewport_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="p">.</span><span class="n">input</span><span class="p">(</span><span class="o">|</span><span class="n">i</span><span class="o">|</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">…</span><span class="w"> </span><span class="p">});</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">let</span><span class="w"> </span><span class="n">is_max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="p">.</span><span class="n">input</span><span class="p">(</span><span class="o">|</span><span class="n">i</span><span class="o">|</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="n">i</span><span class="p">.</span><span class="n">viewport</span><span class="p">().</span><span class="n">maximized</span><span class="p">.</span><span class="n">unwrap_or</span><span class="p">(</span><span class="kc">false</span><span class="p">)</span>
@@ -11892,7 +11892,7 @@ egui input. The arithmetic that follows — alignment, the
 8-px floor, the bar-height subtraction — is pure and
 testable.</p>
 <p><code>compute_auto_resize</code> lives at
-<a href="../../ryll/src/app.rs#L3070-L3082">ryll/src/app.rs:3070-3082</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3070-L3082">ryll/src/app.rs:3070-3082</a>
 and uses the alignment expression <code>((w as u32).max(8) / 8)
 * 8</code>. For <code>w ≥ 0</code> (which is enforced by the call site's
 <code>.max(0.0)</code> clamp) this is bit-for-bit equivalent to the
@@ -11903,7 +11903,7 @@ that — and leaves the inline form in
 <code>maybe_send_monitors_resize</code> to <em>call</em> the helper, so the
 two paths cannot drift in future.</p>
 <p><code>STATS_BAR_HEIGHT</code> is at
-<a href="../../ryll/src/app.rs#L38">ryll/src/app.rs:38</a> and is
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L38">ryll/src/app.rs:38</a> and is
 <code>20.0</code>. Tests should reference it by name, not duplicate
 the constant.</p>
 <h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>

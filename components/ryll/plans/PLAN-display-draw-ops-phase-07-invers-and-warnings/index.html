@@ -11904,30 +11904,30 @@ surfaced to the user.</p>
 </ul>
 <h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../shakenfist-spice-protocol/src/messages.rs">shakenfist-spice-protocol/src/messages.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs">shakenfist-spice-protocol/src/messages.rs</a>
   exposes <code>SpiceInvers = SpiceBlackness</code> from phase 1;
   the 13-byte mask-only payload parses via
   <code>SpiceBlackness::read</code>.</li>
-<li><a href="../../ryll/src/channels/display.rs#L215">ryll/src/channels/display.rs:215-223</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L215">ryll/src/channels/display.rs:215-223</a>
   has <code>decode_draw_solid_fill</code> returning a
   <code>SolidFillOutcome::Paint { base, masked_fallback }</code>.
   DRAW_INVERS can't share the <em>outcome</em> (caller
   semantics differ) but can share the parsing shape.</li>
-<li><a href="../../ryll/src/channels/display.rs#L677">ryll/src/channels/display.rs:677</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L677">ryll/src/channels/display.rs:677</a>
   currently has <code>DRAW_COMPOSITE</code> as a <code>debug!</code>-level
   stub, and <code>DRAW_INVERS</code>/<code>DRAW_ROP3</code>/<code>DRAW_STROKE</code>/
   <code>DRAW_TEXT</code> all fall into the <code>_ =&gt; log_unknown(...)</code>
   arm at line 949.</li>
-<li><a href="../../ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>
   <code>ChannelEvent::Invert</code> still carries
   <code>#[allow(dead_code)] // constructed in phase 7</code>.</li>
-<li><a href="../../ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
   <code>invert_rect</code> still carries <code>#[allow(dead_code)]</code>,
   plus <code>invert_subrect</code> (private helper).</li>
-<li><a href="../../ryll/src/app.rs">ryll/src/app.rs</a> already has
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> already has
   the <code>ChannelEvent::Invert</code> dispatch arm from phase 1f.
   No change needed there.</li>
-<li><a href="../../shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
   <code>warn_once!</code> macro, <code>warn_once_count()</code>, and
   <code>warn_once_keys()</code> are live from phase 2. Key format
   is a static string; convention is colon-delimited
@@ -12183,7 +12183,7 @@ future reader sees the rationale.</p>
 </ol>
 <p>The warn_once convention established across phases 2-7
 has been codified in
-<a href="/components/ryll/STYLEGUIDE/#warn_once-for-protocol-gaps">STYLEGUIDE.md §"warn_once for protocol gaps"</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md#warn_once-for-protocol-gaps">STYLEGUIDE.md §"warn_once for protocol gaps"</a>
 so future phases follow it consistently.</p>
 <h2 id="sub-agent-execution-plan">Sub-agent execution plan<a class="headerlink" href="#sub-agent-execution-plan" title="Permanent link">&para;</a></h2>
 <table>

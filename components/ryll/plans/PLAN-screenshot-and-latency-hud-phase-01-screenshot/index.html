@@ -11714,28 +11714,28 @@ appended before the extension.</p>
 <p>All building blocks already exist:</p>
 <ul>
 <li><code>bugreport::encode_png(pixels, w, h) -&gt; anyhow::Result&lt;Vec&lt;u8&gt;&gt;</code>
-  at <a href="ryll/src/bugreport.rs#L584">ryll/src/bugreport.rs:584</a>.
+  at <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L584">ryll/src/bugreport.rs:584</a>.
   It is <code>pub(crate)</code> already; no visibility change needed.</li>
 <li><code>Surface::pixels() -&gt; &amp;[u8]</code> at
-  <a href="ryll/src/display/surface.rs#L107">ryll/src/display/surface.rs:107</a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L107">ryll/src/display/surface.rs:107</a>
   returns the RGBA buffer. <code>Surface</code> also has public <code>width</code>
   and <code>height</code> fields.</li>
 <li><code>App.surfaces</code> is a <code>HashMap&lt;(u8, u32), DisplaySurface&gt;</code>
   (the key is <code>(channel_id, surface_id)</code>; see
-  <a href="ryll/src/app.rs#L134">app.rs:134</a>). Iteration order is
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L134">app.rs:134</a>). Iteration order is
   unspecified — for multi-monitor output we should sort by
   the key tuple so the <code>-1</code>/<code>-2</code> suffixes are deterministic.</li>
 <li><code>rfd::FileDialog</code> is in use at
-  <a href="ryll/src/app.rs#L1378">ryll/src/app.rs:1378</a> and
-  <a href="ryll/src/app.rs#L1523">ryll/src/app.rs:1523</a> — copy that
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1378">ryll/src/app.rs:1378</a> and
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1523">ryll/src/app.rs:1523</a> — copy that
   pattern (<code>save_file()</code> rather than <code>pick_file()</code> /
   <code>pick_folder()</code>).</li>
 <li>F11 (Traffic) and F12 (Report) are already bound at
-  <a href="ryll/src/app.rs#L917-L931">ryll/src/app.rs:917-931</a>. Add
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L917-L931">ryll/src/app.rs:917-931</a>. Add
   F8 alongside, and follow the same exclusion: don't trigger
   during region-selection mode.</li>
 <li>The bottom-right of the top status bar is where buttons
-  live (<a href="ryll/src/app.rs#L1064-L1078">app.rs:1064-1078</a>) —
+  live (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1064-L1078">app.rs:1064-1078</a>) —
   add a "Screenshot" button next to "Report".</li>
 </ul>
 <h2 id="constraints-and-edge-cases">Constraints and edge cases<a class="headerlink" href="#constraints-and-edge-cases" title="Permanent link">&para;</a></h2>
@@ -11748,14 +11748,14 @@ appended before the extension.</p>
   early in the session), the hotkey/button should show a
   transient status message rather than save an empty file.
   Use the existing <code>bug_status_message: Option&lt;(String,
-  Instant)&gt;</code> mechanism at <a href="ryll/src/app.rs#L1080-L1086">app.rs:1080-1086</a>
+  Instant)&gt;</code> mechanism at <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1080-L1086">app.rs:1080-1086</a>
   for user feedback.</li>
 <li><strong>Save dialog cancelled:</strong> <code>rfd::FileDialog::save_file()</code>
   returns <code>Option&lt;PathBuf&gt;</code>. None means user cancelled — do
   nothing, no error message.</li>
 <li><strong>Default filename:</strong> <code>ryll-screenshot-{timestamp}.png</code>
   using <code>bugreport::filename_timestamp()</code> at
-  <a href="ryll/src/bugreport.rs#L577">bugreport.rs:577</a> (already
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L577">bugreport.rs:577</a> (already
   filename-safe — colons replaced with hyphens). The project
   deliberately avoids the <code>chrono</code> crate; do <strong>not</strong> add it.</li>
 <li><strong>Multi-monitor naming:</strong> if <code>surfaces.len() == 1</code>, save
@@ -11767,7 +11767,7 @@ appended before the extension.</p>
 <li><strong>Errors:</strong> <code>encode_png</code> and <code>std::fs::write</code> can both
   fail. Surface failures via the <code>bug_status_message</code>
   pattern, not panics. Match the error-handling style at
-  <a href="ryll/src/app.rs">app.rs around bug report save</a>.</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">app.rs around bug report save</a>.</li>
 </ul>
 <h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <table>
@@ -11786,28 +11786,28 @@ appended before the extension.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add a <code>save_screenshots(&amp;self, base_path: PathBuf) -&gt; anyhow::Result&lt;Vec&lt;PathBuf&gt;&gt;</code> method on <code>RyllApp</code> in <a href="ryll/src/app.rs">ryll/src/app.rs</a>. Iterate <code>self.surfaces</code> collected and sorted by key (<code>(u8, u32)</code>); call <code>bugreport::encode_png(s.pixels(), s.width, s.height)</code> for each. If <code>surfaces.len() == 1</code>, write directly to <code>base_path</code>. Otherwise, derive per-surface paths via the helper from step 1d. Use <code>std::fs::write</code> for file writes. Return <code>anyhow::bail!</code> if <code>surfaces</code> is empty.</td>
+<td>Add a <code>save_screenshots(&amp;self, base_path: PathBuf) -&gt; anyhow::Result&lt;Vec&lt;PathBuf&gt;&gt;</code> method on <code>RyllApp</code> in <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a>. Iterate <code>self.surfaces</code> collected and sorted by key (<code>(u8, u32)</code>); call <code>bugreport::encode_png(s.pixels(), s.width, s.height)</code> for each. If <code>surfaces.len() == 1</code>, write directly to <code>base_path</code>. Otherwise, derive per-surface paths via the helper from step 1d. Use <code>std::fs::write</code> for file writes. Return <code>anyhow::bail!</code> if <code>surfaces</code> is empty.</td>
 </tr>
 <tr>
 <td>1b</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/app.rs">ryll/src/app.rs</a>, add an F8 hotkey handler next to the existing F11/F12 handlers around line 917-931. F8 should not trigger during region-selection mode (mirror the F11/F12 exclusion). When pressed, open <code>rfd::FileDialog::new().set_file_name(&amp;default_name).save_file()</code> where <code>default_name</code> is <code>format!("ryll-screenshot-{}.png", bugreport::filename_timestamp())</code>. If the user picks a path, call <code>save_screenshots()</code> and set <code>self.bug_status_message = Some((msg, Instant::now()))</code> with a success or failure string (mirror the existing bug-report save pattern — search for <code>bug_status_message =</code> to find precedent). On empty surfaces, set the status message to "No display surface to capture yet".</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a>, add an F8 hotkey handler next to the existing F11/F12 handlers around line 917-931. F8 should not trigger during region-selection mode (mirror the F11/F12 exclusion). When pressed, open <code>rfd::FileDialog::new().set_file_name(&amp;default_name).save_file()</code> where <code>default_name</code> is <code>format!("ryll-screenshot-{}.png", bugreport::filename_timestamp())</code>. If the user picks a path, call <code>save_screenshots()</code> and set <code>self.bug_status_message = Some((msg, Instant::now()))</code> with a success or failure string (mirror the existing bug-report save pattern — search for <code>bug_status_message =</code> to find precedent). On empty surfaces, set the status message to "No display surface to capture yet".</td>
 </tr>
 <tr>
 <td>1c</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/app.rs">ryll/src/app.rs</a> around line 1064-1078 (the status-bar button row containing "Traffic", "USB", "Folders", "Report"), add a <code>ui.small_button("Screenshot")</code> between "Folders" and "Report". On click, perform the same flow as the F8 handler — refactor the F8 handler body into a private <code>fn open_screenshot_dialog(&amp;mut self)</code> helper so the button click and the keypress share one code path.</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> around line 1064-1078 (the status-bar button row containing "Traffic", "USB", "Folders", "Report"), add a <code>ui.small_button("Screenshot")</code> between "Folders" and "Report". On click, perform the same flow as the F8 handler — refactor the F8 handler body into a private <code>fn open_screenshot_dialog(&amp;mut self)</code> helper so the button click and the keypress share one code path.</td>
 </tr>
 <tr>
 <td>1d</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add unit tests in <a href="ryll/src/app.rs">ryll/src/app.rs</a> (or wherever the helper lands) for the multi-surface filename logic. Test cases: <code>("foo.png", 1) → ["foo.png"]</code>, <code>("foo.png", 3) → ["foo-1.png", "foo-2.png", "foo-3.png"]</code>, <code>("foo", 2) → ["foo-1.png", "foo-2.png"]</code> (no extension to strip), <code>("foo.bar.png", 2) → ["foo.bar-1.png", "foo.bar-2.png"]</code> (only strip the last extension). Pull the path-derivation logic into a small pure helper to make it testable without touching the filesystem.</td>
+<td>Add unit tests in <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> (or wherever the helper lands) for the multi-surface filename logic. Test cases: <code>("foo.png", 1) → ["foo.png"]</code>, <code>("foo.png", 3) → ["foo-1.png", "foo-2.png", "foo-3.png"]</code>, <code>("foo", 2) → ["foo-1.png", "foo-2.png"]</code> (no extension to strip), <code>("foo.bar.png", 2) → ["foo.bar-1.png", "foo.bar-2.png"]</code> (only strip the last extension). Pull the path-derivation logic into a small pure helper to make it testable without touching the filesystem.</td>
 </tr>
 </tbody>
 </table>

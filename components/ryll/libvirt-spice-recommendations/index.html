@@ -12182,23 +12182,37 @@
 <p>Ryll is built to tolerate any reasonable SPICE server configuration, but the
 guest configuration has a large effect on what the user perceives as
 "display responsiveness." This document captures the settings we recommend
-for QEMU guests fronted by SPICE, based on what we have learned from
-dogfood sessions and from reading the upstream <code>spice-server</code> and
-<code>qemu</code> source.</p>
+for QEMU guests fronted by SPICE, based on measurements taken against
+real guests with ryll's own bug-report instrumentation, and on reading
+the upstream <code>spice-server</code> and <code>qemu</code> source.</p>
 <p>The recommendations below are written against a <strong>libvirt domain XML</strong>
 because that is the most common deployment path; the equivalent direct
 <code>qemu</code> command-line flags are noted in parentheses where helpful.</p>
-<blockquote>
-<p><strong>TL;DR.</strong> Prefer <code>virtio-vga</code> over <code>qxl</code>. On QXL, expect the
-server's streaming heuristic to stop firing somewhere between
-1280 and 1600 pixels wide (test session 004) — bumping VRAM
-does not help. Set <code>image-compression=auto_lz</code>, drop the
+<div class="admonition tip">
+<p class="admonition-title">Prefer virtio-vga over qxl</p>
+<p>The virtio display path is the actively-maintained one, and it
+does not produce the pathological full-frame updates QXL guests
+fall into.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">QXL video streaming stops working above roughly 1280 pixels wide</p>
+<p>Expect stable streams at 1024×768 and 1280×832, and static
+fallback from 1600×1200 up. Increasing VRAM does not fix it.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Three server-side settings do most of the work</p>
+<p>Set <code>image-compression=auto_lz</code>, drop any
 <code>*-wan-compression=always</code> overrides, and use
-<code>streaming-video=filter</code> rather than <code>all</code>. Install
-<code>spice-vdagent</code> in the guest, and <code>gstreamer1.0-plugins-bad</code> +
-<code>gstreamer1.0-vaapi</code> on the hypervisor if you want H.264
-streams to be available. The rest of this document explains why.</p>
-</blockquote>
+<code>streaming-video=filter</code> rather than <code>all</code> or <code>off</code>.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Two packages are prerequisites</p>
+<p>Install <code>spice-vdagent</code> in the guest for clipboard, absolute
+pointer, and dynamic monitor configuration. Install
+<code>gstreamer1.0-plugins-bad</code> and <code>gstreamer1.0-vaapi</code> on the
+hypervisor if you want H.264 streams to be available at all.</p>
+</div>
+<p>The rest of this document explains why.</p>
 <h2 id="video-device">Video device<a class="headerlink" href="#video-device" title="Permanent link">&para;</a></h2>
 <h3 id="recommended-virtio-vga-or-virtio-gpu-pci">Recommended: virtio-vga (or virtio-gpu-pci)<a class="headerlink" href="#recommended-virtio-vga-or-virtio-gpu-pci" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">&lt;video&gt;</span>
@@ -12216,7 +12230,12 @@ to encode — exactly what the static-UI (terminal, text) path needs.</p>
 <li><strong>No hardware-accelerated streaming video.</strong> The SPICE server's
   "stream this region as MJPEG/H.264" path is tightly coupled to the
   QXL command ring. With <code>virtio-gpu</code>, video playback falls back to
-  bitmap blits and is bandwidth-heavier.</li>
+  bitmap blits and is bandwidth-heavier. This follows from the
+  server source; we have not yet measured a virtio guest against a
+  QXL one for sustained video, so treat the size of the difference
+  as unquantified. Predictable bitmap blits may well feel better
+  than QXL's stream-then-fall-back behaviour above the resolution
+  cliff described below.</li>
 <li><strong>3D acceleration is opt-in.</strong> Set <code>accel3d='yes'</code> if you want
   virgl 3D forwarding; leave off for plain VDI workloads.</li>
 </ul>
@@ -12231,53 +12250,87 @@ works but is no longer where SPICE engineering investment is going.
 We have seen QXL guests fall into pathological encoding patterns
 (full-screen <code>ZlibGlzRgb</code> blasts for terminal cursor blinks) that
 virtio-gpu does not exhibit.</p>
-<p><strong>Resolution cliff.</strong> Test session 004 (Debian 11 + QXL across four
-guest resolutions and three VRAM allocations) showed that the
-spice-server's streaming heuristic falls off a cliff between
-roughly 1280 and 1600 pixels wide. At 1024×768 and 1280×832 video
-playback creates a stable MJPEG/H.264 stream; at 1600×1200 the
-stream lives ~1.7 s before being destroyed; at 1920×1440 no stream
-is ever created. The likely mechanism (per
-<code>spice/server/display-channel.cpp:1057-1078</code>) is that the QXL guest
-driver issues qualitatively different draw ops at higher
-resolutions (tiled copies, alpha-blends, pre-compressed images)
-that fail the heuristic's <code>QXL_DRAW_COPY + QXL_EFFECT_OPAQUE +
-SPICE_ROPD_OP_PUT + SPICE_IMAGE_TYPE_BITMAP</code> filter. The result
-is that every video frame falls back to a full-frame ZlibGlzRgb
-update — heavy on both bandwidth and client-side decode.</p>
-<p><strong>VRAM and streaming: a more nuanced picture.</strong> Session 004 ran
-the same 1920×1440 workload at 64 MiB, 128 MiB, and 256 MiB VRAM
-and reported zero streams created in all three runs — concluding
-"VRAM is not the lever". Session 005 then revealed that
-conclusion was an instrumentation artefact (the spice-debug env
-var was being scrubbed before reaching qemu; once the libvirt
-template was patched to pass it through, the qemu log showed the
-server <em>does</em> create a 1024×768 stream within seconds of video
-start at 1920×1440 — it just tears it down ~8 seconds later and
-never recreates it).</p>
-<p>What 005 also revealed: the qemu log shows
-<code>display_channel_debug_oom</code> firing ~1.7 times per second
-throughout the run. That's qemu's QXL device emulation
-telling spice-server that the <strong>guest QXL driver has run out of
-command-ring memory</strong>; spice-server responds by dropping pending
-drawables via <code>display_channel_free_some</code> and flushing —
-which appears to evict the stream-tracking state and prevent
-re-engagement. So:</p>
+<p><strong>Resolution cliff.</strong> Measured on Debian 11 with QXL across four
+guest resolutions and three VRAM allocations, video streaming
+degrades sharply between roughly 1280 and 1600 pixels wide. The
+raw evidence behind this section is in
+<a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/"><code>PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md</code></a>.</p>
+<table>
+<thead>
+<tr>
+<th>Guest resolution</th>
+<th>Video streaming behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1024×768</td>
+<td>Stable MJPEG/H.264 stream for the whole clip.</td>
+</tr>
+<tr>
+<td>1280×832</td>
+<td>Stable stream.</td>
+</tr>
+<tr>
+<td>1600×1200</td>
+<td>Stream lives ~1.7 s, then is destroyed.</td>
+</tr>
+<tr>
+<td>1920×1440</td>
+<td>Stream is created within seconds of video start, torn down ~8 s later, and never recreated.</td>
+</tr>
+</tbody>
+</table>
+<p>Two distinct mechanisms are at work above the cliff.</p>
+<p><em>The server's stream-detection heuristic stops matching.</em> Per
+<code>spice/server/display-channel.cpp:1057-1078</code>, the QXL guest driver
+issues qualitatively different draw ops at higher resolutions
+(tiled copies, alpha-blends, pre-compressed images) that fail the
+heuristic's <code>QXL_DRAW_COPY + QXL_EFFECT_OPAQUE + SPICE_ROPD_OP_PUT
++ SPICE_IMAGE_TYPE_BITMAP</code> filter. Frames that fail the filter fall
+back to full-frame ZlibGlzRgb updates — heavy on both bandwidth and
+client-side decode.</p>
+<p><em>The guest QXL driver runs out of command-ring memory.</em> At
+1920×1440 the qemu log shows <code>display_channel_debug_oom</code> firing
+~1.7 times per second throughout playback. That is qemu's QXL
+device emulation telling spice-server the guest driver's command
+ring is exhausted; spice-server responds by dropping pending
+drawables via <code>display_channel_free_some</code> and flushing, which
+appears to evict the stream-tracking state and stop the server
+re-engaging streaming for the rest of the session. This is why the
+1920×1440 stream never comes back after its first teardown.</p>
+<p><strong>VRAM is not the lever it looks like.</strong> Running the same
+1920×1440 workload at 64 MiB, 128 MiB, and 256 MiB VRAM does not
+restore stable streaming at any of the three sizes:</p>
 <ul>
-<li><strong>VRAM does not directly unlock streaming.</strong> Bumping <code>vram</code>
-  alone won't restore video performance; the heuristic fires
-  regardless.</li>
-<li><strong>VRAM does affect the OOM rate</strong>, which appears to affect
-  stream <em>survival</em> and <em>re-engagement</em> indirectly. We have
-  not yet measured whether bumping <code>vram</code> reduces OOM
-  frequency enough to keep streams alive; see
-  <a href="/components/ryll/plans/PLAN-stream-caps-and-flap/"><code>PLAN-stream-caps-and-flap.md</code></a>
-  for the work that will quantify this.</li>
+<li><strong>VRAM does not unlock streaming.</strong> None of the three sizes
+  produced stable video, so a <code>vram</code> bump on its own does not
+  restore video performance. The three-size comparison predates
+  the logging fix described below, so it cannot distinguish
+  "no stream was created" from "the stream was invisible to the
+  instrumentation"; the create-then-teardown-then-never-recreate
+  cycle in the table above comes from the one 1920×1440 run with
+  working server-side debug logging.</li>
+<li><strong>VRAM plausibly affects the OOM rate</strong>, and therefore stream
+  <em>survival</em> and <em>re-engagement</em>, indirectly. Whether a larger
+  <code>vram</code> reduces OOM frequency enough to keep a stream alive is
+  an open question we have not yet measured; it is tracked in
+  <a href="/components/ryll/plans/PLAN-stream-caps-and-flap/"><code>PLAN-stream-caps-and-flap.md</code></a>.</li>
 </ul>
 <p>Net: don't undersize <code>vram</code> on QXL guests intended for
 video workloads, but don't expect a <code>vram</code> bump alone to be
 a cure either. The static-UI cache-hit benefit of generous
 VRAM is real and unchanged.</p>
+<div class="admonition note">
+<p class="admonition-title">Reproducing these measurements needs server-side debug logging</p>
+<p>The stream-create, teardown, and OOM evidence above is only
+visible in spice-server's own log output, and libvirt scrubs
+most environment variables before forking qemu — see
+<a href="#enabling-server-side-debug-logging">Enabling server-side debug logging</a>
+below for the setup that actually works. Without it the server
+looks like it never creates a stream at 1920×1440 at all, which
+is a measurement artefact rather than the real behaviour.</p>
+</div>
 <p>For 1024×768 or 1280-class desktops on QXL, streaming works and
 the trade-off is fine. For 1600+ desktops on QXL, expect static
 fallback and use both client-side caps — <code>--image-cache-cap-mib</code>
@@ -12329,11 +12382,10 @@ WAN link), keep <code>auto_glz</code> but at least drop the
 </code></pre></div>
 <p>The <code>always</code> setting forces the server's "wan" code path on every
 image, regardless of what the client advertises. This is what causes
-ryll's <code>LZ4_COMPRESSION</code> hints (and the <code>PREF_COMPRESSION</code> hints
-planned in
-<a href="/components/ryll/plans/PLAN-stream-caps-and-flap/"><code>PLAN-stream-caps-and-flap.md</code></a>)
-to be silently ignored — the server has been told "I don't care
-what the client wants, always use this."</p>
+ryll's <code>LZ4_COMPRESSION</code> and <code>PREF_COMPRESSION</code> capabilities, and
+the <code>PREFERRED_COMPRESSION</code> message it sends on the strength of the
+latter, to be silently ignored — the server has been told "I don't
+care what the client wants, always use this."</p>
 <p>Use <code>auto</code> instead so the server picks dynamically based on the
 client's capabilities and the actual image characteristics.</p>
 <h3 id="why-streaming-modefilter">Why <code>streaming mode='filter'</code>?<a class="headerlink" href="#why-streaming-modefilter" title="Permanent link">&para;</a></h3>
@@ -12415,9 +12467,7 @@ in the guest (<code>apt install spice-vdagent</code> on Debian/Ubuntu;
   guest-side resolution change) does not work.</li>
 </ul>
 <p>Ryll's bug-report <code>MainSnapshot::agent_request_count</code> and related
-fields (planned in
-<a href="/components/ryll/plans/PLAN-stream-caps-and-flap/"><code>PLAN-stream-caps-and-flap.md</code></a>)
-report whether the agent is responding to probes. A <code>0</code> agent reply count
+fields report whether the agent is responding to probes. A <code>0</code> agent reply count
 in a bug report usually means <code>spice-vdagent</code> is not installed or
 not running.</p>
 <h2 id="usb-redirection-optional">USB redirection (optional)<a class="headerlink" href="#usb-redirection-optional" title="Permanent link">&para;</a></h2>
@@ -12591,12 +12641,12 @@ heavier-handed but applies to every VM the host runs.</p>
 <h2 id="what-ryll-cannot-fix-from-the-client-side">What ryll cannot fix from the client side<a class="headerlink" href="#what-ryll-cannot-fix-from-the-client-side" title="Permanent link">&para;</a></h2>
 <p>The server makes the encoding decisions. Ryll can:</p>
 <ul>
-<li>Advertise capabilities (<code>LZ4_COMPRESSION</code>, <code>STREAM_REPORT</code>, etc.)
-  so the server <em>can</em> use efficient paths.</li>
-<li>Send preference hints (<code>PREF_COMPRESSION</code>, <code>PREF_VIDEO_CODEC_TYPE</code>,
-  planned in
-  <a href="/components/ryll/plans/PLAN-stream-caps-and-flap/"><code>PLAN-stream-caps-and-flap.md</code></a>)
-  to bias server choices.</li>
+<li>Advertise capabilities (<code>LZ4_COMPRESSION</code>, <code>STREAM_REPORT</code>,
+  <code>PREF_COMPRESSION</code>, <code>PREF_VIDEO_CODEC_TYPE</code>, etc.) so the server
+  <em>can</em> use efficient paths.</li>
+<li>Send the preference messages those last two capabilities unlock
+  (<code>PREFERRED_COMPRESSION</code>, <code>PREFERRED_VIDEO_CODEC_TYPE</code>) at
+  link-up, to bias server choices.</li>
 <li>Decode whatever arrives as fast as the host hardware allows.</li>
 </ul>
 <p>But ryll cannot override a server config that says

@@ -13066,8 +13066,12 @@ flow — not the per-frame draw_copy path).</p>
 <p>The thresholds (3 destroys, 30 s window, 3 s mean lifetime,
 60 s notification cool-down) are not yet configurable; they
 live in <code>ryll/src/streaming_state.rs</code> and are tuned for the
-session-005 flap pattern. Open an issue if a different
-workload trips them too easily or not easily enough.</p>
+flap pattern seen on QXL guests above the resolution cliff
+(streams created and torn down within a few seconds, then
+never re-engaged — see
+<a href="/components/ryll/libvirt-spice-recommendations/">Libvirt / SPICE server recommendations</a>).
+Open an issue if a different workload trips them too easily
+or not easily enough.</p>
 <h3 id="jpeg-decoder-backend-selection">JPEG decoder backend selection<a class="headerlink" href="#jpeg-decoder-backend-selection" title="Permanent link">&para;</a></h3>
 <p>MJPEG video streams are decoded by a per-platform JPEG decoder
 selected at display-channel startup. The active backend is
@@ -13246,8 +13250,8 @@ parses those pcaps without needing tshark or scapy:</p>
 <a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Which image codecs dominate the DRAW_COPY traffic?</span>
 <a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>tools/pcap-inspect.py<span class="w"> </span>draw-copy<span class="w"> </span>&lt;dir&gt;/display.pcap
 <a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># What did the server send in the last 5 seconds before</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="c1"># you hit F8?</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># What did the server send in the last 5 seconds of the</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="c1"># capture, right after the artefact appeared?</span>
 <a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>tools/pcap-inspect.py<span class="w"> </span>timeline<span class="w"> </span>&lt;dir&gt;/display.pcap<span class="w"> </span>--since-last<span class="w"> </span><span class="m">5</span>
 </code></pre></div>
 <p>Handy when the user reports a visual artefact that's too
@@ -13333,7 +13337,7 @@ changed while you were typing the description.</p>
 stutter or fall behind, these fields in <code>channel-state.json</code> tell
 you which part of the pipeline was slow without re-running the
 session. They come from the master plan
-<a href="/components/ryll/../docs/plans/PLAN-video-keeping-up/"><code>PLAN-video-keeping-up.md</code></a>.</p>
+<a href="/components/ryll/plans/PLAN-video-keeping-up/"><code>PLAN-video-keeping-up.md</code></a>.</p>
 <ul>
 <li><code>decode_total_count</code>, <code>decode_failed_count</code>,
   <code>decode_from_cache_count</code> — cumulative decode counters since
@@ -13597,8 +13601,9 @@ in the diagnostics guide for more details on what each field means.</p>
 <p>The SPICE server flags certain decoded image frames with <code>CACHE_ME</code> to
 reduce bandwidth on future repeated use. Ryll caches these decoded RGBA
 frames client-side; without a bound, sustained video playback can cause
-the cache to grow unbounded (see session 002g: 30 MiB/s growth during
-full-frame ZlibGlzRgb video, reaching 2.8 GiB in 90 seconds).</p>
+the cache to grow unbounded. Measured against full-frame ZlibGlzRgb
+video, an uncapped cache grew at 30 MiB/s and reached 2.8 GiB in 90
+seconds.</p>
 <p>The <code>--image-cache-cap-mib</code> flag (default 256 MiB) bounds the cache with
 an LRU eviction policy: when the total cached bytes exceed the cap, the
 least-recently-used entries are evicted until the cap is satisfied. This
@@ -13675,9 +13680,9 @@ set of fields: <code>image_cache_bytes</code>, <code>image_cache_entries</code>,
 <code>image_cache_ids</code> covered the renderer's <code>BoundedImageCache</code> together
 with the SPICE <code>GlzDictionary</code> decompression cache. This made bug
 reports ambiguous: a 5 GiB <code>image_cache_bytes</code> reading against a
-256 MiB cap (as seen in session 003a) actually came from the GLZ
-dictionary, not the image cache, but nothing in the snapshot
-distinguished the two.</p>
+256 MiB cap — which we have observed in practice — actually came
+from the GLZ dictionary, not the image cache, but nothing in the
+snapshot distinguished the two.</p>
 <p>Current builds report the two separately: the <code>image_cache_*</code>
 fields reflect only the
 <code>BoundedImageCache</code> (CACHE_ME-flagged decoded RGBA frames). The GLZ

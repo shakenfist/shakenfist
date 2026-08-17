@@ -12096,20 +12096,20 @@ goes through the normal PR review gate rather than landing
 directly on <code>develop</code>:</p>
 <ol>
 <li><strong>Stage 1 — propose:</strong>
-   <a href="../tools/propose-release.sh">tools/propose-release.sh</a>
+   <a href="https://github.com/shakenfist/ryll/blob/develop/tools/propose-release.sh">tools/propose-release.sh</a>
    (wrapped by <code>make propose-release X.Y.Z</code>) creates a
    <code>release-X.Y.Z</code> branch from <code>develop</code>, bumps the workspace
    version, runs tests, and pushes the branch. You open a PR
    from it into <code>develop</code> and get it reviewed and merged like
    any other change.</li>
 <li><strong>Stage 2 — tag:</strong> after the PR has merged,
-   <a href="../tools/tag-release.sh">tools/tag-release.sh</a> (wrapped by
+   <a href="https://github.com/shakenfist/ryll/blob/develop/tools/tag-release.sh">tools/tag-release.sh</a> (wrapped by
    <code>make tag-release X.Y.Z</code>) fetches <code>develop</code>, verifies its
    tip has the expected workspace version, creates an annotated
    <code>vX.Y.Z</code> tag at that commit, and pushes the tag.</li>
 </ol>
 <p>The tag push triggers
-<a href="../.github/workflows/release.yml">.github/workflows/release.yml</a>,
+<a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml">.github/workflows/release.yml</a>,
 which:</p>
 <ul>
 <li>Verifies the tag matches the workspace version.</li>

@@ -12066,18 +12066,18 @@ surface helpers exist but nothing calls them yet.</p>
 </ul>
 <h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../shakenfist-spice-protocol/src/messages.rs#L255">shakenfist-spice-protocol/src/messages.rs:255</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L255">shakenfist-spice-protocol/src/messages.rs:255</a>
   defines <code>DrawCopyBase</code> — the generic
   <code>SpiceMsgDisplayBase</code> (surface_id, box, clip). Misnamed;
   every draw op uses it. Rename to <code>DrawBase</code>.</li>
-<li><a href="../../ryll/src/channels/display.rs#L21">ryll/src/channels/display.rs:21</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L21">ryll/src/channels/display.rs:21</a>
   imports <code>DrawCopyBase</code>; that's the only ryll consumer.</li>
-<li><a href="../../ryll/src/channels/mod.rs#L46">ryll/src/channels/mod.rs:46</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs#L46">ryll/src/channels/mod.rs:46</a>
   <code>ChannelEvent::ImageReady</code> is the only "draw-result"
   variant today.</li>
-<li><a href="../../ryll/src/display/surface.rs#L16-L26">ryll/src/display/surface.rs:16-26</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L16-L26">ryll/src/display/surface.rs:16-26</a>
   <code>DisplaySurface::new()</code> fills with <code>(50, 50, 50, 255)</code>.</li>
-<li><a href="../../ryll/src/app.rs#L562">ryll/src/app.rs:562</a> handles
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L562">ryll/src/app.rs:562</a> handles
   <code>ImageReady</code>. No <code>FillRect</code>, <code>CopyBits</code>, or <code>Invert</code>
   handlers exist yet.</li>
 </ul>
@@ -12362,7 +12362,7 @@ image decode is phase 5/6.</p>
 </tbody>
 </table>
 <h2 id="channelevent-additions">ChannelEvent additions<a class="headerlink" href="#channelevent-additions" title="Permanent link">&para;</a></h2>
-<p>In <a href="../../ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>:</p>
+<p>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="sd">/// Solid-colour fill of a destination rect (used by</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="sd">/// DRAW_FILL with solid brush, DRAW_BLACKNESS,</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="sd">/// DRAW_WHITENESS).</span>
@@ -12408,7 +12408,7 @@ image decode is phase 5/6.</p>
   both; the new variants must too.</li>
 </ul>
 <h2 id="surface-helpers">Surface helpers<a class="headerlink" href="#surface-helpers" title="Permanent link">&para;</a></h2>
-<p>In <a href="../../ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>:</p>
+<p>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>:</p>
 <h3 id="signature-sketch">Signature sketch<a class="headerlink" href="#signature-sketch" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">impl</span><span class="w"> </span><span class="n">DisplaySurface</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">/// Paint `colour` (RGBA) into `rect` on this surface,</span>
@@ -12508,7 +12508,7 @@ pattern exactly. Clearer than a direction-aware in-place
 copy, and the allocation is bounded by the SPICE wire
 rect size (typically a console line or a small square).</p>
 <h2 id="app-side-handlers">App-side handlers<a class="headerlink" href="#app-side-handlers" title="Permanent link">&para;</a></h2>
-<p>In <a href="../../ryll/src/app.rs">ryll/src/app.rs</a> inside the
+<p>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> inside the
 main (non-headless) <code>match event</code> at ~line 529:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">ChannelEvent</span><span class="p">::</span><span class="n">FillRect</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="n">display_channel_id</span><span class="p">,</span><span class="w"> </span><span class="n">surface_id</span><span class="p">,</span>
@@ -12556,7 +12556,7 @@ sends them yet; <code>cargo build</code> will flag unused variants
 only if <code>#[warn(unused)]</code>-style lints apply, which they
 don't here (<code>ChannelEvent</code> is <code>pub</code>).</p>
 <p>The second (headless) event loop at
-<a href="../../ryll/src/app.rs#L2580">ryll/src/app.rs:2580</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2580">ryll/src/app.rs:2580</a>
 already has a <code>_ =&gt; {}</code> default arm — the new variants
 fall into it unchanged. Headless mode doesn't render, so
 a no-op is correct.</p>
@@ -12564,7 +12564,7 @@ a no-op is correct.</p>
 <h3 id="rename-drawcopybase-drawbase">Rename <code>DrawCopyBase</code> → <code>DrawBase</code><a class="headerlink" href="#rename-drawcopybase-drawbase" title="Permanent link">&para;</a></h3>
 <p>Mechanical across two files: the struct and its <code>impl</code>
 in <code>messages.rs</code>, and the <code>use</code> line in
-<a href="../../ryll/src/channels/display.rs#L21">ryll/src/channels/display.rs:21</a>.
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L21">ryll/src/channels/display.rs:21</a>.
 The documentation-level plans
 (<a href="/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/">PLAN-crate-extraction-phase-04-protocol.md</a>,
 <a href="/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/">PLAN-deferred-debt-phase-06-tests.md</a>,
@@ -12607,7 +12607,7 @@ test covers:</p>
   <code>!= 0</code> (non-null) cases.</li>
 </ul>
 <p>Reuse the existing <code>DrawCopyBase</code> test block
-<a href="../../shakenfist-spice-protocol/src/messages.rs#L639">messages.rs:639-720</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L639">messages.rs:639-720</a>
 as a style reference (manual byte construction, explicit
 expected values, <code>expect()</code> on the parse, <code>assert_eq!</code>
 on fields).</p>
@@ -12765,7 +12765,7 @@ largest code change and warrants careful reading against
   other visible behaviour change.</li>
 <li>No new opcodes route to a handler — the <code>_ =&gt;
   log_unknown(...)</code> arm in
-  <a href="../../ryll/src/channels/display.rs#L654">ryll/src/channels/display.rs:654</a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654">ryll/src/channels/display.rs:654</a>
   is unchanged, confirming phase 1 did not accidentally
   land phase 2's work.</li>
 </ul>

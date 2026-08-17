@@ -12502,7 +12502,7 @@ of the SPICE display draw opcodes:</p>
 </table>
 <p>Every other draw opcode falls through the <code>_ =&gt;</code> arm in
 <code>handle_message()</code> at
-<a href="../../ryll/src/channels/display.rs#L654">ryll/src/channels/display.rs:654</a>,
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654">ryll/src/channels/display.rs:654</a>,
 which <code>log_unknown(...)</code> and discards the payload. The
 discarded set (with reference numbers from
 <code>shakenfist-spice-protocol/src/constants.rs</code>):</p>
@@ -12599,7 +12599,7 @@ and <em>scroll regions</em> are not.</p>
 <li>
 <p><code>DisplaySurface::new()</code> initialises the pixel buffer to
    <code>(50, 50, 50)</code> "dark grey" rather than black
-   (<a href="../../ryll/src/display/surface.rs#L21-L26">ryll/src/display/surface.rs:21-26</a>).
+   (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L21-L26">ryll/src/display/surface.rs:21-26</a>).
    The grey is what we see <em>between</em> glyph rows because no
    draw op ever overwrites it.</p>
 </li>
@@ -12618,17 +12618,17 @@ has gone unnoticed.</p>
    <code>ChannelEvent::ImageReady { surface_id, left, top,
    width, height, pixels: Vec&lt;u8&gt; }</code>
    to the main event loop
-   (<a href="../../ryll/src/channels/display.rs#L1142-L1156">ryll/src/channels/display.rs:1142-1156</a>).</p>
+   (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L1142-L1156">ryll/src/channels/display.rs:1142-1156</a>).</p>
 </li>
 <li>
 <p>The app handles <code>ImageReady</code> by looking up the
    <code>DisplaySurface</code> and calling <code>surface.blit(...)</code>
-   (<a href="../../ryll/src/app.rs#L562">ryll/src/app.rs:562-...</a>).</p>
+   (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L562">ryll/src/app.rs:562-...</a>).</p>
 </li>
 <li>
 <p><code>DisplaySurface::blit()</code> does a straightforward RGBA
    memcpy into the surface's pixel buffer
-   (<a href="../../ryll/src/display/surface.rs#L39-L64">ryll/src/display/surface.rs:39-64</a>).</p>
+   (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L39-L64">ryll/src/display/surface.rs:39-64</a>).</p>
 </li>
 <li>
 <p>Repaint is triggered via the shared

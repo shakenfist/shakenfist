@@ -11874,8 +11874,8 @@ and ryll's behaviour is unchanged.</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>└── client.rs    # 250 lines: SpiceClient + SpiceCaVerifier + TLS setup
 </code></pre></div>
 <p><code>SpiceClient</code> stayed behind because it imports
-<a href="../../ryll/src/config.rs"><code>crate::config::Config</code></a> at
-<a href="../../ryll/src/protocol/client.rs#L17">client.rs:17</a>. Config
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/config.rs"><code>crate::config::Config</code></a> at
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/client.rs#L17">client.rs:17</a>. Config
 is ryll's application-level struct that bundles CLI parsing,
 .vv file parsing, and SPICE connection parameters.</p>
 <p>The research pass found:</p>
@@ -11890,10 +11890,10 @@ is ryll's application-level struct that bundles CLI parsing,
   will be structurally identical to <code>Config</code>, just defined in
   the protocol crate instead of ryll.</li>
 <li><strong>Single instantiation site</strong>:
-  <a href="../../ryll/src/app.rs#L1924">app.rs:1924</a> —
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1924">app.rs:1924</a> —
   <code>SpiceClient::new(config)?;</code> inside <code>run_connection()</code>.</li>
 <li><strong>Single import site</strong>:
-  <a href="../../ryll/src/app.rs#L24">app.rs:24</a> —
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L24">app.rs:24</a> —
   <code>use crate::protocol::SpiceClient;</code>.</li>
 <li><strong>Three new deps</strong> needed in the protocol crate's
   <code>Cargo.toml</code> when <code>client.rs</code> moves:</li>

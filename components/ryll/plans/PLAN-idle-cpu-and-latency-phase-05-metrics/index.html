@@ -11818,17 +11818,17 @@ gracefully — better than no bug reports at all on
 non-Linux.</p>
 <h2 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h2>
 <p>Bug reports are assembled in
-<a href="ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>.  The
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>.  The
 existing flow:</p>
 <ul>
 <li><code>BugReport::new(...)</code> collects metadata, channel state,
   optional pcap traffic, and an optional screenshot
-  (<a href="ryll/src/bugreport.rs#L608">bugreport.rs:608+</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L608">bugreport.rs:608+</a>).</li>
 <li><code>metadata.json</code> already contains ryll version, platform,
   and target host (see <code>chrono_now()</code> and friends at
-  <a href="ryll/src/bugreport.rs#L540-L579">bugreport.rs:540-579</a>).</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L540-L579">bugreport.rs:540-579</a>).</li>
 <li>The ZIP layout is documented in
-  <a href="/components/ryll/plans/README/">README.md</a> (capture mode section).</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README.md</a> (capture mode section).</li>
 </ul>
 <p>The natural extension: add a <code>runtime_metrics</code> field to
 the report struct, populated at report-creation time, and
@@ -11946,14 +11946,14 @@ the dominant ryll user base today is Linux.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Wire <code>metrics::sample()</code> into <code>BugReport::new()</code> in <a href="ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>.  Sample at the start of report assembly with a 2-second window.  Add a <code>runtime_metrics: RuntimeMetrics</code> field to the <code>BugReport</code> struct.  In the <code>write_zip()</code> method, write a new <code>runtime-metrics.json</code> file alongside the existing files.  Add a unit test that constructs a <code>BugReport</code> with a stub metrics value and verifies the ZIP contains <code>runtime-metrics.json</code> with the expected JSON shape.</td>
+<td>Wire <code>metrics::sample()</code> into <code>BugReport::new()</code> in <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>.  Sample at the start of report assembly with a 2-second window.  Add a <code>runtime_metrics: RuntimeMetrics</code> field to the <code>BugReport</code> struct.  In the <code>write_zip()</code> method, write a new <code>runtime-metrics.json</code> file alongside the existing files.  Add a unit test that constructs a <code>BugReport</code> with a stub metrics value and verifies the ZIP contains <code>runtime-metrics.json</code> with the expected JSON shape.</td>
 </tr>
 <tr>
 <td>5c</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Update <a href="/components/ryll/plans/README/">README.md</a> bug-report bullet (around line 24) to mention runtime metrics.  Update <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency/">docs/plans/PLAN-idle-cpu-and-latency.md</a> phase 5 status to Complete.</td>
+<td>Update <a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README.md</a> bug-report bullet (around line 24) to mention runtime metrics.  Update <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency/">docs/plans/PLAN-idle-cpu-and-latency.md</a> phase 5 status to Complete.</td>
 </tr>
 </tbody>
 </table>

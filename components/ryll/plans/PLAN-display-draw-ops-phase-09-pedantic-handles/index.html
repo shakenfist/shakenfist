@@ -11840,28 +11840,28 @@ bug-report flow, phase-8 pedantic wiring), and ground your
 answers in what the code actually does today.</p>
 <p>Key references for this phase:</p>
 <ul>
-<li><a href="../../ryll/src/main.rs">ryll/src/main.rs</a> — phase-8e
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs">ryll/src/main.rs</a> — phase-8e
   observer wiring block (look for "KNOWN LIMITATION").
   This is what we're moving.</li>
-<li><a href="../../ryll/src/app.rs#L345">ryll/src/app.rs:345</a> —
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L345">ryll/src/app.rs:345</a> —
   <code>RyllApp::new</code> where live <code>TrafficBuffers</code>,
   <code>ChannelSnapshots</code>, and <code>app_snapshot</code> are built
   (lines 367-371 in the phase-8 state).</li>
-<li><a href="../../ryll/src/app.rs#L2616">ryll/src/app.rs:2616</a> —
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2616">ryll/src/app.rs:2616</a> —
   <code>run_headless</code>, which builds its own live
   <code>TrafficBuffers</code>. Check where its equivalents for
   <code>ChannelSnapshots</code> and <code>app_snapshot</code> live (there may
   not be a full set — headless was never plumbed through
   the F8 bug-report path either, so a design decision
   is needed below).</li>
-<li><a href="../../ryll/src/bugreport.rs#L525">ryll/src/bugreport.rs:525</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L525">ryll/src/bugreport.rs:525</a>
   — <code>ChannelSnapshots</code> struct definition. Fields are
   already <code>Arc&lt;Mutex&lt;..&gt;&gt;</code>, so deriving <code>Clone</code> is free.</li>
-<li><a href="../../ryll/src/bugreport.rs#L901">ryll/src/bugreport.rs:901</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L901">ryll/src/bugreport.rs:901</a>
   — <code>BugReport::write_pedantic</code> signature (the helper
   phase 8b added; this phase wraps it in the observer
   factory).</li>
-<li><a href="../../shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
   — <code>register_gap_observer</code> with
   replay-on-late-registration. The tiny window between
   "session starts" and "observer registered" is covered
@@ -11939,7 +11939,7 @@ stubs and the comment together.</p>
 <h2 id="implementation-shape">Implementation shape<a class="headerlink" href="#implementation-shape" title="Permanent link">&para;</a></h2>
 <h3 id="1-clone-on-channelsnapshots">1. <code>Clone</code> on <code>ChannelSnapshots</code><a class="headerlink" href="#1-clone-on-channelsnapshots" title="Permanent link">&para;</a></h3>
 <p>In
-<a href="../../ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="cp">#[derive(Clone)]</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">ChannelSnapshots</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">display</span><span class="p">:</span><span class="w"> </span><span class="nc">Arc</span><span class="o">&lt;</span><span class="n">Mutex</span><span class="o">&lt;</span><span class="n">DisplaySnapshot</span><span class="o">&gt;&gt;</span><span class="p">,</span>
@@ -11955,7 +11955,7 @@ semantic change. Callers that previously did
 working.</p>
 <h3 id="2-pedanticconfig-and-the-observer-factory-helper">2. <code>PedanticConfig</code> and the observer-factory helper<a class="headerlink" href="#2-pedanticconfig-and-the-observer-factory-helper" title="Permanent link">&para;</a></h3>
 <p>Add to
-<a href="../../ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="sd">/// Configuration bundle passed from main.rs into the</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="sd">/// app constructors when --pedantic is enabled.</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="cp">#[derive(Debug, Clone)]</span>
@@ -12040,7 +12040,7 @@ working.</p>
 already correct modulo the stub handles.</p>
 <h3 id="3-call-the-factory-from-appryllappnew">3. Call the factory from <code>app::RyllApp::new</code><a class="headerlink" href="#3-call-the-factory-from-appryllappnew" title="Permanent link">&para;</a></h3>
 <p>In
-<a href="../../ryll/src/app.rs">ryll/src/app.rs</a> <code>RyllApp::new</code>,
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> <code>RyllApp::new</code>,
 after the live handles exist (around line 371) and
 before the struct literal return, insert:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">config</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pedantic_config</span><span class="w"> </span><span class="p">{</span>
@@ -12059,7 +12059,7 @@ before the struct literal return, insert:</p>
 call site in main.rs passes the config through.</p>
 <h3 id="4-call-the-factory-from-run_headless">4. Call the factory from <code>run_headless</code><a class="headerlink" href="#4-call-the-factory-from-run_headless" title="Permanent link">&para;</a></h3>
 <p>In
-<a href="../../ryll/src/app.rs">ryll/src/app.rs</a> <code>run_headless</code>,
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> <code>run_headless</code>,
 around line 2616 after <code>TrafficBuffers</code> is built:</p>
 <p>The headless path may not currently build full
 <code>ChannelSnapshots</code> / <code>AppSnapshot</code> objects — the F8 flow

@@ -12023,7 +12023,7 @@ make lint &amp;&amp; pre-commit run --all-files</code>).</p>
 <h2 id="grounding-whats-there-today">Grounding — what's there today<a class="headerlink" href="#grounding-whats-there-today" title="Permanent link">&para;</a></h2>
 <h3 id="item-6-reconnect-cancellation">Item 6: reconnect cancellation<a class="headerlink" href="#item-6-reconnect-cancellation" title="Permanent link">&para;</a></h3>
 <p><code>RyllApp::reconnect</code> at
-<a href="../../ryll/src/app.rs#L634-L751"><code>ryll/src/app.rs:634-751</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L634-L751"><code>ryll/src/app.rs:634-751</code></a>
 spawns a fresh <code>std::thread::spawn</code> containing a fresh
 <code>tokio::runtime::Runtime</code>, calls
 <code>run_connection(...).await</code> inside <code>block_on</code>, and
@@ -12036,7 +12036,7 @@ in any way. It collapses only when:</p>
 <li>Or the runtime is dropped by the thread exiting.</li>
 </ul>
 <p><code>run_connection</code>'s select loop is at
-<a href="../../ryll/src/app.rs#L3443-L3525"><code>ryll/src/app.rs:3443-3525</code></a>.
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3443-L3525"><code>ryll/src/app.rs:3443-3525</code></a>.
 Three branches today: event channel, connection task
 join, and a 100 ms <code>tokio::time::sleep</code> whose body polls
 <code>SHUTDOWN_REQUESTED</code>. The 100 ms branch is the natural
@@ -12045,7 +12045,7 @@ cooperative-cancel pattern, scoped to a single attempt
 instead of process-wide.</p>
 <h3 id="item-7-cursor-hide-overlay-handling">Item 7: cursor-hide overlay handling<a class="headerlink" href="#item-7-cursor-hide-overlay-handling" title="Permanent link">&para;</a></h3>
 <p>The cursor-hide predicate is at
-<a href="../../ryll/src/app.rs#L2984-L2994"><code>ryll/src/app.rs:2984-2994</code></a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2984-L2994"><code>ryll/src/app.rs:2984-2994</code></a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">cursor_image</span><span class="p">.</span><span class="n">is_some</span><span class="p">()</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="bp">self</span><span class="p">.</span><span class="n">region_select_active</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">surface_rect</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">egui</span><span class="p">::</span><span class="n">Rect</span><span class="p">::</span><span class="n">NOTHING</span>
@@ -12073,7 +12073,7 @@ AND chain reveals the host cursor on those frames and
 keeps it hidden when nothing else wants the pointer.</p>
 <h3 id="item-8-clipboard-crlf-lf-normalisation">Item 8: clipboard CRLF / LF normalisation<a class="headerlink" href="#item-8-clipboard-crlf-lf-normalisation" title="Permanent link">&para;</a></h3>
 <p><code>MainChannel::poll_host_clipboard</code> at
-<a href="../../ryll/src/channels/main_channel.rs#L923-L944"><code>ryll/src/channels/main_channel.rs:923-944</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L923-L944"><code>ryll/src/channels/main_channel.rs:923-944</code></a>
 compares the freshly read host clipboard against
 <code>self.last_clipboard_text</code> (Option<String>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">changed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="o">&amp;</span><span class="bp">self</span><span class="p">.</span><span class="n">last_clipboard_text</span><span class="w"> </span><span class="p">{</span>
@@ -12106,9 +12106,9 @@ since clipboard content can include passwords).</p>
 handler, with a "verify still relevant" caveat because
 the second-rebase merge had replaced parts of that
 handler wholesale. Verification:
-<a href="../../ryll/src/channels/main_channel.rs#L371-L378"><code>ryll/src/channels/main_channel.rs:371-378</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L371-L378"><code>ryll/src/channels/main_channel.rs:371-378</code></a>
 (INIT) and
-<a href="../../ryll/src/channels/main_channel.rs#L411-L415"><code>ryll/src/channels/main_channel.rs:411-415</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L411-L415"><code>ryll/src/channels/main_channel.rs:411-415</code></a>
 (MOUSE_MODE) both use three-arm matches:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">mode_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="n">init</span><span class="p">.</span><span class="n">current_mouse_mode</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="mi">1</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s">&quot;server (relative)&quot;</span><span class="p">,</span>

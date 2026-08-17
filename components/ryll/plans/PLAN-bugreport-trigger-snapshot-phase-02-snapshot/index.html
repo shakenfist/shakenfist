@@ -11959,25 +11959,25 @@ actually makes <code>screenshot.png</code> show the bug.</p>
 <tbody>
 <tr>
 <td>1</td>
-<td><a href="../../ryll/src/app.rs#L1247">app.rs:1247</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1247">app.rs:1247</a></td>
 <td>F12 key (toggles)</td>
 <td><code>BugReportType::Display</code></td>
 </tr>
 <tr>
 <td>2</td>
-<td><a href="../../ryll/src/app.rs#L1440">app.rs:1440</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1440">app.rs:1440</a></td>
 <td>Status-bar "Report" button</td>
 <td><code>BugReportType::Display</code></td>
 </tr>
 <tr>
 <td>3</td>
-<td><a href="../../ryll/src/app.rs#L1786">app.rs:1786</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1786">app.rs:1786</a></td>
 <td>USB error auto-open</td>
 <td><code>BugReportType::Usb</code></td>
 </tr>
 <tr>
 <td>4</td>
-<td><a href="../../ryll/src/app.rs#L2066">app.rs:2066</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2066">app.rs:2066</a></td>
 <td>Channel error auto-open</td>
 <td><code>BugReportType::Connection</code></td>
 </tr>
@@ -11995,17 +11995,17 @@ actually makes <code>screenshot.png</code> show the bug.</p>
 <tbody>
 <tr>
 <td>1</td>
-<td><a href="../../ryll/src/app.rs#L1247">app.rs:1247</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1247">app.rs:1247</a></td>
 <td>F12 again (toggles off)</td>
 </tr>
 <tr>
 <td>2</td>
-<td><a href="../../ryll/src/app.rs#L1275">app.rs:1275</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1275">app.rs:1275</a></td>
 <td>Escape while dialog open</td>
 </tr>
 <tr>
 <td>3</td>
-<td><a href="../../ryll/src/app.rs#L2155">app.rs:2155</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2155">app.rs:2155</a></td>
 <td>Cancel button</td>
 </tr>
 </tbody>
@@ -12022,24 +12022,24 @@ actually makes <code>screenshot.png</code> show the bug.</p>
 <tbody>
 <tr>
 <td>1</td>
-<td><a href="../../ryll/src/app.rs#L2150">app.rs:2150</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2150">app.rs:2150</a></td>
 <td>Capture button for non-Display</td>
 </tr>
 <tr>
 <td>2</td>
-<td><a href="../../ryll/src/app.rs#L2251">app.rs:2251</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2251">app.rs:2251</a></td>
 <td>Region-drag complete (Display)</td>
 </tr>
 <tr>
 <td>3</td>
-<td><a href="../../ryll/src/app.rs#L1236">app.rs:1236</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1236">app.rs:1236</a></td>
 <td>Escape during region select (submits with no region)</td>
 </tr>
 </tbody>
 </table>
 <p>All three submit paths funnel through
-<a href="../../ryll/src/app.rs#L965"><code>finish_bug_report</code></a> →
-<a href="../../ryll/src/app.rs#L923"><code>generate_bug_report</code></a>.</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L965"><code>finish_bug_report</code></a> →
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L923"><code>generate_bug_report</code></a>.</p>
 <h3 id="surface-access">Surface access<a class="headerlink" href="#surface-access" title="Permanent link">&para;</a></h3>
 <p><code>DisplaySurface::pixels()</code> returns <code>&amp;[u8]</code> (RGBA). <code>width</code> /
 <code>height</code> are public fields. <code>generate_bug_report</code> today picks
@@ -12049,7 +12049,7 @@ the largest surface:</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="o">|</span><span class="n">s</span><span class="o">|</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">pixels</span><span class="p">(),</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">height</span><span class="p">))</span>
 </code></pre></div>
 <h3 id="png-encoder">PNG encoder<a class="headerlink" href="#png-encoder" title="Permanent link">&para;</a></h3>
-<p><a href="../../ryll/src/bugreport.rs#L589"><code>bugreport::encode_png(pixels: &amp;[u8], width: u32, height: u32)
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L589"><code>bugreport::encode_png(pixels: &amp;[u8], width: u32, height: u32)
 -&gt; anyhow::Result&lt;Vec&lt;u8&gt;&gt;</code></a>
 is already <code>pub(crate)</code> and pure. No changes needed.</p>
 <h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>

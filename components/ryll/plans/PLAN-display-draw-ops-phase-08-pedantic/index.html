@@ -11857,18 +11857,18 @@ what the code actually does today.</p>
   §"Phase 8: <code>--pedantic</code> mode and status-bar gap
   counter — sketch" — the master-plan sketch, including
   the four gap categories and dedupe-key shape.</li>
-<li><a href="/components/ryll/STYLEGUIDE/">STYLEGUIDE.md §"warn_once for protocol gaps"</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md">STYLEGUIDE.md §"warn_once for protocol gaps"</a>
   — the convention codified in phase 7. Phase 8 turns
   that registry into a live observable.</li>
-<li><a href="../../shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>
   — warn_once registry, <code>warn_once_impl</code>,
   <code>register_key</code>, <code>warn_once_keys()</code>, <code>log_unknown_once</code>
   (phase 7). Phase 8 adds an observer hook.</li>
-<li><a href="../../ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs">ryll/src/bugreport.rs</a>
   — existing F8 flow: <code>BugReport::assemble(...)</code> +
   <code>write_zip(&amp;dir)</code>. Phase 8 adds a <code>Pedantic</code> variant
   and an auto-assemble helper.</li>
-<li><a href="../../ryll/src/app.rs#L1276">ryll/src/app.rs:1276</a> —
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1276">ryll/src/app.rs:1276</a> —
   existing <code>TopBottomPanel::bottom("stats")</code>. Phase 8
   adds a <code>Gaps: N</code> widget here and a click-to-list
   popup.</li>
@@ -11933,23 +11933,23 @@ identified are all surfaced:</p>
 <h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Registry (<code>HashSet&lt;&amp;'static str&gt;</code>) in
-  <a href="../../shakenfist-spice-protocol/src/logging.rs#L10">logging.rs:10-13</a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs#L10">logging.rs:10-13</a>
   holds phase-2+ keys. <code>register_key(key) -&gt; bool</code>
   returns is_new; callers fire side-effects. No
   observer hook.</li>
 <li><code>BugReportType</code> in
-  <a href="../../ryll/src/bugreport.rs#L616">bugreport.rs:616-622</a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L616">bugreport.rs:616-622</a>
   enumerates 5 channels. <code>BugReport::assemble(...)</code> is
   pub(crate); <code>write_zip(&amp;dir)</code> already picks a unique
   filename. F8 flow calls these from the GUI.</li>
 <li><code>_ =&gt; log_unknown(...)</code> arms live in:
-  <a href="../../ryll/src/channels/cursor.rs#L310">cursor.rs:310</a>,
-  <a href="../../ryll/src/channels/display.rs#L983">display.rs:983</a>,
-  <a href="../../ryll/src/channels/inputs.rs#L329">inputs.rs:329</a>,
-  <a href="../../ryll/src/channels/main_channel.rs#L533">main_channel.rs:533</a>,
-  <a href="../../ryll/src/channels/playback.rs#L525">playback.rs:525</a>,
-  <a href="../../ryll/src/channels/usbredir.rs#L246">usbredir.rs:246</a>,
-  <a href="../../ryll/src/channels/webdav.rs#L292">webdav.rs:292</a>.
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/cursor.rs#L310">cursor.rs:310</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L983">display.rs:983</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L329">inputs.rs:329</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L533">main_channel.rs:533</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/playback.rs#L525">playback.rs:525</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/usbredir.rs#L246">usbredir.rs:246</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/webdav.rs#L292">webdav.rs:292</a>.
   Display already uses the new <code>log_unknown_once</code> (via
   phase 7 for its four known-unimpl arms), but its
   <code>_ =&gt;</code> fall-through still uses the old

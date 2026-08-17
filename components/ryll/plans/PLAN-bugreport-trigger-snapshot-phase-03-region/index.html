@@ -11940,7 +11940,7 @@ delay.</p>
 <h2 id="grounding-whats-there-today">Grounding — what's there today<a class="headerlink" href="#grounding-whats-there-today" title="Permanent link">&para;</a></h2>
 <h3 id="region-selection">Region selection<a class="headerlink" href="#region-selection" title="Permanent link">&para;</a></h3>
 <p>Region-select mode at
-<a href="../../ryll/src/app.rs#L2161-L2253">app.rs:2161-2253</a> clamps
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2161-L2253">app.rs:2161-2253</a> clamps
 the drag to the surface bounds during the drag (<code>.min(surf_w)</code>
 / <code>.min(surf_h)</code>) and builds a <code>ReportRegion</code> from
 <code>region_drag_start</code> and <code>region_drag_end</code>:</p>
@@ -11955,7 +11955,7 @@ the drag to the surface bounds during the drag (<code>.min(surf_w)</code>
 <code>pos.x - self.surface_rect.min.x</code> etc., then cast to <code>u32</code>).
 Region selection only runs when <code>bug_report_type ==
 BugReportType::Display</code> — see the dispatch in
-<a href="../../ryll/src/app.rs#L2287-L2302">app.rs:2287-2302</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2287-L2302">app.rs:2287-2302</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">bug_report_type</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">BugReportType</span><span class="p">::</span><span class="n">Display</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="bp">self</span><span class="p">.</span><span class="n">region_select_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="o">..</span><span class="p">.</span>
@@ -11969,13 +11969,13 @@ BugReportType::Display</code> — see the dispatch in
 still guards on both — a belt-and-braces check is cheap and
 defends against future callers.</p>
 <h3 id="surface_pixels-at-submit"><code>surface_pixels</code> at submit<a class="headerlink" href="#surface_pixels-at-submit" title="Permanent link">&para;</a></h3>
-<p><a href="../../ryll/src/app.rs#L955"><code>generate_bug_report</code></a> picks the
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L955"><code>generate_bug_report</code></a> picks the
 largest surface at submit time and passes
 <code>Some((pixels, width, height))</code> for Display reports. That's
 the same surface buffer phase 3 will crop. Non-Display
 reports pass <code>None</code>, so the crop path short-circuits.</p>
 <h3 id="bugreport-zip-layout"><code>BugReport</code> zip layout<a class="headerlink" href="#bugreport-zip-layout" title="Permanent link">&para;</a></h3>
-<p><a href="../../ryll/src/bugreport.rs#L922-L960"><code>write_zip</code></a> writes
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L922-L960"><code>write_zip</code></a> writes
 files in this order:</p>
 <ol>
 <li><code>metadata.json</code></li>
@@ -11988,7 +11988,7 @@ files in this order:</p>
 <p>Phase 3 inserts <code>screenshot-region.png</code> between #5 and #6
 when the field is <code>Some</code>.</p>
 <h3 id="existing-cropping-code">Existing cropping code<a class="headerlink" href="#existing-cropping-code" title="Permanent link">&para;</a></h3>
-<p><a href="../../ryll/src/display/surface.rs#L440-L460"><code>display::surface::DisplaySurface::copy_subrect</code></a>
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L440-L460"><code>display::surface::DisplaySurface::copy_subrect</code></a>
 already does a clipped, aliasing-safe sub-rect copy within
 a single surface. Phase 3's crop is simpler (source and
 destination are different buffers, so no aliasing concern)

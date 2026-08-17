@@ -12057,9 +12057,11 @@
 
 
 <h1 id="diagnostics-and-instrumentation">Diagnostics and instrumentation<a class="headerlink" href="#diagnostics-and-instrumentation" title="Permanent link">&para;</a></h1>
-<p>The facilities ryll carries for understanding what a session did: traffic
-capture, statistics collection, the in-memory traffic ring buffer, channel
-state snapshots, the live traffic viewer, and bug report assembly.</p>
+<p>Ryll carries a set of facilities for understanding what a session did:
+statistics collection, an in-memory traffic ring buffer, channel state
+snapshots, bug report assembly, a live traffic viewer, and a capture mode
+that records per-channel protocol pcaps and H.264 video of the display to
+a directory.</p>
 <h2 id="statistics-and-instrumentation">Statistics and Instrumentation<a class="headerlink" href="#statistics-and-instrumentation" title="Permanent link">&para;</a></h2>
 <p>Ryll tracks:</p>
 <ul>
@@ -12110,7 +12112,7 @@ allocated by weight per channel rather than split evenly:</p>
 <th>Channel</th>
 <th>Cap</th>
 <th>Weight</th>
-<th>Coverage at session-001 rates</th>
+<th>Coverage at measured desktop rates</th>
 </tr>
 </thead>
 <tbody>
@@ -12172,8 +12174,8 @@ shared via <code>Arc&lt;TrafficBuffers&gt;</code> between all channel handler ta
 and the UI thread. This supports both bug-report export, the live
 traffic viewer, and the snapshot-on-notification path. (The webdav
 channel is intentionally absent — its handler does not call
-<code>traffic.record_*</code> today; tracked as a follow-up in
-<a href="/components/ryll/plans/PLAN-session-001-feedback/"><code>PLAN-session-001-feedback.md</code></a>.)</p>
+<code>traffic.record_*</code> today; tracked as a follow-up in the
+<a href="/components/ryll/plans/PLAN-session-001-feedback/">dogfooding feedback plan</a>.)</p>
 <h2 id="channel-state-snapshots">Channel State Snapshots<a class="headerlink" href="#channel-state-snapshots" title="Permanent link">&para;</a></h2>
 <p>Each channel handler maintains an <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> snapshot struct
 that captures the channel's mutable state. The snapshots are updated
@@ -12236,9 +12238,9 @@ written to JSON for bug reports.</p>
 <code>ping_recv_count</code>, <code>pong_send_count</code>, <code>last_ping_recv_ts_secs</code>,
 <code>writer_dropped_count</code>) plus four baseline additions
 (<code>messages_recv_by_opcode</code>, <code>messages_send_by_opcode</code>,
-<code>last_unknown_opcode</code>, <code>unknown_opcode_count</code>). See
-<code>docs/channel-diagnostics-audit.md</code> for the full audit matrix and
-minimum-baseline rationale.</p>
+<code>last_unknown_opcode</code>, <code>unknown_opcode_count</code>). See the
+<a href="/components/ryll/channel-diagnostics-audit/">channel diagnostics audit</a> for the full
+audit matrix and minimum-baseline rationale.</p>
 <p>The <code>ChannelSnapshots</code> struct in <code>ryll/src/bugreport.rs</code> holds the four
 channel snapshot <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> values and is created alongside
 <code>TrafficBuffers</code> in <code>run_connection()</code>. The <code>AppSnapshot</code> is
@@ -12431,7 +12433,8 @@ a misconfigured output directory does not retry on every
 disconnect event. Snapshots land in (in order of
 preference) <code>--bug-report-dir</code>, <code>&lt;--capture&gt;/bug-reports/</code>,
 or the current working directory. The same resolution
-chain is used for the manual F8 button. Runtime metrics
+chain is used for the manual F12 / Menu → Report path.
+Runtime metrics
 are recorded as unavailable in this path — sampling
 them on the GUI thread would freeze the UI for ~1 s,
 and the pcap and channel snapshots are the load-bearing

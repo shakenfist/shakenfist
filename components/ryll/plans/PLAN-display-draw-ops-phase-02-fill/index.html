@@ -12031,24 +12031,24 @@ BIOS and GRUB (the kernel-console scroll case needs phase
 </ul>
 <h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../ryll/src/channels/display.rs#L378-L384">ryll/src/channels/display.rs:378-384</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L378-L384">ryll/src/channels/display.rs:378-384</a>
   — <code>DRAW_COPY</code> is handled; <code>DRAW_COMPOSITE</code> is logged as
   a stub; <code>DRAW_FILL</code> falls into the <code>_ =&gt;
   log_unknown(...)</code> arm at
-  <a href="../../ryll/src/channels/display.rs#L654">ryll/src/channels/display.rs:654</a>.</li>
-<li><a href="../../shakenfist-spice-protocol/src/messages.rs">shakenfist-spice-protocol/src/messages.rs</a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654">ryll/src/channels/display.rs:654</a>.</li>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs">shakenfist-spice-protocol/src/messages.rs</a>
   has the <code>DrawBase</code>, <code>SpiceFill</code>, <code>SpiceBrush</code>,
   <code>SpiceQMask</code> parsers from phase 1.</li>
-<li><a href="../../shakenfist-spice-protocol/src/constants.rs#L189">shakenfist-spice-protocol/src/constants.rs:189</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/constants.rs#L189">shakenfist-spice-protocol/src/constants.rs:189</a>
   defines <code>DRAW_FILL = 302</code> but no <code>SPICE_ROPD_*</code> or
   <code>SPICE_BRUSH_TYPE_*</code>.</li>
-<li><a href="../../shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs:1-76</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs:1-76</a>
   has <code>log_message</code>, <code>log_detail</code>, <code>log_unknown</code>, and
   <code>hex_dump</code>. No warn-once helper.</li>
-<li><a href="../../ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>
   <code>ChannelEvent::FillRect</code> is defined (phase 1) but
   <code>#[allow(dead_code)]</code>.</li>
-<li><a href="../../ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
   <code>DisplaySurface::fill_rect</code> is defined (phase 1) but
   <code>#[allow(dead_code)]</code>.</li>
 </ul>
@@ -12076,7 +12076,7 @@ emit is:</p>
 channel already does for <code>cursor_type = Color32</code>.</p>
 <h2 id="the-warn-once-helper">The warn-once helper<a class="headerlink" href="#the-warn-once-helper" title="Permanent link">&para;</a></h2>
 <p>New API in
-<a href="../../shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>.
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>.
 The master plan calls for a registry that phase 8 can
 iterate; phase 2 only needs "fire once per key",
 but the shape should already allow phase 8 to hook it
@@ -12152,7 +12152,7 @@ each test a unique key prefix (e.g. include the test
 name literally).</p>
 <h2 id="new-protocol-crate-constants">New protocol-crate constants<a class="headerlink" href="#new-protocol-crate-constants" title="Permanent link">&para;</a></h2>
 <p>Add to
-<a href="../../shakenfist-spice-protocol/src/constants.rs">shakenfist-spice-protocol/src/constants.rs</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/constants.rs">shakenfist-spice-protocol/src/constants.rs</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="sd">/// Raster operation descriptors (SPICE_ROPD_* in enums.h).</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">pub</span><span class="w"> </span><span class="k">mod</span><span class="w"> </span><span class="nn">ropd</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">INVERS_SRC</span><span class="p">:</span><span class="w">   </span><span class="kt">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>

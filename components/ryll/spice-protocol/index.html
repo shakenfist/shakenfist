@@ -12125,31 +12125,59 @@
 
 
 <h1 id="spice-protocol-handling">SPICE protocol handling<a class="headerlink" href="#spice-protocol-handling" title="Permanent link">&para;</a></h1>
-<p>How ryll speaks SPICE on the wire: the channel model and handshake, the
-image encodings it decodes, the display channel capabilities it advertises,
-and the keyboard scancode mapping. See
-<a href="/components/ryll/../ARCHITECTURE/">Architecture</a> for where these pieces sit in the crate
-layout.</p>
+<p>This page describes how ryll speaks SPICE on the wire: the channel model
+and handshake, mouse-mode negotiation, the image encodings it decodes, the
+display channel capabilities it advertises, and the keyboard scancode
+mapping. See <a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">Architecture</a> for where these pieces
+sit in the crate layout.</p>
 <h2 id="spice-protocol">SPICE Protocol<a class="headerlink" href="#spice-protocol" title="Permanent link">&para;</a></h2>
 <h3 id="connection-sequence">Connection Sequence<a class="headerlink" href="#connection-sequence" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>1. TCP connect to server
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>2. TLS handshake (if secure port)
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>3. Link handshake (exchange capabilities)
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>4. Authentication (RSA-OAEP encrypted password)
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>5. Main channel: receive session ID and channel list
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>6. Connect secondary channels (display, cursor, inputs)
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>7. Event loop: process messages, render display, send input
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant R as ryll
+    participant S as SPICE server
+
+    R-&gt;&gt;S: TCP connect (plus TLS handshake on a secure port)
+    R-&gt;&gt;S: SpiceLinkMess (common and per-channel capabilities)
+    S-&gt;&gt;R: SpiceLinkReply (capabilities, RSA public key)
+    R-&gt;&gt;S: Auth mechanism, then RSA-OAEP encrypted password
+    S-&gt;&gt;R: Auth result
+    S-&gt;&gt;R: MAIN INIT (session id, mouse modes, agent state)
+    R-&gt;&gt;S: MAIN ATTACH_CHANNELS
+    S-&gt;&gt;R: MAIN CHANNELS_LIST
+    R-&gt;&gt;S: Link and auth again per secondary channel&lt;br/&gt;(display, cursor, inputs, ...)
+    loop Event loop
+        S-&gt;&gt;R: Display, cursor and audio messages
+        R-&gt;&gt;S: Keyboard and pointer events
+    end</code></pre>
 <h3 id="message-format">Message Format<a class="headerlink" href="#message-format" title="Permanent link">&para;</a></h3>
-<p>All SPICE messages use a 6-byte mini-header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>┌──────────────┬──────────────────────┐
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│ message_type │    message_size      │
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>│   (u16 LE)   │      (u32 LE)        │
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├──────────────┴──────────────────────┤
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│            payload                   │
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│         (variable length)            │
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>└─────────────────────────────────────┘
-</code></pre></div>
+<p>All SPICE messages use a 6-byte mini-header, immediately followed
+by the payload:</p>
+<table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Size</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>2</td>
+<td><code>message_type</code> (u16 LE)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>4</td>
+<td><code>message_size</code> (u32 LE)</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>message_size</code></td>
+<td>payload</td>
+</tr>
+</tbody>
+</table>
 <h3 id="channel-types">Channel Types<a class="headerlink" href="#channel-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -12241,7 +12269,7 @@ supported=3 / current=2) which fail every mode check.</p>
 </table>
 <p><code>parse_mouse_mode_payload</code> and
 <code>build_mouse_mode_request_payload</code> in
-<a href="../shakenfist-spice-renderer/src/channels/main_channel.rs"><code>main_channel.rs</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-renderer/src/channels/main_channel.rs"><code>main_channel.rs</code></a>
 own the read and write sides; both have unit tests next
 to them.</p>
 <h4 id="negotiation-flow">Negotiation flow<a class="headerlink" href="#negotiation-flow" title="Permanent link">&para;</a></h4>
@@ -12665,7 +12693,7 @@ unimplemented opcode, ignored sub-feature on an
 implemented op, recoverable decode failure — is
 registered in the process-global warn_once registry
 defined in
-<a href="../shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>.
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs">shakenfist-spice-protocol/src/logging.rs</a>.
 Each call site holds a stable <code>&amp;'static str</code> key shaped
 <code>"&lt;channel&gt;:&lt;kind&gt;:&lt;detail&gt;"</code>; the registry fires
 <code>tracing::warn!</code> exactly once per key per session.</p>

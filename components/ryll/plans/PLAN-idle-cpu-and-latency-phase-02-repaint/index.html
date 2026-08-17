@@ -11776,22 +11776,22 @@ power instead of CPU there.</p>
 <p>Target: idle CPU under 10% of one core, with no perceptible
 change in interactive responsiveness.</p>
 <h2 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h2>
-<p><a href="ryll/src/app.rs#L2169">ryll/src/app.rs:2169</a>:</p>
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2169">ryll/src/app.rs:2169</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">ctx</span><span class="p">.</span><span class="n">request_repaint_after</span><span class="p">(</span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">16</span><span class="p">));</span>
 </code></pre></div>
 <p>This is the only repaint trigger that runs every frame.
 Two other repaint sites exist:</p>
 <ul>
-<li><a href="ryll/src/app.rs#L411">app.rs:411</a>: <code>ctx.request_repaint()</code>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L411">app.rs:411</a>: <code>ctx.request_repaint()</code>
   in the constructor's connection setup.</li>
-<li><a href="ryll/src/app.rs#L1438">app.rs:1438</a> and
-  <a href="ryll/src/app.rs#L1659">app.rs:1659</a>:
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1438">app.rs:1438</a> and
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1659">app.rs:1659</a>:
   <code>request_repaint_after(1s)</code> inside conditional dialog
   branches.</li>
 </ul>
 <p>Channel events arrive on <code>event_rx</code> (a tokio <code>mpsc::Receiver</code>)
 and are drained by <code>process_events()</code> at
-<a href="ryll/src/app.rs#L493">app.rs:493</a> which uses <code>try_recv()</code>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L493">app.rs:493</a> which uses <code>try_recv()</code>
 in a loop.  egui only wakes if something has called
 <code>request_repaint</code>; if it doesn't wake, the events sit in
 the queue.</p>
@@ -11862,7 +11862,7 @@ status messages, the bandwidth tracker's <code>tick()</code>).</p>
   egui repaints via egui's own input handling; no fix
   needed there.</li>
 <li><strong>Bandwidth tracker</strong> ticks once per second
-  (<a href="ryll/src/app.rs">app.rs:bandwidth.tick() at line ~1050</a>).
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">app.rs:bandwidth.tick() at line ~1050</a>).
   The 1 Hz fallback covers this exactly.</li>
 <li><strong>Cadence mode</strong> (<code>--cadence</code>) injects a keystroke every
   2 seconds; that's its own task that calls
@@ -11870,7 +11870,7 @@ status messages, the bandwidth tracker's <code>tick()</code>).</p>
   Hz.  Need to verify and possibly add an explicit repaint
   call there.</li>
 <li><strong>Bug-report status message timeout</strong> (5-second fade at
-  <a href="ryll/src/app.rs#L1080-L1086">app.rs:1080-1086</a>) needs at
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1080-L1086">app.rs:1080-1086</a>) needs at
   least one repaint after the deadline to clear the label.
   The 1 Hz fallback covers this too.</li>
 <li><strong>Connection-state transitions</strong> (connect, disconnect)
@@ -11898,7 +11898,7 @@ status messages, the bandwidth tracker's <code>tick()</code>).</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>In <a href="ryll/src/app.rs">ryll/src/app.rs</a>, spawn a "repaint bridge" tokio task during <code>RyllApp::new</code>.  The task holds (1) an <code>egui::Context</code> clone obtained from <code>cc.egui_ctx.clone()</code> in the eframe <code>creator</code>, and (2) a clone of an <code>Arc&lt;tokio::sync::Notify&gt;</code>.  The task body is <code>loop { notify.notified().await; ctx.request_repaint(); }</code>.  Store the <code>Arc&lt;Notify&gt;</code> on <code>RyllApp</code> so the management code that pushes channel events can call <code>notify.notify_one()</code>.  Then, every place that sends on <code>event_tx</code> (the same <code>mpsc::Sender&lt;ChannelEvent&gt;</code> that channel handlers hold) must call <code>notify.notify_one()</code> immediately after.  Identify those sites: search for <code>event_tx.send(</code> in <code>ryll/src/channels/</code>.  Pass the <code>Arc&lt;Notify&gt;</code> into each channel handler's <code>new()</code> alongside the existing <code>event_tx</code>.  This is intrusive — multiple files change.  Then in <code>update()</code> at <a href="ryll/src/app.rs#L2169">app.rs:2169</a>, replace <code>request_repaint_after(16ms)</code> with <code>request_repaint_after(1s)</code> as a fallback for time-based UI elements (sparklines, status message expiry).  Verify the cadence mode keystroke injection still wakes egui; if not, add a <code>notify.notify_one()</code> there too.  Add a brief <code>// Repaint when channel events arrive; 1s fallback for time-based UI.</code> comment near the new code.</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a>, spawn a "repaint bridge" tokio task during <code>RyllApp::new</code>.  The task holds (1) an <code>egui::Context</code> clone obtained from <code>cc.egui_ctx.clone()</code> in the eframe <code>creator</code>, and (2) a clone of an <code>Arc&lt;tokio::sync::Notify&gt;</code>.  The task body is <code>loop { notify.notified().await; ctx.request_repaint(); }</code>.  Store the <code>Arc&lt;Notify&gt;</code> on <code>RyllApp</code> so the management code that pushes channel events can call <code>notify.notify_one()</code>.  Then, every place that sends on <code>event_tx</code> (the same <code>mpsc::Sender&lt;ChannelEvent&gt;</code> that channel handlers hold) must call <code>notify.notify_one()</code> immediately after.  Identify those sites: search for <code>event_tx.send(</code> in <code>ryll/src/channels/</code>.  Pass the <code>Arc&lt;Notify&gt;</code> into each channel handler's <code>new()</code> alongside the existing <code>event_tx</code>.  This is intrusive — multiple files change.  Then in <code>update()</code> at <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2169">app.rs:2169</a>, replace <code>request_repaint_after(16ms)</code> with <code>request_repaint_after(1s)</code> as a fallback for time-based UI elements (sparklines, status message expiry).  Verify the cadence mode keystroke injection still wakes egui; if not, add a <code>notify.notify_one()</code> there too.  Add a brief <code>// Repaint when channel events arrive; 1s fallback for time-based UI.</code> comment near the new code.</td>
 </tr>
 <tr>
 <td>2b</td>

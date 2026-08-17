@@ -11896,13 +11896,14 @@ the focus has started to shift to performance validation.</p>
 <h2 id="whats-with-the-name">What's With The Name?<a class="headerlink" href="#whats-with-the-name" title="Permanent link">&para;</a></h2>
 <p>Honestly, I am not super into Star Wars or anything, but "ryll" was the first
 good spice pun I came across. To quote the excellently named Wookieepedia:</p>
-<blockquote>
+<div class="admonition quote">
+<p class="admonition-title">Quote</p>
 <p>Ryll was a precious ore harvested from the mines of Ryloth, and could also
 be found in the Krost Mountains on Aaloth. It had military and scientific
 applications, but could also be used as a drug in the form of refined spice,
 which was less effective than glitterstim.</p>
 <p><a href="https://starwars.fandom.com/wiki/Ryll">https://starwars.fandom.com/wiki/Ryll</a></p>
-</blockquote>
+</div>
 <p>I guess I should think of a project to name "glitterstim" now too.</p>
 <h2 id="why-build-a-custom-client">Why Build a Custom Client?<a class="headerlink" href="#why-build-a-custom-client" title="Permanent link">&para;</a></h2>
 <p>Existing SPICE clients like <code>remote-viewer</code> (spice-gtk) are designed for
@@ -11920,18 +11921,11 @@ coverage (display, cursor, inputs, audio, USB redirection, WebDAV folder
 sharing) and enough delivery modes (desktop GUI, headless, web browser) that
 it is now a practical client for real workloads, not just test ones.</p>
 <h2 id="the-testing-setup">The Testing Setup<a class="headerlink" href="#the-testing-setup" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────┐         ┌───────────┐         ┌─────────────┐
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  ryll   │────────▶│ kerbside  │────────▶│ SPICE server│
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│ (client)│         │  (proxy)  │         │   (QEMU)    │
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>└─────────┘         └───────────┘         └─────────────┘
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>     │                    │                      │
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>     │                    │                      │
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>     ▼                    ▼                      ▼
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  Metrics:            Metrics:              Metrics:
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  - Latency           - Throughput          - Server-side
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  - Frame rate        - Connection time       processing
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  - Bytes in/out      - Protocol overhead
-</code></pre></div>
+<pre class="mermaid"><code>flowchart LR
+    ryll["ryll&lt;br/&gt;(client)"] --&gt; kerbside["kerbside&lt;br/&gt;(proxy)"] --&gt; server["SPICE server&lt;br/&gt;(QEMU)"]
+    ryll -.-&gt; rm["Metrics:&lt;br/&gt;latency&lt;br/&gt;frame rate&lt;br/&gt;bytes in / out"]
+    kerbside -.-&gt; km["Metrics:&lt;br/&gt;throughput&lt;br/&gt;connection time&lt;br/&gt;protocol overhead"]
+    server -.-&gt; sm["Metrics:&lt;br/&gt;server-side processing"]</code></pre>
 <p>With ryll, we can:</p>
 <ul>
 <li>Measure end-to-end latency through the proxy</li>
@@ -11974,9 +11968,9 @@ both ends of the traffic through the proxy. This would allow:</p>
 </ul>
 <h2 id="project-files">Project Files<a class="headerlink" href="#project-files" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="/components/ryll/../README/">README</a> - Quick start and usage</li>
-<li><a href="/components/ryll/../ARCHITECTURE/">ARCHITECTURE</a> - The crate map, code organisation, and concurrency model</li>
-<li><a href="/components/ryll/../AGENTS/">AGENTS</a> - Guide for AI coding assistants</li>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README</a> - Quick start and usage</li>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">ARCHITECTURE</a> - The crate map, code organisation, and concurrency model</li>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md">AGENTS</a> - Guide for AI coding assistants</li>
 </ul>
 
 

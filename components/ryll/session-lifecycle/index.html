@@ -11903,8 +11903,12 @@
 
 
 <h1 id="session-lifecycle">Session lifecycle<a class="headerlink" href="#session-lifecycle" title="Permanent link">&para;</a></h1>
-<p>How a ryll session starts, survives a dropped connection, and shuts down
-without losing buffered work.</p>
+<p>A ryll session has to shut down without losing buffered work, and survive
+a dropped connection without leaking the threads and sockets of the
+attempt it replaced. This page covers the graceful shutdown path and the
+reconnection machinery: what is recreated, what survives, how superseded
+attempts are cancelled, and when reconnection happens automatically
+rather than through a modal.</p>
 <h2 id="graceful-shutdown">Graceful Shutdown<a class="headerlink" href="#graceful-shutdown" title="Permanent link">&para;</a></h2>
 <p>Ryll installs a SIGINT handler (via <code>libc::signal</code>) in <code>main.rs</code> that sets a
 global <code>AtomicBool</code> flag (<code>SHUTDOWN_REQUESTED</code>). This allows Ctrl+C to trigger

@@ -12013,19 +12013,26 @@
 
 
 <h1 id="device-redirection">Device redirection<a class="headerlink" href="#device-redirection" title="Permanent link">&para;</a></h1>
-<p>Peripherals and data shared between the local machine and the guest: USB
-mass storage over the usbredir channel, folder sharing over WebDAV, and
-clipboard text delivered as synthetic keystrokes.</p>
+<p>Device redirection shares peripherals and data between the local machine
+and the guest: USB devices over the usbredir channel, either as physical
+pass-through on Linux or as virtual mass storage devices everywhere;
+folder sharing over WebDAV; and clipboard text delivered as synthetic
+keystrokes for guests without vdagent.</p>
 <h2 id="usb-redirection">USB Redirection<a class="headerlink" href="#usb-redirection" title="Permanent link">&para;</a></h2>
 <p>USB device redirection uses the SPICE usbredir channel (type 9) to
 forward USB devices to the remote VM. The implementation spans
 several protocol layers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>SPICE SpiceVMC (DATA/COMPRESSED_DATA messages)
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └── usbredir protocol (hello, device_connect, control/bulk/interrupt packets)
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        └── USB Mass Storage Bulk-Only Transport (for virtual disks)
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>              └── SCSI commands (INQUIRY, READ/WRITE(10), etc.)
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                    └── RAW file I/O (seek + read/write at LBA * 512)
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    vmc["SPICE SpiceVMC&lt;br/&gt;(DATA / COMPRESSED_DATA messages)"]
+    usbredir["usbredir protocol&lt;br/&gt;(hello, device_connect, control / bulk / interrupt packets)"]
+    bot["USB Mass Storage Bulk-Only Transport&lt;br/&gt;(for virtual disks)"]
+    scsi["SCSI commands&lt;br/&gt;(INQUIRY, READ/WRITE(10), and so on)"]
+    raw["RAW file I/O&lt;br/&gt;(seek + read/write at LBA * 512)"]
+
+    vmc -- carries --&gt; usbredir
+    usbredir -- carries --&gt; bot
+    bot -- carries --&gt; scsi
+    scsi -- carries --&gt; raw</code></pre>
 <h3 id="device-backends">Device backends<a class="headerlink" href="#device-backends" title="Permanent link">&para;</a></h3>
 <p>The <code>UsbDeviceBackend</code> trait (<code>shakenfist-spice-renderer/src/usb/mod.rs</code>)
 abstracts over device types. The <code>DeviceBackend</code> enum provides
@@ -12053,11 +12060,12 @@ non-object-safe dispatch:</p>
 <li>Disconnection aborts polling tasks and sends <code>device_disconnect</code>.</li>
 </ol>
 <h3 id="cli-usage">CLI usage<a class="headerlink" href="#cli-usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--usb-disk<span class="w"> </span>/path/to/image.raw<span class="w">       </span><span class="c1"># read-write</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--usb-disk-ro<span class="w"> </span>/path/to/image.raw<span class="w">     </span><span class="c1"># read-only</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--usb-disk<span class="w"> </span>/path/to/image.raw<span class="w">       </span><span class="c1"># read-write</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--usb-disk-ro<span class="w"> </span>/path/to/image.raw<span class="w">     </span><span class="c1"># read-only</span>
 </code></pre></div>
-<p>See <code>docs/configuration.md</code> for details. Use <code>make test-qemu-usb</code> to start
-a QEMU instance with USB redirection enabled.</p>
+<p>See the <a href="/components/ryll/configuration/">configuration guide</a> for details. Use
+<code>make test-qemu-usb</code> to start a QEMU instance with USB redirection
+enabled.</p>
 <h3 id="gui-components">GUI Components<a class="headerlink" href="#gui-components" title="Permanent link">&para;</a></h3>
 <p>The USB panel is a right-side panel toggled by Menu → USB,
 rendered alongside the traffic viewer panel (both use <code>egui::SidePanel::right</code>
@@ -12105,40 +12113,46 @@ local directory to the guest VM. Like usbredir, it uses the SpiceVMC transport
 ryll runs an embedded WebDAV server that fulfils them against the local
 filesystem.</p>
 <h3 id="protocol-layers">Protocol layers<a class="headerlink" href="#protocol-layers" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>SPICE SpiceVMC (DATA/COMPRESSED_DATA messages)
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  └── Mux protocol (client_id + size + HTTP data)
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        └── HTTP/1.1 (parsed by hyper)
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>              └── WebDAV (RFC 4918, handled by dav-server with LocalFs)
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                    └── Local filesystem I/O
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    vmc["SPICE SpiceVMC&lt;br/&gt;(DATA / COMPRESSED_DATA messages)"]
+    mux["Mux protocol&lt;br/&gt;(client_id + size + HTTP data)"]
+    http["HTTP/1.1&lt;br/&gt;(parsed by hyper)"]
+    webdav["WebDAV&lt;br/&gt;(RFC 4918, handled by dav-server with LocalFs)"]
+    fs["Local filesystem I/O"]
+
+    vmc -- carries --&gt; mux
+    mux -- carries --&gt; http
+    http -- carries --&gt; webdav
+    webdav -- carries --&gt; fs</code></pre>
 <h3 id="mux-protocol">Mux protocol<a class="headerlink" href="#mux-protocol" title="Permanent link">&para;</a></h3>
 <p>The WebDAV channel multiplexes multiple concurrent HTTP clients over a
 single byte stream. Each frame is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>client_id:  i64 LE  (8 bytes) — identifies the HTTP client
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>data_size:  u16 LE  (2 bytes) — payload size (0 = disconnect)
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>data:       [u8]    (data_size bytes) — raw HTTP bytes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>client_id:  i64 LE  (8 bytes) — identifies the HTTP client
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>data_size:  u16 LE  (2 bytes) — payload size (0 = disconnect)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>data:       [u8]    (data_size bytes) — raw HTTP bytes
 </code></pre></div>
 <p>The <code>MuxDemuxer</code> (<code>shakenfist-spice-renderer/src/webdav/mux.rs</code>) accumulates
 bytes and extracts complete frames, handling frames that span VMC messages
 or are packed together.</p>
 <h3 id="per-client-architecture">Per-client architecture<a class="headerlink" href="#per-client-architecture" title="Permanent link">&para;</a></h3>
 <p>Each mux client gets a <code>tokio::io::DuplexStream</code> pair:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Guest HTTP request bytes
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>       │
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>       ▼
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  DuplexStream (client end, split)
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  ├── write half: held in MuxClient, main loop writes request data
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  └── read half: reader task reads response data, sends via mpsc
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>       │
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>       ▼
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  DuplexStream (server end)
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>       │
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>       ▼
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>  TokioIo → hyper http1::serve_connection() → dav-server DavHandler
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>       │
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>       ▼
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>  Local filesystem (via dav-server LocalFs)
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    req["Guest HTTP request bytes"]
+    subgraph ce["DuplexStream (client end, split)"]
+        wh["write half&lt;br/&gt;held in MuxClient; the main loop writes request data"]
+        rh["read half&lt;br/&gt;reader task reads response data, sends it via mpsc"]
+    end
+    se["DuplexStream (server end)"]
+    hyper["TokioIo → hyper http1::serve_connection()&lt;br/&gt;→ dav-server DavHandler"]
+    fs["Local filesystem (via dav-server LocalFs)"]
+
+    req --&gt; wh
+    wh --&gt; se
+    se --&gt; hyper
+    hyper --&gt; fs
+    fs -. response .-&gt; hyper
+    hyper -. response .-&gt; se
+    se -. response .-&gt; rh</code></pre>
 <p>Response data flows back through an <code>mpsc::Sender&lt;MuxResponse&gt;</code> from
 the per-client reader task to the main <code>run()</code> loop, which muxes the
 responses back to the guest. This is the same pattern used by usbredir's
@@ -12151,11 +12165,11 @@ a <code>ShareDirectory</code> command arrives from the UI or <code>--share-dir</
 specified on the CLI, and destroyed on <code>StopSharing</code>. Read-only mode uses
 <code>DavMethodSet::WEBDAV_RO</code> to restrict allowed HTTP methods.</p>
 <h3 id="cli-usage_1">CLI usage<a class="headerlink" href="#cli-usage_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--share-dir<span class="w"> </span>/path/to/dir<span class="w">          </span><span class="c1"># read-write</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--share-dir<span class="w"> </span>/path/to/dir<span class="w"> </span>--share-dir-ro<span class="w">  </span><span class="c1"># read-only</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--share-dir<span class="w"> </span>/path/to/dir<span class="w">          </span><span class="c1"># read-write</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>conn.vv<span class="w"> </span>--share-dir<span class="w"> </span>/path/to/dir<span class="w"> </span>--share-dir-ro<span class="w">  </span><span class="c1"># read-only</span>
 </code></pre></div>
-<p>See <code>docs/configuration.md</code> for details. Use <code>make test-qemu-webdav</code> to start
-a QEMU instance with WebDAV enabled.</p>
+<p>See the <a href="/components/ryll/configuration/">configuration guide</a> for details. Use
+<code>make test-qemu-webdav</code> to start a QEMU instance with WebDAV enabled.</p>
 <h3 id="gui-components_1">GUI Components<a class="headerlink" href="#gui-components_1" title="Permanent link">&para;</a></h3>
 <p>The Folders panel is a right-side panel toggled by
 Menu → Folders. It mirrors the USB panel structure:

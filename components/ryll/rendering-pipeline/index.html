@@ -11891,9 +11891,10 @@
 
 
 <h1 id="rendering-and-audio-pipeline">Rendering and audio pipeline<a class="headerlink" href="#rendering-and-audio-pipeline" title="Permanent link">&para;</a></h1>
-<p>How decoded SPICE surfaces become pixels on a screen, how the window is
-sized and how multiple monitors are handled, how audio playback is driven,
-and how user-facing notifications are raised.</p>
+<p>The rendering and audio pipeline turns decoded SPICE surfaces into pixels
+on a screen. This page covers that path in both GUI and headless modes,
+how the window is sized and how multiple monitors are handled, how audio
+playback is driven, and how user-facing notifications are raised.</p>
 <h2 id="display-rendering">Display Rendering<a class="headerlink" href="#display-rendering" title="Permanent link">&para;</a></h2>
 <h3 id="gui-mode-egui">GUI Mode (egui)<a class="headerlink" href="#gui-mode-egui" title="Permanent link">&para;</a></h3>
 <p>Ryll uses <strong>immediate mode rendering</strong> via egui:</p>
@@ -12043,22 +12044,19 @@ untouched.</p>
 <code>PLAYBACK_DATA</code> messages containing a 4-byte multimedia timestamp
 followed by encoded audio. The codec is negotiated via <code>PLAYBACK_MODE</code>
 (raw PCM = 1, Opus = 3).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>SPICE PLAYBACK_DATA message (tokio network task)
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  │
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  ├── raw PCM: i16 LE samples pushed directly
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  └── Opus: decoded via `opus-decoder` crate → i16 samples
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                │
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                ▼
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        rtrb::RingBuffer&lt;i16&gt;  (lock-free, ~2 s capacity at 48kHz stereo)
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>                │
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>                ▼
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>      dedicated std::thread (&quot;audio&quot;)
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>                │
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>                ├── drains ring buffer into local VecDeque
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>                ├── Resampler: linear interpolation from source rate
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>                │   to device rate (ratio = source_rate / device_rate)
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>                └── cpal output stream callback → audio device
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    msg["SPICE PLAYBACK_DATA message&lt;br/&gt;(tokio network task)"]
+    pcm["raw PCM: i16 LE samples pushed directly"]
+    opus["Opus: decoded via the opus-decoder crate → i16 samples"]
+    ring["rtrb::RingBuffer&amp;lt;i16&amp;gt;&lt;br/&gt;lock-free, ~2 s capacity at 48 kHz stereo"]
+    thread["dedicated std::thread, named audio"]
+    drain["drains ring buffer into local VecDeque"]
+    resample["Resampler: linear interpolation from source rate to device rate&lt;br/&gt;(ratio = source_rate / device_rate)"]
+    cpal["cpal output stream callback → audio device"]
+
+    msg --&gt; pcm --&gt; ring
+    msg --&gt; opus --&gt; ring
+    ring --&gt; thread --&gt; drain --&gt; resample --&gt; cpal</code></pre>
 <p>The tokio network task is the <strong>producer</strong>: it decodes incoming audio
 and pushes i16 samples into the ring buffer via <code>rtrb::Producer&lt;i16&gt;</code>.
 Back-pressure is applied by dropping samples when the ring buffer is

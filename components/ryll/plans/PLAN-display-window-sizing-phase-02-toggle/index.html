@@ -11872,19 +11872,19 @@ surface renders at native size inside that window
 <ul>
 <li><code>pending_resize: Option&lt;(f32, f32)&gt;</code> and
   <code>last_auto_resize: Option&lt;(u32, u32)&gt;</code> on <code>RyllApp</code>
-  (<a href="../../ryll/src/app.rs#L241-L251">app.rs:241-251</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L241-L251">app.rs:241-251</a>).</li>
 <li>The <code>compute_auto_resize(pending, last_auto, is_max)</code>
   free function
-  (<a href="../../ryll/src/app.rs#L3036-L3068">app.rs:3036-3068</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3036-L3068">app.rs:3036-3068</a>).</li>
 <li>The call site in <code>RyllApp::update</code>
-  (<a href="../../ryll/src/app.rs#L1674-L1693">app.rs:1674-1693</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1674-L1693">app.rs:1674-1693</a>).</li>
 </ul>
 <p>The hamburger menu lives at
-<a href="../../ryll/src/app.rs#L1927-L1963">app.rs:1927-1963</a> and
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1927-L1963">app.rs:1927-1963</a> and
 already contains three view toggles via plain
 <code>ui.checkbox</code>. Adding a fourth is a one-line change.</p>
 <p><code>Args</code> in
-<a href="../../ryll/src/config.rs#L10-L92">ryll/src/config.rs:10-92</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/config.rs#L10-L92">ryll/src/config.rs:10-92</a>
 uses the standard clap-derive style. Boolean flags follow
 the pattern <code>#[arg(long, default_value_t = false)] pub
 foo: bool</code> (see <code>headless</code>, <code>cadence</code>, <code>pedantic</code>,
@@ -11892,10 +11892,10 @@ foo: bool</code> (see <code>headless</code>, <code>cadence</code>, <code>pedanti
 <code>--no-foo</code> is just a boolean named <code>no_foo</code> that is then
 inverted at the call site.</p>
 <p><code>RyllApp::new</code> is called from <code>run_gui</code> in
-<a href="../../ryll/src/main.rs#L217-L234">ryll/src/main.rs:217-234</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L217-L234">ryll/src/main.rs:217-234</a>
 with positional arguments. <code>app::run_headless</code> is called
 from <code>run_headless</code> in
-<a href="../../ryll/src/main.rs#L178-L194">ryll/src/main.rs:178-194</a>.</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L178-L194">ryll/src/main.rs:178-194</a>.</p>
 <p><code>run_headless</code> does not own a <code>RyllApp</code> — it has its own
 parallel "headless app" code path in <code>ryll/src/app.rs</code>. We
 pass <code>obey_guest_size</code> to it for symmetry and so the CLI
@@ -11905,7 +11905,7 @@ Concretely: store it on the headless-side state struct (if
 one exists) or accept-and-drop in the function signature.
 The phase plan brief asks the implementing agent to pick
 the cleanest of the two after reading
-<a href="../../ryll/src/app.rs"><code>app::run_headless</code></a>.</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs"><code>app::run_headless</code></a>.</p>
 <h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
 <h3 id="state">State<a class="headerlink" href="#state" title="Permanent link">&para;</a></h3>
 <p>Add to <code>RyllApp</code>, near <code>pending_resize</code>:</p>
@@ -11985,7 +11985,7 @@ five-minutes-ago surface size.</p>
 <h3 id="hamburger-menu">Hamburger menu<a class="headerlink" href="#hamburger-menu" title="Permanent link">&para;</a></h3>
 <p>Inside the <code>egui::menu::menu_button(ui, "☰", |ui| { … })</code>
 block at
-<a href="../../ryll/src/app.rs#L1927-L1963">app.rs:1927-1963</a>, add
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1927-L1963">app.rs:1927-1963</a>, add
 the checkbox <strong>above</strong> the three existing view toggles so
 the display-related entry is visually grouped near the
 top:</p>

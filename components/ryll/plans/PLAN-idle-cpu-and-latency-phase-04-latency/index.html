@@ -11758,7 +11758,7 @@
 <p>Replace the broken keystroke-based latency measurement
 with a real signal derived from SPICE PING/PONG.</p>
 <p>The current <code>Latency: Xms</code> label and sparkline always read
-zero because <a href="ryll/src/channels/inputs.rs#L347-L356">channels/inputs.rs:347-356</a>
+zero because <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L347-L356">channels/inputs.rs:347-356</a>
 sets <code>last_key_time = Instant::now()</code> then immediately
 calls <code>last_key_time.unwrap().elapsed()</code> on the very next
 line — measuring only the few microseconds between the two
@@ -11782,13 +11782,13 @@ section "Latency measurement is broken"):</p>
   bypass Nagle and get an accurate first sample.  We
   inherit that signal for free.</li>
 <li>All PING handlers in ryll already exist and parse the
-  message + emit a PONG response: <a href="ryll/src/channels/main_channel.rs#L389">main_channel.rs:389</a>,
-  <a href="ryll/src/channels/display.rs#L442">display.rs:442</a>,
-  <a href="ryll/src/channels/cursor.rs#L292">cursor.rs:292</a>,
-  <a href="ryll/src/channels/inputs.rs#L310">inputs.rs:310</a>,
-  <a href="ryll/src/channels/playback.rs#L456">playback.rs:456</a>,
-  <a href="ryll/src/channels/usbredir.rs#L232">usbredir.rs:232</a>,
-  <a href="ryll/src/channels/webdav.rs#L278">webdav.rs:278</a>.</li>
+  message + emit a PONG response: <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L389">main_channel.rs:389</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L442">display.rs:442</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/cursor.rs#L292">cursor.rs:292</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L310">inputs.rs:310</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/playback.rs#L456">playback.rs:456</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/usbredir.rs#L232">usbredir.rs:232</a>,
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/webdav.rs#L278">webdav.rs:278</a>.</li>
 <li>Each handler currently parses the PING but does nothing
   with the timing — it's free signal we throw away.</li>
 </ul>
@@ -11931,7 +11931,7 @@ too sparse on a given session, fall back to display.</p>
 <p>Delete the broken emission in <code>inputs.rs:347-356</code>.
    <code>last_key_time</code> may also be unused after this — check
    and remove if so (it's referenced in the bug-report
-   snapshot at <a href="ryll/src/channels/inputs.rs#L551">inputs.rs:551</a>,
+   snapshot at <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L551">inputs.rs:551</a>,
    so probably keep the field, just not the latency
    emission).</p>
 </li>
@@ -11953,21 +11953,21 @@ too sparse on a given session, fall back to display.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/channels/mod.rs#L88">ryll/src/channels/mod.rs</a>, rename <code>ChannelEvent::Latency { key_timestamp: f64 }</code> to <code>ChannelEvent::Latency { sample_ms: f32 }</code>.  Update the consumer in <a href="ryll/src/app.rs#L643">ryll/src/app.rs</a> accordingly: change the destructuring and replace <code>(key_timestamp * 1000.0) as f32</code> with the new <code>sample_ms</code> directly.  Drop the broken emission in <a href="ryll/src/channels/inputs.rs#L347-L356">ryll/src/channels/inputs.rs:347-356</a> — keep <code>last_key_time = Some(Instant::now())</code> (still used by the bug-report snapshot at line ~551) but remove the <code>event_tx.send(ChannelEvent::Latency { ... })</code> and the matching <code>repaint_notify.notify_one()</code>.  Add a brief comment at the keep-the-field-but-drop-the-event site: "// last_key_time is recorded for the bug-report snapshot only; latency is now measured from server PINGs in main_channel.rs".</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs#L88">ryll/src/channels/mod.rs</a>, rename <code>ChannelEvent::Latency { key_timestamp: f64 }</code> to <code>ChannelEvent::Latency { sample_ms: f32 }</code>.  Update the consumer in <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L643">ryll/src/app.rs</a> accordingly: change the destructuring and replace <code>(key_timestamp * 1000.0) as f32</code> with the new <code>sample_ms</code> directly.  Drop the broken emission in <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L347-L356">ryll/src/channels/inputs.rs:347-356</a> — keep <code>last_key_time = Some(Instant::now())</code> (still used by the bug-report snapshot at line ~551) but remove the <code>event_tx.send(ChannelEvent::Latency { ... })</code> and the matching <code>repaint_notify.notify_one()</code>.  Add a brief comment at the keep-the-field-but-drop-the-event site: "// last_key_time is recorded for the bug-report snapshot only; latency is now measured from server PINGs in main_channel.rs".</td>
 </tr>
 <tr>
 <td>4b</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/channels/main_channel.rs#L389">ryll/src/channels/main_channel.rs</a>, extend the <code>PING</code> handler to track the previous PING's wall-clock arrival (a new <code>last_ping_at: Option&lt;Instant&gt;</code> field on <code>MainChannel</code>).  When a PING arrives and <code>last_ping_at.is_some()</code>, compute <code>(now - last).as_secs_f64() * 1000.0</code> as the sample, send <code>ChannelEvent::Latency { sample_ms }</code>, and call <code>self.repaint_notify.notify_one()</code> (mirroring the pattern from phase 2).  Always update <code>last_ping_at = Some(now)</code> regardless.  Skip the first PING (no prior sample to diff).  No need to read the embedded server timestamp — keep v1 simple.</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L389">ryll/src/channels/main_channel.rs</a>, extend the <code>PING</code> handler to track the previous PING's wall-clock arrival (a new <code>last_ping_at: Option&lt;Instant&gt;</code> field on <code>MainChannel</code>).  When a PING arrives and <code>last_ping_at.is_some()</code>, compute <code>(now - last).as_secs_f64() * 1000.0</code> as the sample, send <code>ChannelEvent::Latency { sample_ms }</code>, and call <code>self.repaint_notify.notify_one()</code> (mirroring the pattern from phase 2).  Always update <code>last_ping_at = Some(now)</code> regardless.  Skip the first PING (no prior sample to diff).  No need to read the embedded server timestamp — keep v1 simple.</td>
 </tr>
 <tr>
 <td>4c</td>
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Update <a href="/components/ryll/plans/README/">README.md</a> feature bullet for "Latency sparkline" (introduced in the screenshot HUD plan).  Replace the <code>--cadence</code> reference with: "Latency sparkline - Bottom stats panel shows client-observed inter-PING interval from the main channel (lower variance is better; spikes indicate network or server stalls)."  Update the docstring on <code>LatencyTracker</code> in <a href="ryll/src/app.rs">ryll/src/app.rs</a> too, if it still references keystroke timing.</td>
+<td>Update <a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README.md</a> feature bullet for "Latency sparkline" (introduced in the screenshot HUD plan).  Replace the <code>--cadence</code> reference with: "Latency sparkline - Bottom stats panel shows client-observed inter-PING interval from the main channel (lower variance is better; spikes indicate network or server stalls)."  Update the docstring on <code>LatencyTracker</code> in <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> too, if it still references keystroke timing.</td>
 </tr>
 </tbody>
 </table>

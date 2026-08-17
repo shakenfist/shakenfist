@@ -12105,29 +12105,29 @@ features in this plan; nothing new needs to be invented.</p>
 <ul>
 <li><code>bugreport::encode_png(pixels, w, h)</code> already encodes RGBA
   pixels to PNG bytes
-  (<a href="ryll/src/bugreport.rs#L584">bugreport.rs:584</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L584">bugreport.rs:584</a>).</li>
 <li><code>Surface::pixels()</code> returns the RGBA buffer for a display
-  surface (<a href="ryll/src/display/surface.rs#L107">display/surface.rs:107</a>).</li>
+  surface (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L107">display/surface.rs:107</a>).</li>
 <li><code>App.surfaces</code> is a map keyed by surface id; bug reports
   already pick the largest one as the screenshot source
-  (<a href="ryll/src/app.rs#L699-L706">app.rs:699-706</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L699-L706">app.rs:699-706</a>).</li>
 <li><code>rfd::FileDialog</code> is already a dependency and is used
-  elsewhere in the GUI (<a href="ryll/src/app.rs#L1378">app.rs:1378</a>).</li>
+  elsewhere in the GUI (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1378">app.rs:1378</a>).</li>
 <li>F11/F12 are already bound; F8 is free.</li>
 </ul>
 <p><strong>For the latency HUD:</strong></p>
 <ul>
 <li>A <code>Latency: Xms</code> label already renders in the bottom stats
   panel from <code>self.stats.last_latency</code>
-  (<a href="ryll/src/app.rs#L971-L973">app.rs:971-973</a>).</li>
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L971-L973">app.rs:971-973</a>).</li>
 <li>The latency value is updated on <code>ChannelEvent::Latency</code>
-  (<a href="ryll/src/app.rs#L536-L538">app.rs:536-538</a>) which is
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L536-L538">app.rs:536-538</a>) which is
   emitted from the inputs channel
-  (<a href="ryll/src/channels/inputs.rs#L343-L345">channels/inputs.rs:343-345</a>).</li>
-<li><code>BandwidthTracker</code> (<a href="ryll/src/app.rs#L78">app.rs:78</a>) shows
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L343-L345">channels/inputs.rs:343-345</a>).</li>
+<li><code>BandwidthTracker</code> (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L78">app.rs:78</a>) shows
   the exact pattern to follow: a <code>VecDeque&lt;f32&gt;</code> of recent
   samples, a <code>tick()</code> to advance, and a sparkline render
-  block in the status bar (<a href="ryll/src/app.rs#L1037-L1062">app.rs:1037-1062</a>).</li>
+  block in the status bar (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1037-L1062">app.rs:1037-1062</a>).</li>
 <li>The cadence mode (<code>--cadence</code>) injects a keystroke every
   2 seconds, which is the only thing that produces latency
   samples today. Without it, the sparkline stays empty —
@@ -12176,7 +12176,7 @@ protocol, the channel wiring, or any async task.</p>
 <li>(a) Save one PNG per surface (<code>screenshot-1.png</code>,
      <code>screenshot-2.png</code>, ...).</li>
 <li>(b) Save only the largest surface (matches bug report
-     behaviour at <a href="ryll/src/app.rs#L702">app.rs:702</a>).</li>
+     behaviour at <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L702">app.rs:702</a>).</li>
 <li>(c) Save the surface under the mouse cursor at
      keypress time.</li>
 </ol>

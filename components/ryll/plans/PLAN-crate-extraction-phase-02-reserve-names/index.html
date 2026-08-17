@@ -11931,7 +11931,7 @@ repository is a Cargo workspace:</p>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   └── src/
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└── ...
 </code></pre></div>
-<p><a href="../../Cargo.toml">Cargo.toml</a> declares
+<p><a href="https://github.com/shakenfist/ryll/blob/develop/Cargo.toml">Cargo.toml</a> declares
 <code>members = ["ryll"]</code> and shares <code>edition</code>, <code>license</code>,
 <code>authors</code>, and <code>repository</code> via <code>[workspace.package]</code>.</p>
 <p>The master plan (<a href="/components/ryll/plans/PLAN-crate-extraction/">PLAN-crate-extraction.md</a>)
@@ -12222,7 +12222,7 @@ between push and publish.</p>
    substituted in.</p>
 </li>
 <li>
-<p>Update the top-level <a href="../../Cargo.toml">Cargo.toml</a>
+<p>Update the top-level <a href="https://github.com/shakenfist/ryll/blob/develop/Cargo.toml">Cargo.toml</a>
    <code>[workspace] members</code> list:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[workspace]</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">resolver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2&quot;</span>
@@ -12413,7 +12413,7 @@ release will be <code>0.1.0</code> with a fresh README.</p>
   <code>shakenfist-spice-protocol/</code>, and
   <code>shakenfist-spice-usbredir/</code>, each with <code>Cargo.toml</code>,
   <code>README.md</code>, and <code>src/lib.rs</code>.</li>
-<li>The top-level <a href="../../Cargo.toml">Cargo.toml</a> <code>members</code> list
+<li>The top-level <a href="https://github.com/shakenfist/ryll/blob/develop/Cargo.toml">Cargo.toml</a> <code>members</code> list
   contains all four crates (ryll plus the three placeholders).</li>
 <li><code>cargo build --workspace</code>,
   <code>cargo test --workspace</code>,

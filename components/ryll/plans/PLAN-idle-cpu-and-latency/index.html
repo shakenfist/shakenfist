@@ -12164,7 +12164,7 @@ for a release. Initial investigation points to two likely
 contributors, neither yet confirmed as the dominant cause:</p>
 <ol>
 <li>
-<p><strong>Forced 60 FPS repaint.</strong> <a href="ryll/src/app.rs#L2169">ryll/src/app.rs:2169</a>
+<p><strong>Forced 60 FPS repaint.</strong> <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2169">ryll/src/app.rs:2169</a>
    calls <code>ctx.request_repaint_after(Duration::from_millis(16))</code>
    unconditionally at the end of every <code>update()</code>. egui then
    re-renders the entire UI (including all sparklines, the
@@ -12175,7 +12175,7 @@ contributors, neither yet confirmed as the dominant cause:</p>
 <p><strong>INFO-level logging on every protocol message.</strong> Every
    channel logs every message it sends or receives via
    <code>shakenfist_spice_protocol::logging::log_message</code>
-   (<a href="shakenfist-spice-protocol/src/logging.rs#L22-L32">logging.rs:22-32</a>)
+   (<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs#L22-L32">logging.rs:22-32</a>)
    at <code>info!</code> level. Each line allocates a
    <code>format_timestamp()</code> String, takes the global tracing
    subscriber lock, formats the line, and writes to
@@ -12204,7 +12204,7 @@ added by <code>tracing-subscriber</code>, <code>[1776630223.870958]</code> is
 added inside <code>log_message</code> itself. Redundant.</p>
 <h3 id="issue-2-latency-measurement-is-broken">Issue 2 — Latency measurement is broken<a class="headerlink" href="#issue-2-latency-measurement-is-broken" title="Permanent link">&para;</a></h3>
 <p>The current latency code at
-<a href="ryll/src/channels/inputs.rs#L341-L346">channels/inputs.rs:341-346</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L341-L346">channels/inputs.rs:341-346</a>
 sets <code>last_key_time = Some(Instant::now())</code> and on the very
 next line reads <code>last_key_time.unwrap().elapsed()</code>. That
 measures essentially zero (microseconds at most). The

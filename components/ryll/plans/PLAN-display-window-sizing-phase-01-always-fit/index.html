@@ -11883,13 +11883,13 @@ small extracted helper that phase 3 can unit-test.</p>
 <p><code>RyllApp</code> carries the resize machinery on three fields:</p>
 <ul>
 <li><code>pending_resize: Option&lt;(f32, f32)&gt;</code>
-  (<a href="../../ryll/src/app.rs#L242">app.rs:242</a>) — set when a
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L242">app.rs:242</a>) — set when a
   surface event arrives, consumed in <code>update()</code>.</li>
 <li><code>initial_resize_done: bool</code>
-  (<a href="../../ryll/src/app.rs#L248">app.rs:248</a>) — the one-shot
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L248">app.rs:248</a>) — the one-shot
   gate this phase removes.</li>
 <li><code>last_sent_resize: Option&lt;(u32, u32)&gt;</code>
-  (<a href="../../ryll/src/app.rs#L203">app.rs:203</a>) — last
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L203">app.rs:203</a>) — last
   <code>(width, height)</code> we sent on the resize channel via
   <code>maybe_send_monitors_resize</code>. Used to dedup outgoing
   <code>VDAgentMonitorsConfig</code> messages.</li>
@@ -11898,15 +11898,15 @@ small extracted helper that phase 3 can unit-test.</p>
 on the surface key today:</p>
 <ul>
 <li><code>ChannelEvent::SurfaceCreated</code> arm
-  (<a href="../../ryll/src/app.rs#L785-L800">app.rs:785-800</a>) sets
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L785-L800">app.rs:785-800</a>) sets
   it from <code>(width, height)</code> of the new surface.</li>
 <li><code>ChannelEvent::ImageReady</code> auto-create branch
-  (<a href="../../ryll/src/app.rs#L823-L836">app.rs:823-836</a>) sets
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L823-L836">app.rs:823-836</a>) sets
   it when ryll has to fabricate a surface because the
   server drew before sending <code>SURFACE_CREATE</code>.</li>
 </ul>
 <p>The resize is consumed in <code>RyllApp::update</code>
-(<a href="../../ryll/src/app.rs#L1670-L1688">app.rs:1670-1688</a>):</p>
+(<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1670-L1688">app.rs:1670-1688</a>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">((</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">))</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">pending_resize</span><span class="p">.</span><span class="n">take</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">!</span><span class="bp">self</span><span class="p">.</span><span class="n">initial_resize_done</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">total_h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">STATS_BAR_HEIGHT</span><span class="p">;</span>
@@ -11922,13 +11922,13 @@ on the surface key today:</p>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">}</span>
 </code></pre></div>
 <p><code>maybe_send_monitors_resize</code>
-(<a href="../../ryll/src/app.rs#L1539-L1570">app.rs:1539-1570</a>)
+(<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1539-L1570">app.rs:1539-1570</a>)
 runs every frame, samples the live viewport interior,
 subtracts <code>STATS_BAR_HEIGHT</code> (zero when maximised or
 fullscreen), 8-aligns, and sends to the guest if the
 result differs from <code>last_sent_resize</code>.</p>
 <p><code>reconnect</code>
-(<a href="../../ryll/src/app.rs#L646-L700">app.rs:646-700</a>) clears
+(<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L646-L700">app.rs:646-700</a>) clears
 <code>pending_resize</code> and <code>last_sent_resize</code> but <em>not</em>
 <code>initial_resize_done</code> — meaning a reconnect today does not
 re-fit the window even on the new initial surface. With
@@ -11997,7 +11997,7 @@ fire only when the affected key is <code>(0, 0)</code>:</p>
 surface arrives we want to react to it as the primary, not
 to whatever the renderer happened to pick last frame. The
 renderer's primary lookup at
-<a href="../../ryll/src/app.rs#L2553-L2559">app.rs:2553-2559</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2553-L2559">app.rs:2553-2559</a>
 already prefers <code>surface_id == 0</code>, so the two definitions
 agree.</p>
 <h3 id="decision-helper">Decision helper<a class="headerlink" href="#decision-helper" title="Permanent link">&para;</a></h3>
@@ -12050,7 +12050,7 @@ trivial; do not refactor that function as part of this
 phase if the change is awkward.</p>
 <h3 id="call-site">Call site<a class="headerlink" href="#call-site" title="Permanent link">&para;</a></h3>
 <p>In <code>RyllApp::update</code>, replace the existing block at
-<a href="../../ryll/src/app.rs#L1667-L1688">app.rs:1667-1688</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1667-L1688">app.rs:1667-1688</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1">// Resize viewport to match the remote surface (plus stats</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1">// bar) whenever a new primary surface differs from the</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1">// size we last fitted to. Maximised/fullscreen windows</span>
@@ -12102,20 +12102,20 @@ phase if the change is awkward.</p>
 </ul>
 <h3 id="reconnect">Reconnect<a class="headerlink" href="#reconnect" title="Permanent link">&para;</a></h3>
 <p>In <code>reconnect()</code> at
-<a href="../../ryll/src/app.rs#L646-L700">app.rs:646-700</a>, the
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L646-L700">app.rs:646-700</a>, the
 existing <code>self.pending_resize = None;</code> stays. Add
 <code>self.last_auto_resize = None;</code> next to it. Remove the
 <code>initial_resize_done</code> field entirely so there is no
 <code>self.initial_resize_done = …</code> to write at all.</p>
 <h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
 <p>In <code>RyllApp::new</code> at
-<a href="../../ryll/src/app.rs#L551-L643">app.rs:551-643</a>, remove
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L551-L643">app.rs:551-643</a>, remove
 <code>initial_resize_done: false,</code> and add
 <code>last_auto_resize: None,</code> in the same place.</p>
 <h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h2>
 <p>Add one focused unit test inside the existing
 <code>#[cfg(test)] mod tests</code> block at
-<a href="../../ryll/src/app.rs#L3611">app.rs:3611</a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3611">app.rs:3611</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="cp">#[test]</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">fn</span><span class="w"> </span><span class="nf">compute_auto_resize_decisions</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="c1">// No pending event =&gt; no resize.</span>

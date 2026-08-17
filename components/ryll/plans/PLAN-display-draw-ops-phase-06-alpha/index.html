@@ -11988,22 +11988,22 @@ stay warn-once-deferred).</p>
 </ul>
 <h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../shakenfist-spice-protocol/src/messages.rs">shakenfist-spice-protocol/src/messages.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs">shakenfist-spice-protocol/src/messages.rs</a>
   has <code>SpiceTransparent::read</code> and
   <code>SpiceAlphaBlend::read</code> from phase 1.</li>
-<li><a href="../../ryll/src/channels/display.rs">ryll/src/channels/display.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs">ryll/src/channels/display.rs</a>
   <code>decode_image_and_emit(payload, op_name, base,
   src_bitmap_offset, src_top, src_left, src_bottom,
   src_right)</code> from phase 5. Emits <code>ChannelEvent::ImageReady</code>
   at its two emit sites (clip-rects branch and fallback).
   All decode-and-cache logic is in this single method.</li>
-<li><a href="../../ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>
   <code>ChannelEvent::ImageReady</code> — the existing overwrite
   emit variant.</li>
-<li><a href="../../ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
   <code>DisplaySurface::blit</code> — the straight memcpy used by
   <code>ImageReady</code>.</li>
-<li><a href="../../ryll/src/app.rs#L562">ryll/src/app.rs:562</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L562">ryll/src/app.rs:562</a>
   — <code>ImageReady</code> handler that calls <code>surface.blit</code>.</li>
 <li><code>warn_once!</code> macro from phase 2. Available for the
   alpha_flags warn site.</li>
@@ -12052,7 +12052,7 @@ handle the per-pixel-alpha case).</p>
 <h2 id="implementation-shape">Implementation shape<a class="headerlink" href="#implementation-shape" title="Permanent link">&para;</a></h2>
 <h3 id="surface-helpers">Surface helpers<a class="headerlink" href="#surface-helpers" title="Permanent link">&para;</a></h3>
 <p>Both new helpers live in
-<a href="../../ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs">ryll/src/display/surface.rs</a>
 alongside the phase-1 <code>fill_rect</code>/<code>copy_bits</code>/
 <code>invert_rect</code>. Their signatures mirror <code>blit</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">impl</span><span class="w"> </span><span class="n">DisplaySurface</span><span class="w"> </span><span class="p">{</span>
@@ -12157,7 +12157,7 @@ block. Pattern matches phase-1 surface tests:</p>
 <code>sa=255, alpha=254</code> (near-opaque) — covered by the
 half test being within tolerance.</p>
 <h3 id="channelevent-variants">ChannelEvent variants<a class="headerlink" href="#channelevent-variants" title="Permanent link">&para;</a></h3>
-<p>In <a href="../../ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>,
+<p>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs">ryll/src/channels/mod.rs</a>,
 after <code>ImageReady</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="sd">/// Image-bearing paint with chroma-keying (DRAW_TRANSPARENT).</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">ImageReadyChroma</span><span class="w"> </span><span class="p">{</span>
@@ -12194,7 +12194,7 @@ to match the phase-1 precedent of distinct
 match exhaustiveness obvious and keeps the app-side
 handler free of nested match blocks.</p>
 <h3 id="app-side-handlers">App-side handlers<a class="headerlink" href="#app-side-handlers" title="Permanent link">&para;</a></h3>
-<p>In <a href="../../ryll/src/app.rs">ryll/src/app.rs</a> alongside
+<p>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> alongside
 the existing <code>ImageReady</code> / <code>FillRect</code> / <code>CopyBits</code> /
 <code>Invert</code> arms in <code>process_events</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">ChannelEvent</span><span class="p">::</span><span class="n">ImageReadyChroma</span><span class="w"> </span><span class="p">{</span>

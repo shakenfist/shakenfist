@@ -11889,7 +11889,7 @@ the docs alone.</p>
 <h2 id="grounding-whats-there-today">Grounding — what's there today<a class="headerlink" href="#grounding-whats-there-today" title="Permanent link">&para;</a></h2>
 <h3 id="readmemd">README.md<a class="headerlink" href="#readmemd" title="Permanent link">&para;</a></h3>
 <p>Today's Features list is at
-<a href="/components/ryll/README/#L5-L33"><code>README.md:5-33</code></a> — 29 bullets,
+<a href="https://github.com/shakenfist/ryll/blob/develop/README.md#L5-L33"><code>README.md:5-33</code></a> — 29 bullets,
 each one line, alphabetical-ish but really order-of-arrival
 with new features appended. Reconnect and persistence are
 not present. The list ends with the in-app notifications
@@ -11899,7 +11899,7 @@ elsewhere in the README. Searching the file for
 <code>reconnect</code>, <code>persistence</code>, <code>persistent</code> returns no hits.</p>
 <h3 id="architecturemd">ARCHITECTURE.md<a class="headerlink" href="#architecturemd" title="Permanent link">&para;</a></h3>
 <p>The closest existing mention of the mouse-mode model is at
-<a href="/components/ryll/ARCHITECTURE/#L100-L109"><code>ARCHITECTURE.md:100-109</code></a>,
+<a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md#L100-L109"><code>ARCHITECTURE.md:100-109</code></a>,
 inside a longer bullet describing the input channel:</p>
 <blockquote>
 <p>Mouse events are dispatched based on the server's mouse
@@ -11931,7 +11931,7 @@ hits.</p>
 </ul>
 <h3 id="code-under-documentation">Code under documentation<a class="headerlink" href="#code-under-documentation" title="Permanent link">&para;</a></h3>
 <p>The reconnect implementation is
-<a href="../../ryll/src/app.rs#L634-L751"><code>ryll/src/app.rs::reconnect</code></a>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L634-L751"><code>ryll/src/app.rs::reconnect</code></a>
 (118 LOC). It:</p>
 <ol>
 <li>Creates fresh mpsc channels for events, input,
@@ -11968,7 +11968,7 @@ hits.</p>
   question a reader would ask first.</li>
 </ul>
 <p>The mouse-mode model is implemented in
-<a href="../../ryll/src/channels/main_channel.rs"><code>ryll/src/channels/main_channel.rs</code></a>,
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs"><code>ryll/src/channels/main_channel.rs</code></a>,
 specifically:</p>
 <ul>
 <li><code>parse_mouse_mode_payload</code> (line 32) — u16 read.</li>
@@ -11987,7 +11987,7 @@ specifically:</p>
 <li><code>maybe_request_client_mouse_mode</code> itself (line 667).</li>
 </ul>
 <p>Window persistence is one Cargo feature flag at
-<a href="../../ryll/Cargo.toml#L16"><code>ryll/Cargo.toml:16</code></a>:</p>
+<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/Cargo.toml#L16"><code>ryll/Cargo.toml:16</code></a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">eframe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;0.29&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;persistence&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <p>Ryll itself has no persistence-related code; eframe
@@ -12007,7 +12007,7 @@ ryll has not opted in to per-struct serde via
 session bullets (the order is lossy in the existing list
 but several connection-related items cluster around
 "TLS support" and "Cursor rendering" near
-<a href="/components/ryll/README/#L15-L17"><code>README.md:15-17</code></a>). Place the
+<a href="https://github.com/shakenfist/ryll/blob/develop/README.md#L15-L17"><code>README.md:15-17</code></a>). Place the
 new bullets right after the TLS-support line for grouping.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>- **Reconnect on disconnect** — When a session ends
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  unexpectedly, the disconnect dialog offers a Reconnect

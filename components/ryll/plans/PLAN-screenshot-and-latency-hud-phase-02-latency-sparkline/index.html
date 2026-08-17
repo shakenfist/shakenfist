@@ -11724,25 +11724,25 @@ pattern from the top status bar.</p>
 <p>The bandwidth sparkline is the model to copy:</p>
 <ul>
 <li><code>BandwidthTracker</code> struct at
-  <a href="ryll/src/app.rs#L78-L122">ryll/src/app.rs:78-122</a> holds
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L78-L122">ryll/src/app.rs:78-122</a> holds
   a <code>Vec&lt;f32&gt;</code> of samples capped at <code>BANDWIDTH_HISTORY_LEN</code>
   (60). It exposes <code>tick()</code> (advance), <code>label()</code> (format
   the current value), and <code>history</code> (read for rendering).</li>
 <li>The render block at
-  <a href="ryll/src/app.rs#L1037-L1062">ryll/src/app.rs:1037-1062</a>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1037-L1062">ryll/src/app.rs:1037-1062</a>
   computes a dynamic max from the visible window and draws
   fixed-width green bars.</li>
 <li>Bandwidth samples are pushed once per second from a
   shared <code>AtomicU64</code> byte counter. Latency works
   differently: samples arrive only when <code>ChannelEvent::Latency</code>
   fires (currently only via <code>--cadence</code> mode at
-  <a href="ryll/src/channels/inputs.rs#L343-L345">channels/inputs.rs:343-345</a>).</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L343-L345">channels/inputs.rs:343-345</a>).</li>
 <li>The latency value already lives at
   <code>App.stats.last_latency: Option&lt;f64&gt;</code>
-  (<a href="ryll/src/app.rs#L53">app.rs:53</a>) and is updated on each
+  (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L53">app.rs:53</a>) and is updated on each
   <code>ChannelEvent::Latency</code> at
-  <a href="ryll/src/app.rs#L536-L538">app.rs:536-538</a>. The render
-  site is <a href="ryll/src/app.rs#L971-L973">app.rs:971-973</a>:</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L536-L538">app.rs:536-538</a>. The render
+  site is <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L971-L973">app.rs:971-973</a>:</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">latency</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">stats</span><span class="p">.</span><span class="n">last_latency</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">ui</span><span class="p">.</span><span class="n">label</span><span class="p">(</span><span class="fm">format!</span><span class="p">(</span><span class="s">&quot;Latency: {:.1}ms&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">latency</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">1000.0</span><span class="p">));</span>
@@ -11777,7 +11777,7 @@ intuitively.</p>
 <li><strong>Render order in bottom panel:</strong> after <code>Latency: Xms</code>,
   before the existing <code>ui.separator()</code>. The bottom panel is
   a single horizontal <code>ui.horizontal</code> block at
-  <a href="ryll/src/app.rs#L970">app.rs:970</a>.</li>
+  <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L970">app.rs:970</a>.</li>
 <li><strong>Headless mode:</strong> <code>Statistics</code> is shared with the
   headless path, but the tracker only renders in the GUI.
   Adding the tracker as a field on <code>RyllApp</code> (not on the
@@ -11809,21 +11809,21 @@ intuitively.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/app.rs">ryll/src/app.rs</a>, add a <code>LATENCY_HISTORY_LEN: usize = 60</code> constant near <code>BANDWIDTH_HISTORY_LEN</code> (line 36). Add a <code>LatencyTracker</code> struct directly mirroring <code>BandwidthTracker</code> at lines 78-122: <code>history: Vec&lt;f32&gt;</code> (storing milliseconds), <code>record(&amp;mut self, sample_ms: f32)</code> (push, trim to capacity), <code>label(&amp;self) -&gt; String</code> (format the most recent value as <code>"X.Yms"</code> or <code>"--ms"</code> if empty). No <code>tick()</code> needed — samples are event-driven, not time-driven. Add unit tests for <code>record</code> (capacity trimming) and <code>label</code> (empty / non-empty formatting).</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a>, add a <code>LATENCY_HISTORY_LEN: usize = 60</code> constant near <code>BANDWIDTH_HISTORY_LEN</code> (line 36). Add a <code>LatencyTracker</code> struct directly mirroring <code>BandwidthTracker</code> at lines 78-122: <code>history: Vec&lt;f32&gt;</code> (storing milliseconds), <code>record(&amp;mut self, sample_ms: f32)</code> (push, trim to capacity), <code>label(&amp;self) -&gt; String</code> (format the most recent value as <code>"X.Yms"</code> or <code>"--ms"</code> if empty). No <code>tick()</code> needed — samples are event-driven, not time-driven. Add unit tests for <code>record</code> (capacity trimming) and <code>label</code> (empty / non-empty formatting).</td>
 </tr>
 <tr>
 <td>2b</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Wire <code>LatencyTracker</code> into <code>RyllApp</code>. Add a <code>latency: LatencyTracker</code> field next to <code>bandwidth</code> (<a href="ryll/src/app.rs#L172">app.rs:172</a>). Initialise it in the constructor (<a href="ryll/src/app.rs#L353">app.rs:353</a>). In the <code>ChannelEvent::Latency</code> arm at <a href="ryll/src/app.rs#L536-L538">app.rs:536-538</a>, call <code>self.latency.record((key_timestamp * 1000.0) as f32)</code> after the existing <code>self.stats.last_latency = ...</code> assignment.</td>
+<td>Wire <code>LatencyTracker</code> into <code>RyllApp</code>. Add a <code>latency: LatencyTracker</code> field next to <code>bandwidth</code> (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L172">app.rs:172</a>). Initialise it in the constructor (<a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L353">app.rs:353</a>). In the <code>ChannelEvent::Latency</code> arm at <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L536-L538">app.rs:536-538</a>, call <code>self.latency.record((key_timestamp * 1000.0) as f32)</code> after the existing <code>self.stats.last_latency = ...</code> assignment.</td>
 </tr>
 <tr>
 <td>2c</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In <a href="ryll/src/app.rs">ryll/src/app.rs</a> bottom stats panel around line 971-974, after <code>ui.label(format!("Latency: {:.1}ms", ...))</code> and before the existing <code>ui.separator()</code>, add a sparkline render block that exactly copies the structure of the bandwidth sparkline at lines 1037-1062 but reads from <code>self.latency.history</code> and uses <code>Color32::from_rgb(180, 140, 80)</code> for the bars. Keep the same <code>&gt;= 2</code> guard, same dynamic max calculation, same 80×12 dimensions.</td>
+<td>In <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs">ryll/src/app.rs</a> bottom stats panel around line 971-974, after <code>ui.label(format!("Latency: {:.1}ms", ...))</code> and before the existing <code>ui.separator()</code>, add a sparkline render block that exactly copies the structure of the bandwidth sparkline at lines 1037-1062 but reads from <code>self.latency.history</code> and uses <code>Color32::from_rgb(180, 140, 80)</code> for the bars. Keep the same <code>&gt;= 2</code> guard, same dynamic max calculation, same 80×12 dimensions.</td>
 </tr>
 </tbody>
 </table>

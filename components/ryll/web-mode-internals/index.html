@@ -12385,7 +12385,7 @@ relays that connect them to the SPICE channels, and the lifecycle and
 packaging concerns around them.</p>
 <p>This is the developer-facing companion to the
 <a href="/components/ryll/web-frontend/"><code>--web</code> operator guide</a>, which covers running the thing.
-See <a href="/components/ryll/../ARCHITECTURE/">Architecture</a> for where these crates sit overall.</p>
+See <a href="https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md">Architecture</a> for where these crates sit overall.</p>
 <h2 id="encoder-module">Encoder module<a class="headerlink" href="#encoder-module" title="Permanent link">&para;</a></h2>
 <p><code>shakenfist-spice-renderer/src/encoder/</code> is the live H.264 encoder
 pipeline.</p>
@@ -12497,8 +12497,9 @@ unspecified, and IPv6 link-local addresses. <code>WebrtcBridge::new</code>
 rejects an empty result rather than building a peer connection
 that could only ever offer unroutable candidates. This is
 independent of the <code>--web-host</code> flag, which only controls the
-HTTP/HTTPS signalling listener; see <code>docs/web-frontend.md</code>'s
-reverse-proxy callout for the operator-facing consequences.</p>
+HTTP/HTTPS signalling listener; see the reverse-proxy callout in
+the <a href="/components/ryll/web-frontend/">web frontend guide</a> for the operator-facing
+consequences.</p>
 <h3 id="sdp-flow">SDP flow<a class="headerlink" href="#sdp-flow" title="Permanent link">&para;</a></h3>
 <p><code>accept_offer(sdp: String) -&gt; Result&lt;String&gt;</code> is the single SDP
 entry point for the HTTP <code>/offer</code> handler. It:</p>
@@ -12526,7 +12527,7 @@ video track:</p>
 <li>Payloads raw NALs via <code>H264Payloader</code> (from
   <code>rtc::rtp::codec::h264</code> — the sans-io core's payloader, not the
   abandoned standalone <code>rtp</code> crate; see the webrtc entry in
-  <code>docs/development.md</code>'s dependency list).</li>
+  the <a href="/components/ryll/development/">development guide</a>'s dependency list).</li>
 <li>Sets the <code>marker</code> bit on the last RTP packet of each access unit
   (per RFC 6184 §5.1 — decoder pacing depends on this).</li>
 <li>Derives RTP timestamps from <code>EncodedFrame::timestamp_us</code> at
@@ -12569,7 +12570,7 @@ keyframe on a viewer-initiated refresh — the phase 3 plan allowed
 stubbing it, and it was never implemented; <code>bridge.rs</code> registers
 no <code>on_rtcp_packet</code>-equivalent handling.</p>
 <h3 id="webrtc-rs-convention-handler-methods-must-never-block">webrtc-rs convention: handler methods must never block<a class="headerlink" href="#webrtc-rs-convention-handler-methods-must-never-block" title="Permanent link">&para;</a></h3>
-<p>See the "WebRTC conventions" section in <code>AGENTS.md</code> for the
+<p>See the "WebRTC conventions" section in <a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md"><code>AGENTS.md</code></a> for the
 normative rule. In short: webrtc-rs 0.20 awaits every
 <code>PeerConnectionEventHandler</code> method inline in the peer
 connection's driver event loop, so a handler method that loops
@@ -12644,29 +12645,49 @@ via the WebRTC audio pump. PCM-only SPICE servers do not
 trigger any <code>push_opus_packet</code> calls, so the audio track emits
 silence (and a one-time warning is logged).</p>
 <h3 id="end-to-end-data-flow">End-to-end data flow<a class="headerlink" href="#end-to-end-data-flow" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>SPICE server
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    │
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    ▼
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>shakenfist-spice-renderer::run_connection
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    │
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    ├─► DisplayChannel ──► broadcast ChannelEvent ──► SurfaceMirror
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    │                                              └─► CursorRelay (cursor.rs)
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    │
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    ├─► PlaybackChannel ──► OpusPacketSink (audio.rs) ──► WebRTC audio track
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    │
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    └─► InputsChannel ◄── web inputs relay (inputs.rs) ◄── control DC ◄── browser
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                                                                              │
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>shakenfist-spice-webrtc::WebrtcBridge                                         │
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    ├─► video track ◄── EncoderTask ◄── RealFrameSource ◄── SurfaceMirror    │
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    ├─► audio track ◄── WebOpusSink ◄── PlaybackChannel (Opus path)          │
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    └─► control DC ◄──────────────────────────────────── cursor/input relay ──┘
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    │
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    ▼
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>Browser (RTCPeerConnection)
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    ├─ &lt;video&gt; H.264 display
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    ├─ &lt;audio&gt; Opus audio
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    └─ datachannel: cursor overlay + input events
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    spice["SPICE server"]
+    run["shakenfist-spice-renderer::run_connection"]
+    dc["DisplayChannel"]
+    pc["PlaybackChannel"]
+    ic["InputsChannel"]
+    ev["broadcast ChannelEvent"]
+    mirror["SurfaceMirror"]
+    crelay["CursorRelay (cursor.rs)"]
+    sink["WebOpusSink / OpusPacketSink (audio.rs)"]
+    frames["RealFrameSource"]
+    enc["EncoderTask"]
+    irelay["web inputs relay (inputs.rs)"]
+
+    subgraph bridge["shakenfist-spice-webrtc::WebrtcBridge"]
+        vtrack["video track"]
+        atrack["audio track"]
+        ctrl["control datachannel"]
+    end
+
+    subgraph browser["Browser (RTCPeerConnection)"]
+        video["video element: H.264 display"]
+        audio["audio element: Opus audio"]
+        data["datachannel: cursor overlay + input events"]
+    end
+
+    spice --&gt; run
+    run --&gt; dc
+    run --&gt; pc
+    run --&gt; ic
+    dc --&gt; ev
+    ev --&gt; mirror
+    ev --&gt; crelay
+    pc -- Opus path --&gt; sink
+    mirror --&gt; frames --&gt; enc --&gt; vtrack
+    sink --&gt; atrack
+    crelay --&gt; ctrl
+    vtrack --&gt; video
+    atrack --&gt; audio
+    ctrl --&gt; data
+    data -- input events --&gt; ctrl
+    ctrl --&gt; irelay
+    irelay --&gt; ic</code></pre>
 <p>The handler-methods-must-never-block webrtc-rs rule (documented
 above) and the rustls <code>CryptoProvider</code> init (required once at
 process start, before any TLS handshake) both apply to the
