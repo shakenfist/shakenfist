@@ -57,6 +57,47 @@ SWEEP_WORK_LIST_FAILURE_STREAK = Gauge(
     'by sweep and object type.', ['sweep', 'object_type'])
 _SWEEP_FAILURE_STREAK: dict[tuple[str, str], int] = {}
 
+# Where each per-object-type sweep should begin its next pass. The
+# sweeps that read one work list per object type stop the pass on a
+# tier-wide failure, which bounds the pass to a single _grpc_call retry
+# budget (see _fill_per_deleted_object_queue). Stopping at the same
+# place every pass would starve every type after it, though:
+# DatabaseUnavailable is raised for an exhausted DEADLINE_EXCEEDED
+# budget too, which one large, slow or lock-contended query can produce
+# for a single object type on an otherwise healthy tier -- and the
+# backlog that then accumulates makes that type's query slower still.
+# That is the self-sustaining ratchet which made #3638 unrecoverable,
+# one level up. Resuming after the type that stopped the last pass
+# bounds the pass and still reaches every type within a bounded number
+# of passes, whichever shape the failure takes.
+#
+# This is deliberately not cleared on demotion the way the streak
+# metrics are: it is a starting offset, not a published value, and a
+# re-elected node is better off carrying on than starting from the top
+# again.
+_SWEEP_RESUME_AFTER: dict[str, str] = {}
+
+
+def _sweep_object_types(sweep: str, object_types: list[str]) -> list[str]:
+    """Order a pass's object types, resuming after the last early stop."""
+    resume = _SWEEP_RESUME_AFTER.get(sweep)
+    if resume not in object_types:
+        return list(object_types)
+    start = object_types.index(resume)
+    return object_types[start:] + object_types[:start]
+
+
+def _record_sweep_stopped(sweep: str, object_types: list[str],
+                          stopped_on: str) -> None:
+    """Remember to begin the next pass after the type that stopped this one."""
+    nxt = (object_types.index(stopped_on) + 1) % len(object_types)
+    _SWEEP_RESUME_AFTER[sweep] = object_types[nxt]
+
+
+def _record_sweep_completed(sweep: str) -> None:
+    """A pass that reached every type has no backlog to resume from."""
+    _SWEEP_RESUME_AFTER.pop(sweep, None)
+
 
 class WorkList(NamedTuple):
     """The outcome of a sweep's work-list read.
@@ -707,7 +748,8 @@ def _fill_per_deleted_object_queue():
     # (issue 3533). The age filter is pushed down to SQL so objects too
     # young to hard delete are never fetched at all.
     now = time.time()
-    for objtype in OBJECT_NAMES_TO_CLASSES:
+    object_types = list(OBJECT_NAMES_TO_CLASSES)
+    for objtype in _sweep_object_types('per_deleted_object', object_types):
         # A per-reply failure for one object type must not stop the sweep
         # for the rest: the other types are still collectable. This is the
         # site where collapsing None into [] silently turned garbage
@@ -715,26 +757,32 @@ def _fill_per_deleted_object_queue():
         # made each subsequent reply larger still (#3638).
         #
         # A tier-wide failure is the opposite case and must stop the loop.
-        # There are 28 object types here, and each DatabaseUnavailable
-        # costs a full _grpc_call retry budget -- up to GRPC_RETRIES full
-        # deadlines plus sleeps -- before it is raised. Continuing would
-        # multiply the worst case by 28 inside a single scheduled job,
-        # and _run_due_scheduled_jobs() pets the watchdog only between
-        # jobs, so a tier outage would SIGABRT the elected maintainer and
-        # cost a lock failover where before it merely skipped a pass.
-        # Nothing is gained by asking a tier that is not there 27 more
-        # times. This function has blown the watchdog window once already
-        # (issue 3533).
+        # Each DatabaseUnavailable costs a whole _grpc_call retry budget
+        # before it is raised: GRPC_RETRIES (3) deadlines of GRPC_TIMEOUT
+        # (30s) each, plus the escalating GRPC_RETRY_DELAY sleeps, so
+        # about 93s per read. There are 28 object types here and
+        # _run_due_scheduled_jobs() pets the watchdog only between jobs,
+        # while sf-cluster runs at WatchdogSec=300s -- so continuing past
+        # the fourth failure already exceeds the window, and a full pass
+        # would take some 43 minutes. That SIGABRTs the elected
+        # maintainer and costs a lock failover, where before it merely
+        # skipped a pass. Nothing is gained by asking a tier that is not
+        # there 27 more times. This function has blown the watchdog
+        # window once already (issue 3533).
         work = _sweep_work_list(
             'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
             updated_before=(now - _deleted_object_delay(objtype)))
         if work.uuids is None:
             if work.tier_unavailable:
+                _record_sweep_stopped(
+                    'per_deleted_object', object_types, objtype)
                 break
             continue
 
         for obj_uuid in work.uuids:
             DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
+    else:
+        _record_sweep_completed('per_deleted_object')
 
 
 def _process_per_deleted_object_queue(execution_limit=10):
@@ -821,18 +869,21 @@ def reconcile_orphaned_objects():
         LOG.with_fields({'deleted': deleted}).info(
             'Orphan reconciliation removed orphaned artifact attributes')
 
-    for objtype in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES:
-        if objtype in ZOMBIE_REPAIR_EXCLUDED_TYPES:
-            continue
-
+    zombie_types = [t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+                    if t not in ZOMBIE_REPAIR_EXCLUDED_TYPES]
+    for objtype in _sweep_object_types('reconcile_orphans', zombie_types):
         # Same two shapes, same treatment as the deleted-object sweep:
         # a per-reply failure only costs this object type's zombies, but
         # a tier-wide one ends the pass rather than spending another
         # retry budget per remaining type inside a job whose watchdog is
-        # only petted between jobs.
+        # only petted between jobs. The next pass resumes after whichever
+        # type stopped this one, so a persistently slow type cannot
+        # permanently hide the ones behind it.
         work = _stateless_work_list('reconcile_orphans', ObjectType(objtype))
         if work.uuids is None:
             if work.tier_unavailable:
+                _record_sweep_stopped(
+                    'reconcile_orphans', zombie_types, objtype)
                 break
             continue
 
@@ -859,6 +910,8 @@ def reconcile_orphaned_objects():
             except Exception as e:
                 util_exceptions.ignore_exception(
                     f'zombie repair of {objtype} {obj_uuid}', e)
+    else:
+        _record_sweep_completed('reconcile_orphans')
 
 
 def clear_scheduler_capacity_metrics() -> None:

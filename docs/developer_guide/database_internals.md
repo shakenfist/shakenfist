@@ -156,6 +156,18 @@ loop treats it as unhealthy and waits, and (since #3638) the cleaner's
 `_maintain_blobs()` and the cluster daemon's `_cluster_wide_cleanup()`
 and sweep helpers skip the affected work for the pass.
 
+The servicer has the matching obligation. A reply whose only payload is
+a `repeated` field has nowhere to say "the read failed", so
+`GetObjectsByState` and `GetStatelessObjectUuids` must not answer a
+failed read with an empty list: when the direct accessor returns `None`
+(an `OperationalError` — MariaDB down, connection dropped, lock wait
+timeout, deadlock) they set `UNAVAILABLE` on the status, which
+`_grpc_call` retries and then surfaces as `DatabaseUnavailable`. An
+unexpected exception in the handler sets `INTERNAL`, which is
+non-retryable and so becomes a `None` return client-side. This matters
+because it is the failure mode where sf-database itself is healthy and
+answering, so nothing else in the stack notices.
+
 `get_active_blob_uuids()` is the exception to the "wrappers translate to
 not found" rule: it *raises* `DatabaseUnavailable` rather than returning
 `[]`, because the cleaner uses the list as a complement set and unlinks

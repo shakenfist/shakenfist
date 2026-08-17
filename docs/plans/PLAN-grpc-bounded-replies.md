@@ -597,6 +597,19 @@ on the `issue-fix-3638` branch:
 - The per-blob and per-instance sweeps in the cluster daemon had the
   same `or []` collapse as the deleted-object sweep, so a failed read
   reported a healthy pass over an empty queue.
+- `DatabaseServicer.GetObjectsByState` and `GetStatelessObjectUuids`
+  answered a failed read with an OK status and an empty `repeated`
+  field, which left the blob-store deletion hazard reachable through
+  the likelier failure -- MariaDB unreachable while sf-database itself
+  is healthy and answering -- even after the client-side fix. They now
+  set `UNAVAILABLE` (transient, retried into `DatabaseUnavailable`) or
+  `INTERNAL` (handler bug, non-retryable, mapped to `None`). Any
+  bounding mechanism phase 3 picks has to preserve this: a reply that
+  can only carry a list cannot report its own failure.
+- The `break` added to bound the sweeps' worst-case wall time would
+  have starved every object type behind a persistently slow one, since
+  both loops start from the same place every pass. They now resume
+  after whichever type stopped the previous pass.
 
 ### Documentation index maintenance
 

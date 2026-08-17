@@ -289,6 +289,28 @@ Continue on the per-reply shape; stop the loop on the tier-wide one. The
 general form: when one read becomes N reads, recompute the caller's worst-case
 wall time rather than inheriting it.
 
+And when you stop a loop early, ask what it does to whatever is behind the stop.
+Both of those loops iterate a fixed list of object types from the start of the
+list every pass, so `break` on its own would mean a single persistently slow
+type hides every type after it forever -- and the backlog that then accumulates
+makes that type slower still, which is the #3638 ratchet rebuilt one level up.
+They keep a resume offset and begin the next pass after whichever type stopped
+the last one, so the pass stays bounded *and* every type is reached within a
+bounded number of passes.
+
+The same rule applies to the reply itself, one layer down. A gRPC reply whose
+only payload is a `repeated` field has nowhere to put "the read failed", so
+returning `object_uuids=uuids or []` from a servicer hands the client the same
+ambiguity the `or []` at a call site does -- except the client cannot even see
+that a decision was made. `DatabaseServicer.GetObjectsByState` did exactly this,
+which left the blob-store deletion hazard fully reachable through the *likelier*
+failure (MariaDB down while sf-database is up and answering) after the
+client-side half had been fixed. Signal it on the status instead:
+`context.set_code(grpc.StatusCode.UNAVAILABLE)` for a transient database error,
+which `_grpc_call` retries and converts to `DatabaseUnavailable`, and `INTERNAL`
+for a handler bug, which is non-retryable and so becomes a `None` return. When
+you fix an empty-means-failure bug, check both ends of the wire.
+
 ## Cluster CI tests only run in the merge queue
 
 The `(collection)` matrix in `Functional tests` -- everything under

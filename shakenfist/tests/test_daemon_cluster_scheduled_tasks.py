@@ -37,9 +37,13 @@ def _reset_sweep_failure_state():
     reset branch in _sweep_work_list() is guarded on the dict, so
     clearing only the dict leaves the gauge carrying a value from an
     earlier test that nothing will ever zero.
+
+    The resume offsets are process-global for the same reason and would
+    otherwise silently rotate a later test's expected object ordering.
     """
     st._SWEEP_FAILURE_STREAK.clear()
     st.SWEEP_WORK_LIST_FAILURE_STREAK.clear()
+    st._SWEEP_RESUME_AFTER.clear()
 
 
 class FakeBlob:
@@ -786,6 +790,61 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
                 {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
     @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_a_slow_type_cannot_starve_the_types_behind_it(
+            self, mock_get_by_state):
+        """Stopping the pass must not stop it in the same place forever.
+
+        DatabaseUnavailable is not only raised for a dead tier: an
+        exhausted DEADLINE_EXCEEDED budget raises it too, which one
+        large, slow or lock-contended query can produce for a single
+        object type while the tier is otherwise healthy. With a fixed
+        starting point, `break` would mean every type after that one is
+        never swept again -- and the backlog that then accumulates makes
+        the slow type slower still. That is the #3638 ratchet rebuilt
+        one level up, so each pass resumes after wherever the last one
+        stopped.
+        """
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        slow = types[0]
+
+        def by_state(objtype, states, updated_before=None):
+            if str(objtype) == slow:
+                raise DatabaseUnavailable('this one query is too slow')
+            return []
+        mock_get_by_state.side_effect = by_state
+
+        # Pass one stops on the very first type, having read only it.
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(1, mock_get_by_state.call_count)
+
+        # Pass two starts after it and reaches every other type, rather
+        # than dying on the same query again.
+        mock_get_by_state.reset_mock()
+        st._fill_per_deleted_object_queue()
+
+        # Every other type is reached, and the slow one is retried
+        # last: one wasted budget per pass, and nothing behind it
+        # starves. The resume point then holds steady, so this is the
+        # steady state rather than a one-off recovery.
+        read = [str(c.args[0]) for c in mock_get_by_state.call_args_list]
+        self.assertEqual(types[1:] + [slow], read)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state', return_value=[])
+    def test_a_completed_pass_starts_from_the_top_again(
+            self, mock_get_by_state):
+        # Only a pass which stopped early leaves a resume offset behind.
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        st._SWEEP_RESUME_AFTER['per_deleted_object'] = types[5]
+
+        st._fill_per_deleted_object_queue()
+        self.assertNotIn('per_deleted_object', st._SWEEP_RESUME_AFTER)
+
+        mock_get_by_state.reset_mock()
+        st._fill_per_deleted_object_queue()
+        self.assertEqual(
+            types, [str(c.args[0]) for c in mock_get_by_state.call_args_list])
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
     def test_demotion_stops_publishing_the_streak(self, mock_get_by_state):
         # Only the elected node runs these sweeps, so a demoted node
         # holding a non-zero streak keeps a "streak > 0" alert firing
@@ -1075,6 +1134,37 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
                 'cluster_sweep_work_list_failure_streak',
                 {'sweep': 'reconcile_orphans', 'object_type': first_type}))
         mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_a_slow_type_cannot_starve_the_types_behind_it(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # Same starvation hazard as the deleted-object sweep: one slow
+        # object type must not permanently hide every type after it.
+        zombie_types = [t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+                        if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES]
+        slow = zombie_types[0]
+
+        def stateless(objtype):
+            if str(objtype) == slow:
+                raise DatabaseUnavailable('this one query is too slow')
+            return []
+        mock_stateless.side_effect = stateless
+
+        st.reconcile_orphaned_objects()
+        self.assertEqual(1, mock_stateless.call_count)
+
+        mock_stateless.reset_mock()
+        st.reconcile_orphaned_objects()
+
+        read = [str(c.args[0]) for c in mock_stateless.call_args_list]
+        self.assertEqual(zombie_types[1:] + [slow], read)
 
 
 class ReapFederationRecordsTestCase(base.ShakenFistTestCase):
