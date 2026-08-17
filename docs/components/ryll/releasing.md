@@ -5,20 +5,20 @@ goes through the normal PR review gate rather than landing
 directly on `develop`:
 
 1. **Stage 1 — propose:**
-   [tools/propose-release.sh](../tools/propose-release.sh)
+   [tools/propose-release.sh](https://github.com/shakenfist/ryll/blob/develop/tools/propose-release.sh)
    (wrapped by `make propose-release X.Y.Z`) creates a
    `release-X.Y.Z` branch from `develop`, bumps the workspace
    version, runs tests, and pushes the branch. You open a PR
    from it into `develop` and get it reviewed and merged like
    any other change.
 2. **Stage 2 — tag:** after the PR has merged,
-   [tools/tag-release.sh](../tools/tag-release.sh) (wrapped by
+   [tools/tag-release.sh](https://github.com/shakenfist/ryll/blob/develop/tools/tag-release.sh) (wrapped by
    `make tag-release X.Y.Z`) fetches `develop`, verifies its
    tip has the expected workspace version, creates an annotated
    `vX.Y.Z` tag at that commit, and pushes the tag.
 
 The tag push triggers
-[.github/workflows/release.yml](../.github/workflows/release.yml),
+[.github/workflows/release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml),
 which:
 
 - Verifies the tag matches the workspace version.

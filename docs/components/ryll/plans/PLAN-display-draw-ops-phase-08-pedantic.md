@@ -19,18 +19,18 @@ Key references for this phase:
   §"Phase 8: `--pedantic` mode and status-bar gap
   counter — sketch" — the master-plan sketch, including
   the four gap categories and dedupe-key shape.
-* [STYLEGUIDE.md §"warn_once for protocol gaps"](/components/ryll/STYLEGUIDE/)
+* [STYLEGUIDE.md §"warn_once for protocol gaps"](https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md)
   — the convention codified in phase 7. Phase 8 turns
   that registry into a live observable.
-* [shakenfist-spice-protocol/src/logging.rs](../../shakenfist-spice-protocol/src/logging.rs)
+* [shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs)
   — warn_once registry, `warn_once_impl`,
   `register_key`, `warn_once_keys()`, `log_unknown_once`
   (phase 7). Phase 8 adds an observer hook.
-* [ryll/src/bugreport.rs](../../ryll/src/bugreport.rs)
+* [ryll/src/bugreport.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs)
   — existing F8 flow: `BugReport::assemble(...)` +
   `write_zip(&dir)`. Phase 8 adds a `Pedantic` variant
   and an auto-assemble helper.
-* [ryll/src/app.rs:1276](../../ryll/src/app.rs#L1276) —
+* [ryll/src/app.rs:1276](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1276) —
   existing `TopBottomPanel::bottom("stats")`. Phase 8
   adds a `Gaps: N` widget here and a click-to-list
   popup.
@@ -96,23 +96,23 @@ identified are all surfaced:
 ## Current state
 
 * Registry (`HashSet<&'static str>`) in
-  [logging.rs:10-13](../../shakenfist-spice-protocol/src/logging.rs#L10)
+  [logging.rs:10-13](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs#L10)
   holds phase-2+ keys. `register_key(key) -> bool`
   returns is_new; callers fire side-effects. No
   observer hook.
 * `BugReportType` in
-  [bugreport.rs:616-622](../../ryll/src/bugreport.rs#L616)
+  [bugreport.rs:616-622](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L616)
   enumerates 5 channels. `BugReport::assemble(...)` is
   pub(crate); `write_zip(&dir)` already picks a unique
   filename. F8 flow calls these from the GUI.
 * `_ => log_unknown(...)` arms live in:
-  [cursor.rs:310](../../ryll/src/channels/cursor.rs#L310),
-  [display.rs:983](../../ryll/src/channels/display.rs#L983),
-  [inputs.rs:329](../../ryll/src/channels/inputs.rs#L329),
-  [main_channel.rs:533](../../ryll/src/channels/main_channel.rs#L533),
-  [playback.rs:525](../../ryll/src/channels/playback.rs#L525),
-  [usbredir.rs:246](../../ryll/src/channels/usbredir.rs#L246),
-  [webdav.rs:292](../../ryll/src/channels/webdav.rs#L292).
+  [cursor.rs:310](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/cursor.rs#L310),
+  [display.rs:983](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L983),
+  [inputs.rs:329](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L329),
+  [main_channel.rs:533](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L533),
+  [playback.rs:525](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/playback.rs#L525),
+  [usbredir.rs:246](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/usbredir.rs#L246),
+  [webdav.rs:292](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/webdav.rs#L292).
   Display already uses the new `log_unknown_once` (via
   phase 7 for its four known-unimpl arms), but its
   `_ =>` fall-through still uses the old

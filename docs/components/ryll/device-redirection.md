@@ -1,8 +1,10 @@
 # Device redirection
 
-Peripherals and data shared between the local machine and the guest: USB
-mass storage over the usbredir channel, folder sharing over WebDAV, and
-clipboard text delivered as synthetic keystrokes.
+Device redirection shares peripherals and data between the local machine
+and the guest: USB devices over the usbredir channel, either as physical
+pass-through on Linux or as virtual mass storage devices everywhere;
+folder sharing over WebDAV; and clipboard text delivered as synthetic
+keystrokes for guests without vdagent.
 
 ## USB Redirection
 
@@ -10,12 +12,18 @@ USB device redirection uses the SPICE usbredir channel (type 9) to
 forward USB devices to the remote VM. The implementation spans
 several protocol layers:
 
-```
-SPICE SpiceVMC (DATA/COMPRESSED_DATA messages)
-  └── usbredir protocol (hello, device_connect, control/bulk/interrupt packets)
-        └── USB Mass Storage Bulk-Only Transport (for virtual disks)
-              └── SCSI commands (INQUIRY, READ/WRITE(10), etc.)
-                    └── RAW file I/O (seek + read/write at LBA * 512)
+```mermaid
+flowchart TB
+    vmc["SPICE SpiceVMC<br/>(DATA / COMPRESSED_DATA messages)"]
+    usbredir["usbredir protocol<br/>(hello, device_connect, control / bulk / interrupt packets)"]
+    bot["USB Mass Storage Bulk-Only Transport<br/>(for virtual disks)"]
+    scsi["SCSI commands<br/>(INQUIRY, READ/WRITE(10), and so on)"]
+    raw["RAW file I/O<br/>(seek + read/write at LBA * 512)"]
+
+    vmc -- carries --> usbredir
+    usbredir -- carries --> bot
+    bot -- carries --> scsi
+    scsi -- carries --> raw
 ```
 
 ### Device backends
@@ -52,8 +60,9 @@ ryll --file conn.vv --usb-disk /path/to/image.raw       # read-write
 ryll --file conn.vv --usb-disk-ro /path/to/image.raw     # read-only
 ```
 
-See `docs/configuration.md` for details. Use `make test-qemu-usb` to start
-a QEMU instance with USB redirection enabled.
+See the [configuration guide](/components/ryll/configuration/) for details. Use
+`make test-qemu-usb` to start a QEMU instance with USB redirection
+enabled.
 
 ### GUI Components
 
@@ -113,12 +122,18 @@ filesystem.
 
 ### Protocol layers
 
-```
-SPICE SpiceVMC (DATA/COMPRESSED_DATA messages)
-  └── Mux protocol (client_id + size + HTTP data)
-        └── HTTP/1.1 (parsed by hyper)
-              └── WebDAV (RFC 4918, handled by dav-server with LocalFs)
-                    └── Local filesystem I/O
+```mermaid
+flowchart TB
+    vmc["SPICE SpiceVMC<br/>(DATA / COMPRESSED_DATA messages)"]
+    mux["Mux protocol<br/>(client_id + size + HTTP data)"]
+    http["HTTP/1.1<br/>(parsed by hyper)"]
+    webdav["WebDAV<br/>(RFC 4918, handled by dav-server with LocalFs)"]
+    fs["Local filesystem I/O"]
+
+    vmc -- carries --> mux
+    mux -- carries --> http
+    http -- carries --> webdav
+    webdav -- carries --> fs
 ```
 
 ### Mux protocol
@@ -140,22 +155,24 @@ or are packed together.
 
 Each mux client gets a `tokio::io::DuplexStream` pair:
 
-```
-Guest HTTP request bytes
-       │
-       ▼
-  DuplexStream (client end, split)
-  ├── write half: held in MuxClient, main loop writes request data
-  └── read half: reader task reads response data, sends via mpsc
-       │
-       ▼
-  DuplexStream (server end)
-       │
-       ▼
-  TokioIo → hyper http1::serve_connection() → dav-server DavHandler
-       │
-       ▼
-  Local filesystem (via dav-server LocalFs)
+```mermaid
+flowchart TB
+    req["Guest HTTP request bytes"]
+    subgraph ce["DuplexStream (client end, split)"]
+        wh["write half<br/>held in MuxClient; the main loop writes request data"]
+        rh["read half<br/>reader task reads response data, sends it via mpsc"]
+    end
+    se["DuplexStream (server end)"]
+    hyper["TokioIo → hyper http1::serve_connection()<br/>→ dav-server DavHandler"]
+    fs["Local filesystem (via dav-server LocalFs)"]
+
+    req --> wh
+    wh --> se
+    se --> hyper
+    hyper --> fs
+    fs -. response .-> hyper
+    hyper -. response .-> se
+    se -. response .-> rh
 ```
 
 Response data flows back through an `mpsc::Sender<MuxResponse>` from
@@ -179,8 +196,8 @@ ryll --file conn.vv --share-dir /path/to/dir          # read-write
 ryll --file conn.vv --share-dir /path/to/dir --share-dir-ro  # read-only
 ```
 
-See `docs/configuration.md` for details. Use `make test-qemu-webdav` to start
-a QEMU instance with WebDAV enabled.
+See the [configuration guide](/components/ryll/configuration/) for details. Use
+`make test-qemu-webdav` to start a QEMU instance with WebDAV enabled.
 
 ### GUI Components
 

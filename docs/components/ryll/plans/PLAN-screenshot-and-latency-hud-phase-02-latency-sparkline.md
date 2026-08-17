@@ -14,25 +14,25 @@ pattern from the top status bar.
 The bandwidth sparkline is the model to copy:
 
 - `BandwidthTracker` struct at
-  [ryll/src/app.rs:78-122](ryll/src/app.rs#L78-L122) holds
+  [ryll/src/app.rs:78-122](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L78-L122) holds
   a `Vec<f32>` of samples capped at `BANDWIDTH_HISTORY_LEN`
   (60). It exposes `tick()` (advance), `label()` (format
   the current value), and `history` (read for rendering).
 - The render block at
-  [ryll/src/app.rs:1037-1062](ryll/src/app.rs#L1037-L1062)
+  [ryll/src/app.rs:1037-1062](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1037-L1062)
   computes a dynamic max from the visible window and draws
   fixed-width green bars.
 - Bandwidth samples are pushed once per second from a
   shared `AtomicU64` byte counter. Latency works
   differently: samples arrive only when `ChannelEvent::Latency`
   fires (currently only via `--cadence` mode at
-  [channels/inputs.rs:343-345](ryll/src/channels/inputs.rs#L343-L345)).
+  [channels/inputs.rs:343-345](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L343-L345)).
 - The latency value already lives at
   `App.stats.last_latency: Option<f64>`
-  ([app.rs:53](ryll/src/app.rs#L53)) and is updated on each
+  ([app.rs:53](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L53)) and is updated on each
   `ChannelEvent::Latency` at
-  [app.rs:536-538](ryll/src/app.rs#L536-L538). The render
-  site is [app.rs:971-973](ryll/src/app.rs#L971-L973):
+  [app.rs:536-538](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L536-L538). The render
+  site is [app.rs:971-973](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L971-L973):
 
   ```rust
   if let Some(latency) = self.stats.last_latency {
@@ -72,7 +72,7 @@ intuitively.
 - **Render order in bottom panel:** after `Latency: Xms`,
   before the existing `ui.separator()`. The bottom panel is
   a single horizontal `ui.horizontal` block at
-  [app.rs:970](ryll/src/app.rs#L970).
+  [app.rs:970](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L970).
 - **Headless mode:** `Statistics` is shared with the
   headless path, but the tracker only renders in the GUI.
   Adding the tracker as a field on `RyllApp` (not on the
@@ -91,9 +91,9 @@ intuitively.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 2a   | medium | sonnet | none     | In [ryll/src/app.rs](ryll/src/app.rs), add a `LATENCY_HISTORY_LEN: usize = 60` constant near `BANDWIDTH_HISTORY_LEN` (line 36). Add a `LatencyTracker` struct directly mirroring `BandwidthTracker` at lines 78-122: `history: Vec<f32>` (storing milliseconds), `record(&mut self, sample_ms: f32)` (push, trim to capacity), `label(&self) -> String` (format the most recent value as `"X.Yms"` or `"--ms"` if empty). No `tick()` needed — samples are event-driven, not time-driven. Add unit tests for `record` (capacity trimming) and `label` (empty / non-empty formatting). |
-| 2b   | medium | sonnet | none     | Wire `LatencyTracker` into `RyllApp`. Add a `latency: LatencyTracker` field next to `bandwidth` ([app.rs:172](ryll/src/app.rs#L172)). Initialise it in the constructor ([app.rs:353](ryll/src/app.rs#L353)). In the `ChannelEvent::Latency` arm at [app.rs:536-538](ryll/src/app.rs#L536-L538), call `self.latency.record((key_timestamp * 1000.0) as f32)` after the existing `self.stats.last_latency = ...` assignment. |
-| 2c   | medium | sonnet | none     | In [ryll/src/app.rs](ryll/src/app.rs) bottom stats panel around line 971-974, after `ui.label(format!("Latency: {:.1}ms", ...))` and before the existing `ui.separator()`, add a sparkline render block that exactly copies the structure of the bandwidth sparkline at lines 1037-1062 but reads from `self.latency.history` and uses `Color32::from_rgb(180, 140, 80)` for the bars. Keep the same `>= 2` guard, same dynamic max calculation, same 80×12 dimensions. |
+| 2a   | medium | sonnet | none     | In [ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs), add a `LATENCY_HISTORY_LEN: usize = 60` constant near `BANDWIDTH_HISTORY_LEN` (line 36). Add a `LatencyTracker` struct directly mirroring `BandwidthTracker` at lines 78-122: `history: Vec<f32>` (storing milliseconds), `record(&mut self, sample_ms: f32)` (push, trim to capacity), `label(&self) -> String` (format the most recent value as `"X.Yms"` or `"--ms"` if empty). No `tick()` needed — samples are event-driven, not time-driven. Add unit tests for `record` (capacity trimming) and `label` (empty / non-empty formatting). |
+| 2b   | medium | sonnet | none     | Wire `LatencyTracker` into `RyllApp`. Add a `latency: LatencyTracker` field next to `bandwidth` ([app.rs:172](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L172)). Initialise it in the constructor ([app.rs:353](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L353)). In the `ChannelEvent::Latency` arm at [app.rs:536-538](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L536-L538), call `self.latency.record((key_timestamp * 1000.0) as f32)` after the existing `self.stats.last_latency = ...` assignment. |
+| 2c   | medium | sonnet | none     | In [ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) bottom stats panel around line 971-974, after `ui.label(format!("Latency: {:.1}ms", ...))` and before the existing `ui.separator()`, add a sparkline render block that exactly copies the structure of the bandwidth sparkline at lines 1037-1062 but reads from `self.latency.history` and uses `Color32::from_rgb(180, 140, 80)` for the bars. Keep the same `>= 2` guard, same dynamic max calculation, same 80×12 dimensions. |
 
 ## Success criteria for this phase
 

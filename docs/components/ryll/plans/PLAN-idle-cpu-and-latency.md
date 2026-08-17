@@ -33,7 +33,7 @@ happening, ryll burns roughly 6 cores. This is unacceptable
 for a release. Initial investigation points to two likely
 contributors, neither yet confirmed as the dominant cause:
 
-1. **Forced 60 FPS repaint.** [ryll/src/app.rs:2169](ryll/src/app.rs#L2169)
+1. **Forced 60 FPS repaint.** [ryll/src/app.rs:2169](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2169)
    calls `ctx.request_repaint_after(Duration::from_millis(16))`
    unconditionally at the end of every `update()`. egui then
    re-renders the entire UI (including all sparklines, the
@@ -43,7 +43,7 @@ contributors, neither yet confirmed as the dominant cause:
 2. **INFO-level logging on every protocol message.** Every
    channel logs every message it sends or receives via
    `shakenfist_spice_protocol::logging::log_message`
-   ([logging.rs:22-32](shakenfist-spice-protocol/src/logging.rs#L22-L32))
+   ([logging.rs:22-32](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs#L22-L32))
    at `info!` level. Each line allocates a
    `format_timestamp()` String, takes the global tracing
    subscriber lock, formats the line, and writes to
@@ -75,7 +75,7 @@ added inside `log_message` itself. Redundant.
 ### Issue 2 — Latency measurement is broken
 
 The current latency code at
-[channels/inputs.rs:341-346](ryll/src/channels/inputs.rs#L341-L346)
+[channels/inputs.rs:341-346](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs#L341-L346)
 sets `last_key_time = Some(Instant::now())` and on the very
 next line reads `last_key_time.unwrap().elapsed()`. That
 measures essentially zero (microseconds at most). The

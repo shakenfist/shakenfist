@@ -23,8 +23,8 @@ ryll/src/protocol/
 ```
 
 `SpiceClient` stayed behind because it imports
-[`crate::config::Config`](../../ryll/src/config.rs) at
-[client.rs:17](../../ryll/src/protocol/client.rs#L17). Config
+[`crate::config::Config`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/config.rs) at
+[client.rs:17](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/client.rs#L17). Config
 is ryll's application-level struct that bundles CLI parsing,
 .vv file parsing, and SPICE connection parameters.
 
@@ -40,10 +40,10 @@ The research pass found:
   will be structurally identical to `Config`, just defined in
   the protocol crate instead of ryll.
 * **Single instantiation site**:
-  [app.rs:1924](../../ryll/src/app.rs#L1924) —
+  [app.rs:1924](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1924) —
   `SpiceClient::new(config)?;` inside `run_connection()`.
 * **Single import site**:
-  [app.rs:24](../../ryll/src/app.rs#L24) —
+  [app.rs:24](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L24) —
   `use crate::protocol::SpiceClient;`.
 * **Three new deps** needed in the protocol crate's
   `Cargo.toml` when `client.rs` moves:

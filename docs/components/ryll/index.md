@@ -24,12 +24,14 @@ the focus has started to shift to performance validation.
 Honestly, I am not super into Star Wars or anything, but "ryll" was the first
 good spice pun I came across. To quote the excellently named Wookieepedia:
 
-> Ryll was a precious ore harvested from the mines of Ryloth, and could also
-> be found in the Krost Mountains on Aaloth. It had military and scientific
-> applications, but could also be used as a drug in the form of refined spice,
-> which was less effective than glitterstim.
-> 
-> https://starwars.fandom.com/wiki/Ryll
+!!! quote
+
+    Ryll was a precious ore harvested from the mines of Ryloth, and could also
+    be found in the Krost Mountains on Aaloth. It had military and scientific
+    applications, but could also be used as a drug in the form of refined spice,
+    which was less effective than glitterstim.
+
+    https://starwars.fandom.com/wiki/Ryll
 
 I guess I should think of a project to name "glitterstim" now too.
 
@@ -53,18 +55,12 @@ it is now a practical client for real workloads, not just test ones.
 
 ## The Testing Setup
 
-```
-┌─────────┐         ┌───────────┐         ┌─────────────┐
-│  ryll   │────────▶│ kerbside  │────────▶│ SPICE server│
-│ (client)│         │  (proxy)  │         │   (QEMU)    │
-└─────────┘         └───────────┘         └─────────────┘
-     │                    │                      │
-     │                    │                      │
-     ▼                    ▼                      ▼
-  Metrics:            Metrics:              Metrics:
-  - Latency           - Throughput          - Server-side
-  - Frame rate        - Connection time       processing
-  - Bytes in/out      - Protocol overhead
+```mermaid
+flowchart LR
+    ryll["ryll<br/>(client)"] --> kerbside["kerbside<br/>(proxy)"] --> server["SPICE server<br/>(QEMU)"]
+    ryll -.-> rm["Metrics:<br/>latency<br/>frame rate<br/>bytes in / out"]
+    kerbside -.-> km["Metrics:<br/>throughput<br/>connection time<br/>protocol overhead"]
+    server -.-> sm["Metrics:<br/>server-side processing"]
 ```
 
 With ryll, we can:
@@ -110,6 +106,6 @@ both ends of the traffic through the proxy. This would allow:
 
 ## Project Files
 
-- [README](/components/ryll/../README/) - Quick start and usage
-- [ARCHITECTURE](/components/ryll/../ARCHITECTURE/) - The crate map, code organisation, and concurrency model
-- [AGENTS](/components/ryll/../AGENTS/) - Guide for AI coding assistants
+- [README](https://github.com/shakenfist/ryll/blob/develop/README.md) - Quick start and usage
+- [ARCHITECTURE](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md) - The crate map, code organisation, and concurrency model
+- [AGENTS](https://github.com/shakenfist/ryll/blob/develop/AGENTS.md) - Guide for AI coding assistants

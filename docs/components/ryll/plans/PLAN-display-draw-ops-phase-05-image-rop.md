@@ -111,13 +111,13 @@ By the end of this phase:
 
 ## Current state
 
-* [ryll/src/channels/display.rs:789-1283](../../ryll/src/channels/display.rs#L789)
+* [ryll/src/channels/display.rs:789-1283](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L789)
   `handle_draw_copy`. ~490 lines. Inline SpiceCopy
   header parse, then a big match on `ImageType`
   producing an `Option<DecompressedImage>`, then cache
   + record_decode + emit-ImageReady (with optional
   src-area crop and per-clip-rect sub-emit).
-* [shakenfist-spice-protocol/src/messages.rs](../../shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
   `SpiceOpaque::read(data) -> io::Result<(Self,
   usize)>` from phase 1. Already knows about the
   embedded `SpiceBrush`.

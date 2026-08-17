@@ -13,28 +13,28 @@ answers in what the code actually does today.
 
 Key references for this phase:
 
-* [ryll/src/main.rs](../../ryll/src/main.rs) — phase-8e
+* [ryll/src/main.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs) — phase-8e
   observer wiring block (look for "KNOWN LIMITATION").
   This is what we're moving.
-* [ryll/src/app.rs:345](../../ryll/src/app.rs#L345) —
+* [ryll/src/app.rs:345](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L345) —
   `RyllApp::new` where live `TrafficBuffers`,
   `ChannelSnapshots`, and `app_snapshot` are built
   (lines 367-371 in the phase-8 state).
-* [ryll/src/app.rs:2616](../../ryll/src/app.rs#L2616) —
+* [ryll/src/app.rs:2616](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2616) —
   `run_headless`, which builds its own live
   `TrafficBuffers`. Check where its equivalents for
   `ChannelSnapshots` and `app_snapshot` live (there may
   not be a full set — headless was never plumbed through
   the F8 bug-report path either, so a design decision
   is needed below).
-* [ryll/src/bugreport.rs:525](../../ryll/src/bugreport.rs#L525)
+* [ryll/src/bugreport.rs:525](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L525)
   — `ChannelSnapshots` struct definition. Fields are
   already `Arc<Mutex<..>>`, so deriving `Clone` is free.
-* [ryll/src/bugreport.rs:901](../../ryll/src/bugreport.rs#L901)
+* [ryll/src/bugreport.rs:901](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L901)
   — `BugReport::write_pedantic` signature (the helper
   phase 8b added; this phase wraps it in the observer
   factory).
-* [shakenfist-spice-protocol/src/logging.rs](../../shakenfist-spice-protocol/src/logging.rs)
+* [shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs)
   — `register_gap_observer` with
   replay-on-late-registration. The tiny window between
   "session starts" and "observer registered" is covered
@@ -120,7 +120,7 @@ stubs and the comment together.
 ### 1. `Clone` on `ChannelSnapshots`
 
 In
-[ryll/src/bugreport.rs](../../ryll/src/bugreport.rs):
+[ryll/src/bugreport.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs):
 
 ```rust
 #[derive(Clone)]
@@ -141,7 +141,7 @@ working.
 ### 2. `PedanticConfig` and the observer-factory helper
 
 Add to
-[ryll/src/bugreport.rs](../../ryll/src/bugreport.rs):
+[ryll/src/bugreport.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs):
 
 ```rust
 /// Configuration bundle passed from main.rs into the
@@ -234,7 +234,7 @@ already correct modulo the stub handles.
 ### 3. Call the factory from `app::RyllApp::new`
 
 In
-[ryll/src/app.rs](../../ryll/src/app.rs) `RyllApp::new`,
+[ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) `RyllApp::new`,
 after the live handles exist (around line 371) and
 before the struct literal return, insert:
 
@@ -258,7 +258,7 @@ call site in main.rs passes the config through.
 ### 4. Call the factory from `run_headless`
 
 In
-[ryll/src/app.rs](../../ryll/src/app.rs) `run_headless`,
+[ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) `run_headless`,
 around line 2616 after `TrafficBuffers` is built:
 
 The headless path may not currently build full

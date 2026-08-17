@@ -22,7 +22,7 @@ is bit-for-bit unchanged. **The wire format must not change.**
 The marker-struct refactor changes only the public Rust API
 shape, not the bytes that go on the wire.
 
-`SpiceClient` ([ryll/src/protocol/client.rs](../../ryll/src/protocol/client.rs))
+`SpiceClient` ([ryll/src/protocol/client.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/client.rs))
 **stays in ryll** during Phase 4 because it currently imports
 `crate::config::Config`. It is moved into the new crate in
 Phase 6 ([ConnectionConfig refactor](/components/ryll/plans/PLAN-crate-extraction/))
@@ -67,14 +67,14 @@ ryll-repo/
 **Current state of the protocol code** (from the Phase 4
 research pass):
 
-* [ryll/src/protocol/mod.rs](../../ryll/src/protocol/mod.rs)
+* [ryll/src/protocol/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/mod.rs)
   is 8 lines: declares the five sub-modules, plus
   `pub use client::SpiceClient;` and `pub use constants::*;`.
   These two re-exports are the API surface that the rest of
   ryll consumes (`crate::protocol::ChannelType`,
   `crate::protocol::SpiceClient`, etc.).
 
-* [ryll/src/protocol/constants.rs](../../ryll/src/protocol/constants.rs)
+* [ryll/src/protocol/constants.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/constants.rs)
   (357 lines): SPICE magic, version, capability flags,
   `ChannelType`, `SpiceError`, `ImageType`, `NotifySeverity`
   enums; the `main_server`/`main_client`/`display_server`/
@@ -84,7 +84,7 @@ research pass):
   `keyboard_modifiers` and `mouse_buttons` const modules.
   Pure constants and enum impls. No `use crate::*` imports.
 
-* [ryll/src/protocol/messages.rs](../../ryll/src/protocol/messages.rs)
+* [ryll/src/protocol/messages.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs)
   (601 lines): 14 real wire-format structs (`MessageHeader`,
   `MainInit`, `Ping`, `ChannelEntry`, `ChannelsList`, `SetAck`,
   `Notify`, `SurfaceCreate`, `DrawCopyBase`, `ImageDescriptor`,
@@ -92,20 +92,20 @@ research pass):
   plus the `make_message()` helper. Also contains four
   **marker structs** that are zero-sized namespaces with
   associated `write` functions (the subject of Decision #5):
-  - `InputsKeyModifiers` ([line 531](../../ryll/src/protocol/messages.rs#L531)):
+  - `InputsKeyModifiers` ([line 531](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs#L531)):
     `pub fn write(modifiers: u16, buf: &mut Vec<u8>)`
-  - `KeyEvent` ([line 541](../../ryll/src/protocol/messages.rs#L541)):
+  - `KeyEvent` ([line 541](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs#L541)):
     `pub fn write(scancode: u32, buf: &mut Vec<u8>)`
-  - `MousePosition` ([line 551](../../ryll/src/protocol/messages.rs#L551)):
+  - `MousePosition` ([line 551](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs#L551)):
     `pub fn write(x: u32, y: u32, buttons: u32, display_id: u8, buf: &mut Vec<u8>)`
     — **the worst case**: four positional args, three of
     them the same `u32` type, easily mis-ordered at call
     sites.
-  - `MouseButton` ([line 570](../../ryll/src/protocol/messages.rs#L570)):
+  - `MouseButton` ([line 570](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs#L570)):
     `pub fn write(button: u32, buttons_state: u32, buf: &mut Vec<u8>)`
     — has a private `mask_to_id` helper.
 
-* [ryll/src/protocol/logging.rs](../../ryll/src/protocol/logging.rs)
+* [ryll/src/protocol/logging.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/logging.rs)
   (272 lines): pure formatting and tracing helpers
   (`timestamp`, `format_timestamp`, `log_message`, `log_detail`,
   `log_unknown`, `log_incomplete`, `hex_dump`) plus a nested
@@ -113,7 +113,7 @@ research pass):
   functions (one per channel direction). All call into
   `tracing::*` macros directly.
 
-* [ryll/src/protocol/link.rs](../../ryll/src/protocol/link.rs)
+* [ryll/src/protocol/link.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/link.rs)
   (355 lines): the SPICE link handshake. Public items:
   `SpiceStream` enum (Plain/Tls wrapper), `SpiceLinkMess`
   struct + `::new` constructor + `::serialize`, `SpiceLinkReply`
@@ -125,10 +125,10 @@ research pass):
   ergonomically fine as-is because the types are all distinct.
   No internal cleanup needed during Phase 4.
 
-* [ryll/src/protocol/client.rs](../../ryll/src/protocol/client.rs)
+* [ryll/src/protocol/client.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/client.rs)
   (250 lines, **stays in ryll**): `SpiceClient` struct that
   wraps a connection. Imports
-  [`use crate::config::Config;`](../../ryll/src/protocol/client.rs#L17)
+  [`use crate::config::Config;`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/client.rs#L17)
   which is the dependency that forces it to stay in ryll until
   Phase 6. Also imports
   `use super::constants::{ChannelType, SpiceError};` and
@@ -148,21 +148,21 @@ from the research pass):
 
 | File | Imports |
 |---|---|
-| [ryll/src/app.rs](../../ryll/src/app.rs) | `crate::protocol::{ChannelType, SpiceClient}` |
-| [ryll/src/channels/mod.rs](../../ryll/src/channels/mod.rs) | `crate::protocol::ChannelType` |
-| [ryll/src/channels/display.rs](../../ryll/src/channels/display.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, DisplayInit, DrawCopyBase, ImageDescriptor, MessageHeader, Ping, SetAck, SurfaceCreate}`, `{display_client, display_server, ChannelType, ImageType}` |
-| [ryll/src/channels/inputs.rs](../../ryll/src/channels/inputs.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, InputsKeyModifiers, KeyEvent, MessageHeader, MouseButton, MousePosition, Ping, SetAck}`, `{inputs_client, inputs_server, keyboard_modifiers, ChannelType}` |
-| [ryll/src/channels/main_channel.rs](../../ryll/src/channels/main_channel.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::*`, `{main_client, main_server, ChannelType, NotifySeverity}` |
-| [ryll/src/channels/cursor.rs](../../ryll/src/channels/cursor.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::*`, `{cursor_client, cursor_server, ChannelType}` |
-| [ryll/src/channels/usbredir.rs](../../ryll/src/channels/usbredir.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, MessageHeader, Ping, SetAck}`, `{spicevmc_client, spicevmc_server, ChannelType}` |
-| [ryll/src/channels/webdav.rs](../../ryll/src/channels/webdav.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, MessageHeader, Ping, SetAck}`, `{spicevmc_client, spicevmc_server, ChannelType}` |
-| [ryll/src/protocol/client.rs](../../ryll/src/protocol/client.rs) | `super::constants::{ChannelType, SpiceError}`, `super::link::{perform_auth, perform_link, SpiceStream}` |
+| [ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) | `crate::protocol::{ChannelType, SpiceClient}` |
+| [ryll/src/channels/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs) | `crate::protocol::ChannelType` |
+| [ryll/src/channels/display.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, DisplayInit, DrawCopyBase, ImageDescriptor, MessageHeader, Ping, SetAck, SurfaceCreate}`, `{display_client, display_server, ChannelType, ImageType}` |
+| [ryll/src/channels/inputs.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, InputsKeyModifiers, KeyEvent, MessageHeader, MouseButton, MousePosition, Ping, SetAck}`, `{inputs_client, inputs_server, keyboard_modifiers, ChannelType}` |
+| [ryll/src/channels/main_channel.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::*`, `{main_client, main_server, ChannelType, NotifySeverity}` |
+| [ryll/src/channels/cursor.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/cursor.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::*`, `{cursor_client, cursor_server, ChannelType}` |
+| [ryll/src/channels/usbredir.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/usbredir.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, MessageHeader, Ping, SetAck}`, `{spicevmc_client, spicevmc_server, ChannelType}` |
+| [ryll/src/channels/webdav.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/webdav.rs) | `link::SpiceStream`, `logging::{self, message_names}`, `messages::{make_message, MessageHeader, Ping, SetAck}`, `{spicevmc_client, spicevmc_server, ChannelType}` |
+| [ryll/src/protocol/client.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/client.rs) | `super::constants::{ChannelType, SpiceError}`, `super::link::{perform_auth, perform_link, SpiceStream}` |
 
 `app.rs` is the only file that imports `SpiceClient`. Every
 other file imports non-client items only.
 
 **Marker-struct call sites** (the API cleanup scope, all in
-[ryll/src/channels/inputs.rs](../../ryll/src/channels/inputs.rs)):
+[ryll/src/channels/inputs.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs)):
 
 | Line | Call |
 |---|---|
@@ -686,7 +686,7 @@ Place near the existing `shakenfist-spice-compression` line.
 
 ### Updates to ryll's protocol module
 
-After the extraction commit, [ryll/src/protocol/](../../ryll/src/protocol/)
+After the extraction commit, [ryll/src/protocol/](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol)
 contains only `client.rs` and a slimmed-down `mod.rs`:
 
 ```rust
@@ -701,7 +701,7 @@ ryll consumer now imports from `shakenfist_spice_protocol::*`
 directly.
 
 The `mod protocol;` declaration in
-[ryll/src/main.rs:23](../../ryll/src/main.rs#L23) stays
+[ryll/src/main.rs:23](https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L23) stays
 unchanged. It now declares a 2-file directory (`mod.rs` +
 `client.rs`) instead of a 6-file directory.
 
@@ -763,18 +763,18 @@ Each step below is one commit.
 ### Step 1: Marker-struct refactor
 
 Refactor the four marker-struct message types in
-[ryll/src/protocol/messages.rs](../../ryll/src/protocol/messages.rs)
+[ryll/src/protocol/messages.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs)
 into real data-bearing structs per the "Marker-struct
 refactor design" section above. Then update the 8 call sites
 in
-[ryll/src/channels/inputs.rs](../../ryll/src/channels/inputs.rs)
+[ryll/src/channels/inputs.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs)
 to use struct-literal construction followed by
 `.write(&mut buf)`.
 
 Concrete steps within the commit:
 
 1. In
-   [messages.rs](../../ryll/src/protocol/messages.rs),
+   [messages.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/protocol/messages.rs),
    replace the four marker-struct definitions with the
    data-bearing versions. The order matters only for diff
    readability — going top-to-bottom (`InputsKeyModifiers`
@@ -783,7 +783,7 @@ Concrete steps within the commit:
 2. For `MouseButton`, the private `mask_to_id` helper stays
    in the impl block unchanged.
 3. In
-   [inputs.rs](../../ryll/src/channels/inputs.rs),
+   [inputs.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs),
    update each of the 8 call sites per the "After" examples
    above. The struct literal lives on its own line followed
    by `.write(&mut buf)?;` rather than being an expression
@@ -1145,7 +1145,7 @@ We will know Phase 4 has been successfully implemented when:
   `MouseButton`) are real data-bearing structs with `pub`
   fields and `write(&self, buf)` methods.
 * All 8 call sites in
-  [ryll/src/channels/inputs.rs](../../ryll/src/channels/inputs.rs)
+  [ryll/src/channels/inputs.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/inputs.rs)
   use struct literal construction followed by
   `.write(&mut buf)`.
 * `cargo build --workspace`, `cargo test --workspace`, and

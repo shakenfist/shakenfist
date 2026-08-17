@@ -84,24 +84,24 @@ By the end of this phase:
 
 ## Current state
 
-* [ryll/src/channels/display.rs:378-384](../../ryll/src/channels/display.rs#L378-L384)
+* [ryll/src/channels/display.rs:378-384](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L378-L384)
   — `DRAW_COPY` is handled; `DRAW_COMPOSITE` is logged as
   a stub; `DRAW_FILL` falls into the `_ =>
   log_unknown(...)` arm at
-  [ryll/src/channels/display.rs:654](../../ryll/src/channels/display.rs#L654).
-* [shakenfist-spice-protocol/src/messages.rs](../../shakenfist-spice-protocol/src/messages.rs)
+  [ryll/src/channels/display.rs:654](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654).
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
   has the `DrawBase`, `SpiceFill`, `SpiceBrush`,
   `SpiceQMask` parsers from phase 1.
-* [shakenfist-spice-protocol/src/constants.rs:189](../../shakenfist-spice-protocol/src/constants.rs#L189)
+* [shakenfist-spice-protocol/src/constants.rs:189](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/constants.rs#L189)
   defines `DRAW_FILL = 302` but no `SPICE_ROPD_*` or
   `SPICE_BRUSH_TYPE_*`.
-* [shakenfist-spice-protocol/src/logging.rs:1-76](../../shakenfist-spice-protocol/src/logging.rs)
+* [shakenfist-spice-protocol/src/logging.rs:1-76](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs)
   has `log_message`, `log_detail`, `log_unknown`, and
   `hex_dump`. No warn-once helper.
-* [ryll/src/channels/mod.rs](../../ryll/src/channels/mod.rs)
+* [ryll/src/channels/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs)
   `ChannelEvent::FillRect` is defined (phase 1) but
   `#[allow(dead_code)]`.
-* [ryll/src/display/surface.rs](../../ryll/src/display/surface.rs)
+* [ryll/src/display/surface.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs)
   `DisplaySurface::fill_rect` is defined (phase 1) but
   `#[allow(dead_code)]`.
 
@@ -135,7 +135,7 @@ channel already does for `cursor_type = Color32`.
 ## The warn-once helper
 
 New API in
-[shakenfist-spice-protocol/src/logging.rs](../../shakenfist-spice-protocol/src/logging.rs).
+[shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs).
 The master plan calls for a registry that phase 8 can
 iterate; phase 2 only needs "fire once per key",
 but the shape should already allow phase 8 to hook it
@@ -225,7 +225,7 @@ name literally).
 ## New protocol-crate constants
 
 Add to
-[shakenfist-spice-protocol/src/constants.rs](../../shakenfist-spice-protocol/src/constants.rs):
+[shakenfist-spice-protocol/src/constants.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/constants.rs):
 
 ```rust
 /// Raster operation descriptors (SPICE_ROPD_* in enums.h).

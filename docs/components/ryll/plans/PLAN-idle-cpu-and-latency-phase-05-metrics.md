@@ -40,17 +40,17 @@ non-Linux.
 ## Background
 
 Bug reports are assembled in
-[ryll/src/bugreport.rs](ryll/src/bugreport.rs).  The
+[ryll/src/bugreport.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs).  The
 existing flow:
 
 - `BugReport::new(...)` collects metadata, channel state,
   optional pcap traffic, and an optional screenshot
-  ([bugreport.rs:608+](ryll/src/bugreport.rs#L608)).
+  ([bugreport.rs:608+](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L608)).
 - `metadata.json` already contains ryll version, platform,
   and target host (see `chrono_now()` and friends at
-  [bugreport.rs:540-579](ryll/src/bugreport.rs#L540-L579)).
+  [bugreport.rs:540-579](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L540-L579)).
 - The ZIP layout is documented in
-  [README.md](/components/ryll/plans/README/) (capture mode section).
+  [README.md](https://github.com/shakenfist/ryll/blob/develop/README.md) (capture mode section).
 
 The natural extension: add a `runtime_metrics` field to
 the report struct, populated at report-creation time, and
@@ -172,8 +172,8 @@ Or for non-Linux:
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 5a   | medium | sonnet | none     | Add a new module `ryll/src/metrics.rs` with a `RuntimeMetrics` struct, a `sample(window: Duration) -> RuntimeMetrics` function (Linux only — gated by `#[cfg(target_os = "linux")]`), and a non-Linux fallback returning `RuntimeMetrics::unavailable(reason)`.  Read `/proc/self/stat`, `/proc/self/status`, `/proc/self/task/<tid>/stat`, `/proc/self/task/<tid>/comm`.  Compute CPU% as `(delta_utime + delta_stime) / sysconf(_SC_CLK_TCK) / window.as_secs_f64() * 100.0`.  Use `serde::Serialize` so the struct serialises directly to JSON.  Add unit tests for the parsing helpers (parse a sample `/proc/self/stat` string, verify field extraction) — do NOT add a test that actually sleeps for 2 seconds. |
-| 5b   | medium | sonnet | none     | Wire `metrics::sample()` into `BugReport::new()` in [ryll/src/bugreport.rs](ryll/src/bugreport.rs).  Sample at the start of report assembly with a 2-second window.  Add a `runtime_metrics: RuntimeMetrics` field to the `BugReport` struct.  In the `write_zip()` method, write a new `runtime-metrics.json` file alongside the existing files.  Add a unit test that constructs a `BugReport` with a stub metrics value and verifies the ZIP contains `runtime-metrics.json` with the expected JSON shape. |
-| 5c   | low    | sonnet | none     | Update [README.md](/components/ryll/plans/README/) bug-report bullet (around line 24) to mention runtime metrics.  Update [docs/plans/PLAN-idle-cpu-and-latency.md](/components/ryll/plans/PLAN-idle-cpu-and-latency/) phase 5 status to Complete. |
+| 5b   | medium | sonnet | none     | Wire `metrics::sample()` into `BugReport::new()` in [ryll/src/bugreport.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs).  Sample at the start of report assembly with a 2-second window.  Add a `runtime_metrics: RuntimeMetrics` field to the `BugReport` struct.  In the `write_zip()` method, write a new `runtime-metrics.json` file alongside the existing files.  Add a unit test that constructs a `BugReport` with a stub metrics value and verifies the ZIP contains `runtime-metrics.json` with the expected JSON shape. |
+| 5c   | low    | sonnet | none     | Update [README.md](https://github.com/shakenfist/ryll/blob/develop/README.md) bug-report bullet (around line 24) to mention runtime metrics.  Update [docs/plans/PLAN-idle-cpu-and-latency.md](/components/ryll/plans/PLAN-idle-cpu-and-latency/) phase 5 status to Complete. |
 
 ## Success criteria for this phase
 

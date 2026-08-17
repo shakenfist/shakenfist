@@ -74,7 +74,7 @@ By the end of this phase:
 
 * `display_server::COPY_BITS = 104` is defined in
   constants.rs but falls into the `_ => log_unknown(...)`
-  arm at [ryll/src/channels/display.rs:714](../../ryll/src/channels/display.rs#L714)
+  arm at [ryll/src/channels/display.rs:714](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L714)
   (or wherever the unknown arm sits now — the line
   number will have shifted as phase 2 and 3 added
   earlier arms).

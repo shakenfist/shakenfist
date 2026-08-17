@@ -43,7 +43,7 @@ ryll-repo/
 └── ...
 ```
 
-[Cargo.toml](../../Cargo.toml) declares
+[Cargo.toml](https://github.com/shakenfist/ryll/blob/develop/Cargo.toml) declares
 `members = ["ryll"]` and shares `edition`, `license`,
 `authors`, and `repository` via `[workspace.package]`.
 
@@ -361,7 +361,7 @@ Steps within the commit:
    the per-crate "What this crate will contain" paragraph
    substituted in.
 
-3. Update the top-level [Cargo.toml](../../Cargo.toml)
+3. Update the top-level [Cargo.toml](https://github.com/shakenfist/ryll/blob/develop/Cargo.toml)
    `[workspace] members` list:
    ```toml
    [workspace]
@@ -553,7 +553,7 @@ We will know Phase 2 has been successfully implemented when:
   `shakenfist-spice-protocol/`, and
   `shakenfist-spice-usbredir/`, each with `Cargo.toml`,
   `README.md`, and `src/lib.rs`.
-* The top-level [Cargo.toml](../../Cargo.toml) `members` list
+* The top-level [Cargo.toml](https://github.com/shakenfist/ryll/blob/develop/Cargo.toml) `members` list
   contains all four crates (ryll plus the three placeholders).
 * `cargo build --workspace`,
   `cargo test --workspace`,

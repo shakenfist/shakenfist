@@ -75,18 +75,18 @@ By the end of this phase:
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs:255](../../shakenfist-spice-protocol/src/messages.rs#L255)
+* [shakenfist-spice-protocol/src/messages.rs:255](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L255)
   defines `DrawCopyBase` — the generic
   `SpiceMsgDisplayBase` (surface_id, box, clip). Misnamed;
   every draw op uses it. Rename to `DrawBase`.
-* [ryll/src/channels/display.rs:21](../../ryll/src/channels/display.rs#L21)
+* [ryll/src/channels/display.rs:21](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L21)
   imports `DrawCopyBase`; that's the only ryll consumer.
-* [ryll/src/channels/mod.rs:46](../../ryll/src/channels/mod.rs#L46)
+* [ryll/src/channels/mod.rs:46](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs#L46)
   `ChannelEvent::ImageReady` is the only "draw-result"
   variant today.
-* [ryll/src/display/surface.rs:16-26](../../ryll/src/display/surface.rs#L16-L26)
+* [ryll/src/display/surface.rs:16-26](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L16-L26)
   `DisplaySurface::new()` fills with `(50, 50, 50, 255)`.
-* [ryll/src/app.rs:562](../../ryll/src/app.rs#L562) handles
+* [ryll/src/app.rs:562](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L562) handles
   `ImageReady`. No `FillRect`, `CopyBits`, or `Invert`
   handlers exist yet.
 
@@ -210,7 +210,7 @@ image decode is phase 5/6.
 
 ## ChannelEvent additions
 
-In [ryll/src/channels/mod.rs](../../ryll/src/channels/mod.rs):
+In [ryll/src/channels/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs):
 
 ```rust
 /// Solid-colour fill of a destination rect (used by
@@ -260,7 +260,7 @@ Shape notes:
 
 ## Surface helpers
 
-In [ryll/src/display/surface.rs](../../ryll/src/display/surface.rs):
+In [ryll/src/display/surface.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs):
 
 ### Signature sketch
 
@@ -367,7 +367,7 @@ rect size (typically a console line or a small square).
 
 ## App-side handlers
 
-In [ryll/src/app.rs](../../ryll/src/app.rs) inside the
+In [ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) inside the
 main (non-headless) `match event` at ~line 529:
 
 ```rust
@@ -420,7 +420,7 @@ only if `#[warn(unused)]`-style lints apply, which they
 don't here (`ChannelEvent` is `pub`).
 
 The second (headless) event loop at
-[ryll/src/app.rs:2580](../../ryll/src/app.rs#L2580)
+[ryll/src/app.rs:2580](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2580)
 already has a `_ => {}` default arm — the new variants
 fall into it unchanged. Headless mode doesn't render, so
 a no-op is correct.
@@ -431,7 +431,7 @@ a no-op is correct.
 
 Mechanical across two files: the struct and its `impl`
 in `messages.rs`, and the `use` line in
-[ryll/src/channels/display.rs:21](../../ryll/src/channels/display.rs#L21).
+[ryll/src/channels/display.rs:21](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L21).
 The documentation-level plans
 ([PLAN-crate-extraction-phase-04-protocol.md](/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/),
 [PLAN-deferred-debt-phase-06-tests.md](/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/),
@@ -482,7 +482,7 @@ test covers:
   `!= 0` (non-null) cases.
 
 Reuse the existing `DrawCopyBase` test block
-[messages.rs:639-720](../../shakenfist-spice-protocol/src/messages.rs#L639)
+[messages.rs:639-720](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L639)
 as a style reference (manual byte construction, explicit
 expected values, `expect()` on the parse, `assert_eq!`
 on fields).
@@ -568,7 +568,7 @@ largest code change and warrants careful reading against
   other visible behaviour change.
 * No new opcodes route to a handler — the `_ =>
   log_unknown(...)` arm in
-  [ryll/src/channels/display.rs:654](../../ryll/src/channels/display.rs#L654)
+  [ryll/src/channels/display.rs:654](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654)
   is unchanged, confirming phase 1 did not accidentally
   land phase 2's work.
 

@@ -1,7 +1,11 @@
 # Session lifecycle
 
-How a ryll session starts, survives a dropped connection, and shuts down
-without losing buffered work.
+A ryll session has to shut down without losing buffered work, and survive
+a dropped connection without leaking the threads and sockets of the
+attempt it replaced. This page covers the graceful shutdown path and the
+reconnection machinery: what is recreated, what survives, how superseded
+attempts are cancelled, and when reconnection happens automatically
+rather than through a modal.
 
 ## Graceful Shutdown
 

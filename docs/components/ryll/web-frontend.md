@@ -213,34 +213,34 @@ A full nginx server block follows the standard
 `proxy_pass` + `ssl_certificate` / `ssl_certificate_key`
 pattern.
 
-> **Important — WebRTC media is NOT proxied.**
->
-> ICE candidates emitted by ryll point at ryll's host and
-> port directly. The browser opens UDP flows to that
-> endpoint — they never go through the reverse proxy.
-> The proxy carries only the HTTP signalling page and the
-> `POST /offer` request.
->
-> Consequences:
->
-> - **ryll's UDP ports must be reachable from the browser.**
->   At startup ryll enumerates the host's non-loopback
->   network interface addresses and binds one ephemeral UDP
->   socket per address; the OS assigns the actual port per
->   socket (typically from 32768–60999 on Linux). Open the
->   relevant firewall ports on ryll's host. Pinning a specific
->   port is not configurable yet — that lands in a later
->   phase, so a static firewall rule currently has to open the
->   OS's whole ephemeral range rather than a single port.
-> - **ryll advertises a candidate for every non-loopback
->   interface address on the host, independent of
->   `--web-host`.** `--web-host` controls only the HTTP/HTTPS
->   signalling listener (`GET /`, `POST /offer`); it has no
->   effect on which addresses WebRTC binds or advertises. If
->   the host has more than one non-loopback interface (for
->   example a public IP and a private LAN IP), ryll binds and
->   advertises candidates for all of them — there is currently
->   no way to select or restrict which addresses are used.
+!!! warning "WebRTC media is not proxied"
+
+    ICE candidates emitted by ryll point at ryll's host and
+    port directly. The browser opens UDP flows to that
+    endpoint — they never go through the reverse proxy.
+    The proxy carries only the HTTP signalling page and the
+    `POST /offer` request.
+
+    Consequences:
+
+    - **ryll's UDP ports must be reachable from the browser.**
+      At startup ryll enumerates the host's non-loopback
+      network interface addresses and binds one ephemeral UDP
+      socket per address; the OS assigns the actual port per
+      socket (typically from 32768–60999 on Linux). Open the
+      relevant firewall ports on ryll's host. Pinning a specific
+      port is not configurable yet, so a static firewall rule
+      currently has to open the OS's whole ephemeral range
+      rather than a single port.
+    - **ryll advertises a candidate for every non-loopback
+      interface address on the host, independent of
+      `--web-host`.** `--web-host` controls only the HTTP/HTTPS
+      signalling listener (`GET /`, `POST /offer`); it has no
+      effect on which addresses WebRTC binds or advertises. If
+      the host has more than one non-loopback interface (for
+      example a public IP and a private LAN IP), ryll binds and
+      advertises candidates for all of them — there is currently
+      no way to select or restrict which addresses are used.
 
 ## Troubleshooting
 
@@ -315,8 +315,8 @@ The error mentions ICE candidates and interface enumeration,
 which does not obviously translate to "bring up a network
 interface" — that is what it means. Connecting any interface,
 including a bridge or a VPN tunnel, is enough. There is no
-opt-in for loopback-only operation today; whether to add one is
-a question for the phase 03 configuration surface.
+opt-in for loopback-only operation today; whether to add one
+remains an open question.
 
 ### Cert load errors at startup
 
@@ -380,7 +380,7 @@ of whether the signalling page is served over HTTPS.
 For long-lived deployments, run ryll under systemd so it restarts
 automatically on failure and logs go to the journal.
 
-A reference unit file is at [`examples/ryll-web.service`](../examples/ryll-web.service).
+A reference unit file is at [`examples/ryll-web.service`](https://github.com/shakenfist/ryll/blob/develop/examples/ryll-web.service).
 Copy it to `/etc/systemd/system/ryll-web.service`, then:
 
     systemctl daemon-reload
@@ -475,12 +475,11 @@ without requiring a real SPICE session.
 
 macOS and Windows CI builds verify the `--web` dependencies
 link correctly but do not run the smoke test (runtime smoke
-is Linux-only for the MVP; see `docs/portability.md`).
+is Linux-only for the MVP; see [portability](/components/ryll/portability/)).
 
 ## Project status
 
-All 8 phases of the web-frontend plan are complete. The
-`--web` mode ships end-to-end: display, audio, inputs,
+The `--web` mode ships end-to-end: display, audio, inputs,
 cursor, reconnect, CI packaging, native TLS, and operator
-documentation. See `docs/plans/PLAN-web-frontend.md` for
-the full history.
+documentation. See [the web frontend plan](/components/ryll/plans/PLAN-web-frontend/)
+for the development history.

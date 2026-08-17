@@ -2,7 +2,7 @@
 
 ## Problem
 
-The current [release.yml](../../.github/workflows/release.yml) tags, builds
+The current [release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml) tags, builds
 binaries, creates a GitHub Release, and updates Homebrew. It does **not**
 publish any of the four workspace crates to crates.io. The three
 sub-crates (`shakenfist-spice-protocol`, `shakenfist-spice-compression`,
@@ -24,7 +24,7 @@ today regardless of workflow changes.
 
 ### Version unification via `[workspace.package]`
 
-The workspace root [Cargo.toml](../../Cargo.toml) gains
+The workspace root [Cargo.toml](https://github.com/shakenfist/ryll/blob/develop/Cargo.toml) gains
 `version = "0.1.3"` in `[workspace.package]`. All four members switch
 from their current per-crate `version = "..."` lines to
 `version.workspace = true`. Bumping the workspace version in one
@@ -48,7 +48,7 @@ The cut is split into two phases so the version bump goes through
 the same PR review gate as every other change, rather than landing
 directly on `develop`.
 
-**Phase 1** — [tools/propose-release.sh](../../tools/propose-release.sh),
+**Phase 1** — [tools/propose-release.sh](https://github.com/shakenfist/ryll/blob/develop/tools/propose-release.sh),
 invoked as `make propose-release 0.1.4`. The script:
 
 1. Parses and validates the version argument as `X.Y.Z`.
@@ -75,7 +75,7 @@ invoked as `make propose-release 0.1.4`. The script:
     repository convention that PR creation stays with the
     operator).
 
-**Phase 2** — [tools/tag-release.sh](../../tools/tag-release.sh),
+**Phase 2** — [tools/tag-release.sh](https://github.com/shakenfist/ryll/blob/develop/tools/tag-release.sh),
 invoked as `make tag-release 0.1.4` after the phase-1 PR has been
 merged. The script:
 
@@ -89,7 +89,7 @@ merged. The script:
    and prompts "Create and push tag v0.1.4? [y/N]".
 5. On `y`: creates an annotated tag `v0.1.4` at the fetched
    `origin/develop` SHA and pushes it (this is what triggers
-   [release.yml](../../.github/workflows/release.yml)).
+   [release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml)).
 6. Runs `gh run watch` on the triggered workflow, then
    `gh release view v0.1.4 --web` once it completes.
 
@@ -103,7 +103,7 @@ rustc (e.g. Debian's cargo 1.85) should pin
 
 ### Release workflow (release.yml)
 
-Three changes to [release.yml](../../.github/workflows/release.yml):
+Three changes to [release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml):
 
 1. `check-version` reads the version from root `[workspace.package]`
    instead of `ryll/Cargo.toml`. Because all four crates now inherit,

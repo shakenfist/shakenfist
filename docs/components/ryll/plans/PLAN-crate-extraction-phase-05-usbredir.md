@@ -43,20 +43,20 @@ ryll-repo/
 `ryll/src/channels/usbredir.rs` is the *channel handler* that
 uses the protocol module (stays in ryll). Both exist because
 SPICE's usbredir channel uses the usbredir wire protocol. The
-`mod usbredir;` at [ryll/src/main.rs:26](../../ryll/src/main.rs#L26)
+`mod usbredir;` at [ryll/src/main.rs:26](https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L26)
 declares the protocol module (the extraction target). The
 `pub mod usbredir;` at
-[ryll/src/channels/mod.rs:5](../../ryll/src/channels/mod.rs#L5)
+[ryll/src/channels/mod.rs:5](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs#L5)
 declares the channel handler (not touched by Phase 5).
 
 **Current state of the usbredir code** (from the Phase 5
 research pass):
 
-* [ryll/src/usbredir/mod.rs](../../ryll/src/usbredir/mod.rs)
+* [ryll/src/usbredir/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usbredir/mod.rs)
   (9 lines): declares `pub mod constants`, `pub mod messages`,
   `pub mod parser`. No re-exports, no type definitions.
 
-* [ryll/src/usbredir/constants.rs](../../ryll/src/usbredir/constants.rs)
+* [ryll/src/usbredir/constants.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usbredir/constants.rs)
   (150 lines): `pub mod msg_type` (35 message-type constants),
   `pub mod cap` (8 capability constants), `pub const RYLL_CAPS`,
   `pub enum Status`, `pub enum UsbSpeed`, `pub enum EpType`,
@@ -64,7 +64,7 @@ research pass):
   external crate imports (only stdlib). Has
   `#![allow(dead_code)]` at the top.
 
-* [ryll/src/usbredir/messages.rs](../../ryll/src/usbredir/messages.rs)
+* [ryll/src/usbredir/messages.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usbredir/messages.rs)
   (804 lines): 15 message struct types (each with
   `pub const SIZE`, `pub fn read()`, `pub fn write()`),
   `pub fn make_usbredir_message()`, `pub struct UsbredirMessage`,
@@ -72,7 +72,7 @@ research pass):
   `byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt}`.
   Internal `use super::constants::msg_type` for dispatch.
 
-* [ryll/src/usbredir/parser.rs](../../ryll/src/usbredir/parser.rs)
+* [ryll/src/usbredir/parser.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usbredir/parser.rs)
   (349 lines): `pub struct UsbredirParser` with `pub fn new()`,
   `pub fn feed()`, `pub fn next_message()`. Uses
   `anyhow::Result`. Internal `use super::constants::msg_type`
@@ -92,10 +92,10 @@ number). These tests migrate with their files to the new crate.
 
 | File | Imports |
 |---|---|
-| [ryll/src/channels/usbredir.rs](../../ryll/src/channels/usbredir.rs) | `crate::usbredir::constants::{self, msg_type, msg_type_name, Status, RYLL_CAPS}`, `crate::usbredir::messages::{...}`, `crate::usbredir::parser::UsbredirParser` |
-| [ryll/src/usb/mod.rs](../../ryll/src/usb/mod.rs) | `crate::usbredir::constants::Status`, `crate::usbredir::messages::{DeviceConnect, EpInfo, InterfaceInfo}` |
-| [ryll/src/usb/real.rs](../../ryll/src/usb/real.rs) | `crate::usbredir::constants::Status`, `crate::usbredir::messages::{DeviceConnect, EpInfo, InterfaceInfo}` |
-| [ryll/src/usb/virtual_msc.rs](../../ryll/src/usb/virtual_msc.rs) | (likely same pattern as real.rs — verify during execution) |
+| [ryll/src/channels/usbredir.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/usbredir.rs) | `crate::usbredir::constants::{self, msg_type, msg_type_name, Status, RYLL_CAPS}`, `crate::usbredir::messages::{...}`, `crate::usbredir::parser::UsbredirParser` |
+| [ryll/src/usb/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usb/mod.rs) | `crate::usbredir::constants::Status`, `crate::usbredir::messages::{DeviceConnect, EpInfo, InterfaceInfo}` |
+| [ryll/src/usb/real.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usb/real.rs) | `crate::usbredir::constants::Status`, `crate::usbredir::messages::{DeviceConnect, EpInfo, InterfaceInfo}` |
+| [ryll/src/usb/virtual_msc.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/usb/virtual_msc.rs) | (likely same pattern as real.rs — verify during execution) |
 
 **Inline qualified paths** (lesson from Phase 4): the research
 found two inline `crate::usbredir::messages::InterruptReceivingStatus { ... }`
