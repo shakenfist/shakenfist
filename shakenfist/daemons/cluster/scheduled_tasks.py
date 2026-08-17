@@ -758,14 +758,28 @@ def _fill_per_deleted_object_queue():
         #
         # A tier-wide failure is the opposite case and must stop the loop.
         # Each DatabaseUnavailable costs a whole _grpc_call retry budget
-        # before it is raised: GRPC_RETRIES (3) deadlines of GRPC_TIMEOUT
-        # (30s) each, plus the escalating GRPC_RETRY_DELAY sleeps, so
-        # about 93s per read. There are 28 object types here and
-        # _run_due_scheduled_jobs() pets the watchdog only between jobs,
-        # while sf-cluster runs at WatchdogSec=300s -- so continuing past
-        # the fourth failure already exceeds the window, and a full pass
-        # would take some 43 minutes. That SIGABRTs the elected
-        # maintainer and costs a lock failover, where before it merely
+        # before it is raised, and that budget is split by cost, so what
+        # one costs depends on which shape of failure it is:
+        #
+        #   UNAVAILABLE -- a dead tier, and the status the servicer now
+        #   sets for its own transient MariaDB errors -- fails fast and
+        #   does not rebuild the channel, so it spends
+        #   GRPC_UNAVAILABLE_RETRIES (6) attempts and their escalating
+        #   GRPC_RETRY_DELAY sleeps: on the order of ten seconds. This is
+        #   the common shape.
+        #
+        #   DEADLINE_EXCEEDED -- a tier that is up but not answering --
+        #   spends GRPC_RETRIES (3) deadlines of GRPC_TIMEOUT (30s) each
+        #   plus sleeps, so about 93s. This is the shape the break is
+        #   sized for.
+        #
+        # There are 28 object types here and _run_due_scheduled_jobs()
+        # pets the watchdog only between jobs, while sf-cluster runs at
+        # WatchdogSec=300s. In the slow shape continuing past the fourth
+        # failure already exceeds the window and a full pass would take
+        # some 43 minutes; even the fast shape burns most of the window
+        # learning nothing. Either way it risks SIGABRTing the elected
+        # maintainer and costing a lock failover, where before it merely
         # skipped a pass. Nothing is gained by asking a tier that is not
         # there 27 more times. This function has blown the watchdog
         # window once already (issue 3533).

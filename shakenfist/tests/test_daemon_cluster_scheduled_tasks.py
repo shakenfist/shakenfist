@@ -730,8 +730,12 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         """A tier outage must cost one retry budget, not 28 of them.
 
         DatabaseUnavailable is only raised once _grpc_call has spent its
-        whole budget -- up to GRPC_RETRIES full deadlines plus the
-        inter-attempt sleeps. There are 28 object types in this loop and
+        whole budget, which is split by cost: GRPC_UNAVAILABLE_RETRIES
+        fast-failing attempts for the common shape (a dead tier, or the
+        servicer's own UNAVAILABLE for a transient MariaDB error), and up
+        to GRPC_RETRIES full GRPC_TIMEOUT deadlines for the slow one,
+        plus escalating sleeps in both. There are 28 object types in
+        this loop and
         _run_due_scheduled_jobs() pets the watchdog only *between* jobs,
         so continuing past a tier-wide failure multiplies this job's
         worst case by 28 and takes it past sf-cluster's WatchdogSec.
