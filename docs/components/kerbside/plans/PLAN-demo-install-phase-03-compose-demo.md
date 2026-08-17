@@ -238,6 +238,12 @@ released package. `KERBSIDE_SOURCE` now defaults to `/src`,
 with a Dockerfile comment saying to flip it back in the
 first release carrying `kerbside db upgrade`.
 
+*Resolved after this phase merged:* v0.5.0 shipped
+`kerbside db upgrade`, the default was flipped back to
+`kerbside`, and decision 4 stands as originally written. The
+paragraph above is left as the record of why it was reversed
+for one phase.
+
 A checkout install brings no `kerbside-proxy`, so the image
 installs the released proxy wheel explicitly. That is safe
 and was checked rather than assumed: the only change to
