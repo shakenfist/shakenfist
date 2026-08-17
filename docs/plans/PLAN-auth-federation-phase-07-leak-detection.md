@@ -97,7 +97,7 @@ the commit that adds this file, so a later step need not redo it.
   Loki for the credential, and neither had been found by four rounds
   of review of the code that caused them.
 
-### The `secret-handling` audit does not exist
+### The `secret-handling` audit does exist — this survey got it wrong
 
 The section says:
 
@@ -106,24 +106,29 @@ The section says:
 > phase is also how Shaken Fist becomes compliant with an audit it
 > currently fails.
 
-There is no such audit. `development/audits/` holds seventeen audits
-and none is named `secret-handling`. The two security-adjacent ones
-are `security-sanitization.md`, which is about HTTP header and file
-path sanitization and says nothing about scanners, and
-`github-security.md`, which covers repository settings and CodeQL.
-The nearest real requirement is `github-security.md`'s recommendation
-that GitHub's own *secret scanning* and push protection be enabled in
-repository settings — which is a UI setting, not a CI job, and
-`development/PLAN-consistency.md:564` records it as already enabled
-for Shaken Fist. (`PROJECT-CONSISTENCY-AUDITS.md:421` still lists it
-as Disabled; that table is stale, and correcting it belongs to the
-other repository.)
+**That is correct, and an earlier draft of this section wrongly
+asserted the opposite.** `development/audits/secret-handling.md` was
+added on 2026-07-27 by `f5ed399`, three weeks before this survey ran,
+and its compliance table lists Shaken Fist as non-compliant against
+`shakenfist/shakenfist#3546` with the detail "No secret scanner in CI".
+The master plan's claim was right in every particular; the survey
+looked in the wrong place and reported a false negative, which was
+then committed as a correction to a document that had not been wrong.
+Corrected here and in the master plan on 2026-08-17.
 
-The consequence is small but worth stating plainly: this phase does
-not bring Shaken Fist into compliance with anything, because there is
-nothing to comply with. It has to stand on its own merits, which it
-does. If the audit is wanted, writing it is the other repository's
-work — recorded in Future work.
+So this phase does bring Shaken Fist into compliance with a
+cross-project audit it currently fails, which is an additional reason
+for it rather than the whole one. The audit's reference invocation had
+its own defect — it omitted `--log-opts`, so it scanned every ref —
+which this phase found and fixed there in `development` commit
+`fd4ddc4`.
+
+The one genuine finding in this area survives: `github-security.md`
+recommends GitHub's own secret scanning and push protection be enabled
+in repository settings, `development/PLAN-consistency.md:564` records
+it as already enabled for Shaken Fist, and
+`PROJECT-CONSISTENCY-AUDITS.md:421` still lists it as Disabled. That
+table is stale, and correcting it belongs to the other repository.
 
 ### A checksum-valid credential is committed to the documentation
 

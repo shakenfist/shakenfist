@@ -952,18 +952,19 @@ secrets, and early rejection on a bad checksum. What remains
 here is detecting the format once it escapes.
 
 * **A gitleaks rule** for the format. Shaken Fist has no
-  gitleaks job yet — ryll's `supply-chain.yml` has the
-  working pattern, including that `gitleaks-action@v2`
-  refuses to run on org repos without a paid licence so the
-  upstream binary is invoked directly, and that gitleaks is
-  only packaged from Debian 13 onward. Adding the job is
-  part of this phase. (An earlier draft of this section
-  claimed a `secret-handling` consistency audit in
-  `shakenfist/development` already required a scanner in CI,
-  and that this phase would therefore bring Shaken Fist into
-  compliance. The phase 7 survey found no such audit —
-  corrected 2026-08-16. The phase stands on its own merits;
-  writing that audit is recorded as Future work there.)
+  gitleaks job yet — ryll's `ci.yml` has the working
+  pattern, including that `gitleaks-action@v2` refuses to
+  run on org repos without a paid licence so the upstream
+  binary is invoked directly, and that gitleaks is only
+  packaged from Debian 13 onward. Adding the job is part of
+  this phase. The `secret-handling` consistency audit in
+  `shakenfist/development` already requires a scanner in CI
+  and lists Shaken Fist as non-compliant against
+  `shakenfist/shakenfist#3546`, so this phase is also how
+  Shaken Fist becomes compliant. (A parenthetical added on
+  2026-08-16 claimed that audit did not exist. It does, and
+  has since 2026-07-27; the phase 7 survey reported a false
+  negative and the false correction is withdrawn.)
 * **Log-sink detection, which is the valuable half.** Events
   go to syslog *and* to Loki, so a credential written into
   an event leaves the cluster and lands in log aggregation.
@@ -1226,16 +1227,17 @@ implemented because the following statements will be true:
   be verified by reading rather than by the type checker.
   These three carry the credential paths and are good
   candidates for the next tranche of the rollout.
-* **A `secret-handling` consistency audit** in
-  `shakenfist/development`. This plan's phase 7 section
-  asserted one already existed and that Shaken Fist failed
-  it; the phase 7 survey found no such audit, and the claim
-  is corrected above. The aspiration is still sound — "every
-  repository runs a secret scanner in CI" is exactly the kind
-  of cross-project invariant that repository's audits exist
-  to hold — and once phase 7 lands, Shaken Fist is the
-  reference implementation for it. Writing it is a change to
-  a different repository. While there, note that
+* **The `secret-handling` audit's reference invocation** in
+  `shakenfist/development` was scoped to every ref rather
+  than to `HEAD`, which is slow, noisy and — under gitleaks
+  8.16 — misattributed. Fixed there in `fd4ddc4` as part of
+  phase 7, along with guidance on positive controls and on
+  how to accept a finding that cannot be removed. Four other
+  projects still carry the unscoped invocation: `ryll`
+  (`ci.yml`, which additionally lets the scanner skip
+  docs-only changes), `instar` and `client-python-k3s`
+  (`supply-chain.yml`), and `sfui` (`gitleaks.yml`). Each
+  needs a small pull request. While there, note that
   `PROJECT-CONSISTENCY-AUDITS.md`'s security table still
   lists Shaken Fist's GitHub secret scanning as Disabled,
   which `PLAN-consistency.md` records as having been enabled.
