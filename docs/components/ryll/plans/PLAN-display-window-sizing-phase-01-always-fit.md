@@ -70,13 +70,13 @@ Out of scope (later phases):
 `RyllApp` carries the resize machinery on three fields:
 
 - `pending_resize: Option<(f32, f32)>`
-  ([app.rs:242](../../ryll/src/app.rs#L242)) — set when a
+  ([app.rs:242](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L242)) — set when a
   surface event arrives, consumed in `update()`.
 - `initial_resize_done: bool`
-  ([app.rs:248](../../ryll/src/app.rs#L248)) — the one-shot
+  ([app.rs:248](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L248)) — the one-shot
   gate this phase removes.
 - `last_sent_resize: Option<(u32, u32)>`
-  ([app.rs:203](../../ryll/src/app.rs#L203)) — last
+  ([app.rs:203](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L203)) — last
   `(width, height)` we sent on the resize channel via
   `maybe_send_monitors_resize`. Used to dedup outgoing
   `VDAgentMonitorsConfig` messages.
@@ -85,15 +85,15 @@ Out of scope (later phases):
 on the surface key today:
 
 - `ChannelEvent::SurfaceCreated` arm
-  ([app.rs:785-800](../../ryll/src/app.rs#L785-L800)) sets
+  ([app.rs:785-800](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L785-L800)) sets
   it from `(width, height)` of the new surface.
 - `ChannelEvent::ImageReady` auto-create branch
-  ([app.rs:823-836](../../ryll/src/app.rs#L823-L836)) sets
+  ([app.rs:823-836](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L823-L836)) sets
   it when ryll has to fabricate a surface because the
   server drew before sending `SURFACE_CREATE`.
 
 The resize is consumed in `RyllApp::update`
-([app.rs:1670-1688](../../ryll/src/app.rs#L1670-L1688)):
+([app.rs:1670-1688](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1670-L1688)):
 
 ```rust
 if let Some((w, h)) = self.pending_resize.take() {
@@ -112,14 +112,14 @@ if let Some((w, h)) = self.pending_resize.take() {
 ```
 
 `maybe_send_monitors_resize`
-([app.rs:1539-1570](../../ryll/src/app.rs#L1539-L1570))
+([app.rs:1539-1570](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1539-L1570))
 runs every frame, samples the live viewport interior,
 subtracts `STATS_BAR_HEIGHT` (zero when maximised or
 fullscreen), 8-aligns, and sends to the guest if the
 result differs from `last_sent_resize`.
 
 `reconnect`
-([app.rs:646-700](../../ryll/src/app.rs#L646-L700)) clears
+([app.rs:646-700](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L646-L700)) clears
 `pending_resize` and `last_sent_resize` but *not*
 `initial_resize_done` — meaning a reconnect today does not
 re-fit the window even on the new initial surface. With
@@ -204,7 +204,7 @@ The `(0, 0)` check is intentionally literal rather than
 surface arrives we want to react to it as the primary, not
 to whatever the renderer happened to pick last frame. The
 renderer's primary lookup at
-[app.rs:2553-2559](../../ryll/src/app.rs#L2553-L2559)
+[app.rs:2553-2559](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2553-L2559)
 already prefers `surface_id == 0`, so the two definitions
 agree.
 
@@ -264,7 +264,7 @@ phase if the change is awkward.
 ### Call site
 
 In `RyllApp::update`, replace the existing block at
-[app.rs:1667-1688](../../ryll/src/app.rs#L1667-L1688):
+[app.rs:1667-1688](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1667-L1688):
 
 ```rust
 // Resize viewport to match the remote surface (plus stats
@@ -320,7 +320,7 @@ Two subtle behaviours flowing from this:
 ### Reconnect
 
 In `reconnect()` at
-[app.rs:646-700](../../ryll/src/app.rs#L646-L700), the
+[app.rs:646-700](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L646-L700), the
 existing `self.pending_resize = None;` stays. Add
 `self.last_auto_resize = None;` next to it. Remove the
 `initial_resize_done` field entirely so there is no
@@ -329,7 +329,7 @@ existing `self.pending_resize = None;` stays. Add
 ### Constructor
 
 In `RyllApp::new` at
-[app.rs:551-643](../../ryll/src/app.rs#L551-L643), remove
+[app.rs:551-643](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L551-L643), remove
 `initial_resize_done: false,` and add
 `last_auto_resize: None,` in the same place.
 
@@ -337,7 +337,7 @@ In `RyllApp::new` at
 
 Add one focused unit test inside the existing
 `#[cfg(test)] mod tests` block at
-[app.rs:3611](../../ryll/src/app.rs#L3611):
+[app.rs:3611](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3611):
 
 ```rust
 #[test]

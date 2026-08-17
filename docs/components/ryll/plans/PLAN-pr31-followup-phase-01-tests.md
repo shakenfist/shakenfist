@@ -52,7 +52,7 @@ Out of scope (other phases / future PRs):
 ### VD_AGENT_* constants
 
 The constants are file-private in
-[`ryll/src/channels/main_channel.rs:50-74`](../../ryll/src/channels/main_channel.rs#L50-L74),
+[`ryll/src/channels/main_channel.rs:50-74`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L50-L74),
 with a comment that they "must match
 `spice-protocol/spice/vd_agent.h`":
 
@@ -90,7 +90,7 @@ only.
 ### MOUSE_MODE_REQUEST encoding
 
 Today, encoding is inline in
-[`maybe_request_client_mouse_mode`](../../ryll/src/channels/main_channel.rs#L658-L693)
+[`maybe_request_client_mouse_mode`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L658-L693)
 at lines ~679-686:
 
 ```rust
@@ -107,7 +107,7 @@ let msg = make_message(main_client::MOUSE_MODE_REQUEST, &mode_payload);
 ```
 
 The existing tests module
-([`ryll/src/channels/main_channel.rs:990-1047`](../../ryll/src/channels/main_channel.rs#L990-L1047))
+([`ryll/src/channels/main_channel.rs:990-1047`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L990-L1047))
 already covers `parse_mouse_mode_payload` and
 `should_request_client_mouse_mode` — those landed with
 develop's `10f19477`. The write side has no coverage;

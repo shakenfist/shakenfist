@@ -90,30 +90,30 @@ By the end of this phase:
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs](../../shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
   exposes `SpiceInvers = SpiceBlackness` from phase 1;
   the 13-byte mask-only payload parses via
   `SpiceBlackness::read`.
-* [ryll/src/channels/display.rs:215-223](../../ryll/src/channels/display.rs#L215)
+* [ryll/src/channels/display.rs:215-223](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L215)
   has `decode_draw_solid_fill` returning a
   `SolidFillOutcome::Paint { base, masked_fallback }`.
   DRAW_INVERS can't share the *outcome* (caller
   semantics differ) but can share the parsing shape.
-* [ryll/src/channels/display.rs:677](../../ryll/src/channels/display.rs#L677)
+* [ryll/src/channels/display.rs:677](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L677)
   currently has `DRAW_COMPOSITE` as a `debug!`-level
   stub, and `DRAW_INVERS`/`DRAW_ROP3`/`DRAW_STROKE`/
   `DRAW_TEXT` all fall into the `_ => log_unknown(...)`
   arm at line 949.
-* [ryll/src/channels/mod.rs](../../ryll/src/channels/mod.rs)
+* [ryll/src/channels/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs)
   `ChannelEvent::Invert` still carries
   `#[allow(dead_code)] // constructed in phase 7`.
-* [ryll/src/display/surface.rs](../../ryll/src/display/surface.rs)
+* [ryll/src/display/surface.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs)
   `invert_rect` still carries `#[allow(dead_code)]`,
   plus `invert_subrect` (private helper).
-* [ryll/src/app.rs](../../ryll/src/app.rs) already has
+* [ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) already has
   the `ChannelEvent::Invert` dispatch arm from phase 1f.
   No change needed there.
-* [shakenfist-spice-protocol/src/logging.rs](../../shakenfist-spice-protocol/src/logging.rs)
+* [shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs)
   `warn_once!` macro, `warn_once_count()`, and
   `warn_once_keys()` are live from phase 2. Key format
   is a static string; convention is colon-delimited
@@ -377,7 +377,7 @@ future reader sees the rationale.
 
 The warn_once convention established across phases 2-7
 has been codified in
-[STYLEGUIDE.md §"warn_once for protocol gaps"](/components/ryll/STYLEGUIDE/#warn_once-for-protocol-gaps)
+[STYLEGUIDE.md §"warn_once for protocol gaps"](https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md#warn_once-for-protocol-gaps)
 so future phases follow it consistently.
 
 ## Sub-agent execution plan

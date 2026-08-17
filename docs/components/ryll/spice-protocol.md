@@ -1,38 +1,45 @@
 # SPICE protocol handling
 
-How ryll speaks SPICE on the wire: the channel model and handshake, the
-image encodings it decodes, the display channel capabilities it advertises,
-and the keyboard scancode mapping. See
-[Architecture](/components/ryll/../ARCHITECTURE/) for where these pieces sit in the crate
-layout.
+This page describes how ryll speaks SPICE on the wire: the channel model
+and handshake, mouse-mode negotiation, the image encodings it decodes, the
+display channel capabilities it advertises, and the keyboard scancode
+mapping. See [Architecture](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md) for where these pieces
+sit in the crate layout.
 
 ## SPICE Protocol
 
 ### Connection Sequence
 
-```
-1. TCP connect to server
-2. TLS handshake (if secure port)
-3. Link handshake (exchange capabilities)
-4. Authentication (RSA-OAEP encrypted password)
-5. Main channel: receive session ID and channel list
-6. Connect secondary channels (display, cursor, inputs)
-7. Event loop: process messages, render display, send input
+```mermaid
+sequenceDiagram
+    participant R as ryll
+    participant S as SPICE server
+
+    R->>S: TCP connect (plus TLS handshake on a secure port)
+    R->>S: SpiceLinkMess (common and per-channel capabilities)
+    S->>R: SpiceLinkReply (capabilities, RSA public key)
+    R->>S: Auth mechanism, then RSA-OAEP encrypted password
+    S->>R: Auth result
+    S->>R: MAIN INIT (session id, mouse modes, agent state)
+    R->>S: MAIN ATTACH_CHANNELS
+    S->>R: MAIN CHANNELS_LIST
+    R->>S: Link and auth again per secondary channel<br/>(display, cursor, inputs, ...)
+    loop Event loop
+        S->>R: Display, cursor and audio messages
+        R->>S: Keyboard and pointer events
+    end
 ```
 
 ### Message Format
 
-All SPICE messages use a 6-byte mini-header:
+All SPICE messages use a 6-byte mini-header, immediately followed
+by the payload:
 
-```
-┌──────────────┬──────────────────────┐
-│ message_type │    message_size      │
-│   (u16 LE)   │      (u32 LE)        │
-├──────────────┴──────────────────────┤
-│            payload                   │
-│         (variable length)            │
-└─────────────────────────────────────┘
-```
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 2 | `message_type` (u16 LE) |
+| 2 | 4 | `message_size` (u32 LE) |
+| 6 | `message_size` | payload |
 
 ### Channel Types
 
@@ -77,7 +84,7 @@ supported=3 / current=2) which fail every mode check.
 
 `parse_mouse_mode_payload` and
 `build_mouse_mode_request_payload` in
-[`main_channel.rs`](../shakenfist-spice-renderer/src/channels/main_channel.rs)
+[`main_channel.rs`](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-renderer/src/channels/main_channel.rs)
 own the read and write sides; both have unit tests next
 to them.
 
@@ -342,7 +349,7 @@ unimplemented opcode, ignored sub-feature on an
 implemented op, recoverable decode failure — is
 registered in the process-global warn_once registry
 defined in
-[shakenfist-spice-protocol/src/logging.rs](../shakenfist-spice-protocol/src/logging.rs).
+[shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs).
 Each call site holds a stable `&'static str` key shaped
 `"<channel>:<kind>:<detail>"`; the registry fires
 `tracing::warn!` exactly once per key per session.

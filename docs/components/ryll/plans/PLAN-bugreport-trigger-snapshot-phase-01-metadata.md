@@ -39,7 +39,7 @@ Out of scope (later phases):
 ## Grounding — what's there today
 
 `ReportMetadata` lives at
-[ryll/src/bugreport.rs:674-688](../../ryll/src/bugreport.rs#L674-L688)
+[ryll/src/bugreport.rs:674-688](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L674-L688)
 and looks like:
 
 ```rust
@@ -59,18 +59,18 @@ pub struct ReportMetadata {
 ```
 
 It's populated inside
-[`BugReport::assemble`](../../ryll/src/bugreport.rs#L836-L848)
+[`BugReport::assemble`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L836-L848)
 which is called from two public entry points:
 
-- [`BugReport::new`](../../ryll/src/bugreport.rs#L715-L744) —
+- [`BugReport::new`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L715-L744) —
   user-triggered path, runs a 2-second metrics sample then
   delegates. Called from
-  [`app.rs::generate_bug_report`](../../ryll/src/app.rs#L940).
-- [`BugReport::write_pedantic`](../../ryll/src/bugreport.rs#L913-L940)
+  [`app.rs::generate_bug_report`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L940).
+- [`BugReport::write_pedantic`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L913-L940)
   — gap-observer path, takes pre-sampled metrics because it
   runs from the observer closure. Called from the observer
   registered in
-  [`register_pedantic_observer`](../../ryll/src/bugreport.rs#L1035).
+  [`register_pedantic_observer`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L1035).
 
 Both call paths terminate in the same `assemble()`, so this
 phase only has to change one struct, one function signature,

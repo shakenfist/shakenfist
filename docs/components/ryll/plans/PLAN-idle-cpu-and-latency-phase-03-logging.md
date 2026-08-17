@@ -4,7 +4,7 @@ Parent plan: [PLAN-idle-cpu-and-latency.md](/components/ryll/plans/PLAN-idle-cpu
 
 ## Goal
 
-Two cleanups in [shakenfist-spice-protocol/src/logging.rs](shakenfist-spice-protocol/src/logging.rs)
+Two cleanups in [shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs)
 and the channel handlers that call into it:
 
 1. **Demote `log_message` and `log_unknown` from `info!` /
@@ -89,8 +89,8 @@ imports it.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 3a   | low    | sonnet | none     | In [shakenfist-spice-protocol/src/logging.rs](shakenfist-spice-protocol/src/logging.rs): change `log_message` from `info!` to `debug!`; drop the leading `[{}] ` and the corresponding `format_timestamp()` argument from the format string (in `log_message`, `log_unknown`, and `log_incomplete`).  Result format: `"playback received 12 byte opcode 4 ping"` instead of `"[1776630223.870958] playback received 12 byte opcode 4 ping"`.  Remove `format_timestamp` if no other call site uses it (grep first; it's unused outside this file).  Keep `timestamp()` as a public helper.  Adjust the `use tracing::{...}` import to `{debug, warn}` (drop `info`) and verify clippy doesn't complain about unused imports. |
-| 3b   | low    | sonnet | none     | In [ryll/src/channels/playback.rs](ryll/src/channels/playback.rs): wrap the two `logging::log_message(...)` calls at lines 419 and 600 in `if settings::is_verbose() { ... }` blocks, mirroring the pattern used in every other channel.  Verify by grepping for `log_message` in `ryll/src/channels/` and confirming all sites are guarded. |
+| 3a   | low    | sonnet | none     | In [shakenfist-spice-protocol/src/logging.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/logging.rs): change `log_message` from `info!` to `debug!`; drop the leading `[{}] ` and the corresponding `format_timestamp()` argument from the format string (in `log_message`, `log_unknown`, and `log_incomplete`).  Result format: `"playback received 12 byte opcode 4 ping"` instead of `"[1776630223.870958] playback received 12 byte opcode 4 ping"`.  Remove `format_timestamp` if no other call site uses it (grep first; it's unused outside this file).  Keep `timestamp()` as a public helper.  Adjust the `use tracing::{...}` import to `{debug, warn}` (drop `info`) and verify clippy doesn't complain about unused imports. |
+| 3b   | low    | sonnet | none     | In [ryll/src/channels/playback.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/playback.rs): wrap the two `logging::log_message(...)` calls at lines 419 and 600 in `if settings::is_verbose() { ... }` blocks, mirroring the pattern used in every other channel.  Verify by grepping for `log_message` in `ryll/src/channels/` and confirming all sites are guarded. |
 | 3c   | low    | sonnet | none     | Run `pre-commit run --all-files` (must pass) and `make test` (must pass).  No code changes in this step — just verification. |
 
 ## Success criteria for this phase

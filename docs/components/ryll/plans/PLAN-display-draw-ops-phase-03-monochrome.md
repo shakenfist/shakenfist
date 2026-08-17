@@ -82,11 +82,11 @@ By the end of this phase:
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs](../../shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
   has `SpiceBlackness` (with `SpiceWhiteness` and
   `SpiceInvers` as type aliases) from phase 1. 13 bytes,
   one `SpiceQMask` field.
-* [ryll/src/channels/display.rs:378-384](../../ryll/src/channels/display.rs#L378-L384)
+* [ryll/src/channels/display.rs:378-384](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L378-L384)
   handles `DRAW_FILL` (phase 2) and `DRAW_COPY`; every
   other draw op falls into `_ => log_unknown(...)` at
   ~line 654.

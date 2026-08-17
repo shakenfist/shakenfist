@@ -7,7 +7,7 @@ packaging concerns around them.
 
 This is the developer-facing companion to the
 [`--web` operator guide](/components/ryll/web-frontend/), which covers running the thing.
-See [Architecture](/components/ryll/../ARCHITECTURE/) for where these crates sit overall.
+See [Architecture](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md) for where these crates sit overall.
 
 ## Encoder module
 
@@ -135,8 +135,9 @@ unspecified, and IPv6 link-local addresses. `WebrtcBridge::new`
 rejects an empty result rather than building a peer connection
 that could only ever offer unroutable candidates. This is
 independent of the `--web-host` flag, which only controls the
-HTTP/HTTPS signalling listener; see `docs/web-frontend.md`'s
-reverse-proxy callout for the operator-facing consequences.
+HTTP/HTTPS signalling listener; see the reverse-proxy callout in
+the [web frontend guide](/components/ryll/web-frontend/) for the operator-facing
+consequences.
 
 ### SDP flow
 
@@ -168,7 +169,7 @@ video track:
 - Payloads raw NALs via `H264Payloader` (from
   `rtc::rtp::codec::h264` — the sans-io core's payloader, not the
   abandoned standalone `rtp` crate; see the webrtc entry in
-  `docs/development.md`'s dependency list).
+  the [development guide](/components/ryll/development/)'s dependency list).
 - Sets the `marker` bit on the last RTP packet of each access unit
   (per RFC 6184 §5.1 — decoder pacing depends on this).
 - Derives RTP timestamps from `EncodedFrame::timestamp_us` at
@@ -219,7 +220,7 @@ no `on_rtcp_packet`-equivalent handling.
 
 ### webrtc-rs convention: handler methods must never block
 
-See the "WebRTC conventions" section in `AGENTS.md` for the
+See the "WebRTC conventions" section in [`AGENTS.md`](https://github.com/shakenfist/ryll/blob/develop/AGENTS.md) for the
 normative rule. In short: webrtc-rs 0.20 awaits every
 `PeerConnectionEventHandler` method inline in the peer
 connection's driver event loop, so a handler method that loops
@@ -311,29 +312,50 @@ silence (and a one-time warning is logged).
 
 ### End-to-end data flow
 
-```
-SPICE server
-    │
-    ▼
-shakenfist-spice-renderer::run_connection
-    │
-    ├─► DisplayChannel ──► broadcast ChannelEvent ──► SurfaceMirror
-    │                                              └─► CursorRelay (cursor.rs)
-    │
-    ├─► PlaybackChannel ──► OpusPacketSink (audio.rs) ──► WebRTC audio track
-    │
-    └─► InputsChannel ◄── web inputs relay (inputs.rs) ◄── control DC ◄── browser
-                                                                              │
-shakenfist-spice-webrtc::WebrtcBridge                                         │
-    ├─► video track ◄── EncoderTask ◄── RealFrameSource ◄── SurfaceMirror    │
-    ├─► audio track ◄── WebOpusSink ◄── PlaybackChannel (Opus path)          │
-    └─► control DC ◄──────────────────────────────────── cursor/input relay ──┘
-    │
-    ▼
-Browser (RTCPeerConnection)
-    ├─ <video> H.264 display
-    ├─ <audio> Opus audio
-    └─ datachannel: cursor overlay + input events
+```mermaid
+flowchart TB
+    spice["SPICE server"]
+    run["shakenfist-spice-renderer::run_connection"]
+    dc["DisplayChannel"]
+    pc["PlaybackChannel"]
+    ic["InputsChannel"]
+    ev["broadcast ChannelEvent"]
+    mirror["SurfaceMirror"]
+    crelay["CursorRelay (cursor.rs)"]
+    sink["WebOpusSink / OpusPacketSink (audio.rs)"]
+    frames["RealFrameSource"]
+    enc["EncoderTask"]
+    irelay["web inputs relay (inputs.rs)"]
+
+    subgraph bridge["shakenfist-spice-webrtc::WebrtcBridge"]
+        vtrack["video track"]
+        atrack["audio track"]
+        ctrl["control datachannel"]
+    end
+
+    subgraph browser["Browser (RTCPeerConnection)"]
+        video["video element: H.264 display"]
+        audio["audio element: Opus audio"]
+        data["datachannel: cursor overlay + input events"]
+    end
+
+    spice --> run
+    run --> dc
+    run --> pc
+    run --> ic
+    dc --> ev
+    ev --> mirror
+    ev --> crelay
+    pc -- Opus path --> sink
+    mirror --> frames --> enc --> vtrack
+    sink --> atrack
+    crelay --> ctrl
+    vtrack --> video
+    atrack --> audio
+    ctrl --> data
+    data -- input events --> ctrl
+    ctrl --> irelay
+    irelay --> ic
 ```
 
 The handler-methods-must-never-block webrtc-rs rule (documented

@@ -60,7 +60,7 @@ of the SPICE display draw opcodes:
 
 Every other draw opcode falls through the `_ =>` arm in
 `handle_message()` at
-[ryll/src/channels/display.rs:654](../../ryll/src/channels/display.rs#L654),
+[ryll/src/channels/display.rs:654](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654),
 which `log_unknown(...)` and discards the payload. The
 discarded set (with reference numbers from
 `shakenfist-spice-protocol/src/constants.rs`):
@@ -102,7 +102,7 @@ The artefact has two contributors:
 
 2. `DisplaySurface::new()` initialises the pixel buffer to
    `(50, 50, 50)` "dark grey" rather than black
-   ([ryll/src/display/surface.rs:21-26](../../ryll/src/display/surface.rs#L21-L26)).
+   ([ryll/src/display/surface.rs:21-26](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L21-L26)).
    The grey is what we see *between* glyph rows because no
    draw op ever overwrites it.
 
@@ -121,15 +121,15 @@ Display rendering today flows as follows:
    `ChannelEvent::ImageReady { surface_id, left, top,
    width, height, pixels: Vec<u8> }`
    to the main event loop
-   ([ryll/src/channels/display.rs:1142-1156](../../ryll/src/channels/display.rs#L1142-L1156)).
+   ([ryll/src/channels/display.rs:1142-1156](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L1142-L1156)).
 
 2. The app handles `ImageReady` by looking up the
    `DisplaySurface` and calling `surface.blit(...)`
-   ([ryll/src/app.rs:562-...](../../ryll/src/app.rs#L562)).
+   ([ryll/src/app.rs:562-...](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L562)).
 
 3. `DisplaySurface::blit()` does a straightforward RGBA
    memcpy into the surface's pixel buffer
-   ([ryll/src/display/surface.rs:39-64](../../ryll/src/display/surface.rs#L39-L64)).
+   ([ryll/src/display/surface.rs:39-64](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L39-L64)).
 
 4. Repaint is triggered via the shared
    `Arc<tokio::sync::Notify>` (decision #16 in `AGENTS.md`).

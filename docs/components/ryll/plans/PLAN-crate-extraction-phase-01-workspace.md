@@ -56,17 +56,17 @@ The package's `Cargo.toml` declares `name = "ryll"`,
 `[package.metadata.generate-rpm]` blocks used by the packaging
 workflow.
 
-CI ([.github/workflows/ci.yml](../../.github/workflows/ci.yml))
+CI ([.github/workflows/ci.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/ci.yml))
 runs `cargo fmt --check`, `cargo clippy -- -D warnings`,
 `cargo build --release`, `cargo test`, `cargo deb --no-build`,
 and `cargo generate-rpm` from the repo root, with no `-p` or
 `--workspace` flags. The release workflow
-([.github/workflows/release.yml](../../.github/workflows/release.yml))
+([.github/workflows/release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml))
 does the same and additionally `grep`s `^version = ` from the
 top-level `Cargo.toml` to verify the git tag matches.
 
 The pre-commit script
-([scripts/check-rust.sh](../../scripts/check-rust.sh)) runs
+([scripts/check-rust.sh](https://github.com/shakenfist/ryll/blob/develop/scripts/check-rust.sh)) runs
 `cargo fmt --check` and `cargo clippy -- -D warnings` inside the
 ryll-dev docker image, with the repo mounted at `/workspace`.
 
@@ -78,9 +78,9 @@ at `/workspace`.
 Renovate auto-discovers Cargo workspace members, so no change
 is needed there.
 
-[AGENTS.md](/components/ryll/AGENTS/) and
-[ARCHITECTURE.md](/components/ryll/ARCHITECTURE/) have ~16 references to
-`src/...` paths between them; [README.md](/components/ryll/README/) has
+[AGENTS.md](https://github.com/shakenfist/ryll/blob/develop/AGENTS.md) and
+[ARCHITECTURE.md](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md) have ~16 references to
+`src/...` paths between them; [README.md](https://github.com/shakenfist/ryll/blob/develop/README.md) has
 one. Historical phase plans in `docs/plans/` reference `src/`
 ~84 times across 20 files; those are historical records of
 completed work and should NOT be rewritten.
@@ -219,7 +219,7 @@ Each step below is one commit unless explicitly noted.
 
 ### Step 1: Pre-flight CI updates
 
-Update [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
+Update [.github/workflows/ci.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/ci.yml)
 to use workspace-aware cargo flags throughout:
 
 - `cargo fmt --check` → `cargo fmt --all --check` (the `--all`
@@ -240,7 +240,7 @@ to use workspace-aware cargo flags throughout:
 - `cargo generate-rpm` → `cargo generate-rpm -p ryll`.
 
 Apply the same updates to
-[.github/workflows/release.yml](../../.github/workflows/release.yml).
+[.github/workflows/release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml).
 Additionally, the release workflow's version-check step uses
 `grep '^version = ' Cargo.toml`. After the structural commit,
 the top-level `Cargo.toml` will be a workspace manifest with no
@@ -262,7 +262,7 @@ Push and confirm CI passes before proceeding.
 
 ### Step 2: Pre-flight script and Makefile updates
 
-Update [scripts/check-rust.sh](../../scripts/check-rust.sh):
+Update [scripts/check-rust.sh](https://github.com/shakenfist/ryll/blob/develop/scripts/check-rust.sh):
 
 - `cargo fmt --check` → `cargo fmt --all --check`
 - `cargo fmt` → `cargo fmt --all`
@@ -272,7 +272,7 @@ Update [scripts/check-rust.sh](../../scripts/check-rust.sh):
   `cargo clippy --fix --allow-dirty --workspace --all-targets
   -- -D warnings`
 
-Update [Makefile](../../Makefile) targets `build`, `release`,
+Update [Makefile](https://github.com/shakenfist/ryll/blob/develop/Makefile) targets `build`, `release`,
 `test`, `lint`, `lint-fix` to use the same workspace-aware
 flags:
 
@@ -335,7 +335,7 @@ Steps within the commit:
    repository = "https://github.com/shakenfist/ryll"
    ```
 5. Update the version-check step in
-   [.github/workflows/release.yml](../../.github/workflows/release.yml):
+   [.github/workflows/release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml):
    `grep '^version = ' Cargo.toml` →
    `grep '^version = ' ryll/Cargo.toml`. This must happen in
    the same commit as the file move so release tagging works
@@ -367,11 +367,11 @@ Steps within the commit:
 Update the live docs that reference `src/` paths to use
 `ryll/src/`:
 
-- [README.md](/components/ryll/README/) — 1 occurrence.
-- [AGENTS.md](/components/ryll/AGENTS/) — ~8 occurrences. Many of these
+- [README.md](https://github.com/shakenfist/ryll/blob/develop/README.md) — 1 occurrence.
+- [AGENTS.md](https://github.com/shakenfist/ryll/blob/develop/AGENTS.md) — ~8 occurrences. Many of these
   are in build/development sections that may also benefit from
   noting the new workspace layout briefly.
-- [ARCHITECTURE.md](/components/ryll/ARCHITECTURE/) — ~8 occurrences.
+- [ARCHITECTURE.md](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md) — ~8 occurrences.
   The architecture description should mention that ryll is now
   a workspace member at `ryll/`, with a brief note that the
   workspace exists in preparation for extracted crates per
@@ -381,7 +381,7 @@ Do **not** rewrite historical plan files in `docs/plans/`. They
 document past work where the `src/` paths were accurate at the
 time. Their function is historical, not navigational.
 
-[STYLEGUIDE.md](/components/ryll/STYLEGUIDE/) had no `src/` references in
+[STYLEGUIDE.md](https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md) had no `src/` references in
 the audit and does not need updating.
 
 Verify `pre-commit run --all-files` still passes (it has no
@@ -423,7 +423,7 @@ docs hooks, but run it anyway to be safe).
    update PRs against `ryll/Cargo.toml`.
 
 5. **CodeQL workflow.** Not audited in detail. If
-   [.github/workflows/codeql-analysis.yml](../../.github/workflows/codeql-analysis.yml)
+   [.github/workflows/codeql-analysis.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/codeql-analysis.yml)
    has hardcoded paths or build commands, they may also need
    the workspace-aware-flag treatment. Audit this file as part
    of Step 1; if it needs changes, include them in Step 1's

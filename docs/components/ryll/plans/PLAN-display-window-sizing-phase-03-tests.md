@@ -84,7 +84,7 @@ Out of scope (later phases):
 ## Grounding — what's there today
 
 `maybe_send_monitors_resize` lives at
-[ryll/src/app.rs:1557-1588](../../ryll/src/app.rs#L1557-L1588):
+[ryll/src/app.rs:1557-1588](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1557-L1588):
 
 ```rust
 let viewport_size = ctx.input(|i| { … });
@@ -116,7 +116,7 @@ egui input. The arithmetic that follows — alignment, the
 testable.
 
 `compute_auto_resize` lives at
-[ryll/src/app.rs:3070-3082](../../ryll/src/app.rs#L3070-L3082)
+[ryll/src/app.rs:3070-3082](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3070-L3082)
 and uses the alignment expression `((w as u32).max(8) / 8)
 * 8`. For `w ≥ 0` (which is enforced by the call site's
 `.max(0.0)` clamp) this is bit-for-bit equivalent to the
@@ -128,7 +128,7 @@ that — and leaves the inline form in
 two paths cannot drift in future.
 
 `STATS_BAR_HEIGHT` is at
-[ryll/src/app.rs:38](../../ryll/src/app.rs#L38) and is
+[ryll/src/app.rs:38](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L38) and is
 `20.0`. Tests should reference it by name, not duplicate
 the constant.
 

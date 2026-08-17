@@ -94,7 +94,7 @@ Out of scope (future work):
 ## Grounding — what's there today
 
 The notification system at
-[ryll/src/notifications.rs](../../ryll/src/notifications.rs)
+[ryll/src/notifications.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/notifications.rs)
 provides `NotificationStore::push` with built-in dedup
 across a 30-second window for matching
 `(source, severity, message, visibility)` tuples
@@ -106,36 +106,36 @@ why a debounce is needed in addition to the existing
 dedup.
 
 `RyllApp::push_notification` at
-[ryll/src/app.rs:1436-1446](../../ryll/src/app.rs#L1436-L1446)
+[ryll/src/app.rs:1436-1446](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1436-L1446)
 is the standard entry point. Takes `&self` (no `&mut`),
 locks the store mutex, calls `push`. Existing call sites
 use `NotifySeverity::Info` + `NotificationSource::Internal`
 for app-internal events (e.g. screenshot saved at
-[app.rs:1647](../../ryll/src/app.rs#L1647)).
+[app.rs:1647](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1647)).
 
 The two `pending_resize` write sites already short-circuit
 on the primary surface key:
 
 - `SurfaceCreated` arm at
-  [app.rs:799-807](../../ryll/src/app.rs#L799-L807) —
+  [app.rs:799-807](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L799-L807) —
   inside `if display_channel_id == 0 && surface_id == 0`.
 - `ImageReady` auto-create at
-  [app.rs:835-844](../../ryll/src/app.rs#L835-L844) —
+  [app.rs:835-844](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L835-L844) —
   same guard.
 
 The existing auto-resize block in `RyllApp::update` lives
 at
-[app.rs:1689-1707](../../ryll/src/app.rs#L1689-L1707).
+[app.rs:1689-1707](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1689-L1707).
 The new drain block goes immediately after it, before
 the call to `maybe_send_monitors_resize`.
 
 `reconnect` at
-[app.rs:646-700](../../ryll/src/app.rs#L646-L700) already
+[app.rs:646-700](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L646-L700) already
 resets `pending_resize` and `last_auto_resize`. The new
 fields slot into the same block.
 
 The repaint hint pattern is already used at
-[app.rs:3043](../../ryll/src/app.rs#L3043):
+[app.rs:3043](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3043):
 `ctx.request_repaint_after(Duration::from_secs(1))` as
 the steady-state fallback. We add a tighter
 `request_repaint_after` for the debounce deadline.
@@ -179,7 +179,7 @@ Initialise all three to `None` in `RyllApp::new` (alongside
 ### Constant
 
 Near `STATS_BAR_HEIGHT` at
-[app.rs:38](../../ryll/src/app.rs#L38):
+[app.rs:38](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L38):
 
 ```rust
 /// Debounce window for resolution-change notifications.
@@ -260,7 +260,7 @@ In `RyllApp::update`, immediately after the existing
 auto-resize block (the
 `if let Some((w, h, aw, ah)) = compute_auto_resize(…)`
 block at
-[app.rs:1695-1706](../../ryll/src/app.rs#L1695-L1706)),
+[app.rs:1695-1706](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1695-L1706)),
 add:
 
 ```rust

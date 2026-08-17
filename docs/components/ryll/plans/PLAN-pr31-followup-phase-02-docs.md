@@ -59,7 +59,7 @@ Out of scope (other phases / future PRs):
 ### README.md
 
 Today's Features list is at
-[`README.md:5-33`](/components/ryll/README/#L5-L33) — 29 bullets,
+[`README.md:5-33`](https://github.com/shakenfist/ryll/blob/develop/README.md#L5-L33) — 29 bullets,
 each one line, alphabetical-ish but really order-of-arrival
 with new features appended. Reconnect and persistence are
 not present. The list ends with the in-app notifications
@@ -72,7 +72,7 @@ elsewhere in the README. Searching the file for
 ### ARCHITECTURE.md
 
 The closest existing mention of the mouse-mode model is at
-[`ARCHITECTURE.md:100-109`](/components/ryll/ARCHITECTURE/#L100-L109),
+[`ARCHITECTURE.md:100-109`](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md#L100-L109),
 inside a longer bullet describing the input channel:
 
 > Mouse events are dispatched based on the server's mouse
@@ -107,7 +107,7 @@ The two natural anchors for new sections are:
 ### Code under documentation
 
 The reconnect implementation is
-[`ryll/src/app.rs::reconnect`](../../ryll/src/app.rs#L634-L751)
+[`ryll/src/app.rs::reconnect`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L634-L751)
 (118 LOC). It:
 
 1. Creates fresh mpsc channels for events, input,
@@ -144,7 +144,7 @@ Two facts to capture in the architecture text:
   question a reader would ask first.
 
 The mouse-mode model is implemented in
-[`ryll/src/channels/main_channel.rs`](../../ryll/src/channels/main_channel.rs),
+[`ryll/src/channels/main_channel.rs`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs),
 specifically:
 
 - `parse_mouse_mode_payload` (line 32) — u16 read.
@@ -163,7 +163,7 @@ specifically:
 - `maybe_request_client_mouse_mode` itself (line 667).
 
 Window persistence is one Cargo feature flag at
-[`ryll/Cargo.toml:16`](../../ryll/Cargo.toml#L16):
+[`ryll/Cargo.toml:16`](https://github.com/shakenfist/ryll/blob/develop/ryll/Cargo.toml#L16):
 
 ```toml
 eframe = { version = "0.29", features = ["persistence"] }
@@ -189,7 +189,7 @@ Two new bullets, appended near the existing connection /
 session bullets (the order is lossy in the existing list
 but several connection-related items cluster around
 "TLS support" and "Cursor rendering" near
-[`README.md:15-17`](/components/ryll/README/#L15-L17)). Place the
+[`README.md:15-17`](https://github.com/shakenfist/ryll/blob/develop/README.md#L15-L17)). Place the
 new bullets right after the TLS-support line for grouping.
 
 ```

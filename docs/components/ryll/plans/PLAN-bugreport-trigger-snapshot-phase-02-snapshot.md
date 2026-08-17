@@ -49,30 +49,30 @@ Four places set `show_bug_dialog = true`:
 
 | # | Location | Trigger | Default type |
 |---|----------|---------|--------------|
-| 1 | [app.rs:1247](../../ryll/src/app.rs#L1247) | F12 key (toggles) | `BugReportType::Display` |
-| 2 | [app.rs:1440](../../ryll/src/app.rs#L1440) | Status-bar "Report" button | `BugReportType::Display` |
-| 3 | [app.rs:1786](../../ryll/src/app.rs#L1786) | USB error auto-open | `BugReportType::Usb` |
-| 4 | [app.rs:2066](../../ryll/src/app.rs#L2066) | Channel error auto-open | `BugReportType::Connection` |
+| 1 | [app.rs:1247](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1247) | F12 key (toggles) | `BugReportType::Display` |
+| 2 | [app.rs:1440](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1440) | Status-bar "Report" button | `BugReportType::Display` |
+| 3 | [app.rs:1786](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1786) | USB error auto-open | `BugReportType::Usb` |
+| 4 | [app.rs:2066](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2066) | Channel error auto-open | `BugReportType::Connection` |
 
 ### Dialog close-without-submit paths
 
 | # | Location | Trigger |
 |---|----------|---------|
-| 1 | [app.rs:1247](../../ryll/src/app.rs#L1247) | F12 again (toggles off) |
-| 2 | [app.rs:1275](../../ryll/src/app.rs#L1275) | Escape while dialog open |
-| 3 | [app.rs:2155](../../ryll/src/app.rs#L2155) | Cancel button |
+| 1 | [app.rs:1247](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1247) | F12 again (toggles off) |
+| 2 | [app.rs:1275](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1275) | Escape while dialog open |
+| 3 | [app.rs:2155](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2155) | Cancel button |
 
 ### Submit paths
 
 | # | Location | Trigger |
 |---|----------|---------|
-| 1 | [app.rs:2150](../../ryll/src/app.rs#L2150) | Capture button for non-Display |
-| 2 | [app.rs:2251](../../ryll/src/app.rs#L2251) | Region-drag complete (Display) |
-| 3 | [app.rs:1236](../../ryll/src/app.rs#L1236) | Escape during region select (submits with no region) |
+| 1 | [app.rs:2150](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2150) | Capture button for non-Display |
+| 2 | [app.rs:2251](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2251) | Region-drag complete (Display) |
+| 3 | [app.rs:1236](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1236) | Escape during region select (submits with no region) |
 
 All three submit paths funnel through
-[`finish_bug_report`](../../ryll/src/app.rs#L965) →
-[`generate_bug_report`](../../ryll/src/app.rs#L923).
+[`finish_bug_report`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L965) →
+[`generate_bug_report`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L923).
 
 ### Surface access
 
@@ -89,7 +89,7 @@ self.surfaces.values()
 ### PNG encoder
 
 [`bugreport::encode_png(pixels: &[u8], width: u32, height: u32)
--> anyhow::Result<Vec<u8>>`](../../ryll/src/bugreport.rs#L589)
+-> anyhow::Result<Vec<u8>>`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L589)
 is already `pub(crate)` and pure. No changes needed.
 
 ## Design

@@ -56,43 +56,43 @@ ryll-repo/
 **Current state of the decompression code** (from the Phase 3
 research pass):
 
-* [ryll/src/decompression/mod.rs](../../ryll/src/decompression/mod.rs)
+* [ryll/src/decompression/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/mod.rs)
   defines `pub struct DecompressedImage { pub width: u32, pub
   height: u32, pub pixels: Vec<u8>, pub image_id: u64 }` and
   re-exports `decompress_glz`, `decompress_lz`, and
   `quic_decode` from the three sub-modules. Not
   `#[non_exhaustive]`. ~16 lines total.
 
-* [ryll/src/decompression/glz.rs:19-22](../../ryll/src/decompression/glz.rs#L19-L22):
+* [ryll/src/decompression/glz.rs:19-22](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/glz.rs#L19-L22):
   `pub async fn decompress_glz(data: &[u8], previous_images:
   &Arc<Mutex<HashMap<u64, Vec<u8>>>>) -> Result<DecompressedImage>`.
   Cross-channel retry loop with
   `tokio::time::sleep(Duration::from_millis(5)).await` at
-  [glz.rs:214-236](../../ryll/src/decompression/glz.rs#L214-L236),
+  [glz.rs:214-236](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/glz.rs#L214-L236),
   retrying up to 20 times to let another display channel finish
   populating the shared GLZ dictionary. This is the only thing
   forcing the `tokio` dependency on the crate, and per Decision
   #2 we accept it. One unit test at
-  [glz.rs:275](../../ryll/src/decompression/glz.rs#L275).
+  [glz.rs:275](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/glz.rs#L275).
 
-* [ryll/src/decompression/lz.rs:21](../../ryll/src/decompression/lz.rs#L21):
+* [ryll/src/decompression/lz.rs:21](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/lz.rs#L21):
   `pub fn decompress_lz(data: &[u8]) -> Result<DecompressedImage>`.
   Pure sync. One unit test at
-  [lz.rs:189](../../ryll/src/decompression/lz.rs#L189).
+  [lz.rs:189](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/lz.rs#L189).
 
-* [ryll/src/decompression/quic.rs:1539](../../ryll/src/decompression/quic.rs#L1539):
+* [ryll/src/decompression/quic.rs:1539](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/quic.rs#L1539):
   `pub fn quic_decode(data: &[u8], width: u32, height: u32) ->
   Option<Vec<u8>>`. Note the **asymmetric return type**:
   returns `Option<Vec<u8>>` rather than
   `Result<DecompressedImage>`. The caller at
-  [display.rs:921](../../ryll/src/channels/display.rs#L921)
+  [display.rs:921](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L921)
   wraps the raw `Vec<u8>` into a `DecompressedImage` using the
   `img_desc` metadata. No unit tests. The file starts with
   `#![allow(dead_code, clippy::needless_range_loop)]` at
-  [quic.rs:1](../../ryll/src/decompression/quic.rs#L1),
+  [quic.rs:1](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/quic.rs#L1),
   suggesting latent cleanup work.
 
-* [ryll/src/channels/display.rs:30](../../ryll/src/channels/display.rs#L30):
+* [ryll/src/channels/display.rs:30](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L30):
   `fn decompress_spice_lz4(data: &[u8], width: usize, height:
   usize) -> Option<DecompressedImage>`. **Private** to
   `display.rs` (not `pub`). This is the fourth decoder that
@@ -101,23 +101,23 @@ research pass):
   `lz4_flex::decompress` at line 90. Returns
   `Option<DecompressedImage>` — a third asymmetric return type.
   Single caller at
-  [display.rs:863](../../ryll/src/channels/display.rs#L863).
+  [display.rs:863](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L863).
 
 **Decompression dispatch in display.rs** (summary of the
 research findings):
 
 | `ImageType` | Handler | Decoder call |
 |---|---|---|
-| `GlzRgb` | `decompress_glz(&image_data[4..], &self.glz_dictionary).await` | [display.rs:790](../../ryll/src/channels/display.rs#L790) |
-| `LzRgb` | `decompress_lz(&image_data[4..])` | [display.rs:805](../../ryll/src/channels/display.rs#L805) |
-| `ZlibGlzRgb` | zlib then `decompress_glz` | [display.rs:838](../../ryll/src/channels/display.rs#L838) |
-| `Lz4` | `decompress_spice_lz4(image_data, width, height)` | [display.rs:863](../../ryll/src/channels/display.rs#L863) |
-| `Quic` | `quic_decode(quic_data, img_desc.width, img_desc.height)` | [display.rs:921](../../ryll/src/channels/display.rs#L921) |
+| `GlzRgb` | `decompress_glz(&image_data[4..], &self.glz_dictionary).await` | [display.rs:790](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L790) |
+| `LzRgb` | `decompress_lz(&image_data[4..])` | [display.rs:805](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L805) |
+| `ZlibGlzRgb` | zlib then `decompress_glz` | [display.rs:838](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L838) |
+| `Lz4` | `decompress_spice_lz4(image_data, width, height)` | [display.rs:863](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L863) |
+| `Quic` | `quic_decode(quic_data, img_desc.width, img_desc.height)` | [display.rs:921](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L921) |
 | `Pixmap`, `FromCache`, `Jpeg` | (non-decompression paths) | — |
 
 **Import from decompression in display.rs** is exactly one
 line at
-[display.rs:13](../../ryll/src/channels/display.rs#L13):
+[display.rs:13](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L13):
 
 ```rust
 use crate::decompression::{decompress_glz, decompress_lz, quic_decode, DecompressedImage};
@@ -153,7 +153,7 @@ crate via its workspace path. After this phase completes:
   `decompress_lz`, `quic_decode`, and `decompress_spice_lz4`
   as its public API, each gated behind a cargo feature
   (`glz`, `lz`, `quic`, `lz4` respectively).
-- Ryll's [channels/display.rs](../../ryll/src/channels/display.rs)
+- Ryll's [channels/display.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs)
   no longer has a local `decompress_spice_lz4` function, and
   its decompression imports come from
   `shakenfist_spice_compression::*` instead of
@@ -215,7 +215,7 @@ buildable, testable, and CI-green:
      to `use crate::DecompressedImage` (or similar) to match
      the new crate-relative paths.
    - Update ryll's
-     [channels/display.rs:13](../../ryll/src/channels/display.rs#L13)
+     [channels/display.rs:13](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L13)
      import from `crate::decompression::...` to
      `shakenfist_spice_compression::...` (add the missing
      `decompress_spice_lz4` to the import list since it
@@ -407,7 +407,7 @@ external crates from using struct literal syntax. Without the
 constructor, `ryll/src/channels/display.rs` would not compile
 after the extraction — it currently builds `DecompressedImage`
 via struct literal syntax (confirmed at
-[display.rs:921-927](../../ryll/src/channels/display.rs#L921-L927)
+[display.rs:921-927](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L921-L927)
 in the QUIC wrapping code, though this needs rechecking during
 execution). The constructor is a minimal, non-breaking add.
 
@@ -525,7 +525,7 @@ Concrete steps within the commit:
 4. Update `ryll/src/channels/display.rs`:
    - Remove the `fn decompress_spice_lz4(...) -> ...`
      definition entirely (currently at
-     [display.rs:30-144](../../ryll/src/channels/display.rs#L30-L144)
+     [display.rs:30-144](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L30-L144)
      or thereabouts).
    - Add `decompress_spice_lz4` to the import list at line 13:
      ```rust
@@ -688,7 +688,7 @@ Concrete steps within the commit:
 
 10. **Audit `quic.rs`'s top-level attributes**. The existing
     file has `#![allow(dead_code, clippy::needless_range_loop)]`
-    at [quic.rs:1](../../ryll/src/decompression/quic.rs#L1).
+    at [quic.rs:1](https://github.com/shakenfist/ryll/blob/develop/ryll/src/decompression/quic.rs#L1).
     When the file becomes part of a public crate, it's worth
     asking whether this allow is still appropriate. Options:
     - Keep it as-is (minimal change, can be revisited in
@@ -718,7 +718,7 @@ Concrete steps within the commit:
       `use shakenfist_spice_compression::{...}` as described
       in the "Crate layout" section above.
     - Find the QUIC handler wrapping code (around
-      [display.rs:921](../../ryll/src/channels/display.rs#L921))
+      [display.rs:921](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L921))
       that wraps the `Option<Vec<u8>>` from `quic_decode` into
       a `DecompressedImage`. This currently uses struct literal
       syntax like `Some(DecompressedImage { width: ..., ... })`.
@@ -727,7 +727,7 @@ Concrete steps within the commit:
       likely source of a compile break during the extraction
       commit — verify carefully.**
     - Check the LZ4 handler at
-      [display.rs:863](../../ryll/src/channels/display.rs#L863)
+      [display.rs:863](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L863)
       — it shouldn't need changes because
       `decompress_spice_lz4` already returns
       `Option<DecompressedImage>` which the dispatch code
@@ -957,7 +957,7 @@ commit remains a pure refactor.)
 ### Discoveries during execution
 
 * **Open Question #4 answered.** The `mod decompression;`
-  declaration was at [ryll/src/main.rs:22](../../ryll/src/main.rs#L22).
+  declaration was at [ryll/src/main.rs:22](https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L22).
   Ryll is binary-only with no `lib.rs`, so the declaration
   lived in `main.rs` rather than a library root. Removed
   cleanly as part of Step 2.
@@ -1019,9 +1019,9 @@ commit remains a pure refactor.)
 
 * **`lz4_flex` stays as a direct ryll dependency** even after
   the LZ4 decoder moves to the new crate. Ryll's webdav
-  channel ([webdav.rs:482, 585](../../ryll/src/channels/webdav.rs#L482))
+  channel ([webdav.rs:482, 585](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/webdav.rs#L482))
   and usbredir channel
-  ([usbredir.rs:296](../../ryll/src/channels/usbredir.rs#L296))
+  ([usbredir.rs:296](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/usbredir.rs#L296))
   still use `lz4_flex` for general data
   compression/decompression (not for SPICE images). The
   Cargo.toml comment was updated to clarify this. The new

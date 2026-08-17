@@ -1,9 +1,10 @@
 # Key design decisions
 
-Why ryll is shaped the way it is. Each entry records a decision and the
-reasoning behind it, so a change that contradicts one is a deliberate
-choice rather than an accident. See [Architecture](/components/ryll/../ARCHITECTURE/)
-for the structure these decisions produced.
+This page records why ryll is shaped the way it is. Each entry captures a
+decision and the reasoning behind it, so a change that contradicts one is
+a deliberate choice rather than an accident. See
+[Architecture](https://github.com/shakenfist/ryll/blob/develop/ARCHITECTURE.md) for the structure these decisions
+produced.
 
 
 1. **Immediate mode rendering** - egui was chosen because SPICE sends bitmap
@@ -19,8 +20,8 @@ for the structure these decisions produced.
    stack without GUI overhead. Headless is also the first evidence of the
    project's broader **multi-modal client** stance: the SPICE stack is
    frontend-agnostic, and additional frontends (`--web` browser mode shipped
-   end-to-end via `docs/plans/PLAN-web-frontend.md`) are first-class peers of
-   the GUI rather than retrofits. When you add or modify a feature, ask which
+   end-to-end via the [web frontend plan](/components/ryll/plans/PLAN-web-frontend/)) are
+   first-class peers of the GUI rather than retrofits. When you add or modify a feature, ask which
    modes it should be reachable from; if a mode physically cannot host the
    feature, say so in the docs rather than leaving the gap unstated.
 
@@ -204,7 +205,8 @@ for the structure these decisions produced.
     captured at the moment of failure. A 60 s cooldown is enforced
     via `RyllApp::last_disconnect_report_at` and is updated even on
     write failure to avoid retry storms. Output directory resolution
-    (shared with the manual F8 button via `manual_bug_report_dir`):
+    (shared with the manual F12 / Menu → Report path via
+    `manual_bug_report_dir`):
     `--bug-report-dir` → `<--capture>/bug-reports/` → CWD. The
     `--pedantic-dir` flag falls back through the same chain when
     unspecified: `--pedantic-dir` → `--bug-report-dir` →

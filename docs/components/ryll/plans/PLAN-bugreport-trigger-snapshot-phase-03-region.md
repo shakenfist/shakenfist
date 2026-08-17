@@ -49,7 +49,7 @@ Explicitly out of scope (forever, not a later phase):
 ### Region selection
 
 Region-select mode at
-[app.rs:2161-2253](../../ryll/src/app.rs#L2161-L2253) clamps
+[app.rs:2161-2253](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2161-L2253) clamps
 the drag to the surface bounds during the drag (`.min(surf_w)`
 / `.min(surf_h)`) and builds a `ReportRegion` from
 `region_drag_start` and `region_drag_end`:
@@ -67,7 +67,7 @@ The coordinates are in **surface pixel space** (they are
 `pos.x - self.surface_rect.min.x` etc., then cast to `u32`).
 Region selection only runs when `bug_report_type ==
 BugReportType::Display` — see the dispatch in
-[app.rs:2287-2302](../../ryll/src/app.rs#L2287-L2302):
+[app.rs:2287-2302](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2287-L2302):
 
 ```rust
 if self.bug_report_type == BugReportType::Display {
@@ -86,7 +86,7 @@ defends against future callers.
 
 ### `surface_pixels` at submit
 
-[`generate_bug_report`](../../ryll/src/app.rs#L955) picks the
+[`generate_bug_report`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L955) picks the
 largest surface at submit time and passes
 `Some((pixels, width, height))` for Display reports. That's
 the same surface buffer phase 3 will crop. Non-Display
@@ -94,7 +94,7 @@ reports pass `None`, so the crop path short-circuits.
 
 ### `BugReport` zip layout
 
-[`write_zip`](../../ryll/src/bugreport.rs#L922-L960) writes
+[`write_zip`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/bugreport.rs#L922-L960) writes
 files in this order:
 
 1. `metadata.json`
@@ -109,7 +109,7 @@ when the field is `Some`.
 
 ### Existing cropping code
 
-[`display::surface::DisplaySurface::copy_subrect`](../../ryll/src/display/surface.rs#L440-L460)
+[`display::surface::DisplaySurface::copy_subrect`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs#L440-L460)
 already does a clipped, aliasing-safe sub-rect copy within
 a single surface. Phase 3's crop is simpler (source and
 destination are different buffers, so no aliasing concern)

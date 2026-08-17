@@ -77,7 +77,7 @@ Out of scope (future PRs / not part of this phase):
 ### Item 6: reconnect cancellation
 
 `RyllApp::reconnect` at
-[`ryll/src/app.rs:634-751`](../../ryll/src/app.rs#L634-L751)
+[`ryll/src/app.rs:634-751`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L634-L751)
 spawns a fresh `std::thread::spawn` containing a fresh
 `tokio::runtime::Runtime`, calls
 `run_connection(...).await` inside `block_on`, and
@@ -90,7 +90,7 @@ in any way. It collapses only when:
 - Or the runtime is dropped by the thread exiting.
 
 `run_connection`'s select loop is at
-[`ryll/src/app.rs:3443-3525`](../../ryll/src/app.rs#L3443-L3525).
+[`ryll/src/app.rs:3443-3525`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3443-L3525).
 Three branches today: event channel, connection task
 join, and a 100 ms `tokio::time::sleep` whose body polls
 `SHUTDOWN_REQUESTED`. The 100 ms branch is the natural
@@ -101,7 +101,7 @@ instead of process-wide.
 ### Item 7: cursor-hide overlay handling
 
 The cursor-hide predicate is at
-[`ryll/src/app.rs:2984-2994`](../../ryll/src/app.rs#L2984-L2994):
+[`ryll/src/app.rs:2984-2994`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L2984-L2994):
 
 ```rust
 if self.cursor_image.is_some()
@@ -135,7 +135,7 @@ keeps it hidden when nothing else wants the pointer.
 ### Item 8: clipboard CRLF / LF normalisation
 
 `MainChannel::poll_host_clipboard` at
-[`ryll/src/channels/main_channel.rs:923-944`](../../ryll/src/channels/main_channel.rs#L923-L944)
+[`ryll/src/channels/main_channel.rs:923-944`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L923-L944)
 compares the freshly read host clipboard against
 `self.last_clipboard_text` (Option<String>):
 
@@ -177,9 +177,9 @@ The master plan called this out at the MOUSE_MODE
 handler, with a "verify still relevant" caveat because
 the second-rebase merge had replaced parts of that
 handler wholesale. Verification:
-[`ryll/src/channels/main_channel.rs:371-378`](../../ryll/src/channels/main_channel.rs#L371-L378)
+[`ryll/src/channels/main_channel.rs:371-378`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L371-L378)
 (INIT) and
-[`ryll/src/channels/main_channel.rs:411-415`](../../ryll/src/channels/main_channel.rs#L411-L415)
+[`ryll/src/channels/main_channel.rs:411-415`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L411-L415)
 (MOUSE_MODE) both use three-arm matches:
 
 ```rust

@@ -58,20 +58,20 @@ After phase 1, the resize state lives in three places:
 
 - `pending_resize: Option<(f32, f32)>` and
   `last_auto_resize: Option<(u32, u32)>` on `RyllApp`
-  ([app.rs:241-251](../../ryll/src/app.rs#L241-L251)).
+  ([app.rs:241-251](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L241-L251)).
 - The `compute_auto_resize(pending, last_auto, is_max)`
   free function
-  ([app.rs:3036-3068](../../ryll/src/app.rs#L3036-L3068)).
+  ([app.rs:3036-3068](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L3036-L3068)).
 - The call site in `RyllApp::update`
-  ([app.rs:1674-1693](../../ryll/src/app.rs#L1674-L1693)).
+  ([app.rs:1674-1693](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1674-L1693)).
 
 The hamburger menu lives at
-[app.rs:1927-1963](../../ryll/src/app.rs#L1927-L1963) and
+[app.rs:1927-1963](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1927-L1963) and
 already contains three view toggles via plain
 `ui.checkbox`. Adding a fourth is a one-line change.
 
 `Args` in
-[ryll/src/config.rs:10-92](../../ryll/src/config.rs#L10-L92)
+[ryll/src/config.rs:10-92](https://github.com/shakenfist/ryll/blob/develop/ryll/src/config.rs#L10-L92)
 uses the standard clap-derive style. Boolean flags follow
 the pattern `#[arg(long, default_value_t = false)] pub
 foo: bool` (see `headless`, `cadence`, `pedantic`,
@@ -80,10 +80,10 @@ foo: bool` (see `headless`, `cadence`, `pedantic`,
 inverted at the call site.
 
 `RyllApp::new` is called from `run_gui` in
-[ryll/src/main.rs:217-234](../../ryll/src/main.rs#L217-L234)
+[ryll/src/main.rs:217-234](https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L217-L234)
 with positional arguments. `app::run_headless` is called
 from `run_headless` in
-[ryll/src/main.rs:178-194](../../ryll/src/main.rs#L178-L194).
+[ryll/src/main.rs:178-194](https://github.com/shakenfist/ryll/blob/develop/ryll/src/main.rs#L178-L194).
 
 `run_headless` does not own a `RyllApp` — it has its own
 parallel "headless app" code path in `ryll/src/app.rs`. We
@@ -94,7 +94,7 @@ Concretely: store it on the headless-side state struct (if
 one exists) or accept-and-drop in the function signature.
 The phase plan brief asks the implementing agent to pick
 the cleanest of the two after reading
-[`app::run_headless`](../../ryll/src/app.rs).
+[`app::run_headless`](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs).
 
 ## Design
 
@@ -201,7 +201,7 @@ No other logic changes here.
 
 Inside the `egui::menu::menu_button(ui, "☰", |ui| { … })`
 block at
-[app.rs:1927-1963](../../ryll/src/app.rs#L1927-L1963), add
+[app.rs:1927-1963](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L1927-L1963), add
 the checkbox **above** the three existing view toggles so
 the display-related entry is visually grouped near the
 top:

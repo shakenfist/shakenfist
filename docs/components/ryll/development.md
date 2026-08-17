@@ -308,8 +308,8 @@ contains the draw ops you thought it did (this is how we
 established that a "static" artefact was 100% DRAW_COPY
 rather than missing draw ops); `draw-copy` narrows further
 to the image types involved; `timeline --since-last 5`
-dumps the last five seconds of traffic when the user has
-pressed F8 right after seeing the artefact.
+dumps the last five seconds of traffic when the capture
+was stopped right after the artefact appeared.
 
 ryll's pcap files are big-endian libpcap format carrying
 synthetic TCP frames around the raw post-link SPICE

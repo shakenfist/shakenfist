@@ -144,8 +144,12 @@ What to put in a bug report when the indicator is amber or red:
 The thresholds (3 destroys, 30 s window, 3 s mean lifetime,
 60 s notification cool-down) are not yet configurable; they
 live in `ryll/src/streaming_state.rs` and are tuned for the
-session-005 flap pattern. Open an issue if a different
-workload trips them too easily or not easily enough.
+flap pattern seen on QXL guests above the resolution cliff
+(streams created and torn down within a few seconds, then
+never re-engaged — see
+[Libvirt / SPICE server recommendations](/components/ryll/libvirt-spice-recommendations/)).
+Open an issue if a different workload trips them too easily
+or not easily enough.
 
 ### JPEG decoder backend selection
 
@@ -385,8 +389,8 @@ tools/pcap-inspect.py opcodes <dir>/display.pcap
 # Which image codecs dominate the DRAW_COPY traffic?
 tools/pcap-inspect.py draw-copy <dir>/display.pcap
 
-# What did the server send in the last 5 seconds before
-# you hit F8?
+# What did the server send in the last 5 seconds of the
+# capture, right after the artefact appeared?
 tools/pcap-inspect.py timeline <dir>/display.pcap --since-last 5
 ```
 
@@ -490,7 +494,7 @@ When a Display bug report is submitted because video appears to
 stutter or fall behind, these fields in `channel-state.json` tell
 you which part of the pipeline was slow without re-running the
 session. They come from the master plan
-[`PLAN-video-keeping-up.md`](/components/ryll/../docs/plans/PLAN-video-keeping-up/).
+[`PLAN-video-keeping-up.md`](/components/ryll/plans/PLAN-video-keeping-up/).
 
 - `decode_total_count`, `decode_failed_count`,
   `decode_from_cache_count` — cumulative decode counters since
@@ -746,8 +750,9 @@ in the diagnostics guide for more details on what each field means.
 The SPICE server flags certain decoded image frames with `CACHE_ME` to
 reduce bandwidth on future repeated use. Ryll caches these decoded RGBA
 frames client-side; without a bound, sustained video playback can cause
-the cache to grow unbounded (see session 002g: 30 MiB/s growth during
-full-frame ZlibGlzRgb video, reaching 2.8 GiB in 90 seconds).
+the cache to grow unbounded. Measured against full-frame ZlibGlzRgb
+video, an uncapped cache grew at 30 MiB/s and reached 2.8 GiB in 90
+seconds.
 
 The `--image-cache-cap-mib` flag (default 256 MiB) bounds the cache with
 an LRU eviction policy: when the total cached bytes exceed the cap, the
@@ -831,9 +836,9 @@ set of fields: `image_cache_bytes`, `image_cache_entries`, and
 `image_cache_ids` covered the renderer's `BoundedImageCache` together
 with the SPICE `GlzDictionary` decompression cache. This made bug
 reports ambiguous: a 5 GiB `image_cache_bytes` reading against a
-256 MiB cap (as seen in session 003a) actually came from the GLZ
-dictionary, not the image cache, but nothing in the snapshot
-distinguished the two.
+256 MiB cap — which we have observed in practice — actually came
+from the GLZ dictionary, not the image cache, but nothing in the
+snapshot distinguished the two.
 
 Current builds report the two separately: the `image_cache_*`
 fields reflect only the

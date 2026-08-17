@@ -108,12 +108,14 @@ and GitHub treats a skipped required check as satisfied. That is
 why `Can merge` being skipped does not block a pull request, and
 `Can enqueue` being skipped does not block a merge group.
 
-> **Adding a job means editing a gate.** A new job is not
-> really required until it is in a gate's `needs` list. Add
-> smoke-tier jobs to `can_enqueue` (and, if the automated
-> reviewer should wait for them, to `automated_reviewer`); add
-> merge-tier jobs to `can_merge`. A job that no gate depends on
-> can fail without blocking anything.
+!!! warning "Adding a job means editing a gate"
+
+    A new job is not really required until it is in a gate's
+    `needs` list. Add smoke-tier jobs to `can_enqueue` (and, if
+    the automated reviewer should wait for them, to
+    `automated_reviewer`); add merge-tier jobs to `can_merge`. A
+    job that no gate depends on can fail without blocking
+    anything.
 
 ## The life of a pull request
 

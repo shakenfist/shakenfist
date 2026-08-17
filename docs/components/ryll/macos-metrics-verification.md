@@ -1,28 +1,32 @@
 # macOS runtime-metrics verification runbook
 
-This runbook is the user-side acceptance test for the macOS
-runtime-metrics implementation described by
-[`PLAN-macos-runtime-metrics.md`](/components/ryll/plans/PLAN-macos-runtime-metrics/).
-It is addressed at a maintainer running ryll on a real Mac
-(or at the future macOS CI matrix once
-[`PLAN-ci-platform-matrix.md`](/components/ryll/plans/PLAN-ci-platform-matrix/)
-lands).
+This runbook is the manual test suite for ryll's macOS
+runtime-metrics implementation. It is addressed at a
+maintainer running ryll on a real Mac. Re-run it whenever
+`shakenfist-spice-renderer/src/metrics.rs` changes, and
+before a release where macOS bug reports matter.
 
 ## Why this exists
 
-The Mach FFI surface in `shakenfist-spice-renderer/src/metrics.rs`
-cannot be compiled on the Linux devcontainer, so the
-platform-independent unit tests for delta math and JSON shape
-do not catch FFI-level mistakes. The
-`#[cfg(target_os = "macos")]`-gated tests cover the FFI
-shape end-to-end on a real Mac, but they don't cover the
-"plausibility" of the values (CPU% vs. Activity Monitor,
-RSS vs. real memory usage, port-leak safety over hours).
+The Mach FFI surface in `metrics.rs` cannot be compiled on
+the Linux devcontainer, so the platform-independent unit
+tests for delta math and JSON shape do not catch FFI-level
+mistakes. The `#[cfg(target_os = "macos")]`-gated tests do
+cover the FFI shape end-to-end, and CI does run them: the
+macOS cell of the build matrix in
+`.github/workflows/ci.yml` runs `cargo test --workspace`
+with no `runner.os` guard. That job is in the merge tier,
+though, so its `if:` restricts it to `merge_group` and
+`workflow_dispatch` events — the macOS test signal arrives
+when a change is enqueued to land, not on every push to a
+pull request.
 
-The six tests in this runbook plus the soak procedure
-together verify all five acceptance criteria from the master
-plan and the additional port-leak safety property it calls
-out.
+What no automated test can do is judge whether the values
+are *plausible*: CPU% against Activity Monitor, RSS
+against real memory usage, port-leak safety over hours.
+That judgement is the whole point of the six tests and the
+soak below, so they stay worth running even though the FFI
+shape itself is covered automatically.
 
 ## Prerequisites
 
@@ -38,8 +42,9 @@ out.
 
 ### Test 1 — MacOS variant is produced
 
-Start ryll, connect to the SPICE server, trigger an F12 bug
-report, save the zip, and parse:
+Start ryll, connect to the SPICE server, file a bug report
+(F12 or Menu → Report, then submit), save the zip, and
+parse:
 
 ```sh
 unzip -p ryll-bugreport-*.zip runtime-metrics.json | jq '.platform'
@@ -191,8 +196,8 @@ behaviour over many calls.
    `task_threads` + `MachThreadList::drop`. If the cap is
    hit early in the soak, leak detection still works
    (constant port count once sampling stops); for a longer
-   stress, F8-trigger bug reports manually every few
-   minutes to keep `sample()` firing.
+   stress, file bug reports manually (F12, then submit)
+   every few minutes to keep `sample()` firing.
 2. Record the initial Mach port count for the ryll process:
    ```sh
    RYLL_PID=$(pgrep ryll)

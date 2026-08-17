@@ -113,22 +113,22 @@ stay warn-once-deferred).
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs](../../shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
   has `SpiceTransparent::read` and
   `SpiceAlphaBlend::read` from phase 1.
-* [ryll/src/channels/display.rs](../../ryll/src/channels/display.rs)
+* [ryll/src/channels/display.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs)
   `decode_image_and_emit(payload, op_name, base,
   src_bitmap_offset, src_top, src_left, src_bottom,
   src_right)` from phase 5. Emits `ChannelEvent::ImageReady`
   at its two emit sites (clip-rects branch and fallback).
   All decode-and-cache logic is in this single method.
-* [ryll/src/channels/mod.rs](../../ryll/src/channels/mod.rs)
+* [ryll/src/channels/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs)
   `ChannelEvent::ImageReady` — the existing overwrite
   emit variant.
-* [ryll/src/display/surface.rs](../../ryll/src/display/surface.rs)
+* [ryll/src/display/surface.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs)
   `DisplaySurface::blit` — the straight memcpy used by
   `ImageReady`.
-* [ryll/src/app.rs:562](../../ryll/src/app.rs#L562)
+* [ryll/src/app.rs:562](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs#L562)
   — `ImageReady` handler that calls `surface.blit`.
 * `warn_once!` macro from phase 2. Available for the
   alpha_flags warn site.
@@ -189,7 +189,7 @@ handle the per-pixel-alpha case).
 ### Surface helpers
 
 Both new helpers live in
-[ryll/src/display/surface.rs](../../ryll/src/display/surface.rs)
+[ryll/src/display/surface.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/display/surface.rs)
 alongside the phase-1 `fill_rect`/`copy_bits`/
 `invert_rect`. Their signatures mirror `blit`:
 
@@ -303,7 +303,7 @@ half test being within tolerance.
 
 ### ChannelEvent variants
 
-In [ryll/src/channels/mod.rs](../../ryll/src/channels/mod.rs),
+In [ryll/src/channels/mod.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/mod.rs),
 after `ImageReady`:
 
 ```rust
@@ -345,7 +345,7 @@ handler free of nested match blocks.
 
 ### App-side handlers
 
-In [ryll/src/app.rs](../../ryll/src/app.rs) alongside
+In [ryll/src/app.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/app.rs) alongside
 the existing `ImageReady` / `FillRect` / `CopyBits` /
 `Invert` arms in `process_events`:
 

@@ -1,8 +1,9 @@
 # Rendering and audio pipeline
 
-How decoded SPICE surfaces become pixels on a screen, how the window is
-sized and how multiple monitors are handled, how audio playback is driven,
-and how user-facing notifications are raised.
+The rendering and audio pipeline turns decoded SPICE surfaces into pixels
+on a screen. This page covers that path in both GUI and headless modes,
+how the window is sized and how multiple monitors are handled, how audio
+playback is driven, and how user-facing notifications are raised.
 
 ## Display Rendering
 
@@ -180,22 +181,20 @@ SPICE audio data arrives on the **Playback channel** (type 5) as
 followed by encoded audio. The codec is negotiated via `PLAYBACK_MODE`
 (raw PCM = 1, Opus = 3).
 
-```
-SPICE PLAYBACK_DATA message (tokio network task)
-  │
-  ├── raw PCM: i16 LE samples pushed directly
-  └── Opus: decoded via `opus-decoder` crate → i16 samples
-                │
-                ▼
-        rtrb::RingBuffer<i16>  (lock-free, ~2 s capacity at 48kHz stereo)
-                │
-                ▼
-      dedicated std::thread ("audio")
-                │
-                ├── drains ring buffer into local VecDeque
-                ├── Resampler: linear interpolation from source rate
-                │   to device rate (ratio = source_rate / device_rate)
-                └── cpal output stream callback → audio device
+```mermaid
+flowchart TB
+    msg["SPICE PLAYBACK_DATA message<br/>(tokio network task)"]
+    pcm["raw PCM: i16 LE samples pushed directly"]
+    opus["Opus: decoded via the opus-decoder crate → i16 samples"]
+    ring["rtrb::RingBuffer&lt;i16&gt;<br/>lock-free, ~2 s capacity at 48 kHz stereo"]
+    thread["dedicated std::thread, named audio"]
+    drain["drains ring buffer into local VecDeque"]
+    resample["Resampler: linear interpolation from source rate to device rate<br/>(ratio = source_rate / device_rate)"]
+    cpal["cpal output stream callback → audio device"]
+
+    msg --> pcm --> ring
+    msg --> opus --> ring
+    ring --> thread --> drain --> resample --> cpal
 ```
 
 The tokio network task is the **producer**: it decodes incoming audio
