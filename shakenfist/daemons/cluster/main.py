@@ -217,6 +217,18 @@ class Monitor(daemon.Daemon):
         # the cleaner's complement-set use of the same call, where the
         # equivalent failure would delete blobs off disk (#3638). Skip
         # just this section so the rest of the cleanup still runs.
+        #
+        # "Just this section" is not quite true, which is why the flag
+        # exists: the loop below is what records instance-backed blobs
+        # in in_use_blobs, and record_usage() further down is the only
+        # thing that refreshes last_used for a blob whose instance is
+        # long running and never reopens it. The transcode reaper
+        # selects on exactly that column, so a degraded pass which
+        # still reaped would drop transcodes of blobs that are in use.
+        # Artifact-backed blobs are unaffected -- they are recorded
+        # before this read -- but the reaper cannot tell the two apart,
+        # so it sits out the whole pass.
+        blobs_readable = True
         try:
             active_blob_uuids = mariadb.get_active_blob_uuids()
         except exceptions.DatabaseUnavailable as e:
@@ -224,6 +236,7 @@ class Monitor(daemon.Daemon):
                 'Could not read the active blob list, skipping blob reaping '
                 'and replication this pass')
             active_blob_uuids = []
+            blobs_readable = False
 
         for blob_uuid in active_blob_uuids:
             self.pet_watchdog()
@@ -348,13 +361,18 @@ class Monitor(daemon.Daemon):
                 b.request_replication(allow_excess=excess)
 
         # Find transcodes of not recently used blobs and reap them
-        # (database-level filtering)
-        for blob_uuid in mariadb.get_stale_transcoded_blob_uuids(
-                config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME):
-            self.pet_watchdog()
-            b = Blob.from_db(blob_uuid)
-            if b:
-                b.remove_transcodes()
+        # (database-level filtering). Only when this pass was able to
+        # refresh last_used -- see the comment on blobs_readable above.
+        if blobs_readable:
+            for blob_uuid in mariadb.get_stale_transcoded_blob_uuids(
+                    config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME):
+                self.pet_watchdog()
+                b = Blob.from_db(blob_uuid)
+                if b:
+                    b.remove_transcodes()
+        else:
+            LOG.info('Skipping stale transcode reaping, last_used was not '
+                     'refreshed this pass')
 
         # Node management
         for n in Nodes([]):

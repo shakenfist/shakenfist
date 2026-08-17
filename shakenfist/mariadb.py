@@ -4072,6 +4072,34 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
         return False
 
 
+def _log_failed_read(rpc: str, error: grpc.RpcError, target: str = '') -> None:
+    """Log a list-shaped read which did not happen, naming why when we can.
+
+    The wrappers which use this all collapse an RpcError to a
+    failed-read return of None. That is right for the transient codes
+    and for RESOURCE_EXHAUSTED -- the oversized reply of #3638 -- but
+    it folds INVALID_ARGUMENT in with them, and the servicers now set
+    that status when they are handed an object type they cannot
+    resolve. Such a request is a caller bug or a proto_id version skew,
+    not a database problem, and left unnamed it surfaces as a 503
+    telling an operator to retry something that will never succeed, or
+    as a sweep failure streak that never clears while somebody looks
+    for a database fault that does not exist.
+
+    The return value is deliberately unchanged: a caller which could
+    not read the list is in the same position either way, and there are
+    no callers today which can produce this status. The log line is
+    what stops the diagnosis starting in the wrong place.
+    """
+    code = getattr(error, 'code', lambda: None)()
+    context = f' for {target}' if target else ''
+    if code == grpc.StatusCode.INVALID_ARGUMENT:
+        LOG.error(f'gRPC {rpc} was rejected as malformed{context}, which is '
+                  f'a caller bug rather than a database failure: {error}')
+    else:
+        LOG.error(f'gRPC {rpc} failed{context}: {error}')
+
+
 def _grpc_get_objects_by_state(object_type: ObjectType,
                                state_values: list[str],
                                updated_before: Optional[float] = None
@@ -4091,8 +4119,7 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         reply = _grpc_call(stub.GetObjectsByState, request)
         return list(reply.object_uuids)
     except grpc.RpcError as e:
-        LOG.error(
-            f'gRPC GetObjectsByState failed for {object_type}: {e}')
+        _log_failed_read('GetObjectsByState', e, target=str(object_type))
         return None
 
 
@@ -8328,7 +8355,7 @@ def _grpc_get_references_from(
             ))
         return refs
     except grpc.RpcError as e:
-        LOG.error(f'gRPC GetReferencesFrom failed: {e}')
+        _log_failed_read('GetReferencesFrom', e, target=str(source_uuid))
         return None
 
 
@@ -23618,8 +23645,7 @@ def _grpc_get_stateless_object_uuids(
         reply = _grpc_call(stub.GetStatelessObjectUuids, request)
         return list(reply.object_uuids)
     except grpc.RpcError as e:
-        LOG.error(
-            f'gRPC GetStatelessObjectUuids failed for {object_type}: {e}')
+        _log_failed_read('GetStatelessObjectUuids', e, target=str(object_type))
         return None
 
 

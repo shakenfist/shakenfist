@@ -251,6 +251,19 @@ should be recorded per caller, which is what the taxonomy in Q2 is for.
 set, but a node whose instance list reads empty during an outage is a
 node the scheduler believes is idle.
 
+`DatabaseBackedObjectIterator._find()` belongs in the same audit, and
+is the widest instance of the pattern in the tree. A tier-wide
+`DatabaseUnavailable` propagates out of it deliberately — catching it
+would rebuild the #3638 hazard one layer up, in every `Blobs()`,
+`IPAMs()` and `AgentOperations()` caller at once — but a `None` return
+from the per-reply failure shape still truncates to an empty
+iteration. That is tolerable only for as long as every iterator caller
+iterates rather than complements, which is a property of the callers
+and not of the iterator, and so is exactly the kind of thing the Q2
+taxonomy has to be able to state. Whichever bounding mechanism phase 3
+picks, this is the call site where a partially-consumed generator has
+to be distinguishable from a complete one.
+
 Sequencing constraints:
 
 - Phase 1 must land before phase 0 is *finalised*. The decisions in
@@ -631,6 +644,39 @@ on the `issue-fix-3638` branch:
   `get_node_blob_uuids()` over a truthful `_get_references_from()`,
   plus `UNAVAILABLE`/`INTERNAL`/`INVALID_ARGUMENT` on
   `GetReferencesFrom`. Five mutations confirmed the guards.
+- Skipping the blob section of `_cluster_wide_cleanup()` also skips the
+  `record_usage()` pass that refreshes `last_used` for
+  instance-backed blobs, while the stale-transcode reaper further down
+  selects on that same column. A database outage longer than
+  `BLOB_TRANSCODE_MAXIMUM_IDLE_TIME` would therefore have reaped
+  transcodes of blobs in active use. The reaper now sits out any pass
+  which could not read the active blob list. Self-healing (transcodes
+  regenerate on demand), but it is the first case found of the
+  degraded-pass comment's "the rest is independent" claim not holding,
+  and any future partial-failure skip has to ask the same question of
+  the sections downstream of it.
+
+### Deliberately deferred: fault-injected functional coverage
+
+Everything the `issue-fix-3638` branch adds is unit-level, including
+two changes that are observable outside the process: `GET /blobs` now
+answers `503` where it used to answer `200` with an empty list, and the
+cleaner now declines to delete anything on a pass whose reads failed.
+`CLAUDE.md` prefers functional coverage over unit coverage where only
+one is possible, so the absence is recorded here rather than left to be
+rediscovered.
+
+The reason is that both tests need a *failing* database rather than an
+absent one. `deploy/shakenfist_ci` runs against a real cluster with no
+fault-injection surface: there is no supported way to make MariaDB
+return `OperationalError` for one query, or to make a `GetObjectsByState`
+reply exceed the receive cap on demand, without stopping `sf-database`
+outright — which fails every other daemon on the node and tests
+something else. Phase 1 instruments reply sizes, and is the first point
+at which a deliberately oversized reply can be produced as a test
+fixture rather than as an outage. The functional coverage in the
+success criteria above belongs there, and should cover this branch's
+two contract changes as well as the bound itself.
 
 ### Documentation index maintenance
 

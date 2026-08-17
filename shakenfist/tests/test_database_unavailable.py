@@ -15,6 +15,7 @@ from unittest import mock
 import grpc
 from sqlalchemy.exc import OperationalError
 
+from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import locks
 from shakenfist import mariadb
@@ -937,3 +938,71 @@ class ReferenceReadFailureTestCase(base.ShakenFistTestCase):
         # keeps the decision a decision rather than an oversight.
         self.assertEqual(
             [], mariadb.get_references_from(ObjectType.NODE, 'sf-1'))
+
+
+class ObjectIteratorFailedReadTestCase(base.ShakenFistTestCase):
+    """The iterators are the widest consumer of a failed list read.
+
+    A tier-wide failure propagates out of them on purpose: catching it
+    would turn a read that did not happen into an iteration that found
+    nothing, which is the #3638 hazard rebuilt in every Blobs(),
+    IPAMs() and AgentOperations() caller at once.
+    """
+
+    def _make_iterator(self):
+        it = baseobject.DatabaseBackedObjectIterator()
+        it.base_object = mock.MagicMock()
+        it.base_object.object_type = ObjectType.BLOB
+        it.base_object.ACTIVE_STATES = ['created']
+        return it
+
+    @mock.patch('shakenfist.baseobject.mariadb.get_objects_by_state',
+                side_effect=exceptions.DatabaseUnavailable('down'))
+    def test_tier_down_reaches_the_caller(self, mock_get):
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            list, self._make_iterator().get_iterator())
+
+    @mock.patch('shakenfist.baseobject.mariadb.get_objects_by_state',
+                return_value=None)
+    def test_per_reply_failure_still_truncates(self, mock_get):
+        # Pinned as a known gap rather than asserted as correct: the
+        # None shape does collapse to an empty iteration here, which is
+        # safe only while every iterator caller iterates the result
+        # rather than complementing it. Named in phase 1 of
+        # PLAN-grpc-bounded-replies.md.
+        self.assertEqual([], list(self._make_iterator().get_iterator()))
+
+    @mock.patch('shakenfist.baseobject.mariadb.get_objects_by_state',
+                return_value=[])
+    def test_genuinely_empty_is_not_an_error(self, mock_get):
+        # The negative control: an empty answer is a real answer, and
+        # the propagation above is not simply "iterators always raise".
+        self.assertEqual([], list(self._make_iterator().get_iterator()))
+
+
+class MalformedReadRequestTestCase(base.ShakenFistTestCase):
+    """An unresolvable object type is not a database outage.
+
+    The servicers set INVALID_ARGUMENT for a proto_id they cannot
+    resolve, and the wrappers fold every RpcError into the same
+    failed-read return. That is fine for the return value -- a caller
+    which could not read the list is stuck either way -- but it would
+    otherwise send an operator looking for a database fault that does
+    not exist, so the log line has to name it.
+    """
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_invalid_argument_is_named_as_a_caller_bug(self, mock_log):
+        mariadb._log_failed_read(
+            'GetObjectsByState',
+            FakeRpcError(grpc.StatusCode.INVALID_ARGUMENT), target='blob')
+        self.assertIn('caller bug', mock_log.error.call_args[0][0])
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_a_transient_failure_is_not(self, mock_log):
+        mock_log.reset_mock()
+        mariadb._log_failed_read(
+            'GetObjectsByState',
+            FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED), target='blob')
+        self.assertNotIn('caller bug', mock_log.error.call_args[0][0])

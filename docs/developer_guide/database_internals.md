@@ -159,8 +159,8 @@ and sweep helpers skip the affected work for the pass.
 The servicer has the matching obligation. A reply whose only payload is
 a `repeated` field has nowhere to say "the read failed", so
 `GetObjectsByState`, `GetStatelessObjectUuids` and `GetReferencesFrom`
-must not answer a
-failed read with an empty list: when the direct accessor returns `None`
+must not answer a failed read with an empty list: when the direct
+accessor returns `None`
 (an `OperationalError` — MariaDB down, connection dropped, lock wait
 timeout, deadlock) they set `UNAVAILABLE` on the status, which
 `_grpc_call` retries and then surfaces as `DatabaseUnavailable`. An
@@ -170,8 +170,8 @@ because it is the failure mode where sf-database itself is healthy and
 answering, so nothing else in the stack notices.
 
 `get_active_blob_uuids()` and `get_node_blob_uuids()` are the exceptions
-to the "wrappers translate to
-not found" rule: they *raise* `DatabaseUnavailable` rather than returning
+to the "wrappers translate to not found" rule: they *raise*
+`DatabaseUnavailable` rather than returning
 `[]`, because the cleaner uses both lists as complement sets and unlinks
 every blob file named in neither. They are two accessors over reads that
 also have tolerant forms — `get_objects_by_state()` and
@@ -182,6 +182,19 @@ call site, so the pair exists rather than a flag on one accessor. See the
 shape a new accessor should have, and
 [`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md)
 for the reply-size work this came out of.
+
+The object iterators are the widest consumer of all this, and they
+propagate. `DatabaseBackedObjectIterator._find()` catches nothing:
+a `DatabaseUnavailable` raised part way through `Blobs()`, `IPAMs()`
+or `AgentOperations()` unwinds into the caller mid-iteration rather
+than ending the loop quietly, because a read that did not happen must
+not present as an iteration that found nothing. Daemon loops which
+tolerate that catch it at the top of the pass, as the cluster daemon's
+cleanup does; a new caller which cannot tolerate a partially consumed
+iterator has to say so. The `None` failure shape does still truncate
+there, which is safe only while every iterator caller iterates the
+result rather than complementing it — that is recorded, with the rest
+of the audit, in the plan.
 
 The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
 timeout) to detect stale connections before they cause failures, and a
