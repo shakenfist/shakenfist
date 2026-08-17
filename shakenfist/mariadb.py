@@ -7180,6 +7180,17 @@ def get_active_blob_uuids() -> list[str]:
     are active". Callers that can tolerate a skipped pass must catch
     DatabaseUnavailable explicitly.
 
+    The exception deliberately covers two conditions that differ in how
+    retryable they are: an unreachable tier, where a retry eventually
+    works, and an oversized reply, where a retry fails identically until
+    the data shrinks. REST callers are answered 503 "please retry" for
+    both. That is the right answer for the first and an acceptable one
+    for the second -- no client can shrink the reply, so there is no
+    action the distinction would unlock, and a retrying client is still
+    better off than under the silent 200-with-[] this replaced. Phase 3
+    of docs/plans/PLAN-grpc-bounded-replies.md removes the second
+    condition rather than teaching callers to tell the two apart.
+
     Returns:
         List of blob UUID strings in active states.
     """

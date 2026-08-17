@@ -59,6 +59,21 @@ class Monitor(daemon.Daemon):
         # It is a set for the same reason: the membership test below runs
         # once per file in the blob store, and the reply that motivated
         # #3638 held on the order of 10^5 uuids.
+        #
+        # Returning here abandons the whole pass, including the
+        # transcoded-image-cache sweep further down which does not itself
+        # need the active list. That is deliberate: the cache sweep
+        # deletes an entry when Blob.from_db() comes back falsy, which
+        # during a database outage would be a second, smaller version of
+        # the same complement-set hazard. The `if not n: return` below
+        # already skips it for the same reason.
+        #
+        # Unlike the cluster daemon's sweeps this skip has no metric, so
+        # a persistently failing read shows up only in this log line and
+        # as disk that stops being reclaimed. sf-cleaner exports no
+        # Prometheus endpoint at all today, so giving it one is its own
+        # change rather than a rider on this fix -- see the future work
+        # section of docs/plans/PLAN-grpc-bounded-replies.md.
         try:
             active_blob_uuids = set(mariadb.get_active_blob_uuids())
         except exceptions.DatabaseUnavailable as e:

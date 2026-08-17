@@ -276,6 +276,19 @@ and the condition an alert on the streak most needs to see. Cover both, and
 prove it with a test that sets `side_effect = DatabaseUnavailable(...)` rather
 than a `None` return.
 
+Having covered both, do not then treat them alike inside a loop. The two shapes
+differ in blast radius. A `None` return is per-reply, so the next object type is
+still worth reading. A `DatabaseUnavailable` is tier-wide: every remaining read
+will fail identically, and each will spend a full `_grpc_call` retry budget
+before it does. Continuing therefore costs one budget per iteration, and both
+the deleted-object sweep (28 object types) and orphan reconciliation run inside
+a single scheduled job whose watchdog is only petted *between* jobs. The
+tolerant `continue` that is right for the per-reply case would turn a database
+outage into a `SIGABRT` of the elected cluster maintainer and a lock failover.
+Continue on the per-reply shape; stop the loop on the tier-wide one. The
+general form: when one read becomes N reads, recompute the caller's worst-case
+wall time rather than inheriting it.
+
 ## Cluster CI tests only run in the merge queue
 
 The `(collection)` matrix in `Functional tests` -- everything under

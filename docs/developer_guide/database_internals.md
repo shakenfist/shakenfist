@@ -151,17 +151,35 @@ propagates through them: an unreachable database must not be
 indistinguishable from a missing object. The few hot paths that
 intentionally tolerate an unreachable database catch it explicitly --
 `Daemon.check_daemon_state()` skips the check, `ClusterLock.__enter__`
-keeps retrying inside the caller's timeout, and the queues daemon's health
-loop treats it as unhealthy and waits.
+keeps retrying inside the caller's timeout, the queues daemon's health
+loop treats it as unhealthy and waits, and (since #3638) the cleaner's
+`_maintain_blobs()` and the cluster daemon's `_cluster_wide_cleanup()`
+and sweep helpers skip the affected work for the pass.
+
+`get_active_blob_uuids()` is the exception to the "wrappers translate to
+not found" rule: it *raises* `DatabaseUnavailable` rather than returning
+`[]`, because the cleaner uses the list as a complement set and unlinks
+every blob file not named in it. See the
+["`or []` is a decision"](coding_rules.md) rule for how to decide which
+shape a new accessor should have, and
+[`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md)
+for the reply-size work this came out of.
 
 The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
-timeout) to detect stale connections before they cause failures. The
-database gRPC server uses a 20-thread pool to handle concurrent requests
-from all daemons. The database client in `mariadb.py` (`_grpc_call`)
-retries `UNAVAILABLE` and `DEADLINE_EXCEEDED` failures, rebuilding the
-channel on a wedged subchannel but keeping it on a refused connection so
-`round_robin` can serve the retry from a surviving gateway. All gRPC
-failures are logged at ERROR level.
+timeout) to detect stale connections before they cause failures, and a
+32MiB client receive cap (raised from grpcio's 4MiB default in `#3638`,
+where `GetObjectEvents` and `GetObjectsByState` replies outgrew it and
+failed as `RESOURCE_EXHAUSTED`). The cap is client-side only; the server
+sets no send cap, so an oversized reply is still serialised before it
+fails, which is why the durable fix is bounding replies rather than
+raising the cap again -- see
+[`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md).
+The database gRPC server uses a 64-thread pool to handle concurrent
+requests from all daemons. The database client in `mariadb.py`
+(`_grpc_call`) retries `UNAVAILABLE` and `DEADLINE_EXCEEDED` failures,
+rebuilding the channel on a wedged subchannel but keeping it on a
+refused connection so `round_robin` can serve the retry from a surviving
+gateway. All gRPC failures are logged at ERROR level.
 
 `get_objects_by_state()` returns `None` on non-retryable errors (distinct
 from `[]` for no matches). All object iterators handle this by falling back

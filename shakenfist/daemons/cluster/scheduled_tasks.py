@@ -1,5 +1,6 @@
 import queue
 import time
+from typing import NamedTuple
 from typing import Optional
 
 from prometheus_client import Counter
@@ -57,43 +58,40 @@ SWEEP_WORK_LIST_FAILURE_STREAK = Gauge(
 _SWEEP_FAILURE_STREAK: dict[tuple[str, str], int] = {}
 
 
-def _sweep_work_list(sweep: str, object_type: ObjectType,
-                     state_values: list[str],
-                     updated_before: Optional[float] = None
-                     ) -> Optional[list[str]]:
-    """Read a sweep's work list, treating a failed read as visible.
+class WorkList(NamedTuple):
+    """The outcome of a sweep's work-list read.
 
-    ``mariadb.get_objects_by_state`` returns None when the read failed,
-    which is distinct from [] for "no matches". Collapsing the two with
-    ``or []`` turns the sweep off silently: it reports a successful pass
-    over an empty queue while the backlog it exists to drain keeps
-    growing, and grows the very reply that could not be read (#3638).
+    ``uuids`` is None when the read failed, never [] -- a sweep must be
+    able to tell "the read failed" from "there was nothing to do".
 
-    A failed read arrives in two shapes and both mean the same thing
-    here. The gRPC wrapper returns None when the call itself failed --
-    the RESOURCE_EXHAUSTED oversized-reply case of #3638 -- but a
-    database tier that is down or mid rolling-restart exhausts the
-    retry budget in ``_grpc_call`` instead, which raises
-    ``DatabaseUnavailable``. That exception is deliberately not an
-    ``grpc.RpcError`` (issue 3373), so it propagates straight through
-    the wrapper; catching it here is what keeps the streak gauge
-    truthful during precisely the outage it exists to make visible,
-    and what keeps one object type's failure from unwinding the
-    deleted-object sweep for every type after it.
-
-    Returns the uuid list, or None when the read failed. A None return
-    means "skip this pass", never "there was nothing to do".
+    ``tier_unavailable`` says which of the two shapes of failed read
+    happened, because a caller reading one work list per object type
+    must treat them differently. A None return from the gRPC wrapper is
+    per-reply (the RESOURCE_EXHAUSTED oversized-reply case of #3638
+    applies to one type's reply, and the other types are still
+    readable), so that caller should move on to the next type. A
+    ``DatabaseUnavailable`` is tier-wide, and asking the same dead tier
+    27 more times buys nothing while costing a full ``_grpc_call``
+    retry budget each time -- see ``_fill_per_deleted_object_queue``.
     """
-    try:
-        obj_uuids = mariadb.get_objects_by_state(
-            object_type, state_values, updated_before=updated_before)
-        error = None
-    except DatabaseUnavailable as e:
-        obj_uuids = None
-        error = str(e)
+    uuids: Optional[list[str]]
+    tier_unavailable: bool
+
+
+def _record_sweep_read(sweep: str, object_type: ObjectType,
+                       uuids: Optional[list[str]],
+                       error: Optional[str]) -> None:
+    """Account one work-list read against the failure streak gauge.
+
+    Every sweep in this module shares a failure mode: silence. A pass
+    that cannot read its work list does nothing, and nothing else ever
+    retries on its behalf (#3638), so the streak is the only signal an
+    operator gets. A successful read clears the streak for that label
+    set; a failed one increments it and says so in the log.
+    """
     key = (sweep, str(object_type))
 
-    if obj_uuids is None:
+    if uuids is None:
         streak = _SWEEP_FAILURE_STREAK.get(key, 0) + 1
         _SWEEP_FAILURE_STREAK[key] = streak
         SWEEP_WORK_LIST_FAILURE_STREAK.labels(
@@ -105,12 +103,72 @@ def _sweep_work_list(sweep: str, object_type: ObjectType,
             'error': error}).warning(
             'Scheduled sweep could not read its work list; this pass is '
             'skipped and its backlog is not being drained')
-        return None
+        return
 
     if _SWEEP_FAILURE_STREAK.pop(key, None):
         SWEEP_WORK_LIST_FAILURE_STREAK.labels(
             sweep=sweep, object_type=str(object_type)).set(0)
-    return obj_uuids
+
+
+def _sweep_work_list(sweep: str, object_type: ObjectType,
+                     state_values: list[str],
+                     updated_before: Optional[float] = None
+                     ) -> WorkList:
+    """Read a sweep's work list, treating a failed read as visible.
+
+    ``mariadb.get_objects_by_state`` returns None when the read failed,
+    which is distinct from [] for "no matches". Collapsing the two with
+    ``or []`` turns the sweep off silently: it reports a successful pass
+    over an empty queue while the backlog it exists to drain keeps
+    growing, and grows the very reply that could not be read (#3638).
+
+    A failed read arrives in two shapes. The gRPC wrapper returns None
+    when the call itself failed -- the RESOURCE_EXHAUSTED
+    oversized-reply case of #3638 -- but a database tier that is down or
+    mid rolling-restart exhausts the retry budget in ``_grpc_call``
+    instead, which raises ``DatabaseUnavailable``. That exception is
+    deliberately not a ``grpc.RpcError`` (issue 3373), so it propagates
+    straight through the wrapper; catching it here is what keeps the
+    streak gauge truthful during precisely the outage it exists to make
+    visible, and what keeps one object type's failure from unwinding the
+    deleted-object sweep for every type after it. The two shapes are
+    reported separately in the return value -- see ``WorkList``.
+    """
+    try:
+        obj_uuids = mariadb.get_objects_by_state(
+            object_type, state_values, updated_before=updated_before)
+        error = None
+        tier_unavailable = False
+    except DatabaseUnavailable as e:
+        obj_uuids = None
+        error = str(e)
+        tier_unavailable = True
+
+    _record_sweep_read(sweep, object_type, obj_uuids, error)
+    return WorkList(uuids=obj_uuids, tier_unavailable=tier_unavailable)
+
+
+def _stateless_work_list(sweep: str, object_type: ObjectType) -> WorkList:
+    """Read the zombie-repair work list, with the same visibility.
+
+    ``mariadb.get_stateless_object_uuids`` has exactly the shape of
+    ``get_objects_by_state``: None for a failed read, [] for no
+    orphans, and a raised ``DatabaseUnavailable`` when the tier is gone.
+    Routing it through the same accounting means a reconcile pass that
+    silently repairs nothing is as visible as a sweep that silently
+    collects nothing.
+    """
+    try:
+        obj_uuids = mariadb.get_stateless_object_uuids(object_type)
+        error = None
+        tier_unavailable = False
+    except DatabaseUnavailable as e:
+        obj_uuids = None
+        error = str(e)
+        tier_unavailable = True
+
+    _record_sweep_read(sweep, object_type, obj_uuids, error)
+    return WorkList(uuids=obj_uuids, tier_unavailable=tier_unavailable)
 
 
 def clear_sweep_failure_metrics() -> None:
@@ -201,11 +259,11 @@ def per_blob_checks():
 
 
 def _fill_per_blob_queue():
-    blob_uuids = _sweep_work_list(
+    work = _sweep_work_list(
         'per_blob', ObjectType.BLOB, [Blob.STATE_CREATED])
-    if blob_uuids is None:
+    if work.uuids is None:
         return
-    for blob_uuid in blob_uuids:
+    for blob_uuid in work.uuids:
         b = Blob.from_db(blob_uuid)
         if not b:
             continue
@@ -320,11 +378,11 @@ def per_instance_checks_and_usage():
 
 
 def _fill_per_instance_queue():
-    instance_uuids = _sweep_work_list(
+    work = _sweep_work_list(
         'per_instance', ObjectType.INSTANCE, [Instance.STATE_CREATED])
-    if instance_uuids is None:
+    if work.uuids is None:
         return
-    for instance_uuid in instance_uuids:
+    for instance_uuid in work.uuids:
         inst = Instance.from_db(instance_uuid, suppress_failure_audit=True)
         if not inst:
             continue
@@ -650,19 +708,32 @@ def _fill_per_deleted_object_queue():
     # young to hard delete are never fetched at all.
     now = time.time()
     for objtype in OBJECT_NAMES_TO_CLASSES:
-        # A failed read for one object type must not stop the sweep for
-        # the rest: the failure is per-reply, and the other types are
-        # still collectable. This is the site where collapsing None into
-        # [] silently turned garbage collection off for node_inst_op
-        # while its uncollected backlog made each subsequent reply
-        # larger still (#3638).
-        obj_uuids = _sweep_work_list(
+        # A per-reply failure for one object type must not stop the sweep
+        # for the rest: the other types are still collectable. This is the
+        # site where collapsing None into [] silently turned garbage
+        # collection off for node_inst_op while its uncollected backlog
+        # made each subsequent reply larger still (#3638).
+        #
+        # A tier-wide failure is the opposite case and must stop the loop.
+        # There are 28 object types here, and each DatabaseUnavailable
+        # costs a full _grpc_call retry budget -- up to GRPC_RETRIES full
+        # deadlines plus sleeps -- before it is raised. Continuing would
+        # multiply the worst case by 28 inside a single scheduled job,
+        # and _run_due_scheduled_jobs() pets the watchdog only between
+        # jobs, so a tier outage would SIGABRT the elected maintainer and
+        # cost a lock failover where before it merely skipped a pass.
+        # Nothing is gained by asking a tier that is not there 27 more
+        # times. This function has blown the watchdog window once already
+        # (issue 3533).
+        work = _sweep_work_list(
             'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
             updated_before=(now - _deleted_object_delay(objtype)))
-        if obj_uuids is None:
+        if work.uuids is None:
+            if work.tier_unavailable:
+                break
             continue
 
-        for obj_uuid in obj_uuids:
+        for obj_uuid in work.uuids:
             DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
 
 
@@ -754,11 +825,18 @@ def reconcile_orphaned_objects():
         if objtype in ZOMBIE_REPAIR_EXCLUDED_TYPES:
             continue
 
-        uuids = mariadb.get_stateless_object_uuids(ObjectType(objtype))
-        if uuids is None:
+        # Same two shapes, same treatment as the deleted-object sweep:
+        # a per-reply failure only costs this object type's zombies, but
+        # a tier-wide one ends the pass rather than spending another
+        # retry budget per remaining type inside a job whose watchdog is
+        # only petted between jobs.
+        work = _stateless_work_list('reconcile_orphans', ObjectType(objtype))
+        if work.uuids is None:
+            if work.tier_unavailable:
+                break
             continue
 
-        current = set(uuids)
+        current = set(work.uuids)
         confirmed = current & _ZOMBIE_CANDIDATES.get(objtype, set())
         _ZOMBIE_CANDIDATES[objtype] = current
 

@@ -718,6 +718,47 @@ database-side, and objects are hydrated one at a time at processing
 time, so a large backlog or a single failing object cannot stall the
 pass.
 
+### Watching for sweeps that silently do nothing
+
+Every sweep in the cluster daemon starts by reading a work list, and a
+sweep that cannot read its work list does nothing at all — no error, no
+backlog drained, and nothing else retries on its behalf. That is how a
+`node_inst_op` backlog grew until its own reply became too large to read
+(#3638). The daemon therefore counts consecutive failed work-list reads:
+
+- **`cluster_sweep_work_list_failure_streak`** — a gauge on
+  `CLUSTER_METRICS_PORT`, labelled by `sweep` (`per_blob`,
+  `per_instance`, `per_deleted_object`, `reconcile_orphans`) and
+  `object_type`. It is the count of consecutive passes that could not
+  read that work list, and is reset to zero by the first successful
+  read.
+
+The gauge describes elected-leader work, so only the node currently
+holding the cluster maintenance lock publishes it; a node that loses the
+election drops the label sets entirely rather than freezing them at
+their final value, so a stale non-zero reading cannot outlive the
+leadership it describes.
+
+In steady state every label set reads zero. A sample alert:
+
+```
+max by (sweep, object_type) (cluster_sweep_work_list_failure_streak) > 2
+```
+
+Two consecutive failures is noise (a database gateway restart lands
+inside a single pass); a streak that keeps climbing means that sweep has
+stopped running, and its backlog is growing. Check the cluster daemon
+log for `could not read its work list` to see which shape of failure it
+is — an unreachable database tier, or a reply too large for the client's
+receive cap.
+
+Two related skips have no metric of their own and are visible only in
+logs. The cleaner's blob maintenance pass (`could not read the active
+blob list`) skips reclaiming disk on that node when the read fails, and
+`sf-cleaner` exports no Prometheus endpoint today. The cluster daemon's
+`_cluster_wide_cleanup()` logs when it degrades to skipping just its
+blob section while continuing the rest of the pass.
+
 An hourly orphan reconciliation sweep handles rows the state-driven
 iterators cannot see:
 

@@ -527,7 +527,8 @@ the following statements will be true:
   cluster's tail is flat rather than growing.
 * The `cluster_sweep_work_list_failure_streak` gauge reads zero in
   steady state, and the sweeps it covers no longer depend on an
-  unbounded read.
+  unbounded read. The gauge, its labels and a sample alert expression
+  are documented in `docs/operator_guide/database.md`.
 * Filtering and limiting are pushed down to SQL with index-friendly
   predicates -- keyset, not `OFFSET` -- rather than materialising a
   result set and trimming it in Python.
@@ -557,6 +558,26 @@ the following statements will be true:
   no client can receive. A server-side cap would fail the query rather
   than the transport, with a message naming the RPC and the size. Worth
   doing whichever mechanism phase 3 picks.
+- **`GetObjectEvents` still flattens a failed read to `[]`.** It was the
+  RPC that failed most often in #3638 (replies to 6.9MB), and a failed
+  read still renders in the REST response as an authoritative "this
+  object has no events" -- the user-visible half of the defect, left in
+  place while the operator-visible half was fixed. The decision is
+  deliberate and recorded in `_grpc_get_object_events()`'s docstring:
+  both current callers tolerate it (the REST display path, and
+  `errored_node_affected_types()`, which reads an empty result as
+  "blast radius unknown, retry next pass"), and the alternative --
+  answering 503 from the events endpoint -- trades a degraded page for a
+  broken one. Phase 3 should either make the failure impossible, or
+  revisit the choice with a metric so a recurrence is visible without
+  grepping daemon logs.
+- **`sf-cleaner` exports no Prometheus endpoint.** Its blob maintenance
+  pass skips when the active-blob read fails, which is the correct
+  behaviour but leaves the most dangerous caller in #3638 as the least
+  observable one: a node that persistently cannot read the list stops
+  reclaiming disk, and the only signal is a log line. Giving the cleaner
+  a metrics port is its own change -- a new config option, a listener on
+  every node, and firewall rules -- rather than a rider on the stopgap.
 
 ### Bugs fixed during this work
 
