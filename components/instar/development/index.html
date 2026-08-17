@@ -12220,7 +12220,7 @@ Docker, ensuring consistent tooling regardless of local Rust installation.</p>
 <a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>make<span class="w"> </span>build-lint-container
 </code></pre></div></p>
 <p><strong>Cleaning:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Clean a specific prototype&#39;s target directory</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Clean a specific prototype's target directory</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>make<span class="w"> </span>clean-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Clean all build directories (main + prototypes)</span>
@@ -12546,15 +12546,15 @@ ruleset, transform the exported object rather than PUTting the <code>GET</code>
 response back unchanged — the response carries fields that are not part
 of the update schema (<code>id</code>, <code>_links</code>, and <code>"parameters": null</code> on the
 rules that take no parameters):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;{</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
 <a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
 <a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="s1">  rules: [.rules[]</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="s1">    | if .type == &quot;required_status_checks&quot;</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
 <a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="s1">      then .parameters.required_status_checks</span>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="s1">             += [{context: &quot;Can merge&quot;, integration_id: 15368}]</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
 <a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="s1">      else . end</span>
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}&#39;</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
 <a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
 </code></pre></div>
 <p>Read it back and diff it against the intent afterwards; dropping
@@ -12573,7 +12573,7 @@ rules that take no parameters):</p>
   never reports leaves the queue waiting forever.</li>
 </ul>
 <p>To inspect or recreate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">&#39;.[] | &quot;\(.id) \(.name) \(.enforcement)&quot;&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
 </code></pre></div>
 <p><code>.github/exported-config/</code> carries the nightly export of the live

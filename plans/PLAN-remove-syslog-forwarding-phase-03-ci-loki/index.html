@@ -11992,7 +11992,7 @@ pipefail</code>, readiness-poll style). It must:
 - <code>roles/base/templates/config</code>: add, <strong>unconditional</strong> (after
   the MariaDB block at <code>:34-47</code>), rendered only when set:
   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{% if loki_base_url %}
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>SHAKENFIST_LOKI_BASE_URL=&quot;{{ loki_base_url }}&quot;
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>SHAKENFIST_LOKI_BASE_URL="{{ loki_base_url }}"
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>{% endif %}
 </code></pre></div></p>
 <h3 id="3c-workflow-wiring">3c — Workflow wiring<a class="headerlink" href="#3c-workflow-wiring" title="Permanent link">&para;</a></h3>

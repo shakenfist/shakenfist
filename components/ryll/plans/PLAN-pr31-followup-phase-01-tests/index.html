@@ -11893,7 +11893,7 @@ only.</p>
 <p>Today, encoding is inline in
 <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/main_channel.rs#L658-L693"><code>maybe_request_client_mouse_mode</code></a>
 at lines ~679-686:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">info</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;main: requesting client mouse mode&quot;</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">info</span><span class="o">!</span><span class="p">(</span><span class="s">"main: requesting client mouse mode"</span><span class="p">);</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1">// SpiceMsgcMainMouseModeRequest: spice.proto declares</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1">// mouse_mode as flags16, so the body is one little-endian</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1">// u16. Writing u32 here ships two extra zero bytes, which</span>
@@ -11959,7 +11959,7 @@ the broken value again.</p>
 <a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">    </span><span class="c1">// to its mouse-state handler.</span>
 <a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="fm">assert_ne!</span><span class="p">(</span>
 <a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">        </span><span class="n">VD_AGENT_ANNOUNCE_CAPABILITIES</span><span class="p">,</span><span class="w"> </span><span class="n">VD_AGENT_MOUSE_STATE</span><span class="p">,</span>
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="s">&quot;ANNOUNCE_CAPABILITIES (6) must not collide with MOUSE_STATE (1)&quot;</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="s">"ANNOUNCE_CAPABILITIES (6) must not collide with MOUSE_STATE (1)"</span>
 <a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">    </span><span class="p">);</span>
 <a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="p">}</span>
 </code></pre></div>
@@ -11982,7 +11982,7 @@ helper:</p>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="c1">// Vec writes never fail; unwrap is safe.</span>
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="n">payload</span>
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">        </span><span class="p">.</span><span class="n">write_u16</span><span class="p">::</span><span class="o">&lt;</span><span class="n">LittleEndian</span><span class="o">&gt;</span><span class="p">(</span><span class="n">mode</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u16</span><span class="p">)</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&quot;Vec write should not fail&quot;</span><span class="p">);</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">"Vec write should not fail"</span><span class="p">);</span>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="n">payload</span>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">}</span>
 </code></pre></div>
@@ -12009,8 +12009,8 @@ encoding decision rather than the call site.</p>
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="cp">#[test]</span>
 <a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="k">fn</span><span class="w"> </span><span class="nf">mouse_mode_request_payload_is_two_bytes_for_server</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="c1">// Same shape regardless of which mode we ask for —</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="c1">// belt-and-braces against a future &quot;let&#39;s encode</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="c1">// the supported_modes mask too&quot; temptation that</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="c1">// belt-and-braces against a future "let's encode</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="c1">// the supported_modes mask too" temptation that</span>
 <a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">    </span><span class="c1">// would re-widen the body.</span>
 <a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span>
 <a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">        </span><span class="n">build_mouse_mode_request_payload</span><span class="p">(</span><span class="n">MOUSE_MODE_SERVER</span><span class="p">),</span>

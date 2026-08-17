@@ -11679,7 +11679,7 @@ to find the unguarded sums; mechanical from there.</p>
 <p>The harness assert (<code>fuzz_measure_calc.rs:144</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="fm">assert!</span><span class="p">(</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">m</span><span class="p">.</span><span class="n">required</span><span class="p">.</span><span class="n">checked_add</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">fully_allocated</span><span class="p">).</span><span class="n">is_some</span><span class="p">(),</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="s">&quot;required + fully_allocated overflows u64&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="s">"required + fully_allocated overflows u64"</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">);</span>
 </code></pre></div>
 <p>is fired when the calculator returns <code>(required, fully_allocated)</code>

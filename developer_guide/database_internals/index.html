@@ -11861,16 +11861,62 @@ propagates through them: an unreachable database must not be
 indistinguishable from a missing object. The few hot paths that
 intentionally tolerate an unreachable database catch it explicitly --
 <code>Daemon.check_daemon_state()</code> skips the check, <code>ClusterLock.__enter__</code>
-keeps retrying inside the caller's timeout, and the queues daemon's health
-loop treats it as unhealthy and waits.</p>
+keeps retrying inside the caller's timeout, the queues daemon's health
+loop treats it as unhealthy and waits, and (since #3638) the cleaner's
+<code>_maintain_blobs()</code> and the cluster daemon's <code>_cluster_wide_cleanup()</code>
+and sweep helpers skip the affected work for the pass.</p>
+<p>The servicer has the matching obligation. A reply whose only payload is
+a <code>repeated</code> field has nowhere to say "the read failed", so
+<code>GetObjectsByState</code>, <code>GetStatelessObjectUuids</code> and <code>GetReferencesFrom</code>
+must not answer a failed read with an empty list: when the direct
+accessor returns <code>None</code>
+(an <code>OperationalError</code> — MariaDB down, connection dropped, lock wait
+timeout, deadlock) they set <code>UNAVAILABLE</code> on the status, which
+<code>_grpc_call</code> retries and then surfaces as <code>DatabaseUnavailable</code>. An
+unexpected exception in the handler sets <code>INTERNAL</code>, which is
+non-retryable and so becomes a <code>None</code> return client-side. This matters
+because it is the failure mode where sf-database itself is healthy and
+answering, so nothing else in the stack notices.</p>
+<p><code>get_active_blob_uuids()</code> and <code>get_node_blob_uuids()</code> are the exceptions
+to the "wrappers translate to not found" rule: they <em>raise</em>
+<code>DatabaseUnavailable</code> rather than returning
+<code>[]</code>, because the cleaner uses both lists as complement sets and unlinks
+every blob file named in neither. They are two accessors over reads that
+also have tolerant forms — <code>get_objects_by_state()</code> and
+<code>get_references_from()</code> — which keep collapsing a failed read for their
+iterate-only callers. Which form a call site needs is a property of the
+call site, so the pair exists rather than a flag on one accessor. See the
+<a href="../coding_rules/">"<code>or []</code> is a decision"</a> rule for how to decide which
+shape a new accessor should have, and
+<a href="../../plans/PLAN-grpc-bounded-replies/"><code>PLAN-grpc-bounded-replies.md</code></a>
+for the reply-size work this came out of.</p>
+<p>The object iterators are the widest consumer of all this, and they
+propagate. <code>DatabaseBackedObjectIterator._find()</code> catches nothing:
+a <code>DatabaseUnavailable</code> raised part way through <code>Blobs()</code>, <code>IPAMs()</code>
+or <code>AgentOperations()</code> unwinds into the caller mid-iteration rather
+than ending the loop quietly, because a read that did not happen must
+not present as an iteration that found nothing. Daemon loops which
+tolerate that catch it at the top of the pass, as the cluster daemon's
+cleanup does; a new caller which cannot tolerate a partially consumed
+iterator has to say so. The <code>None</code> failure shape does still truncate
+there, which is safe only while every iterator caller iterates the
+result rather than complementing it — that is recorded, with the rest
+of the audit, in the plan.</p>
 <p>The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
-timeout) to detect stale connections before they cause failures. The
-database gRPC server uses a 20-thread pool to handle concurrent requests
-from all daemons. The database client in <code>mariadb.py</code> (<code>_grpc_call</code>)
-retries <code>UNAVAILABLE</code> and <code>DEADLINE_EXCEEDED</code> failures, rebuilding the
-channel on a wedged subchannel but keeping it on a refused connection so
-<code>round_robin</code> can serve the retry from a surviving gateway. All gRPC
-failures are logged at ERROR level.</p>
+timeout) to detect stale connections before they cause failures, and a
+32MiB client receive cap (raised from grpcio's 4MiB default in <code>#3638</code>,
+where <code>GetObjectEvents</code> and <code>GetObjectsByState</code> replies outgrew it and
+failed as <code>RESOURCE_EXHAUSTED</code>). The cap is client-side only; the server
+sets no send cap, so an oversized reply is still serialised before it
+fails, which is why the durable fix is bounding replies rather than
+raising the cap again -- see
+<a href="../../plans/PLAN-grpc-bounded-replies/"><code>PLAN-grpc-bounded-replies.md</code></a>.
+The database gRPC server uses a 64-thread pool to handle concurrent
+requests from all daemons. The database client in <code>mariadb.py</code>
+(<code>_grpc_call</code>) retries <code>UNAVAILABLE</code> and <code>DEADLINE_EXCEEDED</code> failures,
+rebuilding the channel on a wedged subchannel but keeping it on a
+refused connection so <code>round_robin</code> can serve the retry from a surviving
+gateway. All gRPC failures are logged at ERROR level.</p>
 <p><code>get_objects_by_state()</code> returns <code>None</code> on non-retryable errors (distinct
 from <code>[]</code> for no matches). All object iterators handle this by falling back
 to unfiltered scans, ensuring that such failures do not silently drop
@@ -12002,7 +12048,7 @@ every lease no matter whether the worker ran it once or six times.</p>
 <p>Op classes that have such tasks declare them on the class:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">NetOp</span><span class="p">(</span><span class="n">BaseClusterOperation</span><span class="p">):</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">coalescible_tasks</span> <span class="o">=</span> <span class="n">schema</span><span class="o">.</span><span class="n">COALESCIBLE_TASKS</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">coalescible_target_column</span> <span class="o">=</span> <span class="s1">&#39;network_uuid&#39;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">coalescible_target_column</span> <span class="o">=</span> <span class="s1">'network_uuid'</span>
 </code></pre></div>
 <p><code>coalescible_target_column</code> names the indexed column on
 <code>cluster_operations</code> used to group sibling ops. The fold runs at

@@ -12173,19 +12173,19 @@ isolation</strong>:</p>
 </table>
 <h3 id="why-backing-file-attacks-fail">Why Backing File Attacks Fail<a class="headerlink" href="#why-backing-file-attacks-fail" title="Permanent link">&para;</a></h3>
 <p>In a traditional <code>qemu-img</code> scenario:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># Malicious QCOW2 with backing_file = &quot;/etc/shadow&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># Malicious QCOW2 with backing_file = "/etc/shadow"
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>$ qemu-img info malicious.qcow2
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a># qemu-img attempts to open /etc/shadow -&gt; Information disclosure
 </code></pre></div>
 <p>In instar:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a># Same malicious QCOW2
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>$ instar info malicious.qcow2
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a># Guest parses QCOW2, sees backing_file=&quot;/etc/shadow&quot;
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a># Guest parses QCOW2, sees backing_file="/etc/shadow"
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a># Guest attempts to... do what exactly?
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a># - Cannot call open(&quot;/etc/shadow&quot;) - no syscalls
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a># - Cannot call open("/etc/shadow") - no syscalls
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a># - Cannot access host memory - EPT isolation
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a># - Can only read from virtio-block device
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a># Result: Guest reports &quot;backing_file: /etc/shadow&quot; as metadata
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a># Result: Guest reports "backing_file: /etc/shadow" as metadata
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>#         but cannot actually read the file contents
 </code></pre></div>
 <h3 id="parser-vulnerability-containment">Parser Vulnerability Containment<a class="headerlink" href="#parser-vulnerability-containment" title="Permanent link">&para;</a></h3>

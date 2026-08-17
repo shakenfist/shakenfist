@@ -11784,8 +11784,8 @@ root-causing, qcow2 refcount-format interpretation against qemu's
 <h2 id="reproduction-from-the-issue">Reproduction (from the issue)<a class="headerlink" href="#reproduction-from-the-issue" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>for rb in 1 2 4 16; do
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  qemu-img create -f qcow2 -o refcount_bits=$rb t$rb.qcow2 16M
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  qemu-io -f qcow2 -c &#39;write -P 7 0 64k&#39; -c &#39;write -P 9 12M 128k&#39; t$rb.qcow2
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  instar resize --shrink t$rb.qcow2 8M; echo &quot;rb=$rb rc=$?&quot;
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  qemu-io -f qcow2 -c 'write -P 7 0 64k' -c 'write -P 9 12M 128k' t$rb.qcow2
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  instar resize --shrink t$rb.qcow2 8M; echo "rb=$rb rc=$?"
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  qemu-img check t$rb.qcow2
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>done
 </code></pre></div>

@@ -12058,11 +12058,11 @@ with direct database access:</p>
 </code></pre></div>
 <p>This will output the current version of each table and whether any
 migrations were applied. For example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Table &#39;object_states&#39; is up to date (version 1)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Table 'object_states' is up to date (version 1)
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>MariaDB schema verified.
 </code></pre></div>
 <p>Or if a migration was needed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Migrated table &#39;object_states&#39; from version 1 to 2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Migrated table 'object_states' from version 1 to 2
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>MariaDB schema verified.
 </code></pre></div>
 <h3 id="enum-value-reconciliation">ENUM value reconciliation<a class="headerlink" href="#enum-value-reconciliation" title="Permanent link">&para;</a></h3>
@@ -12200,7 +12200,7 @@ failover details.</p>
 </div>
 <p><strong>4. Confirm the node is healthy before moving on.</strong></p>
 <p>Poll <code>/readyz</code> until it returns <code>200 OK</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://&lt;node-ip&gt;:13000/readyz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ready&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://&lt;node-ip&gt;:13000/readyz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"ready"</span>
 </code></pre></div>
 <p><code>/readyz</code> returns <code>200</code> once the worker has successfully contacted
 <code>sf-database</code>. The load balancer will return the node to rotation on its

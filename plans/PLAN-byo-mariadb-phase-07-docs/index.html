@@ -12225,7 +12225,7 @@ mariadb role, etc.). Expectation: no edits.</p>
 <h2 id="stale-reference-cleanup">Stale-reference cleanup<a class="headerlink" href="#stale-reference-cleanup" title="Permanent link">&para;</a></h2>
 <p>The implementing agent runs the following grep
 at the end of step 7a after the per-file edits:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>grep<span class="w"> </span>-ri<span class="w"> </span><span class="s1">&#39;\\bDATA_MIGRATIONS\\|migrate-etcd-to-mariadb\\|migrate-state-to-mariadb\\|migrate-floating-network-uuid\\|roles/mariadb\\|DATABASE_NODE_IP\\|MARIADB_HOST=localhost\\|ensure_data_migrations&#39;</span><span class="w"> </span>docs/<span class="w"> </span>README.md<span class="w"> </span>ARCHITECTURE.md<span class="w"> </span>AGENTS.md<span class="w"> </span>CLAUDE.md
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>grep<span class="w"> </span>-ri<span class="w"> </span><span class="s1">'\\bDATA_MIGRATIONS\\|migrate-etcd-to-mariadb\\|migrate-state-to-mariadb\\|migrate-floating-network-uuid\\|roles/mariadb\\|DATABASE_NODE_IP\\|MARIADB_HOST=localhost\\|ensure_data_migrations'</span><span class="w"> </span>docs/<span class="w"> </span>README.md<span class="w"> </span>ARCHITECTURE.md<span class="w"> </span>AGENTS.md<span class="w"> </span>CLAUDE.md
 </code></pre></div>
 <p>Any match in present tense gets a one-line
 fix in the same commit. Matches inside
@@ -12234,7 +12234,7 @@ deliberately retained — those plans are a
 historical record and rewriting them in
 this phase would corrupt the audit trail.</p>
 <p>A second sweep for the <code>## etcd</code> content:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep<span class="w"> </span>-rn<span class="w"> </span><span class="s1">&#39;^## etcd\\|^### etcd\\|^# etcd&#39;</span><span class="w"> </span>docs/operator_guide/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep<span class="w"> </span>-rn<span class="w"> </span><span class="s1">'^## etcd\\|^### etcd\\|^# etcd'</span><span class="w"> </span>docs/operator_guide/
 </code></pre></div>
 <p>Should return only one result (the section in
 <code>database.md</code> that this phase deletes) — if a

@@ -11990,7 +11990,7 @@ host populates every field then writes the struct to
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Arguments:
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  FILENAME                  Path to the new image to create
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  [SIZE]                    Virtual disk size (e.g. &quot;1G&quot;, &quot;512M&quot;).
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  [SIZE]                    Virtual disk size (e.g. "1G", "512M").
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                            Required unless -b BACKING is given.
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>Options:
@@ -11998,11 +11998,11 @@ host populates every field then writes the struct to
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                            [possible values: raw, qcow2, vmdk, vpc, vhdx]
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  -b, --backing &lt;PATH&gt;      Backing file path (qcow2 / vmdk only in
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                            phase 3; vhd/vhdx backing returns a clear
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                            &quot;not yet supported&quot; error per the guest&#39;s
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                            "not yet supported" error per the guest's
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                            phase-2 limitation)
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  -F, --backing-format &lt;F&gt;  Backing file format hint
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  -u, --backing-unsafe      Don&#39;t verify backing file existence/format
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  -q, --quiet               Suppress the &quot;Created: ...&quot; line on success
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  -u, --backing-unsafe      Don't verify backing file existence/format
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  -q, --quiet               Suppress the "Created: ..." line on success
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
 <a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  --sector-size &lt;N&gt;         Host I/O sector size (power of 2, 512..=64K)
 <a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                            [default: 65536]
@@ -12026,9 +12026,9 @@ host populates every field then writes the struct to
 <a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>  --block-size &lt;N&gt;          vhd/vhdx block size (default 2 MiB / 32 MiB)
 <a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
 <a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>  --preallocation &lt;MODE&gt;    [default: off]
-<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>                            Phase 3 accepts only &quot;off&quot; and &quot;falloc&quot;
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>                            Phase 3 accepts only "off" and "falloc"
 <a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>                            (raw only). Other modes return a clear
-<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>                            &quot;not yet supported&quot; error pointing at
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>                            "not yet supported" error pointing at
 <a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>                            phase 6.
 </code></pre></div>
 <p>The <code>-o</code> and full preallocation handling are explicitly deferred.
@@ -12135,12 +12135,12 @@ and the resolved unit size (cluster/grain/block) when non-zero.
 Suppressed under <code>-q</code>.</p>
 <h3 id="json">JSON<a class="headerlink" href="#json" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/path/to/foo.qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">&quot;virtual_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1073741824</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">&quot;metadata_bytes_written&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">262144</span><span class="p">,</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">&quot;file_size_after&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">262144</span><span class="p">,</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">&quot;resolved_unit_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">"filename"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/foo.qcow2"</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">"virtual_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1073741824</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">"metadata_bytes_written"</span><span class="p">:</span><span class="w"> </span><span class="mi">262144</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">"file_size_after"</span><span class="p">:</span><span class="w"> </span><span class="mi">262144</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">"resolved_unit_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">}</span>
 </code></pre></div>
 <p>4-space indent, keys in the order shown. Mirrors measure's

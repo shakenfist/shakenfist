@@ -12168,10 +12168,10 @@ jobs that do:</p>
 failed or was skipped, and then evaluates a jq expression over
 the <code>needs</code> context that maps each dependency to "success or
 skipped" and requires all of them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>jq<span class="w"> </span><span class="s1">&#39;. | to_entries</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="s1">      | map([.value.result == &quot;success&quot;,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="s1">             .value.result == &quot;skipped&quot;] | any)</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="s1">      | all&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>jq<span class="w"> </span><span class="s1">'. | to_entries</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="s1">      | map([.value.result == "success",</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="s1">             .value.result == "skipped"] | any)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="s1">      | all'</span>
 </code></pre></div>
 <p>Treating a skipped dependency as success is what makes the
 review-only fast path work — see below. A failed or cancelled

@@ -11814,11 +11814,11 @@ and confirmed to need no changes:</p>
   "Python API client: delete a network" example block (around
   lines 59–94 of the current file) currently shows:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_network</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">while</span> <span class="n">n</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;deleted&#39;</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting...&#39;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_network</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">])</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">while</span> <span class="n">n</span><span class="p">[</span><span class="s1">'state'</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">'deleted'</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">'Waiting...'</span><span class="p">)</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">])</span>
 </code></pre></div>
 <p>Replace with an example that reflects the new client API:
   <code>delete_network</code> with <code>wait=True</code> (the default) returns the

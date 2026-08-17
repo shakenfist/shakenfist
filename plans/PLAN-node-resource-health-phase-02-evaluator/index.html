@@ -11887,11 +11887,11 @@ transitive dependency graph).</p>
 attribute</strong> listing the <code>STORAGE_PATH</code>-relative subdirectories it
 needs, next to <code>state_targets</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Instance</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">health_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;instances&#39;</span><span class="p">,</span> <span class="s1">&#39;image_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;blobs&#39;</span><span class="p">]</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">health_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'instances'</span><span class="p">,</span> <span class="s1">'image_cache'</span><span class="p">,</span> <span class="s1">'blobs'</span><span class="p">]</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">Blob</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">health_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;blobs&#39;</span><span class="p">]</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">health_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'blobs'</span><span class="p">]</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">Upload</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">health_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;uploads&#39;</span><span class="p">]</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">health_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'uploads'</span><span class="p">]</span>
 </code></pre></div>
 <p>They are <strong>path names only</strong> — a plain list of strings, so the object
 classes gain no import of the health machinery. The evaluator resolves

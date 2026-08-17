@@ -11663,16 +11663,16 @@ mailing list when I am ready to publicly announce instar:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Subject: Is there a safer way to handle untrusted disk images
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>than qemu-img?
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>For a while now I&#39;ve been wondering if there&#39;s a safer way to
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>handle untrusted disk images in various clouds. They&#39;re a frequent
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>For a while now I've been wondering if there's a safer way to
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>handle untrusted disk images in various clouds. They're a frequent
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>cause of security vulnerability announcements, largely because
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>qemu is a fairly complicated code base where the block device
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>handling is entangled into the larger product, qemu also implements
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>a variety of features clouds don&#39;t even want, and poorly
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>a variety of features clouds don't even want, and poorly
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>intentioned people can spend as much time as they want crafting
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>custom images to find interesting edge conditions in the
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>implementation. I am not convinced that the current strategy of
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>closing gaps as they&#39;re found is really paying off.
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>closing gaps as they're found is really paying off.
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>Recent examples of such `qemu-img` related vulnerabilities
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>include:
@@ -11683,7 +11683,7 @@ mailing list when I am ready to publicly announce instar:</p>
 <a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>* CVE-2024-32498 (OSSA-2024-001)
 <a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>* CVE-2022-47951 (OSSA-2023-002)
 <a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>I toyed with the idea of a &quot;stripped down&quot; `qemu-img` which could
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>I toyed with the idea of a "stripped down" `qemu-img` which could
 <a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>simply not have the features which cause these vulnerabilities,
 <a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>but the complexity of the qemu codebase makes this approach
 <a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>painful, while also not presenting any of the other opportunities
@@ -11699,7 +11699,7 @@ mailing list when I am ready to publicly announce instar:</p>
 <a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>malicious data was done as a KVM guest with a custom virtual
 <a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>machine manager (VMM)?
 <a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
-<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>So I wrote it, and by &quot;I wrote it&quot; I mean Claude Code mostly
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>So I wrote it, and by "I wrote it" I mean Claude Code mostly
 <a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>wrote it. Instar is a from scratch rethink of how to handle
 <a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>untrusted image data as well as an opportunity for me to become
 <a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>more familiar with code generation LLMs. All data processing
@@ -11711,7 +11711,7 @@ mailing list when I am ready to publicly announce instar:</p>
 <a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>Enclaves work in terms of prior art, whilst also being the
 <a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>opposite in intent: Nitro protects sensitive data *from* the
 <a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>cloud; instar protects the cloud *from* malicious data. To be
-<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>clear, `instar info` doesn&#39;t detect or block malicious images -
+<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>clear, `instar info` doesn't detect or block malicious images -
 <a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>it processes them safely and reports what it finds. The security
 <a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>comes from containment, not detection. It is then up to the
 <a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>caller to decide how to handle what is reported.
@@ -11730,7 +11730,7 @@ mailing list when I am ready to publicly announce instar:</p>
 <a id="__codelineno-0-68" name="__codelineno-0-68" href="#__codelineno-0-68"></a>choices and concepts behind instar in painful detail at
 <a id="__codelineno-0-69" name="__codelineno-0-69" href="#__codelineno-0-69"></a>https://github.com/shakenfist/instar/blob/main/docs/technology-primer.md
 <a id="__codelineno-0-70" name="__codelineno-0-70" href="#__codelineno-0-70"></a>
-<a id="__codelineno-0-71" name="__codelineno-0-71" href="#__codelineno-0-71"></a>The primary use case I&#39;m targeting is validating untrusted images
+<a id="__codelineno-0-71" name="__codelineno-0-71" href="#__codelineno-0-71"></a>The primary use case I'm targeting is validating untrusted images
 <a id="__codelineno-0-72" name="__codelineno-0-72" href="#__codelineno-0-72"></a>at upload time (e.g., in Glance), though the same approach could
 <a id="__codelineno-0-73" name="__codelineno-0-73" href="#__codelineno-0-73"></a>apply anywhere qemu-img is invoked on user-supplied data.
 <a id="__codelineno-0-74" name="__codelineno-0-74" href="#__codelineno-0-74"></a>
@@ -11740,41 +11740,41 @@ mailing list when I am ready to publicly announce instar:</p>
 <a id="__codelineno-0-78" name="__codelineno-0-78" href="#__codelineno-0-78"></a>parsing command output. Whilst Instar can certainly emit JSON
 <a id="__codelineno-0-79" name="__codelineno-0-79" href="#__codelineno-0-79"></a>formatted output, there are other options as well like running
 <a id="__codelineno-0-80" name="__codelineno-0-80" href="#__codelineno-0-80"></a>it as a persistent daemon which services requests it receives
-<a id="__codelineno-0-81" name="__codelineno-0-81" href="#__codelineno-0-81"></a>over a unix domain socket. I&#39;ve played that game with other code
+<a id="__codelineno-0-81" name="__codelineno-0-81" href="#__codelineno-0-81"></a>over a unix domain socket. I've played that game with other code
 <a id="__codelineno-0-82" name="__codelineno-0-82" href="#__codelineno-0-82"></a>recently and find protobufs to be a reasonable protocol for such
-<a id="__codelineno-0-83" name="__codelineno-0-83" href="#__codelineno-0-83"></a>things. I don&#39;t know how OpenStack feels about protobufs however.
+<a id="__codelineno-0-83" name="__codelineno-0-83" href="#__codelineno-0-83"></a>things. I don't know how OpenStack feels about protobufs however.
 <a id="__codelineno-0-84" name="__codelineno-0-84" href="#__codelineno-0-84"></a>
-<a id="__codelineno-0-85" name="__codelineno-0-85" href="#__codelineno-0-85"></a>By &quot;command line compatible&quot;, I mean that my current goal is to
+<a id="__codelineno-0-85" name="__codelineno-0-85" href="#__codelineno-0-85"></a>By "command line compatible", I mean that my current goal is to
 <a id="__codelineno-0-86" name="__codelineno-0-86" href="#__codelineno-0-86"></a>provide a version of `instar info` and `instar convert` that is
 <a id="__codelineno-0-87" name="__codelineno-0-87" href="#__codelineno-0-87"></a>byte for byte identical to the output of the same `qemu-img info`
 <a id="__codelineno-0-88" name="__codelineno-0-88" href="#__codelineno-0-88"></a>or `qemu-img convert` command. This has some interesting edge cases
 <a id="__codelineno-0-89" name="__codelineno-0-89" href="#__codelineno-0-89"></a>in as much as `qemu-img` has changed its output format at least
-<a id="__codelineno-0-90" name="__codelineno-0-90" href="#__codelineno-0-90"></a>once since 2020. Additionally, I suspect I&#39;ve found at least one
+<a id="__codelineno-0-90" name="__codelineno-0-90" href="#__codelineno-0-90"></a>once since 2020. Additionally, I suspect I've found at least one
 <a id="__codelineno-0-91" name="__codelineno-0-91" href="#__codelineno-0-91"></a>`qemu-img` bug in this process. Instar resolves these issues by
 <a id="__codelineno-0-92" name="__codelineno-0-92" href="#__codelineno-0-92"></a>having a test suite of sample images, recording the `qemu-img`
 <a id="__codelineno-0-93" name="__codelineno-0-93" href="#__codelineno-0-93"></a>output for those images, and then generating a database of the
 <a id="__codelineno-0-94" name="__codelineno-0-94" href="#__codelineno-0-94"></a>different output formats. When you run `instar info` on your
 <a id="__codelineno-0-95" name="__codelineno-0-95" href="#__codelineno-0-95"></a>machine, instar attempts to detect the version of `qemu-img` you
 <a id="__codelineno-0-96" name="__codelineno-0-96" href="#__codelineno-0-96"></a>have installed, and will match its output format. The interesting
-<a id="__codelineno-0-97" name="__codelineno-0-97" href="#__codelineno-0-97"></a>little edge cases I&#39;ve found along the way are documented at
+<a id="__codelineno-0-97" name="__codelineno-0-97" href="#__codelineno-0-97"></a>little edge cases I've found along the way are documented at
 <a id="__codelineno-0-98" name="__codelineno-0-98" href="#__codelineno-0-98"></a>https://github.com/shakenfist/instar/blob/main/docs/quirks.md,
 <a id="__codelineno-0-99" name="__codelineno-0-99" href="#__codelineno-0-99"></a>and the output formats the `qemu-img info` produces are
 <a id="__codelineno-0-100" name="__codelineno-0-100" href="#__codelineno-0-100"></a>documented at
 <a id="__codelineno-0-101" name="__codelineno-0-101" href="#__codelineno-0-101"></a>https://github.com/shakenfist/instar/blob/main/docs/output-formats.md.
 <a id="__codelineno-0-102" name="__codelineno-0-102" href="#__codelineno-0-102"></a>
-<a id="__codelineno-0-103" name="__codelineno-0-103" href="#__codelineno-0-103"></a>At the moment I&#39;d describe Instar as a &quot;vigorous prototype&quot;. It
+<a id="__codelineno-0-103" name="__codelineno-0-103" href="#__codelineno-0-103"></a>At the moment I'd describe Instar as a "vigorous prototype". It
 <a id="__codelineno-0-104" name="__codelineno-0-104" href="#__codelineno-0-104"></a>implements `qemu-img info` and most of `qemu-img convert`, but
 <a id="__codelineno-0-105" name="__codelineno-0-105" href="#__codelineno-0-105"></a>does not yet know how to resize, rebase, snapshot, and so forth.
-<a id="__codelineno-0-106" name="__codelineno-0-106" href="#__codelineno-0-106"></a>I&#39;d be interested in whether other people think this is an
+<a id="__codelineno-0-106" name="__codelineno-0-106" href="#__codelineno-0-106"></a>I'd be interested in whether other people think this is an
 <a id="__codelineno-0-107" name="__codelineno-0-107" href="#__codelineno-0-107"></a>interesting idea or not, although honestly it was just kind of
-<a id="__codelineno-0-108" name="__codelineno-0-108" href="#__codelineno-0-108"></a>fun to build over the summer holidays. I&#39;d particularly welcome
+<a id="__codelineno-0-108" name="__codelineno-0-108" href="#__codelineno-0-108"></a>fun to build over the summer holidays. I'd particularly welcome
 <a id="__codelineno-0-109" name="__codelineno-0-109" href="#__codelineno-0-109"></a>feedback on whether this approach would be useful for your
 <a id="__codelineno-0-110" name="__codelineno-0-110" href="#__codelineno-0-110"></a>deployment, images that produce unexpected results, and thoughts
 <a id="__codelineno-0-111" name="__codelineno-0-111" href="#__codelineno-0-111"></a>on the daemon / protobuf interface idea.
 <a id="__codelineno-0-112" name="__codelineno-0-112" href="#__codelineno-0-112"></a>
 <a id="__codelineno-0-113" name="__codelineno-0-113" href="#__codelineno-0-113"></a>Instar is licensed under Apache 2.0. The code and extensive notes
 <a id="__codelineno-0-114" name="__codelineno-0-114" href="#__codelineno-0-114"></a>are at https://github.com/shakenfist/instar/. Bug reports,
-<a id="__codelineno-0-115" name="__codelineno-0-115" href="#__codelineno-0-115"></a>examples of images which didn&#39;t work as expected, and pull
+<a id="__codelineno-0-115" name="__codelineno-0-115" href="#__codelineno-0-115"></a>examples of images which didn't work as expected, and pull
 <a id="__codelineno-0-116" name="__codelineno-0-116" href="#__codelineno-0-116"></a>requests should all go there please.
 <a id="__codelineno-0-117" name="__codelineno-0-117" href="#__codelineno-0-117"></a>
 <a id="__codelineno-0-118" name="__codelineno-0-118" href="#__codelineno-0-118"></a>Michael

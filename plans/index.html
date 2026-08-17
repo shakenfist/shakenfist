@@ -11764,8 +11764,9 @@
 <p><a href="PLAN-database-load-reduction/">Database load reduction</a> sits outside that triage: it addresses a measured production problem (the sf-database tier serving ~527 ops/second at idle, 57% of it one polling loop) and its first phase is deliberately shippable immediately. Its phase 4 (caller attribution via gRPC metadata and per-caller counter labels), preceded by a phase 3 that consolidates the three sf-database client stacks into one so attribution has a single interceptor seam, is also the first concrete slice of the OpenTelemetry instrumentation thread — the caller-identity plumbing is what a later span-propagation phase would reuse, and it is designed to compose with the mTLS peer-identity model from <a href="PLAN-embrace-tls/">Embrace TLS</a> rather than duplicate it.</p>
 <p>The <strong>generic-allocator / network-service-ports / network-carrier-model triple</strong> is internally ordered. Generic-allocator is the foundational refactor (replaces five ad-hoc allocators with one primitive and is independently shippable). Network-service-ports builds on the allocator to expose per-network DNAT'd ports for managed services (web consoles, transfer agents, managed VPN endpoints). Network-carrier-model layers a smeared lease-based per-network carrier role with VIP advertisement on top, removing the network-node singleton; it depends on both prior plans and is the largest of the three. The triple supersedes the "network node failover" thread that was previously a not-yet-drafted line item.</p>
 <p><a href="PLAN-api-input-validation/">Declarative API input validation</a> is independent of all of the above and gated on nothing, so it can start whenever there is appetite. It closes a cluster of reported issues going back to 2020 (#528 and #936 are the parent issues) whose common cause is that request body values reach handlers untyped. It is drafted now because a per-endpoint fix for one instance of it (#3609) was attempted and abandoned: seven hand-rolled guards, two of them wrong on the first attempt, and the defect class still not covered. Its one coordination point is with the <a href="api-query-batching-roadmap/">API query batching roadmap</a>, which needs the same bounded <code>limit</code>/<code>offset</code> parameter types for #1974.</p>
-<p><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines and progress detection</a> is similarly independent and gated on nothing. It is driven by CI reliability, but the defect is user-facing too: the #3516 <code>sf-sidechannel</code> wedge (a <code>get-file</code> stuck in <code>executing</code> until the client times out, with the agent-side trigger tracked as #2240) is one of the two most frequent merge-queue flakes as of 2026-08, and because each instance runs at most one executor, a wedged operation also blocks every other agent operation against that instance until the 900-second backstop fires. It adds client-propagated wall-clock deadlines and per-command progress timeouts to agent operations, plus a retry path for operations that fail in <code>executing</code>. Its API-facing phase follows the parameter declaration rules that <a href="PLAN-api-input-validation/">Declarative API input validation</a> enforces, but does not depend on that plan's remaining phases. Its follow-on, <a href="PLAN-agent-operation-dependencies/">Dependency-aware agent operations</a>, extends the cluster operation <code>depends_on</code>/<code>runs_after</code> vocabulary to agent operations (including cross-instance edges, enabling fire-and-await fleet orchestration such as rolling updates) and elevates documentation-with-worked-examples to a deliverable, with <code>client-python-k3s</code> as the first of an example-application suite; it is explicitly gated on the deadlines plan landing, because dependency waiting relies on deadline expiry to break user-created cycles.
-The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing.</p>
+<p><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines and progress detection</a> is similarly independent and gated on nothing. It is driven by CI reliability, but the defect is user-facing too: the #3516 <code>sf-sidechannel</code> wedge (a <code>get-file</code> stuck in <code>executing</code> until the client times out, with the agent-side trigger tracked as #2240) is one of the two most frequent merge-queue flakes as of 2026-08, and because each instance runs at most one executor, a wedged operation also blocks every other agent operation against that instance until the 900-second backstop fires. It adds client-propagated wall-clock deadlines and per-command progress timeouts to agent operations, plus a retry path for operations that fail in <code>executing</code>. Its API-facing phase follows the parameter declaration rules that <a href="PLAN-api-input-validation/">Declarative API input validation</a> enforces, but does not depend on that plan's remaining phases. Its follow-on, <a href="PLAN-agent-operation-dependencies/">Dependency-aware agent operations</a>, extends the cluster operation <code>depends_on</code>/<code>runs_after</code> vocabulary to agent operations (including cross-instance edges, enabling fire-and-await fleet orchestration such as rolling updates) and elevates documentation-with-worked-examples to a deliverable, with <code>client-python-k3s</code> as the first of an example-application suite; it is explicitly gated on the deadlines plan landing, because dependency waiting relies on deadline expiry to break user-created cycles.</p>
+<p><a href="PLAN-grpc-bounded-replies/">Bound the size of DatabaseService gRPC replies</a> is independent and gated on nothing, but it is driven by a production defect rather than an ambition, so it should not sit indefinitely. Several <code>DatabaseService</code> replies are unbounded by construction and the only ceiling on them is gRPC's message size limit, which the sfcbr cluster has now crossed twice from two daemons on two RPCs (#3638). A stopgap has raised the client cap and made the affected callers honest about failed reads — including one that was using an unreadable list as a licence to delete a node's blob store — but the protocol still permits replies whose size we discover by having one fail. Its phase 2 (sweep callers ask for a bounded page rather than everything) is small and independently shippable; its phase 3 is a protocol change and inherits the eventlog plan's deferred cursor-pagination work.</p>
+<p>The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing.</p>
 <h2 id="plan-status">Plan Status<a class="headerlink" href="#plan-status" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12304,6 +12305,42 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 <td><a href="PLAN-eventlog-direct-mariadb-phase-06-docs/">Phase 6: Documentation</a></td>
 <td>Complete</td>
 <td>Operator guide for new eventlog, history-loss called out in release notes, ARCHITECTURE/README/AGENTS</td>
+</tr>
+<tr>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Phase 0: Decisions</td>
+<td>Not started</td>
+<td>Streaming vs keyset pagination vs bounded-by-construction, per RPC class; caller taxonomy; bound policy</td>
+</tr>
+<tr>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Phase 1: Audit and measure</td>
+<td>Not started</td>
+<td>Classify every <code>repeated</code> reply field and its callers; add a server-side reply-size histogram</td>
+</tr>
+<tr>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Phase 2: Bounded by construction</td>
+<td>Not started</td>
+<td>Sweep callers ask for "next N, oldest first" with an explicit more-available signal</td>
+</tr>
+<tr>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Phase 3: General mechanism</td>
+<td>Not started</td>
+<td><code>GetObjectEvents</code>, <code>GetObjectsByState</code> and the <code>Get*Uuids</code> family</td>
+</tr>
+<tr>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Phase 4: Enforcement</td>
+<td>Not started</td>
+<td>CI fails when a new unbounded <code>repeated</code> reply field appears unregistered</td>
+</tr>
+<tr>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Phase 5: Close-out</td>
+<td>Not started</td>
+<td>Lower the client message cap, retire the stopgaps, document the contract</td>
 </tr>
 <tr>
 <td><a href="PLAN-generic-allocator/">Generic allocator</a></td>

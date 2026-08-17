@@ -12336,7 +12336,7 @@ streamOptimized format for OVF/OVA distribution.</p>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// Cannot write to allocated cluster in streamOptimized</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">extent</span><span class="o">-&gt;</span><span class="n">compressed</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">cluster_sector</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Could not write to allocated cluster for streamOptimized&quot;</span><span class="p">);</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="n">error</span><span class="p">(</span><span class="s">"Could not write to allocated cluster for streamOptimized"</span><span class="p">);</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EINVAL</span><span class="p">;</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">}</span>
 </code></pre></div>
@@ -12407,7 +12407,7 @@ streamOptimized format for OVF/OVA distribution.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>+--------------------+ EOF - 1536
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>| Footer Marker      | type = MARKER_FOOTER
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>+--------------------+ EOF - 1024
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>| VMDK4_MAGIC        | &quot;VMDK&quot;
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>| VMDK4_MAGIC        | "VMDK"
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>| VMDK4Header        | Copy of header with correct gd_offset
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>+--------------------+ EOF - 512
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>| EOS Marker         | type = MARKER_END_OF_STREAM

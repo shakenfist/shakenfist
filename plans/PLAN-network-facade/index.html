@@ -12237,10 +12237,10 @@ method having its own wait shim. After the change:</p>
 <p><strong>Resolved approach: <code>ErrorReport</code>.</strong> A small typed
    record carried on the op record describing a failure:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ErrorReport</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>          <span class="c1"># e.g. &#39;network.ensure_mesh.failed&#39;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>          <span class="c1"># e.g. 'network.ensure_mesh.failed'</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>       <span class="c1"># human-readable</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">details</span><span class="p">:</span> <span class="nb">dict</span>      <span class="c1"># structured context</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">origin_class</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># e.g. &#39;shakenfist.exceptions.EnsureMeshFailed&#39;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">origin_class</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># e.g. 'shakenfist.exceptions.EnsureMeshFailed'</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">traceback</span><span class="p">:</span> <span class="nb">str</span>     <span class="c1"># stored for operator debugging</span>
 </code></pre></div>
 <p><code>ErrorReport</code> lives in

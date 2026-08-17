@@ -12001,7 +12001,7 @@ Concretely:</p>
 <h3 id="docsresizemd-skeleton"><code>docs/resize.md</code> skeleton<a class="headerlink" href="#docsresizemd-skeleton" title="Permanent link">&para;</a></h3>
 <p>Structurally mirrors <code>docs/create.md</code>. ~250 lines, with
 these sections:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gh"># `instar resize` — change a disk image&#39;s virtual size</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gh"># `instar resize` — change a disk image's virtual size</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gu">## Synopsis</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
@@ -12033,10 +12033,10 @@ these sections:</p>
 <a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>(matches qemu-img byte-for-byte). <span class="sb">`--output=json`</span> emits
 <a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>a structured envelope:
 <a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>
-<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>  { &quot;filename&quot;: &quot;...&quot;, &quot;format&quot;: &quot;qcow2&quot;,
-<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    &quot;action&quot;: &quot;grow&quot;, &quot;old_virtual_size&quot;: 1048576,
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    &quot;new_virtual_size&quot;: 67108864,
-<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    &quot;new_file_size&quot;: 262144 }
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>  { "filename": "...", "format": "qcow2",
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    "action": "grow", "old_virtual_size": 1048576,
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    "new_virtual_size": 67108864,
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    "new_file_size": 262144 }
 <a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
 <a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="sb">`-q`</span> suppresses both.
 <a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
@@ -12054,7 +12054,7 @@ these sections:</p>
 <a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="gu">## `-o key=value,...` reference</span>
 <a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>
 <a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>[Per-format honoured/rejected/deferred key matrix.
-<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>Matches create.md&#39;s shape.]
+<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>Matches create.md's shape.]
 <a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>
 <a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="gu">## Known divergences from `qemu-img resize`</span>
 <a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>

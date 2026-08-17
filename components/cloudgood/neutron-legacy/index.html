@@ -12726,7 +12726,7 @@ pattern to select the right router class.</p>
 <p>The factory maps feature sets to classes:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_register_router_cls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factory</span><span class="p">):</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">factory</span><span class="o">.</span><span class="n">register</span><span class="p">([],</span> <span class="n">legacy_router</span><span class="o">.</span><span class="n">LegacyRouter</span><span class="p">)</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">factory</span><span class="o">.</span><span class="n">register</span><span class="p">([</span><span class="s1">&#39;ha&#39;</span><span class="p">],</span> <span class="n">ha_router</span><span class="o">.</span><span class="n">HaRouter</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">factory</span><span class="o">.</span><span class="n">register</span><span class="p">([</span><span class="s1">'ha'</span><span class="p">],</span> <span class="n">ha_router</span><span class="o">.</span><span class="n">HaRouter</span><span class="p">)</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="c1"># ... DVR variants for dvr_snat mode ...</span>
 </code></pre></div>
 <p>For a legacy router, the feature list is empty -- no <code>distributed</code>, no <code>ha</code>.
@@ -12738,9 +12738,9 @@ prefix <code>qrouter-</code> followed by the router's UUID:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>qrouter-a1b2c3d4-e5f6-7890-abcd-ef1234567890
 </code></pre></div>
 <p>The naming constants are defined in <code>neutron.agent.l3.namespaces</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">NS_PREFIX</span> <span class="o">=</span> <span class="s1">&#39;qrouter-&#39;</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">INTERNAL_DEV_PREFIX</span> <span class="o">=</span> <span class="s1">&#39;qr-&#39;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">EXTERNAL_DEV_PREFIX</span> <span class="o">=</span> <span class="s1">&#39;qg-&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">NS_PREFIX</span> <span class="o">=</span> <span class="s1">'qrouter-'</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">INTERNAL_DEV_PREFIX</span> <span class="o">=</span> <span class="s1">'qr-'</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">EXTERNAL_DEV_PREFIX</span> <span class="o">=</span> <span class="s1">'qg-'</span>
 </code></pre></div>
 <p>When <code>RouterInfo.initialize()</code> runs, it calls <code>router_namespace.create()</code>,
 which does two things:</p>
@@ -13070,10 +13070,10 @@ table (<code>nat</code>, <code>filter</code>, <code>mangle</code>, <code>raw</co
    case. The design was presented at the OpenStack Summit Barcelona in
    October 2016 as "Under the Trenchcoat: Neutron Agent Extensions."</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">ri</span><span class="o">.</span><span class="n">iptables_manager</span><span class="o">.</span><span class="n">ipv4</span><span class="p">[</span><span class="s1">&#39;nat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">add_rule</span><span class="p">(</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="s1">&#39;PREROUTING&#39;</span><span class="p">,</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="s1">&#39;-d 169.254.100.1/32 -p tcp --dport 443 &#39;</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="s1">&#39;-j DNAT --to-destination 10.99.0.5:443&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">ri</span><span class="o">.</span><span class="n">iptables_manager</span><span class="o">.</span><span class="n">ipv4</span><span class="p">[</span><span class="s1">'nat'</span><span class="p">]</span><span class="o">.</span><span class="n">add_rule</span><span class="p">(</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="s1">'PREROUTING'</span><span class="p">,</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="s1">'-d 169.254.100.1/32 -p tcp --dport 443 '</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="s1">'-j DNAT --to-destination 10.99.0.5:443'</span>
 <a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="p">)</span>
 </code></pre></div>
 <p>Extensions are loaded via stevedore entry points and configured in the
@@ -13253,7 +13253,7 @@ partial failures by simply re-processing the router.</p>
 <p>The agent uses a thread pool (32 workers by default) to process router
 updates concurrently. Each router's <code>process_external()</code> method is
 synchronized with a per-namespace lock:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nd">@coordination</span><span class="o">.</span><span class="n">synchronized</span><span class="p">(</span><span class="s1">&#39;router-lock-ns-</span><span class="si">{self.ns_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nd">@coordination</span><span class="o">.</span><span class="n">synchronized</span><span class="p">(</span><span class="s1">'router-lock-ns-</span><span class="si">{self.ns_name}</span><span class="s1">'</span><span class="p">)</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_external</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="o">...</span>
 </code></pre></div>
@@ -13301,7 +13301,7 @@ substantial class. It's not. The entire class is:</p>
 <a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
 <a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>        <span class="n">ip_lib</span><span class="o">.</span><span class="n">send_ip_addr_adv_notif</span><span class="p">(</span>
 <a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">ns_name</span><span class="p">,</span> <span class="n">interface_name</span><span class="p">,</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>            <span class="n">fip</span><span class="p">[</span><span class="s1">&#39;floating_ip_address&#39;</span><span class="p">])</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>            <span class="n">fip</span><span class="p">[</span><span class="s1">'floating_ip_address'</span><span class="p">])</span>
 <a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>        <span class="k">return</span> <span class="n">lib_constants</span><span class="o">.</span><span class="n">FLOATINGIP_STATUS_ACTIVE</span>
 </code></pre></div>
 <p>That's it. All the heavy lifting -- namespace creation, interface

@@ -12638,7 +12638,7 @@ pattern as <code>-c</code>/<code>-c -1</code> above.</p>
 <a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>exit: 1
 <a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>stdout:
 <a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>stderr:
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>qemu-img: Flush interval can&#39;t be smaller than depth
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>qemu-img: Flush interval can't be smaller than depth
 </code></pre></div>
 <h4 id="10-qemu-img-bench-pattern-65-c-100-proberaw">10. <code>qemu-img bench --pattern 65 -c 100 probe.raw</code><a class="headerlink" href="#10-qemu-img-bench-pattern-65-c-100-proberaw" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ qemu-img bench --pattern 65 -c 100 probe.raw
@@ -12695,7 +12695,7 @@ v1 will refuse this cache mode outright. This is qemu's captured
 <a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>stdout:
 <a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>stderr:
 <a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>qemu-img: Expecting one image file name
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>Try &#39;qemu-img bench --help&#39; for more info
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>Try 'qemu-img bench --help' for more info
 </code></pre></div>
 <p>Two stderr lines: the error itself, plus a "Try --help" hint
 line. Both are needed if instar's message table reproduces this
@@ -12706,7 +12706,7 @@ text verbatim.</p>
 <a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>stdout:
 <a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>stderr:
 <a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>qemu-img: Expecting one image file name
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>Try &#39;qemu-img bench --help&#39; for more info
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>Try 'qemu-img bench --help' for more info
 </code></pre></div>
 <p>Identical text to the no-filename case (15) — qemu does not
 distinguish "zero filenames" from "too many filenames" in its
@@ -12768,9 +12768,9 @@ is exactly 3 decimal places (<code>0.001 seconds.</code>), matching qemu's
 <a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>Sending flush every 50 requests
 <a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>Run completed in 0.004 seconds.
 <a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>stderr:
-<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>WARNING: Image format was not specified for &#39;probe.raw&#39; and probing guessed raw.
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>WARNING: Image format was not specified for 'probe.raw' and probing guessed raw.
 <a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>         Automatically detecting the format is dangerous for raw images, write operations on block 0 will be restricted.
-<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>         Specify the &#39;raw&#39; format explicitly to remove the restrictions.
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>         Specify the 'raw' format explicitly to remove the restrictions.
 </code></pre></div>
 <p>Three stdout lines when a write test has a nonzero
 <code>--flush-interval</code>: the "Sending N write requests..." header,
@@ -12868,7 +12868,7 @@ the same local 10.0.8 binary, all exit 1:</p>
   form, uniformly across all seven numeric options:</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>$ qemu-img bench -c abc probe.raw
-<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>qemu-img: Invalid request count specified: &#39;abc&#39;.
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>qemu-img: Invalid request count specified: 'abc'.
 </code></pre></div>
 <p>and likewise <code>Invalid queue depth specified: 'abc'.</code>,
   <code>Invalid buffer size specified: 'abc'.</code>, <code>Invalid step size

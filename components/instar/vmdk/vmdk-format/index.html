@@ -12069,7 +12069,7 @@ It supports multiple sub-formats with varying features.</p>
 </table>
 <h2 id="vmdk4-header-structure-512-bytes">VMDK4 Header Structure (512 bytes)<a class="headerlink" href="#vmdk4-header-structure-512-bytes" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">VMDK4Header</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">magic</span><span class="p">;</span><span class="w">              </span><span class="c1">// 0x564d444b (&quot;VMDK&quot;)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">magic</span><span class="p">;</span><span class="w">              </span><span class="c1">// 0x564d444b ("VMDK")</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">version</span><span class="p">;</span><span class="w">            </span><span class="c1">// 1, 2, or 3</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span><span class="w">              </span><span class="c1">// Feature flags</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">capacity</span><span class="p">;</span><span class="w">           </span><span class="c1">// Virtual disk size in sectors</span>
@@ -12199,8 +12199,8 @@ It supports multiple sub-formats with varying features.</p>
 </tbody>
 </table>
 <h2 id="key-constants">Key Constants<a class="headerlink" href="#key-constants" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="cp">#define VMDK4_MAGIC             0x564d444b  </span><span class="c1">// &quot;VMDK&quot;</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="cp">#define VMDK3_MAGIC             0x434f5744  </span><span class="c1">// &quot;COWD&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="cp">#define VMDK4_MAGIC             0x564d444b  </span><span class="c1">// "VMDK"</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="cp">#define VMDK3_MAGIC             0x434f5744  </span><span class="c1">// "COWD"</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="cp">#define VMDK4_GD_AT_END         0xffffffffffffffff</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="cp">#define VMDK_GTE_ZEROED         0x00000001</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="cp">#define VMDK4_COMPRESSION_DEFLATE  1</span>

@@ -11920,20 +11920,20 @@ deferred per the master plan).</p>
 <h2 id="algorithmic-design">Algorithmic design<a class="headerlink" href="#algorithmic-design" title="Permanent link">&para;</a></h2>
 <h3 id="inputs-the-planner-expects">Inputs the planner expects<a class="headerlink" href="#inputs-the-planner-expects" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// Existing Qcow2ResizeOpts (from phase 2) plus two new fields:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">Qcow2ResizeOpts</span><span class="o">&lt;&#39;</span><span class="na">a</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">Qcow2ResizeOpts</span><span class="o">&lt;'</span><span class="na">a</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="c1">// ... existing fields ...</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="sd">/// Read-only snapshots of the L2 tables the planner may need</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="sd">/// to walk. The guest&#39;s pre-pass identifies which L2 tables</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="sd">/// to walk. The guest's pre-pass identifies which L2 tables</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="sd">/// cover virtual addresses in</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="sd">/// `[new_virtual_size, current_virtual_size)` and stages them</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="sd">/// here.</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_bytes</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">&#39;</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">],</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_bytes</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">'</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">],</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="sd">/// L1 indices of the L2 tables staged in `existing_l2_bytes`,</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="sd">/// in the same order. Block `i` lives in</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="sd">/// `&amp;existing_l2_bytes[i * cluster_size .. (i + 1) * cluster_size]`.</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="sd">/// If the planner needs an L2 table not present here, it</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="sd">/// returns `ResizeError::ScratchTooSmall`.</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_indices</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">&#39;</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u32</span><span class="p">],</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_indices</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">'</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u32</span><span class="p">],</span>
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="high-level-flow">High-level flow<a class="headerlink" href="#high-level-flow" title="Permanent link">&para;</a></h3>
@@ -12004,7 +12004,7 @@ deferred per the master plan).</p>
 <a id="__codelineno-1-65" name="__codelineno-1-65" href="#__codelineno-1-65"></a>
 <a id="__codelineno-1-66" name="__codelineno-1-66" href="#__codelineno-1-66"></a>    # === Emit patches in crash-safe order ===
 <a id="__codelineno-1-67" name="__codelineno-1-67" href="#__codelineno-1-67"></a>    # No appends; no header-move. Phases A and B only — no
-<a id="__codelineno-1-68" name="__codelineno-1-68" href="#__codelineno-1-68"></a>    # cleanup phase because nothing is &quot;orphaned post-commit&quot;
+<a id="__codelineno-1-68" name="__codelineno-1-68" href="#__codelineno-1-68"></a>    # cleanup phase because nothing is "orphaned post-commit"
 <a id="__codelineno-1-69" name="__codelineno-1-69" href="#__codelineno-1-69"></a>    # (the discarded clusters are visible-but-unreferenced
 <a id="__codelineno-1-70" name="__codelineno-1-70" href="#__codelineno-1-70"></a>    # before and after; the header rewrite just shrinks the
 <a id="__codelineno-1-71" name="__codelineno-1-71" href="#__codelineno-1-71"></a>    # virtual_size field).
@@ -12023,7 +12023,7 @@ deferred per the master plan).</p>
 <a id="__codelineno-1-84" name="__codelineno-1-84" href="#__codelineno-1-84"></a>        plan.push(Write { byte_offset: l2_host_offset(i), bytes: scratch[l2_off..] })
 <a id="__codelineno-1-85" name="__codelineno-1-85" href="#__codelineno-1-85"></a>    if !l1_zeros.is_empty():
 <a id="__codelineno-1-86" name="__codelineno-1-86" href="#__codelineno-1-86"></a>        # Build a new L1 table with the relevant entries zeroed,
-<a id="__codelineno-1-87" name="__codelineno-1-87" href="#__codelineno-1-87"></a>        # then Write the whole L1 region (it&#39;s small — typically
+<a id="__codelineno-1-87" name="__codelineno-1-87" href="#__codelineno-1-87"></a>        # then Write the whole L1 region (it's small — typically
 <a id="__codelineno-1-88" name="__codelineno-1-88" href="#__codelineno-1-88"></a>        # one cluster).
 <a id="__codelineno-1-89" name="__codelineno-1-89" href="#__codelineno-1-89"></a>        plan.push(Write { byte_offset: l1_table_offset, bytes: scratch[l1_buf..] })
 <a id="__codelineno-1-90" name="__codelineno-1-90" href="#__codelineno-1-90"></a>    for &amp;cluster in (discarded_data_clusters ∪ discarded_l2_clusters):
@@ -12080,17 +12080,17 @@ like phase 2's existing_refcount_block_bytes pattern). If a
 block isn't staged but the planner needs to patch it, return
 <code>ScratchTooSmall</code>.</p>
 <h2 id="public-api-delta-from-phase-2">Public API delta from phase 2<a class="headerlink" href="#public-api-delta-from-phase-2" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">Qcow2ResizeOpts</span><span class="o">&lt;&#39;</span><span class="na">a</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">Qcow2ResizeOpts</span><span class="o">&lt;'</span><span class="na">a</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="c1">// ... existing fields from phase 2 ...</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="sd">/// Read-only snapshots of L2 tables the planner needs to</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="sd">/// walk for shrink (and, in a future phase, for backing-</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="sd">/// chain operations). The guest pre-pass identifies which</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="sd">/// L2 tables cover the discarded virtual range and stages</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="sd">/// them here.</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_bytes</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">&#39;</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">],</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_bytes</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">'</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">],</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="sd">/// L1 indices of the L2 tables staged in `existing_l2_bytes`,</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="sd">/// in the same order.</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_indices</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">&#39;</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u32</span><span class="p">],</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">existing_l2_indices</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">'</span><span class="na">a</span><span class="w"> </span><span class="p">[</span><span class="kt">u32</span><span class="p">],</span>
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">}</span>
 </code></pre></div>
 <p>Two new fields, mirroring the refcount-block snapshot pattern.</p>

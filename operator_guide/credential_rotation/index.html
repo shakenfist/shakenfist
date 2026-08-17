@@ -11833,9 +11833,9 @@ stringifying one yields asterisks, and <code>external_view()</code> no longer
 carries the token. Neither change reaches backwards.</p>
 <h3 id="confirming-exposure-on-your-own-cluster">Confirming exposure on your own cluster<a class="headerlink" href="#confirming-exposure-on-your-own-cluster" title="Permanent link">&para;</a></h3>
 <p>If you ship to Loki, this returns the affected lines:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{job=&quot;shakenfist&quot;} |= &quot;Configuration item AUTH_SECRET_SEED&quot;
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>{job=&quot;shakenfist&quot;} |= &quot;Configuration item MARIADB_PASSWORD&quot;
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>{job=&quot;shakenfist&quot;} |= &quot;Configuration item LOKI_AUTH_HEADER&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{job="shakenfist"} |= "Configuration item AUTH_SECRET_SEED"
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>{job="shakenfist"} |= "Configuration item MARIADB_PASSWORD"
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>{job="shakenfist"} |= "Configuration item LOKI_AUTH_HEADER"
 </code></pre></div>
 <p>Search a wide window — the banner is written once per daemon start, so
 on a stable cluster the most recent hit may be old. <strong>The results
@@ -11843,10 +11843,10 @@ contain the secrets in plaintext.</strong> Run them somewhere you are willing
 to have the value displayed, and do not paste the output into a
 ticket.</p>
 <p>Without Loki, the equivalent on each node is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>sf-queues<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">&#39;Configuration item AUTH_SECRET_SEED&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>sf-queues<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'Configuration item AUTH_SECRET_SEED'</span>
 </code></pre></div>
 <p>For the transfer tokens:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>{job=&quot;shakenfist&quot;} |= &quot;transfer_name&quot; |= &quot;token&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>{job="shakenfist"} |= "transfer_name" |= "token"
 </code></pre></div>
 <h3 id="what-to-do-about-it">What to do about it<a class="headerlink" href="#what-to-do-about-it" title="Permanent link">&para;</a></h3>
 <p>Treat all three as compromised to the extent that anyone who could

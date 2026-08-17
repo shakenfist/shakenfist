@@ -12454,8 +12454,8 @@ and did not include a <code>manifest.json</code> file.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>image.tar
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── repositories                      # Image name/tag -&gt; top layer UUID
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── &lt;uuid-1&gt;/
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── VERSION                       # Always &quot;1.0&quot;
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── json                          # Layer metadata with &quot;parent&quot; field
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── VERSION                       # Always "1.0"
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── json                          # Layer metadata with "parent" field
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   └── layer.tar                     # Layer filesystem
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── &lt;uuid-2&gt;/
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   ├── VERSION
@@ -12495,11 +12495,11 @@ and image IDs are derived from SHA256 hashes of their content.</p>
 <h3 id="manifestjson-schema">manifest.json Schema<a class="headerlink" href="#manifestjson-schema" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">[</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p">{</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">&quot;Config&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256abc123.json&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">&quot;RepoTags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;myimage:latest&quot;</span><span class="p">],</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">&quot;Layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="s2">&quot;sha256layer1/layer.tar&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="s2">&quot;sha256layer2/layer.tar&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">"Config"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256abc123.json"</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">"RepoTags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"myimage:latest"</span><span class="p">],</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">"Layers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="s2">"sha256layer1/layer.tar"</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="s2">"sha256layer2/layer.tar"</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="p">]</span>
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">]</span>
@@ -12563,11 +12563,11 @@ backwards compatibility with the content-addressable format.</p>
 <h3 id="manifestjson-in-oci-format">manifest.json in OCI Format<a class="headerlink" href="#manifestjson-in-oci-format" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">[</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="p">{</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">&quot;Config&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;blobs/sha256/abc123...&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">&quot;RepoTags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;myimage:latest&quot;</span><span class="p">],</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">&quot;Layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="s2">&quot;blobs/sha256/def456...&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="s2">&quot;blobs/sha256/ghi789...&quot;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">"Config"</span><span class="p">:</span><span class="w"> </span><span class="s2">"blobs/sha256/abc123..."</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">"RepoTags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"myimage:latest"</span><span class="p">],</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">"Layers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="s2">"blobs/sha256/def456..."</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="s2">"blobs/sha256/ghi789..."</span>
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="p">]</span>
 <a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">]</span>
@@ -12594,15 +12594,15 @@ the tarball using Go's <code>filepath.WalkDir()</code>, which walks files in <st
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>&lt;v1-compat-id&gt;/json       # layer directories (also hex)
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>&lt;v1-compat-id&gt;/layer.tar
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>&lt;v1-compat-id&gt;/VERSION
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>manifest.json             # &#39;m&#39; sorts after 0-9 and a-f
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>repositories              # &#39;r&#39; sorts after &#39;m&#39;
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>manifest.json             # 'm' sorts after 0-9 and a-f
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>repositories              # 'r' sorts after 'm'
 </code></pre></div>
 <p><strong>OCI format (25+):</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>blobs/sha256/&lt;digest&gt;     # all blobs (config, layers, OCI manifests)
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>index.json                # &#39;i&#39; sorts after &#39;blobs/&#39;
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>manifest.json             # &#39;m&#39; sorts after &#39;i&#39;
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>oci-layout                # &#39;o&#39; sorts after &#39;m&#39;
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>repositories              # &#39;r&#39; sorts after &#39;o&#39;
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>index.json                # 'i' sorts after 'blobs/'
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>manifest.json             # 'm' sorts after 'i'
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>oci-layout                # 'o' sorts after 'm'
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>repositories              # 'r' sorts after 'o'
 </code></pre></div>
 <p>In both cases, all layer data and config arrive <strong>before</strong> manifest.json.</p>
 <p>Source: <a href="https://github.com/moby/go-archive/blob/main/archive.go"><code>moby/go-archive/archive.go</code></a>
@@ -12707,8 +12707,8 @@ pointing the socket to <code>/run/podman/podman.sock</code> (rootful) or
 <h3 id="docker-25-oci-format">Docker 25+ (OCI Format)<a class="headerlink" href="#docker-25-oci-format" title="Permanent link">&para;</a></h3>
 <p>Since DiffIDs from inspect directly correspond to OCI blob paths, we can
 pre-compute the full manifest before streaming begins:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">config_filename</span> <span class="o">=</span> <span class="s1">&#39;blobs/sha256/&lt;config-hex&gt;&#39;</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">expected_layers</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;blobs/sha256/&lt;diffid&gt;&#39;</span> <span class="k">for</span> <span class="n">each</span> <span class="n">DiffID</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">config_filename</span> <span class="o">=</span> <span class="s1">'blobs/sha256/&lt;config-hex&gt;'</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">expected_layers</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'blobs/sha256/&lt;diffid&gt;'</span> <span class="k">for</span> <span class="n">each</span> <span class="n">DiffID</span><span class="p">]</span>
 </code></pre></div>
 <p>This allows processing all blobs immediately as they arrive in the stream,
 with no buffering required for in-order entries.</p>
@@ -12741,14 +12741,14 @@ falls back to the actual manifest data.</p>
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">tarball_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">tf</span><span class="p">:</span>
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="n">names</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">getnames</span><span class="p">()</span>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="k">if</span> <span class="s1">&#39;index.json&#39;</span> <span class="ow">in</span> <span class="n">names</span> <span class="ow">and</span> <span class="s1">&#39;oci-layout&#39;</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>            <span class="k">return</span> <span class="s1">&#39;oci-compatible&#39;</span>  <span class="c1"># Docker 25+</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="k">elif</span> <span class="s1">&#39;manifest.json&#39;</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>            <span class="k">return</span> <span class="s1">&#39;content-addressable&#39;</span>  <span class="c1"># Docker 1.10-24</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="k">elif</span> <span class="s1">&#39;repositories&#39;</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>            <span class="k">return</span> <span class="s1">&#39;legacy&#39;</span>  <span class="c1"># Pre-1.10</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="k">if</span> <span class="s1">'index.json'</span> <span class="ow">in</span> <span class="n">names</span> <span class="ow">and</span> <span class="s1">'oci-layout'</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>            <span class="k">return</span> <span class="s1">'oci-compatible'</span>  <span class="c1"># Docker 25+</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="k">elif</span> <span class="s1">'manifest.json'</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>            <span class="k">return</span> <span class="s1">'content-addressable'</span>  <span class="c1"># Docker 1.10-24</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="k">elif</span> <span class="s1">'repositories'</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>            <span class="k">return</span> <span class="s1">'legacy'</span>  <span class="c1"># Pre-1.10</span>
 <a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>            <span class="k">return</span> <span class="s1">&#39;unknown&#39;</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>            <span class="k">return</span> <span class="s1">'unknown'</span>
 </code></pre></div>
 <p>Occystrap's Docker daemon input detects format during streaming by checking
 whether the first tarball entry starts with <code>blobs/</code> (OCI) or not (legacy).</p>

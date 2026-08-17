@@ -12087,21 +12087,21 @@ will use.</p>
 <h2 id="uri-parsing">URI parsing<a class="headerlink" href="#uri-parsing" title="Permanent link">&para;</a></h2>
 <h3 id="how-quaykollalatest-is-parsed-by-urlparse">How <code>quay://kolla/*:latest</code> is parsed by <code>urlparse</code><a class="headerlink" href="#how-quaykollalatest-is-parsed-by-urlparse" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>quay://kolla/*:latest
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  scheme = &#39;quay&#39;
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  netloc = &#39;kolla&#39;        (the org / namespace)
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  path   = &#39;/*:latest&#39;    (glob:tag)
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  query  = &#39;&#39;
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  scheme = 'quay'
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  netloc = 'kolla'        (the org / namespace)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  path   = '/*:latest'    (glob:tag)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  query  = ''
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>quay://kolla/centos-*:2025.1-debian
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  scheme = &#39;quay&#39;
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  netloc = &#39;kolla&#39;
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  path   = &#39;/centos-*:2025.1-debian&#39;
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  scheme = 'quay'
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  netloc = 'kolla'
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  path   = '/centos-*:2025.1-debian'
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>quay://kolla/*:latest?token=abc
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  scheme = &#39;quay&#39;
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  netloc = &#39;kolla&#39;
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  path   = &#39;/*:latest&#39;
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  query  = &#39;token=abc&#39;
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  scheme = 'quay'
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  netloc = 'kolla'
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  path   = '/*:latest'
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  query  = 'token=abc'
 </code></pre></div>
 <p>So <code>parse_uri()</code> already handles this correctly — <code>host</code> gets
 the org name and <code>path</code> gets the <code>/glob:tag</code> string. We just
@@ -12111,7 +12111,7 @@ glob pattern and tag.</p>
 <p>The existing <code>parse_registry_uri()</code> returns a plain tuple. For
 quay we should follow the same pattern:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">parse_quay_uri</span><span class="p">(</span><span class="n">uri_spec</span><span class="p">):</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse quay URI into (namespace, repo_glob, tag, options).</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">"""Parse quay URI into (namespace, repo_glob, tag, options).</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="sd">    Handles formats like:</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="sd">        quay://kolla/*:latest</span>
@@ -12120,7 +12120,7 @@ quay we should follow the same pattern:</p>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="sd">    Returns:</span>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="sd">        Tuple of (namespace, repo_glob, tag, options_dict)</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="sd">    """</span>
 </code></pre></div>
 <p>The tag is split from the path at the last colon (same logic as
 <code>parse_registry_uri</code>). If no colon is present, default to
@@ -12137,7 +12137,7 @@ to <code>*</code>.</p>
 <p>Add a <code>resolve_quay_uri()</code> function to the existing <code>quay.py</code>
 module (next to <code>QuayClient</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">resolve_quay_uri</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">repo_glob</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve a quay:// URI into matching image references.</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">"""Resolve a quay:// URI into matching image references.</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="sd">    Lists all repositories in the namespace, filters by the</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="sd">    glob pattern, checks tag existence for each match, and</span>
@@ -12147,13 +12147,13 @@ module (next to <code>QuayClient</code>):</p>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="sd">    Args:</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="sd">        namespace: Quay.io organization name.</span>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="sd">        repo_glob: Glob pattern for repository names</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="sd">            (e.g., &#39;*&#39;, &#39;nova-*&#39;).</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="sd">            (e.g., '*', 'nova-*').</span>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="sd">        tag: Exact tag name to match.</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="sd">        token: Optional quay.io API token for private orgs.</span>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
 <a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="sd">        List of (&#39;quay.io&#39;, &#39;namespace/repo&#39;, tag) tuples.</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="sd">        List of ('quay.io', 'namespace/repo', tag) tuples.</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="sd">    """</span>
 </code></pre></div>
 <p>The function:
 1. Creates a <code>QuayClient(token=token)</code>.

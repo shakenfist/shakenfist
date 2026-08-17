@@ -11837,7 +11837,7 @@
 <h1 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h1>
 <p>How to set up, test, and release occystrap.</p>
 <h2 id="install-for-development">Install for development<a class="headerlink" href="#install-for-development" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip install -e &quot;.[test]&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip install -e ".[test]"
 </code></pre></div>
 <h2 id="pre-commit-hooks">Pre-commit hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>This project uses pre-commit hooks to validate code before commits. Install them
@@ -11864,7 +11864,7 @@ with:</p>
 <h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
 <p>Releases are automated via GitHub Actions. Push a version tag to trigger the
 pipeline:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git tag -s v0.5.0 -m &quot;Release v0.5.0&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git tag -s v0.5.0 -m "Release v0.5.0"
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git push origin v0.5.0
 </code></pre></div>
 <p>The workflow builds the package, signs the tag with Sigstore, publishes to

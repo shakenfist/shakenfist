@@ -12061,7 +12061,7 @@ allowlist before following them. By default, only files in the same directory
 as the input image are allowed.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># This would fail if base.qcow2 tries to reference /etc/passwd</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>instar<span class="w"> </span>info<span class="w"> </span>--chain<span class="w"> </span>malicious.qcow2
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Error: Backing file &#39;/etc/passwd&#39; is outside allowed paths: [&quot;/path/to/images&quot;]</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Error: Backing file '/etc/passwd' is outside allowed paths: ["/path/to/images"]</span>
 </code></pre></div>
 <h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
 <p>The allowlist can be configured via the config file:</p>
@@ -12072,8 +12072,8 @@ as the input image are allowed.</p>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">#   $IMAGE_DIR - directory containing the input image</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">#   $CWD       - current working directory</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">backing-path-allowlist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="s2">&quot;$IMAGE_DIR&quot;</span><span class="p">,</span><span class="w">                    </span><span class="c1"># Default: same directory as image</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="s2">&quot;/var/lib/libvirt/images&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1"># Add production image directories</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="s2">"$IMAGE_DIR"</span><span class="p">,</span><span class="w">                    </span><span class="c1"># Default: same directory as image</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="s2">"/var/lib/libvirt/images"</span><span class="p">,</span><span class="w">       </span><span class="c1"># Add production image directories</span>
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">]</span>
 <a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># Maximum backing chain depth (default: 16)</span>

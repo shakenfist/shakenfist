@@ -12419,7 +12419,7 @@ a criterion it previously passed, an issue gets reopened automatically.</p>
 <code>export-repo-config</code>) are the right pattern. The combined review+fix
 workflow should follow the same approach. Additionally, audit check
 scripts themselves could live in <code>actions/</code> as composite actions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># In each project&#39;s .github/workflows/consistency-audit.yml</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># In each project's .github/workflows/consistency-audit.yml</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">jobs</span><span class="p">:</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">audit</span><span class="p">:</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shakenfist/actions/.github/workflows/consistency-audit.yml@main</span>

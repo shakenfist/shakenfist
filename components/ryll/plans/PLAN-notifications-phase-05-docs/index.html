@@ -12114,7 +12114,7 @@ together.</p>
 <p><code>BugReport::new</code> (<code>bugreport.rs:808</code>) needs the same new
 parameter, threaded straight through to <code>assemble</code>.</p>
 <p><code>write_zip</code> and <code>write_pedantic</code> add one new entry each:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">zip</span><span class="p">.</span><span class="n">start_file</span><span class="p">(</span><span class="s">&quot;notifications.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">opts</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">zip</span><span class="p">.</span><span class="n">start_file</span><span class="p">(</span><span class="s">"notifications.json"</span><span class="p">,</span><span class="w"> </span><span class="n">opts</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">zip</span><span class="p">.</span><span class="n">write_all</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">notifications_json</span><span class="p">.</span><span class="n">as_bytes</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 </code></pre></div>
 <p>Place it next to <code>runtime-metrics.json</code> (the last
@@ -12222,11 +12222,11 @@ file's flow). Outline:</p>
 <a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>`Arc&lt;Mutex&lt;NotificationStore&gt;&gt;`. Pushes apply a 30-second
 <a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>deduplication window: identical
 <a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>`(source, severity, message, visibility)` tuples within
-<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>the window fold into the most recent entry&#39;s `count`,
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>the window fold into the most recent entry's `count`,
 <a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>incrementing the `[N×]` suffix the side panel renders.
 <a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>
 <a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>The bell glyph in the status-bar right-edge cluster
-<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>tints by the highest-severity unread entry&#39;s colour
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>tints by the highest-severity unread entry's colour
 <a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>(sky-blue for Info, amber for Warn, muted red for
 <a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>Error). Low-visibility SPICE entries are excluded from
 <a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>the bell colour calculation per master plan Q4 — they
@@ -12260,7 +12260,7 @@ pattern", which is thematically adjacent):</p>
 <a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    (optionally `.with_visibility(v)`), then
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    `notifications.lock().push(entry)`. New
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    `NotificationSource` variants are added to the enum
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    in `notifications.rs`; the side panel&#39;s
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    in `notifications.rs`; the side panel's
 <a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    `NotificationSource::label()` impl dictates how the
 <a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    new variant renders. Bug-report zips automatically
 <a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    include any new entries via `notifications.json`.

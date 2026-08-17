@@ -12220,7 +12220,7 @@ wheel built. Result, with <strong>no <code>pyproject.toml</code> change</strong>
 </code></pre></div>
 <p>That wheel was installed into a clean venv and, <strong>run from
 <code>/tmp</code> with no checkout present</strong>, this resolved:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>importlib.resources.files(&#39;kerbside&#39;) / &#39;migrations&#39;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>importlib.resources.files('kerbside') / 'migrations'
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  -&gt; .../site-packages/kerbside/migrations
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>ScriptDirectory.from_config(cfg).walk_revisions()  -&gt; 9 revisions
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>sd.get_current_head()                              -&gt; cdb5c3529858
@@ -12231,8 +12231,8 @@ it. This removes the phase's main unknown.</p>
 <p><code>alembic.ini:15</code> sets <code>prepend_sys_path = .</code>, and
 <code>ScriptDirectory.from_config()</code> <strong>honours it</strong>, verified by
 inspecting <code>sys.path</code> either side of the call:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>prepend_sys_path value: &#39;.&#39;
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>paths added to sys.path by from_config: [&#39;.&#39;]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>prepend_sys_path value: '.'
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>paths added to sys.path by from_config: ['.']
 </code></pre></div>
 <p>In a development checkout that is correct and necessary — it
 is what lets <code>env.py</code> do <code>from kerbside.config import
@@ -12338,9 +12338,9 @@ needed correcting.</p>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">alembic.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">Config</span> <span class="k">as</span> <span class="n">AlembicConfig</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.resources</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">migrations</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s1">&#39;kerbside&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;migrations&#39;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">AlembicConfig</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">migrations</span> <span class="o">/</span> <span class="s1">&#39;alembic.ini&#39;</span><span class="p">))</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">alembic_cfg</span><span class="o">.</span><span class="n">set_main_option</span><span class="p">(</span><span class="s1">&#39;script_location&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">migrations</span><span class="p">))</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">migrations</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s1">'kerbside'</span><span class="p">)</span> <span class="o">/</span> <span class="s1">'migrations'</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">AlembicConfig</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">migrations</span> <span class="o">/</span> <span class="s1">'alembic.ini'</span><span class="p">))</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">alembic_cfg</span><span class="o">.</span><span class="n">set_main_option</span><span class="p">(</span><span class="s1">'script_location'</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">migrations</span><span class="p">))</span>
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">alembic_command</span><span class="o">.</span><span class="n">upgrade</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">,</span> <span class="n">revision</span><span class="p">)</span>
 </code></pre></div>
 <p><code>importlib.resources.files()</code> returns a <code>Traversable</code>; for a

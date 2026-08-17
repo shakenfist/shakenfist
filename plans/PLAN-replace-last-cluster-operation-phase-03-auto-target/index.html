@@ -11966,8 +11966,8 @@ re-litigating.</p>
 <p><strong>Declaration shape on each schema model is an
    explicit field-to-type mapping</strong>:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">target_fields</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ObjectType</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s1">&#39;instance_uuid&#39;</span><span class="p">:</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">instance</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s1">&#39;network_uuid&#39;</span><span class="p">:</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">network</span><span class="p">,</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s1">'instance_uuid'</span><span class="p">:</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">instance</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s1">'network_uuid'</span><span class="p">:</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">network</span><span class="p">,</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">}</span>
 </code></pre></div>
    Convention-based discovery was ruled out by master
@@ -12202,7 +12202,7 @@ succeeds, iterate the model's <code>target_fields</code> and for each
 non-None UUID write a <code>cluster_operation_targets</code> row.</p>
 <p>Outline:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># After the existing enqueue succeeds:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">target_fields</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model_class</span><span class="p">,</span> <span class="s1">&#39;target_fields&#39;</span><span class="p">,</span> <span class="p">{})</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">target_fields</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model_class</span><span class="p">,</span> <span class="s1">'target_fields'</span><span class="p">,</span> <span class="p">{})</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">for</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">object_type</span> <span class="ow">in</span> <span class="n">target_fields</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">target_uuid</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">if</span> <span class="n">target_uuid</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -12294,9 +12294,9 @@ enqueue time. Delete it.</p>
 <code>_set_last_cluster_operation</code>. After the sweep above, no
 caller outside <code>baseobject.py</code> itself should reference
 the old name. Re-run the grep to confirm:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>grep -rn &#39;set_last_cluster_operation\b&#39; shakenfist/ \
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    --include=&#39;*.py&#39; \
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    | grep -v &#39;_set_last_cluster_operation&#39;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>grep -rn 'set_last_cluster_operation\b' shakenfist/ \
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    --include='*.py' \
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    | grep -v '_set_last_cluster_operation'
 </code></pre></div>
 <p>Expected matches after rename: only inside <code>baseobject.py</code>
 and tests in <code>shakenfist/tests/test_cluster_operation_targets.py</code>.

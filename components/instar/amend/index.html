@@ -11977,13 +11977,13 @@ and vhdx are refused.</p>
 <p>Options:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  -f, --format &lt;FMT&gt;            Force format detection.
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                qcow2 only; default: auto-detect
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                                from the file&#39;s magic bytes.
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                                from the file's magic bytes.
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  -o, --options &lt;KEY=VALUE,...&gt; qemu-img-style options.
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                                Repeatable; comma-separated.
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>                                Required: at least one supported
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>                                key must be given.
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  -q, --quiet                   Suppress &quot;Image amended.&quot; or
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                                &quot;No change.&quot; on success. Errors
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  -q, --quiet                   Suppress "Image amended." or
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                                "No change." on success. Errors
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>                                still go to stderr.
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>      --output &lt;FORMAT&gt;         human (default) | json
 </code></pre></div>
@@ -12047,11 +12047,11 @@ header):</p>
 <p><code>-q</code> suppresses both lines; errors still go to stderr.</p>
 <p>JSON (<code>--output json</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/doc2.qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;amended&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">&quot;compat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.1&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">&quot;lazy_refcounts&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;on&quot;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"filename"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/doc2.qcow2"</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"amended"</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">"compat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.1"</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">"lazy_refcounts"</span><span class="p">:</span><span class="w"> </span><span class="s2">"on"</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">}</span>
 </code></pre></div>
 <p>Field meanings:</p>
@@ -12115,7 +12115,7 @@ and the flag may be repeated; both forms are equivalent.</p>
 </tbody>
 </table>
 <p>Any other value is rejected:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>amend: bad value &#39;&lt;v&gt;&#39; for -o key &#39;compat&#39; (expected 0.10 or 1.1)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>amend: bad value '&lt;v&gt;' for -o key 'compat' (expected 0.10 or 1.1)
 </code></pre></div>
 <h3 id="lazy_refcountsvalue"><code>lazy_refcounts=VALUE</code><a class="headerlink" href="#lazy_refcountsvalue" title="Permanent link">&para;</a></h3>
 <table>
@@ -12140,7 +12140,7 @@ and the flag may be repeated; both forms are equivalent.</p>
 </tbody>
 </table>
 <p>Any other value is rejected:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>amend: bad value &#39;&lt;v&gt;&#39; for -o key &#39;lazy_refcounts&#39; (expected on/off)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>amend: bad value '&lt;v&gt;' for -o key 'lazy_refcounts' (expected on/off)
 </code></pre></div>
 <h3 id="constraints">Constraints<a class="headerlink" href="#constraints" title="Permanent link">&para;</a></h3>
 <ul>
@@ -12154,12 +12154,12 @@ and the flag may be repeated; both forms are equivalent.</p>
   yet support, such as <code>refcount_bits</code>, <code>data_file</code>, <code>backing_file</code>,
   and <code>cluster_size</code>) are rejected:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>amend: -o key &#39;&lt;key&gt;&#39; is not supported (amend changes compat and lazy_refcounts only)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>amend: -o key '&lt;key&gt;' is not supported (amend changes compat and lazy_refcounts only)
 </code></pre></div>
 <ul>
 <li>A missing <code>=</code> in a key-value piece is rejected:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>amend: -o option &#39;&lt;piece&gt;&#39; is missing a value (expected KEY=VALUE)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>amend: -o option '&lt;piece&gt;' is missing a value (expected KEY=VALUE)
 </code></pre></div>
 <h2 id="refusals-and-errors">Refusals and errors<a class="headerlink" href="#refusals-and-errors" title="Permanent link">&para;</a></h2>
 <p>The table below lists every distinct refusal and error that

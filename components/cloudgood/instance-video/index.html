@@ -13538,8 +13538,8 @@ events. Enable them with the <code>-d</code> or <code>--trace</code> options:</p
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Or specific categories</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>qemu-system-x86_64<span class="w"> </span>...<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>--trace<span class="w"> </span><span class="s2">&quot;qxl_ring_command_*&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--trace<span class="w"> </span><span class="s2">&quot;qxl_spice_*&quot;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>--trace<span class="w"> </span><span class="s2">"qxl_ring_command_*"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--trace<span class="w"> </span><span class="s2">"qxl_spice_*"</span>
 </code></pre></div>
 <p>Available QXL trace events include:</p>
 <table>
@@ -13591,7 +13591,7 @@ can decode QXL commands into human-readable form.</p>
 </code></pre></div>
 <p><strong>In the guest</strong>, enable DRM debugging and watch the log:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">echo</span><span class="w"> </span>0x1f<span class="w"> </span>&gt;<span class="w"> </span>/sys/module/drm/parameters/debug
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>dmesg<span class="w"> </span>-w<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;(qxl|drm)&#39;</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>dmesg<span class="w"> </span>-w<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">'(qxl|drm)'</span>
 </code></pre></div>
 <p>This lets you correlate guest driver actions with host device responses --
 useful for understanding the command flow or diagnosing display issues.</p>
@@ -13725,7 +13725,7 @@ use plain <code>qxl</code> devices.</p>
 </code></pre></div>
 <p>libvirt XML (note that values are in KB):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">&lt;video&gt;</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">&lt;model</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;qxl&#39;</span><span class="w"> </span><span class="na">ram=</span><span class="s">&#39;131072&#39;</span><span class="w"> </span><span class="na">vram=</span><span class="s">&#39;65536&#39;</span><span class="w"> </span><span class="na">vgamem=</span><span class="s">&#39;32768&#39;</span><span class="w"> </span><span class="na">heads=</span><span class="s">&#39;1&#39;</span><span class="nt">/&gt;</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">&lt;model</span><span class="w"> </span><span class="na">type=</span><span class="s">'qxl'</span><span class="w"> </span><span class="na">ram=</span><span class="s">'131072'</span><span class="w"> </span><span class="na">vram=</span><span class="s">'65536'</span><span class="w"> </span><span class="na">vgamem=</span><span class="s">'32768'</span><span class="w"> </span><span class="na">heads=</span><span class="s">'1'</span><span class="nt">/&gt;</span>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nt">&lt;/video&gt;</span>
 </code></pre></div>
 <h4 id="qemu-defaults-and-parameter-independence"><abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> defaults and parameter independence<a class="headerlink" href="#qemu-defaults-and-parameter-independence" title="Permanent link">&para;</a></h4>

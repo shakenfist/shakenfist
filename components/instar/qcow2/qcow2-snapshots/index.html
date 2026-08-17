@@ -12269,7 +12269,7 @@ The number of snapshots is in <code>nb_snapshots</code> (header bytes 60-63).</p
 </code></pre></div>
 <h2 id="snapshot-header-structure">Snapshot Header Structure<a class="headerlink" href="#snapshot-header-structure" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">QCowSnapshotHeader</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">l1_table_offset</span><span class="p">;</span><span class="w">      </span><span class="c1">// Snapshot&#39;s L1 table (cluster-aligned)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">l1_table_offset</span><span class="p">;</span><span class="w">      </span><span class="c1">// Snapshot's L1 table (cluster-aligned)</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">l1_size</span><span class="p">;</span><span class="w">              </span><span class="c1">// Number of L1 entries</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">id_str_size</span><span class="p">;</span><span class="w">          </span><span class="c1">// Unique ID string length</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">name_size</span><span class="p">;</span><span class="w">            </span><span class="c1">// Snapshot name length</span>
@@ -12536,7 +12536,7 @@ mirroring qemu's <code>qcow2_snapshot_create</code> + <code>qcow2_write_snapshot
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>   followed by snapshots_offset (u64 BE). THIS IS THE COMMIT
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>   POINT.
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>   -&gt; fsync
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>D: free the old snapshot table&#39;s clusters (decrement their
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>D: free the old snapshot table's clusters (decrement their
 <a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>   refcounts to 0 and write those refblocks back). Skipped when
 <a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>   there was no old table (nb_snapshots was 0).
 <a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>   -&gt; fsync
@@ -12563,8 +12563,8 @@ L1 + L2 set for the decrement walk; the active L1 + L2 set for
 the COPIED refresh), then writes back in three <code>fsync</code>-separated
 groups, mirroring <code>qcow2_snapshot_delete</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>precheck: precheck_snapshot_refcount(DecrementForDelete) over the
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>   snapshot&#39;s chain, plus refcount &gt;= 1 checks on the snapshot&#39;s
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>   L1 clusters and the old table&#39;s clusters. Read-only, BEFORE
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>   snapshot's chain, plus refcount &gt;= 1 checks on the snapshot's
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>   L1 clusters and the old table's clusters. Read-only, BEFORE
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>   any disk write: a corrupt image fails here with the file
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>   untouched. (qemu has no such check; its equivalent failure
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>   would surface after the commit point.)
@@ -12578,25 +12578,25 @@ groups, mirroring <code>qcow2_snapshot_delete</code>:</p>
 <a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>   (u32 BE) followed by the new table offset, or 0 / 0 when the
 <a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>   table is now empty. THIS IS THE COMMIT POINT.
 <a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>   -&gt; fsync
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>   (in-memory, qemu&#39;s &quot;we won&#39;t recover but just leak clusters&quot;
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>   (in-memory, qemu's "we won't recover but just leak clusters"
 <a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    zone: update_snapshot_refcount(DecrementForDelete) over the
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    snapshot&#39;s chain, then decrement the snapshot&#39;s L1 clusters,
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    then the old table&#39;s clusters — decrements, never set-to-0,
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    snapshot's chain, then decrement the snapshot's L1 clusters,
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    then the old table's clusters — decrements, never set-to-0,
 <a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    so an underflow surfaces a double-free bug. Then the COPIED
 <a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>    refresh over the ACTIVE chain against the post-decrement
 <a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>    refcounts — shared data clusters that dropped 2 -&gt; 1 get
 <a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>    COPIED SET, the reverse direction from create — AND over the
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>    deleted chain&#39;s staged L2 set, mirroring qemu&#39;s -1 walk,
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>    deleted chain's staged L2 set, mirroring qemu's -1 walk,
 <a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>    which recomputes flags on every L2 entry it visits. The
-<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    deleted snapshot&#39;s L1 buffer is mutated in place but never
-<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>    written — qemu&#39;s &quot;update L1 only if addend &gt;= 0&quot; exemption,
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    deleted snapshot's L1 buffer is mutated in place but never
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>    written — qemu's "update L1 only if addend &gt;= 0" exemption,
 <a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>    and it is being freed anyway.)
 <a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>C: all staged refblocks (now carrying the decrements) + the
 <a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>   active L1 + the active L2 set + the SURVIVING snap-set L2s
-<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>   (those whose own cluster&#39;s post-decrement refcount is
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>   (those whose own cluster's post-decrement refcount is
 <a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>   non-zero, e.g. L2 tables shared with another snapshot, which
 <a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>   land on disk with refreshed COPIED flags). Freed L2s are
-<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>   never written, matching qemu&#39;s cache discard.
+<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>   never written, matching qemu's cache discard.
 <a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>   -&gt; fsync
 </code></pre></div>
 <p>A crash before group B leaves the old table authoritative and at
@@ -12627,22 +12627,22 @@ in place</strong> and never touches the snapshot table or the header:</p>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>   on the outgoing chain, increment overflow on the incoming
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>   one) validated read-only, BEFORE any disk write.
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>   (in-memory: update_snapshot_refcount increment walk over the
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    snapshot&#39;s chain — qemu&#39;s +1 walk)
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    snapshot's chain — qemu's +1 walk)
 <a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>A: all staged refblocks, carrying the increments only.
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>   -&gt; fsync
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>B: the snapshot&#39;s RAW L1 content, zero-padded to the active L1&#39;s
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>B: the snapshot's RAW L1 content, zero-padded to the active L1's
 <a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>   byte size (hdr.l1_size * 8), written at hdr.l1_table_offset —
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>   stale COPIED flags intact, mirroring qemu&#39;s bdrv_pwrite_sync.
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>   stale COPIED flags intact, mirroring qemu's bdrv_pwrite_sync.
 <a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>   THIS IS THE COMMIT POINT: the active view is now the snapshot.
 <a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>   -&gt; fsync
 <a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>   (in-memory: the -1 walk over the staged OLD active chain, then
 <a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    ONE final-state COPIED refresh over the padded new-L1 copy +
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    the snapshot&#39;s L2 set, and over the staged old active chain —
-<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    qemu&#39;s -1 walk also refreshes the old chain&#39;s surviving L2s)
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    the snapshot's L2 set, and over the staged old active chain —
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    qemu's -1 walk also refreshes the old chain's surviving L2s)
 <a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>C: all staged refblocks (now carrying the decrements) + the
 <a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>   refreshed L1 written to BOTH locations — hdr.l1_table_offset
 <a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>   at the padded length AND sn.l1_table_offset at sn.l1_size * 8
-<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>   (replicating the snapshot-stored-L1 flag write qemu&#39;s +1 walk
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>   (replicating the snapshot-stored-L1 flag write qemu's +1 walk
 <a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>   performs) — + the dirty snapshot-set L2s + the surviving
 <a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>   old-active L2s (final refcount &gt; 0, e.g. shared with another
 <a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>   snapshot). Freed old-active L2s are NEVER written (qemu runs
@@ -12706,18 +12706,18 @@ This is the key to copy-on-write:</p>
 <h3 id="restoring-a-snapshot-goto">Restoring a Snapshot (goto)<a class="headerlink" href="#restoring-a-snapshot-goto" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>1. Validate snapshot L1 table offset/size
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>2. Grow current L1 table if needed
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>3. Increment refcounts for snapshot&#39;s clusters
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>4. Decrement refcounts for current L1&#39;s clusters
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>3. Increment refcounts for snapshot's clusters
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>4. Decrement refcounts for current L1's clusters
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>5. Copy snapshot L1 to current L1
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>6. Update COPIED flags based on new refcounts
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>7. Clear DIRTY flag if set
 </code></pre></div>
 <h3 id="deleting-a-snapshot">Deleting a Snapshot<a class="headerlink" href="#deleting-a-snapshot" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>1. Load snapshot&#39;s L1 table
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>1. Load snapshot's L1 table
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>2. Decrement refcounts for all referenced clusters
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>3. Free clusters with refcount reaching 0
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>4. Set COPIED flags where refcount becomes 1
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>5. Free snapshot&#39;s L1 table
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>5. Free snapshot's L1 table
 <a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>6. Remove entry from snapshot table
 <a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>7. Write updated snapshot table
 <a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>8. Update header (nb_snapshots)
@@ -12749,7 +12749,7 @@ creation to avoid unnecessary copy-on-write.</p>
 <p>The function <code>qcow2_update_snapshot_refcount()</code> handles bulk updates:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kt">int</span><span class="w"> </span><span class="n">qcow2_update_snapshot_refcount</span><span class="p">(</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="n">BlockDriverState</span><span class="w"> </span><span class="o">*</span><span class="n">bs</span><span class="p">,</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">l1_table_offset</span><span class="p">,</span><span class="w">   </span><span class="c1">// Snapshot&#39;s L1 table</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">l1_table_offset</span><span class="p">,</span><span class="w">   </span><span class="c1">// Snapshot's L1 table</span>
 <a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">l1_size</span><span class="p">,</span><span class="w">               </span><span class="c1">// Number of L1 entries</span>
 <a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">addend</span><span class="w">                 </span><span class="c1">// +1 for create, -1 for delete</span>
 <a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="p">)</span><span class="w"> </span><span class="p">{</span>

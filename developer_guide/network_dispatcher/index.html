@@ -13440,12 +13440,12 @@ instead of 200. The delete work is queue-based, but
 the previous response shape falsely implied synchronous completion. The new shapes
 are:</p>
 <p><strong>Single-network delete</strong> (<code>DELETE /networks/&lt;uuid&gt;</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">&quot;op_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net_op&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;op_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;cluster-operation-uuid&gt;&quot;</span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">"op_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"net_op"</span><span class="p">,</span><span class="w"> </span><span class="nt">"op_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;cluster-operation-uuid&gt;"</span><span class="p">}</span>
 </code></pre></div>
 <p><strong>Bulk delete</strong> (<code>DELETE /networks</code> — all networks in a namespace):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">[</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="p">{</span><span class="nt">&quot;network_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;n1&gt;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;op_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net_op&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;op_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;op1&gt;&quot;</span><span class="p">},</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p">{</span><span class="nt">&quot;network_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;n2&gt;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;op_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net_op&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;op_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;op2&gt;&quot;</span><span class="p">}</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="p">{</span><span class="nt">"network_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;n1&gt;"</span><span class="p">,</span><span class="w"> </span><span class="nt">"op_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"net_op"</span><span class="p">,</span><span class="w"> </span><span class="nt">"op_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;op1&gt;"</span><span class="p">},</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p">{</span><span class="nt">"network_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;n2&gt;"</span><span class="p">,</span><span class="w"> </span><span class="nt">"op_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"net_op"</span><span class="p">,</span><span class="w"> </span><span class="nt">"op_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;op2&gt;"</span><span class="p">}</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">]</span>
 </code></pre></div>
 <p>Clients that need synchronous-completion semantics should poll
@@ -13466,8 +13466,8 @@ closure. HTTP 404 is returned if the starting op UUID does not exist.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>GET /clusteroperations/abc123.../chain
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>→ 200 [
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    {&quot;uuid&quot;: &quot;abc123...&quot;, &quot;op_type&quot;: &quot;net_op&quot;, &quot;state&quot;: &quot;complete&quot;, ...},
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    {&quot;uuid&quot;: &quot;def456...&quot;, &quot;op_type&quot;: &quot;net_op&quot;, &quot;state&quot;: &quot;complete&quot;, ...}
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    {"uuid": "abc123...", "op_type": "net_op", "state": "complete", ...},
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    {"uuid": "def456...", "op_type": "net_op", "state": "complete", ...}
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  ]
 </code></pre></div>
 <h4 id="get-clusteroperationstarget_object_typetypetarget_uuiduuid">GET /clusteroperations?target_object_type=\&lt;type&gt;&amp;target_uuid=\&lt;uuid&gt;<a class="headerlink" href="#get-clusteroperationstarget_object_typetypetarget_uuiduuid" title="Permanent link">&para;</a></h4>
@@ -13481,8 +13481,8 @@ before filtering — the query is always indexed.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>GET /clusteroperations?target_object_type=network&amp;target_uuid=abc123...
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>→ 200 [
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    {&quot;uuid&quot;: &quot;ghi789...&quot;, &quot;op_type&quot;: &quot;net_op&quot;, &quot;state&quot;: &quot;complete&quot;, ...},
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    {&quot;uuid&quot;: &quot;abc123...&quot;, &quot;op_type&quot;: &quot;net_op&quot;, &quot;state&quot;: &quot;complete&quot;, ...}
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    {"uuid": "ghi789...", "op_type": "net_op", "state": "complete", ...},
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    {"uuid": "abc123...", "op_type": "net_op", "state": "complete", ...}
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  ]
 </code></pre></div>
 <p>The MariaDB helper <code>list_cluster_operations_for_target</code>

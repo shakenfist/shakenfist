@@ -11988,7 +11988,7 @@ specifically:</p>
 </ul>
 <p>Window persistence is one Cargo feature flag at
 <a href="https://github.com/shakenfist/ryll/blob/develop/ryll/Cargo.toml#L16"><code>ryll/Cargo.toml:16</code></a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">eframe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;0.29&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;persistence&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">eframe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"0.29"</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"persistence"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <p>Ryll itself has no persistence-related code; eframe
 handles serialisation to a per-app directory under the
@@ -12018,9 +12018,9 @@ new bullets right after the TLS-support line for grouping.</p>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  toggle, and notification history; resets statistics,
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  traffic buffers, and per-channel state.
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>- **Window persistence** — Window size and position are
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  restored across launches via eframe&#39;s `persistence`
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  restored across launches via eframe's `persistence`
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  feature, which writes the egui memory snapshot to the
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  platform&#39;s per-app config directory
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  platform's per-app config directory
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  (`~/.local/share/ryll/` on Linux,
 <a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  `~/Library/Application Support/ryll/` on macOS,
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  `%APPDATA%\ryll\` on Windows).

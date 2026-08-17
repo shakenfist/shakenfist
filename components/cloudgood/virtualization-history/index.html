@@ -12939,8 +12939,8 @@
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>Initializing software serial port version 1
 <a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>printk: console [mc-1] enabled
 <a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>...
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>VFS: Cannot open root device &quot;98:0&quot; or unknown-block(98,0): error -6
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>Please append a correct &quot;root=&quot; boot option; here are the available partitions:
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>VFS: Cannot open root device "98:0" or unknown-block(98,0): error -6
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>Please append a correct "root=" boot option; here are the available partitions:
 <a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(98,0)
 <a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>CPU: 0 PID: 1 Comm: swapper Not tainted 6.1.82 #1
 <a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>Stack:
@@ -12955,8 +12955,8 @@
 </code></pre></div>
 <p>Here the Linux kernel panicked because it could not find its root filesystem and therefore could not continue booting. Note that a kernel panic in <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> results in a user space process terminating, instead of the bare metal machine halting. Note as well that there was no boot loader in this output, as opposed to what you are used to seeing in boot messages on physical machines. This is because the <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> architecture does not require any pre-kernel setup before starting the kernel.</p>
 <p>Specifically, this section of the output above is the error:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>VFS: Cannot open root device &quot;98:0&quot; or unknown-block(98,0): error -6
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Please append a correct &quot;root=&quot; boot option; here are the available partitions:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>VFS: Cannot open root device "98:0" or unknown-block(98,0): error -6
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Please append a correct "root=" boot option; here are the available partitions:
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(98,0)
 </code></pre></div>
 <div class="admonition foreshadow">
@@ -12983,13 +12983,13 @@
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>passwd:<span class="w"> </span>password<span class="w"> </span>updated<span class="w"> </span>successfully
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>root@uml:/#<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>dev
 <a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>root@uml:/dev#<span class="w"> </span>mknod<span class="w"> </span>--mode<span class="o">=</span><span class="m">660</span><span class="w"> </span>ubd0<span class="w"> </span>b<span class="w"> </span><span class="m">98</span><span class="w"> </span><span class="m">0</span>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>mknod:<span class="w"> </span>cannot<span class="w"> </span><span class="nb">set</span><span class="w"> </span>permissions<span class="w"> </span>of<span class="w"> </span><span class="s1">&#39;ubd0&#39;</span>:<span class="w"> </span>Operation<span class="w"> </span>not<span class="w"> </span>supported
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>mknod:<span class="w"> </span>cannot<span class="w"> </span><span class="nb">set</span><span class="w"> </span>permissions<span class="w"> </span>of<span class="w"> </span><span class="s1">'ubd0'</span>:<span class="w"> </span>Operation<span class="w"> </span>not<span class="w"> </span>supported
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>root@uml:/dev#<span class="w"> </span>chown<span class="w"> </span>root:disk<span class="w"> </span>ubd0
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>root@uml:/#<span class="w"> </span><span class="nb">exit</span>
 </code></pre></div>
 <p>This produces a Debian filesystem in the directory debian_unstable. However, <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> requires the filesystem to be present as a block device image, which makes sense when you consider that this is effectively what a hard disk is when attached to a physical machine. We can convert our new Debian unstable filesystem into a raw block device image like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># qemu-img create -f raw debian_unstable.raw 1G</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Formatting<span class="w"> </span><span class="s1">&#39;debian_unstable.raw&#39;</span>,<span class="w"> </span><span class="nv">fmt</span><span class="o">=</span>raw<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">1073741824</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Formatting<span class="w"> </span><span class="s1">'debian_unstable.raw'</span>,<span class="w"> </span><span class="nv">fmt</span><span class="o">=</span>raw<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">1073741824</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># modprobe nbd max_part=8</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># qemu-nbd --connect=/dev/nbd0 debian_unstable.raw -f raw</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># mkfs.ext4 /dev/nbd0</span>

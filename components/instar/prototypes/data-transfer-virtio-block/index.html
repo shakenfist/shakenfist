@@ -12839,13 +12839,13 @@ gigabytes.</p>
 </code></pre></div>
 <h3 id="data-transfer-pattern">Data Transfer Pattern<a class="headerlink" href="#data-transfer-pattern" title="Permanent link">&para;</a></h3>
 <p>For using virtio-block as a data transfer mechanism:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// Input: Read from &quot;disk&quot; at sector 0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// Input: Read from "disk" at sector 0</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">block_dev</span><span class="p">.</span><span class="n">read</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input_buffer</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1">// Process data...</span>
 <a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">let</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">process</span><span class="p">(</span><span class="o">&amp;</span><span class="n">input_buffer</span><span class="p">);</span>
 <a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1">// Output: Write to &quot;disk&quot; at sector N</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1">// Output: Write to "disk" at sector N</span>
 <a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="kd">let</span><span class="w"> </span><span class="n">output_sector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">input_sectors</span><span class="p">;</span><span class="w">  </span><span class="c1">// After input data</span>
 <a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="n">block_dev</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="n">output_sector</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">output</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>

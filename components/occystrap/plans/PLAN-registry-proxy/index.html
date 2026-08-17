@@ -12501,9 +12501,9 @@ A second image push would silently clobber the first manifest.</p>
 manifest, yields its layers, then tears everything down. There is no
 loop or queue to handle subsequent manifests.</p>
 <h3 id="3-multi-arch-manifests-are-explicitly-rejected">3. Multi-arch manifests are explicitly rejected<a class="headerlink" href="#3-multi-arch-manifests-are-explicitly-rejected" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">if</span> <span class="s1">&#39;manifests&#39;</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">:</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">if</span> <span class="s1">'manifests'</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">:</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="s1">&#39;Received a manifest list (multi-arch) instead of ...&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="s1">'Received a manifest list (multi-arch) instead of ...'</span><span class="p">)</span>
 </code></pre></div>
 <p>A full registry proxy would eventually need to handle manifest lists.
 However, kolla-build produces single-platform images (it builds on the
@@ -12648,9 +12648,9 @@ kolla-build pushing several images in parallel).</p>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># After manifest arrives, snapshot which blobs it references</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">manifest_blobs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;layers&#39;</span><span class="p">]:</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">manifest_blobs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;digest&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">manifest_blobs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;digest&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s1">'layers'</span><span class="p">]:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">manifest_blobs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer</span><span class="p">[</span><span class="s1">'digest'</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">':'</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">manifest_blobs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">'config'</span><span class="p">][</span><span class="s1">'digest'</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">':'</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
 </code></pre></div>
 <p>Only delete blobs when no pending manifest references them.</p>
 <p>Note: even without Phase 2, Docker pushes a single image's <em>layers</em>

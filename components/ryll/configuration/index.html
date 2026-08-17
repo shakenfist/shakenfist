@@ -12819,9 +12819,9 @@ host USB permissions.</p>
 <a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>-device virtserialport,chardev=webdav0,name=org.spice-space.webdav.0
 </code></pre></div>
 <p>Or in libvirt domain XML:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;spiceport&#39;</span><span class="nt">&gt;</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">channel=</span><span class="s">&#39;org.spice-space.webdav.0&#39;</span><span class="nt">/&gt;</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;virtio&#39;</span><span class="w"> </span><span class="na">name=</span><span class="s">&#39;org.spice-space.webdav.0&#39;</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">'spiceport'</span><span class="nt">&gt;</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">channel=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">'virtio'</span><span class="w"> </span><span class="na">name=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
 <a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="nt">&lt;/channel&gt;</span>
 </code></pre></div>
 <p>Use <code>make test-qemu-webdav</code> to start a pre-configured QEMU instance.</p>

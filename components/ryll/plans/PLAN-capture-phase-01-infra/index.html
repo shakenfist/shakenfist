@@ -11808,12 +11808,12 @@ no-ops until the later phases fill them in.</p>
 </code></pre></div>
 <p>In <code>send()</code>, call:
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="k">ref</span><span class="w"> </span><span class="n">c</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">capture</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="n">c</span><span class="p">.</span><span class="n">packet_sent</span><span class="p">(</span><span class="s">&quot;channel_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">);</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="n">c</span><span class="p">.</span><span class="n">packet_sent</span><span class="p">(</span><span class="s">"channel_name"</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">);</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>In the read loop, after extending the buffer, call:
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="k">ref</span><span class="w"> </span><span class="n">c</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">capture</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="n">c</span><span class="p">.</span><span class="n">packet_received</span><span class="p">(</span><span class="s">&quot;channel_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">chunk</span><span class="p">[</span><span class="o">..</span><span class="n">n</span><span class="p">]);</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="n">c</span><span class="p">.</span><span class="n">packet_received</span><span class="p">(</span><span class="s">"channel_name"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">chunk</span><span class="p">[</span><span class="o">..</span><span class="n">n</span><span class="p">]);</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>These are no-ops for now (stub methods), but the wiring
@@ -11833,9 +11833,9 @@ lives in the app, not the display channel. Phase 3 will
 add a <code>CaptureSession::frame()</code> call from the app side
 when it processes the <code>DisplayMark</code> event.</p>
 <h3 id="step-6-log-capture-session-startstop">Step 6: Log capture session start/stop<a class="headerlink" href="#step-6-log-capture-session-startstop" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">info</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;capture: writing to {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">dir</span><span class="p">.</span><span class="n">display</span><span class="p">());</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">info</span><span class="o">!</span><span class="p">(</span><span class="s">"capture: writing to {}"</span><span class="p">,</span><span class="w"> </span><span class="n">dir</span><span class="p">.</span><span class="n">display</span><span class="p">());</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1">// ... on close:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">info</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;capture: session closed&quot;</span><span class="p">);</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">info</span><span class="o">!</span><span class="p">(</span><span class="s">"capture: session closed"</span><span class="p">);</span>
 </code></pre></div>
 <h2 id="files-to-createmodify">Files to create/modify<a class="headerlink" href="#files-to-createmodify" title="Permanent link">&para;</a></h2>
 <table>

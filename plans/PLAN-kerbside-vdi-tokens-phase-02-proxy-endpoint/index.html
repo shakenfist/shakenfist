@@ -11747,7 +11747,7 @@ phase 0 for this endpoint.</p>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">instance_uuid</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">audience</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">issuer</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">...</span>  <span class="c1"># returns {&#39;token&#39;, &#39;jti&#39;, &#39;kid&#39;, &#39;expires_at&#39;}</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">...</span>  <span class="c1"># returns {'token', 'jti', 'kid', 'expires_at'}</span>
 </code></pre></div>
 <p>It reads the active key via
    <code>active_signing_key(get_signing_material())</code>, builds the
@@ -11858,8 +11858,8 @@ phase 0 for this endpoint.</p>
    follows redirects silently, master plan situation note):</p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">&quot;url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;KERBSIDE_URL&gt;/sf-console.vv?token=&lt;jwt&gt;&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w"> </span><span class="nt">&quot;expires_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1789000300</span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;KERBSIDE_URL&gt;/sf-console.vv?token=&lt;jwt&gt;"</span><span class="p">,</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w"> </span><span class="nt">"expires_at"</span><span class="p">:</span><span class="w"> </span><span class="mi">1789000300</span><span class="p">}</span>
 </code></pre></div>
 <p><code>expires_at</code> is epoch seconds (== the token <code>exp</code>), matching
    the rest of the token machinery (<code>created</code> in
@@ -11871,9 +11871,9 @@ phase 0 for this endpoint.</p>
 <li><strong>Audit event</strong> on the instance, never carrying the token:</li>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">instance_from_db</span><span class="o">.</span><span class="n">add_event</span><span class="p">(</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">EVENT_TYPE_AUDIT</span><span class="p">,</span> <span class="s1">&#39;vdi console proxy token minted&#39;</span><span class="p">,</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;jti&#39;</span><span class="p">:</span> <span class="n">jti</span><span class="p">,</span> <span class="s1">&#39;kid&#39;</span><span class="p">:</span> <span class="n">kid</span><span class="p">,</span> <span class="s1">&#39;namespace&#39;</span><span class="p">:</span> <span class="n">namespace</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>           <span class="s1">&#39;expires_at&#39;</span><span class="p">:</span> <span class="n">expires_at</span><span class="p">})</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">EVENT_TYPE_AUDIT</span><span class="p">,</span> <span class="s1">'vdi console proxy token minted'</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s1">'jti'</span><span class="p">:</span> <span class="n">jti</span><span class="p">,</span> <span class="s1">'kid'</span><span class="p">:</span> <span class="n">kid</span><span class="p">,</span> <span class="s1">'namespace'</span><span class="p">:</span> <span class="n">namespace</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>           <span class="s1">'expires_at'</span><span class="p">:</span> <span class="n">expires_at</span><span class="p">})</span>
 </code></pre></div>
 <ol>
 <li><strong>Capability</strong> <code>vdi-console-proxy</code> added to the instance

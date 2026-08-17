@@ -11897,8 +11897,8 @@ building qemu from git tags to find the snapshot boundary; that is
 unnecessary. <strong>Measure with these binaries; do not reason from the
 version-map, and do not reason from qemu source.</strong></p>
 <h3 id="map-json-compressed-boundary-820-confirmed-both-ways">map-json <code>compressed</code> — boundary 8.2.0, confirmed both ways<a class="headerlink" href="#map-json-compressed-boundary-820-confirmed-both-ways" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>8.1.5:  { ... &quot;data&quot;: true, &quot;offset&quot;: 589824}
-8.2.0:  { ... &quot;data&quot;: true, &quot;compressed&quot;: false, &quot;offset&quot;: 589824}
+<div class="highlight"><pre><span></span><code>8.1.5:  { ... "data": true, "offset": 589824}
+8.2.0:  { ... "data": true, "compressed": false, "offset": 589824}
 </code></pre></div>
 <p>Absent at 8.1.5, present at 8.2.0, and the live suite agrees (Ubuntu
 24.04 at 8.2.2 has zero map failures). The field sits between <code>data</code>
@@ -11978,8 +11978,8 @@ qcow1 source, at 7.2.22 / 8.2.2 / 9.0.0 / 10.0.0: every version yields
 </tbody>
 </table>
 <p>The footers explain it:</p>
-<div class="highlight"><pre><span></span><code>instar  app=&#39;imgo&#39; current=2097152  CHS=60/4/17 -&gt; 2088960   MISMATCH
-qemu    app=&#39;qemu&#39; current=2123776  CHS=61/4/17 -&gt; 2123776   consistent
+<div class="highlight"><pre><span></span><code>instar  app='imgo' current=2097152  CHS=60/4/17 -&gt; 2088960   MISMATCH
+qemu    app='qemu' current=2123776  CHS=61/4/17 -&gt; 2123776   consistent
 </code></pre></div>
 <p>qemu's writer always rounds the declared size up so CHS and
 <code>current_size</code> agree. instar keeps the size verbatim and writes the

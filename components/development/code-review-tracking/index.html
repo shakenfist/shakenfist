@@ -11967,14 +11967,14 @@ this repository and passes through to the script.</p>
    minimum. For example:</p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>gh api -X POST repos/shakenfist/&lt;repo&gt;/rulesets --input - &lt;&lt;&#39;EOF&#39;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>gh api -X POST repos/shakenfist/&lt;repo&gt;/rulesets --input - &lt;&lt;'EOF'
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>{
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  &quot;name&quot;: &quot;Protect default branch history&quot;,
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  &quot;target&quot;: &quot;branch&quot;,
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  &quot;enforcement&quot;: &quot;active&quot;,
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  &quot;conditions&quot;: {&quot;ref_name&quot;: {&quot;include&quot;: [&quot;~DEFAULT_BRANCH&quot;],
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                              &quot;exclude&quot;: []}},
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  &quot;rules&quot;: [{&quot;type&quot;: &quot;deletion&quot;}, {&quot;type&quot;: &quot;non_fast_forward&quot;}]
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  "name": "Protect default branch history",
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  "target": "branch",
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  "enforcement": "active",
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"],
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                              "exclude": []}},
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}]
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>}
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>EOF
 </code></pre></div>
@@ -11992,16 +11992,16 @@ this repository and passes through to the script.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Source in every language the repo uses, plus shell scripts,</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># protobuf definitions, the YAML that configures CI and</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># deployment, and the Markdown documentation.</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;*.rs&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.sh&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.py&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.pyi&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.js&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.proto&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.md&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.yml&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.yaml&#39;</span><span class="p">]</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">'*.rs'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.sh'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.py'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.pyi'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.js'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.proto'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.md'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.yml'</span><span class="p">,</span><span class="w"> </span><span class="s1">'*.yaml'</span><span class="p">]</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># docs/plans/ is a point-in-time archive, not living artifacts;</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># protoc output is generated, so reviewing it would attest to the</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># generator rather than to anything a human wrote.</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="s1">&#39;docs/plans/*&#39;</span><span class="p">,</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="s1">&#39;*_pb2.py&#39;</span><span class="p">,</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="s1">&#39;*_pb2.pyi&#39;</span><span class="p">,</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="s1">&#39;*_pb2_grpc.py&#39;</span><span class="p">,</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="s1">&#39;*_pb2_grpc.pyi&#39;</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="s1">'docs/plans/*'</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="s1">'*_pb2.py'</span><span class="p">,</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="s1">'*_pb2.pyi'</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="s1">'*_pb2_grpc.py'</span><span class="p">,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="s1">'*_pb2_grpc.pyi'</span><span class="p">,</span>
 <a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">]</span>
 </code></pre></div>
 <p>An empty <code>include</code> means all tracked files, which is a fine
@@ -12067,10 +12067,10 @@ this repository and passes through to the script.</p>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">develop</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;REVIEWS.md&#39;</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/*.weaudit&#39;</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/*.weaudit-shas.json&#39;</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.vscode/review-scope.toml&#39;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'REVIEWS.md'</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit'</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit-shas.json'</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/review-scope.toml'</span>
 </code></pre></div>
 <p>Apply it to the code-shaped workflows (unit tests, lint, CodeQL,
    functional lanes) but <em>not</em> to content scanners like gitleaks or
@@ -12133,7 +12133,7 @@ covers, which imposes three rules:</p>
    reviewed state:</li>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git add .vscode/*.weaudit*
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git commit    # signed, with a &quot;reviewed N files&quot; style message
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git commit    # signed, with a "reviewed N files" style message
 </code></pre></div>
 <ol>
 <li><strong>Never rewrite history</strong> on the branch carrying review state

@@ -11872,7 +11872,7 @@ the paste-as-keystrokes toggle and the egui Context
 <h3 id="readme-features-bullet">README — Features bullet<a class="headerlink" href="#readme-features-bullet" title="Permanent link">&para;</a></h3>
 <p>Insert as a new bullet adjacent to the existing
 multi-monitor entry. Suggested wording:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Window auto-fit**</span> - The ryll window tracks the guest&#39;s display
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Window auto-fit**</span> - The ryll window tracks the guest's display
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  surface size: every primary <span class="sb">`SURFACE_CREATE`</span> resizes the window
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  to match (modulo an 8-pixel alignment that mirrors what we send
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  the guest via <span class="sb">`VDAgentMonitorsConfig`</span>). Maximised or fullscreen
@@ -11886,7 +11886,7 @@ multi-monitor entry. Suggested wording:</p>
 <h3 id="readme-options-block">README — Options block<a class="headerlink" href="#readme-options-block" title="Permanent link">&para;</a></h3>
 <p>Add one line to the Options block, adjacent to the other
 display-related flags:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  --no-obey-guest-size   Start with &quot;Obey guest size hints&quot; turned off
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  --no-obey-guest-size   Start with "Obey guest size hints" turned off
 </code></pre></div>
 <p>Place it after <code>--monitors &lt;N&gt;</code> so the display-related
 flags cluster.</p>
@@ -11905,14 +11905,14 @@ lines 445 and 447). Suggested content:</p>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>helper, and — if the helper returns Some — issues a
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="sb">`ViewportCommand::InnerSize`</span> to ask egui to make the
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>window match the surface. The aligned target is also
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>seeded into <span class="sb">`last_sent_resize`</span> so the next frame&#39;s
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>seeded into <span class="sb">`last_sent_resize`</span> so the next frame's
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="sb">`maybe_send_monitors_resize`</span> dedupes and we do not echo
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>our own resize back to the guest as a fresh
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="sb">`VDAgentMonitorsConfig`</span>.
 <a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
 <a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>The reverse direction — user drags the ryll window —
 <a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>runs each frame in <span class="sb">`maybe_send_monitors_resize`</span>. The
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>viewport&#39;s inner-rect size is reduced by
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>viewport's inner-rect size is reduced by
 <a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="sb">`STATS_BAR_HEIGHT`</span> (zero when maximised or fullscreen),
 <a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>8-pixel aligned, and clamped to a floor of 8 on each
 <a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>axis via <span class="sb">`compute_outgoing_resize`</span>. The result is sent
@@ -11933,12 +11933,12 @@ lines 445 and 447). Suggested content:</p>
 <a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>  so a no-op resize event does not refire the
 <a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>  <span class="sb">`ViewportCommand`</span> every frame.
 <a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="k">*</span><span class="w"> </span><span class="sb">`compute_outgoing_resize`</span> plus <span class="sb">`last_sent_resize`</span>
-<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>  dedupes the outgoing side, so an auto-fit&#39;s seeded
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>  dedupes the outgoing side, so an auto-fit's seeded
 <a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>  target does not bounce back to the guest as if the
 <a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>  user had just dragged the window.
 <a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>
 <a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>Both decision helpers are pure functions and are
-<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>unit-tested in <span class="sb">`ryll/src/app.rs`</span>&#39;s <span class="sb">`tests`</span> module.
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>unit-tested in <span class="sb">`ryll/src/app.rs`</span>'s <span class="sb">`tests`</span> module.
 <a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>
 <a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a>The auto-fit can be turned off with the
 <a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a><span class="sb">`Obey guest size hints`</span> checkbox in the hamburger menu
@@ -11951,14 +11951,14 @@ lines 445 and 447). Suggested content:</p>
 <a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>
 <a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a><span class="sb">`pending_resize`</span> is only set when the affected surface
 <a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a>key is <span class="sb">`(display_channel_id == 0, surface_id == 0)`</span>, so
-<a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a>a secondary monitor&#39;s surface event cannot resize the
+<a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a>a secondary monitor's surface event cannot resize the
 <a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a>primary window.
 </code></pre></div>
 <h3 id="architecturemd-reconnect-what-survives">ARCHITECTURE.md — Reconnect "What survives"<a class="headerlink" href="#architecturemd-reconnect-what-survives" title="Permanent link">&para;</a></h3>
 <p>Add a bullet between the paste-as-keystrokes entry and
 the notification-store entry (i.e. inside the existing
 list at lines 901-922):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">-</span><span class="w"> </span>The &quot;Obey guest size hints&quot; toggle. It is a
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">-</span><span class="w"> </span>The "Obey guest size hints" toggle. It is a
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  session-level preference (set via the hamburger menu
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  or <span class="sb">`--no-obey-guest-size`</span>) and is not touched by the
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  reconnect path, so a reconnect inherits whatever

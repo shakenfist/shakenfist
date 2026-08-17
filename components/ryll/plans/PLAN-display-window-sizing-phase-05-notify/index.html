@@ -12105,7 +12105,7 @@ add:</p>
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="bp">self</span><span class="p">.</span><span class="n">push_notification</span><span class="p">(</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="n">NotifySeverity</span><span class="p">::</span><span class="n">Info</span><span class="p">,</span>
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="n">NotificationSource</span><span class="p">::</span><span class="n">Internal</span><span class="p">,</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="fm">format!</span><span class="p">(</span><span class="s">&quot;Display resolution: {}x{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">),</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="fm">format!</span><span class="p">(</span><span class="s">"Display resolution: {}x{}"</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">),</span>
 <a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="p">);</span>
 <a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="bp">self</span><span class="p">.</span><span class="n">last_notified_resolution</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Some</span><span class="p">((</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">));</span>
 <a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="bp">self</span><span class="p">.</span><span class="n">pending_resolution_notify</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">None</span><span class="p">;</span>
@@ -12162,7 +12162,7 @@ fields.</p>
 <a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">            </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span>
 <a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="w">        </span><span class="p">),</span>
 <a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="w">        </span><span class="nb">None</span><span class="p">,</span>
-<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="w">        </span><span class="s">&quot;100 ms &lt; 500 ms debounce — must not fire&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="w">        </span><span class="s">"100 ms &lt; 500 ms debounce — must not fire"</span><span class="p">,</span>
 <a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="w">    </span><span class="p">);</span>
 <a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="p">}</span>
 <a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>
@@ -12212,7 +12212,7 @@ test instead.</p>
 <p>Extend the existing Window auto-fit Features bullet with
 one trailing sentence:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Resolution changes are also surfaced as Info notifications
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>(&quot;Display resolution: WxH&quot;), debounced over 500 ms so a
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>("Display resolution: WxH"), debounced over 500 ms so a
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>boot-time mode probe storm or a drag-resize through many
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>sizes collapses to a single entry rather than spamming
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>the panel.
@@ -12221,7 +12221,7 @@ one trailing sentence:</p>
 <p>Extend the Window sizing section with a short paragraph
 after the existing "auto-fit can be turned off" paragraph:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Every primary-surface mode change is also surfaced as an
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Info notification (&quot;Display resolution: WxH&quot;) through the
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Info notification ("Display resolution: WxH") through the
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>existing notification panel, debounced by
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="sb">`RESOLUTION_NOTIFY_DEBOUNCE`</span> (500 ms) so a burst of
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>events — boot probes that step `640×480 → 800×600 →

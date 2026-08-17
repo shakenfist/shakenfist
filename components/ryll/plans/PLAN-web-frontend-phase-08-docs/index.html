@@ -12125,7 +12125,7 @@ No extra crypto provider work needed.</p>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="nb">Some</span><span class="p">(</span><span class="n">cert</span><span class="p">),</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">key</span><span class="p">))</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">&amp;</span><span class="n">args</span><span class="p">.</span><span class="n">web_tls_cert</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">args</span><span class="p">.</span><span class="n">web_tls_key</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RustlsConfig</span><span class="p">::</span><span class="n">from_pem_file</span><span class="p">(</span><span class="n">cert</span><span class="p">,</span><span class="w"> </span><span class="n">key</span><span class="p">).</span><span class="k">await</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">        </span><span class="p">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">||</span><span class="w"> </span><span class="fm">format!</span><span class="p">(</span><span class="s">&quot;loading TLS cert/key from {} / {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cert</span><span class="p">.</span><span class="n">display</span><span class="p">(),</span><span class="w"> </span><span class="n">key</span><span class="p">.</span><span class="n">display</span><span class="p">()))</span><span class="o">?</span><span class="p">;</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">        </span><span class="p">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">||</span><span class="w"> </span><span class="fm">format!</span><span class="p">(</span><span class="s">"loading TLS cert/key from {} / {}"</span><span class="p">,</span><span class="w"> </span><span class="n">cert</span><span class="p">.</span><span class="n">display</span><span class="p">(),</span><span class="w"> </span><span class="n">key</span><span class="p">.</span><span class="n">display</span><span class="p">()))</span><span class="o">?</span><span class="p">;</span>
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span><span class="n">axum_server</span><span class="p">::</span><span class="n">bind_rustls</span><span class="p">(</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">)</span>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">        </span><span class="p">.</span><span class="n">handle</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">        </span><span class="p">.</span><span class="n">serve</span><span class="p">(</span><span class="n">app</span><span class="p">.</span><span class="n">into_make_service</span><span class="p">())</span>
@@ -12145,12 +12145,12 @@ away in favour of <code>Handle::graceful_shutdown</code>.</p>
 <p>CLI flag pair, mutually-required:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="sd">/// PEM-encoded TLS certificate chain. If supplied, --web-tls-key</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="sd">/// is also required and the web frontend serves over HTTPS.</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="cp">#[arg(long, requires = </span><span class="s">&quot;web_tls_key&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="cp">#[arg(long, requires = </span><span class="s">"web_tls_key"</span><span class="cp">)]</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">pub</span><span class="w"> </span><span class="n">web_tls_cert</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">PathBuf</span><span class="o">&gt;</span><span class="p">,</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="sd">/// PEM-encoded TLS private key. Required if --web-tls-cert is</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="sd">/// supplied.</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="cp">#[arg(long, requires = </span><span class="s">&quot;web_tls_cert&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="cp">#[arg(long, requires = </span><span class="s">"web_tls_cert"</span><span class="cp">)]</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">pub</span><span class="w"> </span><span class="n">web_tls_key</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">PathBuf</span><span class="o">&gt;</span><span class="p">,</span>
 </code></pre></div>
 <p>The <code>requires =</code> clap attribute enforces the both-or-
@@ -12243,18 +12243,18 @@ matrix entry: once plain, once TLS.</p>
 <h3 id="tls-recipes-reverse-proxy-fallback-8c">TLS recipes + reverse-proxy fallback (8c)<a class="headerlink" href="#tls-recipes-reverse-proxy-fallback-8c" title="Permanent link">&para;</a></h3>
 <p>Caddyfile (the canonical recipe — autocert handles the
 cert lifecycle):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ryll.example.com {
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    reverse_proxy 127.0.0.1:8080
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ryll.example.com<span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>127.0.0.1:8080
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">}</span>
 </code></pre></div>
 <p>That's the entire config for a publicly-reachable
 deployment with an A record pointing at the host. Caddy
 talks to Let's Encrypt automatically.</p>
 <p>For LAN-only or self-signed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ryll.lan:8443 {
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    tls /etc/ssl/ryll.crt /etc/ssl/ryll.key
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    reverse_proxy 127.0.0.1:8080
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ryll.lan:8443<span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="k">tls</span><span class="w"> </span>/etc/ssl/ryll.crt<span class="w"> </span>/etc/ssl/ryll.key
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>127.0.0.1:8080
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>nginx equivalent (for sysadmins who already run nginx):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">server</span><span class="w"> </span><span class="p">{</span>
@@ -12306,7 +12306,7 @@ and goes in a callout box in <code>docs/web-frontend.md</code>.</p>
   mkcert's local CA.</li>
 <li><strong>Self-signed for one-off use</strong>:
   <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>openssl req -x509 -newkey rsa:2048 -keyout key.pem \
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  -out cert.pem -days 30 -nodes -subj &quot;/CN=ryll.lan&quot;
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  -out cert.pem -days 30 -nodes -subj "/CN=ryll.lan"
 </code></pre></div>
   Browser will show a warning — acceptable for one-off
   diagnostic access.</li>
@@ -12476,16 +12476,16 @@ task that polls SHUTDOWN_REQUESTED the same way.</p>
 </ul>
 <p>For <code>tools/web-smoke.sh</code>, the cleanest extension is a
 new flag <code>--tls</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="s2">&quot;</span><span class="nv">$BIN</span><span class="s2">&quot;</span><span class="w"> </span>--web<span class="w"> </span>--web-port<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PORT</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--web-tls-cert<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$cert</span><span class="s2">&quot;</span><span class="w"> </span>--web-tls-key<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$key</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--file<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$tmpvv</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">&amp;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="s2">"</span><span class="nv">$BIN</span><span class="s2">"</span><span class="w"> </span>--web<span class="w"> </span>--web-port<span class="w"> </span><span class="s2">"</span><span class="nv">$PORT</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--web-tls-cert<span class="w"> </span><span class="s2">"</span><span class="nv">$cert</span><span class="s2">"</span><span class="w"> </span>--web-tls-key<span class="w"> </span><span class="s2">"</span><span class="nv">$key</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--file<span class="w"> </span><span class="s2">"</span><span class="nv">$tmpvv</span><span class="s2">"</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>Use <code>curl -sk https://localhost:$PORT/</code> to verify the
 HTTPS path serves the index. Generate the throwaway cert
 inline:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-x509<span class="w"> </span>-newkey<span class="w"> </span>rsa:2048<span class="w"> </span>-keyout<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$tmpdir</span><span class="s2">/key.pem&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>-out<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$tmpdir</span><span class="s2">/cert.pem&quot;</span><span class="w"> </span>-days<span class="w"> </span><span class="m">1</span><span class="w"> </span>-nodes<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>-subj<span class="w"> </span><span class="s2">&quot;/CN=localhost&quot;</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-x509<span class="w"> </span>-newkey<span class="w"> </span>rsa:2048<span class="w"> </span>-keyout<span class="w"> </span><span class="s2">"</span><span class="nv">$tmpdir</span><span class="s2">/key.pem"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>-out<span class="w"> </span><span class="s2">"</span><span class="nv">$tmpdir</span><span class="s2">/cert.pem"</span><span class="w"> </span>-days<span class="w"> </span><span class="m">1</span><span class="w"> </span>-nodes<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>-subj<span class="w"> </span><span class="s2">"/CN=localhost"</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null
 </code></pre></div>
 <p>CI: in <code>.github/workflows/ci.yml</code>, add a second
 <code>Run --web smoke test (TLS)</code> step on the Linux matrix
@@ -12513,7 +12513,7 @@ config without touching systemd. Document the example
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>WEB_PORT=8080
 </code></pre></div>
 <p>Document journalctl recipe for token extraction:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>ryll-web<span class="w"> </span>-n<span class="w"> </span><span class="m">50</span><span class="w"> </span>--no-pager<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-oE<span class="w"> </span><span class="s1">&#39;http://[^ ]+token=[^ ]+&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>ryll-web<span class="w"> </span>-n<span class="w"> </span><span class="m">50</span><span class="w"> </span>--no-pager<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-oE<span class="w"> </span><span class="s1">'http://[^ ]+token=[^ ]+'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-1
 </code></pre></div>
 <h3 id="step-8c-expanded-brief">Step 8c expanded brief<a class="headerlink" href="#step-8c-expanded-brief" title="Permanent link">&para;</a></h3>
 <p>The TLS section's most important content is the

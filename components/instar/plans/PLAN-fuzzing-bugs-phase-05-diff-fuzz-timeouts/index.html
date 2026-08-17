@@ -11737,10 +11737,10 @@ defect.</p>
 mechanical once the harness's qemu-runner code is located.</p>
 <h2 id="investigation">Investigation<a class="headerlink" href="#investigation" title="Permanent link">&para;</a></h2>
 <p>Issue bodies look like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&quot;instar_rc&quot;: 0, &quot;qemu_rc&quot;: -1,
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>&quot;qemu_stderr&quot;: &quot;TIMEOUT after 30s&quot;,
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>&quot;operation&quot;: &quot;resize&quot;, &quot;apply_shrink&quot;: true,
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>&quot;options&quot;: [&quot;cluster_size=512&quot;, &quot;lazy_refcounts=on&quot;]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>"instar_rc": 0, "qemu_rc": -1,
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>"qemu_stderr": "TIMEOUT after 30s",
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>"operation": "resize", "apply_shrink": true,
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>"options": ["cluster_size=512", "lazy_refcounts=on"]
 </code></pre></div>
 <p>The harness wraps <code>qemu-img</code> calls with a 30-second timeout
 (grep <code>scripts/differential-fuzz.py</code> for <code>TIMEOUT</code> /

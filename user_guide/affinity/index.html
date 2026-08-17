@@ -11664,7 +11664,7 @@ talk a lot over the network to each other and want to keep them together.</p>
 built on top of an instance metadata entry called <code>tags</code>, where you specify the
 attributes of the instance. This metadata entry must be formatted as a valid
 JSON list. So for example we might set the following simple tag on an instance:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[&quot;webserver&quot;]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>["webserver"]
 </code></pre></div>
 <p>Or on the command line:</p>
 <p><code>sf-client instance set-metadata ...uuid... tags '["webserver"]'</code></p>
@@ -11674,7 +11674,7 @@ In our current example, let's say we want to try quite hard to not have more tha
 one of our web servers on a given hypervisor. We might therefore write an
 affinity metadata entry like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>{
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    &quot;webserver&quot;: -10
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    "webserver": -10
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>}
 </code></pre></div>
 <p>Or on the command line:</p>
@@ -11698,8 +11698,8 @@ So to extend our example, let's say that web servers do not prefer sharing with
 other web servers, but do like sharing with a cache server. You might write that
 like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>{
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    &quot;webserver&quot;: -10,
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    &quot;cache&quot;: 10
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    "webserver": -10,
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    "cache": 10
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>}
 </code></pre></div>
 <p>Or on the command line:</p>

@@ -11810,9 +11810,9 @@ handle immediately.</p>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">chain</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_cluster_operation_chain</span><span class="p">(</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s1">&#39;22b757ae-41d1-456b-84a4-edca694ceb6d&#39;</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s1">'22b757ae-41d1-456b-84a4-edca694ceb6d'</span><span class="p">)</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">:</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">&#39;tasks&#39;</span><span class="p">])</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'state'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'tasks'</span><span class="p">])</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -11821,9 +11821,9 @@ handle immediately.</p>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">list_cluster_operations_for_target</span><span class="p">(</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s1">&#39;network&#39;</span><span class="p">,</span> <span class="s1">&#39;6a663ac7-620f-417c-b197-3004d8c84bc7&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s1">'network'</span><span class="p">,</span> <span class="s1">'6a663ac7-620f-417c-b197-3004d8c84bc7'</span><span class="p">)</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">&#39;operation_type&#39;</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">])</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'operation_type'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'state'</span><span class="p">])</span>
 </code></pre></div>
 </details>
 

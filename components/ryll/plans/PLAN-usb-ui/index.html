@@ -12664,7 +12664,7 @@ following the Traffic viewer pattern.</p>
 <li>Add <code>show_usb_panel: bool</code> field to <code>RyllApp</code>.</li>
 <li>Add the "USB" button in the status bar's right-to-left
   layout section (app.rs, near line 794):
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">if</span><span class="w"> </span><span class="n">ui</span><span class="p">.</span><span class="n">small_button</span><span class="p">(</span><span class="s">&quot;USB&quot;</span><span class="p">).</span><span class="n">clicked</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">if</span><span class="w"> </span><span class="n">ui</span><span class="p">.</span><span class="n">small_button</span><span class="p">(</span><span class="s">"USB"</span><span class="p">).</span><span class="n">clicked</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="bp">self</span><span class="p">.</span><span class="n">show_usb_panel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">!</span><span class="bp">self</span><span class="p">.</span><span class="n">show_usb_panel</span><span class="p">;</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="p">}</span>
 </code></pre></div></li>

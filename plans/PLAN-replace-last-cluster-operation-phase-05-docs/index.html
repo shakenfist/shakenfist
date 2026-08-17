@@ -12082,9 +12082,9 @@ ones are:</p>
 <h3 id="6-final-audit">6. Final audit<a class="headerlink" href="#6-final-audit" title="Permanent link">&para;</a></h3>
 <p>Run the following greps to confirm the codebase is
 clean:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep -rn &#39;set_last_cluster_operation\b&#39; shakenfist/ --include=&#39;*.py&#39; | grep -v &#39;_set_last_cluster_operation&#39;
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>grep -rn &#39;last_cluster_operation_json&#39; shakenfist/ protos/ --include=&#39;*.py&#39; --include=&#39;*.proto&#39; | grep -v &#39;shakenfist/protos/database_pb2&#39;
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>grep -rn &quot;get_lock_attr(&#39;last_cluster_operation&#39;&quot; shakenfist/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep -rn 'set_last_cluster_operation\b' shakenfist/ --include='*.py' | grep -v '_set_last_cluster_operation'
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>grep -rn 'last_cluster_operation_json' shakenfist/ protos/ --include='*.py' --include='*.proto' | grep -v 'shakenfist/protos/database_pb2'
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>grep -rn "get_lock_attr('last_cluster_operation'" shakenfist/
 </code></pre></div>
 <p>Expected results:
 1. <strong>First grep</strong> — only docstring matches (e.g. the
@@ -12139,13 +12139,13 @@ is a phase-5 scope creep — flag it and stop.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Bring docs in line with last_cluster_operation rewrite.
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>Phase 5 of the LCO replacement plan completes the work.
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>Updates ARCHITECTURE.md&#39;s Cluster Operation Tracking
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>Updates ARCHITECTURE.md's Cluster Operation Tracking
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>subsection to describe auto-target writes and the
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>history-aware gating model, drops the now-incorrect
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>&quot;and last_cluster_operation&quot; wording from CLAUDE.md and
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>"and last_cluster_operation" wording from CLAUDE.md and
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>docs/operator_guide/database.md, adds a short
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>operator-facing subsection on the cluster_operation_targets
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>table, fills in the master plan&#39;s Bugs fixed section
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>table, fills in the master plan's Bugs fixed section
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>with the two race bugs the plan actually addressed, and
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>flips the plan-status index to Complete for all five
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>phases.
@@ -12155,7 +12155,7 @@ is a phase-5 scope creep — flag it and stop.</p>
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>historical-context docstrings, last_cluster_operation_json
 <a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>appears only in the proto reserved declaration and the
 <a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>schema migration text, and the
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>get_lock_attr(&#39;last_cluster_operation&#39;, ...) wrappers
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>get_lock_attr('last_cluster_operation', ...) wrappers
 <a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>are gone.
 </code></pre></div>
 <p>Plus standard <code>Prompt:</code>, <code>Signed-off-by</code>, and

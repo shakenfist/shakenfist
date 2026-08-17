@@ -11885,7 +11885,7 @@ budget):</p>
 </ul>
 <h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
 <h3 id="1-guest-flow-the-_start-sequence">1. Guest flow (the <code>_start</code> sequence)<a class="headerlink" href="#1-guest-flow-the-_start-sequence" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>validate_call_table!(call_table, &quot;bench&quot;)        // version 20
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>validate_call_table!(call_table, "bench")        // version 20
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>config = &amp;*(OPERATION_CONFIG_ADDR as *const BenchConfig)
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  !config.is_valid()          → result(ERROR_BAD_CONFIG), complete(false)
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  config.flags &amp; FLAG_WRITE   → result(ERROR_BAD_CONFIG), complete(false)
@@ -11899,7 +11899,7 @@ budget):</p>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  chain_config.devices[0].detected_format(); LUKS or any
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  format outside {raw, qcow2, vmdk, vhd, vhdx}
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                              → result(ERROR_UNSUPPORTED_FORMAT), complete(false)
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>image_size = chain_config.devices[0].virtual_size   // convert&#39;s source of truth
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>image_size = chain_config.devices[0].virtual_size   // convert's source of truth
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>build BenchParams from config (raw step; effective_step() stays in the crate)
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>init: ChainStates::default() + init_chain_states(...)
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  parse failure               → result(ERROR_PARSE_FAILED), complete(false)

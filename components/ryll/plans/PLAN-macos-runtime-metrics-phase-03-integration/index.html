@@ -11952,7 +11952,7 @@ trigger" and is acceptable for diagnostic purposes.</p>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="sd">///</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="sd">/// Idempotent and cheap; safe to call more than once.</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">init_at_startup</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="cp">#[cfg(target_os = </span><span class="s">&quot;macos&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="cp">#[cfg(target_os = </span><span class="s">"macos"</span><span class="cp">)]</span>
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span><span class="p">{</span>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">        </span><span class="n">macos</span><span class="p">::</span><span class="n">force_process_start</span><span class="p">();</span>
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="p">}</span>
@@ -11999,12 +11999,12 @@ debugging a session). Contents:</p>
    F12 bug report, unzip, and verify <code>runtime-metrics.json</code>
    parses with the expected <code>MacOS</code> shape:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>jq<span class="w"> </span><span class="s1">&#39;.platform, .threads | length&#39;</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>jq<span class="w"> </span><span class="s1">'.platform, .threads | length'</span>
 </code></pre></div>
    Pass: <code>"macos"</code> and a positive integer.</li>
 <li><strong>Test 2: <code>Unavailable</code> reason is gone.</strong> Same zip:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">&quot;per-thread metrics not implemented&quot;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">"per-thread metrics not implemented"</span>
 </code></pre></div>
    Pass: no match.</li>
 <li><strong>Test 3: <code>process.cpu_percent</code> is plausible.</strong> Compare
@@ -12023,7 +12023,7 @@ debugging a session). Contents:</p>
 <li><strong>Test 6: <code>threads</code> is non-empty, sorted, plausibly
    named.</strong> Same zip:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>jq<span class="w"> </span><span class="s1">&#39;.threads | map({tid, name})&#39;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>jq<span class="w"> </span><span class="s1">'.threads | map({tid, name})'</span>
 </code></pre></div>
    Pass: at least 10 threads on a real session; at least one
    has <code>name == "tokio-runtime-worker"</code> (or similar tokio
@@ -12037,7 +12037,7 @@ debugging a session). Contents:</p>
    <code>metrics::sample</code> runs every few seconds, exercising
    <code>task_threads</code> + the <code>MachThreadList</code> RAII guard.</li>
 <li>Record the initial Mach port count for the ryll process:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>vmmap<span class="w"> </span>-summary<span class="w"> </span><span class="k">$(</span>pgrep<span class="w"> </span>ryll<span class="k">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s2">&quot;Mach Ports&quot;</span>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>vmmap<span class="w"> </span>-summary<span class="w"> </span><span class="k">$(</span>pgrep<span class="w"> </span>ryll<span class="k">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s2">"Mach Ports"</span>
 </code></pre></div></li>
 <li>Wait at least one hour while ryll runs (more is better).</li>
 <li>Record the Mach port count again with the same command.</li>

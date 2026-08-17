@@ -11939,10 +11939,10 @@ identical (thread name <code>logship-drainer</code>).</p>
    line)</code>.
 2. Build the push body (single stream — labels are constant per
    process, so grouping is a no-op):
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{&quot;streams&quot;: [{&quot;stream&quot;: {&quot;job&quot;: &quot;shakenfist&quot;,
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                         &quot;daemon&quot;: &lt;daemon&gt;,
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                         &quot;host&quot;: &lt;config.NODE_NAME&gt;},
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>              &quot;values&quot;: [[str(ts_ns), line], ...]}]}
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{"streams": [{"stream": {"job": "shakenfist",
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                         "daemon": &lt;daemon&gt;,
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                         "host": &lt;config.NODE_NAME&gt;},
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>              "values": [[str(ts_ns), line], ...]}]}
 </code></pre></div>
    <code>str(ts_ns)</code> — Loki rejects a numeric timestamp (HTTP 400);
    it must be a nanosecond <strong>string</strong>. Rows come off the spool in

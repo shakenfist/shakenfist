@@ -12353,6 +12353,11 @@
   blob, ignoring the cap it was given.</li>
 </ul>
 </li>
+<li><code>GET /blobs</code> now answers 503 when the database is unavailable, instead
+  of 200 with an empty list. A failed read used to be indistinguishable
+  from a cluster with no blobs, so a client which treated the empty list
+  as an answer was being told something untrue; it now sees the failure
+  and can retry.</li>
 <li>Two changes here are visible to anyone regenerating a client from the
   specification. Structured parameters are now published as real JSON
   structures rather than as strings: <code>network</code> (on instance create),
@@ -12835,6 +12840,13 @@ daemon process:</p>
 <li><code>eventlog_spool_dropped_total</code> — counter, every daemon: events
   silently dropped because the spool exceeded the high-water mark
   (<code>SPOOL_HIGH_WATER_MARK</code>, default 100 000).</li>
+<li><code>cluster_sweep_work_list_failure_streak{sweep,object_type}</code> — gauge,
+  sf-cluster: consecutive maintenance passes which could not read their
+  work list. A sweep that cannot read its work list does nothing at all,
+  and until now did so silently. Published only by the elected cluster
+  maintainer, and dropped entirely when that node loses the election.
+  Zero in steady state; see <a href="/operator_guide/database/">the operator guide on the
+  database</a> for a sample alert.</li>
 </ul>
 <p>See <a href="/operator_guide/events/">the operator guide on events</a> for alert
 recommendations and the full metrics reference.</p>

@@ -12018,9 +12018,9 @@ timeout, rng)</code> function follows the structural pattern of
 </ol>
 <h3 id="field-selection-what-to-compare-and-what-to-skip">Field selection: what to compare and what to skip<a class="headerlink" href="#field-selection-what-to-compare-and-what-to-skip" title="Permanent link">&para;</a></h3>
 <p><code>instar map --output=json</code> emits per extent:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{&quot;start&quot;: N, &quot;length&quot;: N, &quot;depth&quot;: 0,
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a> &quot;present&quot;: bool, &quot;zero&quot;: bool, &quot;data&quot;: bool,
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a> &quot;compressed&quot;: false, &quot;offset&quot;: N}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{"start": N, "length": N, "depth": 0,
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a> "present": bool, "zero": bool, "data": bool,
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a> "compressed": false, "offset": N}
 </code></pre></div>
 <p>with <code>offset</code> omitted when <code>present == false</code>. Compare:</p>
 <ul>
@@ -12130,13 +12130,13 @@ mutually-exclusive flags). Pseudocode:</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">align</span> <span class="o">=</span> <span class="mi">64</span> <span class="o">*</span> <span class="mi">1024</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">half</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">virtual_size_bytes</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">align</span><span class="p">)</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">start</span> <span class="o">=</span> <span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">half</span><span class="p">)</span> <span class="o">//</span> <span class="n">align</span><span class="p">)</span> <span class="o">*</span> <span class="n">align</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">args</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">&#39;--start-offset&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">start</span><span class="p">)]</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">args</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">'--start-offset'</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">start</span><span class="p">)]</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">if</span> <span class="n">rng</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mf">0.25</span><span class="p">:</span>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="n">align</span> <span class="o">=</span> <span class="mi">64</span> <span class="o">*</span> <span class="mi">1024</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">min_len</span> <span class="o">=</span> <span class="n">align</span>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="n">max_len</span> <span class="o">=</span> <span class="n">virtual_size_bytes</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="n">length</span> <span class="o">=</span> <span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">min_len</span><span class="p">,</span> <span class="n">max_len</span><span class="p">)</span> <span class="o">//</span> <span class="n">align</span><span class="p">)</span> <span class="o">*</span> <span class="n">align</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="n">args</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">&#39;--max-length&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">length</span><span class="p">)]</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="n">args</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">'--max-length'</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">length</span><span class="p">)]</span>
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="k">return</span> <span class="n">args</span>
 </code></pre></div>
 <p>Both probabilities at 25% gives ~56% of iterations with no

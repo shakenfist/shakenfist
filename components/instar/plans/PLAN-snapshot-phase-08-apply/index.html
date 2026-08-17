@@ -12241,7 +12241,7 @@ states, and final bytes are identical.</p>
 <p>After phase 8 lands, on any supported qcow2 image:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>instar snapshot -a snap1 image.qcow2   # silent, exit 0
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>qemu-img check image.qcow2             # clean
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>qemu-img compare image.qcow2 ref.qcow2 # &quot;Images are identical&quot;
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>qemu-img compare image.qcow2 ref.qcow2 # "Images are identical"
 </code></pre></div>
 <p>where <code>ref.qcow2</code> is a copy of the image taken when <code>snap1</code>
 was created — and, from byte-identical inputs, <code>instar

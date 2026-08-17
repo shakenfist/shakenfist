@@ -12159,7 +12159,7 @@ tracked separately and is not yet available.</p>
 <h2 id="labels-and-the-field-contract">Labels and the field contract<a class="headerlink" href="#labels-and-the-field-contract" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist tags every Loki stream with a small, bounded set of
 labels:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{job=&quot;shakenfist&quot;, daemon=&quot;&lt;sf-daemon&gt;&quot;, host=&quot;&lt;node&gt;&quot;}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{job="shakenfist", daemon="&lt;sf-daemon&gt;", host="&lt;node&gt;"}
 </code></pre></div>
 <p>Everything else — including high-cardinality identifiers such as
 <code>instance_uuid</code>, <code>network_uuid</code>, and <code>request-id</code> — lives in the
@@ -12167,8 +12167,8 @@ JSON log line <strong>body</strong>, never in a label. This is deliberate:
 promoting high-cardinality values to Loki labels causes a
 label-cardinality explosion. Query them with LogQL's JSON parser
 instead:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>{job=&quot;shakenfist&quot;} | json | instance_uuid=&quot;&lt;uuid&gt;&quot;
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{job=&quot;shakenfist&quot;, daemon=&quot;sf-net&quot;} | json | level=&quot;ERROR&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>{job="shakenfist"} | json | instance_uuid="&lt;uuid&gt;"
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{job="shakenfist", daemon="sf-net"} | json | level="ERROR"
 </code></pre></div>
 <p>The full set of JSON field names (the base fields plus the
 <code>with_fields</code> conventions) is documented as a stable contract in

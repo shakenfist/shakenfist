@@ -12182,17 +12182,17 @@ They live inside the package so that they ship in the wheel and
 repository checkout present.</p>
 <h3 id="creating-a-new-migration">Creating a new migration<a class="headerlink" href="#creating-a-new-migration" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/shakenfist/kerbside
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>alembic<span class="w"> </span>revision<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;description_of_your_changes&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>alembic<span class="w"> </span>revision<span class="w"> </span>-m<span class="w"> </span><span class="s2">"description_of_your_changes"</span>
 </code></pre></div>
 <p>This will create a new migration file in
 <code>kerbside/migrations/versions/</code>. Edit the generated file to add your
 schema changes in the <code>upgrade()</code> and <code>downgrade()</code> functions.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">upgrade</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">op</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="s1">&#39;table_name&#39;</span><span class="p">,</span> <span class="n">sa</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="s1">&#39;column_name&#39;</span><span class="p">,</span> <span class="n">sa</span><span class="o">.</span><span class="n">Type</span><span class="p">()))</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">op</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="s1">'table_name'</span><span class="p">,</span> <span class="n">sa</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="s1">'column_name'</span><span class="p">,</span> <span class="n">sa</span><span class="o">.</span><span class="n">Type</span><span class="p">()))</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">downgrade</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">op</span><span class="o">.</span><span class="n">drop_column</span><span class="p">(</span><span class="s1">&#39;table_name&#39;</span><span class="p">,</span> <span class="s1">&#39;column_name&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">op</span><span class="o">.</span><span class="n">drop_column</span><span class="p">(</span><span class="s1">'table_name'</span><span class="p">,</span> <span class="s1">'column_name'</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="applying-migrations">Applying migrations<a class="headerlink" href="#applying-migrations" title="Permanent link">&para;</a></h3>
 <p>To apply all pending migrations:</p>

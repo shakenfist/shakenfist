@@ -12257,10 +12257,10 @@ name:</p>
 </code></pre></div>
 <p>Or equivalently in libvirt domain XML, add a channel device
 inside the <code>&lt;devices&gt;</code> element:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;spiceport&#39;</span><span class="nt">&gt;</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">channel=</span><span class="s">&#39;org.spice-space.webdav.0&#39;</span><span class="nt">/&gt;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;virtio&#39;</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">          </span><span class="na">name=</span><span class="s">&#39;org.spice-space.webdav.0&#39;</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">'spiceport'</span><span class="nt">&gt;</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">channel=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">'virtio'</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">          </span><span class="na">name=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">&lt;/channel&gt;</span>
 </code></pre></div>
 <p>Note: many distributions' libvirt templates already include

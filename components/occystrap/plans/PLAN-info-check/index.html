@@ -12225,10 +12225,10 @@ any more.</p>
 I am seeing in CI when using a docker local API -&gt; filtration -&gt;
 registry push flow:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Unknown error message: wrong diff id
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>&quot;sha256:9002b1c0c97baaa58d3bd29d02114743adaee9b3e601ededf6f65b138aae01df&quot;
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>"sha256:9002b1c0c97baaa58d3bd29d02114743adaee9b3e601ededf6f65b138aae01df"
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>calculated on extraction
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>&quot;sha256:123a078714d5ea9382d4d9f550753aefce8b34ec5ae11ae8273038d3bcbb943f&quot;,
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>desc &quot;sha256:2914167652f8241cc96f909543ca0f525f067170ff80482695d1094d84abefea&quot;
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>"sha256:123a078714d5ea9382d4d9f550753aefce8b34ec5ae11ae8273038d3bcbb943f",
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>desc "sha256:2914167652f8241cc96f909543ca0f525f067170ff80482695d1094d84abefea"
 </code></pre></div>
 <p>Now we could fix that one specific bug, but I am more interested
 in ways we could ensure we don't have bugs like this <strong>ever</strong>. We

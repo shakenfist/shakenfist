@@ -11815,8 +11815,8 @@ phase 1.</p>
   <em>Out of scope</em> below).</p>
 <h2 id="audit-findings">Audit findings<a class="headerlink" href="#audit-findings" title="Permanent link">&para;</a></h2>
 <p>A repository-wide audit grounding this phase:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>grep -rn &#39;is_okay\|last_cluster_operation&#39; shakenfist/ \
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    --include=&#39;*.py&#39; \
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>grep -rn 'is_okay\|last_cluster_operation' shakenfist/ \
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    --include='*.py' \
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    | grep -v ^shakenfist/tests/ \
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    | grep -v ^shakenfist/protos/
 </code></pre></div>
@@ -11880,11 +11880,11 @@ no <code>is_okay</code>-style gating.</p>
 <h3 id="1-networkis_okay-replace-the-lco-prelude">1. <code>Network.is_okay()</code> — replace the LCO prelude<a class="headerlink" href="#1-networkis_okay-replace-the-lco-prelude" title="Permanent link">&para;</a></h3>
 <p>Current implementation (<code>network/network.py:503-530</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_okay</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if network is created and running.&quot;&quot;&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">"""Check if network is created and running."""</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">last_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_cluster_operation</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">if</span> <span class="n">last_op</span> <span class="ow">and</span> <span class="n">last_op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;op_type&#39;</span><span class="p">):</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">op</span> <span class="o">=</span> <span class="n">get_object_class</span><span class="p">(</span><span class="n">last_op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;op_type&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">from_db</span><span class="p">(</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            <span class="n">last_op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;op_uuid&#39;</span><span class="p">),</span> <span class="n">suppress_failure_audit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">if</span> <span class="n">last_op</span> <span class="ow">and</span> <span class="n">last_op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'op_type'</span><span class="p">):</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">op</span> <span class="o">=</span> <span class="n">get_object_class</span><span class="p">(</span><span class="n">last_op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'op_type'</span><span class="p">))</span><span class="o">.</span><span class="n">from_db</span><span class="p">(</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            <span class="n">last_op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'op_uuid'</span><span class="p">),</span> <span class="n">suppress_failure_audit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="k">if</span> <span class="n">op</span> <span class="ow">and</span> <span class="n">op</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">STATE_COMPLETE</span><span class="p">,</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>                                         <span class="n">op</span><span class="o">.</span><span class="n">STATE_ABORT</span><span class="p">,</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                                         <span class="n">op</span><span class="o">.</span><span class="n">STATE_ERROR</span><span class="p">,</span>
@@ -11899,10 +11899,10 @@ no <code>is_okay</code>-style gating.</p>
 <p>Replace lines 505-515 with a single call to the new
 method:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_okay</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if network is created and running.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">"""Check if network is created and running."""</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_pending_cluster_operation</span><span class="p">():</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="c1"># An operation is in flight against this network. Defer</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="c1"># the maintainer&#39;s recreate path so it does not race with</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="c1"># the maintainer's recreate path so it does not race with</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="c1"># the queue worker.</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">return</span> <span class="kc">True</span>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
@@ -12004,7 +12004,7 @@ modified in this phase.</p>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>no longer masks an earlier in-flight operation, so the
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>network maintainer correctly defers its recreate path while
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>any op is in flight -- the fix for the recurring
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>&quot;recreating not okay network on hypervisor&quot; CI failure.
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>"recreating not okay network on hypervisor" CI failure.
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>No other gating call sites exist; the audit confirmed
 <a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>Network.is_okay() is the only true gating consumer.

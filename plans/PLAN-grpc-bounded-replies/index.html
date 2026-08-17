@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-01-port-channel/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-grpc-bounded-replies/">
       
       
       
@@ -18,19 +18,19 @@
         
       
       
-      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Phase 1: SpiceVMC port channel transport for WebDAV - Shaken Fist</title>
+        <title>Bound the size of DatabaseService gRPC replies - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -70,9 +70,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-1-spicevmc-port-channel-transport-for-webdav" class="md-skip">
+        <a href="#bound-the-size-of-databaseservice-grpc-replies" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 1: SpiceVMC port channel transport for WebDAV
+              Bound the size of DatabaseService gRPC replies
             
           </span>
         </div>
@@ -249,7 +249,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -279,7 +279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -306,7 +306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../manifesto/" class="md-nav__link">
+      <a href="../../manifesto/" class="md-nav__link">
         
   
   
@@ -380,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../overview/" class="md-nav__link">
+      <a href="../../components/overview/" class="md-nav__link">
         
   
   
@@ -455,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/" class="md-nav__link">
+      <a href="../../components/cloudgood/" class="md-nav__link">
         
   
   
@@ -483,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../components/cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -511,7 +511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../components/cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -539,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/accounting/" class="md-nav__link">
+      <a href="../../components/cloudgood/accounting/" class="md-nav__link">
         
   
   
@@ -567,7 +567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../components/cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -595,7 +595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../components/cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
+      <a href="../../components/cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -651,7 +651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
+      <a href="../../components/cloudgood/virtual-networking/" class="md-nav__link">
         
   
   
@@ -679,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
+      <a href="../../components/cloudgood/networking-shakenfist/" class="md-nav__link">
         
   
   
@@ -707,7 +707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
+      <a href="../../components/cloudgood/neutron-linuxbridge/" class="md-nav__link">
         
   
   
@@ -735,7 +735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
+      <a href="../../components/cloudgood/neutron-legacy/" class="md-nav__link">
         
   
   
@@ -763,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../cloudgood/galera/" class="md-nav__link">
+      <a href="../../components/cloudgood/galera/" class="md-nav__link">
         
   
   
@@ -846,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../agent-python/" class="md-nav__link">
+      <a href="../../components/agent-python/" class="md-nav__link">
         
   
   
@@ -874,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
+      <a href="../../components/agent-python/developer-guide/" class="md-nav__link">
         
   
   
@@ -902,7 +902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../agent-python/protocol/" class="md-nav__link">
+      <a href="../../components/agent-python/protocol/" class="md-nav__link">
         
   
   
@@ -985,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../clingwrap/" class="md-nav__link">
+      <a href="../../components/clingwrap/" class="md-nav__link">
         
   
   
@@ -1013,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../clingwrap/command-types/" class="md-nav__link">
+      <a href="../../components/clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -1041,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../clingwrap/configuration/" class="md-nav__link">
+      <a href="../../components/clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -1069,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../clingwrap/examples/" class="md-nav__link">
+      <a href="../../components/clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -1097,7 +1097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../clingwrap/installation/" class="md-nav__link">
+      <a href="../../components/clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -1180,7 +1180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/index.md" class="md-nav__link">
+      <a href="../../components/development/index.md" class="md-nav__link">
         
   
   
@@ -1208,7 +1208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/automated-pr-review/" class="md-nav__link">
+      <a href="../../components/development/automated-pr-review/" class="md-nav__link">
         
   
   
@@ -1236,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/ci-review-automation/" class="md-nav__link">
+      <a href="../../components/development/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1264,7 +1264,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/code-review-tracking/" class="md-nav__link">
+      <a href="../../components/development/code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1292,7 +1292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/release-automation/" class="md-nav__link">
+      <a href="../../components/development/release-automation/" class="md-nav__link">
         
   
   
@@ -1367,7 +1367,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+      <a href="../../components/development/plans/PLAN-code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1395,7 +1395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+      <a href="../../components/development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
   
@@ -1486,7 +1486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/" class="md-nav__link">
+      <a href="../../components/instar/" class="md-nav__link">
         
   
   
@@ -1514,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/amend/" class="md-nav__link">
+      <a href="../../components/instar/amend/" class="md-nav__link">
         
   
   
@@ -1542,7 +1542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/bitmap/" class="md-nav__link">
+      <a href="../../components/instar/bitmap/" class="md-nav__link">
         
   
   
@@ -1570,7 +1570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/commit/" class="md-nav__link">
+      <a href="../../components/instar/commit/" class="md-nav__link">
         
   
   
@@ -1598,7 +1598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/create/" class="md-nav__link">
+      <a href="../../components/instar/create/" class="md-nav__link">
         
   
   
@@ -1626,7 +1626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/dd/" class="md-nav__link">
+      <a href="../../components/instar/dd/" class="md-nav__link">
         
   
   
@@ -1654,7 +1654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/map/" class="md-nav__link">
+      <a href="../../components/instar/map/" class="md-nav__link">
         
   
   
@@ -1682,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/measure/" class="md-nav__link">
+      <a href="../../components/instar/measure/" class="md-nav__link">
         
   
   
@@ -1710,7 +1710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/rebase/" class="md-nav__link">
+      <a href="../../components/instar/rebase/" class="md-nav__link">
         
   
   
@@ -1738,7 +1738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/resize/" class="md-nav__link">
+      <a href="../../components/instar/resize/" class="md-nav__link">
         
   
   
@@ -1766,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/snapshot/" class="md-nav__link">
+      <a href="../../components/instar/snapshot/" class="md-nav__link">
         
   
   
@@ -1794,7 +1794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/openstack-announcement-email/" class="md-nav__link">
+      <a href="../../components/instar/openstack-announcement-email/" class="md-nav__link">
         
   
   
@@ -1822,7 +1822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/chain-discovery/" class="md-nav__link">
+      <a href="../../components/instar/chain-discovery/" class="md-nav__link">
         
   
   
@@ -1850,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/chain-config/" class="md-nav__link">
+      <a href="../../components/instar/chain-config/" class="md-nav__link">
         
   
   
@@ -1878,7 +1878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/check/" class="md-nav__link">
+      <a href="../../components/instar/check/" class="md-nav__link">
         
   
   
@@ -1906,7 +1906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/compare/" class="md-nav__link">
+      <a href="../../components/instar/compare/" class="md-nav__link">
         
   
   
@@ -1934,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/configuration/" class="md-nav__link">
+      <a href="../../components/instar/configuration/" class="md-nav__link">
         
   
   
@@ -1962,7 +1962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/convert/" class="md-nav__link">
+      <a href="../../components/instar/convert/" class="md-nav__link">
         
   
   
@@ -1990,7 +1990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/development/" class="md-nav__link">
+      <a href="../../components/instar/development/" class="md-nav__link">
         
   
   
@@ -2018,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/format-detection-safety/" class="md-nav__link">
+      <a href="../../components/instar/format-detection-safety/" class="md-nav__link">
         
   
   
@@ -2046,7 +2046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/format-coverage/" class="md-nav__link">
+      <a href="../../components/instar/format-coverage/" class="md-nav__link">
         
   
   
@@ -2074,7 +2074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/guest-architecture/" class="md-nav__link">
+      <a href="../../components/instar/guest-architecture/" class="md-nav__link">
         
   
   
@@ -2102,7 +2102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/security/" class="md-nav__link">
+      <a href="../../components/instar/security/" class="md-nav__link">
         
   
   
@@ -2130,7 +2130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/info/" class="md-nav__link">
+      <a href="../../components/instar/info/" class="md-nav__link">
         
   
   
@@ -2158,7 +2158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/installation/" class="md-nav__link">
+      <a href="../../components/instar/installation/" class="md-nav__link">
         
   
   
@@ -2186,7 +2186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/bench/" class="md-nav__link">
+      <a href="../../components/instar/bench/" class="md-nav__link">
         
   
   
@@ -2214,7 +2214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/testing/" class="md-nav__link">
+      <a href="../../components/instar/testing/" class="md-nav__link">
         
   
   
@@ -2242,7 +2242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/format-internals/" class="md-nav__link">
+      <a href="../../components/instar/format-internals/" class="md-nav__link">
         
   
   
@@ -2270,7 +2270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/output-formats/" class="md-nav__link">
+      <a href="../../components/instar/output-formats/" class="md-nav__link">
         
   
   
@@ -2298,7 +2298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/quirks/" class="md-nav__link">
+      <a href="../../components/instar/quirks/" class="md-nav__link">
         
   
   
@@ -2326,7 +2326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/usage/" class="md-nav__link">
+      <a href="../../components/instar/usage/" class="md-nav__link">
         
   
   
@@ -2354,7 +2354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/security-audits/" class="md-nav__link">
+      <a href="../../components/instar/security-audits/" class="md-nav__link">
         
   
   
@@ -2382,7 +2382,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/technology-primer/" class="md-nav__link">
+      <a href="../../components/instar/technology-primer/" class="md-nav__link">
         
   
   
@@ -2410,7 +2410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/rust-rationale/" class="md-nav__link">
+      <a href="../../components/instar/rust-rationale/" class="md-nav__link">
         
   
   
@@ -2485,7 +2485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/commentary/" class="md-nav__link">
+      <a href="../../components/instar/commentary/" class="md-nav__link">
         
   
   
@@ -2513,7 +2513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/commentary/architectural-decisions/" class="md-nav__link">
+      <a href="../../components/instar/commentary/architectural-decisions/" class="md-nav__link">
         
   
   
@@ -2541,7 +2541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/commentary/reading-order/" class="md-nav__link">
+      <a href="../../components/instar/commentary/reading-order/" class="md-nav__link">
         
   
   
@@ -2624,7 +2624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/crates/guest-protocol/" class="md-nav__link">
+      <a href="../../components/instar/crates/guest-protocol/" class="md-nav__link">
         
   
   
@@ -2707,7 +2707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/image_notes/cirros-qcow2/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/cirros-qcow2/" class="md-nav__link">
         
   
   
@@ -2735,7 +2735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/image_notes/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/" class="md-nav__link">
         
   
   
@@ -2763,7 +2763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/image_notes/qcow2-v2/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/qcow2-v2/" class="md-nav__link">
         
   
   
@@ -2791,7 +2791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/image_notes/virtualpc-vhd/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/virtualpc-vhd/" class="md-nav__link">
         
   
   
@@ -2874,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/" class="md-nav__link">
+      <a href="../../components/instar/plans/" class="md-nav__link">
         
   
   
@@ -2902,7 +2902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
         
   
   
@@ -2930,7 +2930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-release-v0.2/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-release-v0.2/" class="md-nav__link">
         
   
   
@@ -2958,7 +2958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-release-v0.3/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-release-v0.3/" class="md-nav__link">
         
   
   
@@ -2986,7 +2986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-release/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-release/" class="md-nav__link">
         
   
   
@@ -3014,7 +3014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-audit/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-audit/" class="md-nav__link">
         
   
   
@@ -3042,7 +3042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
         
   
   
@@ -3070,7 +3070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
         
   
   
@@ -3098,7 +3098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-convert-followups/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-convert-followups/" class="md-nav__link">
         
   
   
@@ -3126,7 +3126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-measure/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-measure/" class="md-nav__link">
         
   
   
@@ -3154,7 +3154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-create/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-create/" class="md-nav__link">
         
   
   
@@ -3182,7 +3182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-resize/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-resize/" class="md-nav__link">
         
   
   
@@ -3210,7 +3210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-rebase-commit/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-rebase-commit/" class="md-nav__link">
         
   
   
@@ -3238,7 +3238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-map/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-map/" class="md-nav__link">
         
   
   
@@ -3266,7 +3266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-snapshot/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-snapshot/" class="md-nav__link">
         
   
   
@@ -3294,7 +3294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-check-repair/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-check-repair/" class="md-nav__link">
         
   
   
@@ -3322,7 +3322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
   
@@ -3350,7 +3350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-bug-fixes/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bug-fixes/" class="md-nav__link">
         
   
   
@@ -3378,7 +3378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-amend/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-amend/" class="md-nav__link">
         
   
   
@@ -3406,7 +3406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-dd/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-dd/" class="md-nav__link">
         
   
   
@@ -3434,7 +3434,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-bitmap/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bitmap/" class="md-nav__link">
         
   
   
@@ -3462,7 +3462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-bench/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bench/" class="md-nav__link">
         
   
   
@@ -3490,7 +3490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
         
   
   
@@ -3518,7 +3518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
         
   
   
@@ -3546,7 +3546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-format-coverage/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-format-coverage/" class="md-nav__link">
         
   
   
@@ -3629,7 +3629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/building-with-docker/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/building-with-docker/" class="md-nav__link">
         
   
   
@@ -3657,7 +3657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/data-transfer-comparison/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-comparison/" class="md-nav__link">
         
   
   
@@ -3685,7 +3685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
         
   
   
@@ -3713,7 +3713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/kvm/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/kvm/" class="md-nav__link">
         
   
   
@@ -3741,7 +3741,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/kvm-hello-world2/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/kvm-hello-world2/" class="md-nav__link">
         
   
   
@@ -3769,7 +3769,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/kvm-hello-world/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/kvm-hello-world/" class="md-nav__link">
         
   
   
@@ -3797,7 +3797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/performance-counters/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/performance-counters/" class="md-nav__link">
         
   
   
@@ -3825,7 +3825,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/data-transfer-other/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-other/" class="md-nav__link">
         
   
   
@@ -3853,7 +3853,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
         
   
   
@@ -3881,7 +3881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/virtio-block/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block/" class="md-nav__link">
         
   
   
@@ -3909,7 +3909,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/virtio-block2/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block2/" class="md-nav__link">
         
   
   
@@ -3937,7 +3937,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/virtio-block3/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block3/" class="md-nav__link">
         
   
   
@@ -3965,7 +3965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/virtio-block4/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block4/" class="md-nav__link">
         
   
   
@@ -3993,7 +3993,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/virtio-block5/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block5/" class="md-nav__link">
         
   
   
@@ -4021,7 +4021,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
         
   
   
@@ -4104,7 +4104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-compression/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-compression/" class="md-nav__link">
         
   
   
@@ -4132,7 +4132,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-encryption/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-encryption/" class="md-nav__link">
         
   
   
@@ -4160,7 +4160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-format/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-format/" class="md-nav__link">
         
   
   
@@ -4188,7 +4188,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
         
   
   
@@ -4216,7 +4216,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
         
   
   
@@ -4244,7 +4244,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-refcount/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-refcount/" class="md-nav__link">
         
   
   
@@ -4272,7 +4272,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-snapshots/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-snapshots/" class="md-nav__link">
         
   
   
@@ -4300,7 +4300,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/qcow2/qcow2-write-planner/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-write-planner/" class="md-nav__link">
         
   
   
@@ -4383,7 +4383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/raw/raw-format/" class="md-nav__link">
+      <a href="../../components/instar/raw/raw-format/" class="md-nav__link">
         
   
   
@@ -4466,7 +4466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/vmdk/vmdk-compression/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-compression/" class="md-nav__link">
         
   
   
@@ -4494,7 +4494,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/vmdk/vmdk-extents/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-extents/" class="md-nav__link">
         
   
   
@@ -4522,7 +4522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/vmdk/vmdk-format/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-format/" class="md-nav__link">
         
   
   
@@ -4550,7 +4550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
         
   
   
@@ -4641,7 +4641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/" class="md-nav__link">
+      <a href="../../components/kerbside/" class="md-nav__link">
         
   
   
@@ -4669,7 +4669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/configuration/" class="md-nav__link">
+      <a href="../../components/kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -4697,7 +4697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/console-sources/" class="md-nav__link">
+      <a href="../../components/kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -4725,7 +4725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/schema/" class="md-nav__link">
+      <a href="../../components/kerbside/schema/" class="md-nav__link">
         
   
   
@@ -4753,7 +4753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/development/" class="md-nav__link">
+      <a href="../../components/kerbside/development/" class="md-nav__link">
         
   
   
@@ -4781,7 +4781,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/installation/" class="md-nav__link">
+      <a href="../../components/kerbside/installation/" class="md-nav__link">
         
   
   
@@ -4809,7 +4809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../components/kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -4837,7 +4837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/testing/" class="md-nav__link">
+      <a href="../../components/kerbside/testing/" class="md-nav__link">
         
   
   
@@ -4865,7 +4865,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/direct-qemu-harness/" class="md-nav__link">
+      <a href="../../components/kerbside/direct-qemu-harness/" class="md-nav__link">
         
   
   
@@ -4940,7 +4940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/" class="md-nav__link">
         
   
   
@@ -4968,7 +4968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-demo-install/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-demo-install/" class="md-nav__link">
         
   
   
@@ -4996,7 +4996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness/" class="md-nav__link">
         
   
   
@@ -5024,7 +5024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-host-subject/" class="md-nav__link">
         
   
   
@@ -5052,7 +5052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
         
   
   
@@ -5080,7 +5080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
   
@@ -5108,7 +5108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
   
@@ -5136,7 +5136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
         
   
   
@@ -5164,7 +5164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
         
   
   
@@ -5192,7 +5192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
         
   
   
@@ -5220,7 +5220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -5248,7 +5248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
         
   
   
@@ -5276,7 +5276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
         
   
   
@@ -5304,7 +5304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
         
   
   
@@ -5332,7 +5332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
   
@@ -5360,7 +5360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
   
@@ -5388,7 +5388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
         
   
   
@@ -5416,7 +5416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
   
@@ -5444,7 +5444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
         
   
   
@@ -5472,7 +5472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
   
@@ -5500,7 +5500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
         
   
   
@@ -5528,7 +5528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
         
   
   
@@ -5556,7 +5556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
         
   
   
@@ -5584,7 +5584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
   
@@ -5612,7 +5612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
         
   
   
@@ -5640,7 +5640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
         
   
   
@@ -5668,7 +5668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
   
@@ -5696,7 +5696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
         
   
   
@@ -5724,7 +5724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
         
   
   
@@ -5752,7 +5752,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
         
   
   
@@ -5780,7 +5780,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
   
@@ -5808,7 +5808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
   
@@ -5836,7 +5836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
         
   
   
@@ -5864,7 +5864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
         
   
   
@@ -5892,7 +5892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
         
   
   
@@ -5920,7 +5920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
         
   
   
@@ -5948,7 +5948,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
         
   
   
@@ -5976,7 +5976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -6004,7 +6004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
         
   
   
@@ -6032,7 +6032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
   
@@ -6060,7 +6060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
         
   
   
@@ -6088,7 +6088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
         
   
   
@@ -6116,7 +6116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
         
   
   
@@ -6144,7 +6144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
         
   
   
@@ -6172,7 +6172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
         
   
   
@@ -6200,7 +6200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
         
   
   
@@ -6228,7 +6228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-07-polling/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-07-polling/" class="md-nav__link">
         
   
   
@@ -6256,7 +6256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
         
   
   
@@ -6284,7 +6284,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
   
@@ -6312,7 +6312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
         
   
   
@@ -6340,7 +6340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
         
   
   
@@ -6368,7 +6368,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
         
   
   
@@ -6396,7 +6396,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
         
   
   
@@ -6424,7 +6424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
   
@@ -6452,7 +6452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/plans/PLAN-use-case-docs/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-use-case-docs/" class="md-nav__link">
         
   
   
@@ -6535,7 +6535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/console-vv-extensions/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/console-vv-extensions/" class="md-nav__link">
         
   
   
@@ -6563,7 +6563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/scancodes/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/scancodes/" class="md-nav__link">
         
   
   
@@ -6591,7 +6591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/capabilities/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/capabilities/" class="md-nav__link">
         
   
   
@@ -6619,7 +6619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/channel-protocols/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/channel-protocols/" class="md-nav__link">
         
   
   
@@ -6647,7 +6647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/compression-protocols/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/compression-protocols/" class="md-nav__link">
         
   
   
@@ -6675,7 +6675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/spice-link-protocol/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -6703,7 +6703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/protocol-overview/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/protocol-overview/" class="md-nav__link">
         
   
   
@@ -6731,7 +6731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/usb-redirection/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/usb-redirection/" class="md-nav__link">
         
   
   
@@ -6759,7 +6759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../components/kerbside/spice/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -6842,7 +6842,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../kerbside/use-cases/ovirt/" class="md-nav__link">
+      <a href="../../components/kerbside/use-cases/ovirt/" class="md-nav__link">
         
   
   
@@ -6933,7 +6933,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/" class="md-nav__link">
+      <a href="../../components/occystrap/" class="md-nav__link">
         
   
   
@@ -6961,7 +6961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/command-reference/" class="md-nav__link">
+      <a href="../../components/occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -6989,7 +6989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/development/" class="md-nav__link">
+      <a href="../../components/occystrap/development/" class="md-nav__link">
         
   
   
@@ -7017,7 +7017,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../components/occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -7045,7 +7045,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/internals/" class="md-nav__link">
+      <a href="../../components/occystrap/internals/" class="md-nav__link">
         
   
   
@@ -7073,7 +7073,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/installation/" class="md-nav__link">
+      <a href="../../components/occystrap/installation/" class="md-nav__link">
         
   
   
@@ -7101,7 +7101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/performance/" class="md-nav__link">
+      <a href="../../components/occystrap/performance/" class="md-nav__link">
         
   
   
@@ -7129,7 +7129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/pipeline/" class="md-nav__link">
+      <a href="../../components/occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -7157,7 +7157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../components/occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -7185,7 +7185,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/use-cases/" class="md-nav__link">
+      <a href="../../components/occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -7260,7 +7260,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/" class="md-nav__link">
         
   
   
@@ -7288,7 +7288,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -7316,7 +7316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -7344,7 +7344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
         
   
   
@@ -7372,7 +7372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
         
   
   
@@ -7400,7 +7400,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
         
   
   
@@ -7428,7 +7428,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
         
   
   
@@ -7456,7 +7456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
   
@@ -7484,7 +7484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
         
   
   
@@ -7512,7 +7512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
         
   
   
@@ -7540,7 +7540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
   
@@ -7568,7 +7568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
         
   
   
@@ -7596,7 +7596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
         
   
   
@@ -7624,7 +7624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
         
   
   
@@ -7652,7 +7652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
         
   
   
@@ -7680,7 +7680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
         
   
   
@@ -7708,7 +7708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
         
   
   
@@ -7736,7 +7736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
         
   
   
@@ -7764,7 +7764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -7792,7 +7792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
         
   
   
@@ -7820,7 +7820,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
         
   
   
@@ -7911,7 +7911,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../" class="md-nav__link">
+      <a href="../../components/ryll/" class="md-nav__link">
         
   
   
@@ -7939,7 +7939,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../portability/" class="md-nav__link">
+      <a href="../../components/ryll/portability/" class="md-nav__link">
         
   
   
@@ -7967,7 +7967,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development-macos/" class="md-nav__link">
+      <a href="../../components/ryll/development-macos/" class="md-nav__link">
         
   
   
@@ -7995,7 +7995,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../channel-diagnostics-audit/" class="md-nav__link">
+      <a href="../../components/ryll/channel-diagnostics-audit/" class="md-nav__link">
         
   
   
@@ -8023,7 +8023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/" class="md-nav__link">
+      <a href="../../components/ryll/configuration/" class="md-nav__link">
         
   
   
@@ -8051,7 +8051,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ci/" class="md-nav__link">
+      <a href="../../components/ryll/ci/" class="md-nav__link">
         
   
   
@@ -8079,7 +8079,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../control-socket-protocol/" class="md-nav__link">
+      <a href="../../components/ryll/control-socket-protocol/" class="md-nav__link">
         
   
   
@@ -8107,7 +8107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/" class="md-nav__link">
+      <a href="../../components/ryll/development/" class="md-nav__link">
         
   
   
@@ -8135,7 +8135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../device-redirection/" class="md-nav__link">
+      <a href="../../components/ryll/device-redirection/" class="md-nav__link">
         
   
   
@@ -8163,7 +8163,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../diagnostics/" class="md-nav__link">
+      <a href="../../components/ryll/diagnostics/" class="md-nav__link">
         
   
   
@@ -8191,7 +8191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/" class="md-nav__link">
+      <a href="../../components/ryll/features/" class="md-nav__link">
         
   
   
@@ -8219,7 +8219,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../installation/" class="md-nav__link">
+      <a href="../../components/ryll/installation/" class="md-nav__link">
         
   
   
@@ -8247,7 +8247,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-decisions/" class="md-nav__link">
+      <a href="../../components/ryll/design-decisions/" class="md-nav__link">
         
   
   
@@ -8275,7 +8275,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../libvirt-spice-recommendations/" class="md-nav__link">
+      <a href="../../components/ryll/libvirt-spice-recommendations/" class="md-nav__link">
         
   
   
@@ -8303,7 +8303,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../macos-metrics-verification/" class="md-nav__link">
+      <a href="../../components/ryll/macos-metrics-verification/" class="md-nav__link">
         
   
   
@@ -8331,7 +8331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../multi-mode-parity/" class="md-nav__link">
+      <a href="../../components/ryll/multi-mode-parity/" class="md-nav__link">
         
   
   
@@ -8359,7 +8359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../releasing/" class="md-nav__link">
+      <a href="../../components/ryll/releasing/" class="md-nav__link">
         
   
   
@@ -8387,7 +8387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rendering-pipeline/" class="md-nav__link">
+      <a href="../../components/ryll/rendering-pipeline/" class="md-nav__link">
         
   
   
@@ -8415,7 +8415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../web-frontend/" class="md-nav__link">
+      <a href="../../components/ryll/web-frontend/" class="md-nav__link">
         
   
   
@@ -8443,7 +8443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../session-lifecycle/" class="md-nav__link">
+      <a href="../../components/ryll/session-lifecycle/" class="md-nav__link">
         
   
   
@@ -8471,7 +8471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../spice-protocol/" class="md-nav__link">
+      <a href="../../components/ryll/spice-protocol/" class="md-nav__link">
         
   
   
@@ -8499,7 +8499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../troubleshooting/" class="md-nav__link">
+      <a href="../../components/ryll/troubleshooting/" class="md-nav__link">
         
   
   
@@ -8527,7 +8527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../web-mode-internals/" class="md-nav__link">
+      <a href="../../components/ryll/web-mode-internals/" class="md-nav__link">
         
   
   
@@ -8602,7 +8602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../components/ryll/plans/" class="md-nav__link">
         
   
   
@@ -8630,7 +8630,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-initial/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-initial/" class="md-nav__link">
         
   
   
@@ -8658,7 +8658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-capture/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
   
@@ -8686,7 +8686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-packaging/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-packaging/" class="md-nav__link">
         
   
   
@@ -8714,7 +8714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-usb-redir/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-usb-redir/" class="md-nav__link">
         
   
   
@@ -8742,7 +8742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-cursor-rendering/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
         
   
   
@@ -8770,7 +8770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-bug-reports/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-bug-reports/" class="md-nav__link">
         
   
   
@@ -8798,7 +8798,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-usb-ui/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-usb-ui/" class="md-nav__link">
         
   
   
@@ -8826,7 +8826,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-webdav/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-webdav/" class="md-nav__link">
         
   
   
@@ -8854,7 +8854,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-crate-extraction/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
         
   
   
@@ -8882,7 +8882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-remaining-issues/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
   
@@ -8910,7 +8910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-display-iteration-followups/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
         
   
   
@@ -8938,7 +8938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
         
   
   
@@ -8966,7 +8966,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
         
   
   
@@ -8994,7 +8994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-deferred-debt/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
         
   
   
@@ -9022,7 +9022,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-supply-chain-scanning/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
         
   
   
@@ -9050,7 +9050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-supply-chain-followups/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
         
   
   
@@ -9078,7 +9078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
         
   
   
@@ -9106,7 +9106,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-idle-cpu-and-latency/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
   
@@ -9134,7 +9134,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-display-draw-ops/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
         
   
   
@@ -9162,7 +9162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-android-apk/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-android-apk/" class="md-nav__link">
         
   
   
@@ -9190,7 +9190,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
         
   
   
@@ -9218,7 +9218,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
   
@@ -9246,7 +9246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-hamburger-menu/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
         
   
   
@@ -9274,7 +9274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-notifications/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
   
@@ -9302,7 +9302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-pr31-followup/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
         
   
   
@@ -9330,7 +9330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-connection-properties/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-connection-properties/" class="md-nav__link">
         
   
   
@@ -9358,7 +9358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-display-window-sizing/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
         
   
   
@@ -9386,7 +9386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-web-frontend/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-web-frontend/" class="md-nav__link">
         
   
   
@@ -9414,7 +9414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
         
   
   
@@ -9442,7 +9442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-crate-release/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-crate-release/" class="md-nav__link">
         
   
   
@@ -9470,7 +9470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-session-001-feedback/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
         
   
   
@@ -9498,7 +9498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-video-keeping-up/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
         
   
   
@@ -9526,7 +9526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-macos-runtime-metrics/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
         
   
   
@@ -9554,7 +9554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-ci-platform-matrix/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
         
   
   
@@ -9582,7 +9582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-stream-caps-and-flap/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
   
@@ -9610,7 +9610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-self-hosted-runners/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
         
   
   
@@ -9638,7 +9638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-pip-distribution/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
         
   
   
@@ -9666,7 +9666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
         
   
   
@@ -9694,7 +9694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-two-stage-ci/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-two-stage-ci/" class="md-nav__link">
         
   
   
@@ -9745,7 +9745,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../features/" class="md-nav__link">
+      <a href="../../features/" class="md-nav__link">
         
   
   
@@ -9772,7 +9772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../glossary/" class="md-nav__link">
+      <a href="../../glossary/" class="md-nav__link">
         
   
   
@@ -9846,7 +9846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -9881,7 +9881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../community/" class="md-nav__link">
+      <a href="../../community/" class="md-nav__link">
         
   
   
@@ -9955,7 +9955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -9983,7 +9983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -10011,7 +10011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -10039,7 +10039,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -10067,7 +10067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -10095,7 +10095,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -10123,7 +10123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -10151,7 +10151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/objects/" class="md-nav__link">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -10179,7 +10179,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -10308,7 +10308,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -10336,7 +10336,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -10364,7 +10364,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -10392,7 +10392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -10420,7 +10420,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -10448,7 +10448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -10476,7 +10476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -10504,7 +10504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -10532,7 +10532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -10560,7 +10560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -10588,7 +10588,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -10616,7 +10616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -10644,7 +10644,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -10680,7 +10680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -10708,7 +10708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -10736,7 +10736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -10764,7 +10764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -10792,7 +10792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/network_dispatcher/" class="md-nav__link">
+      <a href="../../developer_guide/network_dispatcher/" class="md-nav__link">
         
   
   
@@ -10820,7 +10820,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -10848,7 +10848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -10876,7 +10876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -10904,7 +10904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -10932,7 +10932,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -11014,7 +11014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -11042,7 +11042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -11070,7 +11070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -11152,7 +11152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -11180,7 +11180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -11208,7 +11208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -11236,7 +11236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/database/" class="md-nav__link">
+      <a href="../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -11264,7 +11264,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/events/" class="md-nav__link">
+      <a href="../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -11292,7 +11292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -11320,7 +11320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/load_balancing/" class="md-nav__link">
+      <a href="../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -11348,7 +11348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -11376,7 +11376,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/logging/" class="md-nav__link">
+      <a href="../../operator_guide/logging/" class="md-nav__link">
         
   
   
@@ -11404,7 +11404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -11432,7 +11432,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/node_health/" class="md-nav__link">
+      <a href="../../operator_guide/node_health/" class="md-nav__link">
         
   
   
@@ -11460,7 +11460,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -11488,7 +11488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -11516,7 +11516,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/scheduler/" class="md-nav__link">
+      <a href="../../operator_guide/scheduler/" class="md-nav__link">
         
   
   
@@ -11544,7 +11544,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -11572,7 +11572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -11627,10 +11627,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Prompt
       
     </span>
   </a>
@@ -11638,10 +11638,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#files-changed" class="md-nav__link">
+  <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Files changed
+        Situation
       
     </span>
   </a>
@@ -11649,22 +11649,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#detailed-steps" class="md-nav__link">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Detailed steps
+        Mission and problem statement
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Detailed steps">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Open questions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#step-1-add-webdavcommand-and-channelevent-variants" class="md-nav__link">
+  <a href="#q1-server-streaming-cursor-pagination-or-bounded-by-construction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Add WebdavCommand and ChannelEvent variants
+        Q1. Server streaming, cursor pagination, or bounded-by-construction?
       
     </span>
   </a>
@@ -11672,10 +11683,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-2-add-cli-flags" class="md-nav__link">
+  <a href="#q2-what-is-the-caller-taxonomy-and-who-enforces-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Add CLI flags
+        Q2. What is the caller taxonomy, and who enforces it?
       
     </span>
   </a>
@@ -11683,10 +11694,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-create-srcchannelswebdavrs" class="md-nav__link">
+  <a href="#q3-what-is-the-bound-and-is-it-per-rpc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Create src/channels/webdav.rs
+        Q3. What is the bound, and is it per-RPC?
       
     </span>
   </a>
@@ -11694,43 +11705,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3a-extract-shared-vmc-helpers-optional" class="md-nav__link">
+  <a href="#q4-where-does-the-cap-end-up" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3a: Extract shared VMC helpers (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-register-channel-in-apprs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Register channel in app.rs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-5-add-test-qemu-webdav-makefile-target" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 5: Add test-qemu-webdav Makefile target
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-6-verify-channel-type" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 6: Verify channel type
+        Q4. Where does the cap end up?
       
     </span>
   </a>
@@ -11743,10 +11721,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
+  <a href="#execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing
+        Execution
       
     </span>
   </a>
@@ -11754,6 +11732,156 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dependencies-on-other-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies on other plans
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent guidance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#planning-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planning effort
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-level-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-level guidance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-choice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model choice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#management-session-review-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Management session review checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deliberately-deferred-fault-injected-functional-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deliberately deferred: fault-injected functional coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-index-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation index maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11761,6 +11889,11 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -11785,378 +11918,724 @@
   
 
 
-<h1 id="phase-1-spicevmc-port-channel-transport-for-webdav">Phase 1: SpiceVMC port channel transport for WebDAV<a class="headerlink" href="#phase-1-spicevmc-port-channel-transport-for-webdav" title="Permanent link">&para;</a></h1>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Create the SPICE-level channel handler for WebDAV (channel
-type 11). This is a thin transport layer — it connects,
-handles the standard SpiceVMC message types
-(<code>SPICEVMC_DATA</code> 101 and <code>SPICEVMC_COMPRESSED_DATA</code> 102),
-BaseChannel ACK management, and passes raw byte payloads
-to a callback (stubbed in this phase). It follows the exact
-same pattern as <code>src/channels/usbredir.rs</code>.</p>
-<p>This phase also adds the <code>WebdavCommand</code> enum, new
-<code>ChannelEvent</code> variants, CLI flags (<code>--share-dir</code>,
-<code>--share-dir-ro</code>), and extends the Makefile with a
-<code>test-qemu-webdav</code> target so we can verify the channel
-type the server advertises.</p>
-<h2 id="files-changed">Files changed<a class="headerlink" href="#files-changed" title="Permanent link">&para;</a></h2>
+<h1 id="bound-the-size-of-databaseservice-grpc-replies">Bound the size of DatabaseService gRPC replies<a class="headerlink" href="#bound-the-size-of-databaseservice-grpc-replies" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this document,
+explore the shakenfist codebase thoroughly. Read the gRPC service
+definition (<code>protos/database.proto</code>), the three-layer client in
+<code>shakenfist/mariadb.py</code> (particularly <code>_grpc_call</code> and its retry and
+channel-rebuild logic, <code>_grpc_get_objects_by_state</code>,
+<code>_grpc_get_object_events</code>, and <code>get_active_blob_uuids</code>), the channel
+options in <code>shakenfist/util/grpc_channel.py</code>, the server setup and
+thread pool in <code>shakenfist/daemons/database/main.py</code>, the object
+iterator machinery in <code>shakenfist/baseobject.py</code>
+(<code>DatabaseBackedObjectIterator._find</code> and its subclass overrides), and
+the sweeps in <code>shakenfist/daemons/cluster/scheduled_tasks.py</code> and
+<code>shakenfist/daemons/cleaner/main.py</code> which consume list-shaped replies.
+Ground your answers in what the code actually does today rather than
+guessing.</p>
+<p>Where a question touches on external concepts (gRPC message framing and
+size limits, server-streaming semantics and flow control, protobuf
+serialisation cost, MariaDB keyset versus OFFSET pagination and index
+selection), research as needed to give a confident answer. Flag any
+uncertainty explicitly.</p>
+<p>Consult <code>ARCHITECTURE.md</code> for the system architecture overview and
+<code>CLAUDE.md</code> for the database access patterns, the three-layer client
+convention, and the SQL-pushdown priority. <code>docs/developer_guide/
+coding_rules.md</code> carries the rule this plan's motivating defect
+produced ("<code>or []</code> is a decision about what a failed read means"), and
+<code>docs/developer_guide/database_internals.md</code> describes the object cache
+and gRPC reliability machinery this plan must not regress.</p>
+<!-- shared-block: plan-file-conventions v1 -->
+<p>Plan file conventions (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-file-conventions.md</code>):</p>
+<ul>
+<li>All planning documents live in <code>docs/plans/</code>.</li>
+<li>Detailed planning gets one plan file per phase. Phase files are
+  named for their master plan, sit in the same directory as it,
+  and append <code>-phase-NN-descriptive</code> before the <code>.md</code> extension.</li>
+<li>The master plan tracks its phases in a table under its Execution
+  section:</li>
+</ul>
 <table>
 <thead>
 <tr>
-<th>File</th>
-<th>Change</th>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>src/channels/mod.rs</code></td>
-<td>Add <code>pub mod webdav</code>, export <code>WebdavChannel</code>, add <code>WebdavCommand</code> enum, add <code>ChannelEvent</code> variants</td>
+<td>1. Schema migration</td>
+<td>PLAN-thing-phase-01-schema.md</td>
+<td>Not started</td>
 </tr>
 <tr>
-<td><code>src/channels/webdav.rs</code></td>
-<td><strong>New file.</strong> Channel handler struct and <code>run()</code> loop</td>
-</tr>
-<tr>
-<td><code>src/config.rs</code></td>
-<td>Add <code>--share-dir</code> and <code>--share-dir-ro</code> CLI flags</td>
-</tr>
-<tr>
-<td><code>src/app.rs</code></td>
-<td>Register WebDAV channel, handle new events, create command channel</td>
-</tr>
-<tr>
-<td><code>Makefile</code></td>
-<td>Add <code>test-qemu-webdav</code> target</td>
+<td>2. Public API</td>
+<td>PLAN-thing-phase-02-api.md</td>
+<td>Not started</td>
 </tr>
 </tbody>
 </table>
-<h2 id="detailed-steps">Detailed steps<a class="headerlink" href="#detailed-steps" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-add-webdavcommand-and-channelevent-variants">Step 1: Add <code>WebdavCommand</code> and <code>ChannelEvent</code> variants<a class="headerlink" href="#step-1-add-webdavcommand-and-channelevent-variants" title="Permanent link">&para;</a></h3>
-<p>In <code>src/channels/mod.rs</code>:</p>
 <ul>
-<li>Add <code>pub mod webdav;</code> and
-  <code>pub use webdav::WebdavChannel;</code> alongside the existing
-  USB module declarations.</li>
-<li>Add a <code>WebdavCommand</code> enum:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="nc">WebdavCommand</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="sd">/// Start sharing a local directory.</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="n">ShareDirectory</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">        </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">PathBuf</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="n">read_only</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="p">},</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="sd">/// Stop sharing the current directory.</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="n">StopSharing</span><span class="p">,</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">}</span>
-</code></pre></div></li>
-<li>Add <code>ChannelEvent</code> variants:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="sd">/// A WebDAV channel connected successfully.</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">WebdavChannelReady</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="sd">/// WebDAV folder sharing is now active.</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">WebdavSharingStarted</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">read_only</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">},</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="sd">/// WebDAV folder sharing stopped.</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">WebdavSharingStopped</span><span class="p">,</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="sd">/// A WebDAV error occurred.</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">WebdavError</span><span class="p">(</span><span class="nb">String</span><span class="p">),</span>
-</code></pre></div></li>
+<li>One commit per logical change, and at minimum one commit per
+  phase. Unrelated changes are not batched into a single commit.
+  Each commit is self-contained: it builds, passes tests, and has
+  a message explaining what changed and why.</li>
 </ul>
-<h3 id="step-2-add-cli-flags">Step 2: Add CLI flags<a class="headerlink" href="#step-2-add-cli-flags" title="Permanent link">&para;</a></h3>
-<p>In <code>src/config.rs</code>, add to the <code>Args</code> struct:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="sd">/// Share a local directory with the guest via</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="sd">/// WebDAV (SPICE folder sharing)</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="cp">#[arg(long = </span><span class="s">"share-dir"</span><span class="cp">)]</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">pub</span><span class="w"> </span><span class="n">share_dir</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="nb">String</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="sd">/// Make the shared directory read-only</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="cp">#[arg(long = </span><span class="s">"share-dir-ro"</span><span class="cp">)]</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">pub</span><span class="w"> </span><span class="n">share_dir_ro</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-</code></pre></div>
-<p>Add a <code>ShareDirConfig</code> struct and <code>parse_share_dir()</code>
-function following the <code>VirtualDiskConfig</code> /
-<code>parse_virtual_disks()</code> pattern:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">ShareDirConfig</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">PathBuf</span><span class="p">,</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">read_only</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">}</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">parse_share_dir</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">Args</span><span class="p">)</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">ShareDirConfig</span><span class="o">&gt;&gt;</span>
-</code></pre></div>
-<p>Validate that the path exists and is a directory.</p>
-<h3 id="step-3-create-srcchannelswebdavrs">Step 3: Create <code>src/channels/webdav.rs</code><a class="headerlink" href="#step-3-create-srcchannelswebdavrs" title="Permanent link">&para;</a></h3>
-<p>Create a new channel handler following the usbredir pattern
-exactly. The struct should be:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">WebdavChannel</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="n">stream</span><span class="p">:</span><span class="w"> </span><span class="nc">SpiceStream</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="n">event_tx</span><span class="p">:</span><span class="w"> </span><span class="nc">mpsc</span><span class="p">::</span><span class="n">Sender</span><span class="o">&lt;</span><span class="n">ChannelEvent</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="n">webdav_rx</span><span class="p">:</span><span class="w"> </span><span class="nc">mpsc</span><span class="p">::</span><span class="n">Receiver</span><span class="o">&lt;</span><span class="n">WebdavCommand</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="n">buffer</span><span class="p">:</span><span class="w"> </span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="n">capture</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">Arc</span><span class="o">&lt;</span><span class="n">CaptureSession</span><span class="o">&gt;&gt;</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="n">byte_counter</span><span class="p">:</span><span class="w"> </span><span class="nc">Arc</span><span class="o">&lt;</span><span class="n">ByteCounter</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="c1">// BaseChannel ACK state</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="n">ack_generation</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="n">ack_window</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="n">message_count</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="n">last_ack</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="c1">// Statistics</span>
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="n">bytes_in</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span>
-<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">    </span><span class="n">bytes_out</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span>
-<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
-<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="c1">// Sharing state</span>
-<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">    </span><span class="n">shared_dir</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">ShareDirConfig</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="p">}</span>
-</code></pre></div>
-<p>Implement the following methods, mirroring usbredir:</p>
+<!-- shared-block-end -->
+
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p><code>DatabaseService</code> has 226 RPCs and 68 <code>repeated</code> fields across its
+messages. Several of those replies are unbounded by construction:
+<code>GetObjectsByState</code> returns every uuid of a type in a set of states,
+<code>GetObjectEvents</code> returns an object's event history, and the various
+<code>Get*Uuids</code> / <code>Get*Attributes</code> list calls return whatever the cluster
+happens to contain. Nothing in the protocol, the server, or the client
+places a ceiling on any of them. The only ceiling is gRPC's own message
+size limit, which is a transport-layer accident rather than a designed
+bound, and which fails in the least useful way possible: the client
+receives no data at all and an opaque <code>RESOURCE_EXHAUSTED</code>.</p>
+<p>The sfcbr cluster has now crossed that limit twice, from two different
+daemons, on two different RPCs (issue 3638):</p>
 <ul>
-<li>
-<p><strong><code>new()</code></strong>: constructor taking stream, event_tx,
-  webdav_rx, auto_share_dir (Option<ShareDirConfig>),
-  capture, byte_counter. If <code>auto_share_dir</code> is Some,
-  store it in <code>shared_dir</code>.</p>
-</li>
-<li>
-<p><strong><code>run()</code></strong>: async method with structure:</p>
-</li>
-<li>Send <code>ChannelEvent::WebdavChannelReady</code> via event_tx.</li>
-<li>If <code>shared_dir</code> is Some, send
-     <code>WebdavSharingStarted</code> event (actual WebDAV serving
-     is stubbed — we just track state here).</li>
-<li>Enter <code>tokio::select!</code> loop with two branches:<ul>
-<li><strong>Network read</strong>: read up to 65536 bytes into a
-   temporary buffer. Update byte_counter, feed pcap
-   capture, extend internal buffer, call
-   <code>process_messages()</code>.</li>
-<li><strong>Command receive</strong>: receive <code>WebdavCommand</code> from
-   <code>webdav_rx</code>, call <code>handle_command()</code>.</li>
+<li><code>GetObjectEvents</code>, nine failures on 2026-07-31 from sf-api gunicorn
+  workers, replies up to 6,940,655 bytes against the 4,194,304 default.</li>
+<li><code>GetObjectsByState</code> for <code>node_inst_op</code>, one failure on 2026-08-04
+  from sf-cluster, 4,419,628 bytes.</li>
 </ul>
-</li>
-<li>
-<p>On stream close (n == 0), send
-     <code>Disconnected(ChannelType::Webdav)</code> and return.</p>
-</li>
-<li>
-<p><strong><code>process_messages()</code></strong>: loop while buffer contains a
-  complete message (check <code>MessageHeader::SIZE</code> then
-  total size). For each complete message, drain from
-  buffer, increment <code>message_count</code>, call
-  <code>handle_message()</code>, check ACK window.</p>
-</li>
-<li>
-<p><strong><code>handle_message(msg_type, payload)</code></strong>: match on:</p>
-</li>
-<li><code>spicevmc_server::DATA</code> → call <code>handle_vmc_data()</code>.</li>
-<li><code>spicevmc_server::COMPRESSED_DATA</code> → call
-    <code>handle_vmc_compressed_data()</code>.</li>
-<li><code>spicevmc_server::SET_ACK</code> → read generation/window,
-    store, send ACK_SYNC response.</li>
-<li><code>spicevmc_server::PING</code> → read ID/timestamp, send
-    PONG.</li>
-<li>
-<p>Unknown → log warning.</p>
-</li>
-<li>
-<p><strong><code>handle_vmc_data(payload)</code></strong>: in this phase, just log
-  the payload size at debug level. This is where phase 2
-  will plug in the mux demultiplexer.</p>
-</li>
-<li>
-<p><strong><code>handle_vmc_compressed_data(payload)</code></strong>: decompress
-  LZ4 using the same logic as usbredir (check compression
-  type byte, decompress with <code>lz4_flex</code>, cap at 64MB,
-  call <code>handle_vmc_data()</code> on result). Extract this logic
-  into a shared helper if practical (see step 3a below).</p>
-</li>
-<li>
-<p><strong><code>send_data(data)</code></strong>: wrap in SPICEVMC_DATA message
-  via <code>make_message()</code>, call <code>send_with_log()</code>.</p>
-</li>
-<li>
-<p><strong><code>send_compressed_data(data)</code></strong>: compress with
-  <code>lz4_flex::compress_prepend_size()</code>, wrap in
-  <code>SPICEVMC_COMPRESSED_DATA</code> with the compression type
-  byte prepended, call <code>send_with_log()</code>. Only compress
-  if the compressed output is smaller than the input;
-  otherwise fall back to uncompressed <code>send_data()</code>.</p>
-</li>
-<li>
-<p><strong><code>send_with_log(msg_type, data)</code></strong>: log type and size
-  at trace level, write to stream, flush, increment
-  <code>bytes_out</code>.</p>
-</li>
-<li>
-<p><strong><code>send(data)</code></strong>: feed pcap capture, write_all to
-  stream, flush, increment bytes_out.</p>
-</li>
-<li>
-<p><strong><code>handle_command(cmd)</code></strong>: match on:</p>
-</li>
-<li><code>ShareDirectory { path, read_only }</code> → store config,
-    send <code>WebdavSharingStarted</code> event. (Actual serving
-    stubbed to phase 3/4.)</li>
-<li><code>StopSharing</code> → clear config, send
-    <code>WebdavSharingStopped</code> event.</li>
-</ul>
-<h3 id="step-3a-extract-shared-vmc-helpers-optional">Step 3a: Extract shared VMC helpers (optional)<a class="headerlink" href="#step-3a-extract-shared-vmc-helpers-optional" title="Permanent link">&para;</a></h3>
-<p>If the duplication between usbredir.rs and webdav.rs for
-LZ4 decompression, ACK management, and PING/PONG handling
-is excessive, extract into a shared module. Candidates:</p>
+<p>This is the same failure class as the system-namespace service-key
+bloat of issues 3521 and 3522, but that fix purged one pathological
+object; it did not bound anything.</p>
+<p>Two things have already been done about it, both stopgaps, both on the
+<code>issue-fix-3638</code> branch:</p>
+<ol>
+<li>The client receive cap was raised from the 4MiB default to 32MiB in
+   <code>shakenfist/util/grpc_channel.py</code>. This clears observed traffic with
+   roughly 4.5x headroom. It does not fix anything -- it moves the
+   cliff, and deliberately does not move it far, because sf-database
+   has to serialise whatever it sends and an arbitrarily generous
+   client cap trades a fast client-side failure for memory pressure on
+   the database tier.</li>
+<li>The callers that consumed these replies were made honest about
+   failure. <code>get_objects_by_state()</code> returns <code>None</code> on a failed read
+   and <code>[]</code> for no matches, and three of the four call sites collapsed
+   the two with <code>or []</code>. One of those was actively dangerous: the
+   cleaner uses <code>get_active_blob_uuids()</code> as a <em>complement</em> set and
+   unlinks every blob file on disk not named in it, so a single
+   oversized reply was an instruction to delete a node's entire blob
+   store. That accessor now raises <code>DatabaseUnavailable</code>; the sweeps in
+   the cluster daemon route their work-list reads through
+   <code>_sweep_work_list()</code>, which counts consecutive failures into the
+   <code>cluster_sweep_work_list_failure_streak</code> gauge and logs a skipped
+   pass.</li>
+</ol>
+<p>Neither addresses the actual problem, which is that the protocol permits
+replies of unbounded size and we find out how big they got by having one
+fail in production.</p>
+<p>There is a second-order effect worth naming, because it is what made the
+<code>GetObjectsByState</code> instance self-sustaining. The failing read was the
+garbage collector's work list. Every failed pass left the backlog
+uncollected, and every uncollected object made the next reply larger.
+An unbounded reply feeding a sweep that shrinks the set it reads is a
+system that recovers on its own; feeding a sweep that <em>cannot run</em>
+because the reply is too large, it is a ratchet.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p><strong>No <code>DatabaseService</code> reply may be unbounded in size.</strong> Every
+list-shaped reply has a documented bound, a defined behaviour when the
+result set exceeds it, and a caller contract that makes the difference
+between "here is everything" and "here is some of it" impossible to
+ignore. When this plan is complete, raising the client message cap is
+never again the response to a <code>RESOURCE_EXHAUSTED</code>, and a new unbounded
+reply cannot be added without CI noticing.</p>
+<p>Three things this plan must not break, all of them hard-won:</p>
 <ul>
-<li><code>fn decompress_vmc_data(payload: &amp;[u8]) -&gt; Result&lt;Vec&lt;u8&gt;&gt;</code>
-  in a new <code>src/channels/vmc_common.rs</code>.</li>
-<li>ACK state management could be a small struct with
-  <code>check_and_send_ack()</code> method.</li>
-<li>PING/PONG handler as a standalone function.</li>
+<li><strong>The unary retry path.</strong> <code>_grpc_call</code> retries on <code>UNAVAILABLE</code>,
+  <code>DEADLINE_EXCEEDED</code> and <code>CANCELLED</code>, rebuilding the channel for some
+  of those, and raises <code>DatabaseUnavailable</code> once the budget is spent.
+  That behaviour absorbed the database-tier rolling restart (issue
+  3430) and is the reason a "not found" return value can be trusted
+  (issue 3373). Any change to how these reads are transported has to
+  say what it does to that path.</li>
+<li><strong>The watchdog budget.</strong> Several callers run upstream of a systemd
+  watchdog pet and pass <code>BOUNDED_QUERY_TIMEOUT</code> with a reduced retry
+  count precisely so a stalled tier cannot SIGABRT them (issue 3586).
+  A read that becomes N round trips has an N-times-larger worst case
+  unless the caller's budget is recomputed.</li>
+<li><strong>The server's thread pool.</strong> sf-database serves from a 64-worker
+  <code>ThreadPoolExecutor</code>. A transport that holds a worker for the
+  duration of a client's read, rather than for the duration of a query,
+  changes the tier's concurrency arithmetic.</li>
 </ul>
-<p>Only do this if it meaningfully reduces duplication without
-over-abstracting. If the duplicated code is under ~40 lines
-per function, it may be cleaner to keep it inline. Use
-judgement.</p>
-<h3 id="step-4-register-channel-in-apprs">Step 4: Register channel in <code>app.rs</code><a class="headerlink" href="#step-4-register-channel-in-apprs" title="Permanent link">&para;</a></h3>
-<p>Add WebDAV channel support to the application:</p>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<p>These are for phase 0 to resolve. The first is the substantive one.</p>
+<h3 id="q1-server-streaming-cursor-pagination-or-bounded-by-construction">Q1. Server streaming, cursor pagination, or bounded-by-construction?<a class="headerlink" href="#q1-server-streaming-cursor-pagination-or-bounded-by-construction" title="Permanent link">&para;</a></h3>
+<p>Three mechanisms are available, and they are not mutually exclusive --
+the likely answer is that different RPCs want different ones.</p>
+<p><strong>Server streaming</strong> (<code>rpc Get... (Request) returns (stream Reply)</code>).
+The message cap applies per message, so a stream of fixed-size chunks
+is bounded however large the result set is. There is no cursor to
+mint, no continuation token to validate, and no question about what a
+client should do with a stale one. The client wrapper accumulates
+chunks into the same list callers get today, so calling code is
+unchanged. Against it: a stream holds a server thread for its whole
+life rather than for one query, so a slow or stalled client pins a
+worker out of 64; the retry logic in <code>_grpc_call</code> is built for unary
+calls, and a mid-stream failure has already delivered partial results,
+so "retry the call" stops being a safe default; and this codebase's
+one previous encounter with streaming on this service was the
+<code>grpc.health.v1</code> Watch deadlock documented at length in
+<code>daemons/database/main.py</code>, where the synchronous servicer deadlocked
+against the server's event-dispatch thread. That history is not
+dispositive -- Watch is a long-lived subscription and these would be
+short-lived reads -- but it argues for proving the pattern on one RPC
+before committing the protocol to it.</p>
+<p><strong>Keyset pagination.</strong> Unary calls stay unary, so the retry path, the
+timeout budgets and the caller contract are all untouched, and a server
+thread is held per page rather than per read. The cursor for the RPCs
+that actually matter here is not a general-purpose stateful cursor: it
+is the last uuid seen, with the query ordered by primary key, which is
+index-friendly in a way <code>OFFSET</code> is not. The cost is a real one
+though -- the loop has to live somewhere, and if it lives in the client
+wrapper then the wrapper is doing N round trips behind a caller who
+thinks it made one call, which is exactly the watchdog-budget problem
+above. It also needs a stated contract for rows that change between
+pages.</p>
+<p><strong>Bounded by construction.</strong> Some of these reads do not want a complete
+list at all and never did. A sweep that drains a work queue wants "the
+next N items to work on, oldest first"; a <code>LIMIT N</code> with an explicit
+ordering is a <em>complete and correct</em> answer to that question, not a
+truncated one, and it bounds the reply permanently with no new protocol
+machinery. This is the cheapest option and it retires a good share of
+the exposure, but it is only available where the caller genuinely does
+not need the whole set -- and telling those callers apart from the ones
+that do is exactly what phase 1 is for. Where it does apply the reply
+must still carry an explicit "there was more" signal, so nothing can
+mistake a bounded page for an exhaustive answer.</p>
+<p><strong>Current recommendation, to be confirmed or overturned in phase 0:</strong>
+bounded-by-construction for the sweep callers (phase 2), because it is
+cheap, safe, and immediately useful; and then a single decision between
+streaming and pagination for the genuinely unbounded reads, made
+against the reply-size histogram phase 1 produces rather than against
+intuition. The instinct that streaming avoids maintaining a cursor is
+correct and is a real simplification; the counterweight is that
+pagination leaves the hardened unary retry path in place, and the
+retry path is load-bearing in a way the cursor is not.</p>
+<h3 id="q2-what-is-the-caller-taxonomy-and-who-enforces-it">Q2. What is the caller taxonomy, and who enforces it?<a class="headerlink" href="#q2-what-is-the-caller-taxonomy-and-who-enforces-it" title="Permanent link">&para;</a></h3>
+<p>The motivating defect turned on a distinction the code does not
+currently express: a caller that <em>iterates</em> a list can tolerate a short
+one, a caller that <em>complements</em> or <em>gates</em> on it cannot. Should that
+be a type-level distinction (a <code>PartialList</code> result the caller must
+unwrap), a naming convention, or a documented rule with a CI check?</p>
+<h3 id="q3-what-is-the-bound-and-is-it-per-rpc">Q3. What is the bound, and is it per-RPC?<a class="headerlink" href="#q3-what-is-the-bound-and-is-it-per-rpc" title="Permanent link">&para;</a></h3>
+<p>One global row or byte budget is simpler to reason about; per-RPC
+budgets fit the traffic better. Phase 1's measurements should decide
+this rather than a guess, which is exactly the mistake the 4MiB default
+represents.</p>
+<h3 id="q4-where-does-the-cap-end-up">Q4. Where does the cap end up?<a class="headerlink" href="#q4-where-does-the-cap-end-up" title="Permanent link">&para;</a></h3>
+<p>If replies become genuinely bounded, the 32MiB client cap can come back
+down -- possibly below the 4MiB default, which would turn any regression
+into an immediate loud failure in CI rather than a slow discovery in
+production. Attractive, but it needs the enforcement of phase 4 to be
+trustworthy first.</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Decisions: mechanism per RPC class, caller taxonomy, bound policy</td>
+<td>PLAN-grpc-bounded-replies-phase-00-decisions.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>1. Audit and measure: classify every <code>repeated</code> reply field and every caller; add a server-side reply-size histogram</td>
+<td>PLAN-grpc-bounded-replies-phase-01-audit.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>2. Bounded by construction: convert sweep-style callers to explicit "next N, oldest first" queries with an explicit more-available signal</td>
+<td>PLAN-grpc-bounded-replies-phase-02-sweeps.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>3. The general mechanism for genuinely unbounded reads (<code>GetObjectEvents</code>, <code>GetObjectsByState</code>, the <code>Get*Uuids</code> family)</td>
+<td>PLAN-grpc-bounded-replies-phase-03-mechanism.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>4. Enforcement: CI fails when a new unbounded <code>repeated</code> reply field appears unregistered</td>
+<td>PLAN-grpc-bounded-replies-phase-04-enforcement.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>5. Lower the client cap, retire the stopgaps, document the contract</td>
+<td>PLAN-grpc-bounded-replies-phase-05-closeout.md</td>
+<td>Not started</td>
+</tr>
+</tbody>
+</table>
+<p>Named for phase 1's audit scope, so they are not rediscovered one
+review round at a time: <code>_direct_get_expired_blob_uuids()</code> and
+<code>_direct_get_stale_transcoded_blob_uuids()</code> both still end in <code>except
+OperationalError: return []</code>, and are consumed by the same
+<code>_cluster_wide_cleanup()</code> pass as the accessors this branch hardened.
+Both callers only iterate, so the collapse is permitted by the rule
+rather than overlooked by it — but "permitted" is a judgement that
+should be recorded per caller, which is what the taxonomy in Q2 is for.
+<code>Node.instances</code> is the one to look at hardest: it is not a complement
+set, but a node whose instance list reads empty during an outage is a
+node the scheduler believes is idle.</p>
+<p><code>DatabaseBackedObjectIterator._find()</code> belongs in the same audit, and
+is the widest instance of the pattern in the tree. A tier-wide
+<code>DatabaseUnavailable</code> propagates out of it deliberately — catching it
+would rebuild the #3638 hazard one layer up, in every <code>Blobs()</code>,
+<code>IPAMs()</code> and <code>AgentOperations()</code> caller at once — but a <code>None</code> return
+from the per-reply failure shape still truncates to an empty
+iteration. That is tolerable only for as long as every iterator caller
+iterates rather than complements, which is a property of the callers
+and not of the iterator, and so is exactly the kind of thing the Q2
+taxonomy has to be able to state. Whichever bounding mechanism phase 3
+picks, this is the call site where a partially-consumed generator has
+to be distinguishable from a complete one.</p>
+<p>Sequencing constraints:</p>
 <ul>
-<li>
-<p><strong>Command channel</strong>: create
-  <code>let (webdav_tx, webdav_rx) = mpsc::channel(16);</code>
-  alongside the USB command channel. Store <code>webdav_tx</code>
-  in <code>RyllApp</code> as
-  <code>webdav_tx: Option&lt;mpsc::Sender&lt;WebdavCommand&gt;&gt;</code>.</p>
-</li>
-<li>
-<p><strong>Channel connection</strong>: in the channel type match (around
-  line 1799), add a <code>ChannelType::Webdav</code> arm:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">ChannelType</span><span class="p">::</span><span class="n">Webdav</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">webdav_rx</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">webdav_rx</span><span class="p">.</span><span class="n">take</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">stream</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">connect_channel</span><span class="p">(</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">            </span><span class="n">session_id</span><span class="p">,</span><span class="w"> </span><span class="n">channel_type</span><span class="p">,</span><span class="w"> </span><span class="n">channel_id</span><span class="p">,</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">        </span><span class="p">).</span><span class="k">await</span><span class="o">?</span><span class="p">;</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">channel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">WebdavChannel</span><span class="p">::</span><span class="n">new</span><span class="p">(</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">            </span><span class="n">stream</span><span class="p">,</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">            </span><span class="n">event_tx</span><span class="p">.</span><span class="n">clone</span><span class="p">(),</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">            </span><span class="n">webdav_rx</span><span class="p">,</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">            </span><span class="n">share_dir_config</span><span class="p">.</span><span class="n">clone</span><span class="p">(),</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">            </span><span class="n">capture</span><span class="p">.</span><span class="n">clone</span><span class="p">(),</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">            </span><span class="n">byte_counter</span><span class="p">.</span><span class="n">clone</span><span class="p">(),</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">        </span><span class="p">);</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="n">handles</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">tokio</span><span class="p">::</span><span class="n">spawn</span><span class="p">(</span><span class="k">async</span><span class="w"> </span><span class="k">move</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">            </span><span class="n">channel</span><span class="p">.</span><span class="n">run</span><span class="p">().</span><span class="k">await</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">        </span><span class="p">}));</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="p">}</span>
-</code></pre></div></p>
-</li>
-<li>
-<p><strong>Parse CLI args</strong>: call <code>parse_share_dir(&amp;args)</code> and
-  pass the result to the channel constructor.</p>
-</li>
-<li>
-<p><strong>Event handling</strong>: add match arms for the new
-  <code>ChannelEvent</code> variants in both GUI and headless mode:</p>
-</li>
-<li><code>WebdavChannelReady</code> → set
-    <code>self.webdav_channel_ready = true</code>, log.</li>
-<li><code>WebdavSharingStarted { path, read_only }</code> → store
-    state, record timestamp, log.</li>
-<li><code>WebdavSharingStopped</code> → clear state, log.</li>
-<li><code>WebdavError(msg)</code> → store error, record timestamp,
-    log.</li>
-<li>
-<p><code>Disconnected(ChannelType::Webdav)</code> → clear all
-    WebDAV state.</p>
-</li>
-<li>
-<p><strong>App state fields</strong>: add to <code>RyllApp</code>:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">webdav_channel_ready</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">webdav_shared_dir</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="nb">String</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">webdav_read_only</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">webdav_sharing_active</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">webdav_connected_at</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">Instant</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">webdav_error_message</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="nb">String</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">webdav_error_time</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">Instant</span><span class="o">&gt;</span><span class="p">,</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">webdav_tx</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">mpsc</span><span class="p">::</span><span class="n">Sender</span><span class="o">&lt;</span><span class="n">WebdavCommand</span><span class="o">&gt;&gt;</span><span class="p">,</span>
-</code></pre></div></p>
-</li>
+<li>Phase 1 must land before phase 0 is <em>finalised</em>. The decisions in
+  phase 0 depend on knowing which replies are large and how large, and
+  the reply-size histogram is the only honest source of that. In
+  practice phase 0 drafts the options, phase 1 measures, and phase 0 is
+  then re-cut with the answer. This inversion is deliberate: the
+  4MiB default is what a guessed bound looks like.</li>
+<li>Phase 2 is independent of the phase 0 decision and can land as soon as
+  phase 1 has identified the sweep callers. It is the highest
+  value-to-risk ratio in the plan.</li>
+<li>Phase 3 needs phase 0 settled.</li>
+<li>Phase 4 needs phase 3's registration surface to exist, and must land
+  before phase 5 -- lowering the cap without enforcement just re-arms
+  the trap.</li>
+<li>Phase 5 lands last and only once the operator cluster has run on the
+  new shape long enough for the histogram to show the tail flattening.</li>
 </ul>
-<h3 id="step-5-add-test-qemu-webdav-makefile-target">Step 5: Add <code>test-qemu-webdav</code> Makefile target<a class="headerlink" href="#step-5-add-test-qemu-webdav-makefile-target" title="Permanent link">&para;</a></h3>
-<p>Add a new target that extends the base QEMU configuration
-with the WebDAV spiceport device:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c"># Start a test QEMU instance with SPICE and WebDAV</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c"># folder sharing enabled.</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c"># Connect with: ryll --direct localhost:$(QEMU_SPICE_PORT)</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c">#               --share-dir /path/to/dir</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nf">test-qemu-webdav</span><span class="o">:</span><span class="w"> </span><span class="n">test</span>-<span class="n">qemu</span>-<span class="n">stop</span> <span class="k">$(</span><span class="nv">QEMU_TEST_IMAGE</span><span class="k">)</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span>cp<span class="w"> </span><span class="k">$(</span>OVMF_VARS<span class="k">)</span><span class="w"> </span><span class="k">$(</span>QEMU_VARS_COPY<span class="k">)</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span>qemu-system-x86_64<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">        </span>-display<span class="w"> </span>none<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">        </span>-machine<span class="w"> </span>q35<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">        </span>-m<span class="w"> </span><span class="m">256</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">        </span>-drive<span class="w"> </span><span class="k">if</span><span class="o">=</span>pflash,format<span class="o">=</span>raw,readonly<span class="o">=</span>on,<span class="se">\</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="nv">file</span><span class="o">=</span><span class="k">$(</span>OVMF_CODE<span class="k">)</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">        </span>-drive<span class="w"> </span><span class="k">if</span><span class="o">=</span>pflash,format<span class="o">=</span>raw,<span class="se">\</span>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="nv">file</span><span class="o">=</span><span class="k">$(</span>QEMU_VARS_COPY<span class="k">)</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">        </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="k">$(</span>QEMU_TEST_IMAGE<span class="k">)</span>,format<span class="o">=</span>qcow2,<span class="se">\</span>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="k">if</span><span class="o">=</span>virtio<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">        </span>-vga<span class="w"> </span>qxl<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">        </span>-spice<span class="w"> </span><span class="nv">port</span><span class="o">=</span><span class="k">$(</span>QEMU_SPICE_PORT<span class="k">)</span>,<span class="se">\</span>
-<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>disable-ticketing<span class="o">=</span>on<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="w">        </span>-device<span class="w"> </span>virtio-serial-pci,id<span class="o">=</span>virtio-serial0<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">        </span>-chardev<span class="w"> </span>spiceport,<span class="se">\</span>
-<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="nv">name</span><span class="o">=</span>org.spice-space.webdav.0,id<span class="o">=</span>webdav0<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="w">        </span>-device<span class="w"> </span>virtserialport,chardev<span class="o">=</span>webdav0,<span class="se">\</span>
-<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a><span class="nv">name</span><span class="o">=</span>org.spice-space.webdav.0<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="w">        </span>-daemonize<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="w">        </span>-pidfile<span class="w"> </span><span class="k">$(</span>QEMU_PID_FILE<span class="k">)</span>
-<a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a><span class="w">    </span>@echo<span class="w"> </span><span class="s2">"QEMU SPICE+WebDAV server on port \</span>
-<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="k">$(</span><span class="nv">QEMU_SPICE_PORT</span><span class="k">)</span><span class="w"> </span><span class="err">(PID</span><span class="w"> </span><span class="k">$$</span><span class="err">(cat</span><span class="w"> </span><span class="k">$(</span><span class="nv">QEMU_PID_FILE</span><span class="k">)</span><span class="err">))</span><span class="s2">"</span>
-<a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="s2">    @echo "</span><span class="nf">Connect</span><span class="o">:</span><span class="w"> </span><span class="n">ryll</span> --<span class="n">direct</span> \
-<a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="n">localhost</span>:<span class="k">$(</span><span class="nv">QEMU_SPICE_PORT</span><span class="k">)</span> --<span class="n">share</span>-<span class="n">dir</span> /<span class="n">tmp</span>/<span class="n">test</span>-<span class="n">share</span>"
-</code></pre></div>
-<p>Note the <code>virtio-serial-pci</code> controller device — this is
-needed for the <code>virtserialport</code> device. Some machine types
-create one automatically but <code>q35</code> may not.</p>
-<p>Also consider a combined target <code>test-qemu-all</code> that
-includes both USB and WebDAV devices for full-feature
-testing.</p>
-<h3 id="step-6-verify-channel-type">Step 6: Verify channel type<a class="headerlink" href="#step-6-verify-channel-type" title="Permanent link">&para;</a></h3>
-<p>After implementing the above, start QEMU with
-<code>make test-qemu-webdav</code> and connect ryll. Observe the
-channel list logged during the main channel's
-<code>ChannelsAvailable</code> event to confirm whether the server
-advertises channel type 10 (Port) or 11 (Webdav). Update
-open question 4 in the master plan with the result.</p>
-<p>If the server advertises type 10 instead of 11, adjust the
-<code>ChannelType</code> match in app.rs accordingly.</p>
-<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
+<h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>make test</code> passes (existing tests unbroken).</li>
-<li><code>pre-commit run --all-files</code> passes.</li>
-<li><code>ryll --direct localhost:5900</code> connects to a
-  <code>test-qemu-webdav</code> instance and logs
-  "WebDAV channel connected" (or similar).</li>
-<li><code>ryll --direct localhost:5900 --share-dir /tmp/test</code>
-  logs that sharing has started (even though the server
-  connection is stubbed — the state management works).</li>
-<li><code>ryll --help</code> shows the new <code>--share-dir</code> and
-  <code>--share-dir-ro</code> flags.</li>
-<li>The channel type advertised by QEMU is confirmed and
-  documented.</li>
+<li><strong><code>PLAN-eventlog-direct-mariadb</code> is complete and is where this came
+  from.</strong> Its Future work section listed cursor pagination for
+  <code>GetObjectEvents</code> as deferred; issue 3638 is that deferral coming due.
+  Phase 3 should read its phase 4 plan for the REST contract
+  constraints on event reads before changing them.</li>
+<li><strong><code>PLAN-database-load-reduction</code> phase 3 (client consolidation) is
+  helpful and not blocking.</strong> It consolidates the three sf-database
+  client stacks into one, which would give this plan a single seam to
+  put a pagination loop or stream accumulator behind instead of three.
+  If it has landed, use it; if not, phase 3 should avoid entrenching
+  the duplication.</li>
+<li><strong>The OpenTelemetry thread would improve phase 1.</strong> The reply-size
+  histogram is a poor cousin of proper instrumentation. If OTel has
+  landed, prefer it; if not, phase 1's histogram stands alone and is
+  worth having regardless.</li>
+<li><strong><code>PLAN-api-input-validation</code> is a useful precedent, not a
+  dependency.</strong> Its <code>STRUCTURED_PARAMETERS</code> table -- where the
+  <em>completeness</em> of the table is derived from the published spec, so a
+  new structure fails CI until registered, while the content of each
+  entry is written by hand -- is exactly the shape phase 4 should copy.</li>
 </ul>
-<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>Before executing, please confirm your understanding of:
-1. This phase creates the channel transport only — no mux
-   protocol, no WebDAV server, no UI panel.
-2. The <code>handle_vmc_data()</code> method is deliberately stubbed
-   (log only) and will be connected to the mux layer in
-   phase 2.
-3. The <code>send_compressed_data()</code> method implements LZ4
-   send-side compression as agreed. If extracting shared
-   VMC code from usbredir, limit refactoring to what
-   reduces clear duplication.
-4. The Makefile target is needed early to verify the
-   channel type assumption before building further phases.</p>
+<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
+<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
+<!-- shared-block: subagent-execution-model v1 -->
+<p>Sub-agent execution model (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+<code>templates/shared-blocks/subagent-execution-model.md</code>):</p>
+<p>All implementation work is done by sub-agents, never in the
+management session. The management session is reserved for
+planning, review, and decision-making. This keeps the management
+context lean and avoids drowning it in implementation diffs.</p>
+<p>The workflow is:</p>
+<ol>
+<li><strong>Plan</strong> at high effort in the management session.</li>
+<li><strong>Spawn a sub-agent</strong> for each implementation step with the
+   brief from the plan, at the recommended effort level and model.</li>
+<li><strong>Review</strong> the sub-agent's output in the management session.
+   Check the actual files -- the sub-agent's summary describes
+   what it intended, not necessarily what it did.</li>
+<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether the
+   brief was insufficient (improve it) or the model was too light
+   (upgrade it), then re-run.</li>
+<li><strong>Commit</strong> once the management session is satisfied.</li>
+</ol>
+<p>This applies to all steps, including high-effort ones. If a
+sub-agent cannot succeed even with a detailed brief and the right
+model, that is a signal the brief needs improving, not that the
+management session should do the implementation itself.</p>
+<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
+risky or experimental; the worktree is discarded if the output is
+unsatisfactory. For safe, well-understood changes, sub-agents can
+work directly in the main tree.</p>
+<!-- shared-block-end -->
+
+<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
+<!-- shared-block: plan-planning-effort v1 -->
+<p>Planning effort (shared block; do not edit -- the canonical copy
+lives in shakenfist/development at
+<code>templates/shared-blocks/plan-planning-effort.md</code>):</p>
+<p>The master plan itself is always created at <strong>high effort</strong> -- it
+requires broad codebase understanding, cross-referencing several
+source files, and judgment calls about scope and sequencing.</p>
+<p>Each phase plan states the recommended effort level for planning
+that phase. Phases that turn on design decisions, cross-component
+coordination, protocol changes, or subtle correctness questions
+should be planned at high effort. Phases that are mechanical, or
+that follow a pattern already established elsewhere in the
+codebase, can be planned at medium effort.</p>
+<!-- shared-block-end -->
+
+<div class="admonition note">
+<p class="admonition-title">In this project</p>
+<p>Phase 0 and phase 3 are protocol changes to the service every
+daemon depends on, and both must be planned at high effort with
+opus or better. Phase 1 is broad but mechanical once its
+classification criteria are written down. Phase 2 is a small,
+well-understood change to three call sites plus their SQL.</p>
+</div>
+<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
+<!-- shared-block: subagent-step-guidance v1 -->
+<p>Sub-agent step guidance (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+<code>templates/shared-blocks/subagent-step-guidance.md</code>):</p>
+<p>Each phase plan includes a table like this:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1a</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>One-sentence summary of what to do and which files to touch</td>
+</tr>
+<tr>
+<td>1b</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td>Why this needs high effort: requires understanding X to do Y</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Effort levels</strong>, from cheapest to most thorough:</p>
+<ul>
+<li><strong>low</strong> -- Purely mechanical changes: rename, reformat, add a
+  log line, regenerate generated code. The brief is a complete
+  instruction.</li>
+<li><strong>medium</strong> -- The plan provides enough context to follow a clear
+  brief. The sub-agent may read a few files, but the approach is
+  already decided.</li>
+<li><strong>high</strong> -- Requires reading several files, making judgment
+  calls, or understanding non-obvious invariants. The sub-agent
+  needs to think about edge cases.</li>
+<li><strong>xhigh</strong> -- The setting for hard coding and agentic steps:
+  long-horizon changes, or steps where the sub-agent must both
+  research and implement.</li>
+<li><strong>max</strong> -- Correctness matters more than cost. Expect
+  diminishing returns and occasional overthinking; reserve it for
+  steps where a wrong answer would be expensive to detect.</li>
+</ul>
+<p><strong>Brief for sub-agent:</strong> this is the key field. Write it as if
+briefing a colleague who has never seen the codebase. Include what
+to change, which files to touch, what patterns to follow, and any
+non-obvious constraints.</p>
+<p>A good brief front-loads the research the planner already did, so
+the implementing agent does not repeat it. Instead of "add storage
+functions for the new object", name the functions to add, the file
+they belong in, the existing equivalent to mirror (with line
+numbers), and any registration the change also needs.</p>
+<p>The better the brief, the lower the effort level needed and the
+lighter the model that can succeed.</p>
+<!-- shared-block-end -->
+
+<div class="admonition note">
+<p class="admonition-title">In this project</p>
+<p>A worked brief for this plan: instead of "paginate
+GetObjectsByState", write "add <code>page_size</code> and <code>after_uuid</code> to
+<code>GetObjectsByStateRequest</code> and a <code>bool more_available</code> to
+<code>GetObjectsByStateReply</code> in <code>protos/database.proto</code>; regenerate
+with <code>tox -e genprotos</code>; push the bound into
+<code>_direct_get_objects_by_state</code> in <code>shakenfist/mariadb.py</code> as an
+<code>ORDER BY object_uuid LIMIT :page_size</code> with a
+<code>WHERE object_uuid &gt; :after_uuid</code> predicate so the existing
+primary-key index serves it; leave the public
+<code>get_objects_by_state()</code> signature unchanged by looping in the
+gRPC wrapper, and state in its docstring what the loop costs a
+caller running under a watchdog pet."</p>
+</div>
+<h3 id="model-choice">Model choice<a class="headerlink" href="#model-choice" title="Permanent link">&para;</a></h3>
+<!-- shared-block: subagent-model-roster v1 -->
+<p>Sub-agent model roster (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+<code>templates/shared-blocks/subagent-model-roster.md</code>):</p>
+<p>The planner recommends which model is best suited to each step.
+This is a judgment call, not a rigid rule -- the right model
+depends on what the step requires, not on whether it is "planning"
+or "implementation". The models available to sub-agents are:</p>
+<ul>
+<li><strong>fable</strong> -- The most capable model available, for the hardest
+  reasoning and the longest-horizon work: multi-step changes a
+  single sub-agent must carry end to end, or steps whose
+  correctness depends on holding a whole subsystem in mind at
+  once. It costs materially more than opus, so reserve it for
+  steps that have already defeated opus or are expected to.</li>
+<li><strong>opus</strong> -- The default for steps needing deep reasoning,
+  architectural understanding, subtle correctness judgment
+  (locking, state machines, migrations), or intricate
+  implementation that would be costly to debug if it were wrong.</li>
+<li><strong>sonnet</strong> -- A good default for well-briefed implementation
+  work. Faster and cheaper than opus, and effective when the plan
+  front-loads the research and the brief leaves no broad judgment
+  calls to make.</li>
+<li><strong>haiku</strong> -- Suitable for purely mechanical tasks:
+  search-and-replace, regenerating generated code, adding log
+  lines, running commands. The brief must be a near-complete
+  instruction.</li>
+</ul>
+<p>Model choice interacts with effort level and brief quality. A
+detailed brief compensates for a lighter model -- sonnet at medium
+effort with a thorough brief often matches opus at medium effort
+with a vague brief. The planner's job is to write briefs good
+enough that the recommended model can succeed.</p>
+<p>The model also determines the context window: fable, opus and
+sonnet have 1M tokens, haiku has 200K. A step that must hold many
+files in context at once may need one of the larger-context models
+for that reason alone, even when the reasoning itself is
+straightforward.</p>
+<p><strong>When in doubt, skew to the more capable model.</strong> Saving money
+only matters if the outcome is still acceptable. A failed or
+low-quality implementation wastes more time -- and therefore more
+money -- than the heavier model would have cost. Recommend a
+lighter model only when you are confident the brief is detailed
+enough for it to succeed.</p>
+<!-- shared-block-end -->
+
+<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
+<!-- shared-block: plan-review-checklist v1 -->
+<p>Management session review checklist (shared block; do not edit --
+the canonical copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-review-checklist.md</code>):</p>
+<p>After a sub-agent completes, the management session verifies:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The files that were supposed to change actually changed --
+      read them, do not trust the summary.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The changes match the intent of the brief: not merely
+      syntactically correct, but semantically right.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The project's own pre-merge checks pass, including any
+      generated code that has to be regenerated and committed
+      (see the project-specific checks below).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The commit message follows project conventions, including
+      the <code>Co-Authored-By</code> line recording model, context window,
+      and effort level.</li>
+</ul>
+<!-- shared-block-end -->
+
+<div class="admonition note">
+<p class="admonition-title">In this project</p>
+<p>The project-specific checks referred to above are:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The code passes <code>pre-commit run --all-files</code> (flake8,
+      stestr unit tests, mypy).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> If proto files changed, stubs were regenerated with
+      <code>tox -e genprotos</code> and committed.</li>
+</ul>
+<p>Plus, specific to this plan:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No caller has been silently converted from "the whole
+      set" to "some of the set". Every bounded reply is
+      consumed by a caller that either does not need
+      completeness, or explicitly handles the
+      more-available signal.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The change to how a read is transported states what it
+      does to <code>_grpc_call</code>'s retry behaviour and to the
+      worst-case wall time of callers running under a
+      watchdog pet.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Any assertion that a bound is enforced has been
+      mutation-tested: remove the bound, confirm the test
+      fails, restore it.</li>
+</ul>
+</div>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know when this plan has been successfully implemented because
+the following statements will be true:</p>
+<ul>
+<li>Every <code>repeated</code> field in a <code>DatabaseService</code> reply is either bounded
+  by construction, paginated, streamed, or registered with a written
+  justification for why its size is inherently limited.</li>
+<li>A newly added unbounded <code>repeated</code> reply field fails CI until it is
+  registered, in the manner of <code>STRUCTURED_PARAMETERS</code> in
+  <code>test_openapi_spec.py</code>.</li>
+<li>No caller can mistake a bounded page for a complete result set: the
+  reply carries an explicit more-available signal and the callers that
+  need completeness consume it.</li>
+<li>The client <code>grpc.max_receive_message_length</code> has been reduced from
+  the 32MiB stopgap, and the value is justified by measurement rather
+  than by headroom over the largest failure yet observed.</li>
+<li>sf-database exports a reply-size histogram per RPC, and the operator
+  cluster's tail is flat rather than growing.</li>
+<li>The <code>cluster_sweep_work_list_failure_streak</code> gauge reads zero in
+  steady state, and the sweeps it covers no longer depend on an
+  unbounded read. The gauge, its labels and a sample alert expression
+  are documented in <code>docs/operator_guide/database.md</code>.</li>
+<li>Filtering and limiting are pushed down to SQL with index-friendly
+  predicates -- keyset, not <code>OFFSET</code> -- rather than materialising a
+  result set and trimming it in Python.</li>
+<li><code>_grpc_call</code>'s retry semantics and the <code>BOUNDED_QUERY_TIMEOUT</code>
+  callers' watchdog budgets are documented as unchanged, or the change
+  is explicit and its worst case is recomputed.</li>
+<li>There is unit coverage for the bound on each converted RPC, and
+  functional coverage under <code>deploy/shakenfist_ci</code> for at least one
+  read whose result set exceeds one page.</li>
+<li><code>pre-commit run --all-files</code> passes (flake8, stestr unit tests,
+  mypy).</li>
+<li><code>ARCHITECTURE.md</code>, <code>AGENTS.md</code> and
+  <code>docs/developer_guide/database_internals.md</code> are updated for the
+  reply-size contract.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The same question for the other services.</strong> <code>agent.proto</code>,
+  <code>privexec.proto</code> and <code>nodelock.proto</code> have not been audited here.
+  They are lower risk (smaller result sets, fewer callers) but the
+  argument for bounding them is the same one.</li>
+<li><strong>A general "large result" convention.</strong> If phase 3 produces a
+  mechanism that works, it should become the documented default for new
+  list-shaped RPCs rather than something each author rediscovers.</li>
+<li><strong>Server-side send caps.</strong> The server currently sets no
+  <code>grpc.max_send_message_length</code>, so it will happily serialise a reply
+  no client can receive. A server-side cap would fail the query rather
+  than the transport, with a message naming the RPC and the size. Worth
+  doing whichever mechanism phase 3 picks.</li>
+<li><strong><code>GetObjectEvents</code> still flattens a failed read to <code>[]</code>.</strong> It was the
+  RPC that failed most often in #3638 (replies to 6.9MB), and a failed
+  read still renders in the REST response as an authoritative "this
+  object has no events" -- the user-visible half of the defect, left in
+  place while the operator-visible half was fixed. The decision is
+  deliberate and recorded in <code>_grpc_get_object_events()</code>'s docstring:
+  both current callers tolerate it (the REST display path, and
+  <code>errored_node_affected_types()</code>, which reads an empty result as
+  "blast radius unknown, retry next pass"), and the alternative --
+  answering 503 from the events endpoint -- trades a degraded page for a
+  broken one. Phase 3 should either make the failure impossible, or
+  revisit the choice with a metric so a recurrence is visible without
+  grepping daemon logs.</li>
+<li><strong><code>sf-cleaner</code> exports no Prometheus endpoint.</strong> Its blob maintenance
+  pass skips when the active-blob read fails, which is the correct
+  behaviour but leaves the most dangerous caller in #3638 as the least
+  observable one: a node that persistently cannot read the list stops
+  reclaiming disk, and the only signal is a log line. Giving the cleaner
+  a metrics port is its own change -- a new config option, a listener on
+  every node, and firewall rules -- rather than a rider on the stopgap.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>This section should list any bugs we encounter during development that
+we fixed. You should also scan the project's issue tracker for directly
+related issues.</p>
+<p>Already known, both fixed by the stopgap commit that precedes this plan
+on the <code>issue-fix-3638</code> branch:</p>
+<ul>
+<li><code>get_active_blob_uuids()</code> flattened a failed read to <code>[]</code>, and the
+  cleaner uses it as a complement set. An oversized <code>GetObjectsByState</code>
+  reply was therefore an instruction to delete every blob file on the
+  node older than two cleaner delays. Fixed by raising
+  <code>DatabaseUnavailable</code> and skipping the pass; regression test
+  mutation-tested.</li>
+<li>The per-blob and per-instance sweeps in the cluster daemon had the
+  same <code>or []</code> collapse as the deleted-object sweep, so a failed read
+  reported a healthy pass over an empty queue.</li>
+<li><code>DatabaseServicer.GetObjectsByState</code> and <code>GetStatelessObjectUuids</code>
+  answered a failed read with an OK status and an empty <code>repeated</code>
+  field, which left the blob-store deletion hazard reachable through
+  the likelier failure -- MariaDB unreachable while sf-database itself
+  is healthy and answering -- even after the client-side fix. They now
+  set <code>UNAVAILABLE</code> (transient, retried into <code>DatabaseUnavailable</code>) or
+  <code>INTERNAL</code> (handler bug, non-retryable, mapped to <code>None</code>). Any
+  bounding mechanism phase 3 picks has to preserve this: a reply that
+  can only carry a list cannot report its own failure.</li>
+<li>The <code>break</code> added to bound the sweeps' worst-case wall time would
+  have starved every object type behind a persistently slow one, since
+  both loops start from the same place every pass. They now resume
+  after whichever type stopped the previous pass.</li>
+<li>The cleaner's deletion test is an OR over <em>two</em> lists, and only the
+  active-blob one had been hardened. <code>Node.blobs</code> -&gt;
+  <code>get_references_from()</code> flattened failure to <code>[]</code> at all three
+  layers, so a plain MariaDB <code>OperationalError</code> still emptied the
+  node's blob store -- and that is the <em>likelier</em> trigger, since it
+  breaks while sf-database stays healthy. Fixed with a raising
+  <code>get_node_blob_uuids()</code> over a truthful <code>_get_references_from()</code>,
+  plus <code>UNAVAILABLE</code>/<code>INTERNAL</code>/<code>INVALID_ARGUMENT</code> on
+  <code>GetReferencesFrom</code>. Five mutations confirmed the guards.</li>
+<li>Skipping the blob section of <code>_cluster_wide_cleanup()</code> also skips the
+  <code>record_usage()</code> pass that refreshes <code>last_used</code> for
+  instance-backed blobs, while the stale-transcode reaper further down
+  selects on that same column. A database outage longer than
+  <code>BLOB_TRANSCODE_MAXIMUM_IDLE_TIME</code> would therefore have reaped
+  transcodes of blobs in active use. The reaper now sits out any pass
+  which could not read the active blob list. Self-healing (transcodes
+  regenerate on demand), but it is the first case found of the
+  degraded-pass comment's "the rest is independent" claim not holding,
+  and any future partial-failure skip has to ask the same question of
+  the sections downstream of it.</li>
+</ul>
+<h3 id="deliberately-deferred-fault-injected-functional-coverage">Deliberately deferred: fault-injected functional coverage<a class="headerlink" href="#deliberately-deferred-fault-injected-functional-coverage" title="Permanent link">&para;</a></h3>
+<p>Everything the <code>issue-fix-3638</code> branch adds is unit-level, including
+two changes that are observable outside the process: <code>GET /blobs</code> now
+answers <code>503</code> where it used to answer <code>200</code> with an empty list, and the
+cleaner now declines to delete anything on a pass whose reads failed.
+<code>CLAUDE.md</code> prefers functional coverage over unit coverage where only
+one is possible, so the absence is recorded here rather than left to be
+rediscovered.</p>
+<p>The reason is that both tests need a <em>failing</em> database rather than an
+absent one. <code>deploy/shakenfist_ci</code> runs against a real cluster with no
+fault-injection surface: there is no supported way to make MariaDB
+return <code>OperationalError</code> for one query, or to make a <code>GetObjectsByState</code>
+reply exceed the receive cap on demand, without stopping <code>sf-database</code>
+outright — which fails every other daemon on the node and tests
+something else. Phase 1 instruments reply sizes, and is the first point
+at which a deliberately oversized reply can be produced as a test
+fixture rather than as an outage. The functional coverage in the
+success criteria above belongs there, and should cover this branch's
+two contract changes as well as the bound itself.</p>
+<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
+<p>When creating this master plan from the template, the following files
+in <code>docs/plans/</code> should be updated:</p>
+<ul>
+<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table for this master
+  plan and each of its phase plans.</li>
+<li><strong><code>order.yml</code></strong> — add an entry for this master plan so it appears in
+  the documentation navigation. Phase files are <em>not</em> added to
+  <code>order.yml</code>.</li>
+</ul>
+<p>The site navigation in <code>mkdocs.yml</code> is produced from <code>mkdocs.yml.tmpl</code>
+by the docs-sync workflow, which consumes <code>order.yml</code>. No manual
+<code>mkdocs.yml</code> edits are needed.</p>
+<p>When all phases are complete, update the status column in
+<code>docs/plans/index.md</code>.</p>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, please back brief the operator
+as to your understanding of the plan and how the work you intend to do
+aligns with that plan.</p>
 
 
 
@@ -12177,7 +12656,7 @@ open question 4 in the master plan with the result.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/plans/PLAN-webdav-phase-01-port-channel.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/plans/PLAN-webdav-phase-01-port-channel.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/plans/PLAN-webdav-phase-01-port-channel/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-grpc-bounded-replies.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-grpc-bounded-replies.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-grpc-bounded-replies/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -12218,10 +12697,10 @@ open question 4 in the master plan with the result.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

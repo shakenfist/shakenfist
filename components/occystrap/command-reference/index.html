@@ -12723,7 +12723,7 @@ name:</p>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Registry to directory with filters</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/__pycache__/**&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span>-f<span class="w"> </span><span class="s2">"exclude:pattern=**/__pycache__/**"</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Docker daemon to registry</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>occystrap<span class="w"> </span>process<span class="w"> </span>docker://myimage:v1<span class="w"> </span>registry://myregistry.com/myimage:v1
@@ -12750,13 +12750,13 @@ elapsed time, and any retries or rate-limit events:</p>
 </ul>
 <p><strong>Examples:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Search for shell binaries</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>occystrap<span class="w"> </span>search<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="s2">&quot;bin/*sh&quot;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>occystrap<span class="w"> </span>search<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="s2">"bin/*sh"</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Search with regex</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>occystrap<span class="w"> </span>search<span class="w"> </span>--regex<span class="w"> </span>docker://python:3.11<span class="w"> </span><span class="s2">&quot;.*\.py</span>$<span class="s2">&quot;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>occystrap<span class="w"> </span>search<span class="w"> </span>--regex<span class="w"> </span>docker://python:3.11<span class="w"> </span><span class="s2">".*\.py</span>$<span class="s2">"</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Machine-parseable output</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>occystrap<span class="w"> </span>search<span class="w"> </span>--script-friendly<span class="w"> </span>tar://image.tar<span class="w"> </span><span class="s2">&quot;*.conf&quot;</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>occystrap<span class="w"> </span>search<span class="w"> </span>--script-friendly<span class="w"> </span>tar://image.tar<span class="w"> </span><span class="s2">"*.conf"</span>
 </code></pre></div>
 <h3 id="info">info<a class="headerlink" href="#info" title="Permanent link">&para;</a></h3>
 <p>Display information about a container image without downloading layer
@@ -12899,17 +12899,17 @@ will attempt HTTPS, producing errors like:</p>
 propagated to containerd's push path. To fix this, configure
 containerd's host-based registry config directly:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/containerd/certs.d/127.0.0.1:5050
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>cat<span class="w"> </span><span class="s">&lt;&lt;&#39;TOML&#39; | sudo tee /etc/containerd/certs.d/127.0.0.1:5050/hosts.toml</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="s">server = &quot;http://127.0.0.1:5050&quot;</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>cat<span class="w"> </span><span class="s">&lt;&lt;'TOML' | sudo tee /etc/containerd/certs.d/127.0.0.1:5050/hosts.toml</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="s">server = "http://127.0.0.1:5050"</span>
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s">[host.&quot;http://127.0.0.1:5050&quot;]</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">  capabilities = [&quot;pull&quot;, &quot;resolve&quot;, &quot;push&quot;]</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s">[host."http://127.0.0.1:5050"]</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">  capabilities = ["pull", "resolve", "push"]</span>
 <a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">TOML</span>
 </code></pre></div>
 <p>Then tell containerd where the host configs live by adding this to
 <code>/etc/containerd/config.toml</code> (containerd 2.x syntax):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[plugins.</span><span class="s2">&quot;io.containerd.cri.v1.images&quot;</span><span class="k">.registry]</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="n">config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/etc/containerd/certs.d&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[plugins.</span><span class="s2">"io.containerd.cri.v1.images"</span><span class="k">.registry]</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="n">config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/etc/containerd/certs.d"</span>
 </code></pre></div>
 <p>Restart containerd and Docker after making these changes.</p>
 <p>This differs from the <code>dockerpush://</code> input, which uses HTTPS with an
@@ -13214,7 +13214,7 @@ V2 auth). Public organizations do not require authentication.</p>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># List all images tagged &quot;latest&quot; in the kolla org</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># List all images tagged "latest" in the kolla org</span>
 <a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>occystrap<span class="w"> </span>info<span class="w"> </span>quay://kolla/*:latest
 <a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
 <a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># List as JSON</span>
@@ -13223,17 +13223,17 @@ V2 auth). Public organizations do not require authentication.</p>
 <a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Download all matching images to a directory</span>
 <a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>occystrap<span class="w"> </span>process<span class="w"> </span>quay://kolla/*:latest<span class="w"> </span>dir://./kolla?unique_names<span class="o">=</span><span class="nb">true</span>
 <a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="c1"># Only repos starting with &quot;centos-&quot;</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="c1"># Only repos starting with "centos-"</span>
 <a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>occystrap<span class="w"> </span>process<span class="w"> </span>quay://kolla/centos-*:latest<span class="w"> </span>dir://./out?unique_names<span class="o">=</span><span class="nb">true</span>
 <a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>
 <a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="c1"># Private org with token</span>
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>occystrap<span class="w"> </span>process<span class="w"> </span><span class="s2">&quot;quay://myorg/*:latest?token=abc123&quot;</span><span class="w"> </span>dir://./out?unique_names<span class="o">=</span><span class="nb">true</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>occystrap<span class="w"> </span>process<span class="w"> </span><span class="s2">"quay://myorg/*:latest?token=abc123"</span><span class="w"> </span>dir://./out?unique_names<span class="o">=</span><span class="nb">true</span>
 <a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>
 <a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="c1"># Private org using --password</span>
 <a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>occystrap<span class="w"> </span>--password<span class="w"> </span>mytoken<span class="w"> </span>process<span class="w"> </span>quay://myorg/*:latest<span class="w"> </span>dir://./out?unique_names<span class="o">=</span><span class="nb">true</span>
 <a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a>
 <a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="c1"># Only images whose tag was updated after 2024-01-01</span>
-<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a>occystrap<span class="w"> </span>info<span class="w"> </span><span class="s2">&quot;quay://kolla/*:latest?since=2024-01-01&quot;</span>
+<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a>occystrap<span class="w"> </span>info<span class="w"> </span><span class="s2">"quay://kolla/*:latest?since=2024-01-01"</span>
 </code></pre></div>
 <h3 id="docker">docker://<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
 <p>Fetch images from the local Docker or Podman daemon.</p>
@@ -13435,7 +13435,7 @@ manifest is updated.</p>
 <a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>-f<span class="w"> </span>normalize-timestamps
 <a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
 <a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="c1"># Normalize to specific timestamp (Jan 1, 2021)</span>
-<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>-f<span class="w"> </span><span class="s2">&quot;normalize-timestamps:ts=1609459200&quot;</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>-f<span class="w"> </span><span class="s2">"normalize-timestamps:ts=1609459200"</span>
 </code></pre></div>
 <h3 id="search_1">search<a class="headerlink" href="#search_1" title="Permanent link">&para;</a></h3>
 <p>Search for files matching a pattern while processing.</p>
@@ -13467,10 +13467,10 @@ manifest is updated.</p>
 <p>When used as a filter, search prints matches AND passes elements to the output.</p>
 <p><strong>Examples:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># Search while creating tarball</span>
-<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>-f<span class="w"> </span><span class="s2">"search:pattern=*.conf"</span>
 <a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>
 <a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="c1"># Search with regex</span>
-<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=.*\.py</span>$<span class="s2">,regex=true&quot;</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a>-f<span class="w"> </span><span class="s2">"search:pattern=.*\.py</span>$<span class="s2">,regex=true"</span>
 </code></pre></div>
 <h3 id="inspect">inspect<a class="headerlink" href="#inspect" title="Permanent link">&para;</a></h3>
 <p>Record layer metadata to a JSONL file. This is a passthrough
@@ -13499,16 +13499,16 @@ name, tag, layer digests, sizes, and build history. Multiple
 images can be recorded to the same file.</p>
 <p><strong>Examples:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># Record layer metadata before and after normalization</span>
-<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=before.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>-f<span class="w"> </span><span class="s2">"inspect:file=before.jsonl"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=after.jsonl&quot;</span>
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>-f<span class="w"> </span><span class="s2">"inspect:file=after.jsonl"</span>
 <a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a>
 <a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="c1"># Full pipeline with three observation points</span>
-<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=as-built.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a>-f<span class="w"> </span><span class="s2">"inspect:file=as-built.jsonl"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-normalize.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-exclude.jsonl&quot;</span>
+<a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a>-f<span class="w"> </span><span class="s2">"inspect:file=post-normalize.jsonl"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a>-f<span class="w"> </span><span class="s2">"exclude:pattern=**/.git"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a>-f<span class="w"> </span><span class="s2">"inspect:file=post-exclude.jsonl"</span>
 </code></pre></div>
 <h3 id="exclude">exclude<a class="headerlink" href="#exclude" title="Permanent link">&para;</a></h3>
 <p>Exclude files matching glob patterns from image layers.</p>
@@ -13518,10 +13518,10 @@ images can be recorded to the same file.</p>
 recalculated after modification.</p>
 <p><strong>Examples:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1"># Exclude git directories</span>
-<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>-f<span class="w"> </span><span class="s2">"exclude:pattern=**/.git/**"</span>
 <a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>
 <a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="c1"># Exclude multiple patterns</span>
-<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>-f<span class="w"> </span><span class="s2">"exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc"</span>
 </code></pre></div>
 <h2 id="post-write-verification">Post-write Verification<a class="headerlink" href="#post-write-verification" title="Permanent link">&para;</a></h2>
 <p>The <code>--verify</code> flag (enabled by default) runs a post-write
@@ -13677,14 +13677,14 @@ push.</p>
 <h3 id="cache-file-format">Cache File Format<a class="headerlink" href="#cache-file-format" title="Permanent link">&para;</a></h3>
 <p>The cache is stored as a JSON file:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="p">{</span>
-<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="w">    </span><span class="nt">&quot;sha256:abc123...&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a><span class="w">      </span><span class="nt">&quot;compressed_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:def456...&quot;</span><span class="p">,</span>
-<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="w">      </span><span class="nt">&quot;compressed_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
-<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="w">      </span><span class="nt">&quot;media_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/vnd.docker.image.rootfs.diff.tar.gzip&quot;</span><span class="p">,</span>
-<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="w">      </span><span class="nt">&quot;filters_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
-<a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-09T12:34:56.789012+00:00&quot;</span>
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="w">  </span><span class="nt">"layers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="w">    </span><span class="nt">"sha256:abc123..."</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a><span class="w">      </span><span class="nt">"compressed_digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:def456..."</span><span class="p">,</span>
+<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="w">      </span><span class="nt">"compressed_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
+<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="w">      </span><span class="nt">"media_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.docker.image.rootfs.diff.tar.gzip"</span><span class="p">,</span>
+<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="w">      </span><span class="nt">"filters_hash"</span><span class="p">:</span><span class="w"> </span><span class="s2">"none"</span><span class="p">,</span>
+<a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="w">      </span><span class="nt">"timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-02-09T12:34:56.789012+00:00"</span>
 <a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a><span class="w">    </span><span class="p">}</span>
 <a id="__codelineno-46-11" name="__codelineno-46-11" href="#__codelineno-46-11"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-46-12" name="__codelineno-46-12" href="#__codelineno-46-12"></a><span class="p">}</span>

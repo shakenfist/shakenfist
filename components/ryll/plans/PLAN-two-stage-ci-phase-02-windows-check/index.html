@@ -11738,10 +11738,10 @@ viable</strong>. <code>cargo check</code> still runs build scripts, and <code>aw
 <code>--no-default-features</code>) compiles its vendored BoringSSL C sources
 for the target. With no MSVC cross toolchain present <code>cc-rs</code> falls
 back to the host's Linux <code>gcc</code>, which fails on the Windows headers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>error: unknown type name &#39;pthread_rwlock_t&#39;; did you mean &#39;pthread_cond_t&#39;?
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>error: unknown type name 'pthread_rwlock_t'; did you mean 'pthread_cond_t'?
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  552 |   pthread_rwlock_t lock;
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>error occurred in cc-rs: command did not execute successfully
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  (status code exit status: 1): ... &quot;cc&quot; ... x_x509a.c
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  (status code exit status: 1): ... "cc" ... x_x509a.c
 </code></pre></div>
 <p>Making that work needs <code>xwin</code>-fetched Windows SDK and CRT headers
 plus <code>clang-cl</code> — materially heavier tooling and a licensing

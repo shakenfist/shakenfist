@@ -12550,7 +12550,7 @@ of <code>ps</code> and <code>docker inspect</code>.</p>
    build argument defaulting to the released PyPI package.</strong></li>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ARG KERBSIDE_SOURCE=kerbside
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>RUN pip install --no-cache-dir &quot;${KERBSIDE_SOURCE}&quot;
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>RUN pip install --no-cache-dir "${KERBSIDE_SOURCE}"
 </code></pre></div>
 <p>CI overrides it with <code>/src</code> and a bind-mounted checkout
    so the lane tests the PR. <strong>The default must be the
@@ -12603,9 +12603,9 @@ of <code>ps</code> and <code>docker inspect</code>.</p>
 </li>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ports:
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  - &#39;127.0.0.1:13002:13002&#39;   # REST API and web UI
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  - &#39;127.0.0.1:5900:5900&#39;     # SPICE, TLS
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  - &#39;127.0.0.1:5901:5901&#39;     # SPICE, redirect to TLS
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  - '127.0.0.1:13002:13002'   # REST API and web UI
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  - '127.0.0.1:5900:5900'     # SPICE, TLS
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  - '127.0.0.1:5901:5901'     # SPICE, redirect to TLS
 </code></pre></div>
 <p>The demo has no real authentication, so it must not be
    reachable from the network by default. Comment why

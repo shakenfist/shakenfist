@@ -12653,16 +12653,16 @@ reachable:</p>
 <p>Certs land at
 <code>/etc/letsencrypt/live/ryll.example.com/fullchain.pem</code>
 and <code>.../privkey.pem</code>. Auto-renewal:</p>
-<div class="highlight"><pre><span></span><code># /etc/cron.d/certbot-renew (or use certbot&#39;s timer)
+<div class="highlight"><pre><span></span><code># /etc/cron.d/certbot-renew (or use certbot's timer)
 0 3 * * * root certbot renew --quiet \
-    --deploy-hook &quot;systemctl restart ryll-web&quot;
+    --deploy-hook "systemctl restart ryll-web"
 </code></pre></div>
 <h3 id="openssl-one-off-self-signed">openssl one-off (self-signed)<a class="headerlink" href="#openssl-one-off-self-signed" title="Permanent link">&para;</a></h3>
 <p>For a one-afternoon diagnostic session where a browser
 warning is acceptable:</p>
 <div class="highlight"><pre><span></span><code>openssl req -x509 -newkey rsa:2048 \
     -keyout key.pem -out cert.pem \
-    -days 30 -nodes -subj &quot;/CN=ryll.lan&quot;
+    -days 30 -nodes -subj "/CN=ryll.lan"
 </code></pre></div>
 <p>The browser will show an untrusted-cert warning. Proceed
 by adding a permanent exception, or use mkcert instead.</p>
@@ -12678,9 +12678,9 @@ through to ryll and let the proxy handle HTTPS. Native TLS
 is recommended for new deployments — the reverse-proxy
 path is documented here as a fallback only.</p>
 <p><strong>Caddy</strong> (autocert handles the cert lifecycle):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ryll.example.com {
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    reverse_proxy 127.0.0.1:8080
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ryll.example.com<span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>127.0.0.1:8080
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">}</span>
 </code></pre></div>
 <p>That is the entire config for a publicly-reachable
 deployment with an A record pointing at the host. Caddy
@@ -12887,7 +12887,7 @@ default <code>StandardOutput=inherit</code> the URL goes to the terminal where
 you launched the service. To read it from the journal when it is
 captured there:</p>
 <div class="highlight"><pre><span></span><code>journalctl -u ryll-web -n 50 --no-pager \
-    | grep -oE &#39;https?://[^ ]+token=[^ ]+&#39; | tail -1
+    | grep -oE 'https?://[^ ]+token=[^ ]+' | tail -1
 </code></pre></div>
 <p>The URL includes the token and is valid until the service restarts.</p>
 <h3 id="graceful-shutdown_1">Graceful shutdown<a class="headerlink" href="#graceful-shutdown_1" title="Permanent link">&para;</a></h3>

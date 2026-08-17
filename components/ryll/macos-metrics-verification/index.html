@@ -12074,8 +12074,8 @@ shape itself is covered automatically.</p>
 <p>Start ryll, connect to the SPICE server, file a bug report
 (F12 or Menu → Report, then submit), save the zip, and
 parse:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.platform&#39;</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.threads | length&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.platform'</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.threads | length'</span>
 </code></pre></div>
 <p><strong>Pass:</strong> the first command prints <code>"macos"</code>; the second
 prints a positive integer (the number of threads alive at
@@ -12089,7 +12089,7 @@ sample-B time).</p>
   inspect <code>task_threads</code> return in the Mac console log.</p>
 <h3 id="test-2-unavailable-reason-is-gone">Test 2 — <code>Unavailable</code> reason is gone<a class="headerlink" href="#test-2-unavailable-reason-is-gone" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">&quot;per-thread metrics not implemented&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">"per-thread metrics not implemented"</span>
 </code></pre></div>
 <p><strong>Pass:</strong> no match.</p>
 <p><strong>Fail:</strong> any match means <code>metrics::sample</code> returned the
@@ -12099,7 +12099,7 @@ non-<code>KERN_SUCCESS</code>. Check Console.app for warnings.</p>
 <h3 id="test-3-processcpu_percent-is-plausible">Test 3 — <code>process.cpu_percent</code> is plausible<a class="headerlink" href="#test-3-processcpu_percent-is-plausible" title="Permanent link">&para;</a></h3>
 <p>Open Activity Monitor and note the ryll process's "% CPU"
 column at the moment of the bug-report trigger. Then:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.process.cpu_percent&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.process.cpu_percent'</span>
 </code></pre></div>
 <p><strong>Pass:</strong> within 50% relative of Activity Monitor's reading
 (sampling skew is significant on both sides — ryll's window
@@ -12112,7 +12112,7 @@ Most likely cause: a unit mistake in <code>time_value_to_us</code>
 <h3 id="test-4-processrss_kb-and-vm_size_kb-are-plausible">Test 4 — <code>process.rss_kb</code> and <code>vm_size_kb</code> are plausible<a class="headerlink" href="#test-4-processrss_kb-and-vm_size_kb-are-plausible" title="Permanent link">&para;</a></h3>
 <p>In Activity Monitor's "Memory" tab, note the "Memory" and
 "Virtual Memory" columns for the ryll process. Then:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.process | {rss_kb, vm_size_kb}&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.process | {rss_kb, vm_size_kb}'</span>
 </code></pre></div>
 <p><strong>Pass:</strong> <code>rss_kb</code> within 50% relative of Activity Monitor's
 Memory column (converted to kB); <code>vm_size_kb &gt;= rss_kb</code>,
@@ -12126,8 +12126,8 @@ semantics.</p>
 <h3 id="test-5-processuptime_secs-advances-monotonically">Test 5 — <code>process.uptime_secs</code> advances monotonically<a class="headerlink" href="#test-5-processuptime_secs-advances-monotonically" title="Permanent link">&para;</a></h3>
 <p>File two bug reports a few minutes apart in the same ryll
 session:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-A-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.process.uptime_secs&#39;</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-B-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.process.uptime_secs&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-A-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.process.uptime_secs'</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-B-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.process.uptime_secs'</span>
 </code></pre></div>
 <p><strong>Pass:</strong> the second value is greater than the first by
 roughly the wall-clock time elapsed between the two
@@ -12145,7 +12145,7 @@ real time since <code>ryll</code> started, <code>init_at_startup</code> is wired
 correctly.</p>
 <h3 id="test-6-threads-populated-sorted-named-where-applicable">Test 6 — <code>threads</code> populated, sorted, named where applicable<a class="headerlink" href="#test-6-threads-populated-sorted-named-where-applicable" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>unzip<span class="w"> </span>-p<span class="w"> </span>ryll-bugreport-*.zip<span class="w"> </span>runtime-metrics.json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>jq<span class="w"> </span><span class="s1">&#39;.threads | map({tid, name})&#39;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>jq<span class="w"> </span><span class="s1">'.threads | map({tid, name})'</span>
 </code></pre></div>
 <p><strong>Pass:</strong> all of:
 - The array has at least 10 entries on a real session (ryll
@@ -12192,7 +12192,7 @@ behaviour over many calls.</p>
    every few minutes to keep <code>sample()</code> firing.</li>
 <li>Record the initial Mach port count for the ryll process:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nv">RYLL_PID</span><span class="o">=</span><span class="k">$(</span>pgrep<span class="w"> </span>ryll<span class="k">)</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>vmmap<span class="w"> </span>-summary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RYLL_PID</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s2">&quot;Mach Ports&quot;</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>vmmap<span class="w"> </span>-summary<span class="w"> </span><span class="s2">"</span><span class="nv">$RYLL_PID</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s2">"Mach Ports"</span>
 </code></pre></div>
    Note the line that says <code>Mach Ports: N</code>, where <code>N</code> is the
    port count.</li>

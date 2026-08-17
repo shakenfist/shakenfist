@@ -11768,9 +11768,9 @@ Need to:</p>
 </ul>
 <h2 id="investigation">Investigation<a class="headerlink" href="#investigation" title="Permanent link">&para;</a></h2>
 <p>The divergence detail in (e.g.) issue #335:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&quot;instar_stderr&quot;: &quot;measure: source image is unsupported format\n...&quot;
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>&quot;qemu_stderr&quot;: &quot;&quot;
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>&quot;instar_rc&quot;: 1, &quot;qemu_rc&quot;: 0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>"instar_stderr": "measure: source image is unsupported format\n..."
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>"qemu_stderr": ""
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>"instar_rc": 1, "qemu_rc": 0
 </code></pre></div>
 <p>…shows <code>instar measure</code> failing with <code>MEASURE_RESULT_ERROR_INVALID_SIZE</code>
 (produced when <code>detect_and_scan</code> returns <code>None</code>).

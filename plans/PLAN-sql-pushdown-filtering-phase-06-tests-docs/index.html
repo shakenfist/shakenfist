@@ -11905,9 +11905,9 @@ namespace indexes). Link out to
 <p>The template's wave-1 style-check block at lines 46-48
 today runs three greps (line length, stray <code>print()</code>,
 new <code>etcd</code> references). Add a fourth:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git diff develop...HEAD -- &#39;*.py&#39; \
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    | grep -nE &#39;^\+[^+].*\bmariadb\.get_all_[a-z_]+\(&#39; \
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    | grep -v &#39;# nopushdown:&#39;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git diff develop...HEAD -- '*.py' \
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' \
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    | grep -v '# nopushdown:'
 </code></pre></div>
 <p>Rationale for the inline-comment allowlist rather than a
 file-based list: a solo project doesn't need a

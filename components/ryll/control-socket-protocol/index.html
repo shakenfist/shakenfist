@@ -12725,7 +12725,7 @@ object.</p>
 <p>There are three envelope shapes. Every message on the wire is one of
 these three.</p>
 <h3 id="request-client-to-server">Request (client to server)<a class="headerlink" href="#request-client-to-server" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;send_key&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;scancode&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">28</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;press&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"send_key"</span><span class="p">,</span><span class="w"> </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"scancode"</span><span class="p">:</span><span class="w"> </span><span class="mi">28</span><span class="p">,</span><span class="w"> </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"press"</span><span class="p">}}</span>
 </code></pre></div>
 <p>Fields:</p>
 <table>
@@ -12763,10 +12763,10 @@ recommended for simplicity. The server treats it as an opaque token;
 it never performs arithmetic on it.</p>
 <h3 id="response-server-to-client">Response (server to client)<a class="headerlink" href="#response-server-to-client" title="Permanent link">&para;</a></h3>
 <p>Success:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{}}</span>
 </code></pre></div>
 <p>Failure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;bad_state&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;unrecognised state value \&quot;sideways\&quot;&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"bad_state"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"unrecognised state value \"sideways\""</span><span class="p">}}</span>
 </code></pre></div>
 <p>Fields:</p>
 <table>
@@ -12806,7 +12806,7 @@ it never performs arithmetic on it.</p>
 </tbody>
 </table>
 <h3 id="event-server-to-client-unsolicited">Event (server to client, unsolicited)<a class="headerlink" href="#event-server-to-client-unsolicited" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;latency&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;sample_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">12.4</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;wallclock_us&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1717000000123456</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">"event"</span><span class="p">:</span><span class="w"> </span><span class="s2">"latency"</span><span class="p">,</span><span class="w"> </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"sample_ms"</span><span class="p">:</span><span class="w"> </span><span class="mf">12.4</span><span class="p">,</span><span class="w"> </span><span class="nt">"wallclock_us"</span><span class="p">:</span><span class="w"> </span><span class="mi">1717000000123456</span><span class="p">}}</span>
 </code></pre></div>
 <p>Fields:</p>
 <table>
@@ -12845,14 +12845,14 @@ verb signature.</p>
 <code>hello</code> exchange. If the server receives any request other than
 <code>hello</code> before a successful <code>hello</code> response has been sent, it
 responds immediately with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;</span><span class="kc">t</span><span class="err">he_reques</span><span class="kc">t</span><span class="err">_id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;no_hello_yet&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;first request must be hello&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;</span><span class="kc">t</span><span class="err">he_reques</span><span class="kc">t</span><span class="err">_id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"no_hello_yet"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"first request must be hello"</span><span class="p">}}</span>
 </code></pre></div>
 <p>Importantly, <strong>the connection stays open</strong> after this error. The client
 may then send a <code>hello</code> request and continue normally. This is
 intentional: a buggy client that accidentally sends one request out of
 order should be able to recover without reconnecting.</p>
 <h3 id="hello-request">Hello request<a class="headerlink" href="#hello-request" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hello&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;client_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my-loadtest&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;protocol_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hello"</span><span class="p">,</span><span class="w"> </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"client_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"my-loadtest"</span><span class="p">,</span><span class="w"> </span><span class="nt">"protocol_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.0"</span><span class="p">}}</span>
 </code></pre></div>
 <p>Parameters:</p>
 <table>
@@ -12877,7 +12877,7 @@ order should be able to recover without reconnecting.</p>
 </tbody>
 </table>
 <h3 id="hello-response-success">Hello response — success<a class="headerlink" href="#hello-response-success" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;server_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ryll&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;protocol_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;supported_methods&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;status&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;send_key&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;paste&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;screenshot&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;subscribe&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;unsubscribe&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;supported_events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;latency&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;agent_connected&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;paste_completed&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;paste_failed&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;dropped&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;surface_drawn&quot;</span><span class="p">]}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"server_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">,</span><span class="w"> </span><span class="nt">"protocol_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"supported_methods"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"hello"</span><span class="p">,</span><span class="w"> </span><span class="s2">"status"</span><span class="p">,</span><span class="w"> </span><span class="s2">"send_key"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste"</span><span class="p">,</span><span class="w"> </span><span class="s2">"screenshot"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscribe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"unsubscribe"</span><span class="p">],</span><span class="w"> </span><span class="nt">"supported_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"latency"</span><span class="p">,</span><span class="w"> </span><span class="s2">"agent_connected"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_completed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_failed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"dropped"</span><span class="p">,</span><span class="w"> </span><span class="s2">"surface_drawn"</span><span class="p">]}}</span>
 </code></pre></div>
 <p>Result fields:</p>
 <table>
@@ -12915,7 +12915,7 @@ order should be able to recover without reconnecting.</p>
 <p>If the client's <code>protocol_version</code> has a different <strong>major</strong> component
 from the server's supported major version, the server responds with an
 error and then <strong>closes the connection</strong>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;protocol_version_mismatch&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;server speaks major version 1; client requested major version 2&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"protocol_version_mismatch"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"server speaks major version 1; client requested major version 2"</span><span class="p">}}</span>
 </code></pre></div>
 <p>The server writes the error line and then closes the socket. The client
 will see EOF immediately after reading that line.</p>
@@ -12933,7 +12933,7 @@ document is available on every server.</p>
 connected. A second <code>accept()</code> while a client is connected results in
 the server writing a single error line on the new connection and then
 closing it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;busy&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;another client is connected&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"busy"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"another client is connected"</span><span class="p">}}</span>
 </code></pre></div>
 <p>Note that this synthetic response does not have an <code>id</code> field, because
 no request was received. A client reading this line can detect the
@@ -13022,8 +13022,8 @@ completeness as a verb-reference entry.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>→ {&quot;id&quot;: 1, &quot;method&quot;: &quot;hello&quot;, &quot;params&quot;: {&quot;client_name&quot;: &quot;demo&quot;, &quot;protocol_version&quot;: &quot;1.1&quot;}}
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>← {&quot;id&quot;: 1, &quot;ok&quot;: true, &quot;result&quot;: {&quot;server_name&quot;: &quot;ryll&quot;, &quot;protocol_version&quot;: &quot;1.1&quot;, &quot;supported_methods&quot;: [&quot;hello&quot;, &quot;status&quot;, &quot;send_key&quot;, &quot;paste&quot;, &quot;screenshot&quot;, &quot;subscribe&quot;, &quot;unsubscribe&quot;], &quot;supported_events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;, &quot;dropped&quot;, &quot;surface_drawn&quot;]}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 </code></pre></div>
 <hr />
 <h3 id="status"><code>status</code><a class="headerlink" href="#status" title="Permanent link">&para;</a></h3>
@@ -13090,8 +13090,8 @@ completeness as a verb-reference entry.</p>
 </table>
 <p>Verb-specific error codes: none beyond the common set.</p>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>→ {&quot;id&quot;: 2, &quot;method&quot;: &quot;status&quot;, &quot;params&quot;: {}}
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>← {&quot;id&quot;: 2, &quot;ok&quot;: true, &quot;result&quot;: {&quot;spice_connected&quot;: true, &quot;agent_connected&quot;: true, &quot;surfaces&quot;: [{&quot;channel_id&quot;: 1, &quot;surface_id&quot;: 0, &quot;width&quot;: 1024, &quot;height&quot;: 768}]}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>→ {"id": 2, "method": "status", "params": {}}
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 </code></pre></div>
 <hr />
 <h3 id="send_key"><code>send_key</code><a class="headerlink" href="#send_key" title="Permanent link">&para;</a></h3>
@@ -13143,14 +13143,14 @@ not the documented interface.</p>
 </tbody>
 </table>
 <p>Worked example (Enter key press):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>→ {&quot;id&quot;: 3, &quot;method&quot;: &quot;send_key&quot;, &quot;params&quot;: {&quot;scancode&quot;: 28, &quot;state&quot;: &quot;press&quot;}}
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>← {&quot;id&quot;: 3, &quot;ok&quot;: true, &quot;result&quot;: {}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>→ {"id": 3, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>← {"id": 3, "ok": true, "result": {}}
 </code></pre></div>
 <p>Worked example (extended key, left arrow, explicit down then up):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>→ {&quot;id&quot;: 4, &quot;method&quot;: &quot;send_key&quot;, &quot;params&quot;: {&quot;scancode&quot;: 57419, &quot;state&quot;: &quot;down&quot;}}
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>← {&quot;id&quot;: 4, &quot;ok&quot;: true, &quot;result&quot;: {}}
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>→ {&quot;id&quot;: 5, &quot;method&quot;: &quot;send_key&quot;, &quot;params&quot;: {&quot;scancode&quot;: 57419, &quot;state&quot;: &quot;up&quot;}}
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>← {&quot;id&quot;: 5, &quot;ok&quot;: true, &quot;result&quot;: {}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>→ {"id": 4, "method": "send_key", "params": {"scancode": 57419, "state": "down"}}
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>← {"id": 4, "ok": true, "result": {}}
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>→ {"id": 5, "method": "send_key", "params": {"scancode": 57419, "state": "up"}}
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>← {"id": 5, "ok": true, "result": {}}
 </code></pre></div>
 <p>Note: 57419 decimal is 0xE04B, the scancode for the left arrow key.</p>
 <hr />
@@ -13214,14 +13214,14 @@ session's in-flight action registry.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>→ {&quot;id&quot;: 6, &quot;method&quot;: &quot;paste&quot;, &quot;params&quot;: {&quot;text&quot;: &quot;hunter2&quot;, &quot;char_delay_ms&quot;: 20}}
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>← {&quot;id&quot;: 6, &quot;ok&quot;: true, &quot;result&quot;: {}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>→ {"id": 6, "method": "paste", "params": {"text": "hunter2", "char_delay_ms": 20}}
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>← {"id": 6, "ok": true, "result": {}}
 </code></pre></div>
 <p>After some time, assuming the client is subscribed to <code>paste_completed</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>← {&quot;event&quot;: &quot;paste_completed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 6, &quot;chars_sent&quot;: 7}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>← {"event": "paste_completed", "data": {"request_id": 6, "chars_sent": 7}}
 </code></pre></div>
 <p>Or on failure (e.g. an unrepresentable character mid-string):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>← {&quot;event&quot;: &quot;paste_failed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 6, &quot;reason&quot;: &quot;character U+2022 is not representable in US-QWERTY&quot;}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>← {"event": "paste_failed", "data": {"request_id": 6, "reason": "character U+2022 is not representable in US-QWERTY"}}
 </code></pre></div>
 <hr />
 <h3 id="screenshot"><code>screenshot</code><a class="headerlink" href="#screenshot" title="Permanent link">&para;</a></h3>
@@ -13322,8 +13322,8 @@ surface events.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>→ {&quot;id&quot;: 7, &quot;method&quot;: &quot;screenshot&quot;, &quot;params&quot;: {&quot;surface_id&quot;: 0, &quot;format&quot;: &quot;png&quot;}}
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>← {&quot;id&quot;: 7, &quot;ok&quot;: true, &quot;result&quot;: {&quot;width&quot;: 1024, &quot;height&quot;: 768, &quot;format&quot;: &quot;png&quot;, &quot;data_base64&quot;: &quot;iVBORw0KGgo...&quot;}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>→ {"id": 7, "method": "screenshot", "params": {"surface_id": 0, "format": "png"}}
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>← {"id": 7, "ok": true, "result": {"width": 1024, "height": 768, "format": "png", "data_base64": "iVBORw0KGgo..."}}
 </code></pre></div>
 <p>The <code>data_base64</code> value above is truncated; a real PNG will be
 hundreds of kilobytes when base64-encoded.</p>
@@ -13382,8 +13382,8 @@ and fall back gracefully if a name it needs is not present.</p>
 </table>
 <p>Verb-specific error codes: none beyond the common set.</p>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>→ {&quot;id&quot;: 8, &quot;method&quot;: &quot;subscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;, &quot;digest_updated&quot;]}}
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>← {&quot;id&quot;: 8, &quot;ok&quot;: true, &quot;result&quot;: {&quot;subscribed&quot;: [&quot;latency&quot;]}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>→ {"id": 8, "method": "subscribe", "params": {"events": ["latency", "digest_updated"]}}
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>← {"id": 8, "ok": true, "result": {"subscribed": ["latency"]}}
 </code></pre></div>
 <p>In this example <code>digest_updated</code> was silently dropped — the server
 is either a v1.0 build or a v1.1 build without the <code>digest-decode</code>
@@ -13434,8 +13434,8 @@ active subscription set.</p>
 </table>
 <p>Verb-specific error codes: none beyond the common set.</p>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>→ {&quot;id&quot;: 9, &quot;method&quot;: &quot;unsubscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;]}}
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>← {&quot;id&quot;: 9, &quot;ok&quot;: true, &quot;result&quot;: {&quot;unsubscribed&quot;: [&quot;latency&quot;]}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>→ {"id": 9, "method": "unsubscribe", "params": {"events": ["latency"]}}
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>← {"id": 9, "ok": true, "result": {"unsubscribed": ["latency"]}}
 </code></pre></div>
 <hr />
 <h2 id="event-reference">Event reference<a class="headerlink" href="#event-reference" title="Permanent link">&para;</a></h2>
@@ -13476,7 +13476,7 @@ this event and accumulate samples client-side rather than polling with
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 0.83, &quot;wallclock_us&quot;: 1717000000456789}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>← {"event": "latency", "data": {"sample_ms": 0.83, "wallclock_us": 1717000000456789}}
 </code></pre></div>
 <hr />
 <h3 id="agent_connected"><code>agent_connected</code><a class="headerlink" href="#agent_connected" title="Permanent link">&para;</a></h3>
@@ -13505,10 +13505,10 @@ first paste request.</p>
 </tbody>
 </table>
 <p>Worked example (agent connects):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>← {&quot;event&quot;: &quot;agent_connected&quot;, &quot;data&quot;: {&quot;connected&quot;: true}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>← {"event": "agent_connected", "data": {"connected": true}}
 </code></pre></div>
 <p>Worked example (agent disconnects, e.g. guest shutdown):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>← {&quot;event&quot;: &quot;agent_connected&quot;, &quot;data&quot;: {&quot;connected&quot;: false}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>← {"event": "agent_connected", "data": {"connected": false}}
 </code></pre></div>
 <hr />
 <h3 id="paste_completed"><code>paste_completed</code><a class="headerlink" href="#paste_completed" title="Permanent link">&para;</a></h3>
@@ -13539,7 +13539,7 @@ original request.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>← {&quot;event&quot;: &quot;paste_completed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 6, &quot;chars_sent&quot;: 7}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>← {"event": "paste_completed", "data": {"request_id": 6, "chars_sent": 7}}
 </code></pre></div>
 <hr />
 <h3 id="paste_failed"><code>paste_failed</code><a class="headerlink" href="#paste_failed" title="Permanent link">&para;</a></h3>
@@ -13570,7 +13570,7 @@ be cancelled.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>← {&quot;event&quot;: &quot;paste_failed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 6, &quot;reason&quot;: &quot;agent disconnected during paste&quot;}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>← {"event": "paste_failed", "data": {"request_id": 6, "reason": "agent disconnected during paste"}}
 </code></pre></div>
 <hr />
 <h3 id="dropped"><code>dropped</code><a class="headerlink" href="#dropped" title="Permanent link">&para;</a></h3>
@@ -13597,7 +13597,7 @@ the first one).</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>← {&quot;event&quot;: &quot;dropped&quot;, &quot;data&quot;: {&quot;count&quot;: 14}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>← {"event": "dropped", "data": {"count": 14}}
 </code></pre></div>
 <hr />
 <h3 id="surface_drawn"><code>surface_drawn</code><a class="headerlink" href="#surface_drawn" title="Permanent link">&para;</a></h3>
@@ -13645,7 +13645,7 @@ the consumer, not by the server.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>← {&quot;event&quot;: &quot;surface_drawn&quot;, &quot;data&quot;: {&quot;display_channel_id&quot;: 0, &quot;surface_id&quot;: 0, &quot;produced_at_secs&quot;: 1.234, &quot;wallclock_us&quot;: 1717000000123456}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>← {"event": "surface_drawn", "data": {"display_channel_id": 0, "surface_id": 0, "produced_at_secs": 1.234, "wallclock_us": 1717000000123456}}
 </code></pre></div>
 <p>Backpressure note: <code>surface_drawn</code> shares the same 256-slot per-client
 event buffer as every other event (see <a href="#backpressure">Backpressure</a>).
@@ -13702,11 +13702,11 @@ envelope.  Variant names and field names are snake_case; nested
 enums such as <code>Phase</code> and <code>BootloaderChoice</code> serialise as
 snake_case strings; booleans and numbers are native JSON values.
 Observed on the wire:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>{&quot;event&quot;: &quot;digest_updated&quot;, &quot;data&quot;: {&quot;events&quot;: [
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>  {&quot;keypress&quot;: {&quot;scancode&quot;: 0, &quot;timestamp_ms&quot;: 138550, &quot;unicode&quot;: &quot;\r&quot;}},
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>  {&quot;scene_transition&quot;: {&quot;from&quot;: &quot;awaiting&quot;, &quot;timestamp_ms&quot;: 138550, &quot;to&quot;: &quot;booting&quot;}},
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>  {&quot;line_rendered&quot;: {&quot;row&quot;: 0, &quot;timestamp_ms&quot;: 138550}}
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>], &quot;frame_counter&quot;: 281, &quot;framebuffer_hash&quot;: 4022250974, &quot;wallclock_us&quot;: 1765432100000000}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>{"event": "digest_updated", "data": {"events": [
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>  {"keypress": {"scancode": 0, "timestamp_ms": 138550, "unicode": "\r"}},
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>  {"scene_transition": {"from": "awaiting", "timestamp_ms": 138550, "to": "booting"}},
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>  {"line_rendered": {"row": 0, "timestamp_ms": 138550}}
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>], "frame_counter": 281, "framebuffer_hash": 4022250974, "wallclock_us": 1765432100000000}}
 </code></pre></div>
 <p>Clients matching on these records should treat unknown variant
 keys as forward-compatible additions and skip them.</p>
@@ -13776,7 +13776,7 @@ rather than adding a second <code>dropped</code> entry.</p>
 <hr />
 <h2 id="error-model">Error model<a class="headerlink" href="#error-model" title="Permanent link">&para;</a></h2>
 <p>All error responses share the same structure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;stable_code&gt;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;human_readable&gt;&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;stable_code&gt;"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;human_readable&gt;"</span><span class="p">}}</span>
 </code></pre></div>
 <p>The <code>code</code> field is a stable, machine-readable string. Do not parse
 <code>message</code> programmatically; it may change between minor versions.</p>
@@ -13881,20 +13881,20 @@ events; see the version history at the top of this document.</p>
 hello, status, subscribe, a latency event arriving, a key press, a
 paste with async completion, and then disconnect. Arrow direction
 indicates the sender: <code>→</code> is client-to-server, <code>←</code> is server-to-client.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>→ {&quot;id&quot;: 1, &quot;method&quot;: &quot;hello&quot;, &quot;params&quot;: {&quot;client_name&quot;: &quot;demo-client&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;}}
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {&quot;id&quot;: 1, &quot;ok&quot;: true, &quot;result&quot;: {&quot;server_name&quot;: &quot;ryll&quot;, &quot;protocol_version&quot;: &quot;1.1&quot;, &quot;supported_methods&quot;: [&quot;hello&quot;, &quot;status&quot;, &quot;send_key&quot;, &quot;paste&quot;, &quot;screenshot&quot;, &quot;subscribe&quot;, &quot;unsubscribe&quot;], &quot;supported_events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;, &quot;dropped&quot;, &quot;surface_drawn&quot;]}}
-<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>→ {&quot;id&quot;: 2, &quot;method&quot;: &quot;status&quot;, &quot;params&quot;: {}}
-<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>← {&quot;id&quot;: 2, &quot;ok&quot;: true, &quot;result&quot;: {&quot;spice_connected&quot;: true, &quot;agent_connected&quot;: true, &quot;surfaces&quot;: [{&quot;channel_id&quot;: 1, &quot;surface_id&quot;: 0, &quot;width&quot;: 1024, &quot;height&quot;: 768}]}}
-<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>→ {&quot;id&quot;: 3, &quot;method&quot;: &quot;subscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
-<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>← {&quot;id&quot;: 3, &quot;ok&quot;: true, &quot;result&quot;: {&quot;subscribed&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
-<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.2, &quot;wallclock_us&quot;: 1717000000000100}}
-<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>→ {&quot;id&quot;: 4, &quot;method&quot;: &quot;send_key&quot;, &quot;params&quot;: {&quot;scancode&quot;: 28, &quot;state&quot;: &quot;press&quot;}}
-<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>← {&quot;id&quot;: 4, &quot;ok&quot;: true, &quot;result&quot;: {}}
-<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.1, &quot;wallclock_us&quot;: 1717000002000200}}
-<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>→ {&quot;id&quot;: 5, &quot;method&quot;: &quot;paste&quot;, &quot;params&quot;: {&quot;text&quot;: &quot;hello&quot;, &quot;char_delay_ms&quot;: 10}}
-<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>← {&quot;id&quot;: 5, &quot;ok&quot;: true, &quot;result&quot;: {}}
-<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.3, &quot;wallclock_us&quot;: 1717000002100300}}
-<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>← {&quot;event&quot;: &quot;paste_completed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 5, &quot;chars_sent&quot;: 5}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>→ {"id": 2, "method": "status", "params": {}}
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>→ {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>← {"id": 3, "ok": true, "result": {"subscribed": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>← {"event": "latency", "data": {"sample_ms": 1.2, "wallclock_us": 1717000000000100}}
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>→ {"id": 4, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>← {"id": 4, "ok": true, "result": {}}
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>← {"event": "latency", "data": {"sample_ms": 1.1, "wallclock_us": 1717000002000200}}
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>→ {"id": 5, "method": "paste", "params": {"text": "hello", "char_delay_ms": 10}}
+<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>← {"id": 5, "ok": true, "result": {}}
+<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>← {"event": "latency", "data": {"sample_ms": 1.3, "wallclock_us": 1717000002100300}}
+<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>← {"event": "paste_completed", "data": {"request_id": 5, "chars_sent": 5}}
 </code></pre></div>
 <p>After the <code>paste_completed</code> event the client closes the connection
 (TCP FIN). Ryll detects the EOF on the socket, cleans up the per-client
