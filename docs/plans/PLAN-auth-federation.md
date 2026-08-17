@@ -620,7 +620,22 @@ groundwork exists, and lives mostly outside this repository.
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Complete |
 | 6. Secrets that cannot be logged by accident | [PLAN-auth-federation-phase-06-secret-types.md](PLAN-auth-federation-phase-06-secret-types.md) | Complete |
-| 7. Leak detection | [PLAN-auth-federation-phase-07-leak-detection.md](PLAN-auth-federation-phase-07-leak-detection.md) | In Progress |
+| 7. Leak detection | [PLAN-auth-federation-phase-07-leak-detection.md](PLAN-auth-federation-phase-07-leak-detection.md) | Complete |
+
+**All phases complete**, phase 7 on the
+`auth-federation-phase-07-leak-detection` branch. What the plan set out
+to do — make a namespace key a first-class object, let an external
+workload identity exchange itself for a scoped one, and make a leaked
+credential recognisable, unloggable and detectable — is done.
+
+Completing the plan does not mean nothing is left. The Future work
+section below carries twenty-odd entries, and three of them are the
+ones a reader should not lose: the `SecretStr` conversion still owes
+`BlobTransfer.token`, `util/vdi_tokens.py` and the minted plaintext key
+secret; there is no API for reading back a key's own expiry or scopes,
+so a 401 remains the diagnostic; and two credentials found in history
+by phase 7's baseline need an operator to confirm they authorise
+nothing, which is not a repository change and so cannot be closed here.
 
 Every open question above was resolved by phases 2 and 3, so
 none needed carrying into phase 7.

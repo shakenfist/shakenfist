@@ -391,41 +391,67 @@ lands, rather than a surprise after.
 
 ## Definition of done
 
-Each item is a statement someone can check and find false.
+Each item is a statement someone can check and find false. Checked on
+2026-08-17 against `e9099598c`; one item is deliberately still open and
+says so.
 
-- [ ] `credentials.generate()` output matches the regex in the
+- [x] `credentials.generate()` output matches the regex in the
       committed `.gitleaks.toml`, and a 41- and a 43-character
       lookalike do not, asserted by a test which reads the file with
       `tomllib` rather than restating the pattern.
-- [ ] No file in the working tree contains a string for which
+      (`test_credentials.ScannerAgreementTestCase`; mutation-tested by
+      changing `{38}` to `{37}`, which fails all four of its tests.)
+- [x] No file in the working tree contains a string for which
       `credentials.looks_valid()` is True, asserted by a test which
       also proves it detects a freshly generated credential in a
-      temporary file.
-- [ ] `docs/user_guide/authentication.md` still shows an example key,
-      and `looks_valid()` returns False for it.
+      temporary file. (`test_no_committed_credentials.py`. It caught
+      two real credentials on its first run — in this plan document.)
+- [x] `docs/user_guide/authentication.md` still shows an example key,
+      and `looks_valid()` returns False for it. (Executed, not read:
+      `sfk_e57S...` → `looks_valid = False`.)
 - [ ] The smoke suite's Loki detector fails if its positive control
       does not arrive, and fails if a real `sfk_` credential is
       present — demonstrated by the reviewer experiment described in
-      Risks, with the result recorded in the PR.
-- [ ] `tools/gitleaks-scan.sh` exits 0 on the branch tip, using the
+      Risks, with the result recorded in the PR. **Still open, and
+      cannot be closed from a workstation**: the detector needs a
+      deployed cluster with Loki, so it first runs in the pull
+      request's own smoke job. Its positive control is the mechanism
+      that makes that run meaningful — if the control token does not
+      arrive, the test fails rather than passing quietly.
+- [x] `tools/gitleaks-scan.sh` exits 0 on the branch tip, using the
       committed config and the pinned gitleaks version, having scanned
       every commit reachable from HEAD. Its positive control passes, so
-      the exit code means "scanned and found nothing".
-- [ ] Every entry in the gitleaks allowlist carries a comment saying
+      the exit code means "scanned and found nothing". (5546 commits,
+      3s, both planted credentials reported.)
+- [x] Every entry in the gitleaks allowlist carries a comment saying
       what it excepts and why it is not a credential, and every
       `.gitleaksignore` entry carries a comment saying what was done
       about the credential — the latter enforced by a unit test.
-- [ ] Re-adding an accepted finding in a new commit still fails the
-      scan, demonstrated rather than asserted.
-- [ ] `examples/loki-secret-alert.yaml` exists and uses the same
-      LogQL expression as the CI detector — a grep for the expression
-      finds it in both places and nowhere else.
-- [ ] `docs/operator_guide/logging.md` links both the rule file and
+      (Mutation-tested: an uncommented entry and a truncated
+      fingerprint each fail it.)
+- [x] Re-adding an accepted finding in a new commit still fails the
+      scan, demonstrated rather than asserted. (Done in a throwaway
+      clone, with the converse cases — a new `zzzzzz` example and a new
+      PEM placeholder stay green.)
+- [x] `examples/loki-secret-alert.yaml` and `.gitleaks.toml` search for
+      the same expression, asserted by
+      `test_the_alert_rule_uses_the_same_expression` reading both
+      files; the CI detector asserts its own copy by emitting a token
+      and failing if the query does not find it. (The original wording
+      here — "a grep finds it in both places and nowhere else" — was
+      simply false. The expression legitimately appears in six files:
+      those two, the CI detector, the checksum-aware tree scanner, the
+      operator guide and this plan. A criterion that cannot pass is
+      not a criterion, so it is restated as what is actually bound.)
+- [x] `docs/operator_guide/logging.md` links both the rule file and
       `credential_rotation.md`, and the doc-anchor hook passes.
-- [ ] The master plan's phase 7 section no longer claims a
-      `secret-handling` audit exists, and the `docs/plans/index.md`
-      row describes what this phase actually built.
-- [ ] `pre-commit run --all-files` passes, and `actionlint` accepts
+- [x] The master plan's phase 7 section and the `docs/plans/index.md`
+      row describe what this phase actually built, and state correctly
+      that the `secret-handling` audit exists and that this phase is
+      what makes Shaken Fist compliant with it. (An earlier version of
+      this criterion required the opposite, on the strength of a survey
+      finding that was wrong; see the survey section.)
+- [x] `pre-commit run --all-files` passes, and `actionlint` accepts
       the new workflow.
 
 ## Back brief
