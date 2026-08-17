@@ -9,6 +9,7 @@ namespace cannot take its claims to the grave with it.
 
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import namespace_claim
 from shakenfist.constants import get_object_class
@@ -179,6 +180,34 @@ class NamespaceClaimDeletionTestCase(NamespaceClaimTestCase):
 
         self.assertEqual({}, self.mock_mariadb.namespace_claims)
 
+    @mock.patch('shakenfist.mariadb.delete_object_events', return_value=None)
+    def test_a_failed_delete_leaves_the_claim_whole(self, _mock_delete_events):
+        # A delete that failed is not a delete that found nothing. The
+        # row survives holding claimed_*, so tearing down the state row
+        # on top of it would strand the capacity somewhere no sweep
+        # looks: the row would be there, and the object that explains it
+        # would not.
+        c = self._new()
+        claim_uuid = str(c.uuid)
+
+        with mock.patch(
+                'shakenfist.mariadb.delete_namespace_claim',
+                return_value={
+                    'success': False,
+                    'error': 'the claim row kept changing under '
+                             'concurrent writers',
+                    'deleted': False, 'returned_cpus': 0,
+                    'returned_memory_mb': 0, 'returned_disk_gb': 0,
+                    'clamped': False}):
+            self.assertRaises(exceptions.WriteException, c.hard_delete)
+
+        self.assertIn(claim_uuid, self.mock_mariadb.namespace_claims)
+        self.assertIsNotNone(
+            self._state_row(c),
+            'the state row went while the claim row and its capacity '
+            'stayed, which is the pairing nothing repairs')
+        self.assertIsNotNone(NamespaceClaim.from_db(claim_uuid))
+
 
 class NamespaceCascadeTestCase(NamespaceClaimTestCase):
     """A claim cannot outlive the namespace it sizes."""
@@ -236,6 +265,29 @@ class NamespaceCascadeTestCase(NamespaceClaimTestCase):
         self.assertEqual([], claims_in_namespace('ci'))
 
     @mock.patch('shakenfist.mariadb.delete_object_events', return_value=None)
+    def test_an_unreadable_claim_listing_aborts_the_cascade(
+            self, _mock_delete_events):
+        # The cascade asks which claims to collect and then removes the
+        # namespace regardless of the answer. If an unreadable database
+        # answered "none", the namespace would go and the claim would
+        # stay, holding cluster capacity that nothing can ever release:
+        # its own state row is healthy, so orphan reconciliation never
+        # looks at it, and the namespace's state row is gone, so the
+        # reaper never comes back. The read has to fail loudly.
+        c = self._new()
+
+        with mock.patch('shakenfist.mariadb.get_namespace_claims',
+                        side_effect=exceptions.DatabaseUnavailable('down')):
+            self.assertRaises(exceptions.DatabaseUnavailable,
+                              Namespace.from_db('ci').hard_delete)
+
+        self.assertIn(str(c.uuid), self.mock_mariadb.namespace_claims)
+        self.assertIsNotNone(
+            Namespace.from_db('ci'),
+            'the namespace must survive so the reaper retries the whole '
+            'delete rather than leaving an unreleasable claim')
+
+    @mock.patch('shakenfist.mariadb.delete_object_events', return_value=None)
     def test_another_namespaces_claims_are_untouched(
             self, _mock_delete_events):
         Namespace.new('staging')
@@ -272,6 +324,24 @@ class NamespaceClaimIteratorTestCase(NamespaceClaimTestCase):
         listed = list(NamespaceClaims([]))
         self.assertEqual({mine.uuid, theirs.uuid},
                          {c.uuid for c in listed})
+
+    def test_a_deleted_claim_is_still_listed(self):
+        # The listing and the by-uuid lookup disagree here on purpose,
+        # so the disagreement is pinned rather than left to look like an
+        # oversight. A claim has no soft delete, so a deleted object
+        # state does not mean "already accounted for" -- it means a row
+        # that still holds claimed_* with a state row zombie repair
+        # wrote, waiting for the reaper. The listing is the operator's
+        # only view of held capacity, so it shows it; arg_is_claim_ref
+        # 404s it because there is nothing useful to do to it.
+        c = self._new()
+        c.state = NamespaceClaim.STATE_DELETED
+
+        self.assertEqual(
+            [c.uuid], [listed.uuid for listed in NamespaceClaims(
+                [], namespace='ci')],
+            'a claim still holding cluster capacity vanished from the '
+            'only listing an operator has')
 
 
 class NamespaceClaimRefusalTestCase(NamespaceClaimTestCase):

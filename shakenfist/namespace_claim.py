@@ -377,9 +377,26 @@ class NamespaceClaim(dbo):
         row.
 
         Deleting twice is harmless; the second call finds no row and
-        returns nothing.
+        returns nothing. A delete that *failed*, though, is not the same
+        as one that found nothing, and this raises rather than carrying
+        on: the row survives holding cluster_capacity.claimed_*, and
+        tearing down the state row on top of that would strand the
+        capacity where nothing can find it. Raising leaves the object
+        whole, so the reaper's next pass tries again -- and it matches
+        new() and update(), which both raise when the write fails.
+
+        The callers are ready for it. The reaper wraps each hard_delete()
+        in ignore_exception, the REST endpoint answers 500 rather than a
+        200 that says capacity was returned when it was not, and
+        Namespace.hard_delete() aborts partway, which leaves the
+        namespace's own state row in place for the retry.
         """
         result = mariadb.delete_namespace_claim(str(self.uuid))
+
+        if not result['success']:
+            raise exceptions.WriteException(
+                f'failed to delete namespace claim {self.uuid}, so its '
+                f'capacity is still held: {result["error"]}')
 
         if result['deleted']:
             returned = {
@@ -426,6 +443,26 @@ class NamespaceClaims(dbo_iter):
                 NamespaceClaim._static_data_from_row(row))
 
     def __iter__(self):
+        """Every claim row, including any whose object state is deleted.
+
+        That inclusion is deliberate, and it is why this does not
+        consult the object state the way a state-driven iterator would.
+        A claim has no soft delete, so a `deleted` state here does not
+        mean "on its way out and already accounted for" -- it means a
+        row that still holds cluster_capacity.claimed_* alongside a
+        state row that zombie repair wrote, waiting for the reaper to
+        run hard_delete() and give the capacity back. Hiding it would
+        make the listing an accounting lie of exactly the kind this
+        class refuses elsewhere: capacity is being held and the
+        operator's only view of claims would not show it.
+
+        So the listing and the by-uuid lookup disagree on purpose.
+        arg_is_claim_ref() 404s such a claim because there is nothing
+        useful an operator can do to it -- deleting it is already
+        scheduled -- while the listing's job is to account for capacity,
+        not to offer actions. test_a_deleted_claim_is_still_listed pins
+        this, so a later reader changes it deliberately or not at all.
+        """
         for _, static_values in self.get_iterator():
             c = NamespaceClaim(static_values)
             if not c:

@@ -23,6 +23,7 @@ from types import SimpleNamespace
 from unittest import mock
 from uuid import UUID
 
+import grpc
 import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError
 
@@ -536,6 +537,40 @@ class UpdateNamespaceClaimTestCase(_ClaimMixin, base.ShakenFistTestCase):
         self.assertEqual(4.0, detail['cpus']['limit'])
         self.assertEqual(12.0, detail['cpus']['used'])
 
+    def test_a_stale_grow_retries_rather_than_reporting_below_usage(self):
+        # An advisory over-limit claim -- limit 4, usage 10, which this
+        # release permits -- being *grown* to 8. The claim UPDATE misses,
+        # standing in for a concurrent writer moving the row.
+        #
+        # The shrink floor was never applied to cpus, because cpus is not
+        # being shrunk, so it cannot be what blocked this. Diagnosing it
+        # as below_usage would hand the operator a durable 409 saying a
+        # claim cannot be shrunk below its usage, for a request that was
+        # a grow, and would swallow the retry instead of taking it.
+        router = _ClaimRouter(claim=_claim_row(limit_cpus=4, used_cpus=10),
+                              rowcounts={'claim_update': 0})
+        result = self._run(router, limit_cpus=8)
+
+        self.assertFalse(result['updated'])
+        self.assertEqual([], result['dimensions'])
+
+        # Having declined to short circuit, it retried until the budget
+        # ran out and reported the contention as what it was. 'conflict'
+        # is a 503 the operator can retry; 'below_usage' would have been
+        # a durable 409 telling them to stop.
+        self.assertEqual(
+            'conflict', result['refused_reason'],
+            'a grow was diagnosed against a floor that never ran')
+
+    def test_a_stale_shrink_still_reports_below_usage(self):
+        # The other half of the same branch, so restricting it to
+        # shrinking dimensions cannot silently disable the diagnosis.
+        router = _ClaimRouter(claim=_claim_row(limit_cpus=16, used_cpus=12),
+                              rowcounts={'claim_update': 0})
+        result = self._run(router, limit_cpus=4)
+
+        self.assertEqual('below_usage', result['refused_reason'])
+
     def test_one_request_may_grow_one_dimension_and_shrink_another(self):
         router = _ClaimRouter(
             claim=_claim_row(limit_cpus=16, limit_disk_gb=100,
@@ -769,6 +804,30 @@ class ReadNamespaceClaimsTestCase(_ClaimMixin, base.ShakenFistTestCase):
     def test_a_malformed_uuid_reads_as_absent(self):
         self.assertIsNone(mariadb._direct_get_namespace_claim('nope'))
 
+    def _unreadable(self):
+        """An engine whose every query fails the way a sick database does."""
+        engine = mock.MagicMock()
+        engine.connect.side_effect = OperationalError('SELECT', {}, Exception())
+        return mock.patch('shakenfist.mariadb._get_engine',
+                          return_value=engine)
+
+    def test_an_unreadable_listing_raises_rather_than_reading_as_empty(self):
+        # An empty list means "no claims", and Namespace.hard_delete()
+        # deletes the namespace on the strength of it. Answering "none"
+        # for a database that merely fell over would strand the claim
+        # row holding cluster capacity with no namespace to explain it,
+        # and nothing repairs that pairing.
+        with self._unreadable():
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                mariadb._direct_get_namespace_claims, 'ci-1')
+
+    def test_an_unreadable_point_read_raises_rather_than_absent(self):
+        with self._unreadable():
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                mariadb._direct_get_namespace_claim, str(CLAIM1))
+
 
 class ClaimGrpcWrapperTestCase(base.ShakenFistTestCase):
     """The gRPC layer, including its deliberate lack of a bounded budget."""
@@ -969,6 +1028,31 @@ class ClaimServicerTestCase(base.ShakenFistTestCase):
                 self.context)
         direct.assert_called_once_with('ci-1')
         self.assertEqual(1, len(reply.claims))
+
+    def test_a_failed_get_sets_a_status_code(self):
+        # found=False on its own is a well formed "no such claim", which
+        # the client wrapper has no way to see through. The status code
+        # is the only thing that makes it raise instead.
+        with mock.patch('shakenfist.mariadb._direct_get_namespace_claim',
+                        side_effect=Exception('database on fire')):
+            reply = self.servicer.GetNamespaceClaim(
+                database_pb2.GetNamespaceClaimRequest(uuid=str(CLAIM1)),
+                self.context)
+
+        self.assertFalse(reply.found)
+        self.context.set_code.assert_called_once_with(
+            grpc.StatusCode.INTERNAL)
+
+    def test_a_failed_list_sets_a_status_code(self):
+        with mock.patch('shakenfist.mariadb._direct_get_namespace_claims',
+                        side_effect=Exception('database on fire')):
+            reply = self.servicer.GetNamespaceClaims(
+                database_pb2.GetNamespaceClaimsRequest(namespace='ci-1'),
+                self.context)
+
+        self.assertEqual(0, len(reply.claims))
+        self.context.set_code.assert_called_once_with(
+            grpc.StatusCode.INTERNAL)
 
     def test_update_passes_the_field_mask_through(self):
         with mock.patch(

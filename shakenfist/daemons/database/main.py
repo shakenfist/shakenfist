@@ -2681,8 +2681,15 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetNamespaceClaimReply(
                 found=True, claim=self._claim_message(claim))
         except Exception as e:
+            # found=False on its own tells the client "no such claim",
+            # which is a lie a claim caller acts on destructively -- see
+            # _direct_get_namespace_claims(). The status code is what
+            # makes _grpc_get_namespace_claim() raise instead of
+            # returning a well formed absence.
             util_exceptions.ignore_exception(
                 'database GetNamespaceClaim failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.GetNamespaceClaimReply(found=False)
 
     def GetNamespaceClaims(
@@ -2699,8 +2706,14 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 reply.claims.append(self._claim_message(claim))
             return reply
         except Exception as e:
+            # An empty reply is indistinguishable from "this namespace
+            # holds no claims", and Namespace.hard_delete() acts on that
+            # by removing the namespace anyway. Setting the code is what
+            # makes _grpc_get_namespace_claims() raise.
             util_exceptions.ignore_exception(
                 'database GetNamespaceClaims failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.GetNamespaceClaimsReply()
 
     def UpdateNamespaceClaim(

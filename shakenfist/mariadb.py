@@ -26835,12 +26835,30 @@ def _direct_update_namespace_claim(
 
         Empty means the claim UPDATE missed for some other reason -- a
         concurrent writer moved the limits -- and the operation retries.
+
+        Only dimensions actually being shrunk are considered, because
+        the SQL floor is only applied to those, and this has to diagnose
+        the guard that ran rather than a guard it might have run. The
+        difference is not theoretical while ceilings are advisory:
+        used_* legitimately sits above limit_* then, so a claim at
+        limit 4 and usage 10 being *grown* to 8 satisfies
+        ``used > requested`` without a floor ever having been tested.
+        Reporting that would hand the operator a durable 409 saying a
+        claim cannot be shrunk below its usage, for a request that was a
+        grow, and would swallow the retry that was about to succeed.
+
+        The shrink test is against the row just read rather than the
+        limits the caller started from, for the same reason the read is
+        fresh at all: what matters is the claim as it now stands, after
+        whatever concurrent writer moved it.
         """
         row = _read_claim_row(claim_key)
         if row is None:
             return []
         dimensions = []
         for dimension in changing:
+            if requested[dimension] >= int(getattr(row, f'limit_{dimension}')):
+                continue
             used = int(getattr(row, f'used_{dimension}'))
             if used > requested[dimension]:
                 dimensions.append(_capacity_dimension(
@@ -27025,12 +27043,19 @@ def _direct_delete_namespace_claim(
 
 def _direct_get_namespace_claim(
         claim_uuid: str) -> Optional[NamespaceClaimRow]:
-    """Read one claim row by uuid, or None."""
+    """Read one claim row by uuid, or None if there is no such claim.
+
+    None means *absent*, never *unreadable*: a database failure raises.
+    See _direct_get_namespace_claims() for why that distinction is worth
+    more for a claim than for most objects.
+    """
     claims = _get_namespace_claims_table()
 
     try:
         claim_key = UUID(claim_uuid)
     except ValueError as e:
+        # A malformed uuid is genuinely not a claim, so None is the
+        # honest answer here rather than an error.
         LOG.warning(f'get_namespace_claim given a malformed uuid: {e}')
         return None
 
@@ -27042,7 +27067,8 @@ def _direct_get_namespace_claim(
         return _claim_row_to_dict(row) if row is not None else None
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for namespace_claims: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'namespace claim {claim_uuid} could not be read: {e}') from e
 
 
 def _direct_get_namespace_claims(
@@ -27054,6 +27080,19 @@ def _direct_get_namespace_claims(
     over every row, which is what the project's filter-pushdown rule
     asks for. An empty namespace lists everything, which is what a
     cluster-wide operator view wants.
+
+    An empty list means the namespace holds no claims. It never means
+    the read failed, because one caller cannot tell the difference and
+    is destructive about it: Namespace.hard_delete() deletes each claim
+    it is told about and then removes the namespace regardless. Handed
+    an empty list by a database that was merely unwell, it would take
+    the namespace away and leave the claim row behind holding
+    cluster_capacity.claimed_* -- capacity promised to a namespace that
+    no longer exists, which no sweep repairs, because the claim's own
+    state row is perfectly healthy and the namespace's is now gone.
+    Raising instead aborts that cascade partway, which is safe: the
+    namespace keeps its state row and the reaper retries the whole
+    delete on its next pass.
     """
     claims = _get_namespace_claims_table()
 
@@ -27068,7 +27107,9 @@ def _direct_get_namespace_claims(
         return [_claim_row_to_dict(row) for row in rows]
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for namespace_claims: {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'namespace claims for {namespace!r} could not be read: '
+            f'{e}') from e
 
 
 # ---------------------------------------------------------------------------

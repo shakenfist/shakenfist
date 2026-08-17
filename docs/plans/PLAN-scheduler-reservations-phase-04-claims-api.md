@@ -611,6 +611,54 @@ defect in the tree:
   Checking is right; concluding from a single indirect signal
   is not.
 
+### Automated review round 1 (2026-08-17)
+
+Seven findings: two `fix`, three `consider`, two
+informational. Five were taken, one declined, two need
+nothing. Every guard added was mutation tested -- broken on
+purpose, and the named test confirmed to fail.
+
+Both `fix` findings were the same defect wearing two hats: a
+failure that reads as an absence. The claim reads returned
+`[]`/`None` on `OperationalError` and the two read servicers
+turned any exception into a well formed empty reply, so
+`Namespace.hard_delete()` -- which deletes the claims it is
+told about and then removes the namespace regardless -- would
+take a namespace away on the word of a database that had
+merely fallen over, stranding a claim row holding
+`claimed_*` that nothing repairs: its own state row is
+healthy, so orphan reconciliation never looks, and the
+namespace's state row is gone, so the reaper never returns.
+`NamespaceClaim.hard_delete()` had the same shape, checking
+`deleted` but not `success`, so a failed row delete still
+tore down the object and answered 200. Both now raise. This
+is issue 3522's fix applied to a new object, which is a
+reason to ask whether the pattern can be made structural
+rather than found once per object type.
+
+Of the `consider` findings, the shrink-floor diagnosis was
+taken: it inspected every changing dimension, while the SQL
+floor is only applied to shrinking ones, so an advisory
+over-limit claim being *grown* could be told it cannot shrink
+below its usage -- a durable 409 for a request that was a
+grow, swallowing a retry that would have worked.
+
+The deleted-claim listing was decided rather than changed.
+The listing shows such claims and the by-uuid lookup 404s
+them, and that disagreement is now deliberate and pinned: a
+claim has no soft delete, so a `deleted` state means a row
+still holding capacity awaiting the reaper, and the listing's
+job is to account for capacity even where there is no action
+to offer.
+
+Declined: rebuilding the listing through `from_row()` to save
+a point read per claim. It is real waste, but N is one claim
+per namespace, the pattern is shared with every comparable
+iterator, and the fix wants a row cache on the object whose
+staleness after an update would be a new footgun. It belongs
+in a change that does it for all of them, not one that makes
+claims the exception.
+
 ## Future work
 
 * A cluster-wide claim listing endpoint for operator

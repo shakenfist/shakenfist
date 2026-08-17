@@ -408,6 +408,15 @@ status code says which kind of no it was:
   claim, or the shrink was below what the claim is already using, or the
   claim has expired and must be replaced rather than updated.
 
+A **503 from a read**, or from a delete, means the database could not be
+reached, and is worth separating from the retryable 503 above: claim
+reads deliberately fail rather than answering "no such claim", because
+an operator (and the namespace delete cascade) would act on that absence
+as though the capacity had already been returned. A delete which cannot
+be completed answers **500** rather than a 200 saying capacity came
+back, and leaves the claim in place for the next attempt. In both cases
+the capacity is still held and the request can simply be repeated.
+
 ## Configuration reference
 
 Except for `CPU_OVERCOMMIT_RATIO`, `RAM_OVERCOMMIT_RATIO`,
