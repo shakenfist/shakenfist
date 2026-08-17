@@ -8302,6 +8302,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#manual-verification-against-a-desktop-guest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual verification against a desktop guest
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#helper-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11986,6 +11997,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#manual-verification-against-a-desktop-guest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual verification against a desktop guest
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#helper-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12081,8 +12103,11 @@ coding assistant conventions see
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># Start a test QEMU SPICE server (UEFI latency guest, downloads on first run)</span>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>make<span class="w"> </span>test-qemu
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># Stop the test QEMU instance</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>make<span class="w"> </span>test-qemu-stop
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># Start a full XFCE desktop guest instead (downloads ~770MB on first run)</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>make<span class="w"> </span>test-qemu-desktop
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="c1"># Stop the test QEMU instance</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>make<span class="w"> </span>test-qemu-stop
 </code></pre></div>
 <h2 id="building-with-a-local-rust-installation">Building with a local Rust installation<a class="headerlink" href="#building-with-a-local-rust-installation" title="Permanent link">&para;</a></h2>
 <p>If you have Rust installed locally with the required dependencies:</p>
@@ -12309,14 +12334,68 @@ still surface only in the merge tier.</p>
 <p>Integration testing against real traffic needs a SPICE server;
 <code>make test-qemu</code> starts one locally. Headless mode is what CI uses for
 protocol-level testing.</p>
+<h2 id="manual-verification-against-a-desktop-guest">Manual verification against a desktop guest<a class="headerlink" href="#manual-verification-against-a-desktop-guest" title="Permanent link">&para;</a></h2>
+<p>Some behaviour cannot be tested from the automated suite at all,
+because it needs a guest with a desktop session in it. <code>make
+test-qemu-desktop</code> boots one: the shakenfist <code>debian-xfce:13</code> image
+with <code>spice-vdagent</code>, an <code>intel-hda</code> audio device, user-mode
+networking and a cloud-init seed ISO. XFCE autologins as <code>debian</code>
+(password <code>ryll</code>), and the image ships with the screensaver and
+lock screen disabled.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>test-qemu-desktop
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>target/release/ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900
+</code></pre></div>
+<p>Each run starts from a fresh qcow2 overlay, so the downloaded base
+image stays pristine and repeated runs begin from identical state.
+<code>make test-qemu-stop</code> stops it.</p>
+<p>The devices in <code>tools/start-desktop-qemu.sh</code> are the point of the
+target rather than incidental, and leaving any of them out produces
+a symptom that looks like a client bug:</p>
+<table>
+<thead>
+<tr>
+<th>Device</th>
+<th>What it makes testable</th>
+<th>Symptom without it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>vdagent virtserialport</td>
+<td>Client (absolute) mouse mode, viewport resize</td>
+<td>Server mouse mode: absolute pointer messages are ignored and the guest pointer does not move</td>
+</tr>
+<tr>
+<td><code>intel-hda</code> + <code>hda-duplex</code></td>
+<td>The SPICE playback channel</td>
+<td>Silence, indistinguishable from a broken audio path</td>
+</tr>
+<tr>
+<td>user-mode networking</td>
+<td>cloud-init, <code>apt</code> in the guest</td>
+<td>cloud-init waits out its datasource search on every boot</td>
+</tr>
+</tbody>
+</table>
+<p>Worth checking in ryll's own log when verifying <code>--web</code>:</p>
+<ul>
+<li><code>main: mouse mode=N (...)</code> — <code>2</code> is client mode, which is what a
+  guest running vdagent should negotiate. <code>1</code> means server mode, and
+  everything about the pointer will behave differently.</li>
+<li><code>playback: MODE: 3</code> — Opus. Mode <code>1</code> is raw PCM, which web mode
+  does not yet transcode, so audio is silent by design.</li>
+<li><code>web: encoder restarted at WxH@30fps</code> — the encode resolution. If
+  it does not match the guest's surface, the browser is watching a
+  scaled image.</li>
+</ul>
 <h2 id="helper-tools">Helper tools<a class="headerlink" href="#helper-tools" title="Permanent link">&para;</a></h2>
 <h3 id="inspecting-a-capture-pcap">Inspecting a <code>--capture</code> pcap<a class="headerlink" href="#inspecting-a-capture-pcap" title="Permanent link">&para;</a></h3>
 <p><code>tools/pcap-inspect.py</code> is a pure-Python helper (no tshark
 or scapy dependency) for sifting through a ryll capture.
 Three subcommands:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
 </code></pre></div>
 <p>Typical use: when investigating a rendering artefact,
 <code>opcodes</code> tells you whether the problem window even
@@ -12333,7 +12412,7 @@ stream. The helper handles that without any extra flags.</p>
 <p><code>tools/web-smoke.sh</code> verifies that <code>ryll --web</code> starts,
 binds the HTTP server, and shuts down cleanly on SIGTERM.
 Usage:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
 </code></pre></div>
 <p>Defaults to <code>target/release/ryll</code>; <code>WEB_PORT</code> env var
 overrides the port (default <code>18080</code>). The script creates a

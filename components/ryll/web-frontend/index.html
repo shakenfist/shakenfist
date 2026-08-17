@@ -8672,6 +8672,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#video-is-soft-or-blurry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video is soft or blurry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-guest-pointer-does-not-move-or-lands-in-the-wrong-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guest pointer does not move, or lands in the wrong place
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#no-audio-video-works" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12269,6 +12291,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#video-is-soft-or-blurry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video is soft or blurry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-guest-pointer-does-not-move-or-lands-in-the-wrong-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guest pointer does not move, or lands in the wrong place
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#no-audio-video-works" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12521,15 +12565,25 @@ exchanges SDP via <code>POST /offer</code>, and starts streaming.</p>
 <ul>
 <li><strong>Display</strong>: SPICE display channel rendered in the browser
   via H.264 over WebRTC.</li>
-<li><strong>Inputs</strong>: keyboard and mouse from the browser to SPICE.</li>
-<li><strong>Cursor</strong>: rendered as a <code>&lt;img&gt;</code> overlay above the
-  <code>&lt;video&gt;</code>; the host browser cursor is hidden.</li>
+<li><strong>Inputs</strong>: keyboard and mouse from the browser to SPICE, in
+  both mouse modes — absolute positions when the guest runs
+  vdagent, relative deltas when it does not.</li>
+<li><strong>Cursor</strong>: rendered as an <code>&lt;img&gt;</code> overlay above the
+  <code>&lt;video&gt;</code>, positioned from the viewer's own pointer in client
+  mouse mode and from the guest's reported position in server
+  mode. The host browser cursor is hidden only once the SPICE
+  server has actually sent a cursor shape, so a guest that sends
+  none leaves you with the ordinary browser pointer rather than
+  with no pointer at all.</li>
 <li><strong>Audio</strong>: Opus passthrough from SPICE (no re-encoding) when
   the server negotiated Opus. PCM-only SPICE servers currently
   produce silent audio (a warning is logged).</li>
 <li><strong>Resolution</strong>: the SPICE guest resizes to match the browser
   viewport at connect time (via vdagent
-  <code>VDAgentMonitorsConfig</code>).</li>
+  <code>VDAgentMonitorsConfig</code>), and the encoder follows the guest
+  through the resize. Without vdagent in the guest the resize
+  does not happen and the browser scales whatever resolution the
+  guest booted at, which looks soft.</li>
 <li>Ctrl-C cleanly stops the binary.</li>
 </ul>
 <h2 id="reconnect-behaviour">Reconnect behaviour<a class="headerlink" href="#reconnect-behaviour" title="Permanent link">&para;</a></h2>
@@ -12744,6 +12798,67 @@ The proxy carries only the HTTP signalling page and the
   bug.</p>
 </li>
 </ul>
+<h3 id="video-is-soft-or-blurry">Video is soft or blurry<a class="headerlink" href="#video-is-soft-or-blurry" title="Permanent link">&para;</a></h3>
+<p>Most often the guest never resized, so the browser is scaling a
+smaller desktop up to fill the window. Check what the encoder is
+actually running at:</p>
+<div class="highlight"><pre><span></span><code>web: encoder restarted at 1024x768@30fps
+</code></pre></div>
+<p>and compare it to the browser window. In the browser console,
+<code>[ryll] viewport sent: W x H</code> says the viewport message went out;
+<code>[ryll] viewport deferred</code> means the control channel was not open
+yet and it will be re-sent when it opens. Server-side, run with
+<code>RUST_LOG=info,ryll::web=debug</code> and look for:</p>
+<div class="highlight"><pre><span></span><code>web inputs: viewport WxH
+</code></pre></div>
+<p>If that never appears, the guest is not being told to resize — the
+usual cause is no <code>spice-vdagent</code> in the guest, since the resize is
+delivered as a <code>VDAgentMonitorsConfig</code> message.</p>
+<p>Two known limits, neither of which is a fault to chase:</p>
+<ul>
+<li><strong>The viewport is sent once per connection.</strong> Resizing or
+  maximising the browser window mid-session leaves the guest at the
+  resolution it was given when the datachannel opened, and the
+  browser goes back to upscaling. Reload the page to resize the
+  guest.</li>
+<li><strong>Sizes are in CSS pixels.</strong> On a HiDPI display the guest is
+  asked for fewer pixels than the panel physically has, so the
+  image is scaled up by the device pixel ratio no matter what the
+  guest does.</li>
+</ul>
+<p>Odd sizes are rounded down by one pixel before the guest is asked,
+because H.264 cannot encode an odd dimension. A one-pixel border is
+not what "blurry" looks like.</p>
+<h3 id="the-guest-pointer-does-not-move-or-lands-in-the-wrong-place">The guest pointer does not move, or lands in the wrong place<a class="headerlink" href="#the-guest-pointer-does-not-move-or-lands-in-the-wrong-place" title="Permanent link">&para;</a></h3>
+<p>Check the negotiated mouse mode in ryll's log:</p>
+<div class="highlight"><pre><span></span><code>main: mouse mode=2 (client (absolute)), supported_modes=3
+</code></pre></div>
+<p><code>supported_modes=1</code> means the guest is not running
+<code>spice-vdagent</code>, so the SPICE server cannot offer client mode and
+the session stays relative. ryll handles both, but a guest with no
+agent also has no absolute pointing device, so the pointer is
+driven by deltas and cannot be warped to a position.</p>
+<p>If the pointer stops responding entirely part-way through a
+session, look for:</p>
+<div class="highlight"><pre><span></span><code>inputs: N consecutive pointer moves dropped ...
+</code></pre></div>
+<p>That is the ack window wedged — the server acknowledges only the
+pointer messages it consumes, so a client sending the form the
+server did not negotiate fills the window once and drops
+everything after it.</p>
+<p>In server mode specifically, expect the guest pointer and your own
+to drift apart over a session. The browser reports absolute
+positions and ryll converts consecutive ones into deltas, but the
+guest then applies its own pointer acceleration to those deltas, so
+the two diverge — and there is no warp in server mode to
+re-synchronise them. The same conversion means that once your
+pointer reaches the edge of the video element, no further movement
+is reported in that direction and the guest pointer stops even
+though the guest desktop has room. Both go away with Pointer Lock,
+which the web frontend does not implement yet; installing
+<code>spice-vdagent</code> in the guest avoids the whole class of problem by
+getting you client mode. Moving your pointer back to the middle of
+the window and continuing is the workaround.</p>
 <h3 id="no-audio-video-works">No audio, video works<a class="headerlink" href="#no-audio-video-works" title="Permanent link">&para;</a></h3>
 <p><strong>Likely causes:</strong></p>
 <ul>

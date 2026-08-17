@@ -12022,7 +12022,7 @@ sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Server cursor rendering (SET/INIT)</td>
 <td>available</td>
 <td>missing (<code>ryll/src/app.rs:3563</code> — <code>CursorChannel</code> runs, events arrive, but headless event loop has no handler for <code>CursorImage</code>/<code>CursorPos</code> events)</td>
-<td>available (MVP; datachannel CSS overlay)</td>
+<td>available (datachannel CSS overlay; the host cursor is only hidden once a real SPICE shape has arrived, so a guest that never sends one leaves the browser's own pointer visible rather than none at all)</td>
 </tr>
 <tr>
 <td>Cursor position tracking</td>
@@ -12088,7 +12088,7 @@ sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>Mouse mode negotiation (CLIENT/SERVER)</td>
 <td>available</td>
 <td>available (negotiation runs in <code>MainChannel</code> regardless of mode)</td>
-<td>available (absolute coordinates only in MVP without Pointer Lock; see PLAN-web-frontend.md §Resolutions §9)</td>
+<td>available (both modes drive the guest pointer: absolute <code>MouseMove</code> in client mode, relative <code>MouseMotion</code> derived from consecutive browser positions in server mode. Pointer Lock is still absent, so the derived deltas drift under guest pointer acceleration and dead-zone at the window edge — see docs/web-frontend.md)</td>
 </tr>
 <tr>
 <td>Extended key prefix (E0 for nav cluster)</td>

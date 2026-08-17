@@ -8790,10 +8790,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#control-message-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control-message module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#input-relay" class="md-nav__link">
     <span class="md-ellipsis">
       
         Input relay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mouse-mode-tracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mouse-mode tracker
       
     </span>
   </a>
@@ -12215,10 +12237,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#control-message-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control-message module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#input-relay" class="md-nav__link">
     <span class="md-ellipsis">
       
         Input relay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mouse-mode-tracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mouse-mode tracker
       
     </span>
   </a>
@@ -12396,9 +12440,27 @@ converts to YUV 4:2:0, encodes to Annex-B framed NAL units
 Every IDR frame is accompanied by SPS (NAL type 7) and PPS
 (NAL type 8) NALs so keyframes are self-contained. Even-dimension
 constraint: width and height are rounded down to even numbers
-before encoding. The <code>force_keyframe: bool</code> parameter to
-<code>encode()</code> calls openh264's <code>force_intra_frame()</code> for the
-next encode.</p>
+before encoding, via the shared <code>even_dimensions()</code> helper that
+every producer of a size the encoder will see uses. The
+<code>force_keyframe: bool</code> parameter to <code>encode()</code> calls openh264's
+<code>force_intra_frame()</code> for the next encode.</p>
+<p><code>encode()</code> demands a buffer of exactly the encoder's (rounded)
+size. <code>encode_cropped()</code> takes the <em>source</em> size instead and
+discards the last row and/or column to reach it — an odd height
+alone is a free subslice, an odd width needs a row-wise copy into
+a staging buffer. Odd surfaces are ordinary: the browser asks the
+guest for <code>Math.round()</code> of a CSS viewport and X grants odd modes.</p>
+<p>Bitrate is not openh264's default. That default is a flat
+120 kbit/s regardless of resolution, which is a webcam-era number
+that renders a desktop unreadable. <code>H264Encoder::new</code> derives a
+target from surface area and frame rate instead
+(<code>MILLIBITS_PER_PIXEL_PER_FRAME</code>, ~2.4 Mbit/s at 1024x768<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/30" title="GitHub User: 30">@30</a>),
+clamped to 1–20 Mbit/s, and selects <code>UsageType::ScreenContentRealTime</code>.
+The derivation is <strong>open-loop</strong>: nothing feeds the receiver's
+bandwidth estimate (REMB/TWCC) back into the encoder, because
+<code>EncoderControl</code> carries only keyframe and stop. On a constrained
+link the encoder overshoots the path and the browser sees loss
+rather than a softer picture.</p>
 <h3 id="encodertask"><code>EncoderTask</code><a class="headerlink" href="#encodertask" title="Permanent link">&para;</a></h3>
 <p>Async driver that lives on tokio's blocking pool (openh264 is a
 synchronous C library; <code>spawn_blocking</code> keeps it off the async
@@ -12411,6 +12473,18 @@ executor). The task loop:</p>
 <li>Handles <code>EncoderControl::RequestKeyframe</code> by setting a
   <code>keyframe_pending</code> flag consumed on the next encode.</li>
 <li>Handles <code>EncoderControl::Stop</code> by breaking the loop.</li>
+<li>Rebuilds the encoder when the frame's <em>rounded</em> size stops
+  matching the encoder's, and forces an IDR so the decoder gets
+  fresh SPS/PPS. This is how a mid-session guest resize is
+  survived: the encoder is built for one size and rejects any
+  other, and nothing restarts this task, so without the rebuild
+  the first frame after a resize froze the viewer's video until
+  it renegotiated. Comparing <em>rounded</em> sizes matters — an odd
+  surface never compares equal to the encoder's rounded-down
+  dimensions, which made every frame look like a resize.</li>
+<li>Tolerates up to <code>MAX_CONSECUTIVE_ERRORS</code> failed frames in a
+  row before returning <code>Err</code>, for the same reason: one bad frame
+  should not end the session's video.</li>
 </ul>
 <h3 id="framesource-and-frameref"><code>FrameSource</code> and <code>FrameRef</code><a class="headerlink" href="#framesource-and-frameref" title="Permanent link">&para;</a></h3>
 <p><code>FrameSource</code> is a trait that decouples the encoder from how
@@ -12618,6 +12692,32 @@ uses this to route Opus packets to the WebRTC audio track without
 re-encoding. When the SPICE server negotiates raw PCM (not Opus),
 the sink receives no packets; the web audio track is silent (a
 warning is logged).</p>
+<h3 id="control-message-module">Control-message module<a class="headerlink" href="#control-message-module" title="Permanent link">&para;</a></h3>
+<p><code>ryll/src/web/control.rs</code> — everything the server pushes to
+<code>app.js</code> travels as JSON over the one control datachannel the
+bridge owns, so the message envelopes and the outbound path live in
+one place rather than in whichever relay needed them first.</p>
+<p>The path is a queue, not a direct write. Producers (the cursor
+relay, the mouse-mode tracker, each input relay) hold a plain
+<code>mpsc::Sender&lt;Vec&lt;u8&gt;&gt;</code>; a single long-lived writer task drains it
+onto whichever bridge is installed. Three reasons:</p>
+<ul>
+<li>Producers do not have to know how a bridge is stored, or take the
+  bridge lock on the cursor hot path.</li>
+<li>The queue outlives any one bridge, so "no browser connected" is
+  handled in one place rather than at every producer.</li>
+<li>A test can hold the receiving end and read exactly what the
+  browser would have been sent, without a live peer connection.</li>
+</ul>
+<p>A full queue drops rather than parking the producer: a browser that
+far behind is better served by the next state than by a backlog.</p>
+<p>Sends are best-effort at the far end too. <code>WebrtcBridge::send_control</code>
+writes straight to the datachannel with no buffering and no
+open-state tracking, so a message written before SCTP has opened the
+channel is simply lost, and the error is logged at debug. Anything
+the browser must not miss therefore has to be <em>pulled</em> by the
+browser rather than pushed at a moment the server guesses is safe —
+which is what <code>BrowserMsg::Hello</code> is for.</p>
 <h3 id="input-relay">Input relay<a class="headerlink" href="#input-relay" title="Permanent link">&para;</a></h3>
 <p><code>ryll/src/web/inputs.rs</code> — drains the bridge's control
 datachannel, parses the JSON input events that the browser shell
@@ -12625,7 +12725,42 @@ posts, and emits <code>InputEvent</code> variants (key down/up with AT
 scancodes, mouse position/button) into the renderer's existing
 inputs channel handler. Viewport-resize messages from the browser
 are forwarded to <code>maybe_send_monitors_resize</code> so the SPICE guest
-can track the browser viewport size at connect time.</p>
+can track the browser viewport size at connect time. Viewport
+sizes are rounded down to even here, because nothing between this
+point and vdagent rounds and the encoder cannot code an odd
+surface.</p>
+<p>Which pointer message the relay sends depends on the negotiated
+mouse mode, and a SPICE server discards the form it did not
+negotiate without saying anything — so getting it wrong presents
+as a dead pointer rather than as an error:</p>
+<ul>
+<li><strong>Client mode</strong> (guest has vdagent, so an absolute pointing
+  device): absolute <code>InputEvent::MouseMove</code>.</li>
+<li><strong>Server mode</strong> (no vdagent): relative
+  <code>InputEvent::MouseMotion</code>, derived from the difference between
+  consecutive browser positions. Zero deltas are dropped, because
+  each <code>MouseMotion</code> occupies a slot in an ack window that only
+  drains on <code>MOUSE_MOTION_ACK</code>.</li>
+</ul>
+<p><code>BrowserMsg::Hello</code> is the browser's first message after
+<code>dc.onopen</code>, and the relay answers it with the current mouse mode.
+This is the only correct moment to deliver it: the SPICE server
+announces the mode at session-init, seconds before any browser
+exists, and the tracker below only re-broadcasts on a change that
+a healthy session never has. The browser is the only party that
+knows its channel is open, so it asks.</p>
+<h3 id="mouse-mode-tracker">Mouse-mode tracker<a class="headerlink" href="#mouse-mode-tracker" title="Permanent link">&para;</a></h3>
+<p><code>run_mouse_mode_tracker</code>, also in <code>inputs.rs</code> — a task with the
+lifetime of the <em>process</em>, not of a bridge. It subscribes to the
+<code>ChannelEvent</code> broadcast bus and stores each <code>MouseMode</code> into the
+shared <code>AtomicU32</code> the relay reads.</p>
+<p>Its subscription lifetime is load-bearing. A <code>broadcast::Receiver</code>
+only sees what is sent after it was created, and the mouse mode is
+announced during session-init, so a per-bridge subscription would
+always start out not knowing the mode. For the same reason
+<code>run_web</code> takes this subscription (and the cursor relay's, and the
+surface mirror's) <em>before</em> spawning the SPICE session, rather than
+relying on session-init being slower than the code that follows it.</p>
 <h3 id="cursor-relay">Cursor relay<a class="headerlink" href="#cursor-relay" title="Permanent link">&para;</a></h3>
 <p><code>ryll/src/web/cursor.rs</code> — subscribes to the renderer's
 broadcast <code>ChannelEvent</code> stream and watches for <code>CursorImage</code>
