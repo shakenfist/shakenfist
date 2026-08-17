@@ -86,7 +86,7 @@ sweep; control-socket cells refreshed 2026-07-30.
 | Obey guest size hints toggle (`--no-obey-guest-size` / hamburger toggle) | available | n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, `ryll/src/main.rs:195`) | missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned) |
 | Guest resolution follows viewport (`VDAgentMonitorsConfig`) | available | missing (`ryll/src/app.rs:3391` — `_resize_tx` is created but never used to drive resize logic in headless) | available |
 | **Cursor** | | | |
-| Server cursor rendering (SET/INIT) | available | missing (`ryll/src/app.rs:3563` — `CursorChannel` runs, events arrive, but headless event loop has no handler for `CursorImage`/`CursorPos` events) | available (MVP; datachannel CSS overlay) |
+| Server cursor rendering (SET/INIT) | available | missing (`ryll/src/app.rs:3563` — `CursorChannel` runs, events arrive, but headless event loop has no handler for `CursorImage`/`CursorPos` events) | available (datachannel CSS overlay; the host cursor is only hidden once a real SPICE shape has arrived, so a guest that never sends one leaves the browser's own pointer visible rather than none at all) |
 | Cursor position tracking | available | missing (same as above) | available (MVP) |
 | Cursor hide/show | available | missing (same as above) | available (MVP) |
 | Default arrow fallback cursor | available | n/a — intrinsic (no display) | available |
@@ -97,7 +97,7 @@ sweep; control-socket cells refreshed 2026-07-30.
 | **Keyboard / Mouse Input** | | | |
 | Keyboard input (key down/up, scancodes) | available | available (via the control socket `send_key` verb — down/up/press with AT-set-1 scancodes; without `--control-socket` only cadence and `--paste-text` generate input) | available (MVP; browser-side scancode table) |
 | Mouse input (position and buttons) | available | missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless) | available (MVP) |
-| Mouse mode negotiation (CLIENT/SERVER) | available | available (negotiation runs in `MainChannel` regardless of mode) | available (absolute coordinates only in MVP without Pointer Lock; see PLAN-web-frontend.md §Resolutions §9) |
+| Mouse mode negotiation (CLIENT/SERVER) | available | available (negotiation runs in `MainChannel` regardless of mode) | available (both modes drive the guest pointer: absolute `MouseMove` in client mode, relative `MouseMotion` derived from consecutive browser positions in server mode. Pointer Lock is still absent, so the derived deltas drift under guest pointer acceleration and dead-zone at the window edge — see docs/web-frontend.md) |
 | Extended key prefix (E0 for nav cluster) | available | available (the control socket `send_key` verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space) | available (browser shell builds its own AT table) |
 | Modifier state tracking (Ctrl/Shift/Alt) | available | partial (`ryll/src/channels/inputs.rs:77-82` — tracked internally but only used by paste state machine; cadence does not restore modifiers) | available (MVP) |
 | **Cadence mode** | | | |

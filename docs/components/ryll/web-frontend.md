@@ -26,15 +26,25 @@ exchanges SDP via `POST /offer`, and starts streaming.
 
 - **Display**: SPICE display channel rendered in the browser
   via H.264 over WebRTC.
-- **Inputs**: keyboard and mouse from the browser to SPICE.
-- **Cursor**: rendered as a `<img>` overlay above the
-  `<video>`; the host browser cursor is hidden.
+- **Inputs**: keyboard and mouse from the browser to SPICE, in
+  both mouse modes — absolute positions when the guest runs
+  vdagent, relative deltas when it does not.
+- **Cursor**: rendered as an `<img>` overlay above the
+  `<video>`, positioned from the viewer's own pointer in client
+  mouse mode and from the guest's reported position in server
+  mode. The host browser cursor is hidden only once the SPICE
+  server has actually sent a cursor shape, so a guest that sends
+  none leaves you with the ordinary browser pointer rather than
+  with no pointer at all.
 - **Audio**: Opus passthrough from SPICE (no re-encoding) when
   the server negotiated Opus. PCM-only SPICE servers currently
   produce silent audio (a warning is logged).
 - **Resolution**: the SPICE guest resizes to match the browser
   viewport at connect time (via vdagent
-  `VDAgentMonitorsConfig`).
+  `VDAgentMonitorsConfig`), and the encoder follows the guest
+  through the resize. Without vdagent in the guest the resize
+  does not happen and the browser scales whatever resolution the
+  guest booted at, which looks soft.
 - Ctrl-C cleanly stops the binary.
 
 ## Reconnect behaviour
@@ -264,6 +274,78 @@ pattern.
   to ~1 second. If no frame arrives after 10 seconds,
   the encoder task is wedged — restart ryll and file a
   bug.
+
+### Video is soft or blurry
+
+Most often the guest never resized, so the browser is scaling a
+smaller desktop up to fill the window. Check what the encoder is
+actually running at:
+
+    web: encoder restarted at 1024x768@30fps
+
+and compare it to the browser window. In the browser console,
+`[ryll] viewport sent: W x H` says the viewport message went out;
+`[ryll] viewport deferred` means the control channel was not open
+yet and it will be re-sent when it opens. Server-side, run with
+`RUST_LOG=info,ryll::web=debug` and look for:
+
+    web inputs: viewport WxH
+
+If that never appears, the guest is not being told to resize — the
+usual cause is no `spice-vdagent` in the guest, since the resize is
+delivered as a `VDAgentMonitorsConfig` message.
+
+Two known limits, neither of which is a fault to chase:
+
+- **The viewport is sent once per connection.** Resizing or
+  maximising the browser window mid-session leaves the guest at the
+  resolution it was given when the datachannel opened, and the
+  browser goes back to upscaling. Reload the page to resize the
+  guest.
+- **Sizes are in CSS pixels.** On a HiDPI display the guest is
+  asked for fewer pixels than the panel physically has, so the
+  image is scaled up by the device pixel ratio no matter what the
+  guest does.
+
+Odd sizes are rounded down by one pixel before the guest is asked,
+because H.264 cannot encode an odd dimension. A one-pixel border is
+not what "blurry" looks like.
+
+### The guest pointer does not move, or lands in the wrong place
+
+Check the negotiated mouse mode in ryll's log:
+
+    main: mouse mode=2 (client (absolute)), supported_modes=3
+
+`supported_modes=1` means the guest is not running
+`spice-vdagent`, so the SPICE server cannot offer client mode and
+the session stays relative. ryll handles both, but a guest with no
+agent also has no absolute pointing device, so the pointer is
+driven by deltas and cannot be warped to a position.
+
+If the pointer stops responding entirely part-way through a
+session, look for:
+
+    inputs: N consecutive pointer moves dropped ...
+
+That is the ack window wedged — the server acknowledges only the
+pointer messages it consumes, so a client sending the form the
+server did not negotiate fills the window once and drops
+everything after it.
+
+In server mode specifically, expect the guest pointer and your own
+to drift apart over a session. The browser reports absolute
+positions and ryll converts consecutive ones into deltas, but the
+guest then applies its own pointer acceleration to those deltas, so
+the two diverge — and there is no warp in server mode to
+re-synchronise them. The same conversion means that once your
+pointer reaches the edge of the video element, no further movement
+is reported in that direction and the guest pointer stops even
+though the guest desktop has room. Both go away with Pointer Lock,
+which the web frontend does not implement yet; installing
+`spice-vdagent` in the guest avoids the whole class of problem by
+getting you client mode. Moving your pointer back to the middle of
+the window and continuing is the workaround.
 
 ### No audio, video works
 

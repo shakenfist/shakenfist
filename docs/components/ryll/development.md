@@ -28,6 +28,9 @@ make lint-fix
 # Start a test QEMU SPICE server (UEFI latency guest, downloads on first run)
 make test-qemu
 
+# Start a full XFCE desktop guest instead (downloads ~770MB on first run)
+make test-qemu-desktop
+
 # Stop the test QEMU instance
 make test-qemu-stop
 ```
@@ -287,6 +290,46 @@ Beyond `make test`, a few tests are worth knowing about individually:
 Integration testing against real traffic needs a SPICE server;
 `make test-qemu` starts one locally. Headless mode is what CI uses for
 protocol-level testing.
+
+## Manual verification against a desktop guest
+
+Some behaviour cannot be tested from the automated suite at all,
+because it needs a guest with a desktop session in it. `make
+test-qemu-desktop` boots one: the shakenfist `debian-xfce:13` image
+with `spice-vdagent`, an `intel-hda` audio device, user-mode
+networking and a cloud-init seed ISO. XFCE autologins as `debian`
+(password `ryll`), and the image ships with the screensaver and
+lock screen disabled.
+
+```bash
+make test-qemu-desktop
+target/release/ryll --web --direct localhost:5900
+```
+
+Each run starts from a fresh qcow2 overlay, so the downloaded base
+image stays pristine and repeated runs begin from identical state.
+`make test-qemu-stop` stops it.
+
+The devices in `tools/start-desktop-qemu.sh` are the point of the
+target rather than incidental, and leaving any of them out produces
+a symptom that looks like a client bug:
+
+| Device | What it makes testable | Symptom without it |
+|---|---|---|
+| vdagent virtserialport | Client (absolute) mouse mode, viewport resize | Server mouse mode: absolute pointer messages are ignored and the guest pointer does not move |
+| `intel-hda` + `hda-duplex` | The SPICE playback channel | Silence, indistinguishable from a broken audio path |
+| user-mode networking | cloud-init, `apt` in the guest | cloud-init waits out its datasource search on every boot |
+
+Worth checking in ryll's own log when verifying `--web`:
+
+- `main: mouse mode=N (...)` — `2` is client mode, which is what a
+  guest running vdagent should negotiate. `1` means server mode, and
+  everything about the pointer will behave differently.
+- `playback: MODE: 3` — Opus. Mode `1` is raw PCM, which web mode
+  does not yet transcode, so audio is silent by design.
+- `web: encoder restarted at WxH@30fps` — the encode resolution. If
+  it does not match the guest's surface, the browser is watching a
+  scaled image.
 
 ## Helper tools
 
