@@ -239,6 +239,18 @@ trustworthy first.
 | 4. Enforcement: CI fails when a new unbounded `repeated` reply field appears unregistered | PLAN-grpc-bounded-replies-phase-04-enforcement.md | Not started |
 | 5. Lower the client cap, retire the stopgaps, document the contract | PLAN-grpc-bounded-replies-phase-05-closeout.md | Not started |
 
+Named for phase 1's audit scope, so they are not rediscovered one
+review round at a time: `_direct_get_expired_blob_uuids()` and
+`_direct_get_stale_transcoded_blob_uuids()` both still end in `except
+OperationalError: return []`, and are consumed by the same
+`_cluster_wide_cleanup()` pass as the accessors this branch hardened.
+Both callers only iterate, so the collapse is permitted by the rule
+rather than overlooked by it — but "permitted" is a judgement that
+should be recorded per caller, which is what the taxonomy in Q2 is for.
+`Node.instances` is the one to look at hardest: it is not a complement
+set, but a node whose instance list reads empty during an outage is a
+node the scheduler believes is idle.
+
 Sequencing constraints:
 
 - Phase 1 must land before phase 0 is *finalised*. The decisions in
@@ -610,6 +622,15 @@ on the `issue-fix-3638` branch:
   have starved every object type behind a persistently slow one, since
   both loops start from the same place every pass. They now resume
   after whichever type stopped the previous pass.
+- The cleaner's deletion test is an OR over *two* lists, and only the
+  active-blob one had been hardened. `Node.blobs` ->
+  `get_references_from()` flattened failure to `[]` at all three
+  layers, so a plain MariaDB `OperationalError` still emptied the
+  node's blob store -- and that is the *likelier* trigger, since it
+  breaks while sf-database stays healthy. Fixed with a raising
+  `get_node_blob_uuids()` over a truthful `_get_references_from()`,
+  plus `UNAVAILABLE`/`INTERNAL`/`INVALID_ARGUMENT` on
+  `GetReferencesFrom`. Five mutations confirmed the guards.
 
 ### Documentation index maintenance
 

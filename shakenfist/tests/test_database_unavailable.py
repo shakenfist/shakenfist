@@ -23,6 +23,7 @@ from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist.daemons.queues import main as queues_main
 from shakenfist.daemons.queues import workitem as queues_workitem
 from shakenfist.protos import database_pb2
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
 
@@ -887,3 +888,52 @@ class QueuesWorkItemDatabaseUnavailableTestCase(base.ShakenFistTestCase):
             # The row stays claimed and the stuck-row reaper re-queues
             # it, exactly as for a worker crash.
             job.execute()
+
+
+class ReferenceReadFailureTestCase(base.ShakenFistTestCase):
+    """A failed reference read must survive as None all the way up.
+
+    The cleaner's deletion test is an OR over two lists, and the node's
+    own blob locations are the second one. Every layer of that read used
+    to flatten failure to [], so the complement-set hazard of #3638 was
+    reachable through it even after get_active_blob_uuids() was fixed.
+    """
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_oversized_reply_is_a_failed_read(self, mock_stub, mock_call):
+        # RESOURCE_EXHAUSTED is not retryable, so it arrives here as a
+        # raw RpcError rather than as DatabaseUnavailable from the retry
+        # budget. Both must end up as None, not [].
+        self.assertIsNone(
+            mariadb._grpc_get_references_from(ObjectType.NODE, 'sf-1'))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_is_a_failed_read(self, mock_engine):
+        # The likelier failure: MariaDB itself errors while sf-database
+        # is healthy. This is the path the servicer runs.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'select', {}, Exception('lock wait timeout'))
+
+        self.assertIsNone(
+            mariadb._direct_get_references_from(ObjectType.NODE, 'sf-1'))
+
+    @mock.patch('shakenfist.mariadb._get_references_from', return_value=None)
+    def test_node_blob_uuids_raises(self, mock_refs):
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_node_blob_uuids, 'sf-1')
+
+    @mock.patch('shakenfist.mariadb._get_references_from', return_value=[])
+    def test_node_with_no_blobs_does_not_raise(self, mock_refs):
+        # The negative control: an empty answer is a real answer.
+        self.assertEqual([], mariadb.get_node_blob_uuids('sf-1'))
+
+    @mock.patch('shakenfist.mariadb._get_references_from', return_value=None)
+    def test_tolerant_accessor_still_collapses(self, mock_refs):
+        # get_references_from() keeps collapsing deliberately, because
+        # every one of its callers iterates the result. Pinning that
+        # keeps the decision a decision rather than an oversight.
+        self.assertEqual(
+            [], mariadb.get_references_from(ObjectType.NODE, 'sf-1'))

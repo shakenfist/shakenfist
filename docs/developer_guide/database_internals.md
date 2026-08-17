@@ -158,7 +158,8 @@ and sweep helpers skip the affected work for the pass.
 
 The servicer has the matching obligation. A reply whose only payload is
 a `repeated` field has nowhere to say "the read failed", so
-`GetObjectsByState` and `GetStatelessObjectUuids` must not answer a
+`GetObjectsByState`, `GetStatelessObjectUuids` and `GetReferencesFrom`
+must not answer a
 failed read with an empty list: when the direct accessor returns `None`
 (an `OperationalError` — MariaDB down, connection dropped, lock wait
 timeout, deadlock) they set `UNAVAILABLE` on the status, which
@@ -168,10 +169,15 @@ non-retryable and so becomes a `None` return client-side. This matters
 because it is the failure mode where sf-database itself is healthy and
 answering, so nothing else in the stack notices.
 
-`get_active_blob_uuids()` is the exception to the "wrappers translate to
-not found" rule: it *raises* `DatabaseUnavailable` rather than returning
-`[]`, because the cleaner uses the list as a complement set and unlinks
-every blob file not named in it. See the
+`get_active_blob_uuids()` and `get_node_blob_uuids()` are the exceptions
+to the "wrappers translate to
+not found" rule: they *raise* `DatabaseUnavailable` rather than returning
+`[]`, because the cleaner uses both lists as complement sets and unlinks
+every blob file named in neither. They are two accessors over reads that
+also have tolerant forms — `get_objects_by_state()` and
+`get_references_from()` — which keep collapsing a failed read for their
+iterate-only callers. Which form a call site needs is a property of the
+call site, so the pair exists rather than a flag on one accessor. See the
 ["`or []` is a decision"](coding_rules.md) rule for how to decide which
 shape a new accessor should have, and
 [`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md)

@@ -150,3 +150,65 @@ class GetStatelessObjectUuidsFailedReadTestCase(base.ShakenFistTestCase):
 
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
         self.assertEqual([], list(reply.object_uuids))
+
+
+class GetReferencesFromFailedReadTestCase(base.ShakenFistTestCase):
+    """The same defect, on the reply that feeds the *other* operand.
+
+    _maintain_blobs unlinks a file when it is missing from the active
+    blob list OR from the node's own blob locations. This RPC backs the
+    second list, and returned an OK reply with zero references whenever
+    _direct_get_references_from() hit an OperationalError -- so the
+    complement-set hazard survived the first round of this fix intact.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+        self.request = database_pb2.GetReferencesFromRequest(
+            source_type=ObjectType.NODE.proto_id,
+            source_uuid='sf-1')
+
+    @mock.patch('shakenfist.mariadb._direct_get_references_from',
+                return_value=None)
+    def test_failed_read_is_an_error_status_not_an_empty_reply(self, mock_get):
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetReferencesFrom(self.request, context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertEqual([], list(reply.references))
+
+    @mock.patch('shakenfist.mariadb._direct_get_references_from',
+                return_value=[])
+    def test_genuinely_empty_is_not_an_error(self, mock_get):
+        # The negative control: a node holding no blobs is a real answer.
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetReferencesFrom(self.request, context)
+
+        context.set_code.assert_not_called()
+        self.assertEqual([], list(reply.references))
+
+    @mock.patch('shakenfist.mariadb._direct_get_references_from',
+                side_effect=ValueError('boom'))
+    def test_unexpected_exception_is_internal_not_empty(self, mock_get):
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetReferencesFrom(self.request, context)
+
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        self.assertEqual([], list(reply.references))
+
+    def test_unknown_object_type_is_invalid_argument(self):
+        context = mock.MagicMock()
+        request = database_pb2.GetReferencesFromRequest(
+            source_type=0, source_uuid='sf-1')
+
+        reply = self.servicer.GetReferencesFrom(request, context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertEqual([], list(reply.references))

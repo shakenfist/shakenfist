@@ -89,7 +89,19 @@ class Monitor(daemon.Daemon):
             # failure audit is suppressed above.
             return
 
-        all_node_blobs = set(n.blobs)
+        # The second operand of the deletion decision below, and it needs
+        # exactly the same protection as the first: the test is an OR, so
+        # an empty answer from either list unlinks the whole blob store.
+        # Node.blobs is not used here because it routes through the
+        # tolerant get_references_from(), which cannot tell a node with no
+        # blobs from a read that did not happen.
+        try:
+            all_node_blobs = set(mariadb.get_node_blob_uuids(n.fqdn))
+        except exceptions.DatabaseUnavailable as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read this node\'s blob locations, skipping blob '
+                'maintenance this pass')
+            return
 
         try:
             p = pathlib.Path(blob_path)

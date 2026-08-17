@@ -7202,6 +7202,40 @@ def get_active_blob_uuids() -> list[str]:
     return result
 
 
+def get_node_blob_uuids(node_fqdn: str) -> list[str]:
+    """Get UUIDs of the blobs recorded as present on a node.
+
+    Raises exceptions.DatabaseUnavailable if the read failed, for the
+    same reason get_active_blob_uuids() does: these two lists are the
+    two operands of the cleaner's deletion decision
+
+        if (blob_uuid not in active_blob_uuids
+                or blob_uuid not in all_node_blobs):
+            os.unlink(entpath)
+
+    and it is an OR, so an empty answer from *either* one unlinks the
+    node's entire blob store. Hardening only the first operand left the
+    bug fully reachable through the second, which is the likelier
+    failure in practice: a MariaDB OperationalError (lock wait timeout,
+    deadlock, dropped connection) while sf-database itself is healthy.
+
+    Node.blobs deliberately keeps using the tolerant
+    get_references_from() -- its other callers only iterate.
+
+    Args:
+        node_fqdn: The fqdn of the node, as used for reference rows.
+
+    Returns:
+        List of blob UUID strings located on that node.
+    """
+    refs = _get_references_from(
+        ObjectType.NODE, node_fqdn, RelationshipType.BLOB_LOCATION)
+    if refs is None:
+        raise exceptions.DatabaseUnavailable(
+            'could not read the blob locations for node %s' % node_fqdn)
+    return [str(ref.target_uuid) for ref in refs]
+
+
 # =============================================================================
 # DnsMasq Direct Access Functions
 # These are used by the database daemon for DnsMasq object storage.
@@ -7564,7 +7598,7 @@ def _direct_get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
-) -> list[ObjectReference]:
+) -> Optional[list[ObjectReference]]:
     """Get all references from an object directly from MariaDB.
 
     Args:
@@ -7573,7 +7607,9 @@ def _direct_get_references_from(
         relationship: Optional filter by relationship type.
 
     Returns:
-        List of ObjectReference objects the source references.
+        List of ObjectReference objects the source references, or None if
+        the read failed. None and [] are different answers -- see
+        get_references_from() for which callers may collapse them.
     """
     engine = _get_engine()
     table = _get_object_references_table()
@@ -7607,7 +7643,7 @@ def _direct_get_references_from(
             return refs
     except OperationalError as e:
         LOG.warning(f'MariaDB get_references_from failed: {e}')
-        return []
+        return None
 
 
 @util_callstack.restrict_caller(
@@ -8253,8 +8289,13 @@ def _grpc_get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
-) -> list[ObjectReference]:
-    """Get references from an object via the database microservice."""
+) -> Optional[list[ObjectReference]]:
+    """Get references from an object via the database microservice.
+
+    Returns None if the read failed. DatabaseUnavailable is deliberately
+    not caught here: it is not an RpcError, so an exhausted retry budget
+    propagates to the caller rather than becoming a failed-read None.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetReferencesFromRequest(
@@ -8288,7 +8329,7 @@ def _grpc_get_references_from(
         return refs
     except grpc.RpcError as e:
         LOG.error(f'gRPC GetReferencesFrom failed: {e}')
-        return []
+        return None
 
 
 def _grpc_count_references_to(
@@ -8702,12 +8743,38 @@ def get_references_to(
     return _direct_get_references_to(target_type, target_uuid, relationship)
 
 
+def _get_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> Optional[list[ObjectReference]]:
+    """Route a reference read, preserving the failed-read answer.
+
+    This is the truthful form: None means the read did not happen.
+    """
+    if _use_database_service():
+        return _grpc_get_references_from(source_type, source_uuid, relationship)
+    return _direct_get_references_from(source_type, source_uuid, relationship)
+
+
 def get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
-    """Get all references from an object.
+    """Get all references from an object, treating a failed read as none.
+
+    The collapse here is deliberate and is only safe because every
+    caller of this function iterates the result: hard_delete() reference
+    cleanup, Blob.depends_on, Blob.transcoded, Node.instances. For those
+    a failed read means work is skipped and retried on the next pass.
+
+    It is *not* safe for a caller that uses the result as a complement
+    set -- "delete everything not in this list" -- because an empty list
+    then reads as "delete everything". Such a caller must use a raising
+    accessor built on _get_references_from() instead; see
+    get_node_blob_uuids(), and the rule in
+    docs/developer_guide/coding_rules.md.
 
     Args:
         source_type: The type of the source object.
@@ -8715,11 +8782,10 @@ def get_references_from(
         relationship: Optional filter by relationship type.
 
     Returns:
-        List of ObjectReference objects the source references.
+        List of ObjectReference objects the source references. Empty
+        both when there are none and when the read failed.
     """
-    if _use_database_service():
-        return _grpc_get_references_from(source_type, source_uuid, relationship)
-    return _direct_get_references_from(source_type, source_uuid, relationship)
+    return _get_references_from(source_type, source_uuid, relationship) or []
 
 
 def count_references_to(

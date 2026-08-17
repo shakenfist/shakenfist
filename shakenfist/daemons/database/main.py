@@ -1425,6 +1425,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             self.monitor.counters['get_references_from'].inc()
             source_type = ObjectType.from_proto_id(request.source_type)
             if source_type is None:
+                # An unknown or unset object type is a bad request, not a
+                # source with no references. Non-retryable, so the client
+                # wrapper maps it to None rather than to an empty list.
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(
+                    f'unknown object type id {request.source_type}')
                 return database_pb2.GetReferencesReply(references=[])
             relationship = None
             if request.HasField('relationship'):
@@ -1432,6 +1438,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.relationship)
             refs = mariadb._direct_get_references_from(
                 source_type, request.source_uuid, relationship)
+            if refs is None:
+                LOG.warning(
+                    f'GetReferencesFrom transient MariaDB error for '
+                    f'{source_type} {request.source_uuid}')
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details('reference read failed')
+                return database_pb2.GetReferencesReply(references=[])
             result = []
             for ref in refs:
                 result.append(database_pb2.ObjectReferenceData(
@@ -1454,6 +1467,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetReferencesFrom failed', e)
+            # INTERNAL rather than UNAVAILABLE: an unexpected exception in
+            # this handler is a bug, not a transient outage, and retrying
+            # it will not help.
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.GetReferencesReply(references=[])
 
     def CountReferencesTo(

@@ -311,6 +311,33 @@ which `_grpc_call` retries and converts to `DatabaseUnavailable`, and `INTERNAL`
 for a handler bug, which is non-retryable and so becomes a `None` return. When
 you fix an empty-means-failure bug, check both ends of the wire.
 
+And check every operand of the decision, not just the one that led you there.
+The cleaner's test is an *or*:
+
+```python
+if (blob_uuid not in active_blob_uuids
+        or blob_uuid not in all_node_blobs):
+    os.unlink(entpath)
+```
+
+Hardening `get_active_blob_uuids()` fixed the first operand and left the store
+exactly as deletable through the second, which reads the node's own blob
+locations and flattened failure to `[]` at all three layers. Worse, the second
+operand fails *more* often than the first, because a plain MariaDB
+`OperationalError` -- a lock wait timeout, a deadlock, a dropped connection --
+breaks it while sf-database itself stays healthy and answers everything else
+normally. A guard on one input of a multi-input decision is not a guard on the
+decision. Enumerate the inputs, and write the negative-control test for each.
+
+That said, the fix is per-caller and not per-accessor, so it does not follow
+that every accessor should raise. `get_references_from()` still collapses a
+failed read to `[]`, deliberately and with the reasoning in its docstring,
+because every one of its callers iterates. The complement-set caller gets its
+own raising accessor, `get_node_blob_uuids()`, built on the truthful internal
+`_get_references_from()`. Two accessors over one read, named for what their
+callers may assume, beats one accessor with a `raise_on_failure` flag that
+every call site has to remember to set.
+
 ## Cluster CI tests only run in the merge queue
 
 The `(collection)` matrix in `Functional tests` -- everything under
