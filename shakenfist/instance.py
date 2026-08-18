@@ -233,7 +233,7 @@ class Instance(dbowo):
         dbo.STATE_ERROR: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
                           dbo.STATE_ERROR),
         dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED, STATE_DELETE_WAIT_ERROR),
-        STATE_DELETE_WAIT_ERROR: (dbo.STATE_ERROR),
+        STATE_DELETE_WAIT_ERROR: (dbo.STATE_ERROR,),
         dbo.STATE_DELETED: None,
     }
 

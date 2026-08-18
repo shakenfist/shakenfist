@@ -126,6 +126,38 @@ class InstanceTestCase(base.ShakenFistTestCase):
         with testtools.ExpectedException(exceptions.InvalidStateException):
             i.state = instance.Instance.STATE_CREATED
 
+    def test_set_state_delete_wait_error(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', instance_uuid,
+            set_state=instance.Instance.STATE_DELETE_WAIT_ERROR)
+        i = instance.Instance.from_db(instance_uuid)
+
+        # Instance.state_targets[STATE_DELETE_WAIT_ERROR] must be a 1-element tuple,
+        # not a string (which would allow substring transitions like 'err', 'r', 'o', etc.
+        # or reject exact match if compared against string characters).
+        self.assertEqual((baseobject.DatabaseBackedObject.STATE_ERROR,),
+                         instance.Instance.state_targets[instance.Instance.STATE_DELETE_WAIT_ERROR])
+
+        # Invalid transitions from delete-wait-error must fail
+        invalid_states = [
+            instance.Instance.STATE_DELETED,
+            instance.Instance.STATE_DELETE_WAIT,
+            instance.Instance.STATE_CREATED,
+            'err',
+            'error-extra',
+            'e',
+            'r',
+            'o',
+        ]
+        for inv_state in invalid_states:
+            with testtools.ExpectedException(exceptions.InvalidStateException):
+                i.state = inv_state
+
+        # Intended valid transition from delete-wait-error to error must succeed
+        i.state = instance.Instance.STATE_ERROR
+        self.assertEqual(instance.Instance.STATE_ERROR, i.state.value)
+
     def test_update_power_state(self):
         instance_uuid = str(uuid.uuid4())
         self.mock_mariadb.create_instance('cirros', instance_uuid)
