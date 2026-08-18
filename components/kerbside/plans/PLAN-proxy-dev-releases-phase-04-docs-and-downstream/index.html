@@ -5855,6 +5855,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#decision-1-reversed-2026-08-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision 1 reversed (2026-08-18)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11822,6 +11833,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#decision-1-reversed-2026-08-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision 1 reversed (2026-08-18)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12035,6 +12057,53 @@ proto — <code>f06c4ef8…</code> both sides):</p>
    means the cross-repo work has a step table, briefs and a
    definition of done instead of a checklist bullet.</li>
 </ol>
+<h2 id="decision-1-reversed-2026-08-18">Decision 1 reversed (2026-08-18)<a class="headerlink" href="#decision-1-reversed-2026-08-18" title="Permanent link">&para;</a></h2>
+<p><strong>patch175 keeps its PyPI fallback branch; step 4b is
+withdrawn and the downstream patch is not changed.</strong></p>
+<p>Decision 1 rested on the fallback being a no-op on the happy
+path and a "silent staleness-masker" everywhere else. The
+second half does not survive measurement:</p>
+<ul>
+<li>Kolla's <code>install_pip</code> macro (<code>kolla/docker/macros.j2:35-43</code>)
+  always emits <code>pip --no-cache-dir install --upgrade</code>, and the
+  fallback runs <em>after</em> the <code>pip install /kerbside</code> that
+  resolves the committed floor. So it always runs against an
+  environment where a proxy wheel is already installed.</li>
+<li>Measured against live PyPI with pip 26.2.1 on 2026-08-18:
+  with <code>kerbside-proxy 0.5.1.dev1</code> installed, <code>pip install
+  --upgrade kerbside-proxy</code> reports "Requirement already
+  satisfied" and installs nothing. It does not downgrade the
+  dev wheel to the newest final release (0.5.0), which was the
+  concrete harm the reversal check was looking for.</li>
+<li>The only path on which the fallback installs anything is one
+  where the floor failed to resolve a wheel — and that failure
+  aborts the image build before the fallback is reached.</li>
+<li>Any skew that does survive is already loud: phase 3's
+  contract handshake refuses to launch a binary whose embedded
+  proto hash differs from the package's.</li>
+</ul>
+<p>Against a benefit that measurement puts at zero, deleting it
+costs a downstream patch edit, a wave-8 Gerrit repush and the
+rebase churn that follows, and carries a real tail risk: if
+any part of the floor assumption is wrong for some build, the
+image ends up with no proxy binary at all.</p>
+<p>Consequences for the rest of this plan:</p>
+<ul>
+<li>Step 4b is withdrawn, not deferred. The commit the master
+  plan recorded as "committed in a kerbside-patches worktree
+  awaiting its own PR" no longer exists in any worktree or
+  branch of that repo, so nothing is stranded.</li>
+<li>Decision 2 (refresh rather than abandon the wave-8 Gerrit
+  change) stands, but the refreshed change carries the current
+  diff rather than an override-only one. The patch's message,
+  rewritten upstream on 2026-08-13, describes the override
+  without mentioning the fallback it still contains; aligning
+  the message is a nice-to-have for the next repush.</li>
+<li>Step 4c (the Gerrit recheck) is unaffected and still
+  outstanding; the operator drives it.</li>
+<li>The Definition of done drops its patch175 clause
+  accordingly.</li>
+</ul>
 <h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12059,7 +12128,7 @@ proto — <code>f06c4ef8…</code> both sides):</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>kerbside-patches worktree</td>
-<td><strong>GATED: run only after the kerbside PR merges AND the bootstrap dev wheel is on PyPI (operator confirms both).</strong> In a fresh worktree of shakenfist/kerbside-patches (branch off develop): edit <code>_patches/patch175-kolla-master-install-proxy-wheel.patch</code> and its <code>.patch-message</code> — delete the <code>else</code> / <code>install_pip(['kerbside-proxy'])</code> branch so the conditional only installs <code>/kerbside/proxy-wheels/*.whl</code> when present (mind the <code>\</code>-continuation shell syntax inside the Dockerfile RUN; the surviving branch keeps its current form), and rewrite the message per decision 1 (override = local dev/skew-safety mechanism; the kerbside package now resolves its own proxy wheel via the committed dev-inclusive floor — reference kerbside's dev-proxy-wheel.yml). Do not touch <code>kolla/ORDER</code> or <code>kolla-wave-8/ORDER</code>. Verify with the repo's documented flow (<code>_build/test-apply.sh</code>, per its AGENTS.md — never edit <code>src/</code>); the patch must apply cleanly to the kolla checkout and the resulting Dockerfile must contain exactly one <code>proxy-wheels</code> conditional and zero bare <code>kerbside-proxy</code> pip installs. <code>pre-commit run --all-files</code> in that repo. This is its own PR in kerbside-patches (operator creates it); the wave-8 Gerrit refresh (decision 2) is proposed to the operator, not pushed by the agent.</td>
+<td><strong>WITHDRAWN 2026-08-18 — the fallback this step deletes is inert; see "Decision 1 reversed" above. Retained for the record only; do not execute.</strong> Original brief: <strong>GATED: run only after the kerbside PR merges AND the bootstrap dev wheel is on PyPI (operator confirms both).</strong> In a fresh worktree of shakenfist/kerbside-patches (branch off develop): edit <code>_patches/patch175-kolla-master-install-proxy-wheel.patch</code> and its <code>.patch-message</code> — delete the <code>else</code> / <code>install_pip(['kerbside-proxy'])</code> branch so the conditional only installs <code>/kerbside/proxy-wheels/*.whl</code> when present (mind the <code>\</code>-continuation shell syntax inside the Dockerfile RUN; the surviving branch keeps its current form), and rewrite the message per decision 1 (override = local dev/skew-safety mechanism; the kerbside package now resolves its own proxy wheel via the committed dev-inclusive floor — reference kerbside's dev-proxy-wheel.yml). Do not touch <code>kolla/ORDER</code> or <code>kolla-wave-8/ORDER</code>. Verify with the repo's documented flow (<code>_build/test-apply.sh</code>, per its AGENTS.md — never edit <code>src/</code>); the patch must apply cleanly to the kolla checkout and the resulting Dockerfile must contain exactly one <code>proxy-wheels</code> conditional and zero bare <code>kerbside-proxy</code> pip installs. <code>pre-commit run --all-files</code> in that repo. This is its own PR in kerbside-patches (operator creates it); the wave-8 Gerrit refresh (decision 2) is proposed to the operator, not pushed by the agent.</td>
 </tr>
 <tr>
 <td>4c</td>
@@ -12099,13 +12168,11 @@ proto — <code>f06c4ef8…</code> both sides):</p>
 <li><code>KERBSIDE_SKIP_CONTRACT_CHECK</code> and the startup refusal are
   documented in <code>docs/proxy-architecture.md</code>, and
   <code>docs/installation.md</code> mentions the check and links there.</li>
-<li><code>pre-commit run --all-files</code> passes in kerbside (4a) — and in
-  kerbside-patches when 4b runs.</li>
+<li><code>pre-commit run --all-files</code> passes in kerbside (4a).</li>
 <li>Post-merge tail (tracked, not blocking "implemented on
-  branch"): patch175 contains only the override branch and
-  applies cleanly via <code>_build/test-apply.sh</code>; a kerbside
-  scenario job goes green on Gerrit from unmodified kolla
-  master, build UUID recorded.</li>
+  branch"): a kerbside scenario job goes green on Gerrit from
+  unmodified kolla master, build UUID recorded. The patch175
+  clause is dropped — see "Decision 1 reversed" above.</li>
 <li>The master plan's phase 4 sketch carries the timing gate
   (corrected in this planning commit), and the Execution
   table / <code>index.md</code> rows are updated.</li>

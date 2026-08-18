@@ -12382,12 +12382,12 @@ kolla-ansible code beyond what is already in flight.</p>
 <tr>
 <td>4. Docs, downstream cleanup and verification</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md</a></td>
-<td>Docs (4a) complete in PR #314. Post-merge tail outstanding: patch175 simplification (4b) is committed in a kerbside-patches worktree awaiting its own PR; the Gerrit recheck (4c) has not run</td>
+<td>Docs (4a) complete in PR #314. 4b (patch175 simplification) withdrawn 2026-08-18 — decision 1 is reversed in the phase plan and the Kolla patch keeps its PyPI fallback. 4c (Gerrit recheck) outstanding, operator-driven</td>
 </tr>
 <tr>
 <td>5. Automated dev release pruning</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/">PLAN-proxy-dev-releases-phase-05-pypi-prune.md</a></td>
-<td>Implemented (on branch) — storage monitor, lockfile-only merges no longer publish, pruning runbook</td>
+<td>Complete (merged in PR #328, 2026-08-18) — storage monitor, lockfile-only merges no longer publish, pruning runbook</td>
 </tr>
 </tbody>
 </table>
@@ -12455,12 +12455,35 @@ step is gated on merge + bootstrap (timing correction,
 2026-08-15 during phase 4 planning) — while the
 <code>/kerbside/proxy-wheels/</code> local-override branch remains
 useful and keeps its skew-safety role. Confirm upstream
-kolla needs no change.
-Verification: after the next develop merge that triggers a
+kolla needs no change.</p>
+<p>Verification: after the next develop merge that triggers a
 publish, recheck one of the Gerrit changes and confirm the
 kerbside scenario jobs go green (the ubuntu-noble-upgrade
 cirros flake, issue #293, is unrelated and may still need
 a recheck).</p>
+<p>(Decision reversed, 2026-08-18: patch175 keeps its PyPI
+fallback branch and the downstream patch is not changed. The
+premise for deleting it — that the fallback silently masks
+staleness — does not survive measurement. Kolla's
+<code>install_pip</code> macro (<code>kolla/docker/macros.j2:35-43</code>) always
+passes <code>--upgrade</code>, and the fallback runs <em>after</em> the
+<code>pip install /kerbside</code> that resolves the committed floor, so
+by the time it runs a newer dev wheel is already installed.
+Measured against live PyPI with pip 26.2.1: with
+<code>kerbside-proxy 0.5.1.dev1</code> installed, <code>pip install --upgrade
+kerbside-proxy</code> reports "Requirement already satisfied" and
+installs nothing — it neither downgrades to the newest final
+release nor masks anything. The fallback can only execute
+meaningfully on a path where the floor install already failed,
+which fails the image build first, and phase 3's contract
+handshake turns any surviving skew into a loud startup
+refusal. Against that, deleting it costs a downstream patch
+edit plus a wave-8 Gerrit repush and rebase churn, and risks
+leaving master images with no proxy at all if any part of the
+floor assumption is wrong. The 4b commit this plan previously
+recorded as "awaiting its own PR" no longer exists in any
+kerbside-patches worktree or branch, so nothing is stranded by
+withdrawing the step.)</p>
 <p><strong>Phase 5 — automated dev release pruning.</strong> A scheduled
 workflow that keeps the dev release set bounded: retain
 the newest K dev releases (and never touch final
@@ -12632,6 +12655,16 @@ implemented because the following statements will be true:</p>
   review on PR #314; declined there because phase 2
   accepted the platform trade deliberately and no
   contributor currently needs it.</li>
+<li>patch175's upstream commit message (rewritten 2026-08-13)
+  now frames the patch as an optional local override and no
+  longer mentions the PyPI fallback branch the diff still
+  carries. Worth aligning the message on the next wave-8
+  repush; not worth a change of its own.</li>
+<li>Revisit deleting patch175's PyPI fallback if pip's
+  <code>--upgrade</code> semantics for an already-installed pre-release
+  ever change, or if kerbside-patches stops installing the
+  kerbside source before the fallback runs — both are the
+  measurements that make the fallback inert today.</li>
 <li>Revisit automated dev-release pruning if PyPI ever ships a
   management API. Warehouse issue #12810 ("Warehouse API to
   delete old .dev wheels (nightly builds)") is precisely
