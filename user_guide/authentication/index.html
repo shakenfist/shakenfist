@@ -11840,8 +11840,13 @@ required.</p>
 <h2 id="keys-the-cluster-generated-for-you">Keys the cluster generated for you<a class="headerlink" href="#keys-the-cluster-generated-for-you" title="Permanent link">&para;</a></h2>
 <p>If your administrator asked Shaken Fist to generate your key rather than
 choosing one, it will look like this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sfk_QKLZzvTtHM8fVc7XmoVe5ohIorW9Se6JDMUCWH
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sfk_e57SPWpK3JGmyhuYLrcUtSwhtdJlONiXzzzzzz
 </code></pre></div>
+<p>That example is deliberately not a usable key. The last six characters
+are a checksum, and <code>zzzzzz</code> is a larger number than any checksum the
+cluster can produce, so the example fails validation before anything
+tries it. A real key ends in six characters which look as random as the
+rest of it.</p>
 <p>The <code>sfk_</code> prefix is there so that a leaked credential is easy to find --
 in a log file, in a repository, or by an automated secret scanner. Treat it
 exactly as you would any other key. There is nothing you need to do

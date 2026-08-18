@@ -11660,6 +11660,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#credential-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credential scanning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Credential scanning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#accepting-a-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepting a finding
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#automated-ci-jobs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11780,7 +11808,7 @@ commands available on a PR.</p>
 <tbody>
 <tr>
 <td><code>functional-tests.yml</code></td>
-<td>Main CI: lint, unit tests, functional tests, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the <code>shakenfist.shakenfist</code> Ansible collection (<code>shakenfist/deploy/collection/</code>), driven by the reusable <code>smoke-cluster</code> workflow in the <code>shakenfist/actions</code> repository</td>
+<td>Main CI: lint, unit tests, functional tests, credential scanning, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the <code>shakenfist.shakenfist</code> Ansible collection (<code>shakenfist/deploy/collection/</code>), driven by the reusable <code>smoke-cluster</code> workflow in the <code>shakenfist/actions</code> repository</td>
 <td>PR, merge_group</td>
 </tr>
 <tr>
@@ -11884,6 +11912,72 @@ exported to <code>.github/exported-config/</code> for version control and audit 
 </ul>
 <p>If the <code>export-repo-config</code> workflow creates a PR, it means GitHub UI settings
 have changed and should be reviewed.</p>
+<h2 id="credential-scanning">Credential scanning<a class="headerlink" href="#credential-scanning" title="Permanent link">&para;</a></h2>
+<p>The <code>credential_scan</code> job in <code>functional-tests.yml</code> runs
+<code>tools/gitleaks-scan.sh</code>, which scans every commit reachable from <code>HEAD</code>
+for leaked credentials. On a pull request that is the whole of <code>develop</code>
+plus the branch under test: about three seconds over five and a half
+thousand commits. It is one of <code>Can enqueue</code>'s dependencies, so a
+credential cannot be merged, and unlike most jobs it is not skipped for
+documentation-only changes -- a credential pasted into a code sample is
+still a credential, and the one real key secret this scan found in our
+own history had been published in the user guide.</p>
+<p>The scan is scoped to <code>HEAD</code> rather than every ref because <code>gh-pages</code>
+carries the built documentation site, whose search index is a single
+enormous JSON blob quoting every code sample we have. Scanning it takes
+five minutes instead of three seconds, produces around a hundred and
+fifty findings which are all duplicates of source files already
+scanned, and -- in gitleaks 8.16 -- attributes them to unrelated
+<code>develop</code> merge commits, so they cannot even be triaged by commit.</p>
+<p>The scan carries a positive control: it plants a key secret and an SSH
+private key in a scratch directory and fails if gitleaks does not report
+both. An empty result is otherwise indistinguishable from a broken
+scanner, and the allowlists described below could in principle grow
+until they forgive everything.</p>
+<p>To reproduce a CI failure, run <code>tools/gitleaks-scan.sh</code> yourself, passing
+<code>--gitleaks PATH</code> if the available binary is not the pinned 8.16.0. It
+does not matter which directory you run it from: it changes to the top of
+the working tree first, because both <code>.gitleaks.toml</code> and
+<code>.gitleaksignore</code> are resolved relative to the working directory, and
+from a subdirectory the ignore file would be missed silently and the
+three accepted historical findings reported as new. It does need a full
+clone -- a shallow one cannot see the history the scan claims to cover,
+so the script says so and exits rather than passing over a fraction of
+it.</p>
+<p>Two rules are ours rather than upstream's:</p>
+<ul>
+<li><code>shakenfist-key-secret</code> matches the <code>sfk_</code> credential format. Unit
+  tests in <code>shakenfist/tests/test_credentials.py</code> read the rule's regex
+  out of <code>.gitleaks.toml</code> and assert it matches what
+  <code>credentials.generate()</code> actually produces, so the format and the
+  scanner cannot drift apart silently.</li>
+<li><code>shakenfist/tests/test_no_committed_credentials.py</code> walks the working
+  tree for the same format but <em>verifies the checksum</em>, which
+  distinguishes a real credential from a documented example. It runs in
+  the unit suite and needs no allowlist at all.</li>
+</ul>
+<h3 id="accepting-a-finding">Accepting a finding<a class="headerlink" href="#accepting-a-finding" title="Permanent link">&para;</a></h3>
+<p>There are two places to record a finding you have decided to accept, and
+they are not interchangeable.</p>
+<p>Content which will recur -- a documentation placeholder, a test fixture,
+an upstream default -- goes in the <code>[allowlist]</code> <code>regexes</code> list in
+<code>.gitleaks.toml</code>, keyed on the text itself. Editing the paragraph around
+a placeholder creates a new finding in a new commit, so anything keyed
+on a commit would need replacing every time. Do not use <code>paths</code> for
+this: blinding a whole file also blinds a real credential added to it
+later. Note that 8.16 matches these regexes against the whole match
+rather than the secret alone, so anchoring one with <code>^...$</code> quietly
+stops it matching.</p>
+<p>A specific historical event goes in <code>.gitleaksignore</code> as a
+<code>commit:path:rule-id:line</code> fingerprint, which forgives that one
+occurrence and nothing else -- the same secret in a new commit fails the
+scan again. History cannot be rewritten to make such an entry
+unnecessary: this repository is public, so anything committed here has
+been world-readable since the day it landed. An entry therefore asserts
+that the credential has been dealt with <em>where it was trusted</em>, not that
+it has been tidied out of sight. Write down which credential, and what
+was done. A unit test enforces that every entry is well formed and
+carries a comment.</p>
 <h2 id="automated-ci-jobs">Automated CI Jobs<a class="headerlink" href="#automated-ci-jobs" title="Permanent link">&para;</a></h2>
 <p><code>functional-tests.yml</code> carries three jobs which act on the pull request
 themselves rather than only reporting on it.</p>
