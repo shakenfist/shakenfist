@@ -6163,6 +6163,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -12644,11 +12672,14 @@ versioned by <code>setuptools_scm</code>) to PyPI, unattended, on pushes to
 <code>develop</code> that are path-filtered to the binary's inputs (<code>rust/**</code>,
 <code>kerbside/rpc/kerbside.proto</code>, <code>tools/build-proxy-wheel.sh</code>,
 <code>tools/stamp-dev-proxy-version.sh</code>, <code>tools/gen-protos.sh</code>, and the
-workflow file itself). Dev
-wheels carry build provenance attestations, the same as tagged releases,
-but they are <strong>not</strong> Sigstore tag-signed — there is no <code>v*</code> tag for a
-dev build to sign. See "Configure Dev Release Publishing" and "Dev
-releases" in <code>RELEASE-SETUP.md</code>.</p>
+workflow file itself) — minus <code>rust/kerbside-proxy/Cargo.lock</code>, since a
+lockfile-only bump cannot change the binary's interface or contract
+hash. Dev wheels carry build provenance attestations, the same as
+tagged releases, but they are <strong>not</strong> Sigstore tag-signed — there is no
+<code>v*</code> tag for a dev build to sign. See "Configure Dev Release Publishing"
+and "Dev releases" in <code>RELEASE-SETUP.md</code>. These dev releases accumulate
+on PyPI over time and are pruned manually; see "Pruning dev releases"
+in <code>RELEASE-SETUP.md</code>.</p>
 <p>At release time the two packages release in lockstep from a single <code>v*</code>
 tag: <code>setuptools_scm</code> gives <code>kerbside</code> its version, and
 <code>tools/stamp-proxy-version.sh</code> stamps that same version into the crate

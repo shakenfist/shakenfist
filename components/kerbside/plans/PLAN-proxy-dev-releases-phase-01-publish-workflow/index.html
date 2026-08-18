@@ -5914,6 +5914,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -11994,7 +12022,12 @@ section or <code>index.md</code> description were needed.</p>
    (added for symmetry during PR #314 review),
    <code>.github/workflows/dev-proxy-wheel.yml</code>. This is the master
    plan's list plus the scripts whose changes alter the built
-   artifact or the publish behaviour.</li>
+   artifact or the publish behaviour. (Superseded in phase 5:
+   <code>rust/kerbside-proxy/Cargo.lock</code> was later excluded from
+   <code>rust/**</code>, because lockfile-only bumps were 18 of the 42
+   measured triggers and cannot change the binary's interface.
+   The workflow file itself is the authority on the current
+   filter.)</li>
 <li><strong>Operator setup happens before merge</strong>: the <code>dev-release</code>
    environment (no reviewers, develop-branch-restricted) and the
    PyPI trusted publisher for <code>dev-proxy-wheel.yml</code> +

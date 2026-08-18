@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases/">
       
       
-        <link rel="prev" href="../PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">
+        <link rel="prev" href="../PLAN-proxy-dev-releases-phase-05-pypi-prune/">
       
       
         <link rel="next" href="../PLAN-rust-proxy-phase-01-server-primitives/">
@@ -5770,6 +5770,34 @@
     
   
     Proxy dev releases phase 4: docs, downstream cleanup, verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 5: bounding the dev release set
   
 
     
@@ -12339,27 +12367,27 @@ kolla-ansible code beyond what is already in flight.</p>
 <tr>
 <td>1. Dev wheel publish workflow</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/">PLAN-proxy-dev-releases-phase-01-publish-workflow.md</a></td>
-<td>Implemented (on branch; merge deferred to plan completion)</td>
+<td>Complete (merged in PR #314, 2026-08-16)</td>
 </tr>
 <tr>
 <td>2. Committed dev specifier and release stamping</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/">PLAN-proxy-dev-releases-phase-02-dev-specifier.md</a></td>
-<td>Implemented (on branch; merge deferred to plan completion)</td>
+<td>Complete (merged in PR #314, 2026-08-16)</td>
 </tr>
 <tr>
 <td>3. Contract handshake</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/">PLAN-proxy-dev-releases-phase-03-contract-handshake.md</a></td>
-<td>Implemented (on branch; merge deferred to plan completion)</td>
+<td>Complete (merged in PR #314, 2026-08-16)</td>
 </tr>
 <tr>
 <td>4. Docs, downstream cleanup and verification</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md</a></td>
-<td>Planned</td>
+<td>Docs (4a) complete in PR #314. Post-merge tail outstanding: patch175 simplification (4b) is committed in a kerbside-patches worktree awaiting its own PR; the Gerrit recheck (4c) has not run</td>
 </tr>
 <tr>
 <td>5. Automated dev release pruning</td>
-<td>PLAN-proxy-dev-releases-phase-05-pypi-prune.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/">PLAN-proxy-dev-releases-phase-05-pypi-prune.md</a></td>
+<td>Implemented (on branch) — storage monitor, lockfile-only merges no longer publish, pruning runbook</td>
 </tr>
 </tbody>
 </table>
@@ -12449,10 +12477,27 @@ release count and files a GitHub issue when a threshold is
 crossed, making the manual chore impossible to forget.
 The phase plan should research (a) properly — including
 whether a second PyPI account with maintainer rights on
-kerbside-proxy is acceptable — and pick. Quota headroom is
-years even without pruning (two ~single-digit-MB wheels
-per triggering merge, 10 GB default quota), so this phase
-is about hygiene, not urgency, and lands last.</p>
+kerbside-proxy is acceptable — and pick.</p>
+<p>(Volume correction, 2026-08-17 during phase 5 planning:
+this sketch assumed publishing would be sparse. Measured
+against the merged workflow's actual path filter, 42 of
+the 217 first-parent develop merges in the 42 days since
+the Rust tree was created would have triggered a publish —
+about 30/month, or 365/year at 5.80 MB per publish, which
+is ~2.1 GB/year against PyPI's 10 GB default project
+limit: roughly 4.7 years of headroom, rather than the
+open-ended "years" assumed here. 32 of those 42 touch only
+<code>rust/kerbside-proxy/Cargo.lock</code> and/or <code>Cargo.toml</code> —
+Renovate dependency bumps, none of which can change the
+gRPC contract hash. Reducing that inflow is therefore a
+lever the phase plan must weigh alongside deletion, and
+it interacts with the success criterion below that every
+<code>rust/**</code> merge publishes.)</p>
+<p>(Sequencing note: phases 1-4a landed together in PR #314
+under the operator's CI-cost policy. Phase 5 lands as its
+own, separate PR — the single-PR batching applied to the
+phases that had to merge together to turn the scenario
+jobs green, and phase 5 depends on none of that.)</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
@@ -12533,7 +12578,11 @@ implemented because the following statements will be true:</p>
 <li>A merge to develop that touches <code>rust/**</code> or
   <code>kerbside/rpc/kerbside.proto</code> publishes a
   <code>kerbside-proxy</code> dev wheel to PyPI within one workflow
-  run, and a Python-only merge publishes nothing.</li>
+  run, and a Python-only merge publishes nothing.
+  Phase 5 deliberately narrowed this: a merge touching
+  only <code>rust/kerbside-proxy/Cargo.lock</code> also publishes
+  nothing, since a lockfile-only bump cannot change the
+  proto, the contract hash, or the binary's interface.</li>
 <li><code>pip install .</code> from a clean develop checkout on a
   machine with no Rust toolchain yields a <code>kerbside daemon
   run</code> that launches the proxy binary successfully.</li>
@@ -12583,13 +12632,58 @@ implemented because the following statements will be true:</p>
   review on PR #314; declined there because phase 2
   accepted the platform trade deliberately and no
   contributor currently needs it.</li>
+<li>Revisit automated dev-release pruning if PyPI ever ships a
+  management API. Warehouse issue #12810 ("Warehouse API to
+  delete old .dev wheels (nightly builds)") is precisely
+  this use case and was open and labelled "Blocked" when
+  phase 5 was planned on 2026-08-17; phase 5 declined to
+  automate deletion around that gap because the only
+  available mechanism drives PyPI's web login form with an
+  account password and TOTP seed. If #12810 lands, the
+  monitor phase 5 builds becomes the trigger for a real
+  pruning job.</li>
 <li>Upstream kolla: consider eventually switching
   <code>kerbside-base</code> from git-develop to released tarballs,
   which would make image builds reproducible and reduce
   the dev-wheel dependency to CI-of-kerbside only.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>(none yet)</p>
+<ul>
+<li>Dev wheels built outside the release lane carried the
+  placeholder version 0.1.0, which could not satisfy the
+  committed floor; a joint <code>pip install</code> failed with
+  ResolutionImpossible. <code>tools/build-proxy-wheel.sh</code> now
+  dev-stamps an unstamped tree itself. Found by the sf-e2e
+  lane on PR #314.</li>
+<li>That auto-stamp then fired on release-stamped trees too,
+  because <code>tools/stamp-proxy-version.sh</code> never removed the
+  crate pyproject's <code>dynamic = ["version"]</code>. Left alone it
+  would have failed the release lane or, worse, published a
+  release wheel carrying a dev version. The release stamper
+  now writes a static version, so tree state distinguishes
+  the two modes, and <code>tools/verify-wheel-stamping.sh</code> is a
+  CI guard so the class is caught on PRs rather than at tag
+  time. Found by review on PR #314.</li>
+<li><code>tools/verify-wheel-stamping.sh</code> armed its restore trap
+  before its clean-tree check, so a dirty tree would have
+  had uncommitted work discarded by the trap's <code>git
+  checkout</code>. It also omitted <code>Cargo.lock</code> from the files it
+  restored, which a container run caught.</li>
+<li><code>grep -c</code> under <code>set -e</code> exits non-zero on no matches and
+  silently killed the enclosing script; fixed in the stamp
+  scripts and then again in the new guard.</li>
+<li><code>tools/check-pypi-storage.py</code> (phase 5) first used exit 1
+  for both "threshold crossed" and "the check could not
+  run", so a transient network failure would have filed a
+  threshold issue carrying an empty report. The status is
+  now three-way.</li>
+<li>The phase 5 survey mis-measured how often the publish
+  workflow fires, by passing both <code>-m</code> and <code>--first-parent</code>
+  to <code>git diff-tree</code>, which counts each merge's diff against
+  its second parent too. Corrected to 42 triggering merges
+  in 42 days rather than 77, and the corrected method was
+  checked against the workflow's observed runs.</li>
+</ul>
 <p>Known related issues at planning time:</p>
 <ul>
 <li><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/293" title="GitHub Issue: shakenfist/kerbside #293">kerbside#293</a> — merge CI tempest cirros download flake;

@@ -5859,6 +5859,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -11822,7 +11850,7 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases/">Rolling kerbside-proxy dev releases</a></td>
 <td>Publish PEP 440 dev releases of the kerbside-proxy wheel to PyPI when the binary's inputs change (path-filtered: rust/**, kerbside.proto), commit a dev-inclusive version specifier so unreleased git installs (notably upstream Kolla image builds) resolve a working binary with no upstream kolla changes, and add a proto-hash contract handshake between daemon and binary as the skew backstop</td>
 <td>In progress</td>
-<td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/">phase 1</a> (implemented on branch; single PR at plan end), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/">phase 2</a> (implemented on branch), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/">phase 3</a> (implemented on branch — committed proto-hash constant, --contract-hash flag, startup refusal with KERBSIDE_SKIP_CONTRACT_CHECK escape hatch), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">phase 4</a> (planned — docs truth pass now; patch175 simplification and Gerrit recheck gated post-merge), phase 5 not yet planned</td>
+<td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/">phase 1</a> (done, PR #314), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/">phase 2</a> (done, PR #314), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/">phase 3</a> (done, PR #314 — committed proto-hash constant, --contract-hash flag, startup refusal with KERBSIDE_SKIP_CONTRACT_CHECK escape hatch), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">phase 4</a> (docs done in PR #314; bootstrap wheel 0.4.1.dev184 published 2026-08-17 once the operator registered the trusted publisher, and the committed floor was verified against the live index to resolve it with no pre-release opt-in. Tail outstanding: patch175 simplification committed in kerbside-patches awaiting its own PR; Gerrit recheck not yet run), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/">phase 5</a> (implemented on branch — survey found publishing denser than the master plan assumed, ~365 dev releases/year with 76% of triggers being Renovate dependency bumps. PyPI has no delete/yank API for any credential (Warehouse #12810 open and blocked), so this automates the watching rather than the deleting: a weekly credential-free storage monitor that files a tracking issue, Cargo.lock dropped from the publish trigger, and a manual pruning runbook)</td>
 </tr>
 </tbody>
 </table>
