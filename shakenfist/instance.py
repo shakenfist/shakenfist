@@ -1401,7 +1401,16 @@ class Instance(dbowo):
             self.state = self.STATE_DELETED
 
     def delete(self, global_only=False):
-        self._delete_on_hypervisor()
+        """Delete this instance.
+
+        global_only=True skips the hypervisor-local teardown (power off,
+        libvirt undefine, nvram and disk removal) and performs only the
+        cluster-wide bookkeeping. Callers pass it when the hosting node is
+        gone, so the local paths on the node running this code belong to a
+        different machine and must not be touched.
+        """
+        if not global_only:
+            self._delete_on_hypervisor()
         self._delete_globally()
 
     def _release_placement(self, node_uuid=''):
