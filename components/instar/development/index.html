@@ -12637,6 +12637,37 @@ test, fuzz, and audit suites. <code>make instar</code>/<code>deb</code>/<code>rp
 everything else uses the latter. See
 <a href="https://github.com/shakenfist/instar/blob/develop/docs/development.md">docs/development.md</a>
 for which target uses which image and why bullseye.</p>
+<h2 id="rpm-dependency-generation">RPM dependency generation<a class="headerlink" href="#rpm-dependency-generation" title="Permanent link">&para;</a></h2>
+<p><code>make rpm</code> runs <code>cargo generate-rpm</code>, and <code>src/vmm/Cargo.toml</code> sets
+<code>auto-req = "auto"</code> so the <code>Requires</code> list is derived from the built
+binary rather than hand-maintained. "auto" is not one implementation:
+cargo-generate-rpm uses <code>/usr/lib/rpm/find-requires</code> when that path
+exists, and otherwise silently falls back to a builtin parser of
+<code>ldd -v</code> output.</p>
+<p><strong>The fallback is broken and must never be taken.</strong> The builtin parser
+strips whitespace out of each <code>ldd -v</code> line, so a <em>weak</em> symbol-version
+reference — which glibc's <code>ldd</code> renders as
+<code>libc.so.6 (GLIBC_2.25) [WEAK]</code> — collapses into the dependency
+<code>libc.so.6(GLIBC_2.25)[WEAK](64bit)</code>. No glibc package Provides that
+string, so the .rpm fails to install on every RPM distro with
+<code>nothing provides libc.so.6(GLIBC_2.25)[WEAK](64bit)</code>. rpm's own
+<code>elfdeps</code> ignores <code>VER_FLG_WEAK</code> and emits the plain
+<code>libc.so.6(GLIBC_2.25)(64bit)</code>, which resolves normally.</p>
+<p>Both container images therefore install Debian's <code>rpm</code> package purely
+so <code>/usr/lib/rpm/find-requires</code> is present. It is not used to <em>build</em>
+the package. Do not remove it from either Dockerfile.</p>
+<p>This is latent, not theoretical: it only bites when the toolchain
+starts marking glibc version needs weak. <code>nightly-2026-07-22</code> emitted
+<code>Flags: none</code> for <code>GLIBC_2.18/2.25/2.28/2.29/2.30</code>;
+<code>nightly-2026-08-17</code> emitted <code>Flags: WEAK</code> for the same five, which
+took out the Rocky 9, Rocky 10 and Fedora matrix jobs in the merge
+queue. <code>.deb</code> packaging is unaffected — cargo-deb uses
+<code>dpkg-shlibdeps</code>. To inspect what a built package actually requires:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
+</code></pre></div>
+<p>Note that this class of breakage is only caught by the distro matrix,
+which runs in the merge queue rather than in the pull-request gate.</p>
 <h2 id="toolchain-pinning">Toolchain pinning<a class="headerlink" href="#toolchain-pinning" title="Permanent link">&para;</a></h2>
 <p>Both devcontainer Dockerfiles pin the same Rust nightly via
 <code>ARG RUST_NIGHTLY=nightly-YYYY-MM-DD</code> — a broken floating nightly
