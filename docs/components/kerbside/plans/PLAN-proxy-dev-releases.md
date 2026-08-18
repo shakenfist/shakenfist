@@ -262,11 +262,11 @@ All resolved by the operator on 2026-08-14:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Dev wheel publish workflow | [PLAN-proxy-dev-releases-phase-01-publish-workflow.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/) | Implemented (on branch; merge deferred to plan completion) |
-| 2. Committed dev specifier and release stamping | [PLAN-proxy-dev-releases-phase-02-dev-specifier.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/) | Implemented (on branch; merge deferred to plan completion) |
-| 3. Contract handshake | [PLAN-proxy-dev-releases-phase-03-contract-handshake.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/) | Implemented (on branch; merge deferred to plan completion) |
-| 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Planned |
-| 5. Automated dev release pruning | PLAN-proxy-dev-releases-phase-05-pypi-prune.md | Not started |
+| 1. Dev wheel publish workflow | [PLAN-proxy-dev-releases-phase-01-publish-workflow.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/) | Complete (merged in PR #314, 2026-08-16) |
+| 2. Committed dev specifier and release stamping | [PLAN-proxy-dev-releases-phase-02-dev-specifier.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/) | Complete (merged in PR #314, 2026-08-16) |
+| 3. Contract handshake | [PLAN-proxy-dev-releases-phase-03-contract-handshake.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/) | Complete (merged in PR #314, 2026-08-16) |
+| 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Docs (4a) complete in PR #314. Post-merge tail outstanding: patch175 simplification (4b) is committed in a kerbside-patches worktree awaiting its own PR; the Gerrit recheck (4c) has not run |
+| 5. Automated dev release pruning | [PLAN-proxy-dev-releases-phase-05-pypi-prune.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/) | Implemented (on branch) — storage monitor, lockfile-only merges no longer publish, pruning runbook |
 
 Phase sketches (to be expanded into per-phase plans):
 
@@ -359,10 +359,29 @@ release count and files a GitHub issue when a threshold is
 crossed, making the manual chore impossible to forget.
 The phase plan should research (a) properly — including
 whether a second PyPI account with maintainer rights on
-kerbside-proxy is acceptable — and pick. Quota headroom is
-years even without pruning (two ~single-digit-MB wheels
-per triggering merge, 10 GB default quota), so this phase
-is about hygiene, not urgency, and lands last.
+kerbside-proxy is acceptable — and pick.
+
+(Volume correction, 2026-08-17 during phase 5 planning:
+this sketch assumed publishing would be sparse. Measured
+against the merged workflow's actual path filter, 42 of
+the 217 first-parent develop merges in the 42 days since
+the Rust tree was created would have triggered a publish —
+about 30/month, or 365/year at 5.80 MB per publish, which
+is ~2.1 GB/year against PyPI's 10 GB default project
+limit: roughly 4.7 years of headroom, rather than the
+open-ended "years" assumed here. 32 of those 42 touch only
+`rust/kerbside-proxy/Cargo.lock` and/or `Cargo.toml` —
+Renovate dependency bumps, none of which can change the
+gRPC contract hash. Reducing that inflow is therefore a
+lever the phase plan must weigh alongside deletion, and
+it interacts with the success criterion below that every
+`rust/**` merge publishes.)
+
+(Sequencing note: phases 1-4a landed together in PR #314
+under the operator's CI-cost policy. Phase 5 lands as its
+own, separate PR — the single-PR batching applied to the
+phases that had to merge together to turn the scenario
+jobs green, and phase 5 depends on none of that.)
 
 ## Agent guidance
 
@@ -457,6 +476,10 @@ implemented because the following statements will be true:
   `kerbside/rpc/kerbside.proto` publishes a
   `kerbside-proxy` dev wheel to PyPI within one workflow
   run, and a Python-only merge publishes nothing.
+  Phase 5 deliberately narrowed this: a merge touching
+  only `rust/kerbside-proxy/Cargo.lock` also publishes
+  nothing, since a lockfile-only bump cannot change the
+  proto, the contract hash, or the binary's interface.
 * `pip install .` from a clean develop checkout on a
   machine with no Rust toolchain yields a `kerbside daemon
   run` that launches the proxy binary successfully.
@@ -506,6 +529,16 @@ implemented because the following statements will be true:
   review on PR #314; declined there because phase 2
   accepted the platform trade deliberately and no
   contributor currently needs it.
+* Revisit automated dev-release pruning if PyPI ever ships a
+  management API. Warehouse issue #12810 ("Warehouse API to
+  delete old .dev wheels (nightly builds)") is precisely
+  this use case and was open and labelled "Blocked" when
+  phase 5 was planned on 2026-08-17; phase 5 declined to
+  automate deletion around that gap because the only
+  available mechanism drives PyPI's web login form with an
+  account password and TOTP seed. If #12810 lands, the
+  monitor phase 5 builds becomes the trigger for a real
+  pruning job.
 * Upstream kolla: consider eventually switching
   `kerbside-base` from git-develop to released tarballs,
   which would make image builds reproducible and reduce
@@ -513,7 +546,40 @@ implemented because the following statements will be true:
 
 ### Bugs fixed during this work
 
-(none yet)
+* Dev wheels built outside the release lane carried the
+  placeholder version 0.1.0, which could not satisfy the
+  committed floor; a joint `pip install` failed with
+  ResolutionImpossible. `tools/build-proxy-wheel.sh` now
+  dev-stamps an unstamped tree itself. Found by the sf-e2e
+  lane on PR #314.
+* That auto-stamp then fired on release-stamped trees too,
+  because `tools/stamp-proxy-version.sh` never removed the
+  crate pyproject's `dynamic = ["version"]`. Left alone it
+  would have failed the release lane or, worse, published a
+  release wheel carrying a dev version. The release stamper
+  now writes a static version, so tree state distinguishes
+  the two modes, and `tools/verify-wheel-stamping.sh` is a
+  CI guard so the class is caught on PRs rather than at tag
+  time. Found by review on PR #314.
+* `tools/verify-wheel-stamping.sh` armed its restore trap
+  before its clean-tree check, so a dirty tree would have
+  had uncommitted work discarded by the trap's `git
+  checkout`. It also omitted `Cargo.lock` from the files it
+  restored, which a container run caught.
+* `grep -c` under `set -e` exits non-zero on no matches and
+  silently killed the enclosing script; fixed in the stamp
+  scripts and then again in the new guard.
+* `tools/check-pypi-storage.py` (phase 5) first used exit 1
+  for both "threshold crossed" and "the check could not
+  run", so a transient network failure would have filed a
+  threshold issue carrying an empty report. The status is
+  now three-way.
+* The phase 5 survey mis-measured how often the publish
+  workflow fires, by passing both `-m` and `--first-parent`
+  to `git diff-tree`, which counts each merge's diff against
+  its second parent too. Corrected to 42 triggering merges
+  in 42 days rather than 77, and the corrected method was
+  checked against the workflow's observed runs.
 
 Known related issues at planning time:
 
