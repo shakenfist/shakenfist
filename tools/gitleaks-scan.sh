@@ -28,14 +28,31 @@
 # Usage:
 #   tools/gitleaks-scan.sh [--gitleaks PATH]
 #
-# Expects to be run from the root of a full (not shallow) clone.
+# Runs from anywhere inside the working tree -- it changes to the top
+# itself -- but the clone must be a full one, not shallow.
 
 set -e
 
 GITLEAKS=gitleaks
-if [ "$1" = "--gitleaks" ]; then
-    GITLEAKS="$2"
-fi
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --gitleaks)
+            if [ -z "$2" ]; then
+                echo "--gitleaks needs a path."
+                exit 1
+            fi
+            GITLEAKS="$2"
+            shift 2
+            ;;
+        *)
+            # Refuse rather than ignore. A silently discarded flag would
+            # leave the caller believing they had changed the scan.
+            echo "Unrecognised argument: $1"
+            echo "Usage: tools/gitleaks-scan.sh [--gitleaks PATH]"
+            exit 1
+            ;;
+    esac
+done
 
 if ! command -v "$GITLEAKS" >/dev/null 2>&1 && [ ! -x "$GITLEAKS" ]; then
     echo "gitleaks not found. Install it, or pass --gitleaks PATH."
@@ -49,6 +66,14 @@ if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
     echo "Check out with fetch-depth: 0."
     exit 1
 fi
+
+# Both .gitleaks.toml and .gitleaksignore are named relative to the
+# working directory, and gitleaks looks for the latter in the directory
+# it is run from. Run from a subdirectory -- the obvious thing to do when
+# reproducing a CI failure -- the config would simply not be found, and
+# the ignore file would be missed silently, reporting three accepted
+# historical findings as though they were new.
+cd "$(git rev-parse --show-toplevel)"
 
 # The positive control. Both credentials are generated here rather than
 # written into this file, because a literal one would be found by the

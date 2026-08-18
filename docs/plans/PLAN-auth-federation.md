@@ -637,6 +637,25 @@ so a 401 remains the diagnostic; and two credentials found in history
 by phase 7's baseline need an operator to confirm they authorise
 nothing, which is not a repository change and so cannot be closed here.
 
+Of those two credentials one is closed and one is genuinely open, and
+the open one is written out here rather than left in the completed phase
+plan, so that marking this document complete does not bury it:
+
+* The 3072-bit RSA private key committed in 2020 (fingerprint
+  `SHA256:mz2lj7UcnApwOkzsnaEhMb+l4gbQQWTah06Vvmi9QCs`) — **closed**.
+  Michael confirms it was revoked long ago.
+* The checksum-valid namespace key secret published in
+  `docs/user_guide/authentication.md` between 2026-08-09 and 2026-08-16
+  (`sfk_QKLZ...`, accepted as a fingerprint in `.gitleaksignore`) —
+  **open**. Either `credentials.generate()` produced it at a shell and
+  it never authorised anything, or a real cluster minted it and the
+  plaintext was public for seven days. Nothing in the repository can
+  tell those apart; only whoever wrote phase 4's documentation can. If a
+  real cluster minted it, delete the key from every namespace holding it
+  — `docs/operator_guide/credential_rotation.md` has the mechanics.
+  Until that is answered `.gitleaksignore` says to treat it as
+  disclosed.
+
 Every open question above was resolved by phases 2 and 3, so
 none needed carrying into phase 7.
 

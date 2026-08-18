@@ -36,9 +36,20 @@ from shakenfist.util import credentials
 # -- so a match here is a candidate, and looks_valid() is the verdict.
 SECRET_SHAPE_RE = re.compile(r'sfk_[A-Za-z0-9]{38}')
 
-# Directories which are not the source tree.
+# Directories which are not the source tree. The virtualenv names are
+# here for a developer with an in-tree venv: site-packages is tens of
+# thousands of files, where the tree itself is around fourteen hundred,
+# and none of it is ours to have committed a credential to.
+#
+# .stestr is here for a subtler reason. It stores the output of previous
+# runs, so any test which prints a generated credential in a failure
+# message leaves a real one on disk, and this test then reports it --
+# correctly, but about a file nobody committed and git ignores. That is
+# a false alarm about our own test output, and it happened while the
+# nested-directory control below was being written.
 SKIP_DIRECTORIES = {'.git', '.tox', '.eggs', '__pycache__', 'node_modules',
-                    '.mypy_cache', '.pytest_cache', 'build', 'dist'}
+                    '.mypy_cache', '.pytest_cache', 'build', 'dist',
+                    '.venv', 'venv', 'env', 'cover', '.stestr'}
 
 # Suffixes we know are not text. Anything else which fails to decode is
 # skipped when we meet it, so this list is an optimisation rather than
@@ -135,6 +146,54 @@ class NoCommittedCredentialsTestCase(base.ShakenFistTestCase):
             'docs.md', 'sfk_e57SPWpK3JGmyhuYLrcUtSwhtdJlONiXzzzzzz\n')
 
         self.assertEqual([], scan_file(path))
+
+    def test_the_walk_finds_a_credential_in_a_nested_directory(self):
+        """The positive control for scan_tree(), not just scan_file().
+
+        The test below is the one that matters, and it calls
+        scan_tree(). The control above only ever proves scan_file()
+        works on a single path -- so a walk which skipped every
+        subdirectory, or which pruned too much, would leave that test
+        passing over an almost empty file list. That is the vacuous
+        shape this phase exists to prevent, one level up.
+
+        Also asserts the pruning it relies on: a credential inside a
+        SKIP_DIRECTORIES directory is deliberately not reported, which
+        is what makes an in-tree virtualenv cheap to walk past.
+        """
+        planted = credentials.generate()
+        root = tempfile.mkdtemp(prefix='sf-credential-walk-')
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+
+        nested = os.path.join(root, 'deploy', 'roles', 'templates')
+        os.makedirs(nested)
+        with open(os.path.join(nested, 'vars.yaml'), 'w') as f:
+            f.write('key: %s\n' % planted)
+
+        skipped = os.path.join(root, '.venv', 'lib')
+        os.makedirs(skipped)
+        with open(os.path.join(skipped, 'vendored.py'), 'w') as f:
+            f.write("KEY = '%s'\n" % credentials.generate())
+
+        found = scan_tree(root)
+
+        # Compared without the secret in the message, like every other
+        # failure path here. An assertion which embedded the plaintext
+        # would write a real credential into .stestr's stored results on
+        # failure -- which the whole-tree test below then finds, exactly
+        # as it should. That happened while writing this test.
+        self.assertEqual(
+            [(os.path.join('deploy', 'roles', 'templates', 'vars.yaml'), 1)],
+            [(path, number) for path, number, _ in found],
+            'The tree walk did not report exactly the credential planted '
+            'three directories down, and nothing else. Either it is not '
+            'descending -- which would make the whole-tree test below '
+            'pass over almost no files -- or it is not pruning the '
+            'directories it claims to prune.')
+        self.assertTrue(
+            found[0][2] == planted,
+            'The tree walk reported a string other than the one planted '
+            'at that path (planted %s).' % redact(planted))
 
     def test_no_credential_is_committed_to_the_tree(self):
         found = scan_tree(repository_root())

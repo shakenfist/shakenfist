@@ -412,12 +412,31 @@ says so.
 - [ ] The smoke suite's Loki detector fails if its positive control
       does not arrive, and fails if a real `sfk_` credential is
       present — demonstrated by the reviewer experiment described in
-      Risks, with the result recorded in the PR. **Still open, and
-      cannot be closed from a workstation**: the detector needs a
-      deployed cluster with Loki, so it first runs in the pull
-      request's own smoke job. Its positive control is the mechanism
-      that makes that run meaningful — if the control token does not
-      arrive, the test fails rather than passing quietly.
+      Risks, with the result recorded in the PR. **Half closed by CI,
+      and half still open.**
+
+      The detector ran green against a deployed cluster in the pull
+      request's own smoke job:
+      `test_no_credential_reaches_loki [10.497938s] ... ok`
+      (run 32010544443, 2026-08-17). That result carries the first
+      half of the criterion, because the test cannot pass without
+      both control tokens arriving and being matched by the same
+      expression an operator's alert rule uses — a broken query, a
+      stopped shipper or an empty Loki all fail it instead. So the
+      detector is not vacuous, which is the property phase 6's six
+      dead leak guards lacked.
+
+      The second half — that it fails when a real credential *is*
+      present — is still only reasoned about, not demonstrated. It
+      needs a deliberately leaking build, which is a cluster
+      experiment rather than a repository change.
+
+      Note also that the green run above predates the changes made in
+      response to the automated review of #3794 (the cleanup
+      ordering, the control-family exclusion and the backtick line
+      filters), so it re-establishes this evidence for the code as it
+      stood, not as it now stands. The smoke job runs again on the
+      review-response commit; that run is the one that counts.
 - [x] `tools/gitleaks-scan.sh` exits 0 on the branch tip, using the
       committed config and the pinned gitleaks version, having scanned
       every commit reachable from HEAD. Its positive control passes, so
@@ -555,18 +574,44 @@ property is verified, not assumed — see below.
 ### The second one, which is still open
 
 `docs/user_guide/authentication.md` published a **checksum-valid** key
-secret from 2026-08-08 until step 7c replaced it. Checksum-valid means
-it came from something implementing our format: either
-`credentials.generate()` at a shell, in which case it never authorised
-anything, or a real cluster, in which case its hash is in that
-cluster's `namespace_keys` table and the plaintext has been published on
-the website for eight days.
+secret as its example of a cluster-generated key. Introduced by
+`18618f5bd` and merged to `develop` on 2026-08-09 08:59 (PR #3674,
+phase 4's documentation); replaced by step 7c on 2026-08-16, so it was
+readable for seven days on `develop` and on the published site.
+
+Checksum-valid means it came from something implementing our format:
+either `credentials.generate()` at a shell, in which case it never
+authorised anything, or a real cluster, in which case its hash is in
+that cluster's `namespace_keys` table and the plaintext has been public
+since 2026-08-09.
 
 There is no way to tell which from here, and no way to remove it from
 history. It is accepted in `.gitleaksignore` with a comment saying to
-treat it as disclosed. If any namespace anywhere still holds a key with
-this value, delete it — `docs/operator_guide/credential_rotation.md`
-covers the mechanics.
+treat it as disclosed until someone says otherwise. If any namespace
+anywhere still holds a key with this value, delete it —
+`docs/operator_guide/credential_rotation.md` covers the mechanics.
+
+**This question has an addressee.** Only whoever wrote phase 4's
+documentation can answer it, and this plan is being marked complete in
+the same pull request that accepts the finding — so an open question
+recorded only here, or only as a comment in an ignore file, would have
+nowhere to be closed. It is therefore also listed as an open loose end
+on `PLAN-auth-federation.md`, which outlives this document. A tracking
+issue was drafted while addressing review item 5 on #3794 but not
+filed; filing it and referencing the number in both places is the better
+resting place if this is not answered quickly.
+
+Two statements in earlier drafts of this section were wrong, and were
+found to be wrong while checking the tree to write the paragraph above:
+
+* The date was given as 2026-08-08. The commit is 2026-08-09.
+* The 40-character `sfk_XW3n8Qv...` literal introduced by phase 4's
+  *first* documentation commit (`c46488e4f`) was never one of these
+  findings, which earlier drafts implied. It is 40 characters where the
+  format is 42, so `looks_valid()` is False and the gitleaks rule —
+  which requires exactly 38 characters after the prefix — never matched
+  it at all. Only the string `18618f5bd` replaced it with is
+  checksum-valid.
 
 ### Verification
 
@@ -600,3 +645,77 @@ that reasoning no longer holds: it landed as a `credential_scan` job in
 It deliberately does *not* depend on `check_paths`. Every other job
 skips for documentation-only changes; this one must not, because the
 only real key secret in our history was published in the user guide.
+
+### The tree scanner caught a real credential while the review was being addressed
+
+Worth recording because it is the only time either scanner has fired on
+something nobody planted for it.
+
+Review item 11 noted that `scan_tree()` had no positive control of its
+own — only `scan_file()` did — so a walk which pruned everything would
+leave the whole-tree test passing over almost no files. A control was
+added for it (`test_the_walk_finds_a_credential_in_a_nested_directory`),
+and mutation-tested by replacing the prune line with `dirnames[:] = []`.
+The mutation was caught by the new control, and **the whole-tree test
+passed anyway** — which is precisely the vacuity the item described.
+
+The first version of that control asserted with the planted credential
+inside the assertion message. So when the mutation made it fail, stestr
+wrote a real `credentials.generate()` output into `.stestr/failing` and
+`.stestr/23` — and the next full run of the suite failed with:
+
+```
+actual = [('.stestr/failing', 28, 'sfk_TOsb...'), ('.stestr/23', 42, 'sfk_TOsb...')]
+```
+
+A true positive, about a file which is generated, git-ignored and never
+committed. Two things came out of it, both in the tree:
+
+* The control now compares paths and line numbers, and checks the secret
+  itself with a message that redacts — the same Decision 9 rule every
+  other failure path here follows. A test that prints a credential when
+  it fails is a leak in a test about leaks.
+* `.stestr` joins `SKIP_DIRECTORIES`, so any future slip of that kind is
+  a bug in one test rather than a scary failure in an unrelated one.
+
+## Found while addressing the review: functional CI never deletes its namespaces
+
+The automated review of #3794 predicted that the Loki detector's
+`addCleanup()` for the key it mints would 404 on every run, because
+testtools runs cleanups after `tearDown()` and
+`BaseNamespacedTestCase.tearDown()` ends by deleting the namespace. The
+mechanism is real — two tests in this repository have already failed
+every merge group that way, and both carry a comment saying so — and the
+detector was changed to delete its key from a `tearDown()` override
+before `super()`, which is the pattern `ClaimAPIMixin` uses.
+
+But the prediction did not come true: the test passed in CI. Chasing
+that turned up a separate, older bug, which is recorded here because it
+is the reason the fix above looks unnecessary and must not be reverted
+on that basis.
+
+`_remove_namespace()` (`shakenfist_ci/base.py:85`) reads:
+
+```python
+ns = self.system_client.get_namespaces()
+if name in ns:
+    self.system_client.delete_namespace(name)
+```
+
+`get_namespaces()` returns a list of `external_view()` **dicts**, not a
+list of names, so `name in ns` compares a string against dicts and is
+always False. **No namespaced functional test has ever deleted its
+namespace**, on any topology, since the line was written in `2b7666fa0`
+in 2020. Every run of the suite leaks one namespace per test class, and
+the cleaner collects them `CLEANER_DELAY` later.
+
+That is why the cleanup succeeded: the namespace was still there. It is
+also why the review's reasoning should be trusted over the green tick —
+the day `_remove_namespace()` is fixed, an `addCleanup()` on a key
+becomes the failure the review describes.
+
+Not fixed here. A one-line change that starts actually deleting
+namespaces would alter the teardown behaviour of the entire functional
+suite at once, and the class of failure it would expose is exactly the
+one documented twice above. It wants its own change, with the suite run
+against it. Reported to Michael when the review was addressed.

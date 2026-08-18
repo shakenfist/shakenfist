@@ -221,8 +221,13 @@ string is not. The format is described in the
 To check a cluster once, ask Loki for anything of that shape:
 
 ```logql
-{job="shakenfist"} |~ "sfk_[A-Za-z0-9]{38}"
+{job="shakenfist"} |~ `sfk_[A-Za-z0-9]{38}`
 ```
+
+The pattern is in backticks, which LogQL treats as a raw string.
+Double quotes also work for this particular pattern, but they
+process escape sequences, so a widened pattern containing `\d` or
+`\s` would be rejected outright rather than simply not matching.
 
 Match on the shape rather than on `sfk_` alone. Log lines
 legitimately mention the prefix — key creation refuses an

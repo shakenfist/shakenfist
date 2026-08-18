@@ -3,6 +3,7 @@ import re
 import time
 
 import requests
+from shakenfist_client import apiclient
 from testtools import content
 
 from shakenfist_ci import base
@@ -23,6 +24,23 @@ from shakenfist_ci import base
 # gets switched off.
 SECRET_SHAPE = 'sfk_[A-Za-z0-9]{38}'
 SECRET_SHAPE_RE = re.compile(SECRET_SHAPE)
+
+# The tail which makes a token of the credential shape provably not a
+# credential: the last six characters are the base62 CRC32 of everything
+# before them, the largest CRC32 is 0xffffffff (4294967295), and base62
+# 'zzzzzz' is 56800235583. No input produces it.
+#
+# Named, and excluded as a family rather than as the two specific tokens
+# this test emits, because anything of this shape is impossible whoever
+# wrote it -- a control left behind by an earlier run of the suite
+# against the same cluster, a documentation example a daemon echoes, or
+# a control emitted by some future test. Reporting one of those as "a
+# cluster-minted credential reached the log stream" would be the worst
+# possible false positive for a detector whose entire value is that
+# people believe its failures. This mirrors the [rules.allowlist] entry
+# in .gitleaks.toml, which excepts the same family for the same reason.
+CONTROL_TAIL = 'zzzzzz'
+CONTROL_SHAPE = 'sfk_[A-Za-z0-9]{32}%s' % CONTROL_TAIL
 
 # Where the smoke tests run (the single-node localhost topology) Loki is
 # reachable on localhost. The install helper (tools/ci-install-loki.sh) binds
@@ -46,6 +64,7 @@ class TestLoki(base.BaseNamespacedTestCase):
 
     def setUp(self):
         super().setUp()
+        self._minted_keys = []
 
         # Skip cleanly in any topology where Loki was not stood up (for
         # example a deploy without GETSF_LOKI_BASE_URL). This keeps the
@@ -62,26 +81,63 @@ class TestLoki(base.BaseNamespacedTestCase):
                 'Loki is not ready at %s (status %d, body %r)'
                 % (LOKI_BASE_URL, r.status_code, r.text))
 
+    def tearDown(self):
+        # Keys minted by a test are deleted here rather than through
+        # addCleanup(), because testtools runs cleanups *after*
+        # tearDown() -- and BaseNamespacedTestCase.tearDown() ends by
+        # asking for the namespace to be deleted, after which every
+        # /auth/namespaces/<ns>/keys route answers 404 through
+        # arg_is_namespace(). A cleanup registered for a key could
+        # therefore only ever raise ResourceNotFoundException, and
+        # unlike tearDown's own deletes it would not be wrapped in a
+        # guard. That is exactly how two earlier tests in this
+        # repository failed every merge group from the day they landed;
+        # both carry a comment saying so (database_tier.py and
+        # cluster_ci_tests/test_namespace_claims.py).
+        #
+        # 404 is tolerated here rather than asserted against, because
+        # deleting the namespace is what disposes of its keys in the
+        # ordinary case. This loop is for the case where the namespace
+        # outlives the test.
+        for key_name in getattr(self, '_minted_keys', []):
+            try:
+                self.system_client.delete_namespace_key(
+                    self.namespace, key_name)
+            except apiclient.ResourceNotFoundException:
+                ...
+
+        super().tearDown()
+
     def _query_loki(self, tokens, start_ns, end_ns, regex=None,
-                    exclude=None, limit=100):
+                    exclude=None, exclude_regexes=None, limit=100):
         """Query Loki for log lines containing all tokens. Returns streams.
 
         ``regex`` adds a line filter matched by Loki's own engine
         rather than by us, which is what lets a caller assert on the
-        same expression an operator's alert rule uses. ``exclude``
-        drops lines containing any of the given tokens, which matters
-        when the caller is looking for a needle in its own noise: a
-        filter Loki applies costs nothing against ``limit``, where
-        discarding the same lines in Python spends the result budget
-        on them and can push the interesting line off the end.
+        same expression an operator's alert rule uses. ``exclude`` and
+        ``exclude_regexes`` drop lines containing a given token, or
+        matching a given expression. Excluding at Loki matters when the
+        caller is looking for a needle in its own noise: a filter Loki
+        applies costs nothing against ``limit``, where discarding the
+        same lines in Python spends the result budget on them and can
+        push the interesting line off the end.
+
+        Both expressions are passed as LogQL backtick strings, which are
+        raw. A double-quoted LogQL string processes Go escape sequences,
+        so a pattern containing \\d or \\s would be rejected by Loki
+        rather than simply not matching -- and that arrives here as a
+        request exception, which the caller's poll loop reads as "not
+        yet" until it hits the deadline. A long way from the cause.
         """
         if isinstance(tokens, str):
             tokens = [tokens]
         query = '{job="shakenfist"}' + ''.join(' |= "%s"' % t for t in tokens)
         if regex:
-            query += ' |~ "%s"' % regex
+            query += ' |~ `%s`' % regex
         for token in (exclude or []):
             query += ' != "%s"' % token
+        for pattern in (exclude_regexes or []):
+            query += ' !~ `%s`' % pattern
         params = {
             'query': query,
             'start': str(start_ns),
@@ -220,7 +276,7 @@ class TestLoki(base.BaseNamespacedTestCase):
         is a client of the cluster rather than part of it.
         """
         body = ('CIleakcontrol%s' % self._uniquifier()).ljust(32, 'X')
-        return 'sfk_%s%s' % (body[:32], 'zzzzzz')
+        return 'sfk_%s%s' % (body[:32], CONTROL_TAIL)
 
     def _emit_token(self, token, netblock):
         """Get a token into the log stream through an ordinary API call.
@@ -270,9 +326,17 @@ class TestLoki(base.BaseNamespacedTestCase):
         not. A control token of the credential shape is emitted and
         must be found by the same regex an operator's alert rule uses.
         A second control, emitted after the real credential is minted,
-        is the watermark: once Loki has it, everything logged earlier
-        has had at least as long to arrive, which is what makes the
-        negative assertion sound without an arbitrary sleep.
+        is the watermark: once Loki has it, anything the API logged
+        earlier has had at least as long to arrive, which is what makes
+        the negative assertion sound without an arbitrary sleep.
+
+        That bound is exact for the API, which emits the watermark, and
+        best-effort for everything else: each daemon has its own spool
+        and drainer thread, so a credential logged by sf-net or
+        sf-queues could still be in flight when the sweep runs. The
+        failure mode there is a missed leak rather than a flaky build,
+        and the next run's window overlaps this one -- but the watermark
+        is not the cross-daemon guarantee it might read as.
         """
         start_ns = int((time.time() - 60) * 1e9)
 
@@ -301,9 +365,7 @@ class TestLoki(base.BaseNamespacedTestCase):
         minted = self.system_client._request_url(
             'POST', '/auth/namespaces/%s/keys' % self.namespace,
             data={'key_name': key_name}).json()
-        self.addCleanup(
-            self.system_client.delete_namespace_key,
-            self.namespace, key_name)
+        self._minted_keys.append(key_name)
 
         # Assert on the shape without recording the secret anywhere.
         secret = minted.get('key', '')
@@ -325,13 +387,20 @@ class TestLoki(base.BaseNamespacedTestCase):
         #    here instead would spend the result limit on lines we
         #    already know about, so a genuine leak could fall off the
         #    end of a truncated result and be read as "nothing found".
+        #
+        #    Excluded twice over: by identity, so this run's two controls
+        #    are gone for certain, and by CONTROL_SHAPE, so any other
+        #    arithmetically-impossible token in the window is too. See
+        #    CONTROL_TAIL for why that family costs nothing to forgive.
         end_ns = int((time.time() + 5) * 1e9)
         controls = [control_one, control_two]
         streams = self._query_loki(
-            [], start_ns, end_ns, regex=SECRET_SHAPE, exclude=controls)
+            [], start_ns, end_ns, regex=SECRET_SHAPE, exclude=controls,
+            exclude_regexes=[CONTROL_SHAPE])
         leaked = [(self._redact(token), labels, timestamp)
                   for token, labels, timestamp in self._matches_in(streams)
-                  if token not in controls]
+                  if token not in controls
+                  and not token.endswith(CONTROL_TAIL)]
 
         # Redacted deliberately: CI output is itself shipped and
         # retained, so a test which printed the credential it found

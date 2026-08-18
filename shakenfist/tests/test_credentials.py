@@ -112,9 +112,7 @@ class ScannerAgreementTestCase(base.ShakenFistTestCase):
         # The operator's alerting rule, the functional CI detector and
         # the gitleaks rule are three copies of one pattern in three
         # languages. This is the binding between the first and the
-        # third; the CI detector's copy is asserted by the detector
-        # itself, which fails if its query stops matching a token it
-        # deliberately emitted.
+        # third.
         path = os.path.join(
             self._repository_root(), 'examples', 'loki-secret-alert.yaml')
         with open(path) as f:
@@ -127,6 +125,36 @@ class ScannerAgreementTestCase(base.ShakenFistTestCase):
             'our documentation would be looking for something other '
             'than what we mint.')
 
+    def test_the_ci_detector_uses_the_same_expression(self):
+        """And the binding for the second of the three copies.
+
+        The detector emits a control token and fails if its own query
+        does not find it, which is nearly this assertion -- but not
+        quite. The control is built from a hand-written 'sfk_' plus 32
+        plus 6 layout rather than from credentials.generate(), so if the
+        format changed (a 40 character body, say) the detector's pattern
+        and its control would still agree with each other while
+        matching nothing the cluster mints. It would pass, green and
+        vacuous, which is precisely the failure this phase exists to
+        prevent.
+
+        Read as text rather than imported: the functional suite is a
+        client of the cluster and is not importable from here.
+        """
+        path = os.path.join(
+            self._repository_root(), 'shakenfist', 'deploy', 'shakenfist_ci',
+            'smoke_ci_tests', 'test_loki.py')
+        with open(path) as f:
+            detector = f.read()
+
+        expression = self._gitleaks_rule()['regex']
+        self.assertIn(
+            "SECRET_SHAPE = '%s'" % expression, detector,
+            'The functional CI leak detector does not search for the '
+            'same pattern as .gitleaks.toml, so the repository and the '
+            'log stream are being scanned for different things and one '
+            'of them is not what we mint.')
+
     def test_accepted_findings_are_documented_and_well_formed(self):
         """Every .gitleaksignore entry is a claim, and claims need reasons.
 
@@ -137,6 +165,13 @@ class ScannerAgreementTestCase(base.ShakenFistTestCase):
         next reader unable to tell an accepted risk from a mistake.
         """
         path = os.path.join(self._repository_root(), '.gitleaksignore')
+        if not os.path.exists(path):
+            # No accepted findings at all, which is the state this test
+            # tells its reader to aim for below. Following that advice
+            # should leave the suite green rather than turning this into
+            # a FileNotFoundError.
+            return
+
         with open(path) as f:
             lines = f.read().splitlines()
 

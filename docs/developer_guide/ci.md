@@ -77,6 +77,17 @@ both. An empty result is otherwise indistinguishable from a broken
 scanner, and the allowlists described below could in principle grow
 until they forgive everything.
 
+To reproduce a CI failure, run `tools/gitleaks-scan.sh` yourself, passing
+`--gitleaks PATH` if the available binary is not the pinned 8.16.0. It
+does not matter which directory you run it from: it changes to the top of
+the working tree first, because both `.gitleaks.toml` and
+`.gitleaksignore` are resolved relative to the working directory, and
+from a subdirectory the ignore file would be missed silently and the
+three accepted historical findings reported as new. It does need a full
+clone -- a shallow one cannot see the history the scan claims to cover,
+so the script says so and exits rather than passing over a fraction of
+it.
+
 Two rules are ours rather than upstream's:
 
 * `shakenfist-key-secret` matches the `sfk_` credential format. Unit

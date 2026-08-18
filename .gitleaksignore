@@ -31,11 +31,22 @@
 0734e80ec0eec70032f1b0591e9a424fcb8ef0c6:ansible/files/id_rsa:private-key:1
 2b7666fa06584ee119ff889605e89b42c30e35df:deploy/ansible-ci/tests/files/id_rsa:private-key:1
 
-# A cluster-minted namespace key secret published as the example key in
-# the user guide on 2026-08-08, and replaced on 2026-08-16 by a
-# deliberately checksum-invalid example. It is checksum-valid, so it was
-# produced by something implementing our format -- either
-# credentials.generate() at a shell or a real cluster. Treat it as
-# disclosed: if any namespace anywhere still holds this key, delete it.
-# See docs/operator_guide/credential_rotation.md.
+# A namespace key secret published as the example of a cluster-generated
+# key in the user guide. Introduced by 18618f5bd and merged to develop on
+# 2026-08-09; replaced on 2026-08-16 by a deliberately checksum-invalid
+# example, so it was readable for seven days.
+#
+# It is checksum-valid, which means something implementing our format
+# produced it: either credentials.generate() at a shell, in which case it
+# never authorised anything, or a real cluster, in which case the
+# plaintext has been public since 2026-08-09. Nothing in the repository
+# can tell those apart -- only whoever wrote that documentation can, so
+# until they say, treat it as disclosed: if any namespace anywhere still
+# holds this key, delete it. See
+# docs/operator_guide/credential_rotation.md for the mechanics.
+#
+# This entry is the accepted *finding*, not an answer to that question.
+# The question itself is recorded as an open loose end in
+# docs/plans/PLAN-auth-federation.md, because a plan marked complete
+# should not be the only place an unanswered question lives.
 0f2593b3388d04cc3b555510376b336db8d45205:docs/user_guide/authentication.md:shakenfist-key-secret:43
