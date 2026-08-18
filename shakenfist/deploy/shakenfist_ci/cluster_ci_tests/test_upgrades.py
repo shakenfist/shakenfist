@@ -4,12 +4,18 @@ import sys
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci.base import namespace_names
 
 
 class TestUpgrades(base.BaseTestCase):
     def test_upgraded_data_exists(self):
-        # There is an upgraded namespace called 'upgrade'
-        if 'upgrade' not in self.system_client.get_namespaces():
+        # There is an upgraded namespace called 'upgrade'. This test still
+        # skips on every cluster we currently build, because nothing
+        # creates that namespace -- but until this comparison was fixed it
+        # would have skipped even on a cluster which had one, so the guard
+        # could not detect the condition it names.
+        if 'upgrade' not in namespace_names(
+                self.system_client.get_namespaces()):
             self.skipTest('There is no upgrade namespace')
 
         # Collect networks and check

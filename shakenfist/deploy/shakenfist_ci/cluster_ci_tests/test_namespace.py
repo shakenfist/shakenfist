@@ -5,6 +5,7 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci.base import namespace_names
 
 
 class TestNamespace(base.BaseNamespacedTestCase):
@@ -28,9 +29,7 @@ class TestNamespace(base.BaseNamespacedTestCase):
         self.system_client.create_namespace('d')
         self.system_client.delete_namespace('c')
 
-        namespaces = []
-        for n in self.system_client.get_namespaces():
-            namespaces.append(n['name'])
+        namespaces = namespace_names(self.system_client.get_namespaces())
         self.addDetail(
             'namespaces',
             content.text_content(json.dumps(namespaces, indent=4,
