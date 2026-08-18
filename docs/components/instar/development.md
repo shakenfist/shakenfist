@@ -610,6 +610,45 @@ everything else uses the latter. See
 [docs/development.md](https://github.com/shakenfist/instar/blob/develop/docs/development.md)
 for which target uses which image and why bullseye.
 
+## RPM dependency generation
+
+`make rpm` runs `cargo generate-rpm`, and `src/vmm/Cargo.toml` sets
+`auto-req = "auto"` so the `Requires` list is derived from the built
+binary rather than hand-maintained. "auto" is not one implementation:
+cargo-generate-rpm uses `/usr/lib/rpm/find-requires` when that path
+exists, and otherwise silently falls back to a builtin parser of
+`ldd -v` output.
+
+**The fallback is broken and must never be taken.** The builtin parser
+strips whitespace out of each `ldd -v` line, so a *weak* symbol-version
+reference — which glibc's `ldd` renders as
+`libc.so.6 (GLIBC_2.25) [WEAK]` — collapses into the dependency
+`libc.so.6(GLIBC_2.25)[WEAK](64bit)`. No glibc package Provides that
+string, so the .rpm fails to install on every RPM distro with
+`nothing provides libc.so.6(GLIBC_2.25)[WEAK](64bit)`. rpm's own
+`elfdeps` ignores `VER_FLG_WEAK` and emits the plain
+`libc.so.6(GLIBC_2.25)(64bit)`, which resolves normally.
+
+Both container images therefore install Debian's `rpm` package purely
+so `/usr/lib/rpm/find-requires` is present. It is not used to *build*
+the package. Do not remove it from either Dockerfile.
+
+This is latent, not theoretical: it only bites when the toolchain
+starts marking glibc version needs weak. `nightly-2026-07-22` emitted
+`Flags: none` for `GLIBC_2.18/2.25/2.28/2.29/2.30`;
+`nightly-2026-08-17` emitted `Flags: WEAK` for the same five, which
+took out the Rocky 9, Rocky 10 and Fedora matrix jobs in the merge
+queue. `.deb` packaging is unaffected — cargo-deb uses
+`dpkg-shlibdeps`. To inspect what a built package actually requires:
+
+```bash
+rpm -qpR src/target/generate-rpm/instar-*.rpm
+readelf -V src/target/release/instar   # Version needs section
+```
+
+Note that this class of breakage is only caught by the distro matrix,
+which runs in the merge queue rather than in the pull-request gate.
+
 ## Toolchain pinning
 
 Both devcontainer Dockerfiles pin the same Rust nightly via
