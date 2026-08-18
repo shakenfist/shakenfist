@@ -265,8 +265,8 @@ All resolved by the operator on 2026-08-14:
 | 1. Dev wheel publish workflow | [PLAN-proxy-dev-releases-phase-01-publish-workflow.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/) | Complete (merged in PR #314, 2026-08-16) |
 | 2. Committed dev specifier and release stamping | [PLAN-proxy-dev-releases-phase-02-dev-specifier.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/) | Complete (merged in PR #314, 2026-08-16) |
 | 3. Contract handshake | [PLAN-proxy-dev-releases-phase-03-contract-handshake.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/) | Complete (merged in PR #314, 2026-08-16) |
-| 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Docs (4a) complete in PR #314. Post-merge tail outstanding: patch175 simplification (4b) is committed in a kerbside-patches worktree awaiting its own PR; the Gerrit recheck (4c) has not run |
-| 5. Automated dev release pruning | [PLAN-proxy-dev-releases-phase-05-pypi-prune.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/) | Implemented (on branch) — storage monitor, lockfile-only merges no longer publish, pruning runbook |
+| 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Docs (4a) complete in PR #314. 4b (patch175 simplification) withdrawn 2026-08-18 — decision 1 is reversed in the phase plan and the Kolla patch keeps its PyPI fallback. 4c (Gerrit recheck) outstanding, operator-driven |
+| 5. Automated dev release pruning | [PLAN-proxy-dev-releases-phase-05-pypi-prune.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/) | Complete (merged in PR #328, 2026-08-18) — storage monitor, lockfile-only merges no longer publish, pruning runbook |
 
 Phase sketches (to be expanded into per-phase plans):
 
@@ -337,11 +337,36 @@ step is gated on merge + bootstrap (timing correction,
 `/kerbside/proxy-wheels/` local-override branch remains
 useful and keeps its skew-safety role. Confirm upstream
 kolla needs no change.
+
 Verification: after the next develop merge that triggers a
 publish, recheck one of the Gerrit changes and confirm the
 kerbside scenario jobs go green (the ubuntu-noble-upgrade
 cirros flake, issue #293, is unrelated and may still need
 a recheck).
+
+(Decision reversed, 2026-08-18: patch175 keeps its PyPI
+fallback branch and the downstream patch is not changed. The
+premise for deleting it — that the fallback silently masks
+staleness — does not survive measurement. Kolla's
+`install_pip` macro (`kolla/docker/macros.j2:35-43`) always
+passes `--upgrade`, and the fallback runs *after* the
+`pip install /kerbside` that resolves the committed floor, so
+by the time it runs a newer dev wheel is already installed.
+Measured against live PyPI with pip 26.2.1: with
+`kerbside-proxy 0.5.1.dev1` installed, `pip install --upgrade
+kerbside-proxy` reports "Requirement already satisfied" and
+installs nothing — it neither downgrades to the newest final
+release nor masks anything. The fallback can only execute
+meaningfully on a path where the floor install already failed,
+which fails the image build first, and phase 3's contract
+handshake turns any surviving skew into a loud startup
+refusal. Against that, deleting it costs a downstream patch
+edit plus a wave-8 Gerrit repush and rebase churn, and risks
+leaving master images with no proxy at all if any part of the
+floor assumption is wrong. The 4b commit this plan previously
+recorded as "awaiting its own PR" no longer exists in any
+kerbside-patches worktree or branch, so nothing is stranded by
+withdrawing the step.)
 
 **Phase 5 — automated dev release pruning.** A scheduled
 workflow that keeps the dev release set bounded: retain
@@ -529,6 +554,16 @@ implemented because the following statements will be true:
   review on PR #314; declined there because phase 2
   accepted the platform trade deliberately and no
   contributor currently needs it.
+* patch175's upstream commit message (rewritten 2026-08-13)
+  now frames the patch as an optional local override and no
+  longer mentions the PyPI fallback branch the diff still
+  carries. Worth aligning the message on the next wave-8
+  repush; not worth a change of its own.
+* Revisit deleting patch175's PyPI fallback if pip's
+  `--upgrade` semantics for an already-installed pre-release
+  ever change, or if kerbside-patches stops installing the
+  kerbside source before the fallback runs — both are the
+  measurements that make the fallback inert today.
 * Revisit automated dev-release pruning if PyPI ever ships a
   management API. Warehouse issue #12810 ("Warehouse API to
   delete old .dev wheels (nightly builds)") is precisely
