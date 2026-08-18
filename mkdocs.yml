@@ -249,6 +249,7 @@ nav:
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md
                 - "Proxy dev releases phase 4: docs, downstream cleanup, verification": components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md
+                - "Proxy dev releases phase 5: bounding the dev release set": components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune.md
                 - "Rolling kerbside-proxy dev releases": components/kerbside/plans/PLAN-proxy-dev-releases.md
                 - "Rust proxy phase 1: server-side SPICE primitives": components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives.md
                 - "Rust proxy phase 2: gRPC contract and Python UDS server": components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract.md

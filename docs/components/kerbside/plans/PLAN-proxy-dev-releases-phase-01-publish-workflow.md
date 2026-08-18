@@ -140,7 +140,12 @@ section or `index.md` description were needed.
    (added for symmetry during PR #314 review),
    `.github/workflows/dev-proxy-wheel.yml`. This is the master
    plan's list plus the scripts whose changes alter the built
-   artifact or the publish behaviour.
+   artifact or the publish behaviour. (Superseded in phase 5:
+   `rust/kerbside-proxy/Cargo.lock` was later excluded from
+   `rust/**`, because lockfile-only bumps were 18 of the 42
+   measured triggers and cannot change the binary's interface.
+   The workflow file itself is the authority on the current
+   filter.)
 8. **Operator setup happens before merge**: the `dev-release`
    environment (no reviewers, develop-branch-restricted) and the
    PyPI trusted publisher for `dev-proxy-wheel.yml` +

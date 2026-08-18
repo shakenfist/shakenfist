@@ -75,6 +75,7 @@ live on the queue entry for PR 304.
 | `codeql-analysis.yml` | push, pull_request, weekly | neither |
 | `prune-reviews.yml` | push to develop | neither |
 | `pin-indirect-dependencies.yml` | daily, and on PRs touching the pinning script | neither |
+| `pypi-storage-check.yml` | weekly (Monday 06:00 UTC), workflow_dispatch | neither |
 
 `rust.yml` is advisory rather than gating. Rust breakage still
 blocks merges, because the proxy wheel is built by the direct-qemu
