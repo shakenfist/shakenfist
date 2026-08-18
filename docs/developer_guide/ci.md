@@ -10,7 +10,7 @@ Every workflow in `.github/workflows/`:
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| `functional-tests.yml` | Main CI: lint, unit tests, functional tests, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the `shakenfist.shakenfist` Ansible collection (`shakenfist/deploy/collection/`), driven by the reusable `smoke-cluster` workflow in the `shakenfist/actions` repository | PR, merge_group |
+| `functional-tests.yml` | Main CI: lint, unit tests, functional tests, credential scanning, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the `shakenfist.shakenfist` Ansible collection (`shakenfist/deploy/collection/`), driven by the reusable `smoke-cluster` workflow in the `shakenfist/actions` repository | PR, merge_group |
 | `docs-tests.yml` | Build and test documentation | PR touching `docs/**` or `mkdocs.yml` |
 | `code-formatting.yml` | Whole-tree formatting sweep | Daily schedule, manual, self-test PR |
 | `codeql-analysis.yml` | CodeQL static analysis | Push, PR, weekly schedule |
@@ -50,6 +50,81 @@ exported to `.github/exported-config/` for version control and audit purposes:
 
 If the `export-repo-config` workflow creates a PR, it means GitHub UI settings
 have changed and should be reviewed.
+
+## Credential scanning
+
+The `credential_scan` job in `functional-tests.yml` runs
+`tools/gitleaks-scan.sh`, which scans every commit reachable from `HEAD`
+for leaked credentials. On a pull request that is the whole of `develop`
+plus the branch under test: about three seconds over five and a half
+thousand commits. It is one of `Can enqueue`'s dependencies, so a
+credential cannot be merged, and unlike most jobs it is not skipped for
+documentation-only changes -- a credential pasted into a code sample is
+still a credential, and the one real key secret this scan found in our
+own history had been published in the user guide.
+
+The scan is scoped to `HEAD` rather than every ref because `gh-pages`
+carries the built documentation site, whose search index is a single
+enormous JSON blob quoting every code sample we have. Scanning it takes
+five minutes instead of three seconds, produces around a hundred and
+fifty findings which are all duplicates of source files already
+scanned, and -- in gitleaks 8.16 -- attributes them to unrelated
+`develop` merge commits, so they cannot even be triaged by commit.
+
+The scan carries a positive control: it plants a key secret and an SSH
+private key in a scratch directory and fails if gitleaks does not report
+both. An empty result is otherwise indistinguishable from a broken
+scanner, and the allowlists described below could in principle grow
+until they forgive everything.
+
+To reproduce a CI failure, run `tools/gitleaks-scan.sh` yourself, passing
+`--gitleaks PATH` if the available binary is not the pinned 8.16.0. It
+does not matter which directory you run it from: it changes to the top of
+the working tree first, because both `.gitleaks.toml` and
+`.gitleaksignore` are resolved relative to the working directory, and
+from a subdirectory the ignore file would be missed silently and the
+three accepted historical findings reported as new. It does need a full
+clone -- a shallow one cannot see the history the scan claims to cover,
+so the script says so and exits rather than passing over a fraction of
+it.
+
+Two rules are ours rather than upstream's:
+
+* `shakenfist-key-secret` matches the `sfk_` credential format. Unit
+  tests in `shakenfist/tests/test_credentials.py` read the rule's regex
+  out of `.gitleaks.toml` and assert it matches what
+  `credentials.generate()` actually produces, so the format and the
+  scanner cannot drift apart silently.
+* `shakenfist/tests/test_no_committed_credentials.py` walks the working
+  tree for the same format but *verifies the checksum*, which
+  distinguishes a real credential from a documented example. It runs in
+  the unit suite and needs no allowlist at all.
+
+### Accepting a finding
+
+There are two places to record a finding you have decided to accept, and
+they are not interchangeable.
+
+Content which will recur -- a documentation placeholder, a test fixture,
+an upstream default -- goes in the `[allowlist]` `regexes` list in
+`.gitleaks.toml`, keyed on the text itself. Editing the paragraph around
+a placeholder creates a new finding in a new commit, so anything keyed
+on a commit would need replacing every time. Do not use `paths` for
+this: blinding a whole file also blinds a real credential added to it
+later. Note that 8.16 matches these regexes against the whole match
+rather than the secret alone, so anchoring one with `^...$` quietly
+stops it matching.
+
+A specific historical event goes in `.gitleaksignore` as a
+`commit:path:rule-id:line` fingerprint, which forgives that one
+occurrence and nothing else -- the same secret in a new commit fails the
+scan again. History cannot be rewritten to make such an entry
+unnecessary: this repository is public, so anything committed here has
+been world-readable since the day it landed. An entry therefore asserts
+that the credential has been dealt with *where it was trusted*, not that
+it has been tidied out of sight. Write down which credential, and what
+was done. A unit test enforces that every entry is well formed and
+carries a comment.
 
 ## Automated CI Jobs
 

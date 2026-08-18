@@ -1,0 +1,52 @@
+# Findings in git history which gitleaks is right to report and which we
+# have accepted. Each line is a fingerprint of the form
+#
+#     commit:path:rule-id:line
+#
+# and covers exactly one occurrence in exactly one commit. That
+# narrowness is the point: an entry here cannot forgive the same secret
+# appearing in a new commit, so re-adding one of these files fails the
+# scan again.
+#
+# Every entry is a claim that something is safe, and history cannot be
+# rewritten to make the claim unnecessary -- this repository is public,
+# so a secret committed here has been world-readable since the day it
+# landed. Adding an entry therefore means the credential has been dealt
+# with where it was trusted, not that it has been tidied away. Write
+# down which, and how it was dealt with.
+#
+# Placeholders and documentation examples do not belong here. They recur
+# every time the file around them is edited, which would mean a new
+# fingerprint each time; they are allowlisted by content in
+# .gitleaks.toml instead. See docs/developer_guide/ci.md.
+
+# One 3072-bit RSA private key, committed 2020-04-14 as an Ansible
+# fixture and again 2020-10-04 when the tree was reorganised (the same
+# key: both copies have SHA256 fingerprint
+# mz2lj7UcnApwOkzsnaEhMb+l4gbQQWTah06Vvmi9QCs). Removed from the tree in
+# 2021 by 09ada8e7f and 058cd2cea, which removed it from the tree and
+# from nothing else. The key was revoked long ago and authorises
+# nothing; it is left in history because deleting it from a public
+# repository's history would not unpublish it.
+0734e80ec0eec70032f1b0591e9a424fcb8ef0c6:ansible/files/id_rsa:private-key:1
+2b7666fa06584ee119ff889605e89b42c30e35df:deploy/ansible-ci/tests/files/id_rsa:private-key:1
+
+# A namespace key secret published as the example of a cluster-generated
+# key in the user guide. Introduced by 18618f5bd and merged to develop on
+# 2026-08-09; replaced on 2026-08-16 by a deliberately checksum-invalid
+# example, so it was readable for seven days.
+#
+# It is checksum-valid, which means something implementing our format
+# produced it: either credentials.generate() at a shell, in which case it
+# never authorised anything, or a real cluster, in which case the
+# plaintext has been public since 2026-08-09. Nothing in the repository
+# can tell those apart -- only whoever wrote that documentation can, so
+# until they say, treat it as disclosed: if any namespace anywhere still
+# holds this key, delete it. See
+# docs/operator_guide/credential_rotation.md for the mechanics.
+#
+# This entry is the accepted *finding*, not an answer to that question.
+# The question itself is recorded as an open loose end in
+# docs/plans/PLAN-auth-federation.md, because a plan marked complete
+# should not be the only place an unanswered question lives.
+0f2593b3388d04cc3b555510376b336db8d45205:docs/user_guide/authentication.md:shakenfist-key-secret:43

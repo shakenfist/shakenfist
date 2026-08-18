@@ -620,11 +620,44 @@ groundwork exists, and lives mostly outside this repository.
 | 4. Authentication documentation | [PLAN-auth-federation-phase-04-docs.md](PLAN-auth-federation-phase-04-docs.md) | Complete |
 | 5. OIDC plan refresh | [PLAN-auth-federation-phase-05-oidc-plan-refresh.md](PLAN-auth-federation-phase-05-oidc-plan-refresh.md) | Complete |
 | 6. Secrets that cannot be logged by accident | [PLAN-auth-federation-phase-06-secret-types.md](PLAN-auth-federation-phase-06-secret-types.md) | Complete |
-| 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
+| 7. Leak detection | [PLAN-auth-federation-phase-07-leak-detection.md](PLAN-auth-federation-phase-07-leak-detection.md) | Complete |
 
-The phase 7 plan has not been drafted yet; the open questions
-above should be resolved (or explicitly carried into it)
-before it is cut.
+**All phases complete**, phase 7 on the
+`auth-federation-phase-07-leak-detection` branch. What the plan set out
+to do — make a namespace key a first-class object, let an external
+workload identity exchange itself for a scoped one, and make a leaked
+credential recognisable, unloggable and detectable — is done.
+
+Completing the plan does not mean nothing is left. The Future work
+section below carries twenty-odd entries, and three of them are the
+ones a reader should not lose: the `SecretStr` conversion still owes
+`BlobTransfer.token`, `util/vdi_tokens.py` and the minted plaintext key
+secret; there is no API for reading back a key's own expiry or scopes,
+so a 401 remains the diagnostic; and two credentials found in history
+by phase 7's baseline need an operator to confirm they authorise
+nothing, which is not a repository change and so cannot be closed here.
+
+Of those two credentials one is closed and one is genuinely open, and
+the open one is written out here rather than left in the completed phase
+plan, so that marking this document complete does not bury it:
+
+* The 3072-bit RSA private key committed in 2020 (fingerprint
+  `SHA256:mz2lj7UcnApwOkzsnaEhMb+l4gbQQWTah06Vvmi9QCs`) — **closed**.
+  Michael confirms it was revoked long ago.
+* The checksum-valid namespace key secret published in
+  `docs/user_guide/authentication.md` between 2026-08-09 and 2026-08-16
+  (`sfk_QKLZ...`, accepted as a fingerprint in `.gitleaksignore`) —
+  **open**. Either `credentials.generate()` produced it at a shell and
+  it never authorised anything, or a real cluster minted it and the
+  plaintext was public for seven days. Nothing in the repository can
+  tell those apart; only whoever wrote phase 4's documentation can. If a
+  real cluster minted it, delete the key from every namespace holding it
+  — `docs/operator_guide/credential_rotation.md` has the mechanics.
+  Until that is answered `.gitleaksignore` says to treat it as
+  disclosed.
+
+Every open question above was resolved by phases 2 and 3, so
+none needed carrying into phase 7.
 
 Phases 6 and 7 came out of phase 2's step 2g, which removed
 five separate sites that wrote credentials into audit
@@ -953,15 +986,19 @@ secrets, and early rejection on a bad checksum. What remains
 here is detecting the format once it escapes.
 
 * **A gitleaks rule** for the format. Shaken Fist has no
-  gitleaks job yet — ryll's `supply-chain.yml` has the
-  working pattern, including that `gitleaks-action@v2`
-  refuses to run on org repos without a paid licence so the
-  upstream binary is invoked directly, and that gitleaks is
-  only packaged from Debian 13 onward. Adding the job is
-  part of this phase. Note the `secret-handling` consistency
-  audit in `shakenfist/development` already requires a
-  scanner in CI, so this phase is also how Shaken Fist
-  becomes compliant with an audit it currently fails.
+  gitleaks job yet — ryll's `ci.yml` has the working
+  pattern, including that `gitleaks-action@v2` refuses to
+  run on org repos without a paid licence so the upstream
+  binary is invoked directly, and that gitleaks is only
+  packaged from Debian 13 onward. Adding the job is part of
+  this phase. The `secret-handling` consistency audit in
+  `shakenfist/development` already requires a scanner in CI
+  and lists Shaken Fist as non-compliant against
+  `shakenfist/shakenfist#3546`, so this phase is also how
+  Shaken Fist becomes compliant. (A parenthetical added on
+  2026-08-16 claimed that audit did not exist. It does, and
+  has since 2026-07-27; the phase 7 survey reported a false
+  negative and the false correction is withdrawn.)
 * **Log-sink detection, which is the valuable half.** Events
   go to syslog *and* to Loki, so a credential written into
   an event leaves the cluster and lands in log aggregation.
@@ -1224,6 +1261,20 @@ implemented because the following statements will be true:
   be verified by reading rather than by the type checker.
   These three carry the credential paths and are good
   candidates for the next tranche of the rollout.
+* **The `secret-handling` audit's reference invocation** in
+  `shakenfist/development` was scoped to every ref rather
+  than to `HEAD`, which is slow, noisy and — under gitleaks
+  8.16 — misattributed. Fixed there in `fd4ddc4` as part of
+  phase 7, along with guidance on positive controls and on
+  how to accept a finding that cannot be removed. Four other
+  projects still carry the unscoped invocation: `ryll`
+  (`ci.yml`, which additionally lets the scanner skip
+  docs-only changes), `instar` and `client-python-k3s`
+  (`supply-chain.yml`), and `sfui` (`gitleaks.yml`). Each
+  needs a small pull request. While there, note that
+  `PROJECT-CONSISTENCY-AUDITS.md`'s security table still
+  lists Shaken Fist's GitHub secret scanning as Disabled,
+  which `PLAN-consistency.md` records as having been enabled.
 * **Token introspection / jti denylist** if bounded-delay
   revocation of *scoped keys themselves* (as opposed to
   their derived tokens) ever proves insufficient.

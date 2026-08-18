@@ -1,0 +1,105 @@
+# gitleaks configuration for Shaken Fist.
+#
+# Run in CI by the credential_scan job in
+# .github/workflows/functional-tests.yml, which invokes a pinned gitleaks
+# 8.16.0 through tools/gitleaks-scan.sh rather than using
+# gitleaks-action, because that action refuses to run on organization
+# repositories without a paid licence.
+#
+# There are two places to record an accepted finding, and they are not
+# interchangeable. Content which recurs -- a documentation placeholder,
+# a test fixture -- is allowlisted here, because it reappears in a new
+# commit every time the file around it is edited. A specific historical
+# event is recorded as a fingerprint in .gitleaksignore, which forgives
+# that one occurrence and nothing else. See docs/developer_guide/ci.md.
+#
+# This file is written against 8.16's schema, which is not the one the
+# current upstream documentation describes -- per-rule allowlists became
+# a repeatable [[rules.allowlists]] array in a later release, while 8.16
+# takes a single [rules.allowlist] table. Note also that 8.16 matches
+# global allowlist regexes against the whole match rather than the
+# secret alone, so anchoring one with ^...$ silently stops it matching.
+# Check any change against the pinned version rather than the website.
+#
+# The custom rule below is bound to the code by a test:
+# shakenfist/tests/test_credentials.py reads this file, extracts the
+# rule's regex, and asserts that it matches what credentials.generate()
+# actually produces. So the format and the scanner cannot drift apart
+# silently, which is the failure this rule exists to avoid.
+
+title = "Shaken Fist"
+
+[extend]
+# Keep the upstream rules for third party credential shapes -- cloud
+# keys, tokens, private keys -- and add ours to them.
+useDefault = true
+
+[[rules]]
+id = "shakenfist-key-secret"
+description = "Shaken Fist cluster-minted namespace key secret"
+# The shape only. A scanner cannot verify the trailing base62 CRC32,
+# so this deliberately matches examples and test fixtures too; the
+# checksum-aware check lives in the unit suite, in
+# shakenfist/tests/test_no_committed_credentials.py, which is what
+# distinguishes a real credential from a documented one.
+#
+# Not a bare "sfk_": several log lines and documents legitimately
+# mention the prefix, and a rule which fires on its own documentation
+# gets disabled.
+regex = '''sfk_[A-Za-z0-9]{38}'''
+keywords = ["sfk_"]
+tags = ["key", "shakenfist", "namespace-key"]
+
+[rules.allowlist]
+description = """
+Deliberately invalid examples of the credential shape. Each is the real
+shape with the six checksum characters set to zzzzzz, which as base62 is
+56800235583 and so exceeds the largest possible CRC32 (4294967295) -- no
+input produces it, so these cannot be credentials by arithmetic rather
+than by assertion. The documentation needs to show the shape, and the
+functional leak detector needs to emit it to prove it can fire.
+"""
+regexes = ['''sfk_[A-Za-z0-9]{32}zzzzzz''']
+
+[allowlist]
+description = """
+Repository-wide exceptions. Every entry here is a place a scanner
+believes it has found a credential and has not; adding one is a claim
+that has to be true, so each carries the reason it is safe.
+
+These match on content rather than on path, which is both narrower and
+more durable. A path entry blinds a whole file, including a real
+credential added to it later. A content entry also survives editing:
+the same placeholder in a rewritten paragraph is a new finding in a new
+commit, so a fingerprint in .gitleaksignore would have to be replaced
+every time, while the text itself does not change.
+"""
+regexes = [
+  # PEM delimiters with nothing between them. The upstream private-key
+  # rule matches on the header without looking at what follows, so
+  # documentation showing the shape of a key -- and unit tests using
+  # "foo" where a key would go -- read as findings. Two forms occur: an
+  # ellipsis in prose and JSON examples, and an escaped newline followed
+  # by foo in python source.
+  '''-----BEGIN [A-Z ]*PRIVATE KEY-----(\.\.\.|\\nfoo)''',
+
+  # An elided JWT in the authentication documentation's curl examples.
+  # A real token does not contain an ellipsis.
+  '''eyJhbG\.\.\.IkpXVCJ9''',
+
+  # The key *name* in the federated authentication examples, which the
+  # generic-api-key rule picks up because the key beside it is elided to
+  # "sfk_...". Key names are not secret: sf-client namespace show lists
+  # them.
+  '''ryll-ci-8fJ2mQ''',
+
+  # base64 of "$2b$12$fakehash", a stand-in for a bcrypt hash in the
+  # namespace key unit tests. Not a hash of anything, and a hash rather
+  # than a secret even if it were.
+  '''JDJiJDEyJGZha2VoYXNo''',
+
+  # Grafana's own shipped default, in a commented-out line of a
+  # grafana.ini we no longer carry. Published by Grafana in every
+  # release of their sample configuration.
+  '''SW2YcwTIb9zpOOhoPsMm''',
+]
