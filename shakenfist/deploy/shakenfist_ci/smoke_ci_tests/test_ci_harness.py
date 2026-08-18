@@ -22,22 +22,6 @@ from shakenfist_ci import base
 from shakenfist_ci.base import namespace_names
 
 
-class _EmptyNamespacedTest(base.BaseNamespacedTestCase):
-    """A namespaced test which does nothing, so its teardown can be watched.
-
-    Run in-process by the test below rather than collected by stestr:
-    the thing under test is what ``tearDown()`` does *after* a test
-    finishes, which a test cannot observe about itself.
-    """
-
-    def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'harness'
-        super().__init__(*args, **kwargs)
-
-    def runTest(self):
-        pass
-
-
 class TestNamespaceHelpers(base.BaseTestCase):
     def test_namespace_names_reads_the_api_shape(self):
         """The helper against the real API, not against a fixture.
@@ -96,7 +80,21 @@ class TestNamespaceHelpers(base.BaseTestCase):
         using it correctly, and the teardown path is where the six years
         of leaked namespaces came from.
         """
-        case = _EmptyNamespacedTest()
+        # Defined here rather than at module level because stestr
+        # discovers TestCase subclasses by walking the module, and a
+        # leading underscore does not exempt one -- collected, it ran as
+        # a test in its own right and reported under a name nobody
+        # writing this file intended. Inside the method it is invisible
+        # to discovery and still perfectly runnable.
+        class EmptyNamespacedTest(base.BaseNamespacedTestCase):
+            def __init__(self, *args, **kwargs):
+                kwargs['namespace_prefix'] = 'harness'
+                super().__init__(*args, **kwargs)
+
+            def runTest(self):
+                pass
+
+        case = EmptyNamespacedTest()
         namespace = case.namespace
 
         result = testtools.TestResult()
