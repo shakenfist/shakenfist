@@ -12278,6 +12278,11 @@ live on the queue entry for PR 304.</p>
 <td>neither (advisory)</td>
 </tr>
 <tr>
+<td><code>demo-compose.yml</code></td>
+<td>push and pull_request, path-filtered to <code>demo/**</code>, <code>tools/demo/**</code>, the migrations, <code>pyproject.toml</code> and <code>docs/installation.md</code></td>
+<td>neither (advisory)</td>
+</tr>
+<tr>
 <td><code>dev-proxy-wheel.yml</code></td>
 <td>push to develop, path-filtered to the proxy binary's inputs; workflow_dispatch (dry-run by default)</td>
 <td>neither</td>
@@ -12311,6 +12316,15 @@ tier; what never runs against the merged tree is <code>clippy</code> and
 <code>cargo test</code>, which is an accepted gap.</p>
 <p>The direct-qemu lane also runs nightly, because the merge queue
 does not re-run it against the merged tree.</p>
+<p><code>demo-compose.yml</code> is the only lane that needs a container
+runtime, and the runner image does not have one, so it installs
+Docker Engine itself via <code>tools/demo/install-docker.sh</code> — from
+Docker's own apt repository, because Debian 12 ships neither a
+new enough engine nor a <code>docker compose</code> v2 plugin at all. The
+script is idempotent, so adding docker to the runner image would
+make it a no-op rather than a conflict. It also configures the
+daemon and builds for the runner's proxy, which neither inherits
+on its own.</p>
 <p>Two behaviours only matter when driving CI by hand: on a
 <code>workflow_dispatch</code> run of <code>functional-tests.yml</code> an unselected target
 skips cleanly via a job-level <code>if:</code> (it does not report red), and

@@ -5564,82 +5564,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#approach" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Approach
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Approach">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tier-and-gating" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tier and gating
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runner-and-shape" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Runner and shape
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Steps
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#do-not-test-the-pypi-path-here" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do not test the PyPI path here
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#carried-over-from-the-phase-3-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Carried over from the phase 3 review
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
+        Scope
       
     </span>
   </a>
@@ -5647,10 +5575,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        What the survey found
       
     </span>
   </a>
@@ -11850,82 +11778,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#approach" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Approach
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Approach">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tier-and-gating" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tier and gating
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runner-and-shape" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Runner and shape
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Steps
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#do-not-test-the-pypi-path-here" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do not test the PyPI path here
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#carried-over-from-the-phase-3-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Carried over from the phase 3 review
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
+        Scope
       
     </span>
   </a>
@@ -11933,10 +11789,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        What the survey found
       
     </span>
   </a>
@@ -11966,150 +11822,637 @@
 
 <h1 id="phase-4-a-ci-lane-for-the-compose-demo">Phase 4: a CI lane for the compose demo<a class="headerlink" href="#phase-4-a-ci-lane-for-the-compose-demo" title="Permanent link">&para;</a></h1>
 <p>Master plan: <a href="/components/kerbside/plans/PLAN-demo-install/">PLAN-demo-install.md</a></p>
-<p>Planned at medium effort: it follows <code>rust.yml</code>'s advisory
-path-filtered pattern and reuses the direct-qemu lane's
-proxy-wheel steps.</p>
+<p>Planned at medium effort, as the master plan specifies. The
+survey moved one thing out of medium territory, though: this
+lane would be the <strong>first container build in kerbside CI</strong>, so
+the phase leads with a runner probe rather than assuming a
+working Docker daemon (finding 5).</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The demo from phase 3 becomes a documented, user-facing path
-in phase 5. <code>docs/installation.md</code> will tell readers to run
-it. Nothing else in CI exercises a container build, a compose
-stack, or <code>kerbside db upgrade</code> on the wheel-install path.</p>
-<p>The tree's own history is the argument for this phase:
-<code>etc/kerbside.conf.example</code> was referenced by two documents
-for long enough that a second document copied the reference,
-and nothing noticed, because nothing executed it.</p>
+<p>Phase 3 built <code>demo/</code>. Phase 5 will point <code>docs/installation.md</code>
+at it, which makes it a documented, user-facing path. Nothing
+in CI exercises a container build, a compose stack, or
+<code>kerbside db upgrade</code> on the wheel-install path.</p>
+<p>The argument for this phase stopped being hypothetical while
+the phase was being planned. Renovate merged #330 on
+2026-08-17, bumping <code>demo/docker-compose.yml</code> from <code>mariadb:11</code>
+to <code>mariadb:12</code> — a database major version, under the demo,
+with nothing to run it. I verified it by hand during the survey
+(finding 7) and it is fine, but "a maintainer happened to check"
+is exactly the property this phase exists to replace.</p>
 <h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
 <p>A CI lane brings up the compose stack against the pull
-request's code and asserts a SPICE session is proxied, so a
+request's own code and asserts a SPICE session is proxied, so a
 change that breaks the documented demo fails visibly.</p>
-<h2 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h2>
-<h3 id="tier-and-gating">Tier and gating<a class="headerlink" href="#tier-and-gating" title="Permanent link">&para;</a></h3>
-<p><strong>Advisory, path-filtered — not a required check.</strong>
-<code>docs/testing.md:34</code> establishes the precedent with
-<code>rust.yml</code>, and <code>.claude/CLAUDE.md</code> is emphatic that the five
-required status checks are gate jobs whose names are bound to
-the develop ruleset, so adding a required check means a
-ruleset change that <code>tools/check-required-checks.sh</code>
-validates against. That is not worth it for a demo path.</p>
-<p>Path filter, following <code>rust.yml:10-22</code>'s shape:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>paths:
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  - 'demo/**'
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  - 'kerbside/migrations/**'
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  - 'pyproject.toml'
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  - 'docs/installation.md'
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  - '.github/workflows/demo-compose.yml'
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>In scope:</p>
+<ul>
+<li><code>.github/workflows/demo-compose.yml</code>, advisory and
+  path-filtered.</li>
+<li><code>tools/demo/</code> scripts holding anything longer than a few
+  lines, per the operator convention that workflow steps stay
+  short.</li>
+<li>A runner probe, <code>tools/demo/probe-runner.sh</code>, modelled on
+  <code>tools/direct-qemu/probe-runner.sh</code>.</li>
+<li>shellcheck enforcement in CI for <code>tools/</code> and <code>demo/</code>
+  (carried over from the phase 3 review).</li>
+<li>Registering the lane in <code>docs/testing.md</code> and
+  <code>.claude/CLAUDE.md</code>.</li>
+</ul>
+<p>Out of scope, deliberately:</p>
+<ul>
+<li><strong>Rewriting <code>docs/installation.md</code>.</strong> Phase 5, and it must
+  be last.</li>
+<li><strong>Making the lane a required check.</strong> Decision 1.</li>
+<li><strong>Testing the PyPI default build.</strong> Decision 4.</li>
+<li><strong>Fixing the 5900 collision</strong> (finding 10). Recorded, and
+  the probe will detect it, but changing the demo's published
+  ports is a phase 3 file change with its own documentation
+  consequences and does not belong in a CI phase.</li>
+<li><strong>Publishing a demo image to a registry.</strong> Still a
+  release-process question, as phase 3 recorded.</li>
+</ul>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The draft of this file was written as part of the master plan
+commit (<code>e9d6497</code>), before phases 1–3 executed, and lightly
+touched by the phase 3 review (<code>bc1fa4a</code>). It is substantially
+stale. The corrections are recorded here and applied at source
+in the master plan's Execution table and the <code>index.md</code> row as
+part of the planning commit, so a later step need not redo it.</p>
+<p><strong>1. Every line citation in the draft is wrong.</strong> Not
+approximately — the referenced lines now hold unrelated
+content. Corrected:</p>
+<table>
+<thead>
+<tr>
+<th>Draft said</th>
+<th>Actually</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docs/testing.md:34</code> for the <code>rust.yml</code> advisory precedent</td>
+<td><code>docs/testing.md:73</code> (table row), prose at <code>:79</code></td>
+</tr>
+<tr>
+<td><code>rust.yml:10-22</code> for the path-filter shape</td>
+<td>push filter <code>rust.yml:12-20</code>, PR filter <code>:22-29</code></td>
+</tr>
+<tr>
+<td><code>rust.yml:29</code> for the unsized-<code>vm</code>-defaults-to-<code>xs</code> note</td>
+<td><code>rust.yml:36-38</code>, and it selects <code>xl</code>, not the <code>l</code> the draft proposes</td>
+</tr>
+<tr>
+<td><code>direct-qemu-functional.yml:33-36</code> for concurrency</td>
+<td><code>:30-32</code></td>
+</tr>
+<tr>
+<td><code>direct-qemu-functional.yml:96-99</code> for the <code>no_proxy</code> squid note</td>
+<td><code>:88-92</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>rust.yml</code> filter list also grew two entries in #314
+(<code>tools/stamp-dev-proxy-version.sh</code>,
+<code>tools/verify-wheel-stamping.sh</code>), which is why the range
+moved.</p>
+<p><strong>2. The ryll feature-flag claim is backwards, and copying the
+named file would produce the opposite of what the draft
+intends.</strong> The draft says to follow
+<code>direct-qemu-functional.yml</code>'s ryll build "<strong>without</strong>
+<code>--features digest-decode</code>, which the oVirt lane's equivalent
+step also omits". In fact <code>direct-qemu-functional.yml:143</code>
+<em>includes</em> <code>--features digest-decode</code>; the lane that omits it
+is the oVirt one at <code>functional-tests.yml:629</code>. For a lane
+asserting connection rather than pixels,
+<code>functional-tests.yml:629</code> is the line to copy.</p>
+<p><strong>3. The proxy-wheel build is one step, and not the one
+described.</strong> The draft says to "copy the four steps verbatim
+from <code>direct-qemu-functional.yml</code>'s wheel build (apt
+prerequisites, <code>dtolnay/rust-toolchain@stable</code>, a
+maturin+ziglang venv, <code>tools/build-proxy-wheel.sh</code> with
+<code>WHEEL_OUT</code>)". Reality at
+<code>direct-qemu-functional.yml:157-161</code>: a single step that makes
+a maturin + <strong>setuptools_scm</strong> venv — no ziglang, which is for
+cross-compilation and is not needed for a native build — and
+calls <code>tools/direct-qemu/install-proxy-wheel.sh --venv</code>, which
+sets <code>WHEEL_OUT</code> itself at <code>install-proxy-wheel.sh:53</code>. The
+four-step shape the draft describes is <code>release.yml</code>'s.</p>
+<p><strong>4. The lane probably does not need to build the Rust proxy
+at all, which removes the most expensive thing in the draft.</strong>
+The draft's justification for building it: "the
+<code>KERBSIDE_PROXY_PIN</code> in <code>pyproject.toml</code> is deliberately absent
+from the committed tree, so a <code>KERBSIDE_SOURCE=/src</code> build has
+no proxy to install from PyPI." That was true when written and</p>
+<h1 id="314-changed-it-pyprojecttoml34-now-carries-a">314 changed it. <code>pyproject.toml:34</code> now carries a<a class="headerlink" href="#314-changed-it-pyprojecttoml34-now-carries-a" title="Permanent link">&para;</a></h1>
+<p>dev-inclusive <strong>floor</strong>, <code>kerbside-proxy&gt;=0.4.0.dev0</code>, and the
+<code>.dev0</code> suffix is what makes pre-releases eligible for that
+requirement. Verified rather than reasoned about:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ pip install --dry-run --report - .      # from a clean checkout
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>kerbside-proxy 0.5.1.dev1
 </code></pre></div>
-<p><code>docs/installation.md</code> is in the list deliberately: the
-document and the thing it documents should not be able to
-drift without the lane running. <code>kerbside/migrations/**</code> and
-<code>pyproject.toml</code> are there because phase 1's packaging is the
-part most likely to break silently.</p>
-<p>Read <code>docs/testing.md</code> before writing the workflow — it is
-the authority on tiers and gate jobs — and add the lane to
-its table in the same commit. A lane absent from that table
-is a lane nobody knows the status of.</p>
-<h3 id="runner-and-shape">Runner and shape<a class="headerlink" href="#runner-and-shape" title="Permanent link">&para;</a></h3>
-<p><code>runs-on: [self-hosted, vm, debian-12, l]</code>. Justification for
-<code>l</code>: a qemu TCG guest, a MariaDB, a container build, and a
-release build of the Rust proxy wheel on one runner. Do not
-use an unsized label — <code>rust.yml:29</code>'s comment records that
-an unsized <code>vm</code> label defaults to <code>xs</code> (1 core / 2 GB) in
-private-ci, which will not do.</p>
-<p><code>no_proxy: 127.0.0.1,localhost</code> at job level. The runner
-image exports <code>http_proxy</code>/<code>https_proxy</code> at an upstream
-squid, and loopback traffic to the published demo ports must
-bypass it or squid returns 503 — recorded at
-<code>direct-qemu-functional.yml:96-99</code> and hit again by the oVirt
-lane, so assume it will bite here too.</p>
-<p>Concurrency group cancelling in-progress runs, per
-<code>direct-qemu-functional.yml:33-36</code>.</p>
-<h3 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Checkout.</li>
-<li>Build the proxy wheel: copy the four steps verbatim from
-   <code>direct-qemu-functional.yml</code>'s wheel build (apt
-   prerequisites, <code>dtolnay/rust-toolchain@stable</code>, a
-   maturin+ziglang venv, <code>tools/build-proxy-wheel.sh</code> with
-   <code>WHEEL_OUT</code>). Needed because the <code>KERBSIDE_PROXY_PIN</code> in
-   <code>pyproject.toml</code> is deliberately absent from the committed
-   tree, so a <code>KERBSIDE_SOURCE=/src</code> build has no proxy to
-   install from PyPI.</li>
-<li>Build the demo image with <code>KERBSIDE_SOURCE=/src</code> and the
-   built wheel available, so the lane tests the PR rather
-   than the last release.</li>
-<li><code>docker compose up -d --wait</code>, so compose does the
-   readiness waiting rather than a hand-rolled sleep.</li>
-<li>Run <code>demo/get-console.sh</code> and assert the <code>.vv</code> contains
-   <code>tls-port=</code>, <code>host-subject=</code>, and a <code>ca=</code> field with an
-   escaped PEM. Cheap, and it catches the exact silent
-   failure phase 3 warns about.</li>
-<li>Drive a real SPICE session with <strong>ryll headless</strong>,
-   following <code>direct-qemu-functional.yml</code>'s ryll build (a
-   <code>--depth 1</code> clone of <code>shakenfist/ryll</code>, <code>cargo build
-   --release --no-default-features -p ryll</code>; <strong>without</strong>
-   <code>--features digest-decode</code>, which the oVirt lane's
-   equivalent step also omits, since this lane asserts
-   connection rather than pixels). Connect it to the <code>.vv</code>
-   over the TLS port and assert the SPICE link handshake
-   completes and the main channel opens. <code>tools/direct-qemu/
-   smoke-client.py</code> is the closest existing driver — read it
-   and reuse rather than reinventing the assertion.</li>
-<li>Assert the negative cases, which is what makes the lane
-   more than a smoke test:</li>
-<li><code>docker compose stop spice-target</code>, then confirm a
-     fresh console request fails in a bounded time rather
-     than hanging. A proxy that hangs when its backend
-     disappears is a real defect and this is the only lane
-     positioned to catch it cheaply.</li>
-<li>Append a dummy oVirt entry to <code>demo/sources.yaml</code>,
-     restart, and confirm <code>kerbside demo token</code> <strong>refuses</strong>,
-     naming the offending source. Phase 1 unit-tests this
-     guard against fixtures; here it is exercised against a
-     real deployment, which is where it actually has to
-     hold. Restore the file afterwards.</li>
-<li><code>if: always()</code> artifact upload of <code>docker compose logs</code>
-   for all three services, the <code>.vv</code> (<strong>with the <code>password=</code>
-   line redacted</strong> — it is a live console token, short-lived
-   but real, and CI artifacts are downloadable), and the ryll
-   output.</li>
-</ol>
-<p>Put the multi-step logic in <code>tools/demo/</code> scripts called from
-the workflow, not inline in YAML: the operator's global
-convention is that anything beyond about five lines in a
-workflow step goes in <code>tools/</code> and is invoked from there.</p>
-<h3 id="do-not-test-the-pypi-path-here">Do not test the PyPI path here<a class="headerlink" href="#do-not-test-the-pypi-path-here" title="Permanent link">&para;</a></h3>
-<p>The demo's <em>default</em> build installs released <code>kerbside</code> from
-PyPI. A lane that exercised the default would test the last
-release, not the pull request, and would fail whenever PyPI
-lags a version bump. Test <code>KERBSIDE_SOURCE=/src</code> here, and
-note in the workflow comment that the released-package path
-is covered at release time and by the evaluator. Record it in
-the master plan's future work if a periodic check of the
-PyPI path seems worth adding later — a nightly would be the
-natural home.</p>
-<h3 id="carried-over-from-the-phase-3-review">Carried over from the phase 3 review<a class="headerlink" href="#carried-over-from-the-phase-3-review" title="Permanent link">&para;</a></h3>
-<p><strong>shellcheck over <code>demo/</code> has no CI enforcement.</strong> Phase 3
-extended the pre-commit hook to <code>^(tools|demo)/</code>, which is
-the right scope, but <code>grep -rn pre-commit .github/workflows
-tox.ini</code> shows pre-commit is never invoked by any workflow or
-tox environment -- the only hits are comments in
-<code>pr-address-comments.yml</code> explaining why it is deliberately
-skipped there. So the demo's four shell scripts are checked
-only on machines where a developer installed the hooks.</p>
-<p>This phase should close that, and it is the natural owner
-because it is already adding the lane that runs the demo.
-Either add a shellcheck step to the new lane covering
-<code>tools/</code> and <code>demo/</code>, or add a <code>tox -e shellcheck</code>
-environment and call it from <code>sanity_checks</code>. Prefer the
-former: <code>sanity_checks</code> is a gate job feeding a required
-check, and <code>docs/testing.md</code> is the authority on what may
-change there.</p>
-<p><strong>A cheap smoke check ahead of the full lane.</strong>
-<code>docker compose config</code> validates the compose schema and
-<code>docker compose build</code> catches Dockerfile syntax, both in
-seconds and without bringing anything up. Worth running as
-the lane's first step so a schema typo fails fast rather
-than after a multi-minute image build and stack start.</p>
+<p>That is a dev wheel published from develop by
+<code>dev-proxy-wheel.yml</code>, and resolving it is precisely what phase
+2 of <code>PLAN-proxy-dev-releases</code> set out to achieve for
+downstream git installs. So a <code>/src</code> build pairs a checkout
+daemon with a develop-tracking binary on its own, with no cargo
+in the lane. See decision 3 for the residual case.</p>
+<p><strong>5. No kerbside workflow uses Docker. At all.</strong> <code>grep -rn
+'docker\|podman\|buildkit' .github/workflows/</code> returns nothing.
+This lane would be the repository's first container build, and
+three things the draft silently assumes are unverified on the
+private-CI runners:</p>
+<ul>
+<li>a usable Docker daemon and permission to reach it;</li>
+<li>Docker Engine 23.0+, which <code>demo/Dockerfile</code> requires by
+  name for <code>RUN --mount=type=bind</code> under the built-in
+  BuildKit frontend;</li>
+<li>egress from <em>inside</em> a build container to pypi.org. The
+  runners sit behind a squid
+  (<code>direct-qemu-functional.yml:88-92</code>) and
+  <code>functional-tests.yml:106</code> points pip at a devpi mirror
+  (<code>http://192.168.1.15:3141/root/pypi/+simple/</code>). A
+  <code>docker build</code> inherits neither the runner's proxy
+  environment nor its <code>PIP_INDEX_URL</code>.</li>
+</ul>
+<p>This is the single most likely reason a first attempt at the
+lane fails, and it is cheap to find out first. Hence step 4a.</p>
+<p><strong>6. The shellcheck-in-CI gap is real and unchanged.</strong> <code>grep
+-rn pre-commit .github/workflows tox.ini</code> finds only two hits,
+both comments in <code>pr-address-comments.yml</code> (lines 16 and 154)
+explaining why pre-commit is skipped there. <code>tox.ini</code> has
+<code>flake8</code>, <code>py3</code>, <code>cover</code>, <code>genprotos</code> and <code>bindep</code>, and no
+shellcheck environment. So the demo's four shell scripts are
+checked only where a developer installed the hooks. The phase 3
+review's carry-over stands.</p>
+<p><strong>7. Renovate is already changing the demo untested, and the
+current develop had never been run.</strong> #330 (<code>433bc88</code>,
+2026-08-17) bumped the demo database from <code>mariadb:11</code> to
+<code>mariadb:12</code>. Phase 3's end-to-end verification was on
+<code>mariadb:11</code>. Verified during this survey against
+<code>mariadb:12.3.2</code>: <code>docker compose up -d --wait</code> reaches all
+three services healthy, all 9 migrations apply, the proxy
+starts, and <code>kerbside demo token</code> mints. No action needed — but
+this is the phase's own justification, arriving unprompted.</p>
+<p><strong>8. The <code>.vv</code> really does carry a live credential.</strong> The
+draft's artifact-redaction requirement is well founded:
+<code>kerbside/api.py:374</code> puts <code>password=%(token)s</code> in
+<code>VIRTVIEWER_TEMPLATE</code>.</p>
+<p><strong>9. A <code>/src</code> build needs full git history, so the lane needs
+<code>fetch-depth: 0</code>.</strong> <code>demo/Dockerfile</code> records that
+setuptools_scm's git file finder is the only thing installing
+<code>kerbside/sources/</code> and <code>kerbside/migrations/</code>, and
+<code>install-proxy-wheel.sh</code>'s header notes a shallow clone cannot
+count commits since the last <code>v*</code> tag. <code>actions/checkout</code>
+defaults to depth 1. The precedent is already in the tree:
+<code>direct-qemu-functional.yml:100</code> and
+<code>sf-e2e-functional.yml:113</code> both set <code>fetch-depth: 0</code>.</p>
+<p><strong>10. The demo's fixed port 5900 collides with any host
+running a VNC server.</strong> Hit twice on the development host
+during this survey; the bind fails with <code>failed to bind host
+port 127.0.0.1:5900/tcp: address already in use</code> from the
+Docker daemon, which does not name what holds it. A CI runner
+is a plausible place for the same collision. Out of scope to
+fix (see Scope), but the probe should detect it and say so.</p>
+<p><strong>11. A gotcha for anyone writing a compose override in this
+phase.</strong> <code>docker compose</code> merges list-valued keys such as
+<code>ports</code> by <em>appending</em>, so an override file that lists fewer
+ports does not reduce them — the original bindings are still
+attempted. Replacing the list needs the <code>!override</code> tag
+(Compose 2.24+; this host runs v5.4.0). Learned the hard way
+while working around finding 10.</p>
+<p>Nothing else in the draft's reasoning failed. The tier
+decision, the artifact redaction, the negative-case assertions
+and the "do not test the PyPI path" argument all survive
+scrutiny and are carried forward.</p>
+<h2 id="what-implementation-found-after-the-survey">What implementation found, after the survey<a class="headerlink" href="#what-implementation-found-after-the-survey" title="Permanent link">&para;</a></h2>
+<p><strong>12. A <code>workflow_dispatch</code>-only probe cannot be run before it
+merges.</strong> GitHub only offers <code>workflow_dispatch</code> for workflows
+that exist on the <em>default</em> branch, so the shape decision 2
+specifies — a throwaway dispatch-only workflow — is
+untriggerable on a feature branch, which would have made the
+gating step impossible to execute before merge. Resolved by
+giving <code>demo-probe.yml</code> a <code>pull_request</code> trigger as well,
+path-filtered to itself and the probe script so it costs a
+runner only on the pull request that introduces it. The
+<code>workflow_dispatch</code> trigger is kept for re-running it later.</p>
+<p><strong>13. Asserting the backend-failure case on <code>get-console.sh</code>
+does not work, and passes when it should fail.</strong> Fetching a
+<code>.vv</code> never touches the hypervisor: <code>get-console.sh</code> mints a
+token, reads the console list and verifies the TLS leg to the
+<em>proxy</em>, all of which keep working with the SPICE target
+stopped, because the proxy only dials the backend once a client
+opens a session. The first draft of <code>lane-assert.sh</code> asserted
+on <code>get-console.sh</code> here and reported a stopped backend as
+success. Phase 3's own evidence says why — it verified this
+case with <code>remote-viewer</code>, not with <code>get-console.sh</code> — so the
+assertion now drives ryll and additionally requires the proxy
+to have logged <code>hypervisor connection failed</code>.</p>
+<p><strong>14. Appending a non-static source to <code>demo/sources.yaml</code>
+needs zero indentation, or it crashes the daemon instead of
+tripping the guard.</strong> The file is a list of <em>sources</em>, each
+with <code>source:</code>, <code>type:</code> and <code>consoles:</code>. An indented entry
+lands inside the demo source's <code>consoles:</code> list, which is
+malformed enough that the daemon dies at startup; the container
+never returns, <code>docker compose exec</code> fails, and the refusal
+under test never happens. The first draft did exactly that and
+reported the crash as a missing refusal. <code>lane-assert.sh</code> now
+appends a top-level source and separately checks that kerbside
+came back healthy, so a crash is reported as a crash.</p>
+<p><strong>15. <code>KERBSIDE_SOURCE=/src</code> cannot be built from a git
+worktree</strong>, which matters because that is where this plan was
+written. <code>.git</code> is a file in a worktree, pointing outside the
+build context, so setuptools_scm fails with <code>LookupError:
+setuptools-scm was unable to detect version for /src</code>.
+<code>demo/Dockerfile</code> documents this and issue #326 tracks it; it
+is recorded here because every local verification of this
+phase had to be done from a throwaway clone instead.</p>
+<h2 id="what-the-first-ci-run-found">What the first CI run found<a class="headerlink" href="#what-the-first-ci-run-found" title="Permanent link">&para;</a></h2>
+<p><strong>16. The runner image has no docker at all</strong>, which is a
+stronger result than finding 5 anticipated. Finding 5 asked
+whether the daemon was usable, new enough, and able to reach an
+index; the probe never got as far as any of those. Its entire
+output on <code>[self-hosted, vm, debian-12, l]</code> was:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ERROR: docker is not installed on this runner
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>=== docker client and daemon ===
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>=== probe-runner cannot continue without docker ===
+</code></pre></div>
+<p>Debian 12 cannot close the gap either, so this is not a matter
+of adding <code>docker.io</code> to the existing apt step. Bookworm ships
+<code>docker.io</code> 20.10.24, below the 23.0 <code>demo/Dockerfile</code> needs
+from the built-in BuildKit frontend, and bookworm has <strong>no</strong>
+<code>docker-compose-v2</code> package at all — its only compose is
+1.29.2, the end-of-life python implementation, which does not
+provide the <code>docker compose</code> subcommand the demo documents.
+Verified against <code>sources.debian.org</code>, not assumed. Resolved by
+decision 9.</p>
+<p>The second run, with decision 9's install step in front of the
+probe, answered all of finding 5 and closed the gate:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>client 29.7.2 / server 29.7.2
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Docker Compose version v5.5.0
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>server version: 29.7.2
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>port 13002: free
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>port 5900: free
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>port 5901: free
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>index reachable from inside a build
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>/dev/vda3       282G  4.1G  266G   2% /
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>=== probe-runner complete: this runner can build and run the demo ===
+</code></pre></div>
+<p>The index check is the one that mattered, and it did the real
+thing: pulled <code>python:3.13-slim</code> from Docker Hub, then
+downloaded <code>kerbside_proxy-0.5.0-py3-none-manylinux_2_28_x86_64.whl</code>
+at 29 MB/s from inside the build. The squid also serves
+<code>download.docker.com</code> — <code>docker-ce</code>, <code>docker-ce-cli</code>,
+<code>containerd.io</code>, <code>docker-buildx-plugin</code> and
+<code>docker-compose-plugin</code> all fetched from <code>bookworm/stable</code> — and
+both proxy paths were configured from the runner's real
+environment (<code>http://cache.home.stillhq.com:3128</code>) rather than
+guessed. All three ports the demo publishes are free on these
+runners, so finding 10's collision is a development-host problem
+only.</p>
+<p><strong>17. The four SC2015 findings in <code>lane-assert.sh</code> were never
+linted locally</strong>, despite step 4d's own definition of done
+recording a clean <code>tox -e shellcheck</code>. That run covered 40
+scripts; CI covered 44. The local run predated the last round of
+edits to <code>lane-assert.sh</code>, so the <code>A &amp;&amp; ok ... || bad ...</code> lines
+it introduced were added after the only check that would have
+caught them. Rewritten as explicit <code>if</code>/<code>else</code>, which is what
+SC2015 asks for and is clearer anyway, since <code>bad</code> running
+because <code>ok</code> failed is a genuine (if unlikely) misreport.</p>
+<p>A second, more durable version of the same trap: the wrapper
+selected files with plain <code>git ls-files</code>, so a newly written and
+not-yet-added script was silently unchecked —
+<code>install-docker.sh</code> was invisible to it on first run. Now
+<code>git ls-files --cached --others --exclude-standard</code>. This cannot
+diverge from the pre-commit hook for a file being committed,
+because pre-commit sees staged files; it only makes the tox
+environment stricter for work in progress. The empty-list guard
+in that script already records an earlier member of this same
+family of bug.</p>
+<p><strong>18. The redaction step ran before log collection, so it could
+not have scrubbed the logs at all</strong> — and a real secret went out
+in the first green run's artifact because of it. Finding 8 aimed
+the redaction at the <code>.vv</code> console token, which it did handle
+(<code>password=REDACTED</code> in both <code>.vv</code> files, confirmed by
+downloading the artifact). What it missed is that MariaDB prints
+the root password it generates for <code>MARIADB_RANDOM_ROOT_PASSWORD</code>
+(<code>demo/docker-compose.yml:17</code>) straight into its own log:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>db-1 | [Note] [Entrypoint]: GENERATED ROOT PASSWORD: &lt;32 chars&gt;
+</code></pre></div>
+<p>Severity is low on its own terms — the database is never
+published outside the compose network, the password is random per
+run, and the container is destroyed with the job — but it was a
+credential in an artifact downloadable by anyone who can read the
+repository, and the step meant to prevent exactly that was
+ordered so that it never could.</p>
+<p>Resolved by <code>tools/demo/redact-artifacts.sh</code>, called <em>after</em> log
+collection. It redacts both secrets and then <strong>fails the step if
+either pattern stopped matching</strong>, because a redaction that
+silently stops working looks identical to one that worked. It
+prints offending filenames only, never the matching line, since
+the workflow log is as public as the artifact. Verified both ways
+against the real leaked artifact from the green run: it scrubs
+the live token and the database password, and it exits 1 naming
+the file when a token is planted somewhere the patterns do not
+reach.</p>
+<h2 id="what-review-found">What review found<a class="headerlink" href="#what-review-found" title="Permanent link">&para;</a></h2>
+<p>The automated reviewer raised twelve items on pull request #336.
+Three were real defects in this phase's own work, and two of
+them are the same failure mode findings 13 and 14 already record
+— an assertion reporting the wrong thing — which is worth saying
+plainly rather than filing as three unrelated fixes.</p>
+<p><strong>19. <code>set -e</code> made the bounded-failure assertion dead code.</strong>
+<code>lane-assert.sh</code> ran <code>timeout ... ryll ...</code> as a bare command
+followed by <code>RC=$?</code>. Under <code>set -euo pipefail</code> a non-zero exit
+terminates the script <em>before</em> <code>RC</code> is ever assigned. Verified
+directly: a script doing <code>timeout 1 sleep 5; RC=$?</code> exits 124
+without reaching the next line.</p>
+<p>The consequences were worse than a missed assertion. Exit 124 is
+precisely the hang this group exists to catch, so the <code>bad "a
+session hung..."</code> branch could never run; and everything after
+it — the proxy's own failure log line, and the whole of
+assertion 4 — was silently skipped, while the summary still
+reported however many assertions had passed. The lane reported 8
+passing because ryll happens to exit 0 on this path today, which
+is an accident of ryll's behaviour and not a property the script
+established. Fixed with <code>|| RC=$?</code>.</p>
+<p><strong>20. The "session crossed the TLS port" assertion was a
+tautology.</strong> It grepped the proxy log for <code>secure SPICE listener
+bound</code>, which <code>rust/kerbside-proxy/src/listen.rs</code> emits once at
+<em>bind</em> time; its <code>insecure SPICE listener bound</code> sibling fires
+identically for the plaintext port. So the check passed whenever
+the proxy had merely started, including runs where the client
+never connected — and it sat outside the branch that establishes
+a session, so it passed when ryll never came up at all.
+Confirmed against the real artifact from the green run: both
+lines appear at startup, twice, because the daemon restarted the
+proxy.</p>
+<p>This mattered more than an ordinary weak assertion, because the
+silent-plaintext-fallback failure is the one thing the entire
+demo is arranged to make visible, and the <code>PASS:</code> line read as
+coverage of exactly that.</p>
+<p>Replaced with a real per-session oracle. Both ports are
+published on loopback, so the honest question is what the host's
+socket table says while the session is live: zero established
+sockets on the plaintext port is the property under test, a
+non-zero count on the TLS port is the corroborating positive,
+and both port numbers come from the <code>.vv</code> itself rather than
+being hardcoded. A separate assertion now checks a genuinely
+per-connection log line (<code>hypervisor connection successful</code>,
+which carries a <code>session_id</code>), and the old check is gone rather
+than renamed.</p>
+<p><strong>21. <code>install-docker.sh</code>'s idempotence short-circuit skipped
+the configuration it exists to apply.</strong> The early <code>exit 0</code> on an
+already-usable docker also skipped the systemd drop-in and
+<code>~/.docker/config.json</code> — the two things an improved runner
+image would <em>not</em> bring with it. So the lane would have broken
+on the day the runner image grew docker, which is the day this
+script was supposed to become harmless. It failed safe rather
+than silently, but the diagnosis would have pointed at the
+probe. Now only the apt install is gated, and the daemon restart
+is guarded on the drop-in changing so the unconditional path is
+not gratuitously bouncing the daemon.</p>
+<p>The rest were accepted as written, and are worth recording
+because two of them are latent versions of bugs this plan
+already documents:</p>
+<ul>
+<li><strong>The redaction covered only <code>*.vv</code>.</strong> Widened to every file
+  under the artifact directory before the residual check, so a
+  token reaching a <code>.log</code> is now <em>fixed</em> rather than merely
+  reported. Retested against the leaked artifact with a token
+  planted in <code>logs/kerbside.log</code>.</li>
+<li><strong>The port-collision check could not name a holder.</strong>
+  <code>ss -tlnp</code> only fills the process column for the caller's own
+  sockets, so for the collision the comment names — a system VNC
+  service on 5900 — it added nothing over the daemon's error.
+  This is not hypothetical: it is exactly what happened on the
+  development host, where the 5900 holder could not be
+  identified. Now <code>sudo -n ss</code> with an unprivileged fallback.
+  Worse, <code>netstat</code> is absent from a Debian 12 base, so the
+  fallback branch reported every port free when neither tool
+  existed; that now warns explicitly.</li>
+<li><strong>The shebang regex anchored on end-of-line</strong>, so
+  <code>#!/bin/sh -e</code> and <code>#!/bin/bash -eu</code> were not selected. No such
+  file exists in the tree today, which makes this the third
+  member of finding 17's family: a selection bug that reads as
+  coverage. Now <code>\b(sh|bash|dash|ksh)\b</code>, verified to accept the
+  argument-carrying forms and still reject <code>#!/usr/bin/python3</code>.</li>
+<li><strong>Two <code>docker compose</code> calls discarded both streams under
+  <code>set -e</code></strong>, and nothing asserted <code>spice-target</code> came back after
+  the restart, so a half-dead backend would have been reported as
+  a mint-guard failure — finding 14's wrong-attribution shape
+  again. Both routed through <code>bad</code>, with a wait-and-assert after
+  the restart.</li>
+<li><strong>The runner-size comment implied a cargo-free lane.</strong> It is
+  not: ryll is a cargo release build. The comment now says so and
+  carries the measured timings, which also answer the reviewer's
+  caching suggestion — at 4.5 minutes end to end there is nothing
+  to optimise.</li>
+<li><strong>The default PyPI build path is tested by nothing.</strong> Already
+  decision 4 and already Future work; the gap is now
+  cross-referenced from <code>demo/docker-compose.yml</code> at the point
+  someone would change the glue that breaks it.</li>
+<li><code>demo-probe.yml</code> being a TEMPORARY workflow merging to develop
+  was raised, and the reviewer's preferred resolution — delete it
+  in this pull request, since <code>demo-compose.yml</code> runs the probe as
+  its second step — is what had already been done.</li>
+</ul>
+<h3 id="what-testing-the-review-fixes-then-found">What testing the review fixes then found<a class="headerlink" href="#what-testing-the-review-fixes-then-found" title="Permanent link">&para;</a></h3>
+<p>Running the rewritten script locally, in both directions, turned
+up three more of the same family. That is the argument for
+actually running it rather than reasoning about it.</p>
+<p><strong>22. <code>set -o pipefail</code> killed the diagnostic block, in exactly
+the case it exists for.</strong> <code>PROXY_REASON="$(docker compose logs
+... | grep -E ... | tail -3)"</code> looks safe because <code>tail</code> succeeds,
+but under <code>pipefail</code> a <code>grep</code> that matches nothing makes the
+pipeline exit 1, the assignment fails, and <code>set -e</code> ends the
+script. So when the proxy had <strong>no</strong> matching reason to report,
+the block died instead of falling through to print the ryll log —
+losing the only evidence available precisely when the proxy had
+none to offer. Found because a local run hit it. Fixed with
+<code>|| true</code>, and the same trap is now called out in a comment on
+<code>count_proxy_log</code>.</p>
+<p><strong>23. Two assertions counted the proxy log's whole history, so
+they could pass on an earlier session's lines.</strong> <code>docker compose
+logs</code> returns everything the container has ever printed. A
+re-run against a stack that had already served a session
+reported <code>PASS: the proxy relayed 8 channel(s)</code> while that run
+established no session at all. A single-run CI lane against a
+fresh stack hides this completely, which is what makes it worth
+recording: the assertion was sound only by accident of the
+harness. Both are now before/after deltas, and the healthy run
+correctly reports 4 channels — main, display, cursor, inputs —
+rather than a cumulative 8.</p>
+<p><strong>24. A long <code>WORKDIR</code> makes ryll's control socket unbindable,
+and the script blamed the session for it.</strong> Unix socket paths cap
+at about 108 bytes. A scratch-directory override pushed
+<code>ryll-demo.sock</code> to 127, the bind failed, and <code>lane-assert.sh</code>
+reported <code>ryll never created its control socket</code> for a session
+whose log showed a complete SPICE handshake with display updates
+and ping/pong traffic. CI's default path is short so this cannot
+bite there, but it cost a debugging cycle here and would cost the
+next person one too. There is now an explicit length check that
+fails early and names the real cause.</p>
+<p>Evidence from the local runs, which is what these fixes are worth
+rather than the reasoning behind them:</p>
+<ul>
+<li>healthy: 11 assertions pass, and the port oracle reports
+  <code>established sockets: 5900=12, 5901=0</code> — the same 12-on-TLS,
+  0-on-plaintext split phase 3 measured by hand with
+  <code>remote-viewer</code>.</li>
+<li>the oracle is not blind: holding one plaintext connection open
+  on 5901 takes the count to 3, so the assertion fails.</li>
+<li>the previously-dead hang branch fires:
+  <code>FAIL: a session hung for 1s with the backend stopped</code> — and
+  the script now <strong>runs to completion and prints a verdict</strong>
+  instead of dying at exit 124 with no output.</li>
+<li>the delta assertions fail honestly on a run with no session,
+  where the absolute counts had passed.</li>
+<li>the socket-length guard fails early with the real cause, and a
+  short <code>WORKDIR</code> still passes.</li>
+<li>teardown leaves ports 13002/5900/5901 free and <code>sources.yaml</code>
+  restored by the EXIT trap.</li>
+</ul>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<p><strong>1. Advisory, path-filtered — not a required check.</strong> Carried
+forward from the draft, and confirmed: <code>docs/testing.md:73</code>
+establishes the precedent with <code>rust.yml</code>, and the five
+required checks are gate jobs whose names are bound to the
+develop ruleset that <code>tools/check-required-checks.sh</code> validates
+against. Renaming or adding one blocks every merge in the
+repository. Not worth it for a demo path.</p>
+<p>Path filter:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>paths:
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  - 'demo/**'
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  - 'kerbside/migrations/**'
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  - 'pyproject.toml'
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  - 'docs/installation.md'
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  - 'tools/demo/**'
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  - '.github/workflows/demo-compose.yml'
+</code></pre></div>
+<p><code>docs/installation.md</code> is deliberately included: the document
+and the thing it documents should not be able to drift without
+the lane running. <code>kerbside/migrations/**</code> and <code>pyproject.toml</code>
+are there because phase 1's packaging is the part most likely
+to break silently — and finding 4 adds a second reason, since
+<code>pyproject.toml</code> is where the proxy floor lives.</p>
+<p><strong>2. Probe the runner before writing the lane.</strong> Step 4a is a
+throwaway workflow that answers finding 5's three questions and
+nothing else. It is the cheapest possible way to learn whether
+this phase's shape is even viable, and the alternative is
+discovering it from a red lane whose failure could be any of a
+dozen things. If the probe says the runners cannot build
+containers or cannot reach an index from inside a build, <strong>stop
+and re-plan</strong> — do not work around it in the lane.</p>
+<p><strong>3. Do not build the Rust proxy in the lane.</strong> Per finding 4,
+<code>pip</code> resolves a develop-tracking dev wheel on its own. This
+drops a cold <code>cargo build --release</code> from every run.</p>
+<p>The residual case is a pull request that changes
+<code>kerbside/rpc/kerbside.proto</code> <em>and</em> one of this lane's filtered
+paths, before <code>dev-proxy-wheel.yml</code> has published a wheel for
+the new proto. Then the checkout daemon and the PyPI dev wheel
+disagree, and <code>proxy_supervisor.check_contract()</code> refuses to
+launch — <code>get_binary_contract_hash()</code> treats a mismatch and an
+unanswerable <code>--contract-hash</code> alike, so this fails at startup
+rather than subtly. The lane will go red for a reason that is
+not the demo's fault.</p>
+<p>That is an acceptable trade and should be <em>documented in the
+workflow comment</em> rather than engineered around: the failure is
+loud, correctly diagnosed by the daemon's own error, and the
+fix is to let the dev wheel publish. Building the proxy in the
+lane to avoid it would cost several minutes on every unrelated
+run. If it turns out to bite in practice, the fallback is
+already written and tested — one step calling
+<code>tools/direct-qemu/install-proxy-wheel.sh --venv</code>, exactly as
+<code>direct-qemu-functional.yml:157-161</code> does.</p>
+<p><strong>4. Test <code>KERBSIDE_SOURCE=/src</code>, not the PyPI default.</strong>
+Carried forward. A lane exercising the default would test the
+last release rather than the pull request. Worth restating that
+the default genuinely is PyPI again as of <code>72c5aca</code> — phase 3
+had temporarily reversed it — so this is now a real divergence
+between what the lane builds and what a user builds, and the
+workflow comment should say so and say why.</p>
+<p><strong>5. shellcheck goes in <code>tox -e shellcheck</code>, called from
+<code>sanity_checks</code> — not in this lane.</strong> This reverses the
+draft's stated preference, and it is the decision most likely
+to be argued with.</p>
+<p>The draft preferred adding a shellcheck step to the new lane on
+the grounds that <code>sanity_checks</code> is a gate job feeding a
+required check. But this lane is path-filtered to <code>demo/**</code> and
+friends, so a change to <code>tools/</code> — 40-odd scripts, the majority
+of the shell in the repository — would not trigger it. That
+gives the <em>appearance</em> of CI shellcheck coverage while leaving
+most of the actual shell unchecked, which is worse than the
+status quo because it is misleading.</p>
+<p><code>sanity_checks</code> is the right home, and the caution about it
+does not apply: <code>.claude/CLAUDE.md</code> warns against <strong>renaming</strong>
+gate jobs, because the ruleset binds their display names.
+Adding a step inside <code>sanity_checks</code> renames nothing. And the
+path filter reaches: <code>check_paths</code>' <code>code</code> filter
+(<code>functional-tests.yml:81-88</code>) is <code>'**'</code> minus review marks and
+<code>docs/**</code>, so <code>demo/**</code> and <code>tools/**</code> both count as code and
+<code>sanity_checks</code> runs for them.</p>
+<p>Match the pre-commit hook's scope exactly (<code>^(tools|demo)/</code>,
+<code>-x</code>, <code>types_or: [sh, bash, shell]</code>) so the two cannot disagree
+about what passes.</p>
+<p><strong>6. Copy <code>functional-tests.yml:629</code> for ryll, not
+<code>direct-qemu-functional.yml:143</code>.</strong> Per finding 2. This lane
+asserts that a SPICE session is established, not what it
+renders, so <code>--no-default-features -p ryll</code> without
+<code>digest-decode</code> is correct and cheaper.</p>
+<p><strong>7. Runner size <code>l</code>, and never an unsized <code>vm</code> label.</strong> A qemu
+TCG guest, a MariaDB, a container build and a ryll build on one
+runner. <code>rust.yml:36-38</code> records that an unsized <code>vm</code> label
+defaults to <code>xs</code> (1 core / 2 GB) in private-ci, which will not
+do. <code>l</code> rather than <code>rust.yml</code>'s <code>xl</code> because decision 3
+removes the cargo release build that justifies <code>xl</code>; the probe
+in step 4a should report timings so 4b can revisit this with
+evidence rather than guesswork.</p>
+<p><strong>8. <code>no_proxy: 127.0.0.1,localhost</code> at job level, and a
+concurrency group.</strong> Per <code>direct-qemu-functional.yml:88-92</code>
+and <code>:30-32</code>. Loopback traffic to the published demo ports must
+bypass the squid or it returns 503 <code>ERR_CONNECT_FAIL</code>. This has
+bitten two lanes already; assume it bites here.</p>
+<p><strong>9. Install docker in the lane, from Docker's own apt
+repository, rather than waiting on the runner image.</strong> Forced by
+finding 16, and chosen over the two alternatives:</p>
+<ul>
+<li><em>baking it into the private-ci debian-12 image</em> would keep the
+  lane shorter and would benefit any future container lane, but
+  it is outside this repository, so the phase would block on an
+  image change, and the lane's dependency on it would be
+  invisible to anyone reading the workflow;</li>
+<li><em>pointing at some other runner label</em> was not available:
+  nothing in <code>.github/workflows/</code> uses docker, so no label is
+  known to have it, and <code>gh api .../actions/runners</code> returns
+  nothing at this permission level.</li>
+</ul>
+<p>Installing in the lane keeps the phase self-contained and
+reviewable in one pull request, and it exercises the same
+install path <code>demo/README.md</code> gives a human — which it did not
+when this was written; the README stated the requirement and no
+install path, so it now names Docker's repository and the
+bookworm trap explicitly.</p>
+<p>Measured cost is <strong>12 seconds</strong>, not the "about a minute" first
+claimed here, out of a 4.5 minute lane.
+<code>tools/demo/install-docker.sh</code> skips the apt install when the
+server is already 23.0+ with the compose plugin, so if the runner
+image ever grows one that cost disappears with nobody having to
+remember to remove the step. Only the <em>install</em> is skipped: the
+proxy configuration and the socket permission run every time,
+because they are the parts a better image would not bring with
+it, and the daemon restart is guarded on the drop-in's content
+actually changing.</p>
+<p>The script also configures two proxy paths that the runner's own
+environment does not cover, because neither is inherited: a
+systemd drop-in, without which the daemon cannot pull a base
+image through the squid, and <code>~/.docker/config.json</code> <code>proxies</code>,
+without which a build cannot reach PyPI. Both are conditional on
+<code>http_proxy</code> being set, both are printed, and <code>probe-runner.sh</code>
+still tests reachability independently rather than assuming the
+configuration worked — so if a runner turns out to have direct
+egress, the evidence to delete that block will be in the probe
+output.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12127,43 +12470,262 @@ than after a multi-minute image build and stack start.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Write <code>tools/demo/lane-up.sh</code> and <code>tools/demo/lane-assert.sh</code>, modelled on <code>tools/direct-qemu/lane-up.sh</code> in structure and comment style. <code>lane-up.sh</code> builds the image with <code>KERBSIDE_SOURCE=/src</code> plus the prebuilt proxy wheel, brings the stack up with <code>--wait</code>, and fails with the relevant <code>docker compose logs</code> on timeout. <code>lane-assert.sh</code> runs <code>demo/get-console.sh</code>, asserts the three <code>.vv</code> fields from step 5 above, drives ryll against the TLS port asserting the main channel opens, then performs both negative cases from step 7 (backend stopped, and <code>kerbside demo token</code> refusing a non-static source list), restoring <code>demo/sources.yaml</code> on exit via a trap so a failure mid-assertion does not leave the working tree dirty. Read <code>tools/direct-qemu/smoke-client.py</code> and reuse its assertion approach rather than writing a new SPICE client driver.</td>
+<td><strong>Probe first; this step decides whether the rest of the phase is viable.</strong> Write <code>tools/demo/probe-runner.sh</code>, modelled closely on <code>tools/direct-qemu/probe-runner.sh</code> (read it — same output style, same "print diagnostics, exit non-zero only on a hard blocker" contract). It must report: <code>docker version</code> client and server, whether the daemon is reachable as the runner user, whether the server is 23.0+ (<code>demo/Dockerfile</code> requires it by name for <code>RUN --mount=type=bind</code>), <code>docker compose version</code>, whether TCP 5900/5901/13002 are already bound on 127.0.0.1 (finding 10 — the Docker daemon's own bind error does not name the holder, so this must), and whether a throwaway <code>docker build</code> that runs <code>pip download --no-deps kerbside-proxy</code> can reach an index from <em>inside</em> the build (finding 5 — the build inherits neither the runner's <code>http_proxy</code> nor <code>PIP_INDEX_URL</code>). Exit non-zero for a missing or too-old daemon, or no index reachability; print-and-continue for a bound port. Then add a temporary <code>.github/workflows/demo-probe.yml</code>, <code>workflow_dispatch</code> only, <code>runs-on: [self-hosted, vm, debian-12, l]</code>, that checks out and runs it. Run it, report the output verbatim, and <strong>stop for review before step 4b</strong> — the back brief gates here. Delete the temporary workflow in 4b, keeping the script.</td>
 </tr>
 <tr>
 <td>4b</td>
-<td>medium</td>
+<td>high</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Write <code>.github/workflows/demo-compose.yml</code> per "Runner and shape" and "Steps". Copy the proxy-wheel build steps and the ryll build steps from <code>direct-qemu-functional.yml</code> rather than paraphrasing them — they encode runner-specific workarounds. Include the <code>check_paths</code> review-only filter job only if the lane is cheap enough to care; since this lane is advisory and path-filtered to a narrow set, the filter is unnecessary and its absence should be noted in a comment. Add the <code>if: always()</code> artifact step with the <code>.vv</code> password line redacted.</td>
+<td>Write <code>.github/workflows/demo-compose.yml</code> per the Decisions above. High effort rather than medium because the runner facts from 4a have to be read and applied rather than followed from a recipe. Advisory, path-filtered per decision 1; <code>fetch-depth: 0</code> (finding 9); <code>no_proxy</code> and concurrency per decision 8; <code>runs-on</code> per decision 7. <strong>No cargo step</strong> (decision 3) — and put decision 3's residual-case reasoning in a comment, so the next person to see a contract-hash failure knows it is expected and why. Steps: probe, then <code>docker compose config</code> and <code>docker compose build</code> as a fast schema and Dockerfile check ahead of anything slow, then <code>tools/demo/lane-up.sh</code>, then <code>tools/demo/lane-assert.sh</code>. Finish with an <code>if: always()</code> artifact upload of <code>docker compose logs</code> for all three services, the ryll output, and the <code>.vv</code> <strong>with the <code>password=</code> line redacted</strong> (finding 8: <code>kerbside/api.py:374</code> puts a live console token there, and CI artifacts are downloadable). Delete <code>.github/workflows/demo-probe.yml</code>. Keep workflow steps short — anything beyond a few lines belongs in <code>tools/demo/</code>.</td>
 </tr>
 <tr>
 <td>4c</td>
-<td>low</td>
-<td>haiku</td>
+<td>high</td>
+<td>sonnet</td>
 <td>none</td>
-<td>Add the lane to <code>docs/testing.md</code>'s workflow table (see line 34 for the <code>rust.yml</code> advisory row as the model) and to the "Neither tier" list in <code>.claude/CLAUDE.md</code>'s CI Workflows section. One row and one bullet; do not restructure either document.</td>
+<td>Write <code>tools/demo/lane-up.sh</code> and <code>tools/demo/lane-assert.sh</code>, modelled on <code>tools/direct-qemu/lane-up.sh</code> in structure and comment style. <code>lane-up.sh</code>: build with <code>KERBSIDE_SOURCE=/src</code>, <code>docker compose up -d --wait</code>, and on failure print <code>docker compose logs</code> for the service that is not healthy rather than a bare timeout. <code>lane-assert.sh</code>: run <code>demo/get-console.sh</code>; assert the <code>.vv</code> carries <code>tls-port=</code>, <code>host-subject=</code> and a <code>ca=</code> field holding an escaped PEM; drive ryll headless against the TLS port and assert the link handshake completes and the main channel opens (read <code>tools/direct-qemu/smoke-client.py</code> and reuse its assertion approach — do not write a new SPICE client driver); then both negative cases — <code>docker compose stop spice-target</code> must make a fresh console request fail in bounded time rather than hang, and appending a dummy <code>type: ovirt</code> entry to <code>demo/sources.yaml</code> must make <code>kerbside demo token</code> refuse and name the offending source. Restore <code>demo/sources.yaml</code> from an EXIT trap so a mid-assertion failure does not leave the tree dirty. Note that <code>demo/get-console.sh</code> already proves the TLS leg internally — it verifies the presented certificate against the CA embedded in the <code>.vv</code> — so do not reimplement that; assert the fields and let ryll cover the SPICE handshake.</td>
 </tr>
 <tr>
 <td>4d</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Prove the lane fails when it should, which is the only evidence that matters for a new lane. On a scratch branch, break the demo three ways in sequence and confirm the lane goes red each time for the right reason: (i) point <code>demo/sources.yaml</code> at the wrong <code>insecure_port</code>; (ii) set <code>PROXY_HOST_SUBJECT</code> to a mismatched string, which must fail the TLS assertion rather than silently falling back; (iii) revert phase 1's packaging so <code>kerbside db upgrade</code> cannot find its migrations. Report the three failure messages. Do not merge the scratch branch.</td>
+<td>Add shellcheck to CI per decision 5. New <code>[testenv:shellcheck]</code> in <code>tox.ini</code> mirroring the pre-commit hook's scope exactly — <code>^(tools|demo)/</code>, <code>-x</code>, shell files only — so the two cannot disagree; read <code>.pre-commit-config.yaml:21-27</code> for the authoritative settings. Call it from <code>sanity_checks</code> in <code>functional-tests.yml</code> (the job starts at line 94) as a step alongside the existing flake8 invocation. Do not rename any job. Demonstrate it fails: introduce a deliberate shellcheck violation in a <code>demo/</code> script, show the failure, revert it.</td>
+</tr>
+<tr>
+<td>4e</td>
+<td>low</td>
+<td>haiku</td>
+<td>none</td>
+<td>Register the lane. One row in <code>docs/testing.md</code>'s workflow table (model it on the <code>rust.yml</code> advisory row at line 73) and one bullet in the "Neither tier" list in <code>.claude/CLAUDE.md</code>'s CI Workflows section. Do not restructure either document.</td>
+</tr>
+<tr>
+<td>4f</td>
+<td>high</td>
+<td>sonnet</td>
+<td>worktree</td>
+<td>Prove the lane fails when it should — the only evidence that matters for a new lane. On a scratch branch, break the demo four ways in sequence and confirm the lane goes red each time <em>for the right reason</em>, capturing the message: (i) point <code>demo/sources.yaml</code> at a wrong <code>insecure_port</code>; (ii) set <code>KERBSIDE_PROXY_HOST_SUBJECT</code> to a mismatched string, which must fail the TLS assertion rather than silently falling back to plaintext; (iii) revert phase 1's packaging so <code>kerbside db upgrade</code> cannot find its migrations; (iv) break the compose schema, which must fail at <code>docker compose config</code> in seconds rather than after a full image build. Worktree isolation because this step deliberately breaks the tree. Report the four messages. Do not merge the scratch branch.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
-<ul>
-<li>The lane is green on a pull request touching <code>demo/</code>.</li>
-<li>The lane is red, with a comprehensible message, for each
-  of the three deliberate breakages in 4d.</li>
-<li>The lane does not run on unrelated changes.</li>
-<li>No change to the develop ruleset and no new required
-  check.</li>
-<li><code>docs/testing.md</code> and <code>.claude/CLAUDE.md</code> list the lane.</li>
-<li>Artifacts are uploaded on failure and contain no live
-  console token.</li>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<p><strong>The runners cannot build containers, or a build cannot reach
+a package index.</strong> The likeliest failure, and the whole reason
+for step 4a. Mitigation: the probe answers it before any lane
+is written, and decision 2 says to stop and re-plan rather than
+work around it. Checked by the management session reading 4a's
+verbatim output, not a summary of it.</p>
+<p><strong>The lane goes red for a proto/dev-wheel skew rather than a
+demo fault.</strong> Accepted per decision 3. Mitigation: the workflow
+comment must explain the failure mode, and the daemon's own
+refusal message already names the cause. If it recurs, the
+fallback step is specified in decision 3 and needs no new
+design.</p>
+<p><strong>Something on a runner holds 5900.</strong> Finding 10. Mitigation:
+the probe reports bound ports by name so the diagnosis is not
+the Docker daemon's uninformative bind error. Fixing the port
+choice is explicitly out of scope; if the probe shows a
+collision, that becomes a phase 3 follow-up with its own
+documentation consequences.</p>
+<p><strong>The lane is slow enough that people stop reading it.</strong> A
+container build plus a stack start plus ryll. Mitigation:
+decision 3 removes the cargo build; 4b puts <code>docker compose
+config</code> first so schema errors fail in seconds; the path filter
+keeps it off unrelated pull requests. 4a reports timings so
+decision 7's runner size can be revisited with evidence.</p>
+<p><strong>shellcheck in <code>sanity_checks</code> slows a gate job.</strong> It is a
+lint pass over some fifty small files; seconds. Mitigation: if
+4d finds otherwise, move it to its own job rather than
+weakening the scope, and say so.</p>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Falsifiable, each checkable by running something. Outcome
+recorded after each.</p>
+<p>Everything that can be verified without a CI runner was
+verified against a real stack, from a throwaway clone (a
+<code>git worktree</code> cannot build <code>KERBSIDE_SOURCE=/src</code> — <code>.git</code> is
+a file there, and setuptools_scm fails with
+<code>LookupError: setuptools-scm was unable to detect version for
+/src</code>, exactly as <code>demo/Dockerfile</code> warns). ryll was built in
+Docker, <code>--no-default-features</code> and no <code>digest-decode</code>, to keep
+the host's Rust toolchains untouched.</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/demo/lane-up.sh</code> brings the stack to healthy
+      against the checkout, with <strong>no cargo step</strong>. Verified,
+      and it confirms decision 3 directly: the image installs
+      <code>kerbside 0.5.1.dev4+g7e1f2fc</code> from the checkout and
+      <code>kerbside-proxy 0.5.1.dev1</code> from PyPI, so the daemon and
+      the binary both track develop with nothing built locally.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/demo/lane-assert.sh</code> passes all 11 assertions: the
+      three <code>.vv</code> fields; a ryll SPICE session, zero established
+      sockets on the plaintext port, at least one on the TLS
+      port, and a per-connection relay log line; a bounded
+      backend failure (8s, matching phase 3's ~9s by hand) and
+      the proxy logging that failure; <code>spice-target</code> returning
+      after the restart; and the mint guard refusing and naming
+      the offending source. Was 8 before review — findings 19,
+      20 and the item-9 fixes replaced a tautology with three
+      real checks and added the post-restart one.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>smoke-client.py</code> works against a ryll built without
+      <code>digest-decode</code> — it uses only <code>hello</code>, <code>status</code> and
+      <code>screenshot</code>, no digest verbs. Confirmed by reading it
+      and then by running it.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The lane is red, with a message naming the actual cause,
+      for each of 4f's four deliberate breakages:<ul>
+<li>wrong <code>insecure_port</code>: <code>ryll never created its control
+    socket</code>, plus the proxy's own reason —
+    <code>hypervisor connection failed ... error=Connection
+    refused (os error 111)</code>.</li>
+<li>mismatched host subject: <code>the certificate subject is
+    {'C': 'US', 'O': 'Kerbside CI', 'CN': 'kerbside-ci'},
+    but the .vv says to expect 'C=US,O=Wrong
+    Org,CN=wrong-cn'</code> — and it did not fall back to
+    plaintext.</li>
+<li>migrations hidden from the build: <code>Database upgrade
+    failed: Path doesn't exist:
+    /usr/local/lib/python3.13/site-packages/kerbside/migrations</code>.</li>
+<li>broken compose schema: <code>ERROR:
+    demo/docker-compose.yml is not valid</code>, in seconds,
+    before any image build.</li>
 </ul>
+</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tox -e shellcheck</code> passes on a clean tree — 45 scripts
+      in 1.3s — and was demonstrated to fail (<code>FAIL code 1</code>) on
+      a real violation in <code>demo/demo-env.sh</code>. Worth recording
+      how the first attempt at that demonstration went: a
+      deliberate <code>echo $foo</code> after <code>foo="bar"</code> did <strong>not</strong>
+      fail, because shellcheck suppresses SC2086 for provably
+      safe literals. The tool was right and the test was
+      wrong; the violation used is an unquoted command
+      substitution.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tox -e shellcheck</code>'s scope matches the
+      <code>.pre-commit-config.yaml</code> hook: <code>tools/</code> and <code>demo/</code>,
+      shell only, <code>-x</code>. Selection is by extension <strong>or</strong>
+      shebang, because <code>demo/kerbside-demo-env</code> and
+      <code>tools/run-tempest-tests</code> are shell without a <code>.sh</code>
+      suffix and an extension-only match would skip them
+      silently. Selection also includes untracked-but-not-ignored
+      files, per finding 17, so a script written and not yet
+      added is still checked.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The lane installs its own docker (decision 9), the script
+      is idempotent against an already-usable daemon, and the
+      <code>~/.docker/config.json</code> merge was tested to preserve a
+      pre-existing <code>auths</code> block rather than overwrite it.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No change to any gate job name; only a step added inside
+      <code>sanity_checks</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/testing.md</code> and <code>.claude/CLAUDE.md</code> both list the
+      lane.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No cargo or Rust step in the workflow, and the residual
+      contract-skew case is explained in a comment.</li>
+</ul>
+<p>These needed a push and a pull request, and are now settled by
+runs on pull request #336:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/demo/probe-runner.sh</code> runs on a private-CI runner
+      and its output is recorded here, including the Docker
+      server version and whether a build reached an index.
+      Locally it also correctly reported the real 5900 collision
+      on the development host. Both runs are recorded as finding
+      16: the first stopped at a missing daemon, the second
+      answered everything.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/demo/install-docker.sh</code> succeeds on a private-CI
+      runner — which is also the only test that the squid in
+      front of these runners permits <code>download.docker.com</code>. It
+      does. Locally only the idempotence path is exercisable,
+      and it is: the script exits 0 without touching a host that
+      already has docker.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>.github/workflows/demo-probe.yml</code> deleted, its output
+      recorded in finding 16 first.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The lane is green on a pull request touching <code>demo/</code>. All
+      13 steps ran — none skipped — in 4.5 minutes end to end.
+      The first such run is <em>not</em> what this tick rests on: per
+      findings 19 and 20, one of its eight assertions was a
+      tautology and two more were reached only because ryll
+      happened to exit 0. It rests on the run after the review
+      fixes, where all 11 rewritten assertions passed.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The <code>/src</code> build pairs a checkout daemon with a PyPI dev
+      proxy wheel, with no cargo build of the proxy, exactly as
+      decision 3 argued: <code>kerbside 0.5.1.dev3+gdfd1719.d20260817</code>
+      with <code>kerbside-proxy 0.5.1.dev1</code>. (ryll is still built from
+      source; the lane is not cargo-free.)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A real artifact inspected for a live console token:
+      <code>password=REDACTED</code> in both <code>.vv</code> files. That inspection
+      is what turned up finding 18 — the database password the
+      same artifact <em>did</em> leak — so this item is ticked on the
+      strength of having actually downloaded and grepped the
+      artifact rather than trusting the step.</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/check-required-checks.sh</code> passes against the live
+      ruleset — it runs as the "Verify required-check names
+      against the exported ruleset" step inside <code>sanity_checks</code>,
+      which is green.</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The redaction fix in finding 18 confirmed on a real run:
+      <code>redacted a generated database password in
+      /tmp/kerbside-demo-lane/logs/db.log</code>, then <code>no secrets
+      remain</code>. Confirmed by <strong>downloading that run's artifact and
+      grepping it</strong>, rather than by trusting the step's own
+      output: no unredacted <code>^password=</code> line and no unredacted
+      <code>GENERATED ROOT PASSWORD</code> anywhere in it.</p>
+</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A green run of the <strong>rewritten</strong> assertions (findings 19,
+      20, 22, 23 and the review's item 9). All 11 pass on a
+      runner, and the flakiness risk in the port oracle did not
+      materialise: CI reports <code>established sockets: 5900=12,
+      5901=0</code>, byte-identical to the local run and to the split
+      phase 3 measured by hand with <code>remote-viewer</code>. The relay
+      delta reports 4 channels rather than a cumulative count,
+      confirming finding 23's fix against a fresh stack.</li>
+</ul>
+<p>Still outstanding, and deliberately left for phase 5:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The lane does not run on a pull request touching only
+      <code>docs/</code> outside <code>installation.md</code> — demonstrated, not
+      assumed. This needs a docs-only pull request, which this
+      phase has no reason to raise on its own. Phase 5 edits
+      <code>docs/installation.md</code>, which is <em>in</em> the filter, so it is
+      the natural place to demonstrate both directions: that lane
+      fires for that page, and does not fire for a <code>docs/</code> change
+      outside it.</li>
+</ul>
+<h2 id="registration">Registration<a class="headerlink" href="#registration" title="Permanent link">&para;</a></h2>
+<p>Recorded in the master plan's Execution table and in
+<code>docs/plans/index.md</code>. <code>docs/plans/order.yml</code> is for master
+plans only and is not touched — and this repository has no
+<code>order.yml</code> at all, which the phase 3 plan also recorded.</p>
+<h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>A periodic check of the PyPI default build.</strong> Decision 4
+  keeps it out of the per-PR lane. A nightly is the natural
+  home, and it would have caught nothing so far, but it is the
+  only thing that would notice the released package breaking
+  the demo.</li>
+<li><strong>Move the demo off port 5900</strong> (finding 10), or make the
+  ports configurable. Needs a phase 3 file change and a
+  documentation pass.</li>
+<li><strong>Publish a demo image</strong>, so <code>compose up</code> does not build.
+  Carried over from phase 3; still a release-process and
+  image-signing question.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p><strong>Gate at the end of step 4a.</strong> The probe output decides
+whether this phase's shape survives. Do not start 4b until the
+management session has read 4a's verbatim output and confirmed
+the runners can build containers and reach a package index from
+inside a build. This is cheap to check and expensive to
+discover later.</p>
+<p>Before implementation begins, the implementing session should
+be able to state:</p>
+<ol>
+<li>Why there is no cargo step, and what happens if a pull
+   request changes the proto and <code>demo/</code> together.</li>
+<li>Why shellcheck goes in <code>sanity_checks</code> rather than in this
+   lane, and why that does not touch a gate job's name.</li>
+<li>Which file to copy the ryll build from, and why it is not
+   the direct-qemu lane.</li>
+<li>Why the lane needs <code>fetch-depth: 0</code>.</li>
+</ol>
 
 
 
