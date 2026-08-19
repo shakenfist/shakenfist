@@ -129,9 +129,12 @@ class Monitor(daemon.Daemon):
         # Cleanup floating IP reservations which refer to deleted objects
         fn = network.floating_network()
         if fn:
+            # One read for the whole table rather than one per address
+            # (issue 3655); this sweep runs every 60 seconds.
+            reservations = fn.ipam.get_all_reservations()
             for addr in fn.ipam.in_use:
                 self.pet_watchdog()
-                reservation = fn.ipam.get_reservation(addr)
+                reservation = reservations.get(addr)
                 if not reservation:
                     continue
                 if reservation.reservation_type not in [ReservationType.GATEWAY,

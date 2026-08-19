@@ -49,6 +49,9 @@ class FakeIPAM:
     def get_reservation(self, address):
         return self.reservations.get(address)
 
+    def get_all_reservations(self):
+        return dict(self.reservations)
+
     def get_allocation_age(self, address):
         return 0
 
@@ -56,11 +59,14 @@ class FakeIPAM:
         self.released.append(address)
 
 
-def _reservation(user_type=None, user_uuid=None):
+def _reservation(user_type=None, user_uuid=None, reserved_at=0):
     res = mock.Mock()
     res.reservation_type = ReservationType.GATEWAY
     res.user_type = user_type
     res.user_uuid = user_uuid
+    # The reaper's age check reads this directly now rather than going
+    # back to the database via get_allocation_age().
+    res.reserved_at = reserved_at
     return res
 
 
