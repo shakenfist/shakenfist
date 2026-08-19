@@ -71,6 +71,7 @@ live on the queue entry for PR 304.
 | `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `rust.yml` | push and pull_request, path-filtered to `rust/**` and the proto | neither (advisory) |
+| `demo-compose.yml` | push and pull_request, path-filtered to `demo/**`, `tools/demo/**`, the migrations, `pyproject.toml` and `docs/installation.md` | neither (advisory) |
 | `dev-proxy-wheel.yml` | push to develop, path-filtered to the proxy binary's inputs; workflow_dispatch (dry-run by default) | neither |
 | `codeql-analysis.yml` | push, pull_request, weekly | neither |
 | `prune-reviews.yml` | push to develop | neither |
@@ -85,6 +86,16 @@ tier; what never runs against the merged tree is `clippy` and
 
 The direct-qemu lane also runs nightly, because the merge queue
 does not re-run it against the merged tree.
+
+`demo-compose.yml` is the only lane that needs a container
+runtime, and the runner image does not have one, so it installs
+Docker Engine itself via `tools/demo/install-docker.sh` — from
+Docker's own apt repository, because Debian 12 ships neither a
+new enough engine nor a `docker compose` v2 plugin at all. The
+script is idempotent, so adding docker to the runner image would
+make it a no-op rather than a conflict. It also configures the
+daemon and builds for the runner's proxy, which neither inherits
+on its own.
 
 Two behaviours only matter when driving CI by hand: on a
 `workflow_dispatch` run of `functional-tests.yml` an unselected target
