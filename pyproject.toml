@@ -197,7 +197,7 @@ test = [
     "mkdocs==1.6.1",            # bsd
     "mkdocs-material==9.7.7",   # mit
     "testscenarios==0.6.2",     # bsd
-    "mypy==2.3.0",             # mit
+    "mypy==2.3.1",             # mit
     "mypy-protobuf==5.1.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
     "types-protobuf==7.34.1.20260518",    # apache2
