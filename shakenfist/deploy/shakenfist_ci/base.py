@@ -35,6 +35,14 @@ SF_CI_SSH_KEY = os.environ.get(
     'SF_CI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
 
 
+# The delete endpoint refuses a namespace which still owns a live
+# instance or network with one of "you cannot delete a namespace with
+# instances" or "...with networks". Both are 400s, and so is every other
+# way a request can be malformed, so the prefix is what distinguishes a
+# refusal which will clear from one which will not.
+NAMESPACE_NOT_EMPTY = 'you cannot delete a namespace with'
+
+
 class TimeoutException(Exception):
     pass
 
@@ -49,6 +57,19 @@ class WrongEventException(Exception):
 
 class RetryException(Exception):
     pass
+
+
+def namespace_names(namespaces):
+    """The name of each namespace in a get_namespaces() result.
+
+    get_namespaces() returns a list of external_view() dicts, not a list
+    of names, so asking whether a name is ``in`` its result is always
+    false. That mistake had been made independently in four places, one
+    of which meant no namespaced functional test deleted its namespace
+    between 2020 and 2026. Everything asking the question goes through
+    here now, so there is one place to be wrong.
+    """
+    return [ns['name'] for ns in namespaces]
 
 
 def load_userdata(suite, name):
@@ -73,8 +94,16 @@ class BaseTestCase(testtools.TestCase):
         })
 
     def _make_namespace(self, name, key):
-        self._remove_namespace(name)
-
+        # This deliberately does not delete an existing namespace of the
+        # same name first, though it used to appear to. Namespace
+        # deletion is a soft delete and the create endpoint refuses any
+        # name whose row still exists whatever its state, so
+        # delete-then-create would answer 403 "namespace exists" -- which
+        # reads as though the delete had failed. Removing the call changes
+        # nothing in practice: it could never fire, because the name it
+        # was given was always compared against dicts. Every caller
+        # uniquifies, so a collision here is something the author of the
+        # test needs to be shown rather than have tidied away.
         self.system_client.create_namespace(name)
         self.system_client.add_namespace_key(name, 'test', key)
         return apiclient.Client(
@@ -82,10 +111,46 @@ class BaseTestCase(testtools.TestCase):
             namespace=name, key=key,
             async_strategy=apiclient.ASYNC_PAUSE)
 
-    def _remove_namespace(self, name):
-        ns = self.system_client.get_namespaces()
-        if name in ns:
-            self.system_client.delete_namespace(name)
+    def _remove_namespace(self, name, timeout=120):
+        if name not in namespace_names(self.system_client.get_namespaces()):
+            return
+
+        # The API refuses to delete a namespace which still owns a live
+        # instance or network, and our callers delete those through a
+        # non-blocking client -- so a namespace whose objects have
+        # stopped being listed can still be a few seconds short of
+        # deletable. Retry rather than either failing the test on a
+        # timing artefact or ignoring a refusal that will not clear.
+        #
+        # Only those two refusals, though. This runs at the end of a
+        # teardown which has already spent up to ten minutes waiting for
+        # instances and networks, so retrying a 400 which will never
+        # clear -- a malformed request, a client and server which
+        # disagree -- would add two silent minutes to it and then report
+        # the same error anyway.
+        start_time = time.time()
+        reported = False
+        while True:
+            try:
+                self.system_client.delete_namespace(name)
+                return
+            except apiclient.ResourceNotFoundException:
+                # Gone between the listing and the delete, which is the
+                # outcome we wanted.
+                return
+            except apiclient.RequestMalformedException as e:
+                if NAMESPACE_NOT_EMPTY not in str(e.text):
+                    raise
+                if time.time() - start_time > timeout:
+                    raise
+                if not reported:
+                    # Say why on the first retry rather than only at the
+                    # timeout, so a teardown which is going to be slow
+                    # says so while it is happening.
+                    LOG.info('Namespace %s is not yet deletable, retrying '
+                             'for up to %ds: %s' % (name, timeout, e.text))
+                    reported = True
+                time.sleep(5)
 
     def _uniquifier(self):
         return ''.join(random.choice(string.ascii_lowercase) for i in range(8))

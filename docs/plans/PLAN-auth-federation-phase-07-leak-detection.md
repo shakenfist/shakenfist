@@ -719,3 +719,12 @@ namespaces would alter the teardown behaviour of the entire functional
 suite at once, and the class of failure it would expose is exactly the
 one documented twice above. It wants its own change, with the suite run
 against it. Reported to Michael when the review was addressed.
+
+Fixed on the `ci-namespace-teardown` branch immediately after this phase
+merged, which found the same mistake in three more places -- including a
+guard in `test_upgrades.py` that could never detect the condition it
+skips on, and which that branch went on to delete because nothing has
+ever built the namespace it looked for. The rule in
+`docs/developer_guide/coding_rules.md#teardown-runs-before-addcleanup-and-the-base-class-already-deletes`
+is the durable record; `smoke_ci_tests/test_ci_harness.py` is the guard
+that keeps it true.

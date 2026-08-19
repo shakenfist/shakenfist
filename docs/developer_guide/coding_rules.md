@@ -420,3 +420,20 @@ measurement bug was fixed. Do not register instance cleanups in a namespaced
 test; the base class already reaps them. Reserve `addCleanup` for state the
 base class knows nothing about, such as the host devices in
 `test_stray_vxlan.py` or a namespace the test made itself.
+
+The last thing `tearDown()` does is delete the namespace, so anything
+reached through a `/auth/namespaces/<namespace>/...` route -- a key, a
+claim, a federation mapping rule -- has to be removed *before*
+`super().tearDown()` is called, not from a cleanup. `ClaimAPIMixin` in
+`test_namespace_claims.py` and `TestLoki` in `test_loki.py` are both
+written that way, and both say why in a comment.
+
+That was not true until 2026. `_remove_namespace()` asked whether a
+namespace name was `in` the result of `get_namespaces()`, which is a list
+of `external_view()` dicts, so the answer was always no and no namespaced
+test deleted its namespace for six years. The rule above was correct
+advice for the wrong reason, and it will be correct advice for the right
+one only as long as the comparison stays fixed --
+`smoke_ci_tests/test_ci_harness.py` is what holds it there. When a
+helper's failure mode is to succeed quietly, the guard has to assert the
+effect on the cluster rather than that the helper returned.
