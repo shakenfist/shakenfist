@@ -260,7 +260,9 @@ so the phase plans do not reopen them:
    `context.peer()`. Existing dashboards are unaffected; a new
    panel uses the additive counter.
 5. **Is success criterion 2 still the right criterion?**
-   *(Raised 2026-08-19.)* "`get_node`
+   *(Raised and resolved 2026-08-19 in phase 6: no. Success
+   criterion 2 has been restated as an absolute floor, and
+   measured met.)* "`get_node`
    and `get_node_daemon_state` no longer appear in the top
    five operations by rate" was written against the 527/s
    picture, where those two were 57% of load. `get_node` is
@@ -271,9 +273,10 @@ so the phase plans do not reopen them:
    rate precisely because everything around it got so much
    cheaper. Being high in a much shorter list is not the
    same defect the criterion was written to catch. Phase 6
-   A later phase should either restate it as an absolute
-   rate, or drop it in favour of the per-node-base term of an
-   explicit expected-load model.
+   Restated as an absolute floor rather than a ranking. The
+   ranking form would also have failed on a healthy cluster
+   that simply had fewer object types in play, which is the
+   general problem with ranked criteria.
 
 6. **Does the queues daemon need a 0.2s dequeue poll?**
    `dequeue` at 38/s suggests tight-loop polling by the
@@ -514,10 +517,16 @@ because the following statements will be true:
   been superseded in practice by a 24h window over the
   phase 4 per-caller counter -- a ten minute window is too
   short to distinguish a bursty operation from a floor.)*
-* `get_node` and `get_node_daemon_state` no longer appear
-  in the top five operations by rate. *(`get_node` yes;
-  `get_node_daemon_state` no, and see Open question 5 --
-  this criterion is probably wrong rather than unmet.)*
+* `get_node` no longer appears at all on the idle path, and
+  `get_node_daemon_state` is at or under the arithmetic floor
+  implied by `DAEMON_STATE_POLL_INTERVAL` and the cluster's
+  daemon-process count -- not above it. *(Restated in phase 6
+  per Open question 5; the original wording asked that
+  `get_node_daemon_state` leave the top five by rate, which
+  phase 1's own fix makes unreachable. Met as at 2026-08-18:
+  `get_node` is absent from the idle path, and
+  `get_node_daemon_state` measures ~0.5/s per daemon process,
+  which is exactly one read per 2s interval.)*
 * Daemon shutdown latency remains within the systemd stop
   timeout, verified by a rolling restart of a compute node.
 * Mutable data (object states, attributes, metadata, daemon

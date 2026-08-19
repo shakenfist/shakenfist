@@ -2,7 +2,7 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
-**Status: Not started.**
+**Status: In progress.** 6a, 6b, 6c, 6d, 6e and 6f are done; 6g (re-measurement after deploy) is outstanding and needs a full 24h window on `sfcbr`. What the work actually found is recorded in "Findings" below, which corrects this plan's own survey in two places.
 
 ## Why this phase exists
 
@@ -226,3 +226,120 @@ Before executing any step, back brief the operator: which of the two jobs
 (regression versus floor) the step belongs to, what the step will measure
 before it changes anything, and — for 6c and 6d — what the reply-size and
 index consequences of the chosen approach are.
+
+## Findings (2026-08-19)
+
+### 6a — the regression is two things, and only one of them is a defect
+
+Diffing the per-pair nightly facts for 2026-08-07 (92.4/s, the last night
+under target) against 2026-08-18 (142.3/s) gives a total delta of +49.9/s.
+It decomposes:
+
+**~+19/s is a real defect** — `GetObjectState`/`cluster` went from *below
+the top-40 cutoff* to 18.95/s. It is 38% of the whole regression in one
+pair. Diagnosis below.
+
+**~+12/s is node count, not regression.** The per-node fixed-rate pairs
+all grew by almost exactly 50% on 2026-08-12: `Dequeue`/net 2.03 to 3.04,
+`GetBlobTransfersForNode`/transfers 2.03 to 3.04, and every one of the
+seven `GetNodeDaemonState` pairs 1.99 to 2.98. `GetNodeDaemonState` is
+one read per `DAEMON_STATE_POLL_INTERVAL` per daemon per node, so its rate
+divided by the poll interval *is* a node count: it reads 3.9 nodes before
+2026-08-12 and 5.8 after. The cluster gained two nodes.
+
+That is the most important finding for phase 7, and it is a gap in the
+model rather than a bug in the code: **the ratchet's baselines scale with
+standing instance count but not with node count**, so growing the cluster
+reads as a regression on every per-node pair simultaneously. Phase 7's
+budget must carry a per-node term. It already plans to; this is the
+evidence for why that is not optional.
+
+The remainder is instance-count movement and the long tail (330 to 401
+distinct pairs).
+
+### The `GetObjectState`/`cluster` diagnosis — and a correction
+
+This plan's survey attributed it to `_cluster_wide_cleanup()` and its 60
+second duty-cycle gate. **That was wrong**, and the correction is worth
+recording because the reasoning looked sound.
+
+The raw counters settle it. `database_requests_total` for this pair steps
+in a burst every ~16 minutes on both database nodes — +7,614 and +7,604 at
+18:38, +7,610 and +7,615 at 18:54 — against a continuous baseline of
+~1.3/s. That is ~15,200 calls in a single burst every 15 minutes.
+15,200/900 = 16.9/s, exactly the observed 24h average. The 60 second sweep
+is the 1.3/s baseline, not the 17.
+
+The 15-minute cadence identifies it as a `schedule.every(15).minutes` job,
+and it is `reap_expired_namespace_keys()`
+(`shakenfist/daemons/cluster/scheduled_tasks.py`). It walked every expired
+key and read `key.state.value` per key — an uncached round trip each, since
+`.state` is a property with no memoisation (`baseobject.py:536`) — purely
+to discard the ones it could not act on. `keys_with_attributes()`
+deliberately does not filter on object state (its docstring says so, and
+adds that "any future soft delete path must revisit that"; this sweep *is*
+one), so every key the sweep had already soft deleted stayed in its input
+until hard deletion caught up, and every stateless zombie key stayed there
+forever.
+
+That also explains the shape the earlier investigation could not: the
+nightly numbers ramp monotonically (0, 2.82, 4.60, 10.45, 14.45, 16.21,
+18.95) rather than switching on and off. It was a backlog growing, not a
+loop toggling. The "deploy-bracketed on/off loop" characterisation was an
+artefact of sampling.
+
+**Fix:** one `get_objects_by_state()` query per pass for the keys in an
+actionable state, and a set membership test in the loop. The zombie
+counting this sweep used to do is dropped: `reconcile_orphaned_objects`
+owns stateless rows and already counts them hourly.
+
+### 6c — the bulk accessor already existed
+
+The step brief anticipated adding a bulk reservation RPC through all three
+layers, with a proto change and a reply-size design. None of that was
+needed: `mariadb.get_reservations_for_ipam()` already exists and is already
+used by `IPAM.get_haloed_addresses()`. The change is an
+`IPAM.get_all_reservations()` helper over it and four call-site
+conversions. Reply size is unchanged from a call already made on this path.
+
+The reaper conversion also removed a second read per address —
+`get_allocation_age()` was itself a `get_reservation()` — and fixed a
+latent crash: for an in-use address with no reservation row,
+`get_allocation_age()` returns `None` and the old code evaluated
+`now - None`. That address is exactly the leak the sweep exists to find,
+so it now falls through to the leak path rather than raising.
+
+### 6e — `GetReferencesFrom`/api is not an endpoint defect
+
+The cheap hypothesis was wrong: `Instance.external_view()` already issues
+exactly one `get_references_from` per view, inside the `attribute_memo()`
+that #3654 added. There is no per-view duplication to remove.
+
+Per this step's brief, reporting rather than fixing: the growth is request
+volume, and it correlates with the same 2026-08-12 node-count change. Two
+more nodes means more concurrent CI, which means more API polling, and the
+`/instances` list endpoint costs one reference read per instance returned —
+so its cost scales with instances *times* poll rate while the ratchet's
+coefficient captures only instances. Same model gap as above, seen through
+a different pair. No code change here.
+
+One real but small duplication was confirmed and left alone: the node
+external view issues two `get_references_from` calls, keyed by fqdn and by
+uuid (`shakenfist/node.py:448`), because `BLOB_LOCATION` rows key nodes by
+fqdn and `INSTANCE_LOCATION` rows by uuid. Collapsing it needs an `IN`
+variant at the SQL layer and is worth ~4 calls per sweep. Not worth the
+change on these numbers.
+
+### Deviation from the step plan
+
+Step 6c's brief called for a functional-CI assertion modelled on
+`test_instance_get_fetches_the_attributes_row_once`. The sweeps this phase
+fixes are fixed-rate timers, not API-triggered, so a functional assertion
+would have to sleep through two sampling windows either side of floating
+several addresses — around three minutes of wall clock, for a measurement
+that would still be noisy on shared CI hardware. Unit assertions on the
+sweep functions are exact, instant, and can assert the thing that actually
+matters (that the read count does not grow with address count). Both new
+guards were mutation tested: re-introducing the per-address read fails
+them, and the first version of the namespace-key guard did *not* fail and
+was rewritten until it did.
