@@ -259,7 +259,23 @@ so the phase plans do not reopen them:
    cardinality and there are only ~6 nodes recoverable via
    `context.peer()`. Existing dashboards are unaffected; a new
    panel uses the additive counter.
-5. **Does the queues daemon need a 0.2s dequeue poll?**
+5. **Is success criterion 2 still the right criterion?**
+   *(Raised 2026-08-19.)* "`get_node`
+   and `get_node_daemon_state` no longer appear in the top
+   five operations by rate" was written against the 527/s
+   picture, where those two were 57% of load. `get_node` is
+   gone as intended. `get_node_daemon_state` is not, and
+   cannot be: phase 1 reduced it from ~149/s to ~20/s, but
+   that ~20/s is the designed floor of 48 daemon processes
+   polling at 0.5 Hz, and it is now the *second* operation by
+   rate precisely because everything around it got so much
+   cheaper. Being high in a much shorter list is not the
+   same defect the criterion was written to catch. Phase 6
+   A later phase should either restate it as an absolute
+   rate, or drop it in favour of the per-node-base term of an
+   explicit expected-load model.
+
+6. **Does the queues daemon need a 0.2s dequeue poll?**
    `dequeue` at 38/s suggests tight-loop polling by the
    queues and transfers daemons. Adaptive backoff when the
    queue is empty (e.g. 0.2s → 2s ramp, reset on work)
@@ -270,11 +286,11 @@ so the phase plans do not reopen them:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Stop the idle-loop polls | PLAN-database-load-reduction-phase-01-idle-loop.md | Complete |
+| 1. Stop the idle-loop polls | [PLAN-database-load-reduction-phase-01-idle-loop.md](PLAN-database-load-reduction-phase-01-idle-loop.md) | Complete |
 | 2. Static object value caching | [PLAN-database-load-reduction-phase-02-static-cache.md](PLAN-database-load-reduction-phase-02-static-cache.md) | Complete |
-| 3. Consolidate the gRPC client stacks | PLAN-database-load-reduction-phase-03-client-consolidation.md | Complete |
+| 3. Consolidate the gRPC client stacks | [PLAN-database-load-reduction-phase-03-client-consolidation.md](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete |
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
-| 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Planned (issues #3499-#3502 filed; ratchet pending) |
+| 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
 
 Phase summaries:
 
@@ -369,7 +385,14 @@ precompute (in the 33fl ops repo) to mine per-caller
 sf-database load, encode the honest 24h baseline, and flag
 regressions so the gains cannot silently rot. Detail,
 including the baseline-honesty argument, is in the phase 5
-plan file.
+plan file. **Outcome:** all four issues
+landed; the ~78/s of workload-independent polling they
+targeted is now ~9.5/s and every `known-reducible` baseline
+entry reads `cleared`. The ratchet is live and has already
+both corrected a false regression (standing-instance-count
+scaling, which is why several baselines are now per-instance
+coefficients rather than absolute ceilings) and caught the
+real one described in the phase 5 plan's outcome section.
 
 ## Agent guidance
 
@@ -451,8 +474,16 @@ because the following statements will be true:
 * Steady-state sf-database load on the sfcbr cluster is
   below 100 operations per second, measured over a quiet
   ten minute window from the `database_*_total` counters.
+  *(Met 2026-08-05 to 2026-08-07 at 89-92/s; lost since,
+  ~142/s on 2026-08-18. Regaining and then defending it is
+  the subject of further phases. Note the measurement has since
+  been superseded in practice by a 24h window over the
+  phase 4 per-caller counter -- a ten minute window is too
+  short to distinguish a bursty operation from a floor.)*
 * `get_node` and `get_node_daemon_state` no longer appear
-  in the top five operations by rate.
+  in the top five operations by rate. *(`get_node` yes;
+  `get_node_daemon_state` no, and see Open question 5 --
+  this criterion is probably wrong rather than unmet.)*
 * Daemon shutdown latency remains within the systemd stop
   timeout, verified by a rolling restart of a compute node.
 * Mutable data (object states, attributes, metadata, daemon
@@ -496,9 +527,26 @@ because the following statements will be true:
 
 ### Bugs fixed during this work
 
-None yet. The relevant GitHub tracker should be scanned
-during phase 1 planning for existing issues about database
-load, idle-loop CPU, or daemon shutdown latency.
+* **#3499** queue-worker idle polling, **#3500** transfers
+  idle polling, **#3501** cluster IPAM re-reads, **#3502**
+  cluster sweep attribute/reference re-reads -- the phase 5
+  thread A reductions.
+* **#3532** in-memory-only objects leaking `object_states`
+  rows, **#3533** the deleted-object sweep unable to drain
+  its backlog, **#3534** orphan/zombie row reconciliation --
+  found while chasing #3501, and the actual cause of the
+  `cluster` caller's `GetIPAM` floor.
+* **#3595** the sidechannel dispatcher polling every
+  agent-ready instance at 1 Hz (fixed by #3596). Found by
+  the hunt that phase 4's attribution counter made possible;
+  the single largest reducible line, ~0.8 QPS per standing
+  instance, and it cut cluster load by roughly a third.
+* **#3654** `Instance._external_view()` issuing ~7 separate
+  full-row `GetInstanceAttributes` RPCs per instance API GET.
+
+Still open: **#3655** (floating-IP
+maintenance sweeping every in-use address reservation three
+times per 30s cycle).
 
 ### Documentation index maintenance
 
