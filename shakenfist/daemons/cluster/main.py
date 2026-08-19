@@ -62,6 +62,18 @@ class Monitor(daemon.Daemon):
         # extending the lease; if we crash or get partitioned, the
         # lease expires and a candidate steals the row here. So only
         # one node at a time is performing cluster maintenance.
+        #
+        # Never overwrite a lock object we still hold: the orphaned
+        # object's refresher thread would keep renewing the lease
+        # forever, and this process would then wait indefinitely to
+        # steal a lock from itself (issue 3802).
+        if self.lock is not None and self.lock.is_acquired():
+            try:
+                self.lock.release()
+            except exceptions.LockNotHeld:
+                ...
+        self.lock = None
+
         while daemon.check_abort_path(self.abort_path):
             self.lock = locks.ClusterLock(
                 'cluster', None, None, timeout=10, op='Cluster maintenance')
@@ -611,13 +623,6 @@ class Monitor(daemon.Daemon):
             util_concurrency.set_thread_name('active')
             LOG.debug('This cluster thread is now active')
 
-            if not self.cluster_stable():
-                if time.time() - last_defer_message > 10:
-                    LOG.info('Cluster not yet stable, deferring maintenance')
-                    last_defer_message = time.time()
-                self.idle(60)
-                continue
-
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
                 # This elected loop sleeps via lock.lost_event.wait() rather
@@ -626,30 +631,45 @@ class Monitor(daemon.Daemon):
                 # passes and during the cleanup below.
                 self.pet_watchdog()
 
-                now = time.time()
-                if now - last_loop_run >= 60:
-                    try:
-                        with util_general.RecordedOperation(
-                                'scheduled cluster operations',
-                                None, threshold=10):
-                            self._run_due_scheduled_jobs()
-                    except Exception as e:
-                        util_exceptions.ignore_exception('cluster', e)
+                # An unstable cluster (mixed object versions during an
+                # upgrade, or no fresh node metrics at all just after a
+                # whole-cluster restart) defers maintenance, but we stay
+                # elected and keep the lock while we re-check on every
+                # pass. Deferring by re-entering the election used to
+                # orphan the held lock object -- its refresher thread
+                # kept renewing the lease forever, so the daemon
+                # deadlocked against itself and all cluster maintenance
+                # silently stopped (issue 3802).
+                if not self.cluster_stable():
+                    if time.time() - last_defer_message > 10:
+                        LOG.info('Cluster not yet stable, deferring maintenance')
+                        last_defer_message = time.time()
 
-                    # _run_due_scheduled_jobs() above and the cleanup below are unbounded
-                    # maintenance phases; pet between them so a slow scheduled
-                    # task does not eat the whole watchdog budget before the
-                    # cleanup's own per-loop pets start.
-                    self.pet_watchdog()
+                else:
+                    now = time.time()
+                    if now - last_loop_run >= 60:
+                        try:
+                            with util_general.RecordedOperation(
+                                    'scheduled cluster operations',
+                                    None, threshold=10):
+                                self._run_due_scheduled_jobs()
+                        except Exception as e:
+                            util_exceptions.ignore_exception('cluster', e)
 
-                    try:
-                        with util_general.RecordedOperation(
-                                'cluster wide cleanup', None, threshold=10):
-                            self._cluster_wide_cleanup(last_loop_run)
-                    except Exception as e:
-                        util_exceptions.ignore_exception('cluster', e)
+                        # _run_due_scheduled_jobs() above and the cleanup below are unbounded
+                        # maintenance phases; pet between them so a slow scheduled
+                        # task does not eat the whole watchdog budget before the
+                        # cleanup's own per-loop pets start.
+                        self.pet_watchdog()
 
-                    last_loop_run = now
+                        try:
+                            with util_general.RecordedOperation(
+                                    'cluster wide cleanup', None, threshold=10):
+                                self._cluster_wide_cleanup(last_loop_run)
+                        except Exception as e:
+                            util_exceptions.ignore_exception('cluster', e)
+
+                        last_loop_run = now
 
                 # Sleep up to 5s. Wakes early if the background refresher
                 # reports our lease was stolen, OR when the timeout fires
