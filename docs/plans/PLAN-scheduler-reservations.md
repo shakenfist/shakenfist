@@ -352,7 +352,7 @@ table entirely (decision D8).
 | 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3) |
 | 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
 | 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
-| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Complete — merged as PR #3754, 2026-08-16. The step 9 sfcbr soak has not been run yet |
+| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Complete — merged as PR #3754, 2026-08-16. The step 9 sfcbr soak has not been run yet. **Carries an outstanding defect in its D13 demand clause, issue #3813 — see Future work** |
 | 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Implemented — steps 1-8 landed; management review, operator review and the sfcbr soak still outstanding. `NamespaceClaim` is a first-class object with admin-only REST CRUD at `/auth/namespaces/<namespace>/claims`; creation migrates the namespace's existing drawdown out of the cluster's unclaimed sums and onto the claim. Ceilings are **advisory** this release: an exceedance is admitted and recorded as an audit event, and phase 5 flips `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the phase plan) |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
@@ -467,6 +467,18 @@ already landed as PR 3722 — see the D6 correction of
 2026-08-16 in the phase 0 decisions document for the audit
 trail and the three positions on offer. Phase 6 closes 3565
 only if it picks one of them.
+
+*Correction (2026-08-19):* there is now a competing
+explanation for 3565, and phase 6 must rule it out before
+claiming the flake. Issue #3813 (Future work, below)
+shows the D13 demand clause refusing **every** candidate on
+the CI hypervisors, after which the create places through a
+single forced candidate and the affinity stage has nothing
+left to rank. If that is the mechanism, then no choice among
+D6's three positions closes 3565, because soft affinity is
+never reached to bid at all. Establish which of the two is
+operating **before** spending phase 6's decision budget on
+the bid-against-a-hard-ceiling question.
 
 **Phase 7 — diagnostics.** Failure-path verbose diagnostic
 against the same snapshot, success-path drawdown events,
@@ -604,9 +616,70 @@ because the following statements will be true:
 * Per-rejection audit logging in diagnostic mode produces
   detail at least equivalent to today's default. The
   day-to-day audit log is shorter than today's by design.
+* The D13 demand clause admits placements on a node that has
+  real room for them, at every node size this project supports
+  — or it has been deliberately retired. Issue #3813 is closed,
+  or re-deferred with a written reason and a note saying which
+  node sizes it leaves the spreader inert on.
 * `pre-commit run --all-files` passes.
 
 ### Future work
+
+The first item below is **not** deferrable: it is a live
+defect in code this plan has already shipped, and it is
+listed here rather than under *Bugs fixed during this work*
+only because it is still open.
+
+- **The D13 demand clause is arithmetically unsatisfiable on
+  small nodes** (issue #3813, found 2026-08-19 during merge CI
+  triage of run 32227047799). `_demand_guard_clause()` in
+  `mariadb.py` asks `cpu_load_1 + expected_demand + demand_add
+  <= SCHEDULER_TARGET_LOAD × cpu_schedulable`. The budget is
+  denominated **per schedulable thread** and the charge **per
+  requested vCPU**, and the two were never reconciled: at the
+  seed constants a 1-vCPU instance is charged `1 × 2.5` against
+  a budget of `0.75 × cpu_schedulable`, so a node needs
+  `cpu_schedulable >= 3.34` before it can admit that instance
+  *at zero measured load and zero expected demand*. Any node
+  with fewer than four schedulable threads therefore admits
+  nothing, ever; a 2-vCPU instance needs seven threads and a
+  4-vCPU instance fourteen.
+
+  This is a sharpening of, not a discovery separate from, the
+  D13 amendment of 2026-08-14 in the phase 0 decisions
+  document. That amendment saw the same clause lock a node out
+  and responded with P9, the waiver re-walk. What was not seen
+  at the time is that the condition is not load-dependent — on
+  a node below the thread threshold the clause cannot pass
+  under *any* circumstances, so P9's waiver is not a fallback
+  for a rare case, it is the only path placement ever takes.
+  The consequence is that the demand spreader is inert
+  wherever it is most needed and costs a full candidate sweep
+  plus a re-walk on every create to accomplish nothing.
+
+  Evidence from the CI hypervisors (`cpu_schedulable: 2`,
+  budget 1.5, charge 2.5): all four candidates refused with
+  every allocation dimension reading `used: 0.0, exceeded:
+  false` and only `demand` exceeded, at `used` values of 3.24,
+  6.27, 11.94 and 12.29.
+
+  Fixing it is a **decision, not a patch** — the charge and the
+  budget have to be made dimensionally consistent, which is one
+  of: scale the charge by the node's thread count rather than
+  using an absolute sum; floor the clause so it can never
+  refuse a placement the node has real allocation room for; or
+  retune `SCHEDULER_DEMAND_PER_VCPU`. `config.py` describes
+  both demand constants as "a provisional seed pending the
+  scheduler reservations phase 0 step 3 data analysis", so the
+  third option in particular belongs with that analysis rather
+  than to a same-day fix. Whichever is chosen, the P9 waiver
+  should be re-examined at the same time: once the clause can
+  actually pass, a permanent unconditional waiver path is a
+  different trade-off than it was when the clause never
+  passed.
+
+  Also blocks a clean read on phase 6 — see the 2026-08-19
+  correction to the phase 6 stub above.
 
 - **Generic resource-claim primitive.** If phase 0 chooses to
   keep the reservation table instance-scheduling-specific,
