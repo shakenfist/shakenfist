@@ -28,6 +28,30 @@ Every workflow in `.github/workflows/`:
 | `sync-external-docs.yml` | Import the sibling repositories' documentation into `docs/components/` | Hourly schedule, manual |
 | `release.yml` | Build and publish a release | Tag push, manual |
 
+## Coverage the functional suite does not have
+
+### Upgrade data verification
+
+Every functional job deploys a fresh cluster, so nothing in the suite
+observes an upgraded one. `cluster_ci_tests/test_upgrades.py` used to
+look like coverage for this: it asserted that a namespace called
+`upgrade` still held its networks, its instances and their connectivity
+after an upgrade, guarded by a `skipTest()` for clusters which have no
+such namespace. Nothing has ever built that namespace, and the guard was
+in any case written as `'upgrade' not in client.get_namespaces()` --
+a name against a list of dicts, which is always true -- so the test
+would have skipped even on a cluster which did have one. It was removed
+in the change which fixed that comparison across the suite, rather than
+left to report as a skip in every run's summary.
+
+Reinstating it means building the `upgrade` namespace and its objects
+before the upgrade, in a job which then upgrades in place. Until that
+job exists, upgrade-data verification is unimplemented, and the nearest
+thing the suite does have is the `Schema ENUM widening` job in
+`functional-tests.yml`, which covers exactly one upgrade hazard (ENUM
+columns frozen at `CREATE TABLE` time) on a purpose-built database
+rather than a deployed cluster.
+
 ## Merge Queue Pattern
 
 The CI uses a two-stage merge queue pattern (see [this blog post](https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/)):

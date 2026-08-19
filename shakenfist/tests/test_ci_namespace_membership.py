@@ -12,7 +12,10 @@ suite made that mistake independently:
 * ``cluster_ci_tests/test_auth.py``, likewise;
 * ``cluster_ci_tests/test_upgrades.py``, where it made a ``skipTest()``
   guard incapable of detecting the condition it names, so a test that
-  should run on an upgraded cluster would skip there too.
+  should run on an upgraded cluster would skip there too. That file has
+  since been deleted -- nothing builds the namespace it looked for, so
+  fixing the guard only made it skip honestly; see
+  ``docs/developer_guide/ci.md``.
 
 The functional guard for the first of those needs a deployed cluster
 (``smoke_ci_tests/test_ci_harness.py``). This one needs nothing, runs in
@@ -32,6 +35,11 @@ from shakenfist.tests import base
 
 
 CI_SUITE = os.path.join('shakenfist', 'deploy', 'shakenfist_ci')
+
+# The suite held 54 Python files when this was written. The floor is a
+# long way below that because its job is to catch a walk which found
+# nothing or almost nothing, not to track the file count.
+MINIMUM_SUITE_FILES = 20
 
 # The membership operators. `is`/`==` against the list are not the same
 # mistake and are not this test's business.
@@ -141,6 +149,7 @@ class CINamespaceMembershipTestCase(base.ShakenFistTestCase):
 
     def test_no_test_compares_a_name_against_the_listing(self):
         found = []
+        scanned = 0
         root = self._suite_root()
         for dirpath, _, filenames in os.walk(root):
             for filename in filenames:
@@ -149,9 +158,23 @@ class CINamespaceMembershipTestCase(base.ShakenFistTestCase):
                 path = os.path.join(dirpath, filename)
                 with open(path) as f:
                     source = f.read()
+                scanned += 1
                 for lineno in scan_source(source):
                     found.append(
                         '%s:%d' % (os.path.relpath(path, root), lineno))
+
+        # os.walk() over a directory which is not there yields nothing
+        # and raises nothing, so a clean result has to be shown to be a
+        # result before it is trusted. A rename, a package layout change,
+        # or running this from an installed wheel which does not ship
+        # shakenfist/deploy would otherwise leave a check which passes
+        # forever having read no code at all -- which is the same failure
+        # this file exists to stop.
+        self.assertGreater(
+            scanned, MINIMUM_SUITE_FILES,
+            'The CI suite scan found %d Python files under %s, so an empty '
+            'offence list below would mean nothing. Check _suite_root().'
+            % (scanned, root))
 
         self.assertEqual(
             [], found,

@@ -4,7 +4,6 @@ import requests
 from testtools import content
 
 from shakenfist_ci import base
-from shakenfist_ci.base import namespace_names
 from shakenfist_client import apiclient
 
 
@@ -16,32 +15,32 @@ class TestAuth(base.BaseTestCase):
         namespaces = self.system_client.get_namespaces()
         self.addDetail('namespaces_initial', content.text_content(json.dumps(
             namespaces, indent=4, sort_keys=True)))
-        self.assertNotIn(name, namespace_names(namespaces))
+        self.assertNotIn(name, base.namespace_names(namespaces))
         self.system_client.create_namespace(name)
         self.system_client.add_namespace_key(name, 'test', key)
         namespaces = self.system_client.get_namespaces()
         self.addDetail('namespaces_after_create', content.text_content(
             json.dumps(namespaces, indent=4, sort_keys=True)))
-        self.assertIn(name, namespace_names(namespaces))
+        self.assertIn(name, base.namespace_names(namespaces))
 
         self.assertRaises(apiclient.ResourceNotFoundException,
                           self.system_client.delete_namespace_key, name, 'banana')
         namespaces = self.system_client.get_namespaces()
         self.addDetail('namespaces_after_bad_delete', content.text_content(
             json.dumps(namespaces, indent=4, sort_keys=True)))
-        self.assertIn(name, namespace_names(namespaces))
+        self.assertIn(name, base.namespace_names(namespaces))
 
         self.system_client.delete_namespace_key(name, 'test')
         namespaces = self.system_client.get_namespaces()
         self.addDetail('namespaces_after_key_delete', content.text_content(
             json.dumps(namespaces, indent=4, sort_keys=True)))
-        self.assertIn(name, namespace_names(namespaces))
+        self.assertIn(name, base.namespace_names(namespaces))
 
         self.system_client.delete_namespace(name)
         namespaces = self.system_client.get_namespaces()
         self.addDetail('namespaces_after_ns_delete', content.text_content(
             json.dumps(namespaces, indent=4, sort_keys=True)))
-        self.assertNotIn(name, namespace_names(namespaces))
+        self.assertNotIn(name, base.namespace_names(namespaces))
 
 
 class TestRevokedTokens(base.BaseTestCase):

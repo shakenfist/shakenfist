@@ -35,6 +35,14 @@ SF_CI_SSH_KEY = os.environ.get(
     'SF_CI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
 
 
+# The delete endpoint refuses a namespace which still owns a live
+# instance or network with one of "you cannot delete a namespace with
+# instances" or "...with networks". Both are 400s, and so is every other
+# way a request can be malformed, so the prefix is what distinguishes a
+# refusal which will clear from one which will not.
+NAMESPACE_NOT_EMPTY = 'you cannot delete a namespace with'
+
+
 class TimeoutException(Exception):
     pass
 
@@ -113,7 +121,15 @@ class BaseTestCase(testtools.TestCase):
         # stopped being listed can still be a few seconds short of
         # deletable. Retry rather than either failing the test on a
         # timing artefact or ignoring a refusal that will not clear.
+        #
+        # Only those two refusals, though. This runs at the end of a
+        # teardown which has already spent up to ten minutes waiting for
+        # instances and networks, so retrying a 400 which will never
+        # clear -- a malformed request, a client and server which
+        # disagree -- would add two silent minutes to it and then report
+        # the same error anyway.
         start_time = time.time()
+        reported = False
         while True:
             try:
                 self.system_client.delete_namespace(name)
@@ -122,9 +138,18 @@ class BaseTestCase(testtools.TestCase):
                 # Gone between the listing and the delete, which is the
                 # outcome we wanted.
                 return
-            except apiclient.RequestMalformedException:
+            except apiclient.RequestMalformedException as e:
+                if NAMESPACE_NOT_EMPTY not in str(e.text):
+                    raise
                 if time.time() - start_time > timeout:
                     raise
+                if not reported:
+                    # Say why on the first retry rather than only at the
+                    # timeout, so a teardown which is going to be slow
+                    # says so while it is happening.
+                    LOG.info('Namespace %s is not yet deletable, retrying '
+                             'for up to %ds: %s' % (name, timeout, e.text))
+                    reported = True
                 time.sleep(5)
 
     def _uniquifier(self):
