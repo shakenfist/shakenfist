@@ -154,7 +154,7 @@ section nightly since it landed. It has since done its job twice over: it
 re-explained an apparent four-pair regression as standing-instance-count
 scaling (which is why several baselines now carry a `scaling` block rather
 than an absolute ceiling), and it is currently flagging the genuine
-regression described below.
+regression that phase 6 exists to chase.
 
 **The mission target was met, and then lost.** Cluster-wide steady-state load
 reached 89-92/s on 2026-08-05 to 2026-08-07 -- below the master plan's
@@ -162,4 +162,7 @@ reached 89-92/s on 2026-08-05 to 2026-08-07 -- below the master plan's
 back to ~142/s (2026-08-18) at a *lower* standing instance count than when it
 measured 98/s on 2026-08-09, so the climb is not object-count scaling. That
 regression, and the residual lines this phase deliberately did not chase, are
-the subject of the phases that follow.
+[phase 6](PLAN-database-load-reduction-phase-06-residual-load.md); making the
+detection of such regressions something a deployer can run rather than
+something only our own operations tooling can see is
+[phase 7](PLAN-database-load-reduction-phase-07-regression-detection.md).

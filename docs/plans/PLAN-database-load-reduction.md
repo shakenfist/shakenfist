@@ -291,6 +291,8 @@ so the phase plans do not reopen them:
 | 3. Consolidate the gRPC client stacks | [PLAN-database-load-reduction-phase-03-client-consolidation.md](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete |
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
 | 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
+| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Not started |
+| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Not started |
 
 Phase summaries:
 
@@ -392,7 +394,39 @@ entry reads `cleared`. The ratchet is live and has already
 both corrected a false regression (standing-instance-count
 scaling, which is why several baselines are now per-instance
 coefficients rather than absolute ceilings) and caught the
-real one described in the phase 5 plan's outcome section.
+real one that phase 6 exists to chase.
+
+**Phase 6 — the residual load and the regression.** Phase 5
+drove the cluster to 89-92/s on 2026-08-05 to 2026-08-07,
+below this plan's target, and it has since climbed back to
+~142/s at a *lower* standing instance count. Phase 6 has two
+jobs which must not be confused: find what *regressed* since
+2026-08-07, and reduce the residual floor that was always
+there. Its targets are the cluster maintenance sweep's
+`GetObjectState` cost (~19/s, now traced to
+`_cluster_wide_cleanup()` and its 60s duty-cycle gate, and
+filed at last), the floating-IP maintenance path's
+per-address reservation sweeps (#3655, ~10/s, filed with
+exact call sites and still unfixed), `GetReferencesFrom`/api
+above its per-instance ceiling, the `POST /auth`
+re-authentication volume, and the ~22/s long tail spread
+across ~361 low-rate pairs no baseline watches. It also
+resolves Open question 5.
+
+**Phase 7 — deployer-visible regression detection.** The
+only thing standing between us and a silent repeat of this
+regression is a nightly job in a private operations
+repository watching one cluster. Phase 7 moves the
+capability into the product: a committed load *model*
+(a per-node base plus per-standing-object coefficients, the
+one genuinely portable thing the hunt produced — an absolute
+QPS expectation tells a deployer nothing about their own
+cluster), a functional-CI check that fails when a change
+adds a new fixed-rate poll, drop-in Prometheus rules and an
+`sf-ctl` subcommand for deployers without a monitoring
+stack, and a public dashboard that is no longer worse than
+our private one. The private report then becomes one
+consumer of a public mechanism.
 
 ## Agent guidance
 
@@ -541,7 +575,7 @@ because the following statements will be true:
   the hunt that phase 4's attribution counter made possible;
   the single largest reducible line, ~0.8 QPS per standing
   instance, and it cut cluster load by roughly a third.
-* **#3654** `Instance._external_view()` issuing ~7 separate
+* **#3654** `Instance.external_view()` issuing ~7 separate
   full-row `GetInstanceAttributes` RPCs per instance API GET.
 
 Still open: **#3655** (floating-IP
