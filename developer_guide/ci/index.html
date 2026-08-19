@@ -11666,6 +11666,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#coverage-the-functional-suite-does-not-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage the functional suite does not have
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Coverage the functional suite does not have">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-data-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade data verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#merge-queue-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11921,6 +11949,26 @@ commands available on a PR.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="coverage-the-functional-suite-does-not-have">Coverage the functional suite does not have<a class="headerlink" href="#coverage-the-functional-suite-does-not-have" title="Permanent link">&para;</a></h2>
+<h3 id="upgrade-data-verification">Upgrade data verification<a class="headerlink" href="#upgrade-data-verification" title="Permanent link">&para;</a></h3>
+<p>Every functional job deploys a fresh cluster, so nothing in the suite
+observes an upgraded one. <code>cluster_ci_tests/test_upgrades.py</code> used to
+look like coverage for this: it asserted that a namespace called
+<code>upgrade</code> still held its networks, its instances and their connectivity
+after an upgrade, guarded by a <code>skipTest()</code> for clusters which have no
+such namespace. Nothing has ever built that namespace, and the guard was
+in any case written as <code>'upgrade' not in client.get_namespaces()</code> --
+a name against a list of dicts, which is always true -- so the test
+would have skipped even on a cluster which did have one. It was removed
+in the change which fixed that comparison across the suite, rather than
+left to report as a skip in every run's summary.</p>
+<p>Reinstating it means building the <code>upgrade</code> namespace and its objects
+before the upgrade, in a job which then upgrades in place. Until that
+job exists, upgrade-data verification is unimplemented, and the nearest
+thing the suite does have is the <code>Schema ENUM widening</code> job in
+<code>functional-tests.yml</code>, which covers exactly one upgrade hazard (ENUM
+columns frozen at <code>CREATE TABLE</code> time) on a purpose-built database
+rather than a deployed cluster.</p>
 <h2 id="merge-queue-pattern">Merge Queue Pattern<a class="headerlink" href="#merge-queue-pattern" title="Permanent link">&para;</a></h2>
 <p>The CI uses a two-stage merge queue pattern (see <a href="https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/">this blog post</a>):</p>
 <ol>
