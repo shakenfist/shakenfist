@@ -158,6 +158,35 @@ class InstanceTestCase(base.ShakenFistTestCase):
         s = str(i)
         self.assertEqual('instance(%s)' % instance_uuid, s)
 
+    def test_delete_runs_both_phases(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
+
+        with mock.patch.object(i, '_delete_on_hypervisor') as mock_hyp, \
+                mock.patch.object(i, '_delete_globally') as mock_glob:
+            i.delete()
+
+        mock_hyp.assert_called_once_with()
+        mock_glob.assert_called_once_with()
+
+    def test_delete_global_only_skips_hypervisor_teardown(self):
+        # The cluster maintainer deletes instances hosted on a deleted
+        # node with global_only=True: the hypervisor is gone, and the
+        # maintainer must not run local teardown (power off, libvirt
+        # undefine, disk removal) against its own paths on behalf of an
+        # instance that was never there (issue 3803).
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
+
+        with mock.patch.object(i, '_delete_on_hypervisor') as mock_hyp, \
+                mock.patch.object(i, '_delete_globally') as mock_glob:
+            i.delete(global_only=True)
+
+        mock_hyp.assert_not_called()
+        mock_glob.assert_called_once_with()
+
     def test_nvme_bus_disk_stops_on_io_error(self):
         # NVME-bus disks are attached via raw qemu -drive args rather than a
         # libvirt <disk>, so they must carry werror/rerror=stop themselves to
