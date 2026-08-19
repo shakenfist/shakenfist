@@ -26,6 +26,7 @@ from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespaces
 from shakenfist.namespace_key import keys_with_attributes
+from shakenfist.namespace_key import NamespaceKey
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
@@ -604,7 +605,32 @@ def reap_expired_namespace_keys() -> None:
 
     cutoff = time.time() - grace
     reaped = 0
-    zombies = 0
+
+    # Which keys can this sweep actually act on? Ask once, in SQL,
+    # rather than reading .state per expired key.
+    #
+    # keys_with_attributes(include_expired=True) deliberately does not
+    # filter on object state (see its docstring), so it returns every
+    # key this sweep has ever soft deleted -- they stay expired, and
+    # stay listed, until the hard delete reaper gets to them -- plus
+    # every stateless zombie, which can never be soft deleted at all.
+    # Reading .state per key to discard those was ~15,200 uncached
+    # GetObjectState round trips per pass on sfcbr, issued in one
+    # fifteen minute burst, and it grew with the backlog rather than
+    # with the work: 0 to 19 QPS over eleven days (issue 3814).
+    #
+    # A key not in this set is either already soft deleted or has no
+    # state row. Neither is actionable here, and neither needs to be
+    # told apart one round trip at a time: stateless keys are
+    # reconcile_orphaned_objects' job, and it counts them hourly.
+    actionable = mariadb.get_objects_by_state(
+        ObjectType.NAMESPACE_KEY, sorted(NamespaceKey.ACTIVE_STATES))
+    if actionable is None:
+        # Distinct from an empty list, which means "no active keys".
+        LOG.warning(
+            'Could not list active namespace keys, skipping expiry sweep')
+        return
+    actionable = set(actionable)
 
     for ns in Namespaces(filters=[], prefilter='active'):
         # include_expired is the whole point of the sweep, and the
@@ -614,22 +640,7 @@ def reap_expired_namespace_keys() -> None:
             if attrs.expiry is None or attrs.expiry >= cutoff:
                 continue
 
-            state_value = key.state.value
-
-            # Already soft deleted by an earlier sweep, and now waiting
-            # on the hard delete reaper.
-            if state_value in FINAL_OBJECT_STATES:
-                continue
-
-            # A static row with no state row at all cannot be soft
-            # deleted: the state machine has no transition from None to
-            # deleted, so delete() would raise on every sweep forever.
-            # These zombies are reconcile_orphaned_objects' problem --
-            # it writes them a deleted state row and the hard delete
-            # reaper takes it from there. Count them for one aggregate
-            # log line rather than logging (or worse, eventing) each.
-            if state_value is None:
-                zombies += 1
+            if str(key.uuid) not in actionable:
                 continue
 
             try:
@@ -657,10 +668,6 @@ def reap_expired_namespace_keys() -> None:
 
     if reaped:
         LOG.info(f'Soft deleted {reaped} expired namespace keys')
-    if zombies:
-        LOG.with_fields({'zombies': zombies}).warning(
-            'Expired namespace keys with no state row skipped; '
-            'reconcile_orphaned_objects repairs these')
 
 
 # How long after a token's own expiry its replay record is kept.

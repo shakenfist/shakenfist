@@ -14,6 +14,7 @@ from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
+from shakenfist.namespace_key import NamespaceKey
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -471,9 +472,15 @@ class FakeNamespaceKey:
         self._update_time = update_time
         self.events = []
         self.hard_deleted = False
+        # On a real key .state is an uncached round trip to the
+        # database every single time it is read (baseobject.py's
+        # _state_read), which is what made the expiry sweep expensive
+        # (issue 3814). Count reads so a test can assert none happen.
+        self.state_reads = 0
 
     @property
     def state(self):
+        self.state_reads += 1
         return mock.MagicMock(value=self._state_value,
                               update_time=self._update_time)
 
@@ -516,8 +523,30 @@ class ReapExpiredNamespaceKeysTestCase(base.ShakenFistTestCase):
     moved and which are left alone.
     """
 
-    def _sweep(self, pairs, grace=3600, now=10000.0):
-        """Run the sweep over one namespace holding ``pairs``."""
+    # Distinct from None, which is what a failed state query returns.
+    DERIVE_ACTIONABLE = object()
+
+    def _sweep(self, pairs, grace=3600, now=10000.0,
+               actionable=DERIVE_ACTIONABLE):
+        """Run the sweep over one namespace holding ``pairs``.
+
+        The sweep asks the database once for the keys in an actionable
+        state rather than reading .state per key (issue 3814), so the
+        fake stands in for that query. By default it answers what the
+        real query would for these keys: the ones whose state is one
+        the sweep can move. Pass ``actionable`` to answer something
+        else, including None for a failed read.
+        """
+        if actionable is self.DERIVE_ACTIONABLE:
+            actionable = [
+                str(key.uuid) for key, _ in pairs
+                if key.state.value in NamespaceKey.ACTIVE_STATES]
+
+        # Deriving the answer above read .state itself. Zero the
+        # counters so what a test sees is what the sweep did.
+        for key, _ in pairs:
+            key.state_reads = 0
+
         namespaces = [mock.MagicMock(uuid='banana')]
         with mock.patch.object(config, 'NAMESPACE_KEY_REAP_GRACE', grace), \
                 mock.patch(
@@ -528,9 +557,14 @@ class ReapExpiredNamespaceKeysTestCase(base.ShakenFistTestCase):
                     'keys_with_attributes',
                     return_value=pairs) as mock_keys, \
                 mock.patch(
+                    'shakenfist.daemons.cluster.scheduled_tasks.mariadb.'
+                    'get_objects_by_state',
+                    return_value=actionable) as mock_states, \
+                mock.patch(
                     'shakenfist.daemons.cluster.scheduled_tasks.time.time',
                     return_value=now):
             st.reap_expired_namespace_keys()
+        self._last_state_query = mock_states
         return mock_keys
 
     def test_soft_deletes_a_key_past_the_grace_period(self):
@@ -573,6 +607,64 @@ class ReapExpiredNamespaceKeysTestCase(base.ShakenFistTestCase):
         self.assertEqual(EVENT_TYPE_AUDIT, event_type)
         self.assertIn('expired', message)
         self.assertEqual({'expiry': 1000.0}, extra)
+
+    def test_asks_for_key_states_once_however_many_keys(self):
+        # The point of issue 3814. This sweep used to read .state per
+        # expired key, which is one uncached round trip each: on sfcbr
+        # that was ~15,200 GetObjectState calls in a single fifteen
+        # minute burst, growing with the backlog rather than with the
+        # work. The cost must now be one query whatever the key count.
+        #
+        # The assertion is on the count, not on the absence of a
+        # particular call, so re-introducing a per-key read fails here
+        # rather than passing quietly.
+        pairs = [(FakeNamespaceKey('stale-%d' % i), _attrs(1000.0))
+                 for i in range(50)]
+        self._sweep(pairs)
+
+        self.assertEqual(1, self._last_state_query.call_count)
+        self.assertEqual(
+            (ObjectType.NAMESPACE_KEY, sorted(NamespaceKey.ACTIVE_STATES)),
+            self._last_state_query.call_args[0])
+
+        # And -- the assertion that actually holds the fix in place --
+        # it read no key's state individually. One bulk query plus 50
+        # point reads would satisfy the count above but is the defect.
+        self.assertEqual(
+            0, sum(key.state_reads for key, _ in pairs),
+            'the sweep read .state per key; each read is a database '
+            'round trip (issue 3814)')
+
+        # And it still did the work. Read the state values last, since
+        # reading them is itself counted above.
+        for key, _ in pairs:
+            self.assertEqual(dbo.STATE_DELETED, key.state.value)
+
+    def test_skips_a_zombie_key_with_no_state_row_via_the_bulk_query(self):
+        # A key with no state row cannot be soft deleted -- the state
+        # machine has no None to deleted transition -- so delete()
+        # would raise on it every sweep forever. It is absent from the
+        # actionable set by construction, because that set comes from
+        # object_states. reconcile_orphaned_objects repairs these.
+        key = FakeNamespaceKey('zombie', state=None)
+        self._sweep([(key, _attrs(1000.0))])
+
+        self.assertEqual([], key.events)
+        self.assertIsNone(key.state.value)
+
+    def test_skips_the_pass_when_the_state_query_fails(self):
+        # None means the query failed, which is deliberately distinct
+        # from [] meaning "no active keys". Treating a failed read as an
+        # empty set would be harmless here (nothing is actionable, so
+        # nothing is deleted) but the sweep must not log or behave as
+        # though it completed a clean pass over the keys.
+        key = FakeNamespaceKey('stale')
+        mock_keys = self._sweep([(key, _attrs(1000.0))], actionable=None)
+
+        # Nothing was even listed: the sweep gave up before walking
+        # namespaces.
+        self.assertEqual(0, mock_keys.call_count)
+        self.assertEqual(dbo.STATE_CREATED, key.state.value)
 
     def test_survives_a_key_deleted_underneath_it(self):
         key = FakeNamespaceKey('racing')
