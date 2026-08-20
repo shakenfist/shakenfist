@@ -276,15 +276,15 @@ Concretely:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Plumbing: protocol structs, events, surface helpers, surface-init colour fix | PLAN-display-draw-ops-phase-01-plumbing.md | Complete |
-| 2. `DRAW_FILL` (solid brush) | PLAN-display-draw-ops-phase-02-fill.md | Complete |
-| 3. `DRAW_BLACKNESS` and `DRAW_WHITENESS` | PLAN-display-draw-ops-phase-03-monochrome.md | Complete |
-| 4. `COPY_BITS` | PLAN-display-draw-ops-phase-04-copy-bits.md | Complete |
-| 5. `DRAW_OPAQUE` and `DRAW_BLEND` | PLAN-display-draw-ops-phase-05-image-rop.md | Complete |
-| 6. `DRAW_TRANSPARENT` and `DRAW_ALPHA_BLEND` | PLAN-display-draw-ops-phase-06-alpha.md | Complete |
-| 7. `DRAW_INVERS` and warn-once for deferred ops | PLAN-display-draw-ops-phase-07-invers-and-warnings.md | Complete |
-| 8. `--pedantic` mode and status-bar gap counter | PLAN-display-draw-ops-phase-08-pedantic.md | Complete |
-| 9. Thread live bug-report handles to the pedantic observer | PLAN-display-draw-ops-phase-09-pedantic-handles.md | Complete |
+| 1. Plumbing: protocol structs, events, surface helpers, surface-init colour fix | [PLAN-display-draw-ops-phase-01-plumbing.md](/components/ryll/plans/PLAN-display-draw-ops-phase-01-plumbing/) | Complete |
+| 2. `DRAW_FILL` (solid brush) | [PLAN-display-draw-ops-phase-02-fill.md](/components/ryll/plans/PLAN-display-draw-ops-phase-02-fill/) | Complete |
+| 3. `DRAW_BLACKNESS` and `DRAW_WHITENESS` | [PLAN-display-draw-ops-phase-03-monochrome.md](/components/ryll/plans/PLAN-display-draw-ops-phase-03-monochrome/) | Complete |
+| 4. `COPY_BITS` | [PLAN-display-draw-ops-phase-04-copy-bits.md](/components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits/) | Complete |
+| 5. `DRAW_OPAQUE` and `DRAW_BLEND` | [PLAN-display-draw-ops-phase-05-image-rop.md](/components/ryll/plans/PLAN-display-draw-ops-phase-05-image-rop/) | Complete |
+| 6. `DRAW_TRANSPARENT` and `DRAW_ALPHA_BLEND` | [PLAN-display-draw-ops-phase-06-alpha.md](/components/ryll/plans/PLAN-display-draw-ops-phase-06-alpha/) | Complete |
+| 7. `DRAW_INVERS` and warn-once for deferred ops | [PLAN-display-draw-ops-phase-07-invers-and-warnings.md](/components/ryll/plans/PLAN-display-draw-ops-phase-07-invers-and-warnings/) | Complete |
+| 8. `--pedantic` mode and status-bar gap counter | [PLAN-display-draw-ops-phase-08-pedantic.md](/components/ryll/plans/PLAN-display-draw-ops-phase-08-pedantic/) | Complete |
+| 9. Thread live bug-report handles to the pedantic observer | [PLAN-display-draw-ops-phase-09-pedantic-handles.md](/components/ryll/plans/PLAN-display-draw-ops-phase-09-pedantic-handles/) | Complete |
 | 10. Documentation and release notes | (inline; no separate plan file) | Complete |
 
 ### Sequencing rationale

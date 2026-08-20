@@ -43,8 +43,11 @@ produced.
    counted in per-channel `writer_dropped_count` (channels) and
    `AppSnapshot::video_drop_count` (video). MP4 finalisation runs on the
    encoder task after the sender drops, so a bug report assembled within
-   milliseconds of `CaptureSession::close()` may see an unfinalised MP4 — see
-   the phase-3 plan for the trade-off.
+   milliseconds of `CaptureSession::close()` may see an unfinalised MP4. That
+   was accepted deliberately: finalising synchronously would have blocked the
+   caller on the encoder draining. See
+   [`PLAN-video-keeping-up.md`](/components/ryll/plans/PLAN-video-keeping-up/) for the
+   trade-off.
 
 7. **Display channel capabilities** - Ryll advertises COMPOSITE,
    MONITORS_CONFIG, SIZED_STREAM, A8_SURFACE, plus seven more added by the

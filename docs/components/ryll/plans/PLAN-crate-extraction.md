@@ -397,12 +397,12 @@ the initial extraction.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Convert ryll to a Cargo workspace | PLAN-crate-extraction-phase-01-workspace.md | Complete |
-| 2. Reserve crate names on crates.io | PLAN-crate-extraction-phase-02-reserve-names.md | Complete |
-| 3. Extract shakenfist-spice-compression crate | PLAN-crate-extraction-phase-03-compression.md | Complete |
-| 4. Extract shakenfist-spice-protocol crate | PLAN-crate-extraction-phase-04-protocol.md | Complete |
-| 5. Extract shakenfist-spice-usbredir crate | PLAN-crate-extraction-phase-05-usbredir.md | Complete |
-| 6. Introduce ConnectionConfig and move SpiceClient into protocol crate | PLAN-crate-extraction-phase-06-client.md | Complete |
+| 1. Convert ryll to a Cargo workspace | [PLAN-crate-extraction-phase-01-workspace.md](/components/ryll/plans/PLAN-crate-extraction-phase-01-workspace/) | Complete |
+| 2. Reserve crate names on crates.io | [PLAN-crate-extraction-phase-02-reserve-names.md](/components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names/) | Complete |
+| 3. Extract shakenfist-spice-compression crate | [PLAN-crate-extraction-phase-03-compression.md](/components/ryll/plans/PLAN-crate-extraction-phase-03-compression/) | Complete |
+| 4. Extract shakenfist-spice-protocol crate | [PLAN-crate-extraction-phase-04-protocol.md](/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/) | Complete |
+| 5. Extract shakenfist-spice-usbredir crate | [PLAN-crate-extraction-phase-05-usbredir.md](/components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir/) | Complete |
+| 6. Introduce ConnectionConfig and move SpiceClient into protocol crate | [PLAN-crate-extraction-phase-06-client.md](/components/ryll/plans/PLAN-crate-extraction-phase-06-client/) | Complete |
 
 ### Phase 1: Convert ryll to a Cargo workspace
 

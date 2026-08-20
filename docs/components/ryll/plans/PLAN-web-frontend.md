@@ -532,14 +532,14 @@ master plan is the input to writing them.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 0. Multi-mode parity audit (GUI vs headless today) | (executed inline; see `docs/multi-mode-parity.md`) | Complete |
-| 1. Renderer extraction (`shakenfist-spice-renderer` crate) | PLAN-web-frontend-phase-01-extract.md | Complete |
-| 2. Encoder pipeline (framebuffer → H.264 NAL units, with VP8 contingency) | PLAN-web-frontend-phase-02-encoder.md | Complete (H.264 path; VP8 contingency not triggered) |
-| 3. WebRTC plumbing (`webrtc-rs`, video track, audio track, datachannel) | PLAN-web-frontend-phase-03-webrtc.md | Complete |
-| 4. HTTP server + token auth + signalling endpoint + browser shell | PLAN-web-frontend-phase-04-server.md | Complete (synthetic source; real frames Phase 5) |
-| 5. Inputs + cursor overlay + audio passthrough | PLAN-web-frontend-phase-05-iac.md | Complete |
-| 6. Reconnect + lifecycle | PLAN-web-frontend-phase-06-lifecycle.md | Complete (`7c6fa2fa` bridge dead signal, `a3aaa1b5` reaper + encoder stop, `e7c98f10` browser auto-reconnect, 6d docs) |
-| 7. CI build + packaging | PLAN-web-frontend-phase-07-ci.md | Complete (`026a761e` publish-crates, `c6a0a94b` libopus-dev, `93ab083b` smoke test, `e59b8b13` deb/rpm deps, `efe9de60` docs sweep) |
-| 8. Operator docs + systemd example | PLAN-web-frontend-phase-08-docs.md | Complete (`62ea23ba` native TLS/8a, `5da02936` systemd/8b, `9ba4df0f` TLS docs/8c, `adc5bed` kerbside cross-ref/8d in kerbside repo, this commit/8e) |
+| 1. Renderer extraction (`shakenfist-spice-renderer` crate) | [PLAN-web-frontend-phase-01-extract.md](/components/ryll/plans/PLAN-web-frontend-phase-01-extract/) | Complete |
+| 2. Encoder pipeline (framebuffer → H.264 NAL units, with VP8 contingency) | [PLAN-web-frontend-phase-02-encoder.md](/components/ryll/plans/PLAN-web-frontend-phase-02-encoder/) | Complete (H.264 path; VP8 contingency not triggered) |
+| 3. WebRTC plumbing (`webrtc-rs`, video track, audio track, datachannel) | [PLAN-web-frontend-phase-03-webrtc.md](/components/ryll/plans/PLAN-web-frontend-phase-03-webrtc/) | Complete |
+| 4. HTTP server + token auth + signalling endpoint + browser shell | [PLAN-web-frontend-phase-04-server.md](/components/ryll/plans/PLAN-web-frontend-phase-04-server/) | Complete (synthetic source; real frames Phase 5) |
+| 5. Inputs + cursor overlay + audio passthrough | [PLAN-web-frontend-phase-05-iac.md](/components/ryll/plans/PLAN-web-frontend-phase-05-iac/) | Complete |
+| 6. Reconnect + lifecycle | [PLAN-web-frontend-phase-06-lifecycle.md](/components/ryll/plans/PLAN-web-frontend-phase-06-lifecycle/) | Complete (`7c6fa2fa` bridge dead signal, `a3aaa1b5` reaper + encoder stop, `e7c98f10` browser auto-reconnect, 6d docs) |
+| 7. CI build + packaging | [PLAN-web-frontend-phase-07-ci.md](/components/ryll/plans/PLAN-web-frontend-phase-07-ci/) | Complete (`026a761e` publish-crates, `c6a0a94b` libopus-dev, `93ab083b` smoke test, `e59b8b13` deb/rpm deps, `efe9de60` docs sweep) |
+| 8. Operator docs + systemd example | [PLAN-web-frontend-phase-08-docs.md](/components/ryll/plans/PLAN-web-frontend-phase-08-docs/) | Complete (`62ea23ba` native TLS/8a, `5da02936` systemd/8b, `9ba4df0f` TLS docs/8c, `adc5bed` kerbside cross-ref/8d in kerbside repo, this commit/8e) |
 
 ### Phase 0: Multi-mode parity audit
 
@@ -935,6 +935,13 @@ We will know the MVP has landed when:
   lets the operator run multiple sessions per machine.
 - **Per-rect dirty tracking** for partial-frame encodes.
   Meaningful CPU/bandwidth win on mostly-static desktops.
+- **RTCP PLI (Picture Loss Indication) handling.** The
+  WebRTC bring-up deliberately stubbed this: the bridge
+  forces a keyframe when the peer connection reaches
+  `Connected`, but never in response to a viewer-initiated
+  refresh, so a browser that loses the IDR has to reconnect
+  to recover. Wiring the incoming PLI through to
+  `EncoderControl::RequestKeyframe` closes that gap.
 - **Multi-session / multi-tenant** mode — one daemon, many
   desktops, many viewers. Hard-blocked on the
   authentication and TLS items above.

@@ -368,6 +368,7 @@ nav:
                 - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
                 - "Android APK port": components/ryll/plans/PLAN-android-apk.md
                 - "Bug-report trigger snapshot": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
+                - "Macbook bug-report fixes": components/ryll/plans/PLAN-macbook-bugreport-fixes.md
                 - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
                 - "Hamburger menu": components/ryll/plans/PLAN-hamburger-menu.md
                 - "Notifications system": components/ryll/plans/PLAN-notifications.md
@@ -381,7 +382,10 @@ nav:
                 - "Video keeping up": components/ryll/plans/PLAN-video-keeping-up.md
                 - "macOS runtime metrics": components/ryll/plans/PLAN-macos-runtime-metrics.md
                 - "CI platform matrix": components/ryll/plans/PLAN-ci-platform-matrix.md
+                - "egui / eframe 0.34 follow-ups": components/ryll/plans/PLAN-egui-0.34-followups.md
                 - "Stream caps and flap diagnostics": components/ryll/plans/PLAN-stream-caps-and-flap.md
+                - "Streaming test automation": components/ryll/plans/PLAN-streaming-test-automation.md
+                - "Open questions watch-list": components/ryll/plans/OPEN-QUESTIONS.md
                 - "Self-hosted runner migration": components/ryll/plans/PLAN-self-hosted-runners.md
                 - "Pip-installable ryll": components/ryll/plans/PLAN-pip-distribution.md
                 - "webrtc-rs 0.20 upgrade": components/ryll/plans/PLAN-webrtc-0.20-upgrade.md

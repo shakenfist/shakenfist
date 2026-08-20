@@ -214,11 +214,11 @@ Concretely:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Always-fit + dedup | PLAN-display-window-sizing-phase-01-always-fit.md | Complete |
-| 2. Hamburger toggle + CLI flag | PLAN-display-window-sizing-phase-02-toggle.md | Complete |
-| 3. Tests | PLAN-display-window-sizing-phase-03-tests.md | Complete |
-| 4. Docs | PLAN-display-window-sizing-phase-04-docs.md | Complete |
-| 5. Resolution-change notifications | PLAN-display-window-sizing-phase-05-notify.md | Complete |
+| 1. Always-fit + dedup | [PLAN-display-window-sizing-phase-01-always-fit.md](/components/ryll/plans/PLAN-display-window-sizing-phase-01-always-fit/) | Complete |
+| 2. Hamburger toggle + CLI flag | [PLAN-display-window-sizing-phase-02-toggle.md](/components/ryll/plans/PLAN-display-window-sizing-phase-02-toggle/) | Complete |
+| 3. Tests | [PLAN-display-window-sizing-phase-03-tests.md](/components/ryll/plans/PLAN-display-window-sizing-phase-03-tests/) | Complete |
+| 4. Docs | [PLAN-display-window-sizing-phase-04-docs.md](/components/ryll/plans/PLAN-display-window-sizing-phase-04-docs/) | Complete |
+| 5. Resolution-change notifications | [PLAN-display-window-sizing-phase-05-notify.md](/components/ryll/plans/PLAN-display-window-sizing-phase-05-notify/) | Complete |
 
 Phase 1 is the bug fix proper. Phase 2 adds the escape
 hatch. Phase 3 covers regression tests for the resize

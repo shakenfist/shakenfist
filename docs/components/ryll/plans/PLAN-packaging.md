@@ -187,13 +187,13 @@ This requires:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Platform portability | PLAN-packaging-phase-01-portability.md | Complete |
-| 2. GitHub Actions CI | PLAN-packaging-phase-02-ci.md | Complete |
-| 3. Debian packaging | PLAN-packaging-phase-03-debian.md | Complete |
-| 4. RPM packaging | PLAN-packaging-phase-04-rpm.md | Complete |
-| 5. macOS packaging | PLAN-packaging-phase-05-macos.md | Complete |
-| 6. Windows packaging | PLAN-packaging-phase-06-windows.md | Complete |
-| 7. Release automation | PLAN-packaging-phase-07-release.md | Complete |
+| 1. Platform portability | [PLAN-packaging-phase-01-portability.md](/components/ryll/plans/PLAN-packaging-phase-01-portability/) | Complete |
+| 2. GitHub Actions CI | [PLAN-packaging-phase-02-ci.md](/components/ryll/plans/PLAN-packaging-phase-02-ci/) | Complete |
+| 3. Debian packaging | [PLAN-packaging-phase-03-debian.md](/components/ryll/plans/PLAN-packaging-phase-03-debian/) | Complete |
+| 4. RPM packaging | [PLAN-packaging-phase-04-rpm.md](/components/ryll/plans/PLAN-packaging-phase-04-rpm/) | Complete |
+| 5. macOS packaging | [PLAN-packaging-phase-05-macos.md](/components/ryll/plans/PLAN-packaging-phase-05-macos/) | Complete |
+| 6. Windows packaging | [PLAN-packaging-phase-06-windows.md](/components/ryll/plans/PLAN-packaging-phase-06-windows/) | Complete |
+| 7. Release automation | [PLAN-packaging-phase-07-release.md](/components/ryll/plans/PLAN-packaging-phase-07-release/) | Complete |
 
 ### Phase 1: Platform portability
 
