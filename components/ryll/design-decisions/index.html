@@ -9292,6 +9292,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -9656,6 +9684,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -9664,6 +9720,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -11762,8 +11874,11 @@ produced.</p>
    counted in per-channel <code>writer_dropped_count</code> (channels) and
    <code>AppSnapshot::video_drop_count</code> (video). MP4 finalisation runs on the
    encoder task after the sender drops, so a bug report assembled within
-   milliseconds of <code>CaptureSession::close()</code> may see an unfinalised MP4 — see
-   the phase-3 plan for the trade-off.</p>
+   milliseconds of <code>CaptureSession::close()</code> may see an unfinalised MP4. That
+   was accepted deliberately: finalising synchronously would have blocked the
+   caller on the encoder draining. See
+   <a href="/components/ryll/plans/PLAN-video-keeping-up/"><code>PLAN-video-keeping-up.md</code></a> for the
+   trade-off.</p>
 </li>
 <li>
 <p><strong>Display channel capabilities</strong> - Ryll advertises COMPOSITE,

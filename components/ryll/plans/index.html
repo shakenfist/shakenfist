@@ -9364,6 +9364,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -9728,6 +9756,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -9736,6 +9792,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -11834,6 +11946,38 @@ do not require phased execution.</p>
 <p>New plans should follow the structure in <code>PLAN-TEMPLATE.md</code> at the repo
 root. For pre-push audits of our own work see <code>PUSH-AUDIT.md</code>; for
 reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code>.</p>
+<p>The <code>Status</code> column below uses exactly four values, so the index can be
+skimmed for what is live. This vocabulary is for the index only — each
+plan's own header and phase table describe their state in whatever detail
+that plan needs.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Complete</td>
+<td>Every phase has landed and nothing is outstanding.</td>
+</tr>
+<tr>
+<td>In progress</td>
+<td>At least one phase is being worked, or has landed but is not yet verified.</td>
+</tr>
+<tr>
+<td>Not started</td>
+<td>Phases are written but none has been started.</td>
+</tr>
+<tr>
+<td>Proposed</td>
+<td>A concept: the intent is recorded but no phases are drafted.</td>
+</tr>
+</tbody>
+</table>
+<p>Where a plan is <code>In progress</code> for a reason the phase table does not make
+obvious, that reason belongs in the plan itself rather than in this table.</p>
 <h2 id="master-plans">Master plans<a class="headerlink" href="#master-plans" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -11920,7 +12064,7 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>2026-04-19</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency/">Idle CPU and latency</a></td>
 <td>Investigate 6-core idle CPU usage; replace broken keystroke latency with PING/PONG-based measurement; demote noisy protocol logging; capture runtime metrics in bug reports</td>
-<td>Code landed; awaiting user verification</td>
+<td>In progress</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/">1. Profile</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/">2. Repaint</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/">3. Logging</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/">4. Latency</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/">5. Metrics</a></td>
 </tr>
 <tr>
@@ -11934,7 +12078,7 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>2026-04-23</td>
 <td><a href="/components/ryll/plans/PLAN-android-apk/">Android APK port</a></td>
 <td>Concept plan for a sideloadable Android APK of ryll, targeting the Google TV Streamer as a thin-client SPICE endpoint</td>
-<td>Proposed (concept)</td>
+<td>Proposed</td>
 <td>(phases not yet written)</td>
 </tr>
 <tr>
@@ -12015,11 +12159,11 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>1. TLS handshake smoke, 2. <code>web-smoke</code> parity, 3. Smoke-test portability audit, 4. Release QA checklist (phase plans pending)</td>
 </tr>
 <tr>
-<td>2026-05-21</td>
-<td><a href="/components/ryll/plans/PLAN-streaming-test-automation/">Streaming test automation</a></td>
-<td>Replace the manual session-driven cadence with CI coverage of known-good streaming scenarios. Covers three complementary approaches: pcap replay (smallest first cut), input record-and-replay against a dedicated CI box (closer to real-world), and AT-SPI-based semantic replay (highest effort, dovetails with future MCP agent surfaces). Blocked on phase 13 of the stream-caps work finishing so we know which scenarios are deterministic enough to assert against.</td>
-<td>Proposed (concept)</td>
-<td>(phases not yet written)</td>
+<td>2026-05-17</td>
+<td><a href="/components/ryll/plans/PLAN-egui-0.34-followups/">egui / eframe 0.34 follow-up cleanup</a></td>
+<td>Migrate <code>ryll/src/app.rs</code> off the egui 0.34 deprecated APIs (panel types and <code>show</code>, <code>Frame::none()</code>, <code>Context::style()</code>, <code>InputState::screen_rect()</code>, <code>menu::menu_button</code>) and delete the module-wide <code>#![allow(deprecated)]</code> the minimum-diff bump added, so the next deprecation in the crate's largest file is loud again</td>
+<td>Complete</td>
+<td>(no separate phases; landed with the eframe 0.35 bump in PR #131)</td>
 </tr>
 <tr>
 <td>2026-05-17</td>
@@ -12027,6 +12171,13 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>Advertise the four SPICE display capabilities ryll is missing (<code>STREAM_REPORT</code>, <code>LZ4_COMPRESSION</code>, <code>MULTI_CODEC</code>+<code>CODEC_H264</code>, <code>PREF_COMPRESSION</code>+<code>PREF_VIDEO_CODEC_TYPE</code>), replace the pure-Rust MJPEG decoder with per-platform best-of-breed (ImageIO / WIC / VA-API / libjpeg-turbo), audit and complete per-channel diagnostic surface (especially playback), surface the spice-server's stream-flapping behaviour in the UI, add a vdagent responsiveness probe, and remove the now-redundant spurious-PONG keepalive. Spun out of test sessions 002 and 002b; phase 4 added after sessions 002d/002e exposed a playback observability gap.</td>
 <td>In progress</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">1. STREAM_REPORT</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">2. LZ4</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">3. Fast JPEG decode</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">4. Channel diagnostics audit</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">5. Auto-snapshot mode</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">6. Multi-codec + H.264</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">7. Preference messages</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">8. Streaming indicator + flap notification</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">9. Vdagent probe</a>, 10. Docs (no separate plan; dispatched as a docs-audit catch-all), <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">11. Remove PONG keepalive</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">12. Bounded image cache</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">13. Investigate intermittent server-side streaming</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">14. Status-bar pointer leak</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">15. build_tcp_frame warn</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">16. Guest-driver viability</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">17. Patched libspice validation</a></td>
+</tr>
+<tr>
+<td>2026-05-21</td>
+<td><a href="/components/ryll/plans/PLAN-streaming-test-automation/">Streaming test automation</a></td>
+<td>Replace the manual session-driven cadence with CI coverage of known-good streaming scenarios. Covers three complementary approaches: pcap replay (smallest first cut), input record-and-replay against a dedicated CI box (closer to real-world), and AT-SPI-based semantic replay (highest effort, dovetails with future MCP agent surfaces). Blocked on phase 13 of the stream-caps work finishing so we know which scenarios are deterministic enough to assert against.</td>
+<td>Proposed</td>
+<td>(phases not yet written)</td>
 </tr>
 <tr>
 <td>2026-07-19</td>
@@ -12040,7 +12191,7 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade/">webrtc-rs 0.20 upgrade</a></td>
 <td>Port <code>shakenfist-spice-webrtc</code> from webrtc-rs 0.17.1 to 0.20.x. 0.20 re-homes the crate on a sans-io <code>rtc</code> core behind a thin async layer, moving <code>RTCPeerConnection</code>'s operations onto a trait, collapsing the per-object callbacks into a single <code>PeerConnectionEventHandler</code>, dropping <code>gathering_complete_promise</code> and <code>connection_state</code>, and requiring explicit UDP bind addresses. Deferred from Renovate PR #245, which was repurposed to carry the <code>&lt; 0.18</code> pin and this plan.</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">1. Pre-work on 0.17</a> (complete), <a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">2. Atomic bump</a> (code complete on <code>webrtc = "0.20.2"</code>, both Renovate rules gone; <code>rtc</code> is now a direct dependency, the standalone <code>rtp</code> and <code>rustls</code> dependencies are gone, datachannels and remote tracks became poll loops, and UDP sockets bind enumerated interface addresses because <code>0.0.0.0</code> passes every test and reaches no browser. Awaiting the browser session, which is the only check that can catch a wrong bind address), 3. Socket binding config, 4. Soak and docs (phases 3-4 plans pending)</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">1. Pre-work on 0.17</a> (complete), <a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">2. Atomic bump</a>, 3. Socket binding config, 4. Soak and docs (phases 3-4 plans pending)</td>
 </tr>
 <tr>
 <td>2026-08-09</td>
@@ -12084,6 +12235,11 @@ execution.</p>
 <td>Follow-up fixes from audio playback channel integration</td>
 </tr>
 <tr>
+<td>2026-04-11</td>
+<td><a href="/components/ryll/plans/PLAN-opus-decoder/">Opus decoder</a></td>
+<td>Replace the abandoned <code>audiopus</code> C-wrapper crate with the pure-Rust <code>opus-decoder</code> crate to drop the cmake build dep and remove an unmaintained supply-chain dependency. (Step-based; landed.)</td>
+</tr>
+<tr>
 <td>2026-04-18</td>
 <td><a href="/components/ryll/plans/PLAN-supply-chain-scanning/">Supply-chain scanning</a></td>
 <td>Deterministic scanners for dependencies, secrets, and Unicode-based attacks</td>
@@ -12094,19 +12250,14 @@ execution.</p>
 <td>Tracked advisory ignores and unmaintained-crate debt surfaced when landing scanners</td>
 </tr>
 <tr>
-<td>2026-04-23</td>
-<td><a href="/components/ryll/plans/PLAN-macbook-bugreport-fixes/">Macbook bug-report fixes</a></td>
-<td>MOUSE_MODE wire format, client-mode re-request after guest reboot, and MULTI_MEDIA_TIME handler</td>
-</tr>
-<tr>
-<td>2026-04-11</td>
-<td><a href="/components/ryll/plans/PLAN-opus-decoder/">Opus decoder</a></td>
-<td>Replace the abandoned <code>audiopus</code> C-wrapper crate with the pure-Rust <code>opus-decoder</code> crate to drop the cmake build dep and remove an unmaintained supply-chain dependency. (Step-based; landed.)</td>
-</tr>
-<tr>
 <td>2026-04-22</td>
 <td><a href="/components/ryll/plans/PLAN-crate-release/">Crate release</a></td>
 <td>Publish the workspace's three sub-crates (<code>shakenfist-spice-protocol</code>, <code>-compression</code>, <code>-usbredir</code>) to crates.io alongside ryll on every tagged release. (Single-commit; landed at v0.1.4.)</td>
+</tr>
+<tr>
+<td>2026-04-23</td>
+<td><a href="/components/ryll/plans/PLAN-macbook-bugreport-fixes/">Macbook bug-report fixes</a></td>
+<td>MOUSE_MODE wire format, client-mode re-request after guest reboot, and MULTI_MEDIA_TIME handler</td>
 </tr>
 <tr>
 <td>2026-06-01</td>

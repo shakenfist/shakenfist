@@ -9547,6 +9547,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -9911,6 +9939,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -9919,6 +9975,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -12393,27 +12505,27 @@ guest). Out of scope for this plan.</p>
 <tbody>
 <tr>
 <td>1. Profile idle CPU</td>
-<td>PLAN-idle-cpu-and-latency-phase-01-profile.md</td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/">PLAN-idle-cpu-and-latency-phase-01-profile.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. Repaint cadence fix</td>
-<td>PLAN-idle-cpu-and-latency-phase-02-repaint.md</td>
-<td>Code landed; awaiting user verification</td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/">PLAN-idle-cpu-and-latency-phase-02-repaint.md</a></td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>3. Demote protocol logging</td>
-<td>PLAN-idle-cpu-and-latency-phase-03-logging.md</td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/">PLAN-idle-cpu-and-latency-phase-03-logging.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>4. Real latency from PING/PONG</td>
-<td>PLAN-idle-cpu-and-latency-phase-04-latency.md</td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/">PLAN-idle-cpu-and-latency-phase-04-latency.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>5. Capture runtime metrics in bug reports</td>
-<td>PLAN-idle-cpu-and-latency-phase-05-metrics.md</td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/">PLAN-idle-cpu-and-latency-phase-05-metrics.md</a></td>
 <td>Complete</td>
 </tr>
 </tbody>
@@ -12428,6 +12540,10 @@ readability and a missing is_verbose() guard on the
 playback channel.</em>  Phase 4 is independent of 1-3 but
 should land last so its sparkline data is visible once the
 other CPU-eating problems are fixed.</p>
+<p>Phase 2 is <code>In progress</code> rather than <code>Complete</code>: the repaint
+bridge code landed, but the CPU reduction it is supposed to
+deliver has not been confirmed on the reporter's machine, so
+the phase stays open until a user run verifies it.</p>
 <p>Phase 5 was added after the original incident: had ryll
 captured its own per-thread CPU into bug reports, the user
 report would have included the llvmpipe breakdown directly

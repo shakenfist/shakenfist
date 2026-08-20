@@ -9284,6 +9284,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -10077,6 +10105,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -10085,6 +10141,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -13086,42 +13198,42 @@ master plan is the input to writing them.</p>
 </tr>
 <tr>
 <td>1. Renderer extraction (<code>shakenfist-spice-renderer</code> crate)</td>
-<td>PLAN-web-frontend-phase-01-extract.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-01-extract/">PLAN-web-frontend-phase-01-extract.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. Encoder pipeline (framebuffer → H.264 NAL units, with VP8 contingency)</td>
-<td>PLAN-web-frontend-phase-02-encoder.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-02-encoder/">PLAN-web-frontend-phase-02-encoder.md</a></td>
 <td>Complete (H.264 path; VP8 contingency not triggered)</td>
 </tr>
 <tr>
 <td>3. WebRTC plumbing (<code>webrtc-rs</code>, video track, audio track, datachannel)</td>
-<td>PLAN-web-frontend-phase-03-webrtc.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-03-webrtc/">PLAN-web-frontend-phase-03-webrtc.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>4. HTTP server + token auth + signalling endpoint + browser shell</td>
-<td>PLAN-web-frontend-phase-04-server.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-04-server/">PLAN-web-frontend-phase-04-server.md</a></td>
 <td>Complete (synthetic source; real frames Phase 5)</td>
 </tr>
 <tr>
 <td>5. Inputs + cursor overlay + audio passthrough</td>
-<td>PLAN-web-frontend-phase-05-iac.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-05-iac/">PLAN-web-frontend-phase-05-iac.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>6. Reconnect + lifecycle</td>
-<td>PLAN-web-frontend-phase-06-lifecycle.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-06-lifecycle/">PLAN-web-frontend-phase-06-lifecycle.md</a></td>
 <td>Complete (<code>7c6fa2fa</code> bridge dead signal, <code>a3aaa1b5</code> reaper + encoder stop, <code>e7c98f10</code> browser auto-reconnect, 6d docs)</td>
 </tr>
 <tr>
 <td>7. CI build + packaging</td>
-<td>PLAN-web-frontend-phase-07-ci.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-07-ci/">PLAN-web-frontend-phase-07-ci.md</a></td>
 <td>Complete (<code>026a761e</code> publish-crates, <code>c6a0a94b</code> libopus-dev, <code>93ab083b</code> smoke test, <code>e59b8b13</code> deb/rpm deps, <code>efe9de60</code> docs sweep)</td>
 </tr>
 <tr>
 <td>8. Operator docs + systemd example</td>
-<td>PLAN-web-frontend-phase-08-docs.md</td>
+<td><a href="/components/ryll/plans/PLAN-web-frontend-phase-08-docs/">PLAN-web-frontend-phase-08-docs.md</a></td>
 <td>Complete (<code>62ea23ba</code> native TLS/8a, <code>5da02936</code> systemd/8b, <code>9ba4df0f</code> TLS docs/8c, <code>adc5bed</code> kerbside cross-ref/8d in kerbside repo, this commit/8e)</td>
 </tr>
 </tbody>
@@ -13521,6 +13633,13 @@ verify:</p>
   lets the operator run multiple sessions per machine.</li>
 <li><strong>Per-rect dirty tracking</strong> for partial-frame encodes.
   Meaningful CPU/bandwidth win on mostly-static desktops.</li>
+<li><strong>RTCP PLI (Picture Loss Indication) handling.</strong> The
+  WebRTC bring-up deliberately stubbed this: the bridge
+  forces a keyframe when the peer connection reaches
+  <code>Connected</code>, but never in response to a viewer-initiated
+  refresh, so a browser that loses the IDR has to reconnect
+  to recover. Wiring the incoming PLI through to
+  <code>EncoderControl::RequestKeyframe</code> closes that gap.</li>
 <li><strong>Multi-session / multi-tenant</strong> mode — one daemon, many
   desktops, many viewers. Hard-blocked on the
   authentication and TLS items above.</li>

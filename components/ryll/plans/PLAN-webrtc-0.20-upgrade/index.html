@@ -9284,6 +9284,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -9648,6 +9676,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -9656,6 +9712,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -12218,6 +12330,15 @@ minutes.</p>
 <p>Phase 01 is a hard prerequisite for 02 only in the sense that it
 makes 02 tractable; 02 could be done standalone at higher risk.
 Phases 03 and 04 both depend on 02.</p>
+<p>Phase 02 is <code>Code complete</code> rather than <code>Complete</code>: the port
+itself has landed on <code>webrtc = "0.20.2"</code> and both Renovate rules
+are gone, <code>rtc</code> is now a direct dependency, the standalone <code>rtp</code>
+and <code>rustls</code> dependencies are gone, datachannels and remote
+tracks became poll loops, and UDP sockets bind enumerated
+interface addresses because <code>0.0.0.0</code> passes every test and
+reaches no browser.  That last point is why the phase stays
+open: only a real browser session can catch a wrong bind
+address, and the test suite cannot stand in for it.</p>
 <h2 id="effort-estimate">Effort estimate<a class="headerlink" href="#effort-estimate" title="Permanent link">&para;</a></h2>
 <p>Roughly a week and a half, with a realistic band of five days to
 two weeks:</p>

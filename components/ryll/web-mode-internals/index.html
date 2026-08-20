@@ -9689,6 +9689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -10053,6 +10081,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -10061,6 +10117,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -12696,9 +12808,12 @@ path uses.</p>
 connection transitions to the <code>Connected</code> state, so the first
 frame the browser sees is always a full IDR. There is currently
 no RTCP PLI (Picture Loss Indication) handler requesting a
-keyframe on a viewer-initiated refresh — the phase 3 plan allowed
-stubbing it, and it was never implemented; <code>bridge.rs</code> registers
-no <code>on_rtcp_packet</code>-equivalent handling.</p>
+keyframe on a viewer-initiated refresh: <code>bridge.rs</code> registers no
+<code>on_rtcp_packet</code>-equivalent handling, so a browser that loses the
+IDR has no way to ask for another one and must reconnect. The
+WebRTC bring-up explicitly allowed stubbing this, and it is
+carried as future work in
+<a href="/components/ryll/plans/PLAN-web-frontend/"><code>PLAN-web-frontend.md</code></a>.</p>
 <h3 id="webrtc-rs-convention-handler-methods-must-never-block">webrtc-rs convention: handler methods must never block<a class="headerlink" href="#webrtc-rs-convention-handler-methods-must-never-block" title="Permanent link">&para;</a></h3>
 <p>See the "WebRTC conventions" section in <a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md"><code>AGENTS.md</code></a> for the
 normative rule. In short: webrtc-rs 0.20 awaits every

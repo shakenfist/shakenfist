@@ -9284,6 +9284,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -9772,6 +9800,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
@@ -9780,6 +9836,62 @@
     
   
     Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
   
 
     
@@ -12038,6 +12150,23 @@ actually hot.</p>
    is unmeasurable without external instrumentation. See
    <code>PLAN-video-keeping-up-phase-04-render-latency.md</code>.</p>
 </li>
+<li>
+<p><strong>Asynchronous MP4 finalisation</strong>, accepted as a
+   deliberate regression when phase 3 moved encoding off the
+   GUI event loop. <code>CaptureSession::close()</code> drops the frame
+   sender and returns immediately; the encoder task drains
+   its queue and writes the moov atom afterwards, on the
+   tokio runtime. A bug report assembled within milliseconds
+   of <code>close()</code> can therefore capture an unfinalised
+   (unplayable) MP4, and an abrupt shutdown can tear the
+   runtime down before the final <code>write_end()</code>. Finalising
+   synchronously was rejected because it would have put the
+   caller back to blocking on the encoder draining, which is
+   exactly the stall the phase was removing. In practice the
+   queue is a few frames deep so the window is small. See
+   <code>PLAN-video-keeping-up-phase-03-video-encode-thread.md</code>
+   for the full analysis of both scenarios.</p>
+</li>
 </ol>
 <h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
 <p>A "video stream not keeping up" bug report is self-diagnosing
@@ -12074,22 +12203,22 @@ session:</p>
 <tbody>
 <tr>
 <td>1. Decode duration + socket fill + ACK-window signals</td>
-<td>PLAN-video-keeping-up-phase-01-instrumentation.md</td>
+<td><a href="/components/ryll/plans/PLAN-video-keeping-up-phase-01-instrumentation/">PLAN-video-keeping-up-phase-01-instrumentation.md</a></td>
 <td>Done</td>
 </tr>
 <tr>
 <td>2. Move pcap writes to a dedicated writer task</td>
-<td>PLAN-video-keeping-up-phase-02-pcap-thread.md</td>
+<td><a href="/components/ryll/plans/PLAN-video-keeping-up-phase-02-pcap-thread/">PLAN-video-keeping-up-phase-02-pcap-thread.md</a></td>
 <td>Done</td>
 </tr>
 <tr>
 <td>3. Move MP4 video encoding off the GUI event loop</td>
-<td>PLAN-video-keeping-up-phase-03-video-encode-thread.md</td>
+<td><a href="/components/ryll/plans/PLAN-video-keeping-up-phase-03-video-encode-thread/">PLAN-video-keeping-up-phase-03-video-encode-thread.md</a></td>
 <td>Done</td>
 </tr>
 <tr>
 <td>4. Render-side arrival-to-display latency</td>
-<td>PLAN-video-keeping-up-phase-04-render-latency.md</td>
+<td><a href="/components/ryll/plans/PLAN-video-keeping-up-phase-04-render-latency/">PLAN-video-keeping-up-phase-04-render-latency.md</a></td>
 <td>Done</td>
 </tr>
 </tbody>

@@ -13,10 +13,10 @@
         <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap/">
       
       
-        <link rel="prev" href="../PLAN-ci-platform-matrix/">
+        <link rel="prev" href="../PLAN-egui-0.34-followups/">
       
       
-        <link rel="next" href="../PLAN-self-hosted-runners/">
+        <link rel="next" href="../PLAN-streaming-test-automation/">
       
       
         
@@ -9284,6 +9284,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
@@ -9645,6 +9673,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-egui-0.34-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    egui / eframe 0.34 follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -9955,6 +10011,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-streaming-test-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming test automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPEN-QUESTIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions watch-list
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -12562,47 +12674,47 @@ session 002b showed that MJPEG decode in the pure-Rust
 <tbody>
 <tr>
 <td>1. STREAM_REPORT</td>
-<td>completed/PLAN-stream-caps-and-flap-phase-01-stream-report.md</td>
+<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">completed/PLAN-stream-caps-and-flap-phase-01-stream-report.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. LZ4 compression</td>
-<td>PLAN-stream-caps-and-flap-phase-02-lz4.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">PLAN-stream-caps-and-flap-phase-02-lz4.md</a></td>
 <td>Code landed; smoke test (2C) folded into phase 3 step 3H</td>
 </tr>
 <tr>
 <td>3. Fast JPEG decode</td>
-<td>PLAN-stream-caps-and-flap-phase-03-jpeg-decoders.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">PLAN-stream-caps-and-flap-phase-03-jpeg-decoders.md</a></td>
 <td>Code landed (3A-3G). Session 006 follow-up revealed still-image JPEG path missed the wiring (was on pure-Rust at ~263 ms/frame); fix landed. 3H replaced with the 007 still-image JPEG smoke matrix (one shared guest, three client OSes) — pending operator runs.</td>
 </tr>
 <tr>
 <td>4. Channel diagnostics audit + playback observability</td>
-<td>completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md</td>
+<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md</a></td>
 <td>Complete (4G verified in session 002g: <code>data_packets_received == data_packets_decoded</code>, no decode failures, underruns visible — instrumentation distinguishes the four failure modes as designed)</td>
 </tr>
 <tr>
 <td>5. Auto-snapshot bug-report mode</td>
-<td>PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md</a></td>
 <td>Code landed (5A-5B); 5C operator smoke test pending</td>
 </tr>
 <tr>
 <td>6. Multi-codec + H.264</td>
-<td>PLAN-stream-caps-and-flap-phase-06-h264.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">PLAN-stream-caps-and-flap-phase-06-h264.md</a></td>
 <td>Code landed (6A-6E); 6F operator smoke test pending (needs an H.264-capable spice-server build to actually exercise the new path)</td>
 </tr>
 <tr>
 <td>7. Preference messages</td>
-<td>PLAN-stream-caps-and-flap-phase-07-pref-messages.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">PLAN-stream-caps-and-flap-phase-07-pref-messages.md</a></td>
 <td>Code landed (7A-7C); session 006 measurement drove AUTO_LZ → AUTO_GLZ revert (server stopped using GLZ entirely under AUTO_LZ; +25% bytes_in). 7D smoke folded into the next 005-style run.</td>
 </tr>
 <tr>
 <td>8. Live streaming indicator + flap notification</td>
-<td>PLAN-stream-caps-and-flap-phase-08-streaming-indicator.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">PLAN-stream-caps-and-flap-phase-08-streaming-indicator.md</a></td>
 <td>Code landed.</td>
 </tr>
 <tr>
 <td>9. Vdagent responsiveness probe</td>
-<td>PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md</a></td>
 <td>Code landed (9A-9D). 9E operator smoke (deliberately freeze the guest agent to verify the Warn notification fires) is pending.</td>
 </tr>
 <tr>
@@ -12612,37 +12724,37 @@ session 002b showed that MJPEG decode in the pure-Rust
 </tr>
 <tr>
 <td>11. Remove spurious-PONG keepalive</td>
-<td>PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md</a></td>
 <td>11A landed (main channel); 11B doc cleanup landed (channel-diagnostics-audit + plan addendum); inputs-channel <code>send_idle_keepalive</code> kept (decision recorded in phase 11 plan — different mechanism + no visible side effects + cross-channel-idleness hypothesis); 11C long-idle soak pending.</td>
 </tr>
 <tr>
 <td>12. Bounded image cache</td>
-<td>completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md</td>
+<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md</a></td>
 <td><strong>Complete.</strong> 12A-12C landed; 12D smoke FAILED (revealed GlzDictionary was a second unbounded cache the snapshot was summing in); 12E (bound GLZ), 12F (split snapshot fields), 12G (docs) all landed; 12H verified in session 005b — <code>glz_dictionary_bytes</code> held at 247 MiB / 256 cap across 67 snapshots over 670 s with eviction firing, <code>image_cache_bytes</code> stayed at 0, no RSS drift.</td>
 </tr>
 <tr>
 <td>13. Investigate intermittent server-side streaming</td>
-<td>PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md</a></td>
 <td><strong>Parked.</strong> Session 006 confirmed the trace-ring/VRAM diminishing-returns curve (165→85→77 OOMs/min at 64/128/256 MiB) but uncovered a bigger blocker: the 1024×768 YouTube video almost never crosses <code>is_stream_start</code> (1–2 video stream creates per 10 min vs ~100 cursor / scrollbar creates). All four 006 bundles show <code>streams_created_total = 0</code> client-side. Findings folded into the phase 13 plan's "Session 006 findings" section. Resume after non-video phases close.</td>
 </tr>
 <tr>
 <td>14. Stop status-bar pointer events leaking into the guest</td>
-<td>PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak.md</a></td>
 <td>Code landed.</td>
 </tr>
 <tr>
 <td>15. Track down <code>build_tcp_frame: payload too large</code> warns</td>
-<td>PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn.md</a></td>
 <td>15B (one-shot backtrace) landed; no fires across 006 bundles. Awaiting fresh reproduction.</td>
 </tr>
 <tr>
 <td>16. Evaluate guest driver options for video streaming</td>
-<td>PLAN-stream-caps-and-flap-phase-16-qxl-viability.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">PLAN-stream-caps-and-flap-phase-16-qxl-viability.md</a></td>
 <td><strong>Parked.</strong> Concept stub. Resume alongside phase 13 after non-video phases close.</td>
 </tr>
 <tr>
 <td>17. Patched libspice-server for hypothesis validation</td>
-<td>PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation.md</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation.md</a></td>
 <td><strong>Parked.</strong> Value uncertain after 006: bumping <code>NUM_TRACE_ITEMS</code> 8→128 helps cursor / scrollbar flap, but does not address why the YouTube video itself isn't a stream. Hold off on the .deb build until the predicate question is answered.</td>
 </tr>
 </tbody>
