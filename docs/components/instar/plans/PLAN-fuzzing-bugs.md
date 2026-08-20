@@ -1,5 +1,9 @@
 # Triage and fix the standing fuzzing-bug backlog
 
+## Status: Complete
+
+Phases 1-5.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

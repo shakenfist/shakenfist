@@ -1,6 +1,55 @@
 # Automated fuzzer bug fix workflow
 
-## Status: In Progress (workflow scaffolding merged, not yet exercised end-to-end)
+## Status: In progress
+
+The workflow is built, scheduled, and running daily. It has **never
+produced a pull request**, and that is a bug in the workflow rather
+than a gap in the plan.
+
+As of 2026-08-19: no `autofix/*` branch has ever reached origin, no PR
+has ever been opened, and 28 `security-audit` issues carry the
+`autofix-failed` label (26 closed by hand, 2 open). `autofix-complex`
+has never been applied, so the complexity guardrails are not what is
+stopping it.
+
+### Diagnosis: the gate reads the index, the safety net stages too late
+
+`.github/workflows/fuzz-autofix.yml` decides whether Claude produced a
+fix by inspecting the *staged* tree:
+
+* line 285 (`Check complexity (attempt 1)`) — `git diff --cached --name-only`
+* line 348 (`Verify fix (attempt 1)`) — the same command again, and
+  an empty result sets `fix_succeeded=false`
+* lines 505 and 561 — the same two checks for attempt 2
+
+The compensating `git add -u`, commented in the workflow as a "safety
+net" for exactly this case, does not run until line 637, inside the
+`Create PR` step — which only executes once verification has already
+passed. The safety net sits downstream of the gate that needs it.
+
+Claude Code edits the working tree and does not necessarily stage. So
+a correct fix is written, the gate sees an empty index, both attempts
+report "No changes staged by Claude", and the issue is labelled
+`autofix-failed` with a report whose own text gives it away: a real
+source file under "Changes not staged for commit" above an empty
+`=== Staged Changes ===` block. Issues #492, #485 and #426 all show
+this shape.
+
+Staging is the dominant failure mode but not the only one: #438 did
+stage a substantive fix and still failed, later in verification. Both
+need to be true before a PR can appear, so fixing the gate is
+necessary but may not be sufficient.
+
+### Remaining work
+
+* Stage tracked modifications immediately after each Claude attempt,
+  before the complexity and verification steps read the index (fix in
+  progress on a separate branch).
+* Re-run against the two open `autofix-failed` issues (#485, #492) and
+  confirm at least one reaches a PR — this is the plan's own
+  outstanding success criterion.
+* Refresh the hardcoded `Co-Authored-By: Claude Opus 4.6 (1M context)`
+  trailer at line 653, which no longer names the model that runs.
 
 ## Prompt
 

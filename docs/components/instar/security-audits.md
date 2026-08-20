@@ -456,11 +456,15 @@ improvements:
 ### Scope
 
 Coverage-guided fuzzing of all `no_std` parser crates using
-`cargo-fuzz` (libFuzzer). 17 fuzz targets exercise format detection,
-header parsing, L1/L2 cluster lookup, refcount table traversal,
-decompression, grain directory lookup, BAT traversal, VHDX
-metadata parsing, the measure calculator, the create emitters, and
-the resize planners.
+`cargo-fuzz` (libFuzzer). The campaign began with the parser targets
+listed below — format detection, header parsing, L1/L2 cluster lookup,
+refcount table traversal, decompression, grain directory lookup, BAT
+traversal and VHDX metadata parsing — and has grown to **40 targets**
+(`src/fuzz/fuzz_targets/`): every subcommand implemented since brought
+its own planner and emitter targets onto the same harness
+infrastructure, and the later input-format work added VDI, Parallels,
+QCOW1 and DMG. The table below is the original parser roster; the
+directory is the current one.
 
 ### Technique
 
@@ -501,4 +505,24 @@ hand-crafted minimal valid inputs for each format.
 
 ### Findings
 
-*To be updated as fuzzing runs accumulate.*
+The campaign runs nightly and its findings are tracked as GitHub
+issues rather than in this document, so that CI can file and update
+them without merge conflicts. As of 2026-08-19, 258 `security-audit`
+issues have been closed and 3 are open.
+
+Two backlog drains were large enough to warrant their own plans, and
+both are complete:
+
+- [PLAN-fuzzing-bugs.md](/components/instar/plans/PLAN-fuzzing-bugs/) — 44 issues
+  resolved to 5 root causes (`plan_vmdk` capacity overflow, qcow2
+  `scan_allocation` out-of-bounds L2 entries, measure-calculator sum
+  overflow, vhd/vhdx/vmdk `allocated_bytes` clamp, and a differential
+  external-timeout misclassification).
+- [PLAN-bug-fixes.md](/components/instar/plans/PLAN-bug-fixes/) — 10 issues resolved to
+  3 root causes (Fixed-VHD `virtual_size` overflow in `plan_vhd`, an
+  unchecked VHDX resize sequence-number increment, and qcow2
+  `resize --shrink` sub-byte refcount corruption).
+
+The one open defect at the time of writing is #483: `fuzz_rebase_planners`
+emits a write patch outside `total_file_size` (#485 and #492 are
+duplicate crash reports of the same signature).

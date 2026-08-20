@@ -1,6 +1,54 @@
 # Coverage-guided fuzzing of parser crates (Phase 6)
 
-## Status: In Progress (Steps 1-5 infrastructure merged, extended runs not yet complete)
+## Status: Complete
+
+All seven steps are done, and the campaign the plan describes has been
+running continuously since March 2026.
+
+Delivery outran the plan's own scope. The plan asked for harnesses
+covering the six `no_std` parser crates; `src/fuzz/fuzz_targets/`
+holds **40** targets, because every subcommand plan landed since
+(measure, create, resize, rebase/commit, map, snapshot, check
+--repair, amend, dd, bitmap, bench, qcow2-write) added its own
+coverage-guided targets under this plan's infrastructure. The mock
+`CallTable`, the scratch-memory simulation, and the corpus tooling
+have not needed to change to absorb them, which is the strongest
+evidence the step 1 design was right.
+
+Against the success criteria:
+
+* **Targets for all six parser crates** — done, plus 34 more.
+* **Seed corpus from the test images** — `scripts/extract-fuzz-corpus.py`,
+  persisted to `instar-testdata/custom/fuzz-corpus/`.
+* **4 hours per target / 24 hours cumulative** — exceeded by orders of
+  magnitude. `.github/workflows/coverage-fuzz.yml` runs nightly at
+  04:00 UTC against a 450-minute budget tiered by `tools/ci/fuzz-tier.sh`,
+  plus a per-PR smoke test, a post-merge smoke test, and
+  `workflow_dispatch`.
+* **Automatic issue filing** — `tools/ci/report-fuzz-crash.sh`, with
+  deduplication by crash signature.
+* **Crashes fixed and tracked** — roughly 200 `security-audit` issues
+  have been closed. Two dedicated backlog-drain plans came out of this
+  work and both completed: [PLAN-fuzzing-bugs.md](/components/instar/plans/PLAN-fuzzing-bugs/)
+  (44 issues, 5 root causes) and [PLAN-bug-fixes.md](/components/instar/plans/PLAN-bug-fixes/)
+  (10 issues, 3 root causes).
+* **Documentation** — `docs/testing.md` covers running targets and
+  reading coverage; `docs/security-audits.md` carries the technique and
+  infrastructure; `ARCHITECTURE.md` and `README.md` mention it;
+  `make fuzz-build` / `make fuzz-run` exist.
+
+One criterion is not met in the literal sense and never will be, which
+is why the plan closes rather than waiting: "no unresolved crashes" is
+a steady-state property of a fuzzer that runs every night, not a
+milestone. At close there are three open `security-audit` issues and
+they are one defect — `fuzz_rebase_planners` emitting a write patch
+outside `total_file_size` (#483, with #485 and #492 as duplicate crash
+reports of the same signature). That is tracked as an issue, which is
+where this plan says findings belong; it is not a reason to hold the
+infrastructure plan open.
+
+Follow-on work has its own plan:
+[PLAN-fuzz-autofix.md](/components/instar/plans/PLAN-fuzz-autofix/) for automated triage.
 
 ## Prompt
 

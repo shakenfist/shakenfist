@@ -1,5 +1,17 @@
 # `instar bench` subcommand
 
+## Status: Complete
+
+Phases 1-8. `instar bench` — the reframed sandboxed-path measurement
+(instar's own end-to-end guest→virtio→host I/O path, not qemu's block
+layer) with byte-parity on the deterministic surface (header line,
+validation, exit codes); reads on all five formats (raw, qcow2 incl.
+backing chains, vmdk, vhd, vhdx) and writes on raw and qcow2 incl.
+overlays; live-parity integration tests plus coverage and differential
+fuzzing, explicitly no cross-version baselines (timing is not
+comparable); and docs. instar now implements all 15 qemu-img
+subcommands — the parity roster is closed.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

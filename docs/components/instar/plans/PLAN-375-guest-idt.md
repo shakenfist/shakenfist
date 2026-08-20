@@ -1,5 +1,19 @@
 # PLAN-375: A guest IDT so codegen miscompiles fail loudly, not silently
 
+## Status: Complete
+
+Landed 2026-07-25 in `a938e4b`, together with this plan document:
+`src/core/src/idt.rs` (IDT, 32 exception stubs, common handler),
+`idt::install()` as the first step of `_start`, and the host-side
+`cpu-exception` capture in `src/vmm/src/main.rs`. Validation is
+recorded below.
+
+Issue #375 stays open by design. The `#[inline(never)]` attributes
+remain the primary defence and this plan is the safety net that makes
+their failure observable; the issue closes only if the underlying LLVM
+miscompile is reproduced and root-caused upstream.
+
+
 ## Prompt
 
 "Let's find a permanent fix for #375 instead of a workaround." Issue #375

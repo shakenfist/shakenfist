@@ -1,5 +1,9 @@
 # `instar rebase` and `instar commit` subcommands
 
+## Status: Complete
+
+Phases 1-12.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

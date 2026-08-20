@@ -1,6 +1,11 @@
 # Release v0.3.0
 
-## Status: Complete (v0.3.0 published 2026-08-02; install validation carried to #474)
+## Status: Complete
+
+v0.3.0 published 2026-08-02: signed tag verified, three artifacts
+live. The packaging manifests were fixed to the full 16-binary roster
+and the package smoke test extended to prove it. Post-release install
+validation was carried to issue #474, which closed 2026-08-11.
 
 ## Prompt
 

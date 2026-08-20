@@ -1,5 +1,12 @@
 # Convert follow-ups: deferred work after PLAN-convert.md
 
+## Status: Complete
+
+Phase 1 (all seven subcommands shipped; `snapshot` closed the roster)
+and phase 2 (`check --repair`, promoted to
+[PLAN-check-repair.md](/components/instar/plans/PLAN-check-repair/), all 11 phases landed)
+both done.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

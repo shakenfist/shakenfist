@@ -1,17 +1,55 @@
 # Plan: First Public Release of Instar
 
-## Status: In Progress
+## Status: Complete
 
-Phases 1-4 are complete: Cargo.toml metadata, release workflow,
-.deb / .rpm packaging, and the v0.2.0 tag itself all shipped on
-2026-05-09 (see `PLAN-release-v0.2.md` for the v0.2.0 execution
-record). Phase 5 (security audit) is mostly done — see
-`PLAN-audit.md` for current state. Phase 6 (coverage-guided
-fuzzing) is in progress — see `PLAN-coverage-fuzzing.md`.
+The umbrella goal — "prepare instar for its first public release"
+— was met on 2026-05-09 when v0.2.0 was tagged and published, and
+has since been exercised a second time end-to-end by v0.3.0
+(published 2026-08-02). All five phases of this plan are done:
 
-This plan now serves as the umbrella for ongoing release-quality
-work; per-release execution lives in its own plan
-(`PLAN-release-v0.2.md`, future `PLAN-release-vN.M.md`).
+* **Phase 1 (Cargo.toml metadata)** — shipped. `src/vmm/Cargo.toml`
+  carries the full published-crate metadata block; library crates
+  carry `repository` / `authors` / `keywords` / `categories`;
+  internal crates carry `publish = false`.
+* **Phase 2 (release workflow)** — shipped as
+  `.github/workflows/release.yml`: `check-version` → `build` →
+  `sign-tag` (Sigstore, gated on the `release` GitHub environment)
+  → `github-release`. It has run for real twice. The build job also
+  went beyond the original sketch: it enforces the shipped binary's
+  glibc floor via `tools/ci/check-glibc-floor.sh`, and builds and
+  uploads `.deb` and `.rpm` packages alongside the tarball — the
+  packaging that this plan originally deferred.
+* **Phase 3 (documentation gaps)** — shipped: `CHANGELOG.md`,
+  `SECURITY.md`, and the README `Installation` section all exist
+  and are maintained per release.
+* **Phase 4 (version and tagging)** — shipped: `make release`,
+  `make check-version`, `make package`, the `release` environment,
+  and the documented tag-and-push sequence. v0.2.0 and v0.3.0 both
+  went out through it.
+* **Phase 5 (pre-release audit)** — discharged as a v0.2.0 gate;
+  the execution record is in `PLAN-release-v0.2.md`. The recurring
+  items have since become standing CI rather than per-release
+  checklists: `cargo audit` runs in `supply-chain.yml`, clippy in
+  `lint.yml`, the functional suite in `functional-tests.yml`, and
+  `pre-commit` on every push. One checklist item is simply stale
+  and was never true in the form written — plan documents are
+  versioned in `docs/plans/`, not gitignored; the release tarball
+  is built from an explicit file list (`instar`, the guest `.bin`
+  files, `LICENSE`, `README.md`), so no plan document has ever
+  been published in an artifact.
+
+The "phase 6 coverage fuzzing" referenced by the old status line
+was never a phase of this plan. Coverage-guided fuzzing and the
+security audit are separately registered master plans
+(`PLAN-coverage-fuzzing.md`, `PLAN-audit.md`) that continue on
+their own; they are release-quality work, not first-release
+blockers, and holding this plan open for them was what kept it
+marked in-progress long after it was finished.
+
+Per-release execution lives in its own plan
+(`PLAN-release-v0.2.md`, `PLAN-release-v0.3.md`, future
+`PLAN-release-vN.M.md`). Future releases need this plan only as
+background; they do not reopen it.
 
 ## Goal
 
@@ -262,6 +300,12 @@ The README already exists and is comprehensive but needs an
   can create them
 
 ## Phase 5: Pre-release audit
+
+Discharged as a v0.2.0 gate — the execution record, including which
+items passed and which were carried forward, is in
+`PLAN-release-v0.2.md`. The recurring items are now standing CI
+(see the Status section). The checklist below is retained as the
+historical statement of what the gate required.
 
 Before tagging v0.2.0:
 

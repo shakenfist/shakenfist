@@ -1,5 +1,7 @@
 # `instar dd` subcommand
 
+## Status: Complete
+
 ## Prompt
 
 Before responding to questions or discussion points in this

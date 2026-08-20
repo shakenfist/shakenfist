@@ -1,12 +1,19 @@
 # Plan: Multi-distro install + qemu-img differential CI
 
-## Status: Complete 2026-08-15 (all phases)
+## Status: Complete
 
 Every merge to `develop` now installs a freshly built `.deb` or `.rpm`
 on Debian 12/13, Ubuntu 22.04/24.04, Fedora and Rocky 9/10 and runs the
 full integration suite against each distribution's own `qemu-img`
 (6.2 through 10.2), and cannot merge unless all seven pass. Pull-request
 latency is unchanged — the matrix runs only in the merge queue.
+
+Phases 1-5 and 2b, finished 2026-08-15. Phase 1 dropped the release
+binary's glibc floor to 2.30 by splitting the build image off the dev
+image; phases 2 and 2b measured every qemu output-format boundary
+against 80 static per-version `qemu-img` builds rather than inferring
+them, and found that instar's VHD writer had been silently truncating
+on every qemu before 10.0.
 
 It found a regression on its first real run: see the phase 5 outcome.
 
