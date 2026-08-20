@@ -86,8 +86,9 @@ virtio-gpu does not exhibit.
 **Resolution cliff.** Measured on Debian 11 with QXL across four
 guest resolutions and three VRAM allocations, video streaming
 degrades sharply between roughly 1280 and 1600 pixels wide. The
-raw evidence behind this section is in
-[`PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md`](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/).
+raw evidence behind this section is in the streaming
+intermittency investigation, linked from
+[`PLAN-stream-caps-and-flap.md`](/components/ryll/plans/PLAN-stream-caps-and-flap/).
 
 | Guest resolution | Video streaming behaviour |
 |---|---|

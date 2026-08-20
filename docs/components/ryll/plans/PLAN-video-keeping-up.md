@@ -120,6 +120,22 @@ actually hot.
    is unmeasurable without external instrumentation. See
    `PLAN-video-keeping-up-phase-04-render-latency.md`.
 
+4. **Asynchronous MP4 finalisation**, accepted as a
+   deliberate regression when phase 3 moved encoding off the
+   GUI event loop. `CaptureSession::close()` drops the frame
+   sender and returns immediately; the encoder task drains
+   its queue and writes the moov atom afterwards, on the
+   tokio runtime. A bug report assembled within milliseconds
+   of `close()` can therefore capture an unfinalised
+   (unplayable) MP4, and an abrupt shutdown can tear the
+   runtime down before the final `write_end()`. Finalising
+   synchronously was rejected because it would have put the
+   caller back to blocking on the encoder draining, which is
+   exactly the stall the phase was removing. In practice the
+   queue is a few frames deep so the window is small. See
+   `PLAN-video-keeping-up-phase-03-video-encode-thread.md`
+   for the full analysis of both scenarios.
+
 ## Acceptance criteria
 
 A "video stream not keeping up" bug report is self-diagnosing
@@ -148,10 +164,10 @@ session:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Decode duration + socket fill + ACK-window signals | PLAN-video-keeping-up-phase-01-instrumentation.md | Done |
-| 2. Move pcap writes to a dedicated writer task | PLAN-video-keeping-up-phase-02-pcap-thread.md | Done |
-| 3. Move MP4 video encoding off the GUI event loop | PLAN-video-keeping-up-phase-03-video-encode-thread.md | Done |
-| 4. Render-side arrival-to-display latency | PLAN-video-keeping-up-phase-04-render-latency.md | Done |
+| 1. Decode duration + socket fill + ACK-window signals | [PLAN-video-keeping-up-phase-01-instrumentation.md](/components/ryll/plans/PLAN-video-keeping-up-phase-01-instrumentation/) | Done |
+| 2. Move pcap writes to a dedicated writer task | [PLAN-video-keeping-up-phase-02-pcap-thread.md](/components/ryll/plans/PLAN-video-keeping-up-phase-02-pcap-thread/) | Done |
+| 3. Move MP4 video encoding off the GUI event loop | [PLAN-video-keeping-up-phase-03-video-encode-thread.md](/components/ryll/plans/PLAN-video-keeping-up-phase-03-video-encode-thread/) | Done |
+| 4. Render-side arrival-to-display latency | [PLAN-video-keeping-up-phase-04-render-latency.md](/components/ryll/plans/PLAN-video-keeping-up-phase-04-render-latency/) | Done |
 
 **Phase 1** is the gate. It produces the data needed to triage
 U1 and tells us whether phases 2–4 are warranted. Done when the

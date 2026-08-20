@@ -246,9 +246,12 @@ The bridge sends `EncoderControl::RequestKeyframe` when the peer
 connection transitions to the `Connected` state, so the first
 frame the browser sees is always a full IDR. There is currently
 no RTCP PLI (Picture Loss Indication) handler requesting a
-keyframe on a viewer-initiated refresh — the phase 3 plan allowed
-stubbing it, and it was never implemented; `bridge.rs` registers
-no `on_rtcp_packet`-equivalent handling.
+keyframe on a viewer-initiated refresh: `bridge.rs` registers no
+`on_rtcp_packet`-equivalent handling, so a browser that loses the
+IDR has no way to ask for another one and must reconnect. The
+WebRTC bring-up explicitly allowed stubbing this, and it is
+carried as future work in
+[`PLAN-web-frontend.md`](/components/ryll/plans/PLAN-web-frontend/).
 
 ### webrtc-rs convention: handler methods must never block
 

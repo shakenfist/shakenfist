@@ -190,16 +190,16 @@ table top-to-bottom is always safe.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Auto-snapshot ring buffer at disconnect moment | PLAN-session-001-feedback-phase-01-disconnect-snapshot.md | Done |
-| 2. Main-channel auto-reconnect / keepalive (originally framed as the K1 fix; K1 root cause is now fixed independently in `370d8ce5`. Phase 02 reframed as general-purpose disconnect/reconnect UX — steps 1, 2, 2b, 2c, 2e, 2f, 3 landed during the investigation; steps 4, 5, 6 landed as session-001-feedback follow-ups; step 7 is this doc wrap-up.) | PLAN-session-001-feedback-phase-02-reconnect.md | Done |
-| 3. Preserve audio volume across reconnect | PLAN-session-001-feedback-phase-03-audio-volume.md | Done |
-| 4. Region-select zero-width guard | PLAN-session-001-feedback-phase-04-region-select.md | Done |
-| 5. Handle `STREAM_DESTROY_ALL` (display msg 126) | PLAN-session-001-feedback-phase-05-stream-destroy-all.md | Done |
-| 6. Rebalance per-channel ring-buffer split by expected traffic | PLAN-session-001-feedback-phase-06-channel-rebalance.md | Done |
-| 7. `Arc<[u8]>` refactor for `TrafficEntry::pcap_frame` | PLAN-session-001-feedback-phase-07-traffic-arc.md | Done |
-| 8. Segment large messages in ring-buffer frame builder | PLAN-session-001-feedback-phase-08-ring-segmentation.md | Done |
-| 9. Connection events in notifications pane (F1) | PLAN-session-001-feedback-phase-09-connection-notifications.md | Done |
-| 10. Notification → bug-report button (F2) | PLAN-session-001-feedback-phase-10-notification-bug-button.md | Done |
+| 1. Auto-snapshot ring buffer at disconnect moment | [PLAN-session-001-feedback-phase-01-disconnect-snapshot.md](/components/ryll/plans/PLAN-session-001-feedback-phase-01-disconnect-snapshot/) | Done |
+| 2. Main-channel auto-reconnect / keepalive (originally framed as the K1 fix; K1 root cause is now fixed independently in `370d8ce5`. Phase 02 reframed as general-purpose disconnect/reconnect UX — steps 1, 2, 2b, 2c, 2e, 2f, 3 landed during the investigation; steps 4, 5, 6 landed as session-001-feedback follow-ups; step 7 is this doc wrap-up.) | [PLAN-session-001-feedback-phase-02-reconnect.md](/components/ryll/plans/PLAN-session-001-feedback-phase-02-reconnect/) | Done |
+| 3. Preserve audio volume across reconnect | [PLAN-session-001-feedback-phase-03-audio-volume.md](/components/ryll/plans/PLAN-session-001-feedback-phase-03-audio-volume/) | Done |
+| 4. Region-select zero-width guard | [PLAN-session-001-feedback-phase-04-region-select.md](/components/ryll/plans/PLAN-session-001-feedback-phase-04-region-select/) | Done |
+| 5. Handle `STREAM_DESTROY_ALL` (display msg 126) | [PLAN-session-001-feedback-phase-05-stream-destroy-all.md](/components/ryll/plans/PLAN-session-001-feedback-phase-05-stream-destroy-all/) | Done |
+| 6. Rebalance per-channel ring-buffer split by expected traffic | [PLAN-session-001-feedback-phase-06-channel-rebalance.md](/components/ryll/plans/PLAN-session-001-feedback-phase-06-channel-rebalance/) | Done |
+| 7. `Arc<[u8]>` refactor for `TrafficEntry::pcap_frame` | [PLAN-session-001-feedback-phase-07-traffic-arc.md](/components/ryll/plans/PLAN-session-001-feedback-phase-07-traffic-arc/) | Done |
+| 8. Segment large messages in ring-buffer frame builder | [PLAN-session-001-feedback-phase-08-ring-segmentation.md](/components/ryll/plans/PLAN-session-001-feedback-phase-08-ring-segmentation/) | Done |
+| 9. Connection events in notifications pane (F1) | [PLAN-session-001-feedback-phase-09-connection-notifications.md](/components/ryll/plans/PLAN-session-001-feedback-phase-09-connection-notifications/) | Done |
+| 10. Notification → bug-report button (F2) | [PLAN-session-001-feedback-phase-10-notification-bug-button.md](/components/ryll/plans/PLAN-session-001-feedback-phase-10-notification-bug-button/) | Done |
 
 **Master plan complete.** All five confirmed bugs (K1–K5)
 and both confirmed feature requests (F1, F2) are resolved.

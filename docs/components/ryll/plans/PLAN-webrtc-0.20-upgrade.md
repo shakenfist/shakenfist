@@ -326,6 +326,16 @@ Phase 01 is a hard prerequisite for 02 only in the sense that it
 makes 02 tractable; 02 could be done standalone at higher risk.
 Phases 03 and 04 both depend on 02.
 
+Phase 02 is `Code complete` rather than `Complete`: the port
+itself has landed on `webrtc = "0.20.2"` and both Renovate rules
+are gone, `rtc` is now a direct dependency, the standalone `rtp`
+and `rustls` dependencies are gone, datachannels and remote
+tracks became poll loops, and UDP sockets bind enumerated
+interface addresses because `0.0.0.0` passes every test and
+reaches no browser.  That last point is why the phase stays
+open: only a real browser session can catch a wrong bind
+address, and the test suite cannot stand in for it.
+
 ## Effort estimate
 
 Roughly a week and a half, with a realistic band of five days to
