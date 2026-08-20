@@ -160,17 +160,6 @@ the commits that add marks need signatures.
 
 ## Vendored web assets
 
-### Bootstrap CSS
-
-Kerbside uses bootstrap CSS for styling. This was constructed by
-downloading Bootstrap 5.3 and jQuery 3.7.0 and then installing to
-`kerbside/api/static/js`.
-
-### Axios
-
-Kerbside's web administration API uses Axios for HTTP requests.
-Version 1.6.5 is cached at `kerbside/api/static/js`.
-
 ### sfui
 
 `kerbside/api/static/sfui` is a vendored copy of
@@ -216,11 +205,11 @@ flagged even when every vendored file is byte for byte correct.
 ### Page polling
 
 Every page rendered with `refresh=True` polls instead of reloading.
-`base-sfui.html` wraps the page body in `<main id="kb-content">` and
+`base.html` wraps the page body in `<main id="kb-content">` and
 includes `templates/includes/poll.html`, which every 30 seconds
 fetches the current URL, parses that element out of the response and
-morphs it onto the live one with the vendored morphdom. The old
-`base.html` used a `<meta http-equiv="refresh">`; the morph cycle
+morphs it onto the live one with the vendored morphdom. These pages
+previously used a `<meta http-equiv="refresh">`; the morph cycle
 exists so that scroll position, selection, focus, an open `<details>`
 disclosure and a half-confirmed terminate all survive a tick instead
 of being reset by a reload.
@@ -251,8 +240,8 @@ up a deployed kerbside first.
 Jinja rendering are exactly what a real request would produce -- and
 writes it next to a symlink of the real static tree, because the
 templates reference their assets as root-relative absolute paths
-(`/static/sfui/...`). Only pages that have actually been converted
-onto `base-sfui.html` are supported; today that is all five: `login`,
+(`/static/sfui/...`). Every page the app renders is supported, all
+five of them on `base.html`: `login`,
 which needs neither authentication nor the database; `consoles`,
 whose fixtures render two consoles -- one with sessions and active
 tokens, one with neither -- so a single screenshot shows both

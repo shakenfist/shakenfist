@@ -258,7 +258,7 @@ locally-running kerbside.
 | 6. Sessions, sources and audit pages | PLAN-sfui-conversion-phase-06-remaining-pages.md | Done |
 | 7. morphdom polling | PLAN-sfui-conversion-phase-07-polling.md | Done |
 | 8. Terminate actions to POST (#133) | PLAN-sfui-conversion-phase-08-terminate-post.md | Done |
-| 9. Teardown, docs and issue closure | PLAN-sfui-conversion-phase-09-teardown.md | Not started |
+| 9. Teardown, docs and issue closure | PLAN-sfui-conversion-phase-09-teardown.md | Done |
 
 Phase notes, dependencies and recommended planning effort:
 
@@ -370,13 +370,17 @@ Phase notes, dependencies and recommended planning effort:
    mitigated rather than converted (#319).
 9. **Teardown, docs and issue closure** (plan at medium
    effort). Delete the old `base.html` (renaming
-   `base-sfui.html` into place), Bootstrap (all 40+ files),
-   jQuery, axios and `logo.svg`; update
-   `docs/development.md`'s "Vendored web assets" section,
-   `ARCHITECTURE.md`'s directory notes and `AGENTS.md`;
-   prune the pre-commit exclude back down; run the sfui
-   README audit greps over the finished templates; close
-   #244.
+   `base-sfui.html` into place), Bootstrap, jQuery, axios and
+   `logo.svg` — 47 files, 8.6 MB; update
+   `docs/development.md`'s "Vendored web assets" section and
+   `ARCHITECTURE.md`'s directory notes; prune the pre-commit
+   exclude back down; run the sfui README audit greps over
+   the finished templates; close #244. Two corrections from
+   the phase 9 survey: `AGENTS.md` needs no change, because
+   PR #318 moved that material into `docs/` and what remains
+   there stays true; and `.vscode/review-scope.toml` also
+   excludes `kerbside/api/static/js/*` and needs pruning
+   alongside the pre-commit config.
 
 ## Agent guidance
 
