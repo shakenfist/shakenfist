@@ -1,5 +1,9 @@
 # PLAN-resize followup 01: targeted refcount-block pre-pass
 
+## Status: Complete
+
+Steps 01a-01e.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

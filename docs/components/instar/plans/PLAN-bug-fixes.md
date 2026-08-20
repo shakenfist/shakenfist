@@ -1,5 +1,9 @@
 # Triage and fix the June 2026 fuzzer bug backlog
 
+## Status: Complete
+
+Phases 1-3: `bbfdfc9`, `514c52a`, `a54cef8`.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

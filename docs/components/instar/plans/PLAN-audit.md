@@ -1,5 +1,24 @@
 # Instar and qemu-img security audit
 
+## Status: Complete
+
+All six phases are executed. Phases 1a-5 are recorded as Done in the
+Progress table below; phase 6 was expanded into
+[PLAN-coverage-fuzzing.md](/components/instar/plans/PLAN-coverage-fuzzing/), which is now
+complete in its own right.
+
+The audit found and fixed 9 bugs (listed under Progress) and verified
+6 qemu-img CVEs as mitigated by instar's architecture with 0 bypasses.
+Its two standing outputs — nightly coverage-guided fuzzing and nightly
+differential fuzzing, both filing `security-audit` issues
+automatically — outlive the plan and need no plan to keep running.
+
+Closing this plan does not close the audit posture. Findings continue
+to arrive as GitHub issues, which is exactly what the Vulnerability
+tracking section below specifies; a fuzzer that runs every night has
+no terminal state to wait for.
+
+
 ## Prompt
 
 Before responding to questions or discussion points in this
@@ -124,14 +143,14 @@ techniques, each of which catches different classes of bugs:
 
 | Phase | Status | Branch | Notes |
 |-------|--------|--------|-------|
-| 1a. Unsafe code audit | **Done** | `static-analysis` | All unsafe blocks classified (0 unsound, 1 fragile in VMM, ~5 fragile in guest FFI boundary). SAFETY comments added to VMM. |
-| 1b. Integer arithmetic review | **Done** | `static-analysis` | VHDX BAT `as u32` truncation found and fixed (`u32::try_from().ok()?`). All checked arithmetic patterns verified. |
-| 1c. Static analysis tooling | **Done** | `static-analysis` | Nightly clippy clean (12 lints fixed), cargo audit 0 vulns, truncating cast table added to docs/security-audits.md. |
-| 2. Adversarial image crafting | **Done** | `adversarial-testing` | 61 adversarial images across 12 categories. Scripts in instar-testdata/scripts/. |
-| 3. Differential fuzzing | **Done** | `differential-fuzzing` | 1070-line fuzzer with libyal cross-validation. CI workflow: 100/200/1000 iterations (PR/merge/nightly). Auto-files issues on divergences. |
-| 4. CVE reproduction | **Done** | `cve-reproduction` | 6 CVEs verified (19 tests, 7 reproducer images, 0 bypasses). All mitigated by existing architecture. |
-| 5. VMM boundary audit | **Done** | (main) | 8 bugs fixed: sector bounds checking (2 High), BackingStore overflow/capacity (2 Medium), IO buffer cap (Medium), sandboxed info exit handling (Medium), DebugBuffer OOM (Moderate), SerialDecoder cap (Low). Plus desc_idx validation. |
-| 6. Coverage-guided fuzzing | **In progress** | `audit` | Harness infrastructure, fuzz targets, corpus seeding, CI smoke tests merged. Detailed plan: [PLAN-coverage-fuzzing.md](/components/instar/plans/PLAN-coverage-fuzzing/) |
+| 1a. Unsafe code audit | **Complete** | `static-analysis` | All unsafe blocks classified (0 unsound, 1 fragile in VMM, ~5 fragile in guest FFI boundary). SAFETY comments added to VMM. |
+| 1b. Integer arithmetic review | **Complete** | `static-analysis` | VHDX BAT `as u32` truncation found and fixed (`u32::try_from().ok()?`). All checked arithmetic patterns verified. |
+| 1c. Static analysis tooling | **Complete** | `static-analysis` | Nightly clippy clean (12 lints fixed), cargo audit 0 vulns, truncating cast table added to docs/security-audits.md. |
+| 2. Adversarial image crafting | **Complete** | `adversarial-testing` | 61 adversarial images across 12 categories. Scripts in instar-testdata/scripts/. |
+| 3. Differential fuzzing | **Complete** | `differential-fuzzing` | 1070-line fuzzer with libyal cross-validation. CI workflow: 100/200/1000 iterations (PR/merge/nightly). Auto-files issues on divergences. |
+| 4. CVE reproduction | **Complete** | `cve-reproduction` | 6 CVEs verified (19 tests, 7 reproducer images, 0 bypasses). All mitigated by existing architecture. |
+| 5. VMM boundary audit | **Complete** | (main) | 8 bugs fixed: sector bounds checking (2 High), BackingStore overflow/capacity (2 Medium), IO buffer cap (Medium), sandboxed info exit handling (Medium), DebugBuffer OOM (Moderate), SerialDecoder cap (Low). Plus desc_idx validation. |
+| 6. Coverage-guided fuzzing | **Complete** | `audit` | 40 fuzz targets, corpus seeding, nightly CI at a 450-minute tiered budget, automatic issue filing. ~200 `security-audit` issues closed; 1 open defect (#483). Detailed plan: [PLAN-coverage-fuzzing.md](/components/instar/plans/PLAN-coverage-fuzzing/) |
 
 **Commits on `static-analysis`:**
 1. `9f40bdd` Fix VHDX BAT calculation integer overflow

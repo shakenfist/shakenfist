@@ -1,5 +1,9 @@
 # `instar measure` subcommand
 
+## Status: Complete
+
+Phases 1-10.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

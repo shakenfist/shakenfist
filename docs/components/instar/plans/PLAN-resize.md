@@ -1,5 +1,9 @@
 # `instar resize` subcommand
 
+## Status: Complete
+
+Phases 1-13.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

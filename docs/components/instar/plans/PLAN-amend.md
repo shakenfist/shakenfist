@@ -1,5 +1,9 @@
 # `instar amend` subcommand
 
+## Status: Complete
+
+Phases 1-9.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

@@ -1,6 +1,19 @@
 # Format coverage expansion
 
-## Status: Complete (2026-07-20)
+## Status: Complete
+
+All 7 phases, finished 2026-07-20. Closed the input-side
+format-coverage gap against qemu-img's real 14-format roster. Four new
+`no_std` guest crates (`vdi`, `parallels`, `qcow1`, `dmg`) with
+coverage-guided and differential fuzz coverage graduated VDI,
+Parallels, QCOW1 and DMG from detect+info-only to full
+convert/compare/dd/bench read support; detection parity closed against
+oslo.utils' roster plus four formats oslo never detected; QED received
+a recorded refusal-as-policy decision rather than a read path;
+`test_info_safe` grew 580 to 954 passing scenarios. Along the way,
+fixed the pre-existing #444 defect (detect-only formats silently read
+as raw), a live QCOW1-misdetected-as-QCOW2 defect, the never-consumed
+`INFO_RESULT_FLAG_ENCRYPTED` flag, and three instar-testdata defects.
 
 ## Prompt
 

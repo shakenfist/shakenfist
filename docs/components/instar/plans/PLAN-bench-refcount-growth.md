@@ -1,5 +1,9 @@
 # bench qcow2 refcount growth
 
+## Status: Complete
+
+Phases 1-4.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

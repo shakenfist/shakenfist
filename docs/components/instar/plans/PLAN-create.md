@@ -1,5 +1,9 @@
 # `instar create` subcommand
 
+## Status: Complete
+
+Phases 1-11.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

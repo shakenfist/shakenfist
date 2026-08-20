@@ -1,5 +1,14 @@
 # `instar bitmap` subcommand
 
+## Status: Complete
+
+Phases 1-10. `instar bitmap` — full qcow2 persistent-dirty-bitmap
+management (add/remove/clear/enable/disable/merge), qcow2-oracle
+integration tests + bit-for-bit merge validation, cross-version
+baselines, coverage + differential fuzzing, and docs; pre-existing
+resize bitmap-data-loss defect fixed. Leaves `bench` the only
+unimplemented qemu-img subcommand.
+
 ## Prompt
 
 Before responding to questions or discussion points in this
