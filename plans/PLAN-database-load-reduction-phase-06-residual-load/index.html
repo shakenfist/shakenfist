@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-database-load-reduction-phase-06-residual-load/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 5 — next-tier reductions, diagnosed and ratcheted - Shaken Fist</title>
+        <title>Phase 6 — the residual load, and the regression - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-5-next-tier-reductions-diagnosed-and-ratcheted" class="md-skip">
+        <a href="#phase-6-the-residual-load-and-the-regression" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 5 — next-tier reductions, diagnosed and ratcheted
+              Phase 6 — the residual load, and the regression
             
           </span>
         </div>
@@ -11795,10 +11795,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-the-attribution-data-actually-said" class="md-nav__link">
+  <a href="#why-this-phase-exists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the attribution data actually said
+        Why this phase exists
       
     </span>
   </a>
@@ -11806,10 +11806,82 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#thread-a-the-reductions-filed-as-issues" class="md-nav__link">
+  <a href="#what-the-survey-found-2026-08-19" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Thread A — the reductions (filed as issues)
+        What the survey found (2026-08-19)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the survey found (2026-08-19)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-getobjectstatecluster-loop-is-the-cluster-maintenance-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The GetObjectState/cluster loop is the cluster maintenance sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getreservationnet-is-3655-filed-and-unfixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetReservation/net is #3655, filed and unfixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getreferencesfromapi-climbed-above-its-per-instance-ceiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetReferencesFrom/api climbed above its per-instance ceiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-post-auth-re-authentication-storm-was-never-filed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The POST /auth re-authentication storm was never filed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#success-criterion-2-is-probably-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criterion 2 is probably wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
       
     </span>
   </a>
@@ -11817,10 +11889,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#thread-b-the-ratchet-this-phases-actual-deliverable" class="md-nav__link">
+  <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Thread B — the ratchet (this phase's actual deliverable)
+        Step plan
       
     </span>
   </a>
@@ -11828,10 +11900,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        Risks and mitigations
       
     </span>
   </a>
@@ -11839,21 +11911,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#out-of-scope" class="md-nav__link">
+  <a href="#definition-of-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Out of scope
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#outcome-recorded-2026-08-19" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Outcome (recorded 2026-08-19)
+        Definition of done
       
     </span>
   </a>
@@ -11881,246 +11942,397 @@
   
 
 
-<h1 id="phase-5-next-tier-reductions-diagnosed-and-ratcheted">Phase 5 — next-tier reductions, diagnosed and ratcheted<a class="headerlink" href="#phase-5-next-tier-reductions-diagnosed-and-ratcheted" title="Permanent link">&para;</a></h1>
+<h1 id="phase-6-the-residual-load-and-the-regression">Phase 6 — the residual load, and the regression<a class="headerlink" href="#phase-6-the-residual-load-and-the-regression" title="Permanent link">&para;</a></h1>
 <p>Master plan: <a href="../PLAN-database-load-reduction/">PLAN-database-load-reduction.md</a></p>
-<p><strong>Status: Complete.</strong> Both threads landed and the measured outcome is
-recorded below. Phase 4 attribution had been deployed on <code>sfcbr</code> for several
-days when this was planned, so the next-tier targets were diagnosed from real
-per-caller data rather than guessed. This phase splits into two threads:
-(a) the individual reductions, filed as GitHub issues so they can be fixed
-opportunistically and owned separately; and (b) a durable ratchet — teaching
-the nightly infra report to mine per-caller sf-database load so these signals
-are watched going forward and cannot silently regress.</p>
-<h2 id="what-the-attribution-data-actually-said">What the attribution data actually said<a class="headerlink" href="#what-the-attribution-data-actually-said" title="Permanent link">&para;</a></h2>
-<p>Measured on the Prometheus at <code>maui.home.stillhq.com:9099</code> against the
-<code>database_requests_total{operation, caller_daemon}</code> counter added in phase 4
-(#3473). Total steady-state sf-database load is <strong>~174/s over 24h</strong> (down from
-the ~527/s that started this whole effort — phases 1-2 removed ~two thirds).</p>
-<p>A 1h snapshot initially made <code>GetIPAM</code> look like the dominant cost (~48/s,
-~22% of that window). The 24h average corrected this: <code>GetIPAM</code> is
-workload-correlated and <em>bursts</em> under load but averages only ~14/s at rest.
-The real steady-state floor is <strong>fixed-rate polling that runs even when the
-cluster is completely idle</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>Operation</th>
-<th>24h steady</th>
-<th>Caller(s)</th>
-<th>Nature</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Dequeue</td>
-<td>38.8/s</td>
-<td>net 19.6, queues 19.2</td>
-<td>fixed-rate poll</td>
-</tr>
-<tr>
-<td>GetExistingLocks</td>
-<td>19.2/s</td>
-<td>queues</td>
-<td>lock-check paired with each dequeue</td>
-</tr>
-<tr>
-<td>GetBlobTransfersForNode</td>
-<td>19.5/s</td>
-<td>transfers</td>
-<td>fixed-rate poll</td>
-</tr>
-<tr>
-<td><strong>idle-poll subtotal</strong></td>
-<td><strong>~78/s</strong></td>
-<td></td>
-<td><strong>~45% of load, workload-independent</strong></td>
-</tr>
-<tr>
-<td>GetIPAM</td>
-<td>14.4/s (peaks ~48)</td>
-<td>cluster</td>
-<td>workload-correlated burst</td>
-</tr>
-<tr>
-<td>GetInstanceAttributes</td>
-<td>15.0/s</td>
-<td>spread (cluster 4.2)</td>
-<td>mutable</td>
-</tr>
-<tr>
-<td>GetReferencesFrom</td>
-<td>9.1/s</td>
-<td>cluster 5.8, api 3.2</td>
-<td>mutable</td>
-</tr>
-</tbody>
-</table>
-<p>The lesson — recorded here deliberately — is that the ratchet baseline must be
-taken from a 24h (or longer) window, never a single busy hour, or it both
-overstates bursty operations and would enshrine reducible idle-poll cost as
-the defended floor.</p>
-<h2 id="thread-a-the-reductions-filed-as-issues">Thread A — the reductions (filed as issues)<a class="headerlink" href="#thread-a-the-reductions-filed-as-issues" title="Permanent link">&para;</a></h2>
-<p>Each next-tier reduction is a separate change in a different daemon loop, so
-each is a standalone GitHub issue rather than a single monolithic phase:</p>
-<ul>
-<li><strong>#3499 — queue-worker idle polling (~58/s, highest).</strong> <code>Dequeue</code> +
-  <code>GetExistingLocks</code> fire as a lockstep pair on every fixed tick in the
-  <code>queues</code> daemon, and <code>net</code> polls <code>Dequeue</code> the same way. Fix: adaptive
-  backoff on empty dequeue, with a latency cap. Backing off the dequeue
-  collapses the paired lock check too.</li>
-<li><strong>#3500 — transfers idle polling (~20/s).</strong> <code>GetBlobTransfersForNode</code>
-  polls at a fixed rate even with no pending transfers. Fix: back off / wake
-  on enqueue.</li>
-<li><strong>#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).</strong> Diagnosed as
-  the immutable-tier cache pattern, not loop surgery: the record <code>get_ipam</code>
-  returns is the static block definition
-  (<code>uuid</code>/<code>namespace</code>/<code>network_uuid</code>/<code>ipblock</code>/<code>version</code>); the mutable
-  allocations live in the separate <code>ipam_reservations</code> table, and <code>update_ipam</code>
-  exists only to persist version upgrades. Fix: wire <code>get_ipam</code> through the
-  phase 2 object cache at the immutable TTL, evicting on <code>update_ipam</code>/
-  <code>delete_ipam</code>.</li>
-<li><strong>#3502 — cluster sweep attribute/reference re-reads (~10/s, lowest).</strong>
-  Mutable reads re-hydrated per-check; fix is batching within the sweep.</li>
-</ul>
-<p><strong>Post-fix addendum (2026-07-28).</strong> The ratchet worked: the nightly report
-flagged <code>GetIPAM</code>/<code>cluster</code> at ~20x its post-#3501 goal even though the
-cache fix was deployed. Investigation showed the cluster caller's load was
-never cacheable at all — it was ~3,600 <em>phantom</em> <code>object_states</code> ipam rows
-(state row present, <code>ipams</code> row gone) re-read every maintenance pass, with
-<code>None</code> results that the cache deliberately never stores. The phantom rows
-were written by in-memory-only IPAM objects leaking their state to MariaDB
-(#3532), accumulated because the deleted-object sweep could not drain its
-backlog (#3533), and were invisible to every cleanup path until the orphan
-reconciliation sweep (#3534). Those three fixes, not further caching, are
-what clears the <code>cluster</code> caller's <code>GetIPAM</code> floor. The same investigation
-closed #3502: the sweep's <code>GetInstanceAttributes</code>/<code>GetReferencesFrom</code> floor
-was O(blobs × instances) — <code>instance_usage_for_blob_uuid()</code> re-walked every
-healthy instance (and every disk's dependency chain) for every blob — and
-is now a single <code>instance_blob_usage()</code> pass per cleanup loop.</p>
-<p>These are deliberately <em>not</em> bundled into this phase's PR. #3499 and #3500 are
-behaviour changes (backoff trades a little first-task latency for a large load
-reduction) and each deserves its own review. The correct order by
-value-per-risk is #3499, then #3500, then #3501, then #3502.</p>
-<h2 id="thread-b-the-ratchet-this-phases-actual-deliverable">Thread B — the ratchet (this phase's actual deliverable)<a class="headerlink" href="#thread-b-the-ratchet-this-phases-actual-deliverable" title="Permanent link">&para;</a></h2>
-<p>Fixing the four issues above is necessary but not sufficient: without a
-standing check, load creeps back as new loops are added. Phase 5's own work is
-to make per-caller sf-database load a mined, watched signal, consistent with
-the existing practice of moving hand-computation into the nightly report
-precompute.</p>
-<ul>
-<li><strong>Where.</strong> The nightly infra report precompute
-  (<code>tools/infra-report-precompute.py</code> in the private <code>33fl</code> ops repo, not this
-  repo). This phase's code change lands there; this plan documents the intent
-  and the honest baseline it must encode.</li>
-<li><strong>What it computes.</strong> Per <code>(operation, caller_daemon)</code> 24h-averaged QPS from
-  <code>database_requests_total</code>, plus the cluster total, straight from the same
-  Prometheus the numbers above came from.</li>
-<li><strong>What it flags.</strong> Any caller/operation that climbs materially above the
-  recorded baseline, and specifically any regression on the four operations
-  the issues target — so a fix that lands and then rots is caught, and a new
-  fixed-rate poll added elsewhere shows up as a new high-rate <code>(operation,
-  caller_daemon)</code> pair.</li>
-<li><strong>Baseline honesty.</strong> The ratchet records today's 24h numbers as the
-  starting baseline <em>and</em> the expected post-fix floors for #3499/#3500, so it
-  defends the improved target rather than the current wasteful number. Until a
-  fix lands, its operation sits at "known-reducible", not "healthy".</li>
-</ul>
-<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
-<ol>
-<li>The nightly report emits a per-caller sf-database load section with the 24h
-   baseline and flags regressions against it.</li>
-<li>The four reduction issues are filed with attributed numbers and a repro
-   query (done: #3499-#3502).</li>
-<li>When #3499/#3500 land, the report's flagged "known-reducible" items clear
-   and the defended floor drops accordingly — verifiable in the nightly output
-   rather than by ad-hoc PromQL.</li>
-</ol>
-<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
-<p>The individual daemon-loop fixes (#3499-#3502) — tracked separately. mTLS and
-OpenTelemetry span propagation, which reuse phase 4's caller-identity plumbing,
-remain their own plans.</p>
-<h2 id="outcome-recorded-2026-08-19">Outcome (recorded 2026-08-19)<a class="headerlink" href="#outcome-recorded-2026-08-19" title="Permanent link">&para;</a></h2>
-<p><strong>Thread A — all four reductions landed and are holding.</strong> #3499, #3500 and</p>
-<h1 id="3501-closed-2026-07-26-3502-closed-2026-07-29-alongside-the-353235333534">3501 closed 2026-07-26; #3502 closed 2026-07-29 alongside the #3532/#3533/#3534<a class="headerlink" href="#3501-closed-2026-07-26-3502-closed-2026-07-29-alongside-the-353235333534" title="Permanent link">&para;</a></h1>
-<p>phantom-row work described in the addendum above. The code is
-<code>daemon.IdlePollBackoff</code> (used by the <code>queues</code>, <code>net</code> and <code>transfers</code> loops),
-<code>get_ipam</code> wired through the phase 2 object cache at the immutable TTL, and
-<code>instance_blob_usage()</code> replacing the O(blobs x instances) per-blob walk.</p>
-<p>The ratchet's own verdict on those fixes, from the nightly per-caller facts:</p>
+<p><strong>Status: In progress.</strong> 6a, 6b, 6c, 6d, 6e and 6f are done; 6g (re-measurement after deploy) is outstanding and needs a full 24h window on <code>sfcbr</code>. What the work actually found is recorded in "Findings" below, which corrects this plan's own survey in two places.</p>
+<h2 id="why-this-phase-exists">Why this phase exists<a class="headerlink" href="#why-this-phase-exists" title="Permanent link">&para;</a></h2>
+<p>Phases 1-5 took steady-state sf-database load from ~527/s to 89-92/s,
+below this plan's "under 100 operations per second" success criterion,
+measured 2026-08-05 to 2026-08-07. It has since climbed back to ~142/s
+(2026-08-18). That is not object-count scaling: on 2026-08-09 the cluster
+ran 98.0/s carrying a 24h-mean 15.24 standing instances, and on 2026-08-18
+it ran 142.3/s carrying 12.48. More load, fewer objects.</p>
+<p>So this phase has two jobs which are easy to confuse and must not be:
+find and fix what <em>regressed</em>, and reduce the residual floor that was
+always there and that phase 5 deliberately did not chase. The first is a
+bug hunt with a known-good reference point eleven days back. The second is
+ordinary optimisation.</p>
+<h2 id="what-the-survey-found-2026-08-19">What the survey found (2026-08-19)<a class="headerlink" href="#what-the-survey-found-2026-08-19" title="Permanent link">&para;</a></h2>
+<p>Numbers are 24h-averaged per <code>(operation, caller_daemon)</code> from
+<code>database_requests_total</code>, the phase 4 counter, as recorded in the nightly
+facts for 2026-08-18. <code>scaled</code> baselines are per-standing-instance
+coefficients established by the hunt described in the phase 5 plan.</p>
 <table>
 <thead>
 <tr>
 <th>Pair</th>
-<th>Baseline</th>
-<th>Post-fix target</th>
-<th>Measured 2026-08-18</th>
+<th>24h QPS</th>
+<th>Defended ceiling</th>
 <th>Verdict</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Dequeue</code> / <code>net</code></td>
-<td>19.0</td>
-<td>4.0</td>
-<td>3.04</td>
-<td>cleared</td>
+<td><code>GetObjectState</code> / <code>cluster</code></td>
+<td>18.95</td>
+<td>10.5 (absolute, on-phase)</td>
+<td>regressed</td>
 </tr>
 <tr>
-<td><code>Dequeue</code> / <code>queues</code></td>
-<td>18.6</td>
-<td>4.0</td>
-<td>3.09</td>
-<td>cleared</td>
+<td><code>GetObjectState</code> / <code>net</code></td>
+<td>11.47</td>
+<td>7.67 (scaled)</td>
+<td>healthy</td>
 </tr>
 <tr>
-<td><code>GetBlobTransfersForNode</code> / <code>transfers</code></td>
-<td>19.0</td>
-<td>4.0</td>
-<td>3.04</td>
-<td>cleared</td>
+<td><code>GetReservation</code> / <code>net</code></td>
+<td>10.09</td>
+<td>8.4 (absolute)</td>
+<td>healthy, but is #3655</td>
 </tr>
 <tr>
-<td><code>GetExistingLocks</code> / <code>queues</code></td>
-<td>18.5</td>
-<td>2.0</td>
-<td>0.20</td>
-<td>cleared</td>
+<td><code>GetReferencesFrom</code> / <code>api</code></td>
+<td>6.86</td>
+<td>3.99 (scaled)</td>
+<td>regressed</td>
 </tr>
 <tr>
-<td><code>GetIPAM</code> / <code>cluster</code></td>
-<td>5.5</td>
-<td>2.0</td>
-<td>0.02</td>
-<td>cleared</td>
+<td><code>GetNodeDaemonState</code> / (7 daemons)</td>
+<td>~20 aggregate</td>
+<td>2.1 each</td>
+<td>at the designed floor</td>
 </tr>
 <tr>
-<td><code>GetIPAM</code> / <code>net</code></td>
-<td>2.5</td>
-<td>1.5</td>
-<td>0.11</td>
-<td>cleared</td>
+<td>everything below the top 40</td>
+<td>~22 aggregate</td>
+<td>none</td>
+<td>unwatched</td>
 </tr>
 </tbody>
 </table>
-<p>That is ~78/s of workload-independent polling reduced to ~9.5/s, and every
-<code>known-reducible</code> entry in the baseline now reads <code>cleared</code> with none left in
-<code>still-reducible</code>.</p>
-<p><strong>Thread B — the ratchet is live</strong> and has been emitting the per-caller
-section nightly since it landed. It has since done its job twice over: it
-re-explained an apparent four-pair regression as standing-instance-count
-scaling (which is why several baselines now carry a <code>scaling</code> block rather
-than an absolute ceiling), and it is currently flagging the genuine
-regression that phase 6 exists to chase.</p>
-<p><strong>The mission target was met, and then lost.</strong> Cluster-wide steady-state load
-reached 89-92/s on 2026-08-05 to 2026-08-07 -- below the master plan's
-"under 100 operations per second" success criterion -- and has since climbed
-back to ~142/s (2026-08-18) at a <em>lower</em> standing instance count than when it
-measured 98/s on 2026-08-09, so the climb is not object-count scaling. That
-regression, and the residual lines this phase deliberately did not chase, are
-<a href="../PLAN-database-load-reduction-phase-06-residual-load/">phase 6</a>; making the
-detection of such regressions something a deployer can run rather than
-something only our own operations tooling can see is
-<a href="../PLAN-database-load-reduction-phase-07-regression-detection/">phase 7</a>.</p>
+<p>Total 142.3/s across <strong>401 distinct pairs</strong>; the top 40 account for 120.2/s,
+so ~22/s is spread across ~361 pairs that no baseline watches individually
+and that are individually too small to be worth a baseline.</p>
+<h3 id="the-getobjectstatecluster-loop-is-the-cluster-maintenance-sweep">The <code>GetObjectState</code>/<code>cluster</code> loop is the cluster maintenance sweep<a class="headerlink" href="#the-getobjectstatecluster-loop-is-the-cluster-maintenance-sweep" title="Permanent link">&para;</a></h3>
+<p>Hunt 2026-01 characterised this as a "deploy-bracketed on/off loop"
+(~10 QPS continuously between certain deploys, ~zero otherwise, ~900k
+queries per observed on-phase) but never identified the owning code, so it
+was never filed. The survey places it, and the "on/off" framing now looks
+like an artefact of measuring a <em>duty cycle</em> rather than a rate:</p>
+<p><code>ClusterDaemon._run_inner()</code>
+(<code>shakenfist/daemons/cluster/main.py:568</code>) gates all maintenance behind
+<code>if now - last_loop_run &gt;= 60</code>, and sets <code>last_loop_run = now</code> where <code>now</code>
+was captured <strong>before</strong> the pass ran (<code>:630</code>, <code>:652</code>). The pass is
+therefore scheduled every 60 s from its own <em>start</em>, so its duty cycle is
+<code>min(1, pass_duration / 60)</code> — and once a pass exceeds 60 s the loop runs
+back to back with no idle time at all. <code>_cluster_wide_cleanup()</code> (<code>:76</code>)
+walks, per pass, every active IPAM, every in-use floating address, every
+artifact, every blob and every namespace key, reading state for each.</p>
+<p>Direct evidence from the sfcbr journals (<code>RecordedOperation('cluster wide
+cleanup', threshold=10)</code> logs any pass over 10 s):</p>
+<ul>
+<li>Over six hours on 2026-08-19, six passes exceeded 10 s; the rest were
+  faster. Durations 11.8, 13.4, 15.5, <strong>33.9</strong>, 14.5, 16.6 seconds.</li>
+<li>The last three of those are consecutive minutes (17:10:29, 17:11:03,
+  17:12:10) — the loop briefly running nearly continuously, which is the
+  shape the hunt's "on-phase" describes, in miniature.</li>
+<li>Separately, the same loop logs ~30 <code>deleting this namespace key because
+  it expired</code> audits every 15-16 minutes, sustained. Something is minting
+  short-lived namespace keys at roughly 2/minute and this loop is reaping
+  them — which is very likely the same phenomenon as the unfiled <code>POST
+  /auth</code> finding below, seen from the other end.</li>
+</ul>
+<p>At 18.95 QPS against a 60 s cycle the sweep is issuing roughly 1,140
+<code>GetObjectState</code> calls per pass. The question phase 6 must answer is not
+"where does this come from" — it is <code>_cluster_wide_cleanup()</code> — but
+"why has the per-pass object count grown, and which of those state reads
+does the sweep actually need".</p>
+<p>Also noted while reading: <code>_cluster_wide_cleanup()</code> takes a
+<code>last_loop_run</code> argument (<code>:76</code>, passed at <code>:648</code>) which its body never
+uses. Dead parameter; delete it while in there.</p>
+<h3 id="getreservationnet-is-3655-filed-and-unfixed"><code>GetReservation</code>/<code>net</code> is #3655, filed and unfixed<a class="headerlink" href="#getreservationnet-is-3655-filed-and-unfixed" title="Permanent link">&para;</a></h3>
+<p>The one item in this phase that is already fully diagnosed. Issue #3655
+(open) records that the floating-IP maintenance path sweeps every in-use
+address reservation three times per 30 s cycle. The call sites confirm it:
+<code>shakenfist/daemons/network/maintain.py:533</code>,
+<code>shakenfist/daemons/network/floating_ip_reaper.py:82</code> and <code>:137</code>, and
+<code>shakenfist/daemons/cluster/main.py:134</code> — each an
+<code>fn.ipam.get_reservation(addr)</code> inside a <code>for addr in ...in_use</code> loop,
+which is one RPC per address per sweep. <code>mariadb.py</code> has no bulk form;
+<code>get_reservation()</code> (<code>:6418</code>) is single-address only.</p>
+<h3 id="getreferencesfromapi-climbed-above-its-per-instance-ceiling"><code>GetReferencesFrom</code>/<code>api</code> climbed above its per-instance ceiling<a class="headerlink" href="#getreferencesfromapi-climbed-above-its-per-instance-ceiling" title="Permanent link">&para;</a></h3>
+<p>Flagged regressed on 7 of the last 8 nights, peaking at 13.28 on
+2026-08-15. The scaled ceiling says the API should issue 0.32 of these per
+standing instance; it is issuing about 0.55. <code>references_from</code> is populated per
+object inside <code>external_view()</code>, one RPC each, at
+<code>shakenfist/instance.py:653</code>, <code>artifact.py:610</code>, <code>blob.py:305</code> and
+<code>node.py:448</code> — where the node path issues <em>two</em>, one keyed by fqdn and
+one by uuid. A list endpoint therefore costs one (or two) of these per
+object returned, so either a list endpoint grew the field or something is
+polling one harder than it used to. Note #3654 fixed the directly
+analogous defect for <code>GetInstanceAttributes</code> by memoising within
+<code>Instance.external_view()</code> (<code>instance.py:563</code>) — check first whether
+<code>references_from</code> in the same function was simply missed.</p>
+<h3 id="the-post-auth-re-authentication-storm-was-never-filed">The <code>POST /auth</code> re-authentication storm was never filed<a class="headerlink" href="#the-post-auth-re-authentication-storm-was-never-filed" title="Permanent link">&para;</a></h3>
+<p>Hunt 2026-01 measured ~45% of "mutating" API background traffic as bare
+<code>POST /auth</code> token acquisition — activity-independent, and disguising idle
+hours in every API-side measurement. It was characterised at the API log
+level but never attributed to a client, so it was never filed upstream and
+exists only in the hunt's verdict document. The namespace-key expiry
+cadence above is a second, independent sighting of what may be the same
+behaviour. Clients are in a separate repository
+(<code>shakenfist_client</code>, in <code>client-python</code>), so a fix may well land there;
+the attribution work is here.</p>
+<h3 id="success-criterion-2-is-probably-wrong">Success criterion 2 is probably wrong<a class="headerlink" href="#success-criterion-2-is-probably-wrong" title="Permanent link">&para;</a></h3>
+<p>Recorded as open question 5 on the master plan. <code>get_node_daemon_state</code> is
+now the second operation by rate, at ~20/s aggregate — but that ~20/s is
+exactly 48 daemon processes polling at the 0.5 Hz that phase 1 chose, and
+it is second only because everything around it got much cheaper. Phase 6
+should resolve the criterion rather than chase the number.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Separate the regression from the floor.</strong> The 2026-08-07 nightly
+   facts are a known-good reference point with per-pair detail. Any pair
+   materially above its 2026-08-07 value is regression work; anything at
+   or below it is floor work. Do the regression work first — it is
+   bounded, it has a bisection window of about eleven days of <code>develop</code>,
+   and the floor was already judged acceptable at 89-92/s.</li>
+<li><strong>Do not add a cache for anything mutable.</strong> Decision 2 of the master
+   plan still holds and this phase does not reopen it. <code>GetObjectState</code>,
+   <code>GetReferencesFrom</code> and <code>GetReservation</code> are all mutable reads. The
+   levers available are: do not ask, ask once per pass instead of once per
+   object (the #3654 and #3502 pattern), or push the filter into SQL so
+   one RPC answers what N did.</li>
+<li><strong>Prefer pushing work into SQL over batching in Python.</strong> Per the
+   project's standing preference for filter pushdown, a sweep that needs
+   "every X whose state is deleted and older than N" should ask MariaDB
+   that question once, not hydrate every X and test in Python. This is
+   also what makes the fix survive object-count growth rather than merely
+   moving the constant.</li>
+<li><strong>The long tail gets a budget, not 361 baselines.</strong> ~22/s across ~361
+   pairs is real but individually unattributable, and per-pair ceilings
+   there would be pure noise. It is bounded in aggregate by phase 7's
+   model instead. This phase's only obligation to the tail is to check
+   that no single pair in it is a new fixed-rate poll in disguise.</li>
+<li><strong>File before fixing, for anything not already filed.</strong> The
+   <code>GetObjectState</code>/<code>cluster</code> loop and the <code>POST /auth</code> storm have both
+   now survived one full investigation without being filed, which is how
+   they came to be rediscovered here. They get issues as the first act of
+   this phase, whether or not they are fixed within it.</li>
+</ol>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6a</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Bisect the regression.</strong> Do not write code. The cluster ran 89-92/s on 2026-08-05..07 and ~142/s on 2026-08-18 at a <em>lower</em> standing instance count, so something merged in between. Pull the per-pair nightly facts for 2026-08-05 through 2026-08-18 and diff them pair by pair, normalising per-instance pairs by that night's <code>instances_day_mean</code> (the coefficients are in the phase 5 plan and the hunt verdict). Produce a ranked list of pairs by QPS <em>added</em> since 08-07, which will not be the same ranking as by absolute QPS. Then <code>git log --oneline --since=2026-08-05 --until=2026-08-19 origin/develop</code> and correlate: for each pair that grew, name the candidate commits that touch its call path. Deliverable is a written attribution, not a fix — and an honest statement of which growth is unattributed. Note that the 08-08 spike (140.5/s at 35.79 instances) is object-count scaling and is <em>not</em> evidence of the regression; the regression is that 08-18 sits at 142/s with a third of those instances.</td>
+</tr>
+<tr>
+<td>6b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>File the two unfiled findings.</strong> Two GitHub issues, each carrying the measured numbers, the repro PromQL, and the call sites from this plan's survey — so neither can be lost a third time. Issue one: the cluster maintenance sweep's <code>GetObjectState</code> cost (~19 QPS, <code>daemons/cluster/main.py:76</code> and the 60 s duty-cycle gate at <code>:630</code>/<code>:652</code>), including the pass-duration evidence and the observation that the loop runs back to back once a pass exceeds 60 s. Issue two: the bare <code>POST /auth</code> re-authentication volume (~45% of mutating API background per hunt 2026-01), stating explicitly that the client attribution is <em>not</em> done and is the first task on it. Apply the <code>automated-fix-attempted</code> label to both at filing time if this phase intends to fix them in-flight, so the issue autofixer does not race a branch.</td>
+</tr>
+<tr>
+<td>6c</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>Fix #3655: bulk-read floating IP reservations.</strong> Four call sites each issue one <code>get_reservation()</code> RPC per in-use address inside a sweep: <code>daemons/network/maintain.py:533</code>, <code>daemons/network/floating_ip_reaper.py:82</code> and <code>:137</code>, <code>daemons/cluster/main.py:134</code>. Add a bulk accessor to <code>mariadb.py</code> beside <code>get_reservation()</code> (<code>:6418</code>) that returns every reservation for an IPAM in one call — follow the three-layer pattern exactly (<code>_direct_*</code>, <code>_grpc_*</code>, public, a proto message, <code>tox -e genprotos</code>, and a <code>database_*_total</code> counter like its neighbours) and read <code>PLAN-grpc-bounded-replies.md</code> first, because an all-reservations reply is exactly the unbounded shape that plan exists to stop: bound it, and say in the plan how. Convert all four sweeps to one bulk read per pass. Expected effect ~8-9 QPS. Add a functional test in <code>cluster_ci_tests/test_database_tier.py</code> asserting the count, modelled on <code>test_instance_get_fetches_the_attributes_row_once</code> which already does exactly this shape for #3654. Commit subject: "net: read floating IP reservations in one pass." Fixes #3655.</td>
+</tr>
+<tr>
+<td>6d</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>Reduce the cluster maintenance sweep's state reads.</strong> Depends on 6b's issue. <code>_cluster_wide_cleanup()</code> (<code>daemons/cluster/main.py:76</code>) reads object state per swept object across five populations. Per decision 3, convert the state-filtered walks into SQL questions: the IPAM walk (<code>:114</code>) discards everything whose state was updated within 300 s <em>after</em> hydrating it; the floating-address walk (<code>:132</code>) reads <code>obj.state</code> per reservation to find deleted-and-aged users; the artifact walk (<code>:168</code>) hydrates a namespace per artifact. <code>mariadb.get_objects_by_state()</code> and the orphan-reconciliation queries in <code>mariadb.py</code> are the existing precedent for asking MariaDB instead. Measure before and after with the CI harness, not by inspection. Also delete the unused <code>last_loop_run</code> parameter (<code>:76</code>, <code>:648</code>). Do <strong>not</strong> change the 60 s gate or the duty-cycle behaviour in this step — that is a separate judgement about maintenance latency and belongs in its own commit if it is wanted at all.</td>
+</tr>
+<tr>
+<td>6e</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Diagnose <code>GetReferencesFrom</code>/<code>api</code>.</strong> It is running at roughly 0.55 per standing instance against a 0.32 ceiling and has been flagged 7 nights of 8. First check the cheap hypothesis: #3654 memoised <code>GetInstanceAttributes</code> within <code>Instance.external_view()</code> (<code>shakenfist/instance.py:563</code>), and <code>references_from</code> (<code>:653</code>) may be the same defect left unfixed in the same function. If so, fix it the same way and add the same style of CI assertion. If not, find which endpoint grew the read; the call sites are <code>instance.py:653</code>, <code>artifact.py:610</code>, <code>blob.py:305</code> and <code>node.py:448</code> (the last issuing two RPCs per node, keyed by fqdn and by uuid — worth collapsing regardless of what this step concludes). Report before fixing if the cause turns out to be a caller polling harder rather than an endpoint doing more work — that is a different fix in a different repository.</td>
+</tr>
+<tr>
+<td>6f</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Resolve success criterion 2.</strong> Master plan open question 5. Replace "<code>get_node</code> and <code>get_node_daemon_state</code> no longer appear in the top five operations by rate" with a criterion that survives the thing phase 1 actually did: <code>get_node</code> gone entirely, and <code>get_node_daemon_state</code> at or under the arithmetic floor implied by <code>DAEMON_STATE_POLL_INTERVAL</code> for the cluster's daemon-process count. Edit the master plan's success criteria and close the open question with the resolution recorded inline, in the style of the other resolved questions there.</td>
+</tr>
+<tr>
+<td>6g</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Re-measure and record.</strong> After 6c-6e deploy to sfcbr, wait for a full 24h window and record the new per-pair numbers in this plan the way phase 5's outcome section does — including any target that did <em>not</em> move, which per the master plan's measurement discipline is a finding rather than a detail. Then update the committed load baseline so the improved floor is the defended one, and state plainly whether the plan's under-100/s criterion is met again. If it is not, say by how much and what is left.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Chasing the floor instead of the regression.</strong> The absolute ranking
+  puts <code>GetObjectState</code>/<code>cluster</code> first, but the <em>growth</em> ranking may put
+  something else first, and the growth is what broke the criterion.
+  <em>Mitigation:</em> 6a is a pure attribution step, deliberately produces no
+  code, and normalises for instance count before ranking.</li>
+<li><strong>A bulk reservations reply is unbounded.</strong> 6c replaces N small RPCs
+  with one large one, which is exactly the failure mode
+  <code>PLAN-grpc-bounded-replies.md</code> exists to prevent, and sfcbr has already
+  crossed the gRPC message limit twice (#3638). <em>Mitigation:</em> the step
+  requires reading that plan and bounding the reply as part of the design,
+  not as a follow-up.</li>
+<li><strong>Pushing filters into SQL without the index.</strong> Decision 3's SQL
+  pushdown makes things worse, not better, if the predicate has no index
+  to use — moving load from the gRPC tier onto MariaDB is not a win.
+  <em>Mitigation:</em> every new predicate in 6d states which index serves it,
+  and adds one if none does; this is a standing project rule.</li>
+<li><strong>The sweep changes alter cleanup semantics.</strong> 6d touches code that
+  deletes IPAMs, releases addresses and removes artifacts. A wrong
+  predicate deletes live objects. <em>Mitigation:</em> worktree isolation, and
+  the sweep's behaviour is covered by functional CI (which exercises full
+  object lifecycles) rather than by unit tests alone.</li>
+<li><strong>The regression is not ours.</strong> It may be a change in what runs against
+  sfcbr — CI shape, conductor behaviour, a client — rather than a change
+  in Shaken Fist. <em>Mitigation:</em> 6a is required to say so explicitly if the
+  growth does not correlate with any <code>develop</code> commit, and that answer
+  ends the phase's regression thread rather than prolonging it.</li>
+</ul>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The regression is attributed: every pair that grew materially since
+  2026-08-07 is either explained by a named change, explained by standing
+  object count, or explicitly recorded as unattributed.</li>
+<li>
+<h1 id="3655-is-fixed-and-closed-with-a-functional-ci-assertion-that-the">3655 is fixed and closed, with a functional-CI assertion that the<a class="headerlink" href="#3655-is-fixed-and-closed-with-a-functional-ci-assertion-that-the" title="Permanent link">&para;</a></h1>
+  reservation sweep issues one bulk read per pass rather than one per
+  address.</li>
+<li>The cluster maintenance sweep's <code>GetObjectState</code> cost is reduced, with
+  before-and-after numbers from a 24h window recorded in this file.</li>
+<li>The <code>GetObjectState</code>/<code>cluster</code> loop and the <code>POST /auth</code> volume are
+  filed as issues with their measured numbers, whether or not they are
+  fixed here.</li>
+<li><code>GetReferencesFrom</code>/<code>api</code> is either back under its per-instance ceiling
+  or its cause is documented as living outside this repository.</li>
+<li>Master plan success criterion 2 is restated and open question 5 closed.</li>
+<li><code>pre-commit run --all-files</code> green; functional CI green.</li>
+<li>The 24h cluster total is recorded honestly against the under-100/s
+  criterion, met or not.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, back brief the operator: which of the two jobs
+(regression versus floor) the step belongs to, what the step will measure
+before it changes anything, and — for 6c and 6d — what the reply-size and
+index consequences of the chosen approach are.</p>
+<h2 id="findings-2026-08-19">Findings (2026-08-19)<a class="headerlink" href="#findings-2026-08-19" title="Permanent link">&para;</a></h2>
+<h3 id="6a-the-regression-is-two-things-and-only-one-of-them-is-a-defect">6a — the regression is two things, and only one of them is a defect<a class="headerlink" href="#6a-the-regression-is-two-things-and-only-one-of-them-is-a-defect" title="Permanent link">&para;</a></h3>
+<p>Diffing the per-pair nightly facts for 2026-08-07 (92.4/s, the last night
+under target) against 2026-08-18 (142.3/s) gives a total delta of +49.9/s.
+It decomposes:</p>
+<p><strong>~+19/s is a real defect</strong> — <code>GetObjectState</code>/<code>cluster</code> went from <em>below
+the top-40 cutoff</em> to 18.95/s. It is 38% of the whole regression in one
+pair. Diagnosis below.</p>
+<p><strong>~+12/s is node count, not regression.</strong> The per-node fixed-rate pairs
+all grew by almost exactly 50% on 2026-08-12: <code>Dequeue</code>/net 2.03 to 3.04,
+<code>GetBlobTransfersForNode</code>/transfers 2.03 to 3.04, and every one of the
+seven <code>GetNodeDaemonState</code> pairs 1.99 to 2.98. <code>GetNodeDaemonState</code> is
+one read per <code>DAEMON_STATE_POLL_INTERVAL</code> per daemon per node, so its rate
+divided by the poll interval <em>is</em> a node count: it reads 3.9 nodes before
+2026-08-12 and 5.8 after. The cluster gained two nodes.</p>
+<p>That is the most important finding for phase 7, and it is a gap in the
+model rather than a bug in the code: <strong>the ratchet's baselines scale with
+standing instance count but not with node count</strong>, so growing the cluster
+reads as a regression on every per-node pair simultaneously. Phase 7's
+budget must carry a per-node term. It already plans to; this is the
+evidence for why that is not optional.</p>
+<p>The remainder is instance-count movement and the long tail (330 to 401
+distinct pairs).</p>
+<h3 id="the-getobjectstatecluster-diagnosis-and-a-correction">The <code>GetObjectState</code>/<code>cluster</code> diagnosis — and a correction<a class="headerlink" href="#the-getobjectstatecluster-diagnosis-and-a-correction" title="Permanent link">&para;</a></h3>
+<p>This plan's survey attributed it to <code>_cluster_wide_cleanup()</code> and its 60
+second duty-cycle gate. <strong>That was wrong</strong>, and the correction is worth
+recording because the reasoning looked sound.</p>
+<p>The raw counters settle it. <code>database_requests_total</code> for this pair steps
+in a burst every ~16 minutes on both database nodes — +7,614 and +7,604 at
+18:38, +7,610 and +7,615 at 18:54 — against a continuous baseline of
+~1.3/s. That is ~15,200 calls in a single burst every 15 minutes.
+15,200/900 = 16.9/s, exactly the observed 24h average. The 60 second sweep
+is the 1.3/s baseline, not the 17.</p>
+<p>The 15-minute cadence identifies it as a <code>schedule.every(15).minutes</code> job,
+and it is <code>reap_expired_namespace_keys()</code>
+(<code>shakenfist/daemons/cluster/scheduled_tasks.py</code>). It walked every expired
+key and read <code>key.state.value</code> per key — an uncached round trip each, since
+<code>.state</code> is a property with no memoisation (<code>baseobject.py:536</code>) — purely
+to discard the ones it could not act on. <code>keys_with_attributes()</code>
+deliberately does not filter on object state (its docstring says so, and
+adds that "any future soft delete path must revisit that"; this sweep <em>is</em>
+one), so every key the sweep had already soft deleted stayed in its input
+until hard deletion caught up, and every stateless zombie key stayed there
+forever.</p>
+<p>That also explains the shape the earlier investigation could not: the
+nightly numbers ramp monotonically (0, 2.82, 4.60, 10.45, 14.45, 16.21,
+18.95) rather than switching on and off. It was a backlog growing, not a
+loop toggling. The "deploy-bracketed on/off loop" characterisation was an
+artefact of sampling.</p>
+<p><strong>Fix:</strong> one <code>get_objects_by_state()</code> query per pass for the keys in an
+actionable state, and a set membership test in the loop. The zombie
+counting this sweep used to do is dropped: <code>reconcile_orphaned_objects</code>
+owns stateless rows and already counts them hourly.</p>
+<h3 id="6c-the-bulk-accessor-already-existed">6c — the bulk accessor already existed<a class="headerlink" href="#6c-the-bulk-accessor-already-existed" title="Permanent link">&para;</a></h3>
+<p>The step brief anticipated adding a bulk reservation RPC through all three
+layers, with a proto change and a reply-size design. None of that was
+needed: <code>mariadb.get_reservations_for_ipam()</code> already exists and is already
+used by <code>IPAM.get_haloed_addresses()</code>. The change is an
+<code>IPAM.get_all_reservations()</code> helper over it and four call-site
+conversions. Reply size is unchanged from a call already made on this path.</p>
+<p>The reaper conversion also removed a second read per address —
+<code>get_allocation_age()</code> was itself a <code>get_reservation()</code> — and fixed a
+latent crash: for an in-use address with no reservation row,
+<code>get_allocation_age()</code> returns <code>None</code> and the old code evaluated
+<code>now - None</code>. That address is exactly the leak the sweep exists to find,
+so it now falls through to the leak path rather than raising.</p>
+<h3 id="6e-getreferencesfromapi-is-not-an-endpoint-defect">6e — <code>GetReferencesFrom</code>/api is not an endpoint defect<a class="headerlink" href="#6e-getreferencesfromapi-is-not-an-endpoint-defect" title="Permanent link">&para;</a></h3>
+<p>The cheap hypothesis was wrong: <code>Instance.external_view()</code> already issues
+exactly one <code>get_references_from</code> per view, inside the <code>attribute_memo()</code>
+that #3654 added. There is no per-view duplication to remove.</p>
+<p>Per this step's brief, reporting rather than fixing: the growth is request
+volume, and it correlates with the same 2026-08-12 node-count change. Two
+more nodes means more concurrent CI, which means more API polling, and the
+<code>/instances</code> list endpoint costs one reference read per instance returned —
+so its cost scales with instances <em>times</em> poll rate while the ratchet's
+coefficient captures only instances. Same model gap as above, seen through
+a different pair. No code change here.</p>
+<p>One real but small duplication was confirmed and left alone: the node
+external view issues two <code>get_references_from</code> calls, keyed by fqdn and by
+uuid (<code>shakenfist/node.py:448</code>), because <code>BLOB_LOCATION</code> rows key nodes by
+fqdn and <code>INSTANCE_LOCATION</code> rows by uuid. Collapsing it needs an <code>IN</code>
+variant at the SQL layer and is worth ~4 calls per sweep. Not worth the
+change on these numbers.</p>
+<h3 id="deviation-from-the-step-plan">Deviation from the step plan<a class="headerlink" href="#deviation-from-the-step-plan" title="Permanent link">&para;</a></h3>
+<p>Step 6c's brief called for a functional-CI assertion modelled on
+<code>test_instance_get_fetches_the_attributes_row_once</code>. The sweeps this phase
+fixes are fixed-rate timers, not API-triggered, so a functional assertion
+would have to sleep through two sampling windows either side of floating
+several addresses — around three minutes of wall clock, for a measurement
+that would still be noisy on shared CI hardware. Unit assertions on the
+sweep functions are exact, instant, and can assert the thing that actually
+matters (that the read count does not grow with address count). Both new
+guards were mutation tested: re-introducing the per-address read fails
+them, and the first version of the namespace-key guard did <em>not</em> fail and
+was rewritten until it did.</p>
 
 
 
@@ -12141,7 +12353,7 @@ something only our own operations tooling can see is
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-database-load-reduction-phase-05-next-tier.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-database-load-reduction-phase-05-next-tier.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-database-load-reduction-phase-06-residual-load.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-database-load-reduction-phase-06-residual-load.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-database-load-reduction-phase-06-residual-load/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

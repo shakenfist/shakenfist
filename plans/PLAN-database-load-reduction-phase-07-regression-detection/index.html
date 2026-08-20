@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-database-load-reduction-phase-07-regression-detection/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 5 — next-tier reductions, diagnosed and ratcheted - Shaken Fist</title>
+        <title>Phase 7 — regression detection a deployer can run - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-5-next-tier-reductions-diagnosed-and-ratcheted" class="md-skip">
+        <a href="#phase-7-regression-detection-a-deployer-can-run" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 5 — next-tier reductions, diagnosed and ratcheted
+              Phase 7 — regression detection a deployer can run
             
           </span>
         </div>
@@ -11795,10 +11795,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-the-attribution-data-actually-said" class="md-nav__link">
+  <a href="#why-this-phase-exists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the attribution data actually said
+        Why this phase exists
       
     </span>
   </a>
@@ -11806,10 +11806,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#thread-a-the-reductions-filed-as-issues" class="md-nav__link">
+  <a href="#the-one-idea-worth-porting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Thread A — the reductions (filed as issues)
+        The one idea worth porting
       
     </span>
   </a>
@@ -11817,10 +11817,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#thread-b-the-ratchet-this-phases-actual-deliverable" class="md-nav__link">
+  <a href="#what-already-exists-to-build-on" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Thread B — the ratchet (this phase's actual deliverable)
+        What already exists to build on
       
     </span>
   </a>
@@ -11828,10 +11828,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        Decisions
       
     </span>
   </a>
@@ -11839,10 +11839,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#out-of-scope" class="md-nav__link">
+  <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Out of scope
+        Step plan
       
     </span>
   </a>
@@ -11850,10 +11850,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome-recorded-2026-08-19" class="md-nav__link">
+  <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome (recorded 2026-08-19)
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
       
     </span>
   </a>
@@ -11881,246 +11903,230 @@
   
 
 
-<h1 id="phase-5-next-tier-reductions-diagnosed-and-ratcheted">Phase 5 — next-tier reductions, diagnosed and ratcheted<a class="headerlink" href="#phase-5-next-tier-reductions-diagnosed-and-ratcheted" title="Permanent link">&para;</a></h1>
+<h1 id="phase-7-regression-detection-a-deployer-can-run">Phase 7 — regression detection a deployer can run<a class="headerlink" href="#phase-7-regression-detection-a-deployer-can-run" title="Permanent link">&para;</a></h1>
 <p>Master plan: <a href="../PLAN-database-load-reduction/">PLAN-database-load-reduction.md</a></p>
-<p><strong>Status: Complete.</strong> Both threads landed and the measured outcome is
-recorded below. Phase 4 attribution had been deployed on <code>sfcbr</code> for several
-days when this was planned, so the next-tier targets were diagnosed from real
-per-caller data rather than guessed. This phase splits into two threads:
-(a) the individual reductions, filed as GitHub issues so they can be fixed
-opportunistically and owned separately; and (b) a durable ratchet — teaching
-the nightly infra report to mine per-caller sf-database load so these signals
-are watched going forward and cannot silently regress.</p>
-<h2 id="what-the-attribution-data-actually-said">What the attribution data actually said<a class="headerlink" href="#what-the-attribution-data-actually-said" title="Permanent link">&para;</a></h2>
-<p>Measured on the Prometheus at <code>maui.home.stillhq.com:9099</code> against the
-<code>database_requests_total{operation, caller_daemon}</code> counter added in phase 4
-(#3473). Total steady-state sf-database load is <strong>~174/s over 24h</strong> (down from
-the ~527/s that started this whole effort — phases 1-2 removed ~two thirds).</p>
-<p>A 1h snapshot initially made <code>GetIPAM</code> look like the dominant cost (~48/s,
-~22% of that window). The 24h average corrected this: <code>GetIPAM</code> is
-workload-correlated and <em>bursts</em> under load but averages only ~14/s at rest.
-The real steady-state floor is <strong>fixed-rate polling that runs even when the
-cluster is completely idle</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>Operation</th>
-<th>24h steady</th>
-<th>Caller(s)</th>
-<th>Nature</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Dequeue</td>
-<td>38.8/s</td>
-<td>net 19.6, queues 19.2</td>
-<td>fixed-rate poll</td>
-</tr>
-<tr>
-<td>GetExistingLocks</td>
-<td>19.2/s</td>
-<td>queues</td>
-<td>lock-check paired with each dequeue</td>
-</tr>
-<tr>
-<td>GetBlobTransfersForNode</td>
-<td>19.5/s</td>
-<td>transfers</td>
-<td>fixed-rate poll</td>
-</tr>
-<tr>
-<td><strong>idle-poll subtotal</strong></td>
-<td><strong>~78/s</strong></td>
-<td></td>
-<td><strong>~45% of load, workload-independent</strong></td>
-</tr>
-<tr>
-<td>GetIPAM</td>
-<td>14.4/s (peaks ~48)</td>
-<td>cluster</td>
-<td>workload-correlated burst</td>
-</tr>
-<tr>
-<td>GetInstanceAttributes</td>
-<td>15.0/s</td>
-<td>spread (cluster 4.2)</td>
-<td>mutable</td>
-</tr>
-<tr>
-<td>GetReferencesFrom</td>
-<td>9.1/s</td>
-<td>cluster 5.8, api 3.2</td>
-<td>mutable</td>
-</tr>
-</tbody>
-</table>
-<p>The lesson — recorded here deliberately — is that the ratchet baseline must be
-taken from a 24h (or longer) window, never a single busy hour, or it both
-overstates bursty operations and would enshrine reducible idle-poll cost as
-the defended floor.</p>
-<h2 id="thread-a-the-reductions-filed-as-issues">Thread A — the reductions (filed as issues)<a class="headerlink" href="#thread-a-the-reductions-filed-as-issues" title="Permanent link">&para;</a></h2>
-<p>Each next-tier reduction is a separate change in a different daemon loop, so
-each is a standalone GitHub issue rather than a single monolithic phase:</p>
+<p><strong>Status: Not started.</strong></p>
+<h2 id="why-this-phase-exists">Why this phase exists<a class="headerlink" href="#why-this-phase-exists" title="Permanent link">&para;</a></h2>
+<p>Phase 5 built a ratchet and the ratchet worked: it correctly refused to
+call an instance-count increase a regression, and it caught the real
+regression that phase 6 exists to chase. But it lives in a private
+operations repository, watching one cluster. Everything that makes it
+useful — the expected-load model, the committed baseline, the "is this a
+new fixed-rate poll" test — is knowledge about <em>Shaken Fist</em>, not
+knowledge about our operations, and it is currently unavailable to anyone
+who deploys Shaken Fist and to every change that lands in this repository
+before it reaches production.</p>
+<p>The consequences are concrete. The load regression phase 6 chases ran for
+roughly eleven days before anyone looked, because the only detector runs
+nightly against production. Nothing in CI would have caught a new
+fixed-rate poll at review time. And a deployer with a cluster of their own
+has no way to answer "is 200 queries per second normal for my cluster?"
+other than asking us.</p>
+<p>This phase moves the capability into the product: the model, the check and
+the operator's view all become things Shaken Fist ships. The private
+nightly report then becomes one consumer of a public mechanism rather than
+the sole owner of the signal, which is also the only version of this that
+survives the report being rewritten or retired.</p>
+<h2 id="the-one-idea-worth-porting">The one idea worth porting<a class="headerlink" href="#the-one-idea-worth-porting" title="Permanent link">&para;</a></h2>
+<p>The single most valuable thing the ratchet learned is <em>not</em> a number. It
+is that <strong>an absolute QPS ceiling is the wrong shape for most of this
+load</strong>. Hunt 2026-01 established that Shaken Fist's database load is
+dominated by polling whose rate is set by how many objects exist rather
+than by any work performed, and that it decomposes cleanly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>expected_qps ~= per_node_base x nodes
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>              + per_instance_coefficient x standing_instances
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>              + an activity-coupled remainder
+</code></pre></div>
+<p>with six <code>(operation, caller)</code> pairs fitting the per-instance term at
+r-squared 0.90-0.996. A deployer told "expect under 100 QPS" learns
+nothing, because their cluster is not our cluster. A deployer given the
+decomposition can compute what <em>their</em> cluster should draw, and — much
+more usefully — can tell the difference between "my load doubled because I
+doubled my instances" and "my load doubled because something is broken".
+That distinction is the entire value of the ratchet, and it is portable in
+a way that our baseline numbers are not.</p>
+<p>So the deliverable is the model and the means to evaluate it, with our
+measured coefficients as the shipped defaults.</p>
+<h2 id="what-already-exists-to-build-on">What already exists to build on<a class="headerlink" href="#what-already-exists-to-build-on" title="Permanent link">&para;</a></h2>
+<p>The survey found more foundation here than expected, and one embarrassment:</p>
 <ul>
-<li><strong>#3499 — queue-worker idle polling (~58/s, highest).</strong> <code>Dequeue</code> +
-  <code>GetExistingLocks</code> fire as a lockstep pair on every fixed tick in the
-  <code>queues</code> daemon, and <code>net</code> polls <code>Dequeue</code> the same way. Fix: adaptive
-  backoff on empty dequeue, with a latency cap. Backing off the dequeue
-  collapses the paired lock check too.</li>
-<li><strong>#3500 — transfers idle polling (~20/s).</strong> <code>GetBlobTransfersForNode</code>
-  polls at a fixed rate even with no pending transfers. Fix: back off / wake
-  on enqueue.</li>
-<li><strong>#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).</strong> Diagnosed as
-  the immutable-tier cache pattern, not loop surgery: the record <code>get_ipam</code>
-  returns is the static block definition
-  (<code>uuid</code>/<code>namespace</code>/<code>network_uuid</code>/<code>ipblock</code>/<code>version</code>); the mutable
-  allocations live in the separate <code>ipam_reservations</code> table, and <code>update_ipam</code>
-  exists only to persist version upgrades. Fix: wire <code>get_ipam</code> through the
-  phase 2 object cache at the immutable TTL, evicting on <code>update_ipam</code>/
-  <code>delete_ipam</code>.</li>
-<li><strong>#3502 — cluster sweep attribute/reference re-reads (~10/s, lowest).</strong>
-  Mutable reads re-hydrated per-check; fix is batching within the sweep.</li>
+<li><strong>The counter is already public.</strong> <code>database_requests_total{operation,
+  caller_daemon}</code> is served from every <code>sf-database</code> on
+  <code>MARIADB_GATEWAY_METRICS_PORT</code> (default 13006,
+  <code>shakenfist/config.py:647</code>). Phase 4 deliberately made <code>caller_node</code> a
+  metadata field rather than a label, so summing across tier instances is
+  the natural read and label cardinality stays sane.</li>
+<li><strong>A scrape-and-diff harness already exists in the CI suite.</strong>
+  <code>shakenfist/deploy/shakenfist_ci/database_tier.py</code> has
+  <code>scrape_database_counters()</code> (<code>:48</code>) and
+  <code>scrape_operation_requests(mesh_ip, operation, caller_daemon)</code> (<code>:70</code>),
+  plus <code>_database_nodes()</code> and <code>_sum_requests()</code> on the test base class,
+  and <code>cluster_ci_tests/test_database_tier.py</code> already contains
+  <code>test_instance_get_fetches_the_attributes_row_once</code> — a working
+  before/after delta assertion guarding the #3654 fix. The pattern this
+  phase needs is already proven in-tree on one operation; it needs
+  generalising, not inventing.</li>
+<li><strong><code>examples/</code> is an established home for drop-in monitoring config.</strong>
+  <code>examples/loki-secret-alert.yaml</code> set the precedent in the auth
+  federation work: a commented, drop-in rule file plus an operator guide
+  section explaining where it goes and how to confirm it fires.</li>
+<li><strong>The public Grafana dashboard is stale.</strong>
+  <code>examples/grafana-dashboard.json</code> still ships <code>etcd Traffic</code> and <code>etcd DB
+  Size</code> panels — etcd was removed from the product — and has no
+  database-tier panels at all. The good dashboard is the private one. That
+  is exactly backwards.</li>
 </ul>
-<p><strong>Post-fix addendum (2026-07-28).</strong> The ratchet worked: the nightly report
-flagged <code>GetIPAM</code>/<code>cluster</code> at ~20x its post-#3501 goal even though the
-cache fix was deployed. Investigation showed the cluster caller's load was
-never cacheable at all — it was ~3,600 <em>phantom</em> <code>object_states</code> ipam rows
-(state row present, <code>ipams</code> row gone) re-read every maintenance pass, with
-<code>None</code> results that the cache deliberately never stores. The phantom rows
-were written by in-memory-only IPAM objects leaking their state to MariaDB
-(#3532), accumulated because the deleted-object sweep could not drain its
-backlog (#3533), and were invisible to every cleanup path until the orphan
-reconciliation sweep (#3534). Those three fixes, not further caching, are
-what clears the <code>cluster</code> caller's <code>GetIPAM</code> floor. The same investigation
-closed #3502: the sweep's <code>GetInstanceAttributes</code>/<code>GetReferencesFrom</code> floor
-was O(blobs × instances) — <code>instance_usage_for_blob_uuid()</code> re-walked every
-healthy instance (and every disk's dependency chain) for every blob — and
-is now a single <code>instance_blob_usage()</code> pass per cleanup loop.</p>
-<p>These are deliberately <em>not</em> bundled into this phase's PR. #3499 and #3500 are
-behaviour changes (backoff trades a little first-task latency for a large load
-reduction) and each deserves its own review. The correct order by
-value-per-risk is #3499, then #3500, then #3501, then #3502.</p>
-<h2 id="thread-b-the-ratchet-this-phases-actual-deliverable">Thread B — the ratchet (this phase's actual deliverable)<a class="headerlink" href="#thread-b-the-ratchet-this-phases-actual-deliverable" title="Permanent link">&para;</a></h2>
-<p>Fixing the four issues above is necessary but not sufficient: without a
-standing check, load creeps back as new loops are added. Phase 5's own work is
-to make per-caller sf-database load a mined, watched signal, consistent with
-the existing practice of moving hand-computation into the nightly report
-precompute.</p>
-<ul>
-<li><strong>Where.</strong> The nightly infra report precompute
-  (<code>tools/infra-report-precompute.py</code> in the private <code>33fl</code> ops repo, not this
-  repo). This phase's code change lands there; this plan documents the intent
-  and the honest baseline it must encode.</li>
-<li><strong>What it computes.</strong> Per <code>(operation, caller_daemon)</code> 24h-averaged QPS from
-  <code>database_requests_total</code>, plus the cluster total, straight from the same
-  Prometheus the numbers above came from.</li>
-<li><strong>What it flags.</strong> Any caller/operation that climbs materially above the
-  recorded baseline, and specifically any regression on the four operations
-  the issues target — so a fix that lands and then rots is caught, and a new
-  fixed-rate poll added elsewhere shows up as a new high-rate <code>(operation,
-  caller_daemon)</code> pair.</li>
-<li><strong>Baseline honesty.</strong> The ratchet records today's 24h numbers as the
-  starting baseline <em>and</em> the expected post-fix floors for #3499/#3500, so it
-  defends the improved target rather than the current wasteful number. Until a
-  fix lands, its operation sits at "known-reducible", not "healthy".</li>
-</ul>
-<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
 <ol>
-<li>The nightly report emits a per-caller sf-database load section with the 24h
-   baseline and flags regressions against it.</li>
-<li>The four reduction issues are filed with attributed numbers and a repro
-   query (done: #3499-#3502).</li>
-<li>When #3499/#3500 land, the report's flagged "known-reducible" items clear
-   and the defended floor drops accordingly — verifiable in the nightly output
-   rather than by ad-hoc PromQL.</li>
+<li><strong>Ship a model, not a number.</strong> The budget file expresses expected load
+   as a per-node base plus a per-standing-object coefficient per
+   <code>(operation, caller_daemon)</code>, with our measured values as defaults and
+   a documented way to re-derive them. Absolute ceilings are used only for
+   pairs the hunt showed to have near-zero slope.</li>
+<li><strong>The budget file is data in this repository, and it is the single
+   source of truth.</strong> CI reads it, the <code>sf-ctl</code> command reads it, the
+   shipped Prometheus rules are generated from it, and any external
+   consumer reads it too. One file, several readers — not one model per
+   consumer, which is how the private and public versions would drift.</li>
+<li><strong>CI checks shape, production checks level.</strong> A CI cluster is small,
+   short-lived and shares hardware, so asserting a precise QPS there would
+   flake. CI's job is to catch the thing that is unambiguous at any scale:
+   a new <code>(operation, caller_daemon)</code> pair polling at a fixed rate on an
+   <em>idle</em> cluster, or an existing pair leaving its budget by a wide
+   margin. Precise level-tracking stays in production monitoring.</li>
+<li><strong>Every detector carries a positive control.</strong> The failure mode this
+   phase must not have is a check that passes because it is broken — the
+   lesson recorded in the auth federation leak-detection work, and the
+   reason its Loki test emits a synthetic token before asserting the
+   absence of real ones. Here the natural control is a rate we set by
+   configuration: <code>GetNodeDaemonState</code> should appear at
+   <code>daemon_count / DAEMON_STATE_POLL_INTERVAL</code>, so a harness that cannot
+   see that is not measuring anything and must fail loudly.</li>
+<li><strong>Give deployers a path with no monitoring stack.</strong> Prometheus rules
+   serve deployers who run Prometheus. An <code>sf-ctl</code> subcommand that scrapes
+   the tier twice, diffs, and prints a per-caller table against the budget
+   serves everyone else, is the natural thing to ask for in a bug report,
+   and is how a deployer answers "is this normal for my cluster?" without
+   installing anything.</li>
+<li><strong>Do not put load assertions in the health endpoints.</strong> Database load
+   is a capacity and regression signal, not a liveness one; a node drawing
+   more queries than budgeted is not unhealthy and must not be drained or
+   restarted for it. This keeps phase 7 clear of the health-check plan's
+   routing rules.</li>
+<li><strong>Our private nightly report becomes a consumer.</strong> It reads the same
+   committed budget file instead of its own baseline, so the two cannot
+   disagree. That change is small, belongs in that repository, and is out
+   of scope here beyond noting the contract it depends on.</li>
 </ol>
-<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
-<p>The individual daemon-loop fixes (#3499-#3502) — tracked separately. mTLS and
-OpenTelemetry span propagation, which reuse phase 4's caller-identity plumbing,
-remain their own plans.</p>
-<h2 id="outcome-recorded-2026-08-19">Outcome (recorded 2026-08-19)<a class="headerlink" href="#outcome-recorded-2026-08-19" title="Permanent link">&para;</a></h2>
-<p><strong>Thread A — all four reductions landed and are holding.</strong> #3499, #3500 and</p>
-<h1 id="3501-closed-2026-07-26-3502-closed-2026-07-29-alongside-the-353235333534">3501 closed 2026-07-26; #3502 closed 2026-07-29 alongside the #3532/#3533/#3534<a class="headerlink" href="#3501-closed-2026-07-26-3502-closed-2026-07-29-alongside-the-353235333534" title="Permanent link">&para;</a></h1>
-<p>phantom-row work described in the addendum above. The code is
-<code>daemon.IdlePollBackoff</code> (used by the <code>queues</code>, <code>net</code> and <code>transfers</code> loops),
-<code>get_ipam</code> wired through the phase 2 object cache at the immutable TTL, and
-<code>instance_blob_usage()</code> replacing the O(blobs x instances) per-blob walk.</p>
-<p>The ratchet's own verdict on those fixes, from the nightly per-caller facts:</p>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Pair</th>
-<th>Baseline</th>
-<th>Post-fix target</th>
-<th>Measured 2026-08-18</th>
-<th>Verdict</th>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Dequeue</code> / <code>net</code></td>
-<td>19.0</td>
-<td>4.0</td>
-<td>3.04</td>
-<td>cleared</td>
+<td>7a</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Derive and commit the budget.</strong> Produce <code>shakenfist/data/database_load_budget.yaml</code> (or the repo's established data location — check where other shipped data files live before choosing) holding, per <code>(operation, caller_daemon)</code>: a <code>per_node_base_qps</code>, an optional <code>per_instance_qps</code>, and a short <code>note</code> naming the loop that produces it. Seed it from the coefficients established by hunt 2026-01 (<code>GetObjectState</code>/net 0.31, <code>GetReferencesFrom</code>/api 0.32, <code>GetInstanceAttributes</code>/net 0.29, <code>GetInstanceAttributes</code>/api 0.27, <code>GetNetworkInterfaceAttributes</code>/net 0.23, <code>FindNetworkInterfaces</code>/net 0.08 QPS per standing instance) and from the per-node pairs (<code>GetNodeDaemonState</code> per daemon, <code>Dequeue</code>, <code>GetBlobTransfersForNode</code>, <code>GetExistingLocks</code>) whose slope is near zero. <strong>Use post-phase-6 numbers, not today's</strong> — this file defends a floor, and encoding a regression as the budget is the exact failure the phase 5 plan warned about. Include a <code>_doc</code> block stating the window the numbers came from, the cluster shape, and how to re-derive them. Add a schema and a unit test that validates the file parses and every entry has either a base or a coefficient.</td>
 </tr>
 <tr>
-<td><code>Dequeue</code> / <code>queues</code></td>
-<td>18.6</td>
-<td>4.0</td>
-<td>3.09</td>
-<td>cleared</td>
+<td>7b</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Generalise the CI harness and add the idle-load check.</strong> <code>shakenfist/deploy/shakenfist_ci/database_tier.py</code> already has <code>scrape_database_counters()</code> (<code>:48</code>) and <code>scrape_operation_requests()</code> (<code>:70</code>); add a function returning the <em>full</em> per-<code>(operation, caller_daemon)</code> delta over a window across all tier nodes, and put the new test in <code>cluster_ci_tests/test_database_tier.py</code> beside <code>test_instance_get_fetches_the_attributes_row_once</code>, which is the working precedent for the delta shape. The test: (1) emits the <strong>positive control</strong> by asserting <code>GetNodeDaemonState</code> appears at approximately <code>daemon_count / DAEMON_STATE_POLL_INTERVAL</code> — if that pair is absent or far off, fail with a message saying the harness is not measuring, because that is the vacuous case; (2) quiesces, sleeps a measured idle window, and diffs; (3) fails on any pair above its budget by more than the tolerance in 7a's file, and on any <em>unbudgeted</em> pair above a fixed-rate threshold, naming the pair and its rate. Per decision 3 the tolerance is generous — this catches a new poll, not a 10% drift. Commit subject: "ci: fail the build on a new fixed-rate database poll."</td>
 </tr>
 <tr>
-<td><code>GetBlobTransfersForNode</code> / <code>transfers</code></td>
-<td>19.0</td>
-<td>4.0</td>
-<td>3.04</td>
-<td>cleared</td>
+<td>7c</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Ship the production detectors.</strong> Generate <code>examples/prometheus-database-load-rules.yaml</code> from 7a's budget file — recording rules for per-<code>(operation, caller_daemon)</code> rate over a 24h window and for the cluster total, and alerting rules for a pair materially above its modelled ceiling and for an unbudgeted pair polling at a fixed rate. Comment it for an operator who has not written Prometheus rules before: where the file goes, what to scrape to make it work (the <code>sf-database</code> metrics port), and how to confirm it evaluates. Follow <code>examples/loki-secret-alert.yaml</code> for tone and level of hand-holding. Include the generator as a small tool so the rules cannot drift from the budget, and a test asserting the committed rules match what the generator produces from the committed budget.</td>
 </tr>
 <tr>
-<td><code>GetExistingLocks</code> / <code>queues</code></td>
-<td>18.5</td>
-<td>2.0</td>
-<td>0.20</td>
-<td>cleared</td>
+<td>7d</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong><code>sf-ctl database-load</code>.</strong> A subcommand in <code>shakenfist/client/ctl.py</code> (see the <code>@click.command()</code> pattern at <code>:180</code> onwards) that scrapes every <code>MARIADB_GATEWAY_HOSTS</code> entry on <code>MARIADB_GATEWAY_METRICS_PORT</code> twice over a <code>--window</code> (default 60s), diffs, and prints a table of <code>(operation, caller_daemon)</code>, measured QPS, modelled QPS from the budget for this cluster's node and instance counts, and the ratio — sorted by excess, not by absolute rate, because excess is what a deployer needs to see. Support <code>--json</code> for scripting. It must degrade honestly: if a tier node is unreachable, say which and report on the rest rather than silently under-reporting. This is the no-monitoring-stack path from decision 5 and the thing to ask for in a bug report.</td>
 </tr>
 <tr>
-<td><code>GetIPAM</code> / <code>cluster</code></td>
-<td>5.5</td>
-<td>2.0</td>
-<td>0.02</td>
-<td>cleared</td>
-</tr>
-<tr>
-<td><code>GetIPAM</code> / <code>net</code></td>
-<td>2.5</td>
-<td>1.5</td>
-<td>0.11</td>
-<td>cleared</td>
+<td>7e</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Fix the public dashboard and document the model.</strong> <code>examples/grafana-dashboard.json</code> still has <code>etcd Traffic</code> and <code>etcd DB Size</code> panels for a component that no longer exists — remove them, and add per-caller database load panels driven by <code>database_requests_total</code> so the public dashboard is not strictly worse than the private one. Then add a "Understanding database load" section to <code>docs/operator_guide/database.md</code> covering: the decomposition (per-node base, per-standing-object coefficient, activity remainder) and why an absolute number is not a useful expectation; how to read <code>sf-ctl database-load</code>; where the drop-in Prometheus rules go; and what to do when a pair exceeds its budget, which is to file an issue with the <code>sf-ctl --json</code> output attached. Keep it operator-facing — the derivation and the history belong in the plan documents, and this section links to them rather than restating them.</td>
 </tr>
 </tbody>
 </table>
-<p>That is ~78/s of workload-independent polling reduced to ~9.5/s, and every
-<code>known-reducible</code> entry in the baseline now reads <code>cleared</code> with none left in
-<code>still-reducible</code>.</p>
-<p><strong>Thread B — the ratchet is live</strong> and has been emitting the per-caller
-section nightly since it landed. It has since done its job twice over: it
-re-explained an apparent four-pair regression as standing-instance-count
-scaling (which is why several baselines now carry a <code>scaling</code> block rather
-than an absolute ceiling), and it is currently flagging the genuine
-regression that phase 6 exists to chase.</p>
-<p><strong>The mission target was met, and then lost.</strong> Cluster-wide steady-state load
-reached 89-92/s on 2026-08-05 to 2026-08-07 -- below the master plan's
-"under 100 operations per second" success criterion -- and has since climbed
-back to ~142/s (2026-08-18) at a <em>lower</em> standing instance count than when it
-measured 98/s on 2026-08-09, so the climb is not object-count scaling. That
-regression, and the residual lines this phase deliberately did not chase, are
-<a href="../PLAN-database-load-reduction-phase-06-residual-load/">phase 6</a>; making the
-detection of such regressions something a deployer can run rather than
-something only our own operations tooling can see is
-<a href="../PLAN-database-load-reduction-phase-07-regression-detection/">phase 7</a>.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The budget encodes the regression.</strong> If 7a is derived before phase 6
+  lands, the shipped model defends ~142 QPS as normal and every detector
+  built on it is worse than useless. <em>Mitigation:</em> 7a explicitly requires
+  post-phase-6 numbers; this phase does not start until phase 6's
+  re-measurement step is recorded.</li>
+<li><strong>The CI check flakes and gets disabled.</strong> A load assertion on shared CI
+  hardware is the classic flaky test, and a disabled check is worse than
+  no check because it reads as coverage. <em>Mitigation:</em> decision 3 — CI
+  asserts shape with a generous tolerance, not level; and the positive
+  control means a broken harness fails loudly rather than passing.</li>
+<li><strong>The model does not generalise off sfcbr.</strong> Our coefficients come from
+  one cluster with one workload shape. A deployer with 500 instances and
+  no CI churn may fit the model badly. <em>Mitigation:</em> ship the derivation
+  method alongside the numbers, and treat the defaults as defaults; the
+  <code>sf-ctl</code> output is designed to be readable even when the modelled column
+  is wrong, because measured QPS and the pair name are useful on their
+  own.</li>
+<li><strong>Two sources of truth re-emerge.</strong> The private report keeps its own
+  baseline "just for now" and the two drift. <em>Mitigation:</em> decision 2 and
+  decision 7 — the committed file is the only model, and the report's
+  switch to it is a stated dependency of this phase's value even though
+  the change itself is out of scope.</li>
+<li><strong>Scope creep into a monitoring product.</strong> <em>Mitigation:</em> decision 6.
+  This phase ships one data file, one CI test, one rules file, one CLI
+  subcommand and one docs section. Anything beyond that is future work.</li>
+</ul>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A committed, schema-validated database load budget expressing expected
+  load as a per-node base plus per-standing-object coefficients, derived
+  from a post-phase-6 window, with its derivation method documented.</li>
+<li>Functional CI fails when a change introduces a new fixed-rate poll or
+  pushes a budgeted pair well outside its budget, and the check carries a
+  positive control that fails loudly if the harness stops measuring.</li>
+<li>A drop-in Prometheus rules file, generated from the budget and tested
+  against it, plus an alert an operator can confirm fires.</li>
+<li><code>sf-ctl database-load</code> reports measured versus modelled per-caller load
+  on any cluster, with <code>--json</code>, and degrades honestly when a tier node is
+  unreachable.</li>
+<li><code>examples/grafana-dashboard.json</code> no longer references etcd and has
+  database-tier panels.</li>
+<li><code>docs/operator_guide/database.md</code> explains the load model in operator
+  terms.</li>
+<li><code>pre-commit run --all-files</code> green; functional CI green.</li>
+</ul>
+<h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Query-result churn.</strong> The truest definition of wasteful polling is a
+  read whose result has not changed since the last read, and nothing
+  measures that today. Hunt 2026-01 recorded it as the main missing
+  telemetry; it would need either server-side result hashing or MariaDB
+  <code>performance_schema</code> digest sampling, and it is the natural input to any
+  future decision about the deferred watch/subscribe mechanism.</li>
+<li><strong>Per-call-site attribution.</strong> <code>caller_daemon</code> localises load to a
+  daemon but not to a loop, which is why the hunt needed source reading to
+  finish several attributions. The phase 4 metadata channel is where a
+  call-site label would go, and it composes with the OpenTelemetry thread.</li>
+</ul>
 
 
 
@@ -12141,7 +12147,7 @@ something only our own operations tooling can see is
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-database-load-reduction-phase-05-next-tier.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-database-load-reduction-phase-05-next-tier.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-database-load-reduction-phase-07-regression-detection.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-database-load-reduction-phase-07-regression-detection.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-database-load-reduction-phase-07-regression-detection/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

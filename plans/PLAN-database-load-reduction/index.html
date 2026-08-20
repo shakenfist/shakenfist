@@ -12295,12 +12295,34 @@ so the phase plans do not reopen them:</p>
    cardinality and there are only ~6 nodes recoverable via
    <code>context.peer()</code>. Existing dashboards are unaffected; a new
    panel uses the additive counter.</li>
-<li><strong>Does the queues daemon need a 0.2s dequeue poll?</strong>
+<li>
+<p><strong>Is success criterion 2 still the right criterion?</strong>
+   <em>(Raised and resolved 2026-08-19 in phase 6: no. Success
+   criterion 2 has been restated as an absolute floor, and
+   measured met.)</em> "<code>get_node</code>
+   and <code>get_node_daemon_state</code> no longer appear in the top
+   five operations by rate" was written against the 527/s
+   picture, where those two were 57% of load. <code>get_node</code> is
+   gone as intended. <code>get_node_daemon_state</code> is not, and
+   cannot be: phase 1 reduced it from ~149/s to ~20/s, but
+   that ~20/s is the designed floor of 48 daemon processes
+   polling at 0.5 Hz, and it is now the <em>second</em> operation by
+   rate precisely because everything around it got so much
+   cheaper. Being high in a much shorter list is not the
+   same defect the criterion was written to catch. Phase 6
+   Restated as an absolute floor rather than a ranking. The
+   ranking form would also have failed on a healthy cluster
+   that simply had fewer object types in play, which is the
+   general problem with ranked criteria.</p>
+</li>
+<li>
+<p><strong>Does the queues daemon need a 0.2s dequeue poll?</strong>
    <code>dequeue</code> at 38/s suggests tight-loop polling by the
    queues and transfers daemons. Adaptive backoff when the
    queue is empty (e.g. 0.2s → 2s ramp, reset on work)
    is the obvious shape, but the phase 5 plan must check
-   coalescing behaviour and CI latency sensitivity first.</li>
+   coalescing behaviour and CI latency sensitivity first.</p>
+</li>
 </ol>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
@@ -12314,7 +12336,7 @@ so the phase plans do not reopen them:</p>
 <tbody>
 <tr>
 <td>1. Stop the idle-loop polls</td>
-<td>PLAN-database-load-reduction-phase-01-idle-loop.md</td>
+<td><a href="../PLAN-database-load-reduction-phase-01-idle-loop/">PLAN-database-load-reduction-phase-01-idle-loop.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
@@ -12324,7 +12346,7 @@ so the phase plans do not reopen them:</p>
 </tr>
 <tr>
 <td>3. Consolidate the gRPC client stacks</td>
-<td>PLAN-database-load-reduction-phase-03-client-consolidation.md</td>
+<td><a href="../PLAN-database-load-reduction-phase-03-client-consolidation/">PLAN-database-load-reduction-phase-03-client-consolidation.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
@@ -12335,7 +12357,17 @@ so the phase plans do not reopen them:</p>
 <tr>
 <td>5. Next-tier reductions</td>
 <td><a href="../PLAN-database-load-reduction-phase-05-next-tier/">PLAN-database-load-reduction-phase-05-next-tier.md</a></td>
-<td>Planned (issues #3499-#3502 filed; ratchet pending)</td>
+<td>Complete</td>
+</tr>
+<tr>
+<td>6. Residual load and the regression</td>
+<td><a href="../PLAN-database-load-reduction-phase-06-residual-load/">PLAN-database-load-reduction-phase-06-residual-load.md</a></td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>7. Deployer-visible regression detection</td>
+<td><a href="../PLAN-database-load-reduction-phase-07-regression-detection/">PLAN-database-load-reduction-phase-07-regression-detection.md</a></td>
+<td>Not started</td>
 </tr>
 </tbody>
 </table>
@@ -12427,7 +12459,44 @@ precompute (in the 33fl ops repo) to mine per-caller
 sf-database load, encode the honest 24h baseline, and flag
 regressions so the gains cannot silently rot. Detail,
 including the baseline-honesty argument, is in the phase 5
-plan file.</p>
+plan file. <strong>Outcome:</strong> all four issues
+landed; the ~78/s of workload-independent polling they
+targeted is now ~9.5/s and every <code>known-reducible</code> baseline
+entry reads <code>cleared</code>. The ratchet is live and has already
+both corrected a false regression (standing-instance-count
+scaling, which is why several baselines are now per-instance
+coefficients rather than absolute ceilings) and caught the
+real one that phase 6 exists to chase.</p>
+<p><strong>Phase 6 — the residual load and the regression.</strong> Phase 5
+drove the cluster to 89-92/s on 2026-08-05 to 2026-08-07,
+below this plan's target, and it has since climbed back to
+~142/s at a <em>lower</em> standing instance count. Phase 6 has two
+jobs which must not be confused: find what <em>regressed</em> since
+2026-08-07, and reduce the residual floor that was always
+there. Its targets are the cluster maintenance sweep's
+<code>GetObjectState</code> cost (~19/s, now traced to
+<code>_cluster_wide_cleanup()</code> and its 60s duty-cycle gate, and
+filed at last), the floating-IP maintenance path's
+per-address reservation sweeps (#3655, ~10/s, filed with
+exact call sites and still unfixed), <code>GetReferencesFrom</code>/api
+above its per-instance ceiling, the <code>POST /auth</code>
+re-authentication volume, and the ~22/s long tail spread
+across ~361 low-rate pairs no baseline watches. It also
+resolves Open question 5.</p>
+<p><strong>Phase 7 — deployer-visible regression detection.</strong> The
+only thing standing between us and a silent repeat of this
+regression is a nightly job in a private operations
+repository watching one cluster. Phase 7 moves the
+capability into the product: a committed load <em>model</em>
+(a per-node base plus per-standing-object coefficients, the
+one genuinely portable thing the hunt produced — an absolute
+QPS expectation tells a deployer nothing about their own
+cluster), a functional-CI check that fails when a change
+adds a new fixed-rate poll, drop-in Prometheus rules and an
+<code>sf-ctl</code> subcommand for deployers without a monitoring
+stack, and a public dashboard that is no longer worse than
+our private one. The private report then becomes one
+consumer of a public mechanism.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
@@ -12495,9 +12564,23 @@ because the following statements will be true:</p>
 <ul>
 <li>Steady-state sf-database load on the sfcbr cluster is
   below 100 operations per second, measured over a quiet
-  ten minute window from the <code>database_*_total</code> counters.</li>
-<li><code>get_node</code> and <code>get_node_daemon_state</code> no longer appear
-  in the top five operations by rate.</li>
+  ten minute window from the <code>database_*_total</code> counters.
+  <em>(Met 2026-08-05 to 2026-08-07 at 89-92/s; lost since,
+  ~142/s on 2026-08-18. Regaining and then defending it is
+  the subject of further phases. Note the measurement has since
+  been superseded in practice by a 24h window over the
+  phase 4 per-caller counter -- a ten minute window is too
+  short to distinguish a bursty operation from a floor.)</em></li>
+<li><code>get_node</code> no longer appears at all on the idle path, and
+  <code>get_node_daemon_state</code> is at or under the arithmetic floor
+  implied by <code>DAEMON_STATE_POLL_INTERVAL</code> and the cluster's
+  daemon-process count -- not above it. <em>(Restated in phase 6
+  per Open question 5; the original wording asked that
+  <code>get_node_daemon_state</code> leave the top five by rate, which
+  phase 1's own fix makes unreachable. Met as at 2026-08-18:
+  <code>get_node</code> is absent from the idle path, and
+  <code>get_node_daemon_state</code> measures ~0.5/s per daemon process,
+  which is exactly one read per 2s interval.)</em></li>
 <li>Daemon shutdown latency remains within the systemd stop
   timeout, verified by a rolling restart of a compute node.</li>
 <li>Mutable data (object states, attributes, metadata, daemon
@@ -12540,9 +12623,27 @@ because the following statements will be true:</p>
   daemon-state reads vs sf-2's 53/s).</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>None yet. The relevant GitHub tracker should be scanned
-during phase 1 planning for existing issues about database
-load, idle-loop CPU, or daemon shutdown latency.</p>
+<ul>
+<li><strong>#3499</strong> queue-worker idle polling, <strong>#3500</strong> transfers
+  idle polling, <strong>#3501</strong> cluster IPAM re-reads, <strong>#3502</strong>
+  cluster sweep attribute/reference re-reads -- the phase 5
+  thread A reductions.</li>
+<li><strong>#3532</strong> in-memory-only objects leaking <code>object_states</code>
+  rows, <strong>#3533</strong> the deleted-object sweep unable to drain
+  its backlog, <strong>#3534</strong> orphan/zombie row reconciliation --
+  found while chasing #3501, and the actual cause of the
+  <code>cluster</code> caller's <code>GetIPAM</code> floor.</li>
+<li><strong>#3595</strong> the sidechannel dispatcher polling every
+  agent-ready instance at 1 Hz (fixed by #3596). Found by
+  the hunt that phase 4's attribution counter made possible;
+  the single largest reducible line, ~0.8 QPS per standing
+  instance, and it cut cluster load by roughly a third.</li>
+<li><strong>#3654</strong> <code>Instance.external_view()</code> issuing ~7 separate
+  full-row <code>GetInstanceAttributes</code> RPCs per instance API GET.</li>
+</ul>
+<p>Still open: <strong>#3655</strong> (floating-IP
+maintenance sweeping every in-use address reservation three
+times per 30s cycle).</p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this plan file lands, add it to <code>docs/plans/index.md</code>
 (Plan Status table, one row per phase) and
