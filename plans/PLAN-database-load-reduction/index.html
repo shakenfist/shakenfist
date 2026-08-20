@@ -12362,7 +12362,7 @@ so the phase plans do not reopen them:</p>
 <tr>
 <td>6. Residual load and the regression</td>
 <td><a href="../PLAN-database-load-reduction-phase-06-residual-load/">PLAN-database-load-reduction-phase-06-residual-load.md</a></td>
-<td>Not started</td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>7. Deployer-visible regression detection</td>
@@ -12473,16 +12473,28 @@ below this plan's target, and it has since climbed back to
 ~142/s at a <em>lower</em> standing instance count. Phase 6 has two
 jobs which must not be confused: find what <em>regressed</em> since
 2026-08-07, and reduce the residual floor that was always
-there. Its targets are the cluster maintenance sweep's
-<code>GetObjectState</code> cost (~19/s, now traced to
-<code>_cluster_wide_cleanup()</code> and its 60s duty-cycle gate, and
-filed at last), the floating-IP maintenance path's
-per-address reservation sweeps (#3655, ~10/s, filed with
-exact call sites and still unfixed), <code>GetReferencesFrom</code>/api
-above its per-instance ceiling, the <code>POST /auth</code>
-re-authentication volume, and the ~22/s long tail spread
-across ~361 low-rate pairs no baseline watches. It also
-resolves Open question 5.</p>
+there. Its targets were the ~19/s of <code>GetObjectState</code> from
+the cluster daemon (#3814), the floating-IP maintenance
+path's per-address reservation sweeps (#3655, ~10/s),
+<code>GetReferencesFrom</code>/api above its per-instance ceiling, the
+<code>POST /auth</code> re-authentication volume, and the ~22/s long
+tail spread across ~361 low-rate pairs no baseline watches.
+It also resolves Open question 5.</p>
+<p>Steps 6a-6f have landed (PR #3818); 6g, the re-measurement
+that closes the phase, waits on a full 24h window after the
+changes reach sfcbr. Two claims made above before the work
+started turned out to be wrong, and are corrected here
+rather than left to mislead. The ~19/s was <strong>not</strong>
+<code>_cluster_wide_cleanup()</code>'s 60s duty-cycle gate: the raw
+counter series showed ~15,200 calls arriving in a burst
+every 16 minutes, which is a <code>schedule.every(15).minutes</code>
+job, and the cost was <code>reap_expired_namespace_keys()</code>
+reading <code>key.state</code> once per key. And the climb from 89/s to
+~142/s is not one regression: roughly +19/s was that defect,
+but roughly +12/s was simply the cluster growing from four
+nodes to six on 2026-08-12, which is not a regression at all
+and exposes that these baselines carry no per-node term. See
+the phase plan's Findings section.</p>
 <p><strong>Phase 7 — deployer-visible regression detection.</strong> The
 only thing standing between us and a silent repeat of this
 regression is a nightly job in a private operations
@@ -12638,12 +12650,26 @@ because the following statements will be true:</p>
   the hunt that phase 4's attribution counter made possible;
   the single largest reducible line, ~0.8 QPS per standing
   instance, and it cut cluster load by roughly a third.</li>
-<li><strong>#3654</strong> <code>Instance.external_view()</code> issuing ~7 separate
-  full-row <code>GetInstanceAttributes</code> RPCs per instance API GET.</li>
+<li>
+<p><strong>#3654</strong> <code>Instance.external_view()</code> issuing ~7 separate
+  full-row <code>GetInstanceAttributes</code> RPCs per instance API GET.</p>
+</li>
+<li>
+<p><strong>#3655</strong> floating-IP maintenance sweeping every in-use
+  address reservation three times per 30s cycle, and
+  <strong>#3814</strong> <code>reap_expired_namespace_keys()</code> reading
+  <code>key.state</code> once per key every 15 minutes -- both fixed in
+  phase 6. #3814 was the larger half of the climb back to
+  ~142/s, and the diagnosis recorded against it when it was
+  filed was wrong; see the phase 6 plan's Findings section.</p>
+</li>
 </ul>
-<p>Still open: <strong>#3655</strong> (floating-IP
-maintenance sweeping every in-use address reservation three
-times per 30s cycle).</p>
+<p>Still open: <strong>#3815</strong> (<code>POST /auth</code> is ~37% of mutating API
+requests because the client caches its token on the <code>Client</code>
+object, so every process invocation re-authenticates). The
+fix most likely belongs in <code>client-python</code>, not here: the
+server already returns <code>expires_in</code>, so a cross-process
+cache needs no server change.</p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this plan file lands, add it to <code>docs/plans/index.md</code>
 (Plan Status table, one row per phase) and
