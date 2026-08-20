@@ -4922,28 +4922,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#bootstrap-css" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap CSS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#axios" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Axios
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#sfui" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6580,6 +6558,34 @@
     
   
     sfui conversion phase 8: terminate actions to POST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-sfui-conversion-phase-09-teardown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 9: teardown, docs and issue closure
   
 
     
@@ -12044,28 +12050,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#bootstrap-css" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap CSS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#axios" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Axios
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#sfui" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12315,13 +12299,6 @@ authenticate once per session instead of once per commit.</p>
 ever removes marks, so it cannot manufacture an attestation. Only
 the commits that add marks need signatures.</p>
 <h2 id="vendored-web-assets">Vendored web assets<a class="headerlink" href="#vendored-web-assets" title="Permanent link">&para;</a></h2>
-<h3 id="bootstrap-css">Bootstrap CSS<a class="headerlink" href="#bootstrap-css" title="Permanent link">&para;</a></h3>
-<p>Kerbside uses bootstrap CSS for styling. This was constructed by
-downloading Bootstrap 5.3 and jQuery 3.7.0 and then installing to
-<code>kerbside/api/static/js</code>.</p>
-<h3 id="axios">Axios<a class="headerlink" href="#axios" title="Permanent link">&para;</a></h3>
-<p>Kerbside's web administration API uses Axios for HTTP requests.
-Version 1.6.5 is cached at <code>kerbside/api/static/js</code>.</p>
 <h3 id="sfui">sfui<a class="headerlink" href="#sfui" title="Permanent link">&para;</a></h3>
 <p><code>kerbside/api/static/sfui</code> is a vendored copy of
 <a href="https://github.com/shakenfist/sfui">shakenfist/sfui</a>, the Shaken
@@ -12355,11 +12332,11 @@ feature branch commit -- or an ancestor of a merge commit -- is
 flagged even when every vendored file is byte for byte correct.</p>
 <h3 id="page-polling">Page polling<a class="headerlink" href="#page-polling" title="Permanent link">&para;</a></h3>
 <p>Every page rendered with <code>refresh=True</code> polls instead of reloading.
-<code>base-sfui.html</code> wraps the page body in <code>&lt;main id="kb-content"&gt;</code> and
+<code>base.html</code> wraps the page body in <code>&lt;main id="kb-content"&gt;</code> and
 includes <code>templates/includes/poll.html</code>, which every 30 seconds
 fetches the current URL, parses that element out of the response and
-morphs it onto the live one with the vendored morphdom. The old
-<code>base.html</code> used a <code>&lt;meta http-equiv="refresh"&gt;</code>; the morph cycle
+morphs it onto the live one with the vendored morphdom. These pages
+previously used a <code>&lt;meta http-equiv="refresh"&gt;</code>; the morph cycle
 exists so that scroll position, selection, focus, an open <code>&lt;details&gt;</code>
 disclosure and a half-confirmed terminate all survive a tick instead
 of being reset by a reload.</p>
@@ -12387,8 +12364,8 @@ up a deployed kerbside first.</p>
 Jinja rendering are exactly what a real request would produce -- and
 writes it next to a symlink of the real static tree, because the
 templates reference their assets as root-relative absolute paths
-(<code>/static/sfui/...</code>). Only pages that have actually been converted
-onto <code>base-sfui.html</code> are supported; today that is all five: <code>login</code>,
+(<code>/static/sfui/...</code>). Every page the app renders is supported, all
+five of them on <code>base.html</code>: <code>login</code>,
 which needs neither authentication nor the database; <code>consoles</code>,
 whose fixtures render two consoles -- one with sessions and active
 tokens, one with neither -- so a single screenshot shows both

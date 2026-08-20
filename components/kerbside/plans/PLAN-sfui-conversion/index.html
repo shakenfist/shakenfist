@@ -6546,6 +6546,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-sfui-conversion-phase-09-teardown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sfui conversion phase 9: teardown, docs and issue closure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
@@ -12372,7 +12400,7 @@ locally-running kerbside.</p>
 <tr>
 <td>9. Teardown, docs and issue closure</td>
 <td>PLAN-sfui-conversion-phase-09-teardown.md</td>
-<td>Not started</td>
+<td>Done</td>
 </tr>
 </tbody>
 </table>
@@ -12486,13 +12514,17 @@ locally-running kerbside.</p>
    mitigated rather than converted (#319).</li>
 <li><strong>Teardown, docs and issue closure</strong> (plan at medium
    effort). Delete the old <code>base.html</code> (renaming
-   <code>base-sfui.html</code> into place), Bootstrap (all 40+ files),
-   jQuery, axios and <code>logo.svg</code>; update
-   <code>docs/development.md</code>'s "Vendored web assets" section,
-   <code>ARCHITECTURE.md</code>'s directory notes and <code>AGENTS.md</code>;
-   prune the pre-commit exclude back down; run the sfui
-   README audit greps over the finished templates; close
-   #244.</li>
+   <code>base-sfui.html</code> into place), Bootstrap, jQuery, axios and
+   <code>logo.svg</code> — 47 files, 8.6 MB; update
+   <code>docs/development.md</code>'s "Vendored web assets" section and
+   <code>ARCHITECTURE.md</code>'s directory notes; prune the pre-commit
+   exclude back down; run the sfui README audit greps over
+   the finished templates; close #244. Two corrections from
+   the phase 9 survey: <code>AGENTS.md</code> needs no change, because
+   PR #318 moved that material into <code>docs/</code> and what remains
+   there stays true; and <code>.vscode/review-scope.toml</code> also
+   excludes <code>kerbside/api/static/js/*</code> and needs pruning
+   alongside the pre-commit config.</li>
 </ol>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
