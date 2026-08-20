@@ -77,9 +77,15 @@ def reap_floating_ips():
                 }).error('Floating address not reserved correctly')
     LOG.info('Found floating addresses: %s' % floating_addresses)
 
+    # Read the reservation table once and use it for both passes below.
+    # Each of those walks every in-use address, and the second one used
+    # to read each address twice -- once for its age and once for the
+    # reservation itself (issue 3655).
+    reservations = floating_network.ipam.get_all_reservations()
+
     floating_routed = []
     for addr in floating_network.ipam.in_use:
-        reservation = floating_network.ipam.get_reservation(addr)
+        reservation = reservations.get(addr)
         if not reservation:
             continue
         if reservation.reservation_type != ReservationType.ROUTED:
@@ -129,12 +135,17 @@ def reap_floating_ips():
                                      floating_halo):
             # This IP needs to have been allocated more than 300 seconds
             # ago to ensure that the network setup isn't still queued.
-            if now - floating_network.ipam.get_allocation_age(ip) < 300:
+            # An address which is in use but has no reservation row at
+            # all is precisely the leak this sweep exists to find, so it
+            # must fall through rather than be skipped. It also has no
+            # age to test -- which is why this used to subtract None from
+            # a float and raise.
+            res = reservations.get(ip)
+            if res and now - res.reserved_at < 300:
                 continue
 
             # However, the inverse is also true -- the deletion of whatever
             # was using this address might still be in process.
-            res = floating_network.ipam.get_reservation(ip)
             if res and res.user_type and res.user_uuid:
                 o = get_object_class(res.user_type).from_db(str(res.user_uuid))
                 if o:

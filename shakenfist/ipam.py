@@ -385,6 +385,24 @@ class IPAM(dbo):
 
         return mariadb.get_reservation(self.uuid, address)
 
+    def get_all_reservations(self) -> dict[str, IPAMReservation]:
+        """Every reservation on this IPAM, keyed by address.
+
+        For a sweep which looks at every in-use address, this is one
+        round trip where get_reservation() per address is one each. The
+        floating network on a busy cluster holds enough addresses for
+        that difference to be most of a daemon's idle database load
+        (issue 3655). Callers which genuinely want a single address
+        should still use get_reservation().
+        """
+        if self._in_memory_only:
+            return dict(self.__in_memory_store)
+
+        return {
+            str(res.address): res
+            for res in mariadb.get_reservations_for_ipam(self.uuid)
+        }
+
     def get_allocation_age(self, address: Optional[str]) -> Optional[float]:
         if not address:
             raise exceptions.InvalidIPAMAddress(

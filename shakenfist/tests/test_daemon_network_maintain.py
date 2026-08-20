@@ -614,7 +614,10 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         fake_fn = mock.MagicMock()
         fake_fn.ipam.in_use = [fake_addr]
-        fake_fn.ipam.get_reservation.return_value = fake_resv
+        # The sweep reads the whole reservation table once rather than
+        # one address at a time (issue 3655).
+        fake_fn.ipam.get_all_reservations.return_value = {
+            fake_addr: fake_resv}
 
         active = self._run_one_iteration(
             network_node=True,

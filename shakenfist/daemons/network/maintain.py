@@ -529,8 +529,11 @@ class Job(util_concurrency.Job):
                 # fn should never be None, but we do in fact see it during
                 # installation at the moment and I am not sure why. I suspect
                 # a startup race.
+                # One read for the whole table, not one per address --
+                # this runs every maintenance cycle (issue 3655).
+                reservations = fn.ipam.get_all_reservations()
                 for addr in fn.ipam.in_use:
-                    resv = fn.ipam.get_reservation(addr)
+                    resv = reservations.get(addr)
                     if resv and resv.reservation_type == ReservationType.ROUTED:
                         routed_by_network[resv.user_uuid].append(addr)
 

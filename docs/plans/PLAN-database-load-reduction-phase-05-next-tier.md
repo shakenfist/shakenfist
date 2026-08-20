@@ -2,8 +2,9 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
-**Status: Planned.** Phase 4 attribution has now been deployed on `sfcbr`
-for several days, so the next-tier targets are diagnosed from real
+**Status: Complete.** Both threads landed and the measured outcome is
+recorded below. Phase 4 attribution had been deployed on `sfcbr` for several
+days when this was planned, so the next-tier targets were diagnosed from real
 per-caller data rather than guessed. This phase splits into two threads:
 (a) the individual reductions, filed as GitHub issues so they can be fixed
 opportunistically and owned separately; and (b) a durable ratchet — teaching
@@ -123,3 +124,45 @@ precompute.
 The individual daemon-loop fixes (#3499-#3502) — tracked separately. mTLS and
 OpenTelemetry span propagation, which reuse phase 4's caller-identity plumbing,
 remain their own plans.
+
+## Outcome (recorded 2026-08-19)
+
+**Thread A — all four reductions landed and are holding.** #3499, #3500 and
+#3501 closed 2026-07-26; #3502 closed 2026-07-29 alongside the #3532/#3533/#3534
+phantom-row work described in the addendum above. The code is
+`daemon.IdlePollBackoff` (used by the `queues`, `net` and `transfers` loops),
+`get_ipam` wired through the phase 2 object cache at the immutable TTL, and
+`instance_blob_usage()` replacing the O(blobs x instances) per-blob walk.
+
+The ratchet's own verdict on those fixes, from the nightly per-caller facts:
+
+| Pair | Baseline | Post-fix target | Measured 2026-08-18 | Verdict |
+|------|----------|-----------------|---------------------|---------|
+| `Dequeue` / `net` | 19.0 | 4.0 | 3.04 | cleared |
+| `Dequeue` / `queues` | 18.6 | 4.0 | 3.09 | cleared |
+| `GetBlobTransfersForNode` / `transfers` | 19.0 | 4.0 | 3.04 | cleared |
+| `GetExistingLocks` / `queues` | 18.5 | 2.0 | 0.20 | cleared |
+| `GetIPAM` / `cluster` | 5.5 | 2.0 | 0.02 | cleared |
+| `GetIPAM` / `net` | 2.5 | 1.5 | 0.11 | cleared |
+
+That is ~78/s of workload-independent polling reduced to ~9.5/s, and every
+`known-reducible` entry in the baseline now reads `cleared` with none left in
+`still-reducible`.
+
+**Thread B — the ratchet is live** and has been emitting the per-caller
+section nightly since it landed. It has since done its job twice over: it
+re-explained an apparent four-pair regression as standing-instance-count
+scaling (which is why several baselines now carry a `scaling` block rather
+than an absolute ceiling), and it is currently flagging the genuine
+regression that phase 6 exists to chase.
+
+**The mission target was met, and then lost.** Cluster-wide steady-state load
+reached 89-92/s on 2026-08-05 to 2026-08-07 -- below the master plan's
+"under 100 operations per second" success criterion -- and has since climbed
+back to ~142/s (2026-08-18) at a *lower* standing instance count than when it
+measured 98/s on 2026-08-09, so the climb is not object-count scaling. That
+regression, and the residual lines this phase deliberately did not chase, are
+[phase 6](PLAN-database-load-reduction-phase-06-residual-load.md); making the
+detection of such regressions something a deployer can run rather than
+something only our own operations tooling can see is
+[phase 7](PLAN-database-load-reduction-phase-07-regression-detection.md).
