@@ -294,7 +294,7 @@ so the phase plans do not reopen them:
 | 3. Consolidate the gRPC client stacks | [PLAN-database-load-reduction-phase-03-client-consolidation.md](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete |
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
 | 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
-| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Not started |
+| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | In progress |
 | 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Not started |
 
 Phase summaries:
@@ -405,16 +405,29 @@ below this plan's target, and it has since climbed back to
 ~142/s at a *lower* standing instance count. Phase 6 has two
 jobs which must not be confused: find what *regressed* since
 2026-08-07, and reduce the residual floor that was always
-there. Its targets are the cluster maintenance sweep's
-`GetObjectState` cost (~19/s, now traced to
-`_cluster_wide_cleanup()` and its 60s duty-cycle gate, and
-filed at last), the floating-IP maintenance path's
-per-address reservation sweeps (#3655, ~10/s, filed with
-exact call sites and still unfixed), `GetReferencesFrom`/api
-above its per-instance ceiling, the `POST /auth`
-re-authentication volume, and the ~22/s long tail spread
-across ~361 low-rate pairs no baseline watches. It also
-resolves Open question 5.
+there. Its targets were the ~19/s of `GetObjectState` from
+the cluster daemon (#3814), the floating-IP maintenance
+path's per-address reservation sweeps (#3655, ~10/s),
+`GetReferencesFrom`/api above its per-instance ceiling, the
+`POST /auth` re-authentication volume, and the ~22/s long
+tail spread across ~361 low-rate pairs no baseline watches.
+It also resolves Open question 5.
+
+Steps 6a-6f have landed (PR #3818); 6g, the re-measurement
+that closes the phase, waits on a full 24h window after the
+changes reach sfcbr. Two claims made above before the work
+started turned out to be wrong, and are corrected here
+rather than left to mislead. The ~19/s was **not**
+`_cluster_wide_cleanup()`'s 60s duty-cycle gate: the raw
+counter series showed ~15,200 calls arriving in a burst
+every 16 minutes, which is a `schedule.every(15).minutes`
+job, and the cost was `reap_expired_namespace_keys()`
+reading `key.state` once per key. And the climb from 89/s to
+~142/s is not one regression: roughly +19/s was that defect,
+but roughly +12/s was simply the cluster growing from four
+nodes to six on 2026-08-12, which is not a regression at all
+and exposes that these baselines carry no per-node term. See
+the phase plan's Findings section.
 
 **Phase 7 — deployer-visible regression detection.** The
 only thing standing between us and a silent repeat of this
@@ -587,9 +600,20 @@ because the following statements will be true:
 * **#3654** `Instance.external_view()` issuing ~7 separate
   full-row `GetInstanceAttributes` RPCs per instance API GET.
 
-Still open: **#3655** (floating-IP
-maintenance sweeping every in-use address reservation three
-times per 30s cycle).
+* **#3655** floating-IP maintenance sweeping every in-use
+  address reservation three times per 30s cycle, and
+  **#3814** `reap_expired_namespace_keys()` reading
+  `key.state` once per key every 15 minutes -- both fixed in
+  phase 6. #3814 was the larger half of the climb back to
+  ~142/s, and the diagnosis recorded against it when it was
+  filed was wrong; see the phase 6 plan's Findings section.
+
+Still open: **#3815** (`POST /auth` is ~37% of mutating API
+requests because the client caches its token on the `Client`
+object, so every process invocation re-authenticates). The
+fix most likely belongs in `client-python`, not here: the
+server already returns `expires_in`, so a cross-process
+cache needs no server change.
 
 ### Documentation index maintenance
 
