@@ -11655,6 +11655,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11742,6 +11753,16 @@
 
 
 <h1 id="plan-375-a-guest-idt-so-codegen-miscompiles-fail-loudly-not-silently">PLAN-375: A guest IDT so codegen miscompiles fail loudly, not silently<a class="headerlink" href="#plan-375-a-guest-idt-so-codegen-miscompiles-fail-loudly-not-silently" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>Landed 2026-07-25 in <code>a938e4b</code>, together with this plan document:
+<code>src/core/src/idt.rs</code> (IDT, 32 exception stubs, common handler),
+<code>idt::install()</code> as the first step of <code>_start</code>, and the host-side
+<code>cpu-exception</code> capture in <code>src/vmm/src/main.rs</code>. Validation is
+recorded below.</p>
+<p>Issue #375 stays open by design. The <code>#[inline(never)]</code> attributes
+remain the primary defence and this plan is the safety net that makes
+their failure observable; the issue closes only if the underlying LLVM
+miscompile is reproduced and root-caused upstream.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>"Let's find a permanent fix for #375 instead of a workaround." Issue #375
 tracks the guest ops' fragile dependence on <code>#[inline(never)]</code> to dodge an

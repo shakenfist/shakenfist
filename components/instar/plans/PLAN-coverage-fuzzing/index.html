@@ -3112,10 +3112,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress-steps-1-5-infrastructure-merged-extended-runs-not-yet-complete" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In Progress (Steps 1-5 infrastructure merged, extended runs not yet complete)
+        Status: Complete
       
     </span>
   </a>
@@ -12244,10 +12244,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress-steps-1-5-infrastructure-merged-extended-runs-not-yet-complete" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In Progress (Steps 1-5 infrastructure merged, extended runs not yet complete)
+        Status: Complete
       
     </span>
   </a>
@@ -12797,7 +12797,51 @@
 
 
 <h1 id="coverage-guided-fuzzing-of-parser-crates-phase-6">Coverage-guided fuzzing of parser crates (Phase 6)<a class="headerlink" href="#coverage-guided-fuzzing-of-parser-crates-phase-6" title="Permanent link">&para;</a></h1>
-<h2 id="status-in-progress-steps-1-5-infrastructure-merged-extended-runs-not-yet-complete">Status: In Progress (Steps 1-5 infrastructure merged, extended runs not yet complete)<a class="headerlink" href="#status-in-progress-steps-1-5-infrastructure-merged-extended-runs-not-yet-complete" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>All seven steps are done, and the campaign the plan describes has been
+running continuously since March 2026.</p>
+<p>Delivery outran the plan's own scope. The plan asked for harnesses
+covering the six <code>no_std</code> parser crates; <code>src/fuzz/fuzz_targets/</code>
+holds <strong>40</strong> targets, because every subcommand plan landed since
+(measure, create, resize, rebase/commit, map, snapshot, check
+--repair, amend, dd, bitmap, bench, qcow2-write) added its own
+coverage-guided targets under this plan's infrastructure. The mock
+<code>CallTable</code>, the scratch-memory simulation, and the corpus tooling
+have not needed to change to absorb them, which is the strongest
+evidence the step 1 design was right.</p>
+<p>Against the success criteria:</p>
+<ul>
+<li><strong>Targets for all six parser crates</strong> — done, plus 34 more.</li>
+<li><strong>Seed corpus from the test images</strong> — <code>scripts/extract-fuzz-corpus.py</code>,
+  persisted to <code>instar-testdata/custom/fuzz-corpus/</code>.</li>
+<li><strong>4 hours per target / 24 hours cumulative</strong> — exceeded by orders of
+  magnitude. <code>.github/workflows/coverage-fuzz.yml</code> runs nightly at
+  04:00 UTC against a 450-minute budget tiered by <code>tools/ci/fuzz-tier.sh</code>,
+  plus a per-PR smoke test, a post-merge smoke test, and
+  <code>workflow_dispatch</code>.</li>
+<li><strong>Automatic issue filing</strong> — <code>tools/ci/report-fuzz-crash.sh</code>, with
+  deduplication by crash signature.</li>
+<li><strong>Crashes fixed and tracked</strong> — roughly 200 <code>security-audit</code> issues
+  have been closed. Two dedicated backlog-drain plans came out of this
+  work and both completed: <a href="/components/instar/plans/PLAN-fuzzing-bugs/">PLAN-fuzzing-bugs.md</a>
+  (44 issues, 5 root causes) and <a href="/components/instar/plans/PLAN-bug-fixes/">PLAN-bug-fixes.md</a>
+  (10 issues, 3 root causes).</li>
+<li><strong>Documentation</strong> — <code>docs/testing.md</code> covers running targets and
+  reading coverage; <code>docs/security-audits.md</code> carries the technique and
+  infrastructure; <code>ARCHITECTURE.md</code> and <code>README.md</code> mention it;
+  <code>make fuzz-build</code> / <code>make fuzz-run</code> exist.</li>
+</ul>
+<p>One criterion is not met in the literal sense and never will be, which
+is why the plan closes rather than waiting: "no unresolved crashes" is
+a steady-state property of a fuzzer that runs every night, not a
+milestone. At close there are three open <code>security-audit</code> issues and
+they are one defect — <code>fuzz_rebase_planners</code> emitting a write patch
+outside <code>total_file_size</code> (#483, with #485 and #492 as duplicate crash
+reports of the same signature). That is tracked as an issue, which is
+where this plan says findings belong; it is not a reason to hold the
+infrastructure plan open.</p>
+<p>Follow-on work has its own plan:
+<a href="/components/instar/plans/PLAN-fuzz-autofix/">PLAN-fuzz-autofix.md</a> for automated triage.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant

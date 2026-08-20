@@ -11778,126 +11778,126 @@ at the repo root).</p>
 <td>2026-05-08</td>
 <td><a href="/components/instar/plans/PLAN-distro-matrix-ci/">Distro matrix CI</a></td>
 <td>Run instar's full functional test suite against installed <code>.deb</code>/<code>.rpm</code> packages on a representative matrix of Linux distributions in the GitHub merge queue, with qemu-img differential coverage</td>
-<td>Complete (phases 1-5 and 2b, 2026-08-15): every merge to <code>develop</code> installs a freshly built <code>.deb</code>/<code>.rpm</code> on Debian 12/13, Ubuntu 22.04/24.04, Fedora and Rocky 9/10 and runs the full integration suite against each distribution's own <code>qemu-img</code> (6.2 to 10.2), gated by the queue's <code>Can merge</code> aggregate; pull-request latency is unchanged. Phase 1 dropped the release binary's glibc floor to 2.30 by splitting the build image off the dev image; phases 2 and 2b measured every qemu output-format boundary against 80 static per-version <code>qemu-img</code> builds rather than inferring them, and found that instar's VHD writer had been silently truncating on every qemu before 10.0. The queue found a regression on its first real run: Renovate had reverted the bullseye pin to trixie, raising the shipped floor to 2.39 and dropping three distros</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-distro-matrix-ci-phase-01-glibc-build/">1: glibc build split</a>, <a href="/components/instar/plans/PLAN-distro-matrix-ci-phase-02-qemu-profiles/">2: qemu profiles</a>, <a href="/components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity/">2b: qemu output parity</a>, <a href="/components/instar/plans/PLAN-distro-matrix-ci-phase-03-runner/">3: runner</a>, <a href="/components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow/">4: workflow</a>, <a href="/components/instar/plans/PLAN-distro-matrix-ci-phase-05-merge-queue/">5: merge queue</a></td>
 </tr>
 <tr>
 <td>2026-05-09</td>
 <td><a href="/components/instar/plans/PLAN-release-v0.2/">Release v0.2.0</a></td>
 <td>Cut the v0.2.0 tag and publish signed GitHub Release artifacts (tarball, .deb, .rpm) for x86_64 Linux</td>
-<td>Complete (tagged 2026-05-09)</td>
+<td>Complete</td>
 <td>(no phase files; sequential gates)</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-release/">First public release of instar</a></td>
 <td>Cargo.toml metadata, release workflow, .deb/.rpm packaging, and signing for instar's public releases (umbrella plan; v0.2.0 execution lives in <code>PLAN-release-v0.2.md</code>)</td>
-<td>In progress (phases 1-4 complete through v0.2.0; phase 5 audit mostly done; phase 6 coverage fuzzing in progress)</td>
+<td>Complete</td>
 <td>(phases inline)</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-audit/">Security audit</a></td>
 <td>Sweep instar for security weaknesses across the host VMM, KVM guest, call-table boundary, and format parsers, including coverage-guided fuzzing</td>
-<td>In progress (phases 1a-5 done; phase 6 coverage fuzzing in progress)</td>
+<td>Complete</td>
 <td>(phases inline)</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-coverage-fuzzing/">Coverage-guided fuzzing</a></td>
 <td>Stand up coverage-guided fuzzing across the format parsers and run sustained campaigns</td>
-<td>In progress (steps 1-5 infrastructure merged; extended runs not yet complete)</td>
+<td>Complete</td>
 <td>(phases inline)</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix/">Fuzz autofix workflow</a></td>
 <td>Workflow that triages fuzzer-discovered crashes and proposes minimal fixes</td>
-<td>In progress (workflow scaffolding merged; not yet exercised end-to-end)</td>
+<td>In progress</td>
 <td>(phases inline)</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-convert-followups/">Convert follow-ups</a></td>
 <td>Track the deferred work from the (now-removed) convert master plan: extra <code>qemu-img</code> subcommands (create / map / measure / resize / snapshot / rebase / commit) and <code>check --repair</code> wiring</td>
-<td>Complete — phase 1 (all seven subcommands shipped; <code>snapshot</code> closed the roster) and phase 2 (<code>check --repair</code>, promoted to <a href="/components/instar/plans/PLAN-check-repair/">PLAN-check-repair.md</a>, all 11 phases landed) both done</td>
+<td>Complete</td>
 <td>1: subcommand parity, 2: check --repair</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-measure/"><code>instar measure</code> subcommand</a></td>
 <td>Implement the <code>measure</code> subcommand (qemu-img parity for raw and qcow2 outputs; instar extensions for vmdk / vhd / vhdx) with cross-version baselines, integration tests, coverage-guided fuzzing, and differential fuzzing</td>
-<td>Complete (phases 1-10)</td>
+<td>Complete</td>
 <td>1: calculators, 2: allocation scanners, 3: guest op, 4: host CLI, 5: target options, 6: baselines, 7: integration tests, 8: coverage fuzz, 9: differential fuzz, 10: docs</td>
 </tr>
 <tr>
 <td>2026-05-16</td>
 <td><a href="/components/instar/plans/PLAN-create/"><code>instar create</code> subcommand</a></td>
 <td>Implement the <code>create</code> subcommand (qemu-img parity for raw / qcow2 / vmdk monolithicSparse / vhd / vhdx outputs, with backing-file support, preallocation modes, cross-version info-equivalence baselines, integration tests, coverage-guided fuzzing, and differential fuzzing)</td>
-<td>Complete (phases 1-11)</td>
+<td>Complete</td>
 <td>1: emitters, 2: guest op, 3: host CLI, 4: target options, 5: backing file, 6: preallocation, 7: baselines, 8: integration tests, 9: coverage fuzz, 10: differential fuzz, 11: docs</td>
 </tr>
 <tr>
 <td>2026-05-20</td>
 <td><a href="/components/instar/plans/PLAN-resize/"><code>instar resize</code> subcommand</a></td>
 <td>Implement the <code>resize</code> subcommand (qemu-img parity for raw / qcow2 / vmdk monolithicSparse / vhd dynamic+fixed / vhdx dynamic, including <code>--shrink</code> for raw and qcow2, <code>--preallocation</code> modes, the <code>[+-]SIZE</code> syntax, a new <code>read_output_sector</code> call-table primitive, cross-version info-equivalence baselines, integration tests, coverage-guided fuzzing, and differential fuzzing)</td>
-<td>Complete (phases 1-13)</td>
+<td>Complete</td>
 <td>1: skeleton, 2: qcow2 grow, 3: qcow2 shrink, 4: vhd, 5: vhdx, 6: vmdk, 7: guest op, 8: host CLI, 9: preallocation, 10: baselines, 11: integration tests, 12: fuzz, 13: docs</td>
-</tr>
-<tr>
-<td>2026-05-30</td>
-<td><a href="/components/instar/plans/PLAN-rebase-commit/"><code>instar rebase</code> and <code>instar commit</code> subcommands</a></td>
-<td>Implement <code>rebase</code> (change backing-file references; both <code>-u</code> unsafe metadata-only mode and the default safe data-aware mode) and <code>commit</code> (merge overlay clusters into backing file) for qcow2 and vmdk monolithicSparse, with cross-version baselines, integration tests, coverage-guided fuzzing, and differential fuzzing. Reuses the <code>read_output_sector</code> call-table primitive from resize; no ABI extension required.</td>
-<td>Complete (phases 1-12)</td>
-<td>1: ABI, 2: rebase planners, 3: rebase guest, 4: rebase host, 5: rebase tests, 6: commit planners, 7: commit guest, 8: commit host, 9: commit tests, 10: fuzz, 11: diff fuzz, 12: docs</td>
 </tr>
 <tr>
 <td>2026-05-25</td>
 <td><a href="/components/instar/plans/PLAN-resize-followup-01-targeted-prepass/">resize followup-01: targeted refcount pre-pass</a></td>
 <td>Lift the qcow2 grow image-size ceiling (~128 GiB at default cluster) by replacing the guest's "stage every refcount block" pre-pass with a targeted pre-pass that stages only the specific blocks the chosen grow flavour will modify. New public <code>compute_qcow2_grow_query</code> planner helper computes the action + required-block set; guest pre-pass dispatches on it. Bound is now "what the filesystem can hold" instead of per-cluster-size. Shrink retains its older stage-all pre-pass (separate followup).</td>
-<td>Complete (steps 01a-01e)</td>
+<td>Complete</td>
 <td>01a: planner helper, 01b: guest pre-pass, 01c: large-image integration tests, 01d: fuzz clamp relaxation, 01e: docs</td>
 </tr>
 <tr>
 <td>2026-05-27</td>
 <td><a href="/components/instar/plans/PLAN-fuzzing-bugs/">Fuzzing bug backlog</a></td>
 <td>Triage and fix the 44 open <code>security-audit</code> GitHub issues filed by coverage-guided fuzzing and differential fuzzing. Five root-cause fix phases: <code>plan_vmdk</code> capacity overflow, qcow2 <code>scan_allocation</code> out-of-bounds L2 entries, measure-calculator sum overflow, vhd/vhdx/vmdk <code>allocated_bytes</code> clamp, differential-fuzz external-timeout reclassification.</td>
-<td>Complete (phases 1-5)</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-fuzzing-bugs-phase-01-create-emitters/">01: plan_vmdk</a>, <a href="/components/instar/plans/PLAN-fuzzing-bugs-phase-02-measure-scan/">02: qcow2 OOB L2</a>, <a href="/components/instar/plans/PLAN-fuzzing-bugs-phase-03-measure-calc/">03: measure calc overflow</a>, <a href="/components/instar/plans/PLAN-fuzzing-bugs-phase-04-measure-fixed-vhd/">04: vhd/vhdx/vmdk clamp</a>, <a href="/components/instar/plans/PLAN-fuzzing-bugs-phase-05-diff-fuzz-timeouts/">05: diff-fuzz timeouts</a></td>
+</tr>
+<tr>
+<td>2026-05-30</td>
+<td><a href="/components/instar/plans/PLAN-rebase-commit/"><code>instar rebase</code> and <code>instar commit</code> subcommands</a></td>
+<td>Implement <code>rebase</code> (change backing-file references; both <code>-u</code> unsafe metadata-only mode and the default safe data-aware mode) and <code>commit</code> (merge overlay clusters into backing file) for qcow2 and vmdk monolithicSparse, with cross-version baselines, integration tests, coverage-guided fuzzing, and differential fuzzing. Reuses the <code>read_output_sector</code> call-table primitive from resize; no ABI extension required.</td>
+<td>Complete</td>
+<td>1: ABI, 2: rebase planners, 3: rebase guest, 4: rebase host, 5: rebase tests, 6: commit planners, 7: commit guest, 8: commit host, 9: commit tests, 10: fuzz, 11: diff fuzz, 12: docs</td>
 </tr>
 <tr>
 <td>2026-06-03</td>
 <td><a href="/components/instar/plans/PLAN-map/"><code>instar map</code> subcommand</a></td>
 <td>Implement the <code>map</code> subcommand (qemu-img parity for raw / qcow2 / vmdk / vhd / vhdx single-image sources, streaming per-extent emission over the guest serial channel, cross-version baselines, integration tests, coverage-guided fuzzing, and differential fuzzing). Backing-chain <code>depth</code> composition deferred to a follow-up.</td>
-<td>Complete (phases 1-9)</td>
+<td>Complete</td>
 <td>1: extent iterators, 2: guest op, 3: host CLI, 4: output formatting, 5: baselines, 6: integration tests, 7: coverage fuzz, 8: differential fuzz, 9: docs</td>
 </tr>
 <tr>
 <td>2026-06-08</td>
 <td><a href="/components/instar/plans/PLAN-snapshot/"><code>instar snapshot</code> subcommand</a></td>
 <td>Implement the <code>snapshot</code> subcommand (qcow2-only, mirroring <code>qemu-img snapshot</code>'s <code>-l</code>/<code>-c</code>/<code>-a</code>/<code>-d</code> modes). List mode emits qemu-img-compatible human and JSON output; mutating modes manipulate the snapshot table, L1 copies, refcounts, and COPIED flags entirely inside the KVM guest using the existing <code>write_input_sector</code> primitive. Cross-version list baselines, integration tests with <code>qemu-img check</code> / <code>info</code> / <code>compare</code> post-op assertions, coverage-guided fuzzing of parse and refcount mutators, and differential fuzzing of random <code>-c/-d/-a</code> chains against qemu-img. Closes out the convert-followups subcommand roster.</td>
-<td>Complete (phases 1-14)</td>
+<td>Complete</td>
 <td>1: ABI, 2: list planner, 3: list guest, 4: list host, 5: refcount mutators, 6: create, 7: delete, 8: apply, 9: mutate host, 10: baselines, 11: integration tests, 12: coverage fuzz, 13: differential fuzz, 14: docs</td>
 </tr>
 <tr>
 <td>2026-06-13</td>
 <td><a href="/components/instar/plans/PLAN-bug-fixes/">June 2026 fuzzer bug backlog</a></td>
 <td>Triage and fix the 10 open bug GitHub issues outstanding after the May 2026 backlog drain. Three root-cause fix phases: Fixed-VHD <code>virtual_size</code> overflow in <code>plan_vhd</code> (7 <code>fuzz_create_emitters</code> issues), unchecked VHDX resize sequence-number increment (2 <code>fuzz_resize_planners</code> issues), and qcow2 <code>resize --shrink</code> sub-byte refcount corruption (1 hand-filed snapshot-audit issue).</td>
-<td>Complete (phases 1-3: <code>bbfdfc9</code>, <code>514c52a</code>, <code>a54cef8</code>)</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-bug-fixes-phase-01-fixed-vhd-overflow/">01: fixed-vhd overflow</a>, <a href="/components/instar/plans/PLAN-bug-fixes-phase-02-vhdx-resize-seqnum/">02: vhdx resize seqnum</a>, <a href="/components/instar/plans/PLAN-bug-fixes-phase-03-qcow2-shrink-subbyte-refcount/">03: qcow2 shrink sub-byte refcount</a></td>
 </tr>
 <tr>
 <td>2026-06-13</td>
 <td><a href="/components/instar/plans/PLAN-check-repair/"><code>instar check --repair</code> for QCOW2</a></td>
 <td>Wire <code>CheckConfig::FLAG_REPAIR</code> (reserved but dead since the original <code>check</code> op) to real QCOW2 repair logic, mirroring <code>qemu-img check -r leaks</code>/<code>-r all</code>. Settles the repair safety model (tiered safe-vs-lossy repair, dry-run-by-default, in-place mutation with no mandatory backup, crash-safe write ordering guarded by the <code>corrupt</code> header bit, refuse-rather-than-guess) and implements leak reclamation + refcount/COPIED rebuild inside the KVM guest, reusing the <code>src/crates/snapshot/</code> refcount mutators. Corrupt-fixture baselines, integration tests with post-op <code>qemu-img check</code>/<code>info</code>/<code>compare</code>, coverage and differential fuzzing. Promoted from convert-followups phase 2.</td>
-<td>Complete (all 11 phases landed)</td>
+<td>Complete</td>
 <td>1: ABI + crate, 2: leak planner, 3: refcount planner, 4: guest (leaks tier), 5: guest (all tier), 6: host CLI, 7: baselines, 8: integration tests, 9: coverage fuzz, 10: differential fuzz, 11: docs</td>
 </tr>
 <tr>
 <td>2026-06-15</td>
 <td><a href="/components/instar/plans/PLAN-amend/"><code>instar amend</code> subcommand</a></td>
 <td>Implement the <code>amend</code> subcommand (qcow2-only, mirroring <code>qemu-img amend -o</code>). v1 scope is the two header-only options that change no cluster/refcount data: <code>compat=0.10\|1.1</code> (qcow2 v2⇔v3 version transition, with v3-only-feature downgrade blockers, refcount-width constraints, and header-extension relocation) and <code>lazy_refcounts=on\|off</code> (the v3 compatible-feature bit). Reuses the resize/rebase in-place-mutation idiom; new <code>src/crates/amend/</code> planner crate and <code>src/operations/amend/</code> guest op. Cross-version info-equivalence baselines, integration tests with post-op <code>info</code>/<code>check</code>/<code>compare</code>, coverage and differential fuzzing. <code>refcount_bits</code>, external data file, encryption, and backing-file amend deferred. Picks up the <code>qemu-img amend</code> sibling deferred from convert-followups.</td>
-<td>Complete (phases 1-9)</td>
+<td>Complete</td>
 <td>1: ABI, 2: qcow2 planner, 3: guest, 4: host CLI, 5: rust tests, 6: integration tests, 7: baselines, 8: fuzz, 9: docs</td>
 </tr>
 <tr>
@@ -11911,42 +11911,49 @@ at the repo root).</p>
 <td>2026-06-29</td>
 <td><a href="/components/instar/plans/PLAN-bitmap/"><code>instar bitmap</code> subcommand</a></td>
 <td>Implement the <code>bitmap</code> subcommand (qcow2-only, mirroring <code>qemu-img bitmap</code>'s <code>--add</code>/<code>--remove</code>/<code>--clear</code>/<code>--enable</code>/<code>--disable</code>/<code>--merge</code> actions, applied in command-line order). Manages persistent dirty bitmaps: net-new qcow2 bitmaps-extension + directory + table + data parsing in the qcow2 crate, a new <code>src/crates/bitmap/</code> planner crate and <code>src/operations/bitmap/</code> guest op that allocate/free clusters and maintain refcounts (reusing the snapshot/check mutators) and the autoclear-bit crash-safe ordering. Cross-validates against <code>qemu-img bitmap</code> via post-op <code>qemu-img check</code>/<code>info</code>, with cross-version baselines, integration tests, coverage and differential fuzzing. Leaves <code>bench</code> as the only unimplemented qemu-img subcommand.</td>
-<td>Complete (phases 1-10): <code>instar bitmap</code> — full qcow2 persistent-dirty-bitmap management (add/remove/clear/enable/disable/merge), qcow2-oracle integration tests + bit-for-bit merge validation, cross-version baselines, coverage + differential fuzzing, and docs; pre-existing resize bitmap-data-loss defect fixed. Leaves <code>bench</code> the only unimplemented qemu-img subcommand.</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-bitmap-phase-01-parse/">1: parse</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-02-abi/">2: ABI</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-03-planner/">3: planner</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-04-guest/">4: guest</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-05-host-cli/">5: host CLI</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-06-rust-tests/">6: rust tests</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-07-integration/">7: integration tests</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-08-baselines/">8: baselines</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-09-fuzz/">9: fuzz</a> ✓, <a href="/components/instar/plans/PLAN-bitmap-phase-10-docs/">10: docs</a> ✓</td>
 </tr>
 <tr>
 <td>2026-07-06</td>
 <td><a href="/components/instar/plans/PLAN-bench/"><code>instar bench</code> subcommand</a></td>
 <td>Implement the <code>bench</code> subcommand — the last unimplemented qemu-img subcommand, closing the 15/15 parity roster. Runs a fixed-count sequential read (or <code>-w</code> write) benchmark through the format layer <em>inside the KVM guest</em>, so the reported time measures instar's real sandboxed I/O path; <code>instar bench</code> vs <code>qemu-img bench</code> on the same image is the reproducible sandbox-overhead measurement the announcement email lacked. Byte-parity on the deterministic output surface (header line, validation, exit codes); host-<code>Instant</code> timing bracketed by guest markers (no guest clock exists); <code>-d</code> accepted but serialized in v1 (the synchronous single-buffer virtio driver has no queue depth — true depth is future work); <code>--output json</code> instar extension for perf-regression tracking. New pure <code>crates/bench</code> schedule crate, <code>src/operations/bench/</code> guest op, call-table VERSION 19→20. Explicitly no cross-version baselines (timing is not comparable).</td>
-<td>Complete (phases 1-8): <code>instar bench</code> — the reframed sandboxed-path measurement (instar's own end-to-end guest→virtio→host I/O path, not qemu's block layer) with byte-parity on the deterministic surface (header line, validation, exit codes); reads on all five formats (raw, qcow2 incl. backing chains, vmdk, vhd, vhdx) and writes on raw and qcow2 incl. overlays; live-parity integration tests plus coverage and differential fuzzing, explicitly no cross-version baselines (timing is not comparable); and docs. instar now implements all 15 qemu-img subcommands — the parity roster is closed.</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-bench-phase-01-crate/">1: schedule crate</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-02-abi/">2: ABI</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-03-guest-read/">3: guest read</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-04-host-cli/">4: host CLI</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-05-write/">5: write test</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-06-integration/">6: integration tests</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-07-fuzz/">7: fuzz</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-08-docs/">8: docs</a> ✓</td>
 </tr>
 <tr>
 <td>2026-07-09</td>
 <td><a href="/components/instar/plans/PLAN-bench-refcount-growth/">bench qcow2 refcount growth</a></td>
 <td>Let bench's qcow2 <code>-w</code> path grow the refcount structures (new refblocks; refcount-table relocation with a snapshot-style fsync-ordered header flip) preemptively at setup from a worst-case schedule bound, so any schedule qemu-img bench executes on the fuzzer envelope also succeeds under instar with identical virtual content and a clean <code>qemu-img check</code>. Retires the <code>qcow2-write-refblock-coverage</code> fuzzer steer-around (issues #397-#401) and restores the full cluster-size matrix to <code>-w</code> differential coverage.</td>
-<td>Complete (phases 1-4)</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-01-planner/">01: planner</a>, <a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-02-guest/">02: guest</a>, <a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-03-integration/">03: integration</a>, <a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-04-fuzzer-docs/">04: fuzzer + docs</a></td>
 </tr>
 <tr>
 <td>2026-07-10</td>
 <td><a href="/components/instar/plans/PLAN-qcow2-write-infrastructure/">qcow2 write infrastructure</a></td>
 <td>Build <code>src/crates/qcow2-write/</code>, the missing callable "write N bytes at virtual offset X into an existing qcow2, allocating as needed" primitive: a pure planner owning cluster classification (overwrite / allocate / copy-on-write), L2 and data-cluster allocation, refcount maintenance, the shared v1 envelope gates, and the crash-safe write-ordering contract. Migrates the three existing inlined allocate-on-write compositions (commit, rebase safe mode, bench <code>-w</code>) onto it with byte-invisible refactor proofs, generalizes bench's refcount growth into the shared crate, and adds copy-on-write for snapshot-shared clusters (adopted per consumer as its parity oracle permits; bench lifts its internal-snapshot gate first). Phase 1 empirically pins qemu's snapshot-bearing commit/rebase behaviour — commit's blind overwrite (no <code>nb_snapshots</code> gate, no COPIED check) is a candidate live corruption defect that gets an interim gate if confirmed. Foundation for deferred features: <code>amend refcount_bits</code>, qcow2 preallocation modes, per-format write infrastructure.</td>
-<td>Complete (all 9 phases; 2026-07-14): phase 1 (2026-07-12) confirmed all three defects — commit silently corrupts backing snapshots, rebase corrupts snapshot-shared overlay metadata with a data-loss chain, plus an unrelated rebase 512-byte-cluster livelock; no byte-identity oracle constrains any consumer, so COW has full layout freedom. Phase 2 landed byte-idempotent refusal gates for #420, #421 and a newly-found overlay-side commit sibling defect (#423) — the corruption is unreachable pending phase-7 COW — and root-caused #422 as a guest panic (stale staged-L2 lookup slice, not a livelock, not cs=512-specific) and fixed it. Phase 3 landed <code>src/crates/qcow2-write</code>, the pure no_std windowed step-program planner — per-cluster classification, allocate-on-write with sub-cluster zero-fill, refcount maintenance in a single staged refblock copy, the unified envelope gates, and the crash-ordering contract as emitted data — proven by an ordering property suite (window-invariance down to a 1-step buffer, 192-run grid) and a SimDisk simulation harness that replays the step journal truncated at every Durability barrier (176 truncation points). Phase 4 (2026-07-13) migrated commit's qcow2 write path onto the crate through the new <code>crates/qcow2-write-exec</code> guest step executor, byte-invisibly — the new <code>scripts/migration-proof.py</code> before/after oracle passed 73/73 fixture combos with 0 identity failures and a 300-iteration differential-fuzz run had 0 divergences — while converting two probe-discovered silent-corruption shapes (compressed backing clusters; sparse/holed refcount tables, both stock-producible) into typed refusals and widening the backing staging caps. Phase 5 (2026-07-13) migrated rebase safe mode (including safe detach) onto the crate the same way, byte-invisibly — 69/69 proof combos with 0 identity failures and exactly 1 pre-declared beyond-EOV raw divergence with proven virtual equality, 300-iteration differential fuzz clean — converting two more probe-discovered silent-corruption shapes (holed refcount tables on the overlay, #428's sibling; extended-L2 overlays) into typed refusals, retiring the stage-everything staging caps, and identifying (not fixing) a pre-existing chain-reader zero-flag defect affecting rebase/convert/compare/bench. Phase 6 (2026-07-13) migrated bench <code>-w</code> onto the crate and moved bench's refcount-growth planner into the crate's new <code>growth</code> module; because bench's oracle is <code>qemu-img compare</code> + <code>check</code> rather than byte identity, the proof deliberately relaxes byte parity for allocating schedules — the shared planner allocates the L2 table before the data cluster, so allocating outputs are content-equivalent and check-clean but not byte-identical, while overwrite-only schedules stay byte-identical. <code>scripts/migration-proof.py --op bench</code> passed 56/56 combos (2 controls + 17 overwrite-only byte-identical, 34 allocating compare/check/info/<code>flushes-issued</code>/RT-geometry equivalent, 3 refusals) with 0 failures, 300-iteration differential fuzz clean, and the fsync census preserved exactly. A data-integrity defect the phase-6 probes found — #433, an overwrite-dominant growth schedule leaving the refcount table pointing at unmaterialized blocks past EOF — was fixed fix-first before the migration. Phase 7 (2026-07-13/14) added the crate's copy-on-write branch and adopted it in all three consumers, lifting the phase-2 interim snapshot-refusal gates and resolving #420 / #421 / #423: writes into snapshot-bearing qcow2 images now COW the shared clusters (data-cluster and L2-table COW with a net-new refcount-decrement primitive, and — a 7p correction — no child-refcount increment). commit preserves backing snapshots, rebase leaves the active view resolving through the new backing (qemu's contract), bench preserves snapshots. The proof is qemu-parity — <code>qemu-img check</code> clean + active-view <code>qemu-img compare</code> + a snapshot read-back oracle — not image-byte identity; verified across pinned qemu 6.2.0–10.2.0 and a 50-iteration soak with 0 divergences. #432 (chain-reader classic-L2 zero flag) was fixed fix-first (7z). Two follow-ups recorded: an overlay-side COW-clear primitive for full commit overlay byte-emptying, and a tighter rebase growth bound. Phase 8 (2026-07-14) fuzzed the new crate and its snapshot-bearing COW paths — two coverage-guided targets for the planner (<code>fuzz_qcow2_write</code> with the <code>max_rc&lt;3</code> COW invariant oracle over a Vec-backed <code>sim</code> harness lifted from the crate's unit tests, and <code>fuzz_qcow2_write_growth</code>) and the phase-7 read-back oracle scaled into the differential fuzzer's snapshot-bearing commit/rebase/bench fixtures; 0 crashes and 0 divergences, no bug found, cow-soak folded in and retired. Phase 9 (2026-07-14, docs) authored the durable <code>docs/qcow2/qcow2-write-planner.md</code> write-infrastructure reference, consolidated the per-op / ARCHITECTURE docs to link it, and closed out the programme (master-plan retrospective + Success Criteria confirmed all met + final acceptance gate green: make instar / lint / test-rust 1720-pass / check-binary-sizes / pre-commit clean, representative snapshot-COW smoke and a combined commit/rebase/bench differential soak with 0 divergences). All four snapshot-corruption defects (#420 / #421 / #423 / #432) are resolved.</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-01-semantics/">1: semantics pin</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-02-gates/">2: interim gates + defect handling</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-03-crate/">3: qcow2-write crate</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-04-commit/">4: migrate commit</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-05-rebase/">5: migrate rebase</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-06-bench/">6: migrate bench</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-07-cow/">7: copy-on-write</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-08-fuzz/">8: fuzz</a> ✓, <a href="/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-09-docs/">9: docs</a> ✓</td>
 </tr>
 <tr>
 <td>2026-07-17</td>
 <td><a href="/components/instar/plans/PLAN-format-coverage/">Format coverage expansion</a></td>
 <td>Close the input-side format-coverage gap against qemu-img's real image-format roster: detection + info parity for Parallels / Bochs / cloop / DMG, convert-from read paths for VDI / Parallels / QCOW1 / DMG, a recorded decision on QED, tested refusals for the formats we choose not to read, and a qemu-img-parity axis in <code>docs/format-coverage.md</code>. Output formats unchanged; write/create support for new formats out of scope.</td>
-<td>Complete (all 7 phases, 2026-07-20): closed the input-side format-coverage gap against qemu-img's real 14-format roster. Four new <code>no_std</code> guest crates (<code>vdi</code>, <code>parallels</code>, <code>qcow1</code>, <code>dmg</code>) with coverage-guided and differential fuzz coverage graduated VDI, Parallels, QCOW1, and DMG from detect+info-only to full convert/compare/dd/bench read support; detection parity closed against oslo.utils' roster plus four formats oslo never detected; QED received a recorded refusal-as-policy decision rather than a read path; <code>test_info_safe</code> grew 580 → 954 passing scenarios with every phase's full consumer-suite matrix landing zero-fail. Along the way, fixed the pre-existing #444 defect (detect-only formats silently read as raw), a live QCOW1-misdetected-as-QCOW2 defect, the never-consumed <code>INFO_RESULT_FLAG_ENCRYPTED</code> flag, and three instar-testdata defects. Closed out with a consolidated, fully-sourced qemu-img parity axis (<code>docs/format-coverage.md</code>) replacing per-op archaeology with one op × format matrix.</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-format-coverage-phase-01-detection/">1: detection + info</a> ✓, <a href="/components/instar/plans/PLAN-format-coverage-phase-02-vdi-read/">2: vdi read</a> ✓, <a href="/components/instar/plans/PLAN-format-coverage-phase-03-parallels-read/">3: parallels read</a> ✓, <a href="/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/">4: qcow1 read</a> ✓, <a href="/components/instar/plans/PLAN-format-coverage-phase-05-dmg-read/">5: dmg read</a> ✓, <a href="/components/instar/plans/PLAN-format-coverage-phase-06-qed/">6: qed decision</a> ✓, <a href="/components/instar/plans/PLAN-format-coverage-phase-07-docs/">7: docs</a> ✓</td>
+</tr>
+<tr>
+<td>2026-07-25</td>
+<td><a href="/components/instar/plans/PLAN-375-guest-idt/">Guest IDT for loud codegen failures</a></td>
+<td>Install a minimal IDT in the guest <code>core</code> so a CPU exception is reported to the host as a named vector and faulting RIP over the existing serial <code>error</code> channel, instead of escalating to an opaque triple fault. Makes any recurrence of the <code>opt-level=z</code>+<code>lto</code> control-flow miscompile on <code>x86_64-unknown-none</code> (issue #375) loud rather than silent</td>
+<td>Complete</td>
+<td>(no phase files; single change)</td>
 </tr>
 <tr>
 <td>2026-07-28</td>
 <td><a href="/components/instar/plans/PLAN-release-v0.3/">Release v0.3.0</a></td>
 <td>Cut the v0.3.0 tag and publish signed GitHub Release artifacts (tarball, .deb, .rpm) for x86_64 Linux, with the packaging manifests brought up to the 15/15 subcommand roster and the package smoke test extended to prove it</td>
-<td>Complete (v0.3.0 published 2026-08-02: signed tag verified, three artifacts live; packaging manifests fixed to the full 16-binary roster with the smoke test extended to prove it; install validation carried to #474)</td>
+<td>Complete</td>
 <td>(no phase files; sequential gates)</td>
 </tr>
 </tbody>

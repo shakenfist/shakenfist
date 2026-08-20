@@ -13597,11 +13597,15 @@ improvements:</p>
 <h2 id="coverage-guided-fuzzing-2026-03-19">Coverage-guided fuzzing (2026-03-19)<a class="headerlink" href="#coverage-guided-fuzzing-2026-03-19" title="Permanent link">&para;</a></h2>
 <h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
 <p>Coverage-guided fuzzing of all <code>no_std</code> parser crates using
-<code>cargo-fuzz</code> (libFuzzer). 17 fuzz targets exercise format detection,
-header parsing, L1/L2 cluster lookup, refcount table traversal,
-decompression, grain directory lookup, BAT traversal, VHDX
-metadata parsing, the measure calculator, the create emitters, and
-the resize planners.</p>
+<code>cargo-fuzz</code> (libFuzzer). The campaign began with the parser targets
+listed below — format detection, header parsing, L1/L2 cluster lookup,
+refcount table traversal, decompression, grain directory lookup, BAT
+traversal and VHDX metadata parsing — and has grown to <strong>40 targets</strong>
+(<code>src/fuzz/fuzz_targets/</code>): every subcommand implemented since brought
+its own planner and emitter targets onto the same harness
+infrastructure, and the later input-format work added VDI, Parallels,
+QCOW1 and DMG. The table below is the original parser roster; the
+directory is the current one.</p>
 <h3 id="technique">Technique<a class="headerlink" href="#technique" title="Permanent link">&para;</a></h3>
 <p>A mock <code>CallTable</code> backed by fuzzer input (<code>src/fuzz/src/lib.rs</code>)
 replaces the real VMM/KVM I/O layer, allowing libFuzzer to explore
@@ -13697,7 +13701,26 @@ hand-crafted minimal valid inputs for each format.</p>
   Claude Code with 30-turn limit, two attempts per issue)</li>
 </ul>
 <h3 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h3>
-<p><em>To be updated as fuzzing runs accumulate.</em></p>
+<p>The campaign runs nightly and its findings are tracked as GitHub
+issues rather than in this document, so that CI can file and update
+them without merge conflicts. As of 2026-08-19, 258 <code>security-audit</code>
+issues have been closed and 3 are open.</p>
+<p>Two backlog drains were large enough to warrant their own plans, and
+both are complete:</p>
+<ul>
+<li><a href="/components/instar/plans/PLAN-fuzzing-bugs/">PLAN-fuzzing-bugs.md</a> — 44 issues
+  resolved to 5 root causes (<code>plan_vmdk</code> capacity overflow, qcow2
+  <code>scan_allocation</code> out-of-bounds L2 entries, measure-calculator sum
+  overflow, vhd/vhdx/vmdk <code>allocated_bytes</code> clamp, and a differential
+  external-timeout misclassification).</li>
+<li><a href="/components/instar/plans/PLAN-bug-fixes/">PLAN-bug-fixes.md</a> — 10 issues resolved to
+  3 root causes (Fixed-VHD <code>virtual_size</code> overflow in <code>plan_vhd</code>, an
+  unchecked VHDX resize sequence-number increment, and qcow2
+  <code>resize --shrink</code> sub-byte refcount corruption).</li>
+</ul>
+<p>The one open defect at the time of writing is #483: <code>fuzz_rebase_planners</code>
+emits a write patch outside <code>total_file_size</code> (#485 and #492 are
+duplicate crash reports of the same signature).</p>
 
 
 

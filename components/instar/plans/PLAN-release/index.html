@@ -3056,10 +3056,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In Progress
+        Status: Complete
       
     </span>
   </a>
@@ -12011,10 +12011,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In Progress
+        Status: Complete
       
     </span>
   </a>
@@ -12331,16 +12331,54 @@
 
 
 <h1 id="plan-first-public-release-of-instar">Plan: First Public Release of Instar<a class="headerlink" href="#plan-first-public-release-of-instar" title="Permanent link">&para;</a></h1>
-<h2 id="status-in-progress">Status: In Progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
-<p>Phases 1-4 are complete: Cargo.toml metadata, release workflow,
-.deb / .rpm packaging, and the v0.2.0 tag itself all shipped on
-2026-05-09 (see <code>PLAN-release-v0.2.md</code> for the v0.2.0 execution
-record). Phase 5 (security audit) is mostly done — see
-<code>PLAN-audit.md</code> for current state. Phase 6 (coverage-guided
-fuzzing) is in progress — see <code>PLAN-coverage-fuzzing.md</code>.</p>
-<p>This plan now serves as the umbrella for ongoing release-quality
-work; per-release execution lives in its own plan
-(<code>PLAN-release-v0.2.md</code>, future <code>PLAN-release-vN.M.md</code>).</p>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>The umbrella goal — "prepare instar for its first public release"
+— was met on 2026-05-09 when v0.2.0 was tagged and published, and
+has since been exercised a second time end-to-end by v0.3.0
+(published 2026-08-02). All five phases of this plan are done:</p>
+<ul>
+<li><strong>Phase 1 (Cargo.toml metadata)</strong> — shipped. <code>src/vmm/Cargo.toml</code>
+  carries the full published-crate metadata block; library crates
+  carry <code>repository</code> / <code>authors</code> / <code>keywords</code> / <code>categories</code>;
+  internal crates carry <code>publish = false</code>.</li>
+<li><strong>Phase 2 (release workflow)</strong> — shipped as
+  <code>.github/workflows/release.yml</code>: <code>check-version</code> → <code>build</code> →
+  <code>sign-tag</code> (Sigstore, gated on the <code>release</code> GitHub environment)
+  → <code>github-release</code>. It has run for real twice. The build job also
+  went beyond the original sketch: it enforces the shipped binary's
+  glibc floor via <code>tools/ci/check-glibc-floor.sh</code>, and builds and
+  uploads <code>.deb</code> and <code>.rpm</code> packages alongside the tarball — the
+  packaging that this plan originally deferred.</li>
+<li><strong>Phase 3 (documentation gaps)</strong> — shipped: <code>CHANGELOG.md</code>,
+  <code>SECURITY.md</code>, and the README <code>Installation</code> section all exist
+  and are maintained per release.</li>
+<li><strong>Phase 4 (version and tagging)</strong> — shipped: <code>make release</code>,
+  <code>make check-version</code>, <code>make package</code>, the <code>release</code> environment,
+  and the documented tag-and-push sequence. v0.2.0 and v0.3.0 both
+  went out through it.</li>
+<li><strong>Phase 5 (pre-release audit)</strong> — discharged as a v0.2.0 gate;
+  the execution record is in <code>PLAN-release-v0.2.md</code>. The recurring
+  items have since become standing CI rather than per-release
+  checklists: <code>cargo audit</code> runs in <code>supply-chain.yml</code>, clippy in
+  <code>lint.yml</code>, the functional suite in <code>functional-tests.yml</code>, and
+  <code>pre-commit</code> on every push. One checklist item is simply stale
+  and was never true in the form written — plan documents are
+  versioned in <code>docs/plans/</code>, not gitignored; the release tarball
+  is built from an explicit file list (<code>instar</code>, the guest <code>.bin</code>
+  files, <code>LICENSE</code>, <code>README.md</code>), so no plan document has ever
+  been published in an artifact.</li>
+</ul>
+<p>The "phase 6 coverage fuzzing" referenced by the old status line
+was never a phase of this plan. Coverage-guided fuzzing and the
+security audit are separately registered master plans
+(<code>PLAN-coverage-fuzzing.md</code>, <code>PLAN-audit.md</code>) that continue on
+their own; they are release-quality work, not first-release
+blockers, and holding this plan open for them was what kept it
+marked in-progress long after it was finished.</p>
+<p>Per-release execution lives in its own plan
+(<code>PLAN-release-v0.2.md</code>, <code>PLAN-release-v0.3.md</code>, future
+<code>PLAN-release-vN.M.md</code>). Future releases need this plan only as
+background; they do not reopen it.</p>
 <h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
 <p>Prepare instar for its first public release as a compiled Rust CLI
 tool. This covers Cargo.toml metadata, release workflow automation,
@@ -12547,6 +12585,11 @@ demand for the crates as standalone libraries.</p>
   can create them</li>
 </ul>
 <h2 id="phase-5-pre-release-audit">Phase 5: Pre-release audit<a class="headerlink" href="#phase-5-pre-release-audit" title="Permanent link">&para;</a></h2>
+<p>Discharged as a v0.2.0 gate — the execution record, including which
+items passed and which were carried forward, is in
+<code>PLAN-release-v0.2.md</code>. The recurring items are now standing CI
+(see the Status section). The checklist below is retained as the
+historical statement of what the gate required.</p>
 <p>Before tagging v0.2.0:</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Complete VMM boundary audit (PLAN-audit.md Phase 5) --

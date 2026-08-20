@@ -3364,6 +3364,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12050,6 +12061,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12409,6 +12431,8 @@
 
 
 <h1 id="instar-check-repair-for-qcow2"><code>instar check --repair</code> for QCOW2<a class="headerlink" href="#instar-check-repair-for-qcow2" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>All 11 phases landed.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -12727,32 +12751,32 @@ documented.</p>
 <tr>
 <td>1. ABI + crate scaffolding: add <code>FLAG_REPAIR_ALL</code> to <code>CheckConfig</code>, repair-result counters (<code>repaired_leaks</code>/<code>refcounts</code>/<code>corruptions</code>) + <code>FLAG_REPAIR_INCOMPLETE</code> to <code>CheckResult</code>, create the <code>src/crates/check/</code> planner crate (deps <code>shared</code>+<code>qcow2</code>+<code>snapshot</code>; <code>RepairTier</code>/<code>RepairError</code>/<code>RepairCounters</code> surface), and rename the op package <code>check</code> → <code>check-op</code> (binary stays <code>check.bin</code>) to free the crate name. Writable-input-device open deferred to phase 4/5 (open question 3)</td>
 <td>PLAN-check-repair-phase-01-abi.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>2. Leak-reclamation planner (safe tier): <code>reclaim_leaks_in_refblock</code> — pure per-refblock driver that zeroes the refcount of <code>rc &gt; 0 &amp;&amp; !is_referenced</code> entries (the guest supplies the per-block referenced predicate), reusing <code>set_refcount_in_block</code>; never lowers a live cluster (that is phase 3's over-count case, since the detector's bitmap is boolean); unit tests over synthetic refblocks incl. sub-byte neighbour preservation</td>
 <td>PLAN-check-repair-phase-02-leak-planner.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>3. Refcount-rebuild + COPIED reconciliation planner (lossy tier): <code>account_reference_in_map</code> (count references into a staged computed-refcount map, overflow→<code>AmbiguousCorruption</code>), <code>correct_refcounts_in_refblock</code> (both-directions correction to the computed value — raise too-low, lower too-high, free zero-count — generalising phase 2), and <code>reconcile_copied_flags_for_l1</code> (wrapper over <code>snapshot::update_copied_flags_for_l1</code>). Recounts because the detector's bitmap is boolean; refuses on overflow / over-capacity (refcount-structure growth deferred, OQ7). Pure; unwired</td>
 <td>PLAN-check-repair-phase-03-refcount-planner.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>4. Guest wiring — <strong>safe <code>leaks</code> tier, end-to-end</strong>: <code>check-op</code> depends on the <code>check</code> crate; after the detection walk (which builds the reference bitmap), a <code>repair_leaks_qcow2</code> pass stages each refblock and calls <code>reclaim_leaks_in_refblock</code>, writes back via <code>write_input_sector</code>/<code>fsync_input</code>, updates the post-repair <code>CheckResult</code> (<code>repaired_leaks</code>, recomputed <code>leaks</code>). Plus the <strong>minimal host enablement</strong> pulled forward: a <code>--repair</code> flag on <code>CheckArgs</code>, conditional read-write device open in <code>run_check</code>, <code>FLAG_REPAIR</code> plumbed. No <code>corrupt</code>-bit dance — leak reclamation is crash-safe (monotonic frees of unreferenced clusters). Memory-light (one refblock at a time)</td>
 <td>PLAN-check-repair-phase-04-guest-leaks.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>5. Guest wiring — <strong>lossy <code>all</code> tier</strong> (snapshot-free / uncompressed scope): for the supported scope every valid refcount is 0 or 1, so the recount reuses the detection bitmap (<code>computed = bmp.test(cidx) ? 1 : 0</code>) — no counting walk or computed-map memory; <code>correct_refcounts_in_refblock</code> corrects both directions and <code>reconcile_copied_flags_for_l1</code> re-sets COPIED, under the <strong>crash-safe <code>corrupt</code>-bit ordering</strong> (set → correct → reconcile COPIED → clear) this tier needs. Refuses snapshots / compression / external-data / structural corruption with <code>FLAG_REPAIR_INCOMPLETE</code>. <code>--repair[=leaks\|all]</code> value-parsing + <code>FLAG_REPAIR_ALL</code> pulled forward. <code>account_reference_in_map</code> + the snapshot/compression-aware counting walk are deferred future work</td>
 <td>PLAN-check-repair-phase-05-guest-all.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>6. Host CLI polish: qemu-parity exit codes (0 clean / 3 leaks / 2 errors) mapped from the post-repair <code>CheckResult</code> (the <code>--repair[=leaks\|all]</code> clap surface already landed in phase 5); repair-result rendering (human + JSON: <code>repaired_leaks</code>/<code>repaired_refcounts</code>/incomplete); a destructive-<code>--repair=all</code> <code>--help</code>+stderr warning; and a <code>--repair</code>+<code>--chain</code> reject. Host-only (<code>check.bin</code> unchanged). NOTE: at phase 6 the <code>repaired_*</code> counters were not on the guest→host protobuf, so per-counter "Repaired N" rendering was deferred to a guest+proto follow-up; only <code>FLAG_REPAIR_INCOMPLETE</code> rendered. <strong>That follow-up has since landed</strong> (the counters are on the <code>CheckResultMessage</code> protobuf and render in human + JSON). Exit codes (incl. <code>not_supported</code>→63) match qemu</td>
 <td>PLAN-check-repair-phase-06-host.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>7. Corrupt fixtures + cross-version baselines (cross-repo: instar-testdata + manifest): extend <code>custom/check-validation/create-corrupt-images.py</code> with repair fixtures (refcount-too-high, stale-COPIED, corrupt-bit-set, snapshot-leak, compressed-leak; reuse leaked-cluster/refcount-zero/overlapping), each verified by <code>qemu-img check</code> (condition) and <code>qemu-img check -r all</code> (cleans the repairable ones); capture cross-version <code>check</code> detection baselines (expect ~1-2 profiles — detection is stable); register all in <code>tests/manifest.json</code> with repair-tier tags + sha256. Two commits (instar-testdata main + instar branch). No instar source change. End-to-end-validated: all four repairable fixtures repair to qemu-img-clean; refuse fixtures untouched. 80-version baseline capture deferred (detection stable, low value)</td>
@@ -12762,22 +12786,22 @@ documented.</p>
 <tr>
 <td>8. Integration tests (<code>tests/test_check_repair.py</code>): codify the phase-7-verified behaviour — leaks/all tiers repair the fixtures to <code>qemu-img check</code>-clean with guest data preserved (<code>qemu-io read -P</code>); refuse paths (corrupt-bit / snapshot / compression) stay byte-identical; overlapping is a safe partial repair (leak reclaimed, overlap remains, not worse, exit 2); plus CLI (<code>--repair</code>+<code>--chain</code> reject, qcow2-only, idempotence). Adds an additive <code>repair=</code> param to <code>run_instar_check</code>; host-test-only (<code>check.bin</code> unchanged)</td>
 <td>PLAN-check-repair-phase-08-integration.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>9. Coverage-guided fuzzing of the repair planners (<code>fuzz_check_repair</code>): corrupt refblock/L1/L2 buffers in, assert no panic and no out-of-bounds write</td>
 <td>PLAN-check-repair-phase-09-fuzz-coverage.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>10. Differential fuzzing: random corruptions injected into a valid image, repaired by both instar and qemu-img, results compared for <code>qemu-img check</code> cleanliness and guest-data equivalence</td>
 <td>PLAN-check-repair-phase-10-fuzz-differential.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 <tr>
 <td>11. Docs, CHANGELOG, follow-ups: <code>docs/qcow2/qcow2-refcount.md</code> repair section, <code>docs/usage.md</code> + <code>--help</code>, <code>ARCHITECTURE.md</code>/<code>README.md</code>/<code>AGENTS.md</code>, strike through convert-followups phase 2</td>
 <td>PLAN-check-repair-phase-11-docs.md</td>
-<td><strong>Landed</strong></td>
+<td><strong>Complete</strong></td>
 </tr>
 </tbody>
 </table>

@@ -3140,13 +3140,41 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress-workflow-scaffolding-merged-not-yet-exercised-end-to-end" class="md-nav__link">
+  <a href="#status-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In Progress (workflow scaffolding merged, not yet exercised end-to-end)
+        Status: In progress
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Status: In progress">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnosis-the-gate-reads-the-index-the-safety-net-stages-too-late" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosis: the gate reads the index, the safety net stages too late
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remaining-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remaining work
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -12027,13 +12055,41 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress-workflow-scaffolding-merged-not-yet-exercised-end-to-end" class="md-nav__link">
+  <a href="#status-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In Progress (workflow scaffolding merged, not yet exercised end-to-end)
+        Status: In progress
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Status: In progress">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnosis-the-gate-reads-the-index-the-safety-net-stages-too-late" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosis: the gate reads the index, the safety net stages too late
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remaining-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remaining work
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -12363,7 +12419,50 @@
 
 
 <h1 id="automated-fuzzer-bug-fix-workflow">Automated fuzzer bug fix workflow<a class="headerlink" href="#automated-fuzzer-bug-fix-workflow" title="Permanent link">&para;</a></h1>
-<h2 id="status-in-progress-workflow-scaffolding-merged-not-yet-exercised-end-to-end">Status: In Progress (workflow scaffolding merged, not yet exercised end-to-end)<a class="headerlink" href="#status-in-progress-workflow-scaffolding-merged-not-yet-exercised-end-to-end" title="Permanent link">&para;</a></h2>
+<h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
+<p>The workflow is built, scheduled, and running daily. It has <strong>never
+produced a pull request</strong>, and that is a bug in the workflow rather
+than a gap in the plan.</p>
+<p>As of 2026-08-19: no <code>autofix/*</code> branch has ever reached origin, no PR
+has ever been opened, and 28 <code>security-audit</code> issues carry the
+<code>autofix-failed</code> label (26 closed by hand, 2 open). <code>autofix-complex</code>
+has never been applied, so the complexity guardrails are not what is
+stopping it.</p>
+<h3 id="diagnosis-the-gate-reads-the-index-the-safety-net-stages-too-late">Diagnosis: the gate reads the index, the safety net stages too late<a class="headerlink" href="#diagnosis-the-gate-reads-the-index-the-safety-net-stages-too-late" title="Permanent link">&para;</a></h3>
+<p><code>.github/workflows/fuzz-autofix.yml</code> decides whether Claude produced a
+fix by inspecting the <em>staged</em> tree:</p>
+<ul>
+<li>line 285 (<code>Check complexity (attempt 1)</code>) — <code>git diff --cached --name-only</code></li>
+<li>line 348 (<code>Verify fix (attempt 1)</code>) — the same command again, and
+  an empty result sets <code>fix_succeeded=false</code></li>
+<li>lines 505 and 561 — the same two checks for attempt 2</li>
+</ul>
+<p>The compensating <code>git add -u</code>, commented in the workflow as a "safety
+net" for exactly this case, does not run until line 637, inside the
+<code>Create PR</code> step — which only executes once verification has already
+passed. The safety net sits downstream of the gate that needs it.</p>
+<p>Claude Code edits the working tree and does not necessarily stage. So
+a correct fix is written, the gate sees an empty index, both attempts
+report "No changes staged by Claude", and the issue is labelled
+<code>autofix-failed</code> with a report whose own text gives it away: a real
+source file under "Changes not staged for commit" above an empty
+<code>=== Staged Changes ===</code> block. Issues #492, #485 and #426 all show
+this shape.</p>
+<p>Staging is the dominant failure mode but not the only one: #438 did
+stage a substantive fix and still failed, later in verification. Both
+need to be true before a PR can appear, so fixing the gate is
+necessary but may not be sufficient.</p>
+<h3 id="remaining-work">Remaining work<a class="headerlink" href="#remaining-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Stage tracked modifications immediately after each Claude attempt,
+  before the complexity and verification steps read the index (fix in
+  progress on a separate branch).</li>
+<li>Re-run against the two open <code>autofix-failed</code> issues (#485, #492) and
+  confirm at least one reaches a PR — this is the plan's own
+  outstanding success criterion.</li>
+<li>Refresh the hardcoded <code>Co-Authored-By: Claude Opus 4.6 (1M context)</code>
+  trailer at line 653, which no longer names the model that runs.</li>
+</ul>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant

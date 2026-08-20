@@ -3532,6 +3532,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11911,6 +11922,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12131,6 +12153,16 @@
 
 
 <h1 id="instar-bench-subcommand"><code>instar bench</code> subcommand<a class="headerlink" href="#instar-bench-subcommand" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>Phases 1-8. <code>instar bench</code> — the reframed sandboxed-path measurement
+(instar's own end-to-end guest→virtio→host I/O path, not qemu's block
+layer) with byte-parity on the deterministic surface (header line,
+validation, exit codes); reads on all five formats (raw, qcow2 incl.
+backing chains, vmdk, vhd, vhdx) and writes on raw and qcow2 incl.
+overlays; live-parity integration tests plus coverage and differential
+fuzzing, explicitly no cross-version baselines (timing is not
+comparable); and docs. instar now implements all 15 qemu-img
+subcommands — the parity roster is closed.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant

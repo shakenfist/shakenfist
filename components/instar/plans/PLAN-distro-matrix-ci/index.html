@@ -2972,10 +2972,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-complete-2026-08-15-all-phases" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Complete 2026-08-15 (all phases)
+        Status: Complete
       
     </span>
   </a>
@@ -11817,10 +11817,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-complete-2026-08-15-all-phases" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Complete 2026-08-15 (all phases)
+        Status: Complete
       
     </span>
   </a>
@@ -11943,12 +11943,18 @@
 
 
 <h1 id="plan-multi-distro-install-qemu-img-differential-ci">Plan: Multi-distro install + qemu-img differential CI<a class="headerlink" href="#plan-multi-distro-install-qemu-img-differential-ci" title="Permanent link">&para;</a></h1>
-<h2 id="status-complete-2026-08-15-all-phases">Status: Complete 2026-08-15 (all phases)<a class="headerlink" href="#status-complete-2026-08-15-all-phases" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
 <p>Every merge to <code>develop</code> now installs a freshly built <code>.deb</code> or <code>.rpm</code>
 on Debian 12/13, Ubuntu 22.04/24.04, Fedora and Rocky 9/10 and runs the
 full integration suite against each distribution's own <code>qemu-img</code>
 (6.2 through 10.2), and cannot merge unless all seven pass. Pull-request
 latency is unchanged — the matrix runs only in the merge queue.</p>
+<p>Phases 1-5 and 2b, finished 2026-08-15. Phase 1 dropped the release
+binary's glibc floor to 2.30 by splitting the build image off the dev
+image; phases 2 and 2b measured every qemu output-format boundary
+against 80 static per-version <code>qemu-img</code> builds rather than inferring
+them, and found that instar's VHD writer had been silently truncating
+on every qemu before 10.0.</p>
 <p>It found a regression on its first real run: see the phase 5 outcome.</p>
 <p>Rewritten 2026-08-08 from the original 2026-05-08 draft. The v0.3.0
 release has shipped and the <code>package-smoke</code> job in

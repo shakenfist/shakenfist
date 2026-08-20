@@ -3336,6 +3336,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12116,6 +12127,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12541,6 +12563,8 @@
 
 
 <h1 id="instar-snapshot-subcommand"><code>instar snapshot</code> subcommand<a class="headerlink" href="#instar-snapshot-subcommand" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>Phases 1-14.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -13529,72 +13553,72 @@ qemu-img.</p>
 <tr>
 <td>1. Shared ABI: <code>SnapshotConfig</code>, <code>SnapshotResult</code>, <code>SnapshotEntryRecord</code>, error codes, <code>send_snapshot_entry</code>/<code>send_snapshot_result</code> call-table pointers, <code>fsync_input</code> call-table primitive, <code>GuestMessage</code> arms</td>
 <td>PLAN-snapshot-phase-01-abi.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Snapshot-table parser extension and list-mode planner: <code>for_each_snapshot_entry</code> streaming primitive + extra-data fallback + planner converter (<code>snapshot_entry_to_record</code>); <code>find_snapshot_streaming</code>; extended <code>SnapshotEntry</code> with v3 fields; ~14 new qcow2 unit tests</td>
 <td>PLAN-snapshot-phase-02-list-planner.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. Guest binary scaffolding + list mode (<code>src/operations/snapshot/</code>): config read, format check, dispatch, MODE_LIST emit loop</td>
 <td>PLAN-snapshot-phase-03-list-guest.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4. Host CLI for list mode (<code>run_snapshot</code>, clap surface, human + JSON renderer, <code>qemu-img snapshot -l</code> byte-exact output)</td>
 <td>PLAN-snapshot-phase-04-list-host.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5. Refcount mutators (planner crate): <code>update_snapshot_refcount</code>, <code>alloc_cluster_in_refblocks</code>, <code>set_refcount_in_block</code> (lifted from resize), <code>update_copied_flags_for_l1</code>, two-pass overflow check. New <code>src/crates/snapshot/</code> crate parallel to commit/rebase; ~60 unit tests</td>
 <td>PLAN-snapshot-phase-05-refcount-planners.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>6. Snapshot create planner + guest binary (MODE_CREATE), plus the minimal <code>-c</code> host dispatch pulled forward from phase 9 (see open question 1 in that plan)</td>
 <td>PLAN-snapshot-phase-06-create.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>7. Snapshot delete planner + guest binary (MODE_DELETE), plus the <code>-d</code> host dispatch (pulled forward like <code>-c</code> was) and the shared <code>run_snapshot_mutating_guest</code> launch helper</td>
 <td>PLAN-snapshot-phase-07-delete.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>8. Snapshot apply planner + guest binary (MODE_APPLY), plus the <code>-a</code> host dispatch (pulled forward like <code>-c</code> / <code>-d</code>), the shared raw-table finder (<code>find_snapshot_in_table</code>, ID-then-name for apply / name-only for delete), and the walker stale-flag scrub</td>
 <td>PLAN-snapshot-phase-08-apply.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>9. Host CLI consolidation and parity: D1 fix (<code>-U</code> with mutating modes refused before file access), D2 fix (bare <code>snapshot FILE</code> defaults to list), D3 documented (mixed-mode exit-code delta kept as-is), launch consolidation declined (renderer borrow fights the helper boundary), <code>tools/snapshot-cli-parity.sh</code> (30 assertions, all passing), quirks docs updated.</td>
 <td>PLAN-snapshot-phase-09-mutate-host.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>10. Cross-version baselines: snapshot-bearing qcow2 fixtures, <code>snapshot-list-human</code> profiles in <code>generate-baselines.py</code> (JSON deferred to phase 11 — no qemu source of truth; mutation baselines dropped — column drift already captured by listing frozen fixtures), baseline generation pass for 80 versions. FINDING: snapshot names &gt;63 bytes are truncated by the list parser (bug fixed post-landing: <code>SnapshotEntry::name</code> widened to <code>[u8;256]</code>, cap raised to <code>.min(255)</code>; <code>snap-qcow2-longname</code> profile updated to full 200-byte baseline; see "Bugs fixed during this work").</td>
 <td>PLAN-snapshot-phase-10-baselines.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>11. Integration tests (<code>tests/test_snapshot.py</code>): list matrix, create/delete/apply round-trips, error paths, qcow2-only enforcement, post-op <code>qemu-img check</code> clean. <strong>Fixtures, profiles, and manifest tag <code>snapshots</code> are ready from phase 10.</strong> JSON golden files for <code>--output=json</code> belong here (instar-side self-baseline; no qemu source of truth). 94 tests: 92 pass, 2 skip (qcow2-snapshots: no phase-10 baseline), 0 fail; suite wall time ~1s; JSON goldens in <code>tests/golden/snapshot-list/</code>. Test families: (a) list-matrix (b) JSON-goldens + vmstate structural + QMP-key schema (c) mutation round-trips (d) error paths + qcow2-only enforcement (e) empty-table.</td>
 <td>PLAN-snapshot-phase-11-integration-tests.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>12. Coverage-guided fuzz harnesses: <code>fuzz_snapshot_parse</code>, <code>fuzz_snapshot_refcount</code></td>
 <td>PLAN-snapshot-phase-12-fuzz-coverage.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>13. Differential fuzzing extension: random <code>-c/-d/-a</code> chain vs qemu-img, structural <code>qemu-img info</code> comparison</td>
 <td>PLAN-snapshot-phase-13-fuzz-differential.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>14. Documentation, CHANGELOG, follow-ups (<code>docs/snapshot.md</code>, quirks, usage, ARCHITECTURE, README, AGENTS, <code>PLAN-convert-followups.md</code> final strike-through) plus the four deferred dispositions, three of which were code: <code>find_snapshot</code> reworked to qemu's two-full-pass ID-then-name matcher (fixing a real <code>convert --snapshot</code> collision bug; dead <code>find_snapshot_streaming</code> removed), zero-<code>date_sec</code> now renders the epoch like qemu, dead <code>SnapshotPlan</code>/<code>SnapshotPatch</code> API removed (with the fuzz-target op-7 and corpus-seeder ripple), and the seven shell harnesses wired into CI via <code>make snapshot-harnesses</code> + a functional-tests job</td>
 <td>PLAN-snapshot-phase-14-docs.md</td>
-<td>Landed</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>

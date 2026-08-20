@@ -3084,6 +3084,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12100,6 +12111,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12509,6 +12531,20 @@
 
 
 <h1 id="instar-and-qemu-img-security-audit">Instar and qemu-img security audit<a class="headerlink" href="#instar-and-qemu-img-security-audit" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>All six phases are executed. Phases 1a-5 are recorded as Done in the
+Progress table below; phase 6 was expanded into
+<a href="/components/instar/plans/PLAN-coverage-fuzzing/">PLAN-coverage-fuzzing.md</a>, which is now
+complete in its own right.</p>
+<p>The audit found and fixed 9 bugs (listed under Progress) and verified
+6 qemu-img CVEs as mitigated by instar's architecture with 0 bypasses.
+Its two standing outputs — nightly coverage-guided fuzzing and nightly
+differential fuzzing, both filing <code>security-audit</code> issues
+automatically — outlive the plan and need no plan to keep running.</p>
+<p>Closing this plan does not close the audit posture. Findings continue
+to arrive as GitHub issues, which is exactly what the Vulnerability
+tracking section below specifies; a fuzzer that runs every night has
+no terminal state to wait for.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -12632,51 +12668,51 @@ techniques, each of which catches different classes of bugs:</p>
 <tbody>
 <tr>
 <td>1a. Unsafe code audit</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>static-analysis</code></td>
 <td>All unsafe blocks classified (0 unsound, 1 fragile in VMM, ~5 fragile in guest FFI boundary). SAFETY comments added to VMM.</td>
 </tr>
 <tr>
 <td>1b. Integer arithmetic review</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>static-analysis</code></td>
 <td>VHDX BAT <code>as u32</code> truncation found and fixed (<code>u32::try_from().ok()?</code>). All checked arithmetic patterns verified.</td>
 </tr>
 <tr>
 <td>1c. Static analysis tooling</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>static-analysis</code></td>
 <td>Nightly clippy clean (12 lints fixed), cargo audit 0 vulns, truncating cast table added to docs/security-audits.md.</td>
 </tr>
 <tr>
 <td>2. Adversarial image crafting</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>adversarial-testing</code></td>
 <td>61 adversarial images across 12 categories. Scripts in instar-testdata/scripts/.</td>
 </tr>
 <tr>
 <td>3. Differential fuzzing</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>differential-fuzzing</code></td>
 <td>1070-line fuzzer with libyal cross-validation. CI workflow: 100/200/1000 iterations (PR/merge/nightly). Auto-files issues on divergences.</td>
 </tr>
 <tr>
 <td>4. CVE reproduction</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>cve-reproduction</code></td>
 <td>6 CVEs verified (19 tests, 7 reproducer images, 0 bypasses). All mitigated by existing architecture.</td>
 </tr>
 <tr>
 <td>5. VMM boundary audit</td>
-<td><strong>Done</strong></td>
+<td><strong>Complete</strong></td>
 <td>(main)</td>
 <td>8 bugs fixed: sector bounds checking (2 High), BackingStore overflow/capacity (2 Medium), IO buffer cap (Medium), sandboxed info exit handling (Medium), DebugBuffer OOM (Moderate), SerialDecoder cap (Low). Plus desc_idx validation.</td>
 </tr>
 <tr>
 <td>6. Coverage-guided fuzzing</td>
-<td><strong>In progress</strong></td>
+<td><strong>Complete</strong></td>
 <td><code>audit</code></td>
-<td>Harness infrastructure, fuzz targets, corpus seeding, CI smoke tests merged. Detailed plan: <a href="/components/instar/plans/PLAN-coverage-fuzzing/">PLAN-coverage-fuzzing.md</a></td>
+<td>40 fuzz targets, corpus seeding, nightly CI at a 450-minute tiered budget, automatic issue filing. ~200 <code>security-audit</code> issues closed; 1 open defect (#483). Detailed plan: <a href="/components/instar/plans/PLAN-coverage-fuzzing/">PLAN-coverage-fuzzing.md</a></td>
 </tr>
 </tbody>
 </table>

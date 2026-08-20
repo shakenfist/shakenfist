@@ -3616,10 +3616,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-complete-2026-07-20" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Complete (2026-07-20)
+        Status: Complete
       
     </span>
   </a>
@@ -11989,10 +11989,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-complete-2026-07-20" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Complete (2026-07-20)
+        Status: Complete
       
     </span>
   </a>
@@ -12287,7 +12287,19 @@
 
 
 <h1 id="format-coverage-expansion">Format coverage expansion<a class="headerlink" href="#format-coverage-expansion" title="Permanent link">&para;</a></h1>
-<h2 id="status-complete-2026-07-20">Status: Complete (2026-07-20)<a class="headerlink" href="#status-complete-2026-07-20" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>All 7 phases, finished 2026-07-20. Closed the input-side
+format-coverage gap against qemu-img's real 14-format roster. Four new
+<code>no_std</code> guest crates (<code>vdi</code>, <code>parallels</code>, <code>qcow1</code>, <code>dmg</code>) with
+coverage-guided and differential fuzz coverage graduated VDI,
+Parallels, QCOW1 and DMG from detect+info-only to full
+convert/compare/dd/bench read support; detection parity closed against
+oslo.utils' roster plus four formats oslo never detected; QED received
+a recorded refusal-as-policy decision rather than a read path;
+<code>test_info_safe</code> grew 580 to 954 passing scenarios. Along the way,
+fixed the pre-existing #444 defect (detect-only formats silently read
+as raw), a live QCOW1-misdetected-as-QCOW2 defect, the never-consumed
+<code>INFO_RESULT_FLAG_ENCRYPTED</code> flag, and three instar-testdata defects.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
