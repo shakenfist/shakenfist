@@ -805,6 +805,52 @@ def arg_is_instance_ref(func):
     return wrapper
 
 
+def proxy_request_to_node(url, api_token, data, peer):
+    """Proxy the current request to a peer node's API and relay its reply.
+
+    A refused, reset, or otherwise failed connection to the peer is an
+    infrastructure condition, not a fault in the API server which received
+    the request, so it must not escape as an unqualified 500 (issue 3743,
+    the node-to-node variant of issues 3373 and 3522). It surfaces as a
+    503 naming the peer, with the peer and proxied URL as structured log
+    fields so the failure is attributable without parsing a traceback.
+    """
+    method = flask.request.environ['REQUEST_METHOD']
+
+    try:
+        r = requests.request(
+            method, url,
+            data=data,
+            headers={
+                'Authorization': api_token,
+                'User-Agent': util_general.get_user_agent(),
+                'X-Request-ID': flask.request.headers.get('X-Request-ID')
+            })
+    except requests.exceptions.RequestException as e:
+        LOG.with_fields({
+            'method': method,
+            'url': url,
+            'peer': peer,
+            'error': str(e)
+        }).error('Peer node API unreachable while proxying request')
+        return sf_api.error(
+            503, f'peer node {peer} did not answer the proxied request, please retry',
+            suppress_traceback=True)
+
+    LOG.with_fields({
+        'method': method,
+        'url': url,
+        'peer': peer,
+        'status_code': r.status_code,
+        'body_bytes': len(r.content)
+    }).info('Returning proxied request')
+    resp = flask.Response(
+        r.content,
+        mimetype=r.headers.get('Content-Type', 'application/json'))
+    resp.status_code = r.status_code
+    return resp
+
+
 def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
@@ -835,26 +881,9 @@ def redirect_instance_request(func):
             api_token = get_api_token(
                 f'http://{target_ip}:13000',
                 namespace=request_namespace())
-            r = requests.request(
-                flask.request.environ['REQUEST_METHOD'], url,
-                data=json.dumps(sf_api.flask_get_post_body()),
-                headers={
-                    'Authorization': api_token,
-                    'User-Agent': util_general.get_user_agent(),
-                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
-                })
-
-            LOG.with_fields({
-                'method': flask.request.environ['REQUEST_METHOD'],
-                'url': url,
-                'status_code': r.status_code,
-                'body_bytes': len(r.content)
-            }).info('Returning proxied request')
-            resp = flask.Response(
-                r.content,
-                mimetype=r.headers.get('Content-Type', 'application/json'))
-            resp.status_code = r.status_code
-            return resp
+            return proxy_request_to_node(
+                url, api_token, json.dumps(sf_api.flask_get_post_body()),
+                target_node.fqdn)
 
         return func(*args, **kwargs)
     return wrapper
@@ -941,27 +970,9 @@ def redirect_to_network_node(func):
             path = flask.request.environ['PATH_INFO']
             admin_token = get_api_token(
                 f'http://{config.NETWORK_NODE_IP}:13000', namespace='system')
-            r = requests.request(
-                flask.request.environ['REQUEST_METHOD'],
-                f'http://{config.NETWORK_NODE_IP}:13000{path}',
-                data=flask.request.data,
-                headers={
-                    'Authorization': admin_token,
-                    'User-Agent': util_general.get_user_agent(),
-                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
-                })
-
-            LOG.with_fields({
-                'method': flask.request.environ['REQUEST_METHOD'],
-                'url': path,
-                'status_code': r.status_code,
-                'body_bytes': len(r.content)
-            }).info('Returning proxied request')
-            resp = flask.Response(
-                r.content,
-                mimetype=r.headers.get('Content-Type', 'application/json'))
-            resp.status_code = r.status_code
-            return resp
+            return proxy_request_to_node(
+                f'http://{config.NETWORK_NODE_IP}:13000{path}', admin_token,
+                flask.request.data, config.NETWORK_NODE_IP)
 
         return func(*args, **kwargs)
     return wrapper
@@ -1046,27 +1057,11 @@ def redirect_upload_request(func):
             url = f'http://{u.node}:13000{path}'
             api_token = get_api_token(
                 f'http://{u.node}:13000', namespace=request_namespace())
-            r = requests.request(
-                flask.request.environ['REQUEST_METHOD'], url,
-                data=flask.request.get_data(cache=False, as_text=False,
-                                            parse_form_data=False),
-                headers={
-                    'Authorization': api_token,
-                    'User-Agent': util_general.get_user_agent(),
-                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
-                })
-
-            LOG.with_fields({
-                'method': flask.request.environ['REQUEST_METHOD'],
-                'url': url,
-                'status_code': r.status_code,
-                'body_bytes': len(r.content)
-            }).info('Returning proxied request')
-            resp = flask.Response(
-                r.content,
-                mimetype=r.headers.get('Content-Type', 'application/json'))
-            resp.status_code = r.status_code
-            return resp
+            return proxy_request_to_node(
+                url, api_token,
+                flask.request.get_data(cache=False, as_text=False,
+                                       parse_form_data=False),
+                u.node)
 
         return func(*args, **kwargs)
     return wrapper
