@@ -145,7 +145,8 @@ the WebRTC conventions section of AGENTS.md for why a bare
 `Notify` is not safe here.
 
 `WebrtcBridgeConfig` carries the ICE server list (empty for
-LAN-only use) and the `EncoderControl` sender.
+LAN-only use, populated by `--web-ice-server`), the UDP bind
+policy described below, and the `EncoderControl` sender.
 
 #### UDP bind addresses
 
@@ -160,15 +161,39 @@ every browser discards — and is invisible to the in-process test
 suite, since two Rust peers on one host agree about the bogus
 address and connect happily.
 `shakenfist-spice-webrtc/src/bind_addrs.rs` reproduces what 0.17
-did internally: `host_udp_bind_addrs()` enumerates the host's
-network interface addresses via the `if-addrs` crate and returns
-one ephemeral-port `SocketAddr` per address, skipping loopback,
-unspecified, and IPv6 link-local addresses. `WebrtcBridge::new`
-rejects an empty result rather than building a peer connection
-that could only ever offer unroutable candidates. This is
-independent of the `--web-host` flag, which only controls the
-HTTP/HTTPS signalling listener; see the reverse-proxy callout in
-the [web frontend guide](/components/ryll/web-frontend/) for the operator-facing
+did internally, as a `UdpBindPolicy` the bridge resolves. With no
+selectors — the default, and what `host_udp_bind_addrs()` is — it
+enumerates the host's network interface addresses via the
+`if-addrs` crate and returns one ephemeral-port `SocketAddr` per
+address, skipping loopback, unspecified, and IPv6 link-local
+addresses. `--web-media-addr` fills the selectors with addresses
+or interface names, and `--web-media-port` replaces the ephemeral
+port.
+
+The module splits its exclusions into two kinds, and the split is
+what the configuration surface means:
+
+- *Policy* — loopback, and everything not filtered at all (RFC
+  1918, IPv4 link-local, IPv6 ULA). Defaults about what is worth
+  advertising, overridden by naming addresses explicitly. This is
+  what makes `--web-media-addr 127.0.0.1` a supported
+  loopback-only deployment.
+- *Mechanism* — unspecified (`0.0.0.0`, `::`) and zoneless
+  `fe80::/10`. A `SocketAddr` cannot represent either in a way ICE
+  can use, so `UdpBindPolicy::validate` refuses them at startup
+  and no flag re-enables them.
+
+The policy is resolved on every `WebrtcBridge::new` rather than
+once per process, so a session that outlives a DHCP lease or a
+VPN coming up binds what exists when the viewer arrives.
+`WebrtcBridge::new` rejects an empty result rather than building
+a peer connection that could only ever offer unroutable
+candidates, and distinguishes the two empty cases: nothing
+bindable on this host, versus nothing matching the configured
+selectors. All of this is independent of the `--web-host` flag,
+which only controls the HTTP/HTTPS signalling listener; see the
+reverse-proxy callout in the
+[web frontend guide](/components/ryll/web-frontend/) for the operator-facing
 consequences.
 
 ### SDP flow

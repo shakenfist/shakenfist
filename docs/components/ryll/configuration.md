@@ -54,6 +54,23 @@ configuration section below.
 | `--pedantic` | false | Write a bug-report zip to `./ryll-pedantic-reports/` (or `--pedantic-dir`) the first time each distinct protocol gap is detected |
 | `--pedantic-dir <DIR>` | none | Output directory for pedantic bug reports |
 
+### Web Mode
+
+`--web` runs ryll as a SPICE-to-browser transcoder instead of opening a GUI
+window. The operator guide, including reverse-proxy and TLS setup, is
+[web-frontend.md](/components/ryll/web-frontend/); this table is the flag reference.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--web` | false | Run as a SPICE → browser transcoder. Serves a browser shell that consumes the SPICE display via WebRTC, and prints a URL carrying a per-launch random token. Mutually exclusive with `--headless` and the GUI default |
+| `--web-host <ADDR>` | `127.0.0.1` | Bind address for the HTTP/HTTPS signalling listener only. Use `0.0.0.0` for LAN access. Has no effect on which addresses WebRTC media binds or advertises — that is `--web-media-addr` |
+| `--web-port <PORT>` | 0 (ephemeral) | TCP port for the signalling listener |
+| `--web-tls-cert <PATH>` | none | PEM-encoded TLS certificate chain. Serving over HTTPS requires `--web-tls-key` as well |
+| `--web-tls-key <PATH>` | none | PEM-encoded TLS private key. Required with `--web-tls-cert` |
+| `--web-media-addr <ADDR\|IFACE>` | every non-loopback interface address | Local address, or interface name, to bind the WebRTC media (UDP) sockets to. Repeatable. Naming addresses explicitly also overrides the default exclusion of loopback, which is how a loopback-only host is served (`--web-media-addr 127.0.0.1`). The unspecified addresses (`0.0.0.0`, `::`) and zoneless `fe80::/10` are refused at startup: neither can become an ICE candidate a browser will use |
+| `--web-media-port <PORT>` | 0 (ephemeral) | UDP port for the media sockets. Pin it so a firewall rule can name one port instead of the OS's whole ephemeral range. Applies to every bound address; a port already in use fails loudly rather than falling back to an ephemeral one, since a silent fallback would no longer match the firewall rule |
+| `--web-ice-server <URL>` | none | STUN or TURN server URL (`stun:host:port`, `turn:host:port`). Repeatable. Empty by default: ryll assumes browser and host share a LAN, so ICE host candidates are usually enough. The scheme must be `stun:`, `stuns:`, `turn:` or `turns:` and is checked at startup, so a URL with the scheme left off fails the launch rather than producing an ICE server that silently does nothing |
+
 ### Capture and Debugging
 
 | Option | Default | Description |

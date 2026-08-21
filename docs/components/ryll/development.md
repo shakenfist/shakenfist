@@ -330,8 +330,29 @@ Worth checking in ryll's own log when verifying `--web`:
 - `web: encoder restarted at WxH@30fps` — the encode resolution. If
   it does not match the guest's surface, the browser is watching a
   scaled image.
+- `webrtc: no H.264 payload type negotiated` — the browser offered no
+  H.264, so there is no video at all. See below.
 
-## Helper tools
+### A browser with no H.264 gets no video
+
+ryll's web mode encodes H.264 and nothing else, so a browser that does
+not offer H.264 connects successfully and shows a black rectangle.
+Audio, input, cursor and viewport resize all keep working, which makes
+the symptom look like a rendering bug rather than a negotiation one.
+The server-side tell is the `no H.264 payload type negotiated` warning
+followed by an endless `Failed to send RTP: unsupported codec type by
+this transceiver`.
+
+Firefox is the browser this happens on. It ships H.264 for WebRTC via
+Cisco's OpenH264 plugin, and if that plugin has not loaded, Firefox
+still lists H.264 in `RTCRtpReceiver.getCapabilities('video')` while
+omitting it from the offer — so the capability list is not evidence.
+Check `about:addons` → Plugins for OpenH264, and confirm against a
+generated offer rather than against capabilities.
+
+Chromium carries H.264 in-tree and does not have this failure mode,
+which makes it the browser to reach for when deciding whether a
+problem is ryll's.
 
 ### Inspecting a `--capture` pcap
 

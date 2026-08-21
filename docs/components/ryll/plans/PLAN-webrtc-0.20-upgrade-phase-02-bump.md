@@ -538,8 +538,10 @@ datachannel poll loops, and the bind-address wiring.
 | 2d — the atomic bump | Done (`41c1e7cf`) |
 | 2e — Renovate and docs | Done (`959b14a8`) |
 
-Every Definition-of-done item is met **except the browser
-session**, which is manual and is the phase's remaining gate:
+Every Definition-of-done item is met, the browser session
+included — with one clause evidenced only indirectly: nobody
+listened to the audio. See *Browser verification* under What
+landed.
 
 - `make test` (16 suites), `make lint`, `make check-windows`,
   `make web-smoke`, `make web-smoke-tls` and
@@ -553,15 +555,16 @@ session**, which is manual and is the phase's remaining gate:
   candidate carries a routable address.
 - `tests/lifecycle.rs` is unchanged in intent and passes.
 
-**Outstanding: a real browser against a real SPICE guest.** This
-is not a formality. Decision 4 exists because a wrong bind address
-leaves the entire automated suite green — two Rust peers on one
-host agree about an unroutable address and connect — so nothing
-above can distinguish a working deployment from a broken one. Two
-findings from 2d sharpen the same point: the datachannel
-stream-1 collision means the browser direction is now exercised
-only by a test that emulates the browser, and the new RTX
-advertisement is something only a real browser can react to.
+**The browser session was not a formality.** Decision 4 exists
+because a wrong bind address leaves the entire automated suite
+green — two Rust peers on one host agree about an unroutable
+address and connect — so nothing above can distinguish a working
+deployment from a broken one. Two findings from 2d sharpen the
+same point: the datachannel stream-1 collision means the browser
+direction is now exercised only by a test that emulates the
+browser, and the new RTX advertisement is something only a real
+browser can react to. It earned its keep: it found a defect no
+test in the suite can see (see *Browser verification*).
 
 ## Two decisions this phase deliberately left open
 
@@ -661,6 +664,76 @@ matching would not have made it an error either way — it degrades to
 a mime-type-only match
 (`rtc-0.20.2/src/rtp_transceiver/rtp_sender/rtp_codec.rs:139-163`).
 
+### Browser verification
+
+The Definition-of-done gate, run 2026-08-17.
+
+| | |
+|---|---|
+| Commit | `7e2fb58e` (`ryll v0.1.7 (7e2fb58e)` in the session log) |
+| Guest | shakenfist `debian-xfce:13` via `make test-qemu-desktop`, 1280x1024 surface, SPICE on 5900 |
+| Browser | Chromium 151.0.7922.137 (Debian 13) — **pass** |
+| Browser | Firefox 140.13.0esr — **video fails**, see below |
+| Locked dependency | webrtc/rtc **0.20.3**, not the 0.20.2 the manifest declares and this plan analyses. A Renovate patch bump landed between the port and this session |
+
+Chromium carried a working session: video, keyboard, mouse, cursor
+and viewport resize all behaved, and the three log lines
+`docs/development.md` names were correct — `main: mouse mode=2
+(client (absolute))`, `playback: MODE: 3`, and `web: encoder
+restarted at 1280x1024@30fps`.
+
+**Audio was not verified by ear.** `playback: MODE: 3` says the
+channel negotiated Opus, and `loopback.rs` asserts audio RTP
+reaches the far side, but nobody listened. That leaves one
+Definition-of-done clause evidenced only indirectly. It does not
+bear on the bind-address question this phase exists to answer, so
+it is carried into phase 04 — which holds a browser session open
+for minutes anyway — rather than held against the port.
+
+**The bind address is confirmed good.** This was the gate's whole
+reason for existing. ICE nominated a host pair on a real interface
+address and held it, with consent refreshing on schedule — the
+failure mode Decision 4 anticipated (a literal `0.0.0.0` candidate
+that every browser discards) is not present.
+
+**Firefox connects but shows no video, and that is a real defect.**
+Everything except the picture worked — audio, datachannel, input,
+cursor, resize — while the server logged `no H.264 payload type
+negotiated` followed by an unbounded `Failed to send RTP:
+unsupported codec type by this transceiver`.
+
+The cause is not the codec intersection. Firefox 140 on this host
+*advertises* four H.264 entries via
+`RTCRtpReceiver.getCapabilities('video')` but emits an offer whose
+video section carries only VP8, VP9, AV1, rtx, ulpfec and red — no
+`a=rtpmap` H.264 line at any payload type. Its OpenH264 GMP is
+present on disk (2.6.0) but never loads. ryll encodes H.264 only,
+so there is no common video codec and nothing to negotiate;
+`resolve_negotiated_payload_types` reported exactly that.
+
+Chromium by contrast offers H.264 at PT 102 with
+`profile-level-id=42001f`, matching the MediaEngine default entry —
+which is precisely the divergence the `resolve_negotiated_payload_types`
+doc comment predicted, now observed on both sides.
+
+Two defects follow, filed rather than fixed here because neither is
+a port regression: a browser with no common video codec gets a black
+screen and no explanation (#289), and the video pump keeps encoding
+and writing packets that cannot be sent (#290). The session also
+motivated an in-browser diagnostics panel (#291) — establishing the
+above took `about:webrtc`, a hand-written offer-generating page and
+a read through the intersection logic, to recover a fact the browser
+knew from the start.
+
+Phase 04 requires Chrome and Firefox at minimum. Firefox is
+therefore that phase's gate, not this one's, and #289 should land
+before it so the next person to meet this sees a sentence rather
+than a black rectangle.
+
+**Not established:** whether anything ever arrives on the
+`remote-dc` pump in a real browser session — the open decision
+below asks for that confirmation, and this session did not capture
+it. Do not delete the pump on the strength of this run.
 
 ## Review follow-up
 
