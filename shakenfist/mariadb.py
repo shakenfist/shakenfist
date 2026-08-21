@@ -23443,6 +23443,11 @@ _STATIC_TABLE_GETTERS: dict[str, tuple[Callable[[], sa.Table], str]] = {
     ObjectType.INSTANCE.value: (_get_instances_table, 'uuid'),
     ObjectType.INTERFACE.value: (_get_network_interfaces_table, 'uuid'),
     ObjectType.IPAM.value: (_get_ipams_table, 'uuid'),
+    # mapping_rule and trusted_issuer were missing from this map from the
+    # day federated identity landed, the same omission as namespace_key
+    # (issue 3588) in two more object types (issue 3788). The parity test
+    # against constants.OBJECT_NAMES_TO_CLASSES now pins the invariant.
+    ObjectType.MAPPING_RULE.value: (_get_mapping_rules_table, 'uuid'),
     ObjectType.NAMESPACE.value: (_get_namespaces_table, 'name'),
     # namespace_key was missing from this map from the day the object
     # landed, so the reconciler never repaired zombie keys: 4,151
@@ -23453,6 +23458,7 @@ _STATIC_TABLE_GETTERS: dict[str, tuple[Callable[[], sa.Table], str]] = {
     ObjectType.NAMESPACE_CLAIM.value: (_get_namespace_claims_table, 'uuid'),
     ObjectType.NETWORK.value: (_get_networks_table, 'uuid'),
     ObjectType.NODE.value: (_get_nodes_table, 'uuid'),
+    ObjectType.TRUSTED_ISSUER.value: (_get_trusted_issuers_table, 'uuid'),
     ObjectType.UPLOAD.value: (_get_uploads_table, 'uuid'),
     ObjectType.ARTIFACT_FETCH_OP.value: (_get_cluster_operations_table, 'uuid'),
     ObjectType.IMGCACHE_OP.value: (_get_cluster_operations_table, 'uuid'),

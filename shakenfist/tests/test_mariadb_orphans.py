@@ -13,6 +13,7 @@ from unittest import mock
 
 import sqlalchemy as sa
 
+from shakenfist import constants
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
@@ -221,3 +222,38 @@ class OrphanQueryTestCase(base.ShakenFistTestCase):
         table, pk = entry
         self.assertEqual('namespace_keys', table.name)
         self.assertEqual('uuid', pk)
+
+    def test_federated_identity_objects_are_reconcilable(self):
+        # trusted_issuer and mapping_rule were missing from
+        # _STATIC_TABLE_GETTERS from the day federated identity landed,
+        # the same omission as namespace_key (issue 3588) in two more
+        # object types, so their orphans were unreapable in both
+        # directions (issue 3788).
+        for objtype, table_name in (
+                (ObjectType.TRUSTED_ISSUER, 'trusted_issuers'),
+                (ObjectType.MAPPING_RULE, 'mapping_rules')):
+            self.assertIn(objtype.value,
+                          mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES)
+
+            entry = mariadb._static_table_for_object_type(objtype)
+            self.assertIsNotNone(entry)
+            table, pk = entry
+            self.assertEqual(table_name, table.name)
+            self.assertEqual('uuid', pk)
+
+    def test_every_object_class_has_a_static_table_getter(self):
+        # Three object types have now each been registered in
+        # constants.OBJECT_NAMES_TO_CLASSES but not in
+        # _STATIC_TABLE_GETTERS (namespace_key in issue 3588,
+        # trusted_issuer and mapping_rule in issue 3788), and each time a
+        # human happened to notice. The two registries now agree exactly,
+        # so assert the invariant directly. If a future object type
+        # legitimately has a class but no static-values table, this
+        # assertion is the place to argue that case, with a comment
+        # saying why.
+        self.assertEqual(
+            set(constants.OBJECT_NAMES_TO_CLASSES),
+            set(mariadb._STATIC_TABLE_GETTERS),
+            'every object type with a class needs a static table getter, '
+            'or the orphan reconciler silently skips it in both directions '
+            '(issues 3588, 3788)')
