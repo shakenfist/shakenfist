@@ -348,12 +348,12 @@ table entirely (decision D8).
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | In progress |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete |
-| 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete |
-| 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete |
-| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Complete |
-| 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | In progress |
+| 00a. Load-aware ordering and system reservations (static quick wins) | [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md) | In progress |
+| 0. Research and decisions document | [PLAN-scheduler-reservations-phase-00-decisions.md](PLAN-scheduler-reservations-phase-00-decisions.md) | Complete |
+| 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete |
+| 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
+| 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
+| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | In progress |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |

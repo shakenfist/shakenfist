@@ -439,12 +439,12 @@ post-decisions plan.
 | Phase | Plan | Status |
 |-------|------|--------|
 | -1. Local sqlite spool + batched-RPC drainer (caller side) | _(delivered in the network-facade branch ahead of this plan)_ | Complete |
-| 1. `events`/`event_objects` schema, accessors, the `RecordEventBatch` RPC on sf-database, and the events-row-count gauge | PLAN-eventlog-direct-mariadb-phase-01-schema.md | Complete |
-| 2. Swap the drainer's RPC target from sf-eventlog to sf-database; promote `event_uuid` and `request_id` to first-class fields; wire spool-depth, drop, and insert metrics | PLAN-eventlog-direct-mariadb-phase-02-write.md | Complete |
-| 3. Move prune sweep into the cluster daemon's scheduled tasks, with prune-delete counter | PLAN-eventlog-direct-mariadb-phase-03-prune.md | Complete |
-| 4. REST API direct-read path via a new `GetObjectEvents` RPC on sf-database | PLAN-eventlog-direct-mariadb-phase-04-read.md | Complete |
-| 5. Delete `sf-eventlog` daemon, gRPC protos, systemd unit, config, the MariaDB `event_dlq`, and the on-disk sqlite chunks | PLAN-eventlog-direct-mariadb-phase-05-remove.md | Complete |
-| 6. Documentation (operator guide for the new eventlog, ARCHITECTURE/README/AGENTS updates, cut-over loss called out in release notes) | PLAN-eventlog-direct-mariadb-phase-06-docs.md | Complete |
+| 1. `events`/`event_objects` schema, accessors, the `RecordEventBatch` RPC on sf-database, and the events-row-count gauge | [PLAN-eventlog-direct-mariadb-phase-01-schema.md](PLAN-eventlog-direct-mariadb-phase-01-schema.md) | Complete |
+| 2. Swap the drainer's RPC target from sf-eventlog to sf-database; promote `event_uuid` and `request_id` to first-class fields; wire spool-depth, drop, and insert metrics | [PLAN-eventlog-direct-mariadb-phase-02-write.md](PLAN-eventlog-direct-mariadb-phase-02-write.md) | Complete |
+| 3. Move prune sweep into the cluster daemon's scheduled tasks, with prune-delete counter | [PLAN-eventlog-direct-mariadb-phase-03-prune.md](PLAN-eventlog-direct-mariadb-phase-03-prune.md) | Complete |
+| 4. REST API direct-read path via a new `GetObjectEvents` RPC on sf-database | [PLAN-eventlog-direct-mariadb-phase-04-read.md](PLAN-eventlog-direct-mariadb-phase-04-read.md) | Complete |
+| 5. Delete `sf-eventlog` daemon, gRPC protos, systemd unit, config, the MariaDB `event_dlq`, and the on-disk sqlite chunks | [PLAN-eventlog-direct-mariadb-phase-05-remove.md](PLAN-eventlog-direct-mariadb-phase-05-remove.md) | Complete |
+| 6. Documentation (operator guide for the new eventlog, ARCHITECTURE/README/AGENTS updates, cut-over loss called out in release notes) | [PLAN-eventlog-direct-mariadb-phase-06-docs.md](PLAN-eventlog-direct-mariadb-phase-06-docs.md) | Complete |
 
 Sequencing constraints between phases:
 

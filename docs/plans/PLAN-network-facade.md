@@ -911,15 +911,15 @@ Notes:
 | Phase | Plan | Status |
 |-------|------|--------|
 | 0. Stability-branch lock fix (separate, lands now) | (not a sub-plan — see commit on `stability`) | Complete |
-| 1. Per-node `sf-net` queue family (five priority lanes mirroring the existing taxonomy) + dispatcher changes: exponential back-off map (100 ms → 15 s, ×2, single-worker safety comment) and cancellation-check on dequeue (drop aborted/deleted ops, fix the latent `InvalidStateException` from executing a pre-aborted op) | PLAN-network-facade-phase-01-per-node-queues.md | Complete |
-| 2. `BridgedVXLanNetwork` scaffold, `ErrorReport` infrastructure (class, `from_exception` registry, `to_http` mapping, `op.error_report` / `op.raise_for_error` API), and `ensure_mesh` migration | PLAN-network-facade-phase-02-ensure-mesh.md | Complete |
-| 3. Floating-IP and route migration | PLAN-network-facade-phase-03-floating-ip.md | Complete |
-| 4. dnsmasq operation migration | PLAN-network-facade-phase-04-dnsmasq.md | Complete |
-| 5. `create_on_*` and `delete_on_*` migration | PLAN-network-facade-phase-05-lifecycle.md | Complete |
-| 6. `maintain.py` rewrite as discovery-only | PLAN-network-facade-phase-06-maintain.md | Complete |
-| 7. REST contract: remove `redirect_to_network_node` from three of its four sites, flip the two delete endpoints to 202+poll, add `/clusteroperations/<uuid>/chain` and `/clusteroperations?target_*=` endpoints, update `client-python` | PLAN-network-facade-phase-07-rest-contract.md | Complete |
-| 8. Remove the temporary `NodeLock`s from the stability fix (no per-method migration flags existed to remove — Phases 2–5 migrated each method cleanly in-place) | PLAN-network-facade-phase-08-cleanup.md | Complete |
-| 9. Documentation and tests | PLAN-network-facade-phase-09-docs.md | Complete |
+| 1. Per-node `sf-net` queue family (five priority lanes mirroring the existing taxonomy) + dispatcher changes: exponential back-off map (100 ms → 15 s, ×2, single-worker safety comment) and cancellation-check on dequeue (drop aborted/deleted ops, fix the latent `InvalidStateException` from executing a pre-aborted op) | [PLAN-network-facade-phase-01-per-node-queues.md](PLAN-network-facade-phase-01-per-node-queues.md) | Complete |
+| 2. `BridgedVXLanNetwork` scaffold, `ErrorReport` infrastructure (class, `from_exception` registry, `to_http` mapping, `op.error_report` / `op.raise_for_error` API), and `ensure_mesh` migration | [PLAN-network-facade-phase-02-ensure-mesh.md](PLAN-network-facade-phase-02-ensure-mesh.md) | Complete |
+| 3. Floating-IP and route migration | [PLAN-network-facade-phase-03-floating-ip.md](PLAN-network-facade-phase-03-floating-ip.md) | Complete |
+| 4. dnsmasq operation migration | [PLAN-network-facade-phase-04-dnsmasq.md](PLAN-network-facade-phase-04-dnsmasq.md) | Complete |
+| 5. `create_on_*` and `delete_on_*` migration | [PLAN-network-facade-phase-05-lifecycle.md](PLAN-network-facade-phase-05-lifecycle.md) | Complete |
+| 6. `maintain.py` rewrite as discovery-only | [PLAN-network-facade-phase-06-maintain.md](PLAN-network-facade-phase-06-maintain.md) | Complete |
+| 7. REST contract: remove `redirect_to_network_node` from three of its four sites, flip the two delete endpoints to 202+poll, add `/clusteroperations/<uuid>/chain` and `/clusteroperations?target_*=` endpoints, update `client-python` | [PLAN-network-facade-phase-07-rest-contract.md](PLAN-network-facade-phase-07-rest-contract.md) | Complete |
+| 8. Remove the temporary `NodeLock`s from the stability fix (no per-method migration flags existed to remove — Phases 2–5 migrated each method cleanly in-place) | [PLAN-network-facade-phase-08-cleanup.md](PLAN-network-facade-phase-08-cleanup.md) | Complete |
+| 9. Documentation and tests | [PLAN-network-facade-phase-09-docs.md](PLAN-network-facade-phase-09-docs.md) | Complete |
 
 Phase numbering reflects dependency ordering. Phase 1 is
 foundational (no per-method migration can happen without per-node

@@ -200,8 +200,7 @@ re-cut phase plans' scopes.
 
 ## Decisions
 
-Drafted 2026-07-30 from the step 1 findings
-(PLAN-scheduler-reservations-phase-00-findings.md) and the
+Drafted 2026-07-30 from the [step 1 findings](PLAN-scheduler-reservations-phase-00-findings.md) and the
 step 2 benchmark. Status: **reviewed and approved by the
 operator 2026-07-30** (step 7). Numbers that depend on step
 3's `peak_allocated_*` data are marked *revisit when data

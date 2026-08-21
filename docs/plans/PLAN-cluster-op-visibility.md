@@ -256,7 +256,7 @@ every consumer, so that:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. CI await helper deflake | PLAN-cluster-op-visibility-phase-01-ci-deflake.md | Complete |
+| 1. CI await helper deflake | [PLAN-cluster-op-visibility-phase-01-ci-deflake.md](PLAN-cluster-op-visibility-phase-01-ci-deflake.md) | Complete |
 | 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete |
 | 2. Observational flag: schema and query layer | PLAN-cluster-op-visibility-phase-02-observational-schema.md | Not started |
 | 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started |
