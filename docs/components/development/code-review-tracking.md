@@ -177,6 +177,12 @@ this repository and passes through to the script.
    then `~/src/shakenfist/development` -- and passes its arguments
    through to `scripts/review-tracking.py`.
 
+   This repository is the exception: its own wrapper does not go
+   looking, because `scripts/review-tracking.py` is in the tree
+   beside it. The search order above would find a *sibling* clone
+   and run that one's copy of the script, which is the wrong answer
+   in the one repository where the right answer is certain.
+
 6. Bootstrap existing review marks, if any were made before the
    tooling was adopted. A stale pre-existing mark must not be
    blessed: `stamp` records whatever content the file has *now*,
