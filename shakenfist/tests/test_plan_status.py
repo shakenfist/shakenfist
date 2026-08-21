@@ -15,11 +15,18 @@ written.
 
 The final test is the regression guard for `docs/plans/` itself. No workflow
 runs pre-commit, so the hook alone would not catch a contributor who has not
-installed it, nor the merge queue. The guard only closes that gap because
-`functional-tests.yml` gates its unit test job on a `plans` paths-filter
-output as well as `code`: a plan-only edit is docs-only, so it does not match
-the `code` filter, and without that second output the job -- and this guard --
-would skip on exactly the changes it exists to police.
+installed it. The guard only closes that gap because `functional-tests.yml`
+gates its unit test job on a `plans` paths-filter output as well as `code`: a
+plan-only edit is docs-only, so it does not match the `code` filter, and
+without that second output the job -- and this guard -- would skip on exactly
+the changes it exists to police.
+
+The coverage that buys is entry to the merge queue, not the merge itself.
+This runs in `sanity_checks`, which `can_enqueue` waits on and `can_merge`
+does not; that split is the workflow's deliberate design -- cheap checks gate
+the pull request, expensive integration jobs gate the merge -- and moving a
+lint-and-unit-test job onto the merge gate is a change to make on its own
+terms, not as a side effect of adding a checker.
 """
 
 import importlib.util
@@ -65,6 +72,32 @@ MASTER = """# A plan
 |-------|------|--------|
 | 1. One | [FIXTURE-plan-phase-01-one.md](FIXTURE-plan-phase-01-one.md) | Complete |
 | 2. Two | [FIXTURE-plan-phase-02-two.md](FIXTURE-plan-phase-02-two.md) | Not started |
+"""
+
+# A plan which shows the convention rather than following it. Both forms
+# occur in the tree: PLAN-qemu-futures.md fences its example, and the
+# `plan-file-conventions` shared block indents one two spaces inside a
+# bullet. Three rows, so it beats the real two-row table if it is parsed.
+FENCED_EXAMPLE = """Track phases in a table like this:
+
+```
+| Phase | Plan | Status |
+|-------|------|--------|
+| 1. Schema | FIXTURE-thing-phase-01-schema.md | Landed |
+| 2. gRPC | FIXTURE-thing-phase-02-grpc.md | Landed |
+| 3. Docs | FIXTURE-thing-phase-03-docs.md | Landed |
+```
+
+"""
+
+INDENTED_EXAMPLE = """Track phases in a table like this:
+
+  | Phase | Plan | Status |
+  |-------|------|--------|
+  | 1. Schema | FIXTURE-thing-phase-01-schema.md | Landed |
+  | 2. gRPC | FIXTURE-thing-phase-02-grpc.md | Landed |
+  | 3. Docs | FIXTURE-thing-phase-03-docs.md | Landed |
+
 """
 
 INDEX = """# Plans
@@ -238,6 +271,87 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
     def test_a_missing_vocabulary_block_fails(self):
         self._write('PLAN-TEMPLATE.md', 'nothing here\n', root=True)
         self.assertProblem('carries no plan-status-vocabulary shared block')
+
+    def _exempt(self, attribute, names):
+        """Point one of the checker's exemption sets at the fixture plan.
+
+        Substituting the set tests the mechanism rather than the membership.
+        Whether the six real names are still the right six is what the
+        whole-tree regression test below answers.
+        """
+        original = getattr(checker, attribute)
+        setattr(checker, attribute, names)
+        self.addCleanup(setattr, checker, attribute, original)
+
+    def test_a_hand_counted_plan_skips_the_arithmetic(self):
+        # A plan which keeps its phases as headings has no table to count,
+        # so the index number is maintained by hand and must not be
+        # second-guessed.
+        self._write('index.md', INDEX.replace('1 of 2', '99 of 99'))
+        self.assertProblem('says \'99 of 99\', but')
+        self._exempt('HAND_COUNTED', {'FIXTURE-plan.md'})
+        self.assertEqual([], checker.problems())
+
+    def test_a_provisional_plan_expects_an_em_dash(self):
+        # A placeholder table has rows but not phases, so the index
+        # publishes no arithmetic. This also pins the em-dash itself: a
+        # hyphen here would otherwise only surface as a whole-tree failure.
+        self._exempt('PROVISIONAL', {'FIXTURE-plan.md'})
+        self.assertProblem('counts \'\u2014\'')
+        self._write('index.md', INDEX.replace('| 1 of 2 |', '| \u2014 |'))
+        self.assertEqual([], checker.problems())
+
+    def test_an_ellipsis_row_is_not_counted(self):
+        # How a plan writes "and so on" in a table it has not finished
+        # decomposing. It is neither a phase nor a status claim, so it
+        # changes neither number.
+        self._write('FIXTURE-plan.md', MASTER + '| ... | ... | ... |\n')
+        self.assertEqual([], checker.problems())
+
+    def test_a_stale_index_row_fails(self):
+        self._write('index.md', INDEX + (
+            '| 2026-01-02 | [Gone](FIXTURE-gone.md) | Went | Complete | 1 of 1 |\n'))
+        self.assertProblem('is listed but is not a master plan')
+
+    def test_a_fenced_example_table_is_not_a_phase_table(self):
+        # Otherwise the example wins on length, its placeholder statuses are
+        # validated against the vocabulary, and the plan's arithmetic is
+        # computed from rows which describe no work at all.
+        self._write('FIXTURE-plan.md', FENCED_EXAMPLE + MASTER)
+        self.assertEqual([], checker.problems())
+
+    def test_an_indented_example_table_is_not_a_phase_table(self):
+        self._write('FIXTURE-plan.md', INDENTED_EXAMPLE + MASTER)
+        self.assertEqual([], checker.problems())
+
+    def test_a_link_inside_a_fence_is_not_an_inbound_link(self):
+        # A link displayed as an example is not a way to reach anything.
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '| 2. Two | [FIXTURE-plan-phase-02-two.md]'
+            '(FIXTURE-plan-phase-02-two.md) | Not started |\n',
+            '| 2. Two | FIXTURE-plan-phase-02-two.md | Not started |\n'
+            '\n```\n[FIXTURE-plan-phase-02-two.md]'
+            '(FIXTURE-plan-phase-02-two.md)\n```\n'))
+        self.assertProblem('has no inbound link')
+
+    def test_a_short_execution_row_is_reported(self):
+        # A row too narrow to reach the status column used to vanish from
+        # the count, which is the drift this checker exists to catch.
+        self._write('FIXTURE-plan.md', MASTER + '| 3. Three |\n')
+        self.assertProblem('too few to reach the status column')
+
+    def test_a_commented_out_order_entry_fails(self):
+        # Commenting an entry out is how a page is kept out of a synced
+        # navigation, so it is a different mistake from forgetting one.
+        self._write('order.yml', '- index.md: Plans index\n'
+                                 '#- FIXTURE-plan.md: A plan\n')
+        self.assertProblem('is commented out of')
+
+    def test_a_dangling_order_entry_fails(self):
+        self._write('order.yml', '- index.md: Plans index\n'
+                                 '- FIXTURE-plan.md: A plan\n'
+                                 '- FIXTURE-gone.md: Gone\n')
+        self.assertProblem('which is not a file in')
 
 
 class PlanStatusRegressionTestCase(base.ShakenFistTestCase):

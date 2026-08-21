@@ -12,17 +12,26 @@ what motivated the index rework in the first place, and the vocabulary this
 checks is justified on being machine readable, so this is the machine that
 reads it.
 
-Six things are checked:
+These things are checked:
 
 * every status cell in a master plan's Execution table is one of the seven
   vocabulary terms, and nothing else;
-* every index row's status is a vocabulary term too;
+* every index row's status is a vocabulary term too, and does not contradict
+  the phases beneath it in either direction;
 * each index row's `N of M` recomputes from the linked plan's Execution
-  table;
+  table, and no Execution row is too short to be counted;
 * every master plan in `docs/plans/` is registered in both `index.md` and
-  `order.yml`;
+  `order.yml`, and neither names a plan that is not there;
 * every markdown link between plans resolves to a file that exists; and
 * every phase plan is linked from somewhere in `docs/plans/`.
+
+Example tables and example links do not count as either. Plans document the
+phase-table convention by showing one -- the `plan-file-conventions` shared
+block carries an indented example, PLAN-qemu-futures.md a fenced one -- so
+fenced blocks are skipped and a table row must start in column zero. Before
+that, both examples parsed as real tables, and because the largest
+Phase-and-Status table wins, a small plan created from the template could
+have had its arithmetic computed from the template's placeholder rows.
 
 That last one is the invariant the template's own wording now rests on.
 Phase plans are deliberately absent from `order.yml`, and the index lists
@@ -43,10 +52,20 @@ in the canonical block (which lives in shakenfist/development, at
 `templates/shared-blocks/plan-status-vocabulary.md`) cannot leave this
 checker rejecting a status the template tells authors to write.
 
-Four plans predate the Execution-table convention and are counted by hand.
-They are named in `HAND_COUNTED` rather than detected, so that a plan cannot
-join them by quietly omitting its table: adding a name here is a deliberate
-edit, and the index preamble lists the same four for readers.
+Four plans predate the Execution-table convention and are counted by hand,
+and two more keep a table which is a placeholder rather than a phase list.
+They are named in `HAND_COUNTED` and `PROVISIONAL` rather than detected, so
+that a plan cannot join them by quietly omitting or stubbing its table:
+adding a name is a deliberate edit, and the index preamble names the same
+six for readers.
+
+`order.yml` is registration, not navigation. Nothing in this repository
+renders it -- `mkdocs.yml.tmpl` lists the Plans nav by hand -- but the format
+and its semantics belong to `tools/sync_component_docs.py` in
+shakenfist/actions, which every repository whose docs are synced into a site
+uses as a per-directory nav allowlist. Keeping the file complete is what
+makes generating that nav from it a later mechanical change rather than an
+archaeology exercise.
 """
 
 import os
@@ -97,9 +116,21 @@ UNFINISHED = {'proposed', 'not started', 'in progress', 'blocked'}
 STARTLESS = {'proposed', 'not started'}
 
 PHASE_FILE_RE = re.compile(r'-phase-\d')
+FENCE_RE = re.compile(r'^\s*(?:```|~~~)')
 SEPARATOR_RE = re.compile(r'^\|[\s:|-]+\|$')
 CELL_SPLIT_RE = re.compile(r'(?<!\\)\|')
 ABSOLUTE_RE = re.compile(r'^(?:[a-z][a-z0-9+.-]*:|//|/)')
+# order.yml is a flat list of single-key mappings. Anchoring to the start of
+# the line matters: a substring test is satisfied by a commented-out entry,
+# which is the most likely way to produce exactly the unregistered state the
+# check exists to catch. Commented entries are matched separately rather than
+# ignored, because in a directory order.yml commenting an entry out is the
+# sanctioned way to keep a page out of the navigation (see
+# tools/sync_component_docs.py in shakenfist/actions), so the two states
+# deserve different messages.
+ORDER_ENTRY_RE = re.compile(r'^[ \t]*-[ \t]*([^\s:#][^:\n]*):', re.MULTILINE)
+ORDER_COMMENTED_RE = re.compile(r'^[ \t]*#[ \t]*-[ \t]*([^\s:#][^:\n]*):',
+                                re.MULTILINE)
 LINK_RE = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
 INDEX_ROW_RE = re.compile(r'^\|\s*\d{4}-\d{2}-\d{2}\s*\|')
 
@@ -120,40 +151,72 @@ def cells(line):
     return [part.replace('\\|', '|').strip() for part in parts]
 
 
+def outside_code(lines):
+    """The lines of a document with fenced code blocks blanked out.
+
+    Plans document the phase-table convention by showing one, so a naive
+    parse finds example tables and example links in prose and treats them
+    as real. Blanking rather than dropping the lines keeps every later
+    offset -- and so every line number in an error message -- honest.
+    """
+    masked = []
+    fenced = False
+    for line in lines:
+        if FENCE_RE.match(line):
+            fenced = not fenced
+            masked.append('')
+            continue
+        masked.append('' if fenced else line)
+    return masked
+
+
 def status_tables(path, require_phase=False):
     """Every table in path with a Status column, as lists of status cells.
 
     A header is recognised by the separator row beneath it rather than by its
     content, so a data row which happens to look like a header cannot start a
     phantom table. Prose between two tables ends the first one.
+
+    A row must begin in column zero. That is what separates a plan's own
+    table from the example one in the `plan-file-conventions` shared block,
+    which sits two spaces deep inside a bullet; fenced examples are already
+    gone by the time this reads the lines. Both were being parsed, and
+    since execution_table() takes the longest table, a plan created from
+    the template could have had its arithmetic computed from the template's
+    own placeholder rows.
+
+    Returns tables as {'index', 'rows', 'short'}: 'short' collects rows with
+    too few cells to reach the status column, which are reported rather than
+    dropped -- a hidden row is the drift this checker exists to catch.
     """
     with open(path, encoding='utf-8') as f:
-        lines = f.read().splitlines()
+        lines = outside_code(f.read().splitlines())
 
     tables = []
     current = None
     for offset, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped.startswith('|'):
+        if not line.startswith('|'):
             current = None
             continue
-        if SEPARATOR_RE.match(stripped):
+        if SEPARATOR_RE.match(line):
             continue
 
-        following = lines[offset + 1].strip() if offset + 1 < len(lines) else ''
+        following = lines[offset + 1] if offset + 1 < len(lines) else ''
         if following.startswith('|') and SEPARATOR_RE.match(following):
-            names = [c.lower() for c in cells(stripped)]
+            names = [c.lower() for c in cells(line)]
             current = None
             if 'status' in names and (not require_phase or 'phase' in names):
-                current = {'index': names.index('status'), 'rows': []}
+                current = {'index': names.index('status'), 'rows': [], 'short': []}
                 tables.append(current)
             continue
 
         if current is None:
             continue
-        row = cells(stripped)
+        row = cells(line)
         if current['index'] < len(row):
             current['rows'].append((offset + 1, row[current['index']]))
+        else:
+            current['short'].append((offset + 1, len(row)))
     return tables
 
 
@@ -210,7 +273,9 @@ def plan_links(plans_dir):
 
     Returns (targets, inbound): targets is a list of (source, lineno, target)
     for links naming a `.md` file, and inbound is the set of plan filenames
-    something links to.
+    something links to. Fenced code blocks are skipped: a link displayed as
+    an example is not a way to reach anything, for the same reason an
+    example table is not a phase table.
     """
     targets = []
     inbound = set()
@@ -219,21 +284,22 @@ def plan_links(plans_dir):
             continue
         path = os.path.join(plans_dir, name)
         with open(path, encoding='utf-8') as f:
-            for lineno, line in enumerate(f, start=1):
-                for raw in LINK_RE.findall(line):
-                    target = raw.split('#')[0].strip()
-                    if not target.endswith('.md'):
-                        continue
-                    if ABSOLUTE_RE.match(target):
-                        # An absolute URL is the docs-external-links audit's
-                        # business, and its target is not on this filesystem.
-                        continue
-                    base = os.path.basename(target)
-                    if base == name:
-                        # A plan naming itself is not a way in.
-                        continue
-                    inbound.add(base)
-                    targets.append((path, lineno, target))
+            lines = outside_code(f.read().splitlines())
+        for lineno, line in enumerate(lines, start=1):
+            for raw in LINK_RE.findall(line):
+                target = raw.split('#')[0].strip()
+                if not target.endswith('.md'):
+                    continue
+                if ABSOLUTE_RE.match(target):
+                    # An absolute URL is the docs-external-links audit's
+                    # business, and its target is not on this filesystem.
+                    continue
+                base = os.path.basename(target)
+                if base == name:
+                    # A plan naming itself is not a way in.
+                    continue
+                inbound.add(base)
+                targets.append((path, lineno, target))
     return targets, inbound
 
 
@@ -277,10 +343,15 @@ def problems():
                 if value != ELLIPSIS and value.lower() not in known:
                     found.append('%s:%d: phase status %r is not one of %s'
                                  % (path, lineno, value, listed))
+            for lineno, width in table['short']:
+                found.append(
+                    '%s:%d: Execution table row has %d cell(s), too few to '
+                    'reach the status column, so it is invisible to the '
+                    'phase count.' % (path, lineno, width))
 
         if name not in rows:
-            found.append(
-                         '%s: master plan is not registered in %s' % (path, index))
+            found.append('%s: master plan is not registered in %s'
+                         % (path, index))
             continue
 
         lineno, status, phases = rows[name]
@@ -316,11 +387,24 @@ def problems():
                 % (index, lineno, name, status, path))
 
     with open(order, encoding='utf-8') as f:
-        ordered = f.read()
+        raw = f.read()
+    ordered = set(ORDER_ENTRY_RE.findall(raw))
+    commented = set(ORDER_COMMENTED_RE.findall(raw))
     for name in plans:
-        if ('- %s:' % name) not in ordered:
+        if name in ordered:
+            continue
+        if name in commented:
+            found.append(
+                '%s: master plan is commented out of %s, which hides it from '
+                'the navigation while the index still publishes a row for it.'
+                % (os.path.join(plans_dir, name), order))
+        else:
             found.append('%s: master plan is not registered in %s'
                          % (os.path.join(plans_dir, name), order))
+    for entry in sorted(ordered):
+        if not os.path.isfile(os.path.join(plans_dir, entry)):
+            found.append('%s: lists %r, which is not a file in %s'
+                         % (order, entry, plans_dir))
 
     for stale in sorted(set(rows) - set(plans)):
         found.append('%s: %s is listed but is not a master plan in %s'
