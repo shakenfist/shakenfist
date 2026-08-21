@@ -97,8 +97,8 @@ spelling above is the one to write.
     The same term is written twice: once in the phase table
     below, and once in the row this plan carries in
     `docs/plans/index.md`. Keep them in step -- the index row is
-    the whole-plan status, so it only reaches `Complete` when
-    every phase has.
+    the whole-plan status, so it only reaches `Complete` once
+    every phase has been completed, abandoned or superseded.
 
 ...
 

@@ -706,7 +706,7 @@ during phase 0 and be recorded here.)
 
 ### Documentation index maintenance
 
-On creation of this plan: add a Plan Status row to
+On creation of this plan: add a *Master plans* row to
 `docs/plans/index.md` and an entry to `docs/plans/order.yml`
 in the shakenfist repo, and a cross-reference entry to
 kerbside's `docs/plans/index.md`. As phases complete, update

@@ -702,9 +702,10 @@ development that we fixed.
 When creating this master plan from the template, the
 following files in `docs/plans/` should be updated:
 
-* **`index.md`** — add a row to the *Plan Status* table
-  for this master plan and each of its phase plans, keyed
-  to one-line descriptions and current status.
+* **`index.md`** — add one row to the *Master plans* table
+  for this master plan, keyed to a one-line intent and its
+  current status. Phases are tracked in the Execution
+  table above, not in the index.
 * **`order.yml`** — add an entry for this master plan so
   it appears in the documentation navigation. Phase files
   are *not* added to `order.yml`; they are linked from

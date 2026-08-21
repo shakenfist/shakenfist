@@ -980,7 +980,7 @@ phases land.)_
 When creating a new master plan from this template, update
 the following files in `docs/plans/`:
 
-* **`index.md`** — add rows to the *Plan Status* table and
+* **`index.md`** — add one row to the *Master plans* table and
   update the *Plan sequencing* section to reflect that
   the health-checks master plan now exists.
 * **`order.yml`** — add an entry for the new master plan.

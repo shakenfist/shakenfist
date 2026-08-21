@@ -425,6 +425,6 @@ node-error mark vs slow surviving-node cascade).
 
 ## Documentation index maintenance
 
-This master plan is registered in `docs/plans/index.md` (Plan Status
-table + sequencing note) and `docs/plans/order.yml`. Keep both in
-sync as phases land.
+This master plan is registered in `docs/plans/index.md` (*Master
+plans* table + sequencing note) and `docs/plans/order.yml`. Keep
+both in sync as phases land.

@@ -2,7 +2,9 @@
 
 ## Status
 
-Steps 1-6 implemented on the `network-facade` branch. Step 7
+In progress.
+
+Steps 1-6 are implemented, on the `network-facade` branch. Step 7
 (measure, decide on fairness) is left until the per-op
 `'started executing'` event from step 1 produces real CI data.
 

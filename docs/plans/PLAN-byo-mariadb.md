@@ -889,10 +889,11 @@ during development that we fixed.
 When creating this master plan from the template,
 update the following files in `docs/plans/`:
 
-* **`index.md`** — add rows to the *Plan Status*
-  table for this master plan and each of its
-  phase plans, keyed to one-line descriptions
-  and current status. Also update the *Plan
+* **`index.md`** — add one row to the *Master
+  plans* table for this master plan, keyed to a
+  one-line intent and its current status. Phases
+  are tracked in this plan's own Execution table,
+  not in the index. Also update the *Plan
   sequencing* prose to reflect that this plan
   now carries the MariaDB scope and that remove-
   primary's scope has shrunk accordingly.

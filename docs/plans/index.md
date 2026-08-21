@@ -52,11 +52,18 @@ reason belongs in the plan itself rather than in this table. The canonical wordi
 
 ## Master plans
 
-Every master plan tracks its own phases -- a phase plan and a status for each -- in its own
-Execution table. The `Phases` column here is only the arithmetic; follow the plan link for
-what each phase covers, and for why a plan is where it is. It counts *completed* phases, so
-a plan whose phases were abandoned or superseded rather than done can read `Complete`
-without the two numbers meeting, and `—` means the plan has no enumerated phases yet.
+Most master plans track their own phases -- a phase plan and a status for each -- in their
+own Execution table, and the `Phases` column here is arithmetic over that table; follow the
+plan link for what each phase covers, and for why a plan is where it is. It counts
+*completed* phases, so a plan whose phases were abandoned or superseded rather than done can
+read `Complete` without the two numbers meeting, and `—` means the plan has no enumerated
+phases yet.
+
+Four plans are counted by hand because they do not keep a phase table:
+[blob storage](blob-storage-roadmap.md), [API query
+batching](api-query-batching-roadmap.md) and [attribute field
+masks](PLAN-attribute-field-masks.md) carry their phases as headings, and [queue
+performance](PLAN-queue-performance.md) is numbered in steps rather than phases.
 
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|

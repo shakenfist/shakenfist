@@ -442,9 +442,9 @@ development that we fixed.
 
 This plan has been registered in `docs/plans/`:
 
-* **`index.md`** — a row added to the *Plan Status* table
-  linking this plan, its phases, status, and one-line
-  description.
+* **`index.md`** — a row added to the *Master plans* table
+  linking this plan, its status, phase arithmetic and
+  one-line intent.
 * **`order.yml`** — an entry added next to
   `PLAN-remove-primary.md` so it appears in the documentation
   navigation. Phase files are *not* added to `order.yml`;

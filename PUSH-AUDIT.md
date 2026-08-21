@@ -352,6 +352,11 @@ copy lives in shakenfist/development at
   reference is genuinely not about an implementation plan.
 <!-- shared-block-end -->
 
+- That audit runs out-of-band, from the daily consistency audit in
+  `shakenfist/development`, not from anything in this repository's
+  `tools/` or pre-commit configuration. Its current findings against
+  this tree are tracked as issue #3732.
+
 - Plan files in `docs/plans/` are up to date — completed
   phases marked complete, deferred items listed, and the
   *Master plans* table in `docs/plans/index.md` reflects

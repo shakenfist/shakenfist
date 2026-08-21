@@ -599,7 +599,7 @@ development that we fixed.
 When creating a new master plan from this template, update
 the following files in `docs/plans/`:
 
-* **`index.md`** — add rows to the *Plan Status* table.
+* **`index.md`** — add one row to the *Master plans* table.
 * **`order.yml`** — add an entry for the new master plan.
 
 ### Back brief

@@ -589,7 +589,7 @@ decisions:
 
 When this master plan was created:
 
-* A row was added to the *Plan Status* table in
+* A row was added to the *Master plans* table in
   `docs/plans/index.md`.
 * An entry was added to `docs/plans/order.yml`.
 

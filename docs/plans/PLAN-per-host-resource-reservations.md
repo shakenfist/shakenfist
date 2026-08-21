@@ -269,9 +269,9 @@ reservations, scheduling headroom, or `MINIMUM_FREE_DISK`.)_
 
 ### Documentation index maintenance
 
-On creation of this master plan, `docs/plans/index.md` gains a Plan Status row
-group and `docs/plans/order.yml` gains a master-plan entry (phase files are not
-listed in `order.yml`). Update the status column as phases complete.
+On creation of this master plan, `docs/plans/index.md` gains one *Master plans*
+row and `docs/plans/order.yml` gains a master-plan entry (phase files are listed
+in neither). Update the status column as phases complete.
 
 ### Back brief
 

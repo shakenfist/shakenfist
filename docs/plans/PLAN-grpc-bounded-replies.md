@@ -683,8 +683,8 @@ two contract changes as well as the bound itself.
 When creating this master plan from the template, the following files
 in `docs/plans/` should be updated:
 
-* **`index.md`** — add a row to the *Plan Status* table for this master
-  plan and each of its phase plans.
+* **`index.md`** — add one row to the *Master plans* table for this
+  master plan. Phases are tracked in the Execution table above.
 * **`order.yml`** — add an entry for this master plan so it appears in
   the documentation navigation. Phase files are *not* added to
   `order.yml`.

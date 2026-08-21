@@ -618,9 +618,9 @@ adjacent reports are #3432 (lock lifetime noise) and #3278
 When creating this master plan, update the following files in
 `docs/plans/`:
 
-* **`index.md`** — add a row to the *Plan Status* table with
-  a link to this plan, its phase breakdown, initial status,
-  and a one-line description.
+* **`index.md`** — add one row to the *Master plans* table
+  with a link to this plan, its initial status, its phase
+  arithmetic, and a one-line intent.
 * **`order.yml`** — add an entry for this master plan so it
   appears in the documentation navigation. Phase files are
   linked from the Execution table and `index.md` only.

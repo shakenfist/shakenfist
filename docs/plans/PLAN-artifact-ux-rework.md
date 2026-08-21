@@ -308,7 +308,7 @@ _To be filled in as we go._
 
 ### Documentation index maintenance
 
-This plan has been added to `docs/plans/index.md` (Plan Status table) and
+This plan has been added to `docs/plans/index.md` (*Master plans* table) and
 `docs/plans/order.yml`. Phase files, once created, are linked from the
 Execution table above and from `index.md`, but are **not** added to
 `order.yml`.

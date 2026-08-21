@@ -823,7 +823,7 @@ Loki and CI already checks them there. Phase 6 documents.
 | 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | [PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md](PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md) | Complete |
 | 6. Documentation: operator guide, field contract, ARCHITECTURE/README/AGENTS, index/order | [PLAN-remove-syslog-forwarding-phase-06-docs.md](PLAN-remove-syslog-forwarding-phase-06-docs.md) | Complete |
 
-Landing record:
+### Landing record
 
 - **Phase 0**'s decisions are the Decisions section above.
 - **Phase 1** shipped as `shakenfist-utilities==0.8.5`, released to
@@ -833,7 +833,7 @@ Landing record:
 - **Phase 5** additionally required the `loki-node-checks` branch on
   `shakenfist/actions` to merge before it could go green.
 
-Phase notes:
+### Phase notes
 
 - **Phase 0** is a decisions phase in the style of
   `PLAN-health-checks-phase-00-decisions.md`. It resolves every
@@ -1202,9 +1202,10 @@ them as part of the relevant phase or note them here.
 
 When this master plan is created from the template:
 
-* **`docs/plans/index.md`** — add rows to the *Plan Status*
-  table for this plan and its phases, with links, status, and
-  one-line descriptions, grouped under this master plan. Add a
+* **`docs/plans/index.md`** — add one row to the *Master
+  plans* table for this plan, with a link, its status and a
+  one-line intent. Phases are tracked in the Execution table
+  above, not in the index. Add a
   line to the *Plan sequencing* section noting that this plan
   delivers the Loki-shipper story remove-primary phase 1 depends
   on, and that it can land in parallel with the other BYO work.

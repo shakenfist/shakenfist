@@ -40,7 +40,7 @@ Key code locations:
 
 **Goal**: Move hash storage from etcd to MariaDB with proper indexes, enabling O(1) hash lookups.
 
-**Status**: COMPLETE
+**Status**: Complete
 
 **Prerequisites**: PLAN-reference-counts.md (COMPLETE)
 
@@ -98,7 +98,7 @@ The migration command is idempotent and can be run multiple times safely.
 
 **Goal**: Enable storage deduplication by converting duplicate blobs to composites that reference shared content.
 
-**Status**: Future
+**Status**: Not started
 
 **Prerequisites**: Phase 1 (blob_hashes table with `idx_hash_lookup`)
 
@@ -165,7 +165,9 @@ This provides:
 
 **Goal**: Break large blobs into variable-sized chunks based on content boundaries, enabling cross-blob deduplication.
 
-**Status**: Future (prototype in `src/private/flywheel`)
+**Status**: Not started
+
+A prototype exists in `src/private/flywheel`.
 
 **Prerequisites**: Phase 2 (composite blobs)
 

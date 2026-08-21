@@ -1152,7 +1152,7 @@ heading.
 
 When this plan moves past placeholder status, update:
 
-- `docs/plans/index.md` — add a Plan Status row.
+- `docs/plans/index.md` — add a *Master plans* row.
 - `docs/plans/order.yml` — entry already added under the
   current filename `PLAN-qemu-futures.md` (renamed from
   `PLAN-qmp-orchestration.md` once the scope grew beyond
