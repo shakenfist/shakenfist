@@ -124,6 +124,16 @@ Optional flags:
 - `--web-tls-cert /path/cert.pem` + `--web-tls-key /path/key.pem` —
   serve over HTTPS with native TLS (both required together; see
   [web-frontend.md](/components/ryll/web-frontend/) for cert recipes)
+- `--web-media-addr eth0` — address or interface name for the WebRTC
+  media sockets (repeatable; defaults to every non-loopback interface
+  address)
+- `--web-media-port 41000` — pin the media UDP port so one firewall
+  rule covers it (defaults to ephemeral)
+- `--web-ice-server stun:stun.example.com:3478` — STUN/TURN server
+  (repeatable; unnecessary when browser and host share a LAN)
+
+See [configuration.md](/components/ryll/configuration/#web-mode) for the full flag
+reference, including what each of these refuses and why.
 
 Closing the browser tab reaps the bridge and encoder within ~1 second
 (the SPICE session stays live); reopening the same URL establishes

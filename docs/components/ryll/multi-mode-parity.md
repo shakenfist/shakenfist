@@ -60,7 +60,8 @@ is no standing gap-closure plan — gaps get closed by mode-specific
 work (the [web frontend plan](/components/ryll/plans/PLAN-web-frontend/) closed the
 Web column's MVP set; the control socket work gave headless an
 interactive driving surface). Last full audit: the web frontend
-sweep; control-socket cells refreshed 2026-07-30.
+sweep; control-socket cells refreshed 2026-07-30, media socket
+binding added 2026-08-21.
 
 ## Parity matrix
 
@@ -177,6 +178,7 @@ sweep; control-socket cells refreshed 2026-07-30.
 | **Authentication / Session Token** | | | |
 | Per-launch URL token (web mode only) | n/a — intrinsic (no HTTP server) | n/a — intrinsic (no HTTP server) | available (MVP; random 32-byte token printed to stdout) |
 | TLS for browser-facing endpoint | n/a — intrinsic | n/a — intrinsic | available (`--web-tls-cert` / `--web-tls-key` flags; axum-server with rustls) |
+| WebRTC media socket binding | n/a — intrinsic (no WebRTC) | n/a — intrinsic (no WebRTC) | available (`--web-media-addr` takes an address or an interface name, `--web-media-port` pins the UDP port for a firewall rule, `--web-ice-server` supplies STUN/TURN URLs) |
 | **Web frontend (--web mode)** | | | |
 | HTTP server with per-launch URL token | n/a — intrinsic | n/a — intrinsic | available (`ryll/src/web/server.rs`) |
 | Embedded browser shell (HTML/JS/CSS via include_bytes!) | n/a — intrinsic | n/a — intrinsic | available |

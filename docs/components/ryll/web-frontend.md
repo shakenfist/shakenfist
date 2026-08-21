@@ -10,9 +10,23 @@ WebRTC. Single-viewer for MVP; multi-viewer is future work.
 
 Optional flags:
 
-- `--web-host 127.0.0.1` — bind address. Defaults to
-  loopback; use `0.0.0.0` for LAN access.
+- `--web-host 127.0.0.1` — bind address for the HTTP
+  listener. Defaults to loopback; use `0.0.0.0` for LAN
+  access. This does *not* affect WebRTC media — see
+  `--web-media-addr` below.
 - `--web-port 0` — TCP port. Defaults to ephemeral.
+- `--web-media-addr` — address or interface name to bind the
+  WebRTC media (UDP) sockets to. Repeatable. Defaults to every
+  interface address that is not loopback, unspecified or IPv6
+  link-local.
+- `--web-media-port 0` — UDP port for those sockets. Defaults
+  to an ephemeral port per address; pin it to write a single
+  static firewall rule.
+- `--web-ice-server` — STUN or TURN URL. Repeatable, empty by
+  default.
+
+Every flag is tabulated in
+[configuration.md](/components/ryll/configuration/#web-mode).
 
 The binary prints a URL with a per-launch token:
 
@@ -234,23 +248,37 @@ pattern.
     Consequences:
 
     - **ryll's UDP ports must be reachable from the browser.**
-      At startup ryll enumerates the host's non-loopback
-      network interface addresses and binds one ephemeral UDP
-      socket per address; the OS assigns the actual port per
-      socket (typically from 32768–60999 on Linux). Open the
-      relevant firewall ports on ryll's host. Pinning a specific
-      port is not configurable yet, so a static firewall rule
-      currently has to open the OS's whole ephemeral range
-      rather than a single port.
-    - **ryll advertises a candidate for every non-loopback
-      interface address on the host, independent of
-      `--web-host`.** `--web-host` controls only the HTTP/HTTPS
-      signalling listener (`GET /`, `POST /offer`); it has no
-      effect on which addresses WebRTC binds or advertises. If
-      the host has more than one non-loopback interface (for
-      example a public IP and a private LAN IP), ryll binds and
-      advertises candidates for all of them — there is currently
-      no way to select or restrict which addresses are used.
+      By default ryll enumerates the host's non-loopback network
+      interface addresses and binds one ephemeral UDP socket per
+      address; the OS assigns the actual port per socket
+      (typically from 32768–60999 on Linux), so a firewall rule
+      written against the default has to open that whole range.
+      `--web-media-port 41000` pins the port instead, and one
+      static rule covers it. The pinned port applies to every
+      bound address, and a port already in use fails the
+      connection loudly rather than falling back to an ephemeral
+      one — a silent fallback would leave a session the firewall
+      rule no longer matches.
+    - **`--web-host` does not select the media addresses;
+      `--web-media-addr` does.** `--web-host` controls only the
+      HTTP/HTTPS signalling listener (`GET /`, `POST /offer`).
+      With no `--web-media-addr`, ryll binds and advertises a
+      candidate for *every* non-loopback interface address, so a
+      host with both a public IP and a private LAN IP tells the
+      browser about both. Pass `--web-media-addr` — repeatably,
+      with an address or an interface name — to narrow that:
+
+          ryll --web session.vv \
+              --web-media-addr eth0 \
+              --web-media-port 41000
+
+      Naming addresses explicitly also overrides the default
+      exclusions, which is how a loopback-only host is served
+      (`--web-media-addr 127.0.0.1`). The two exclusions that
+      *cannot* be overridden are the unspecified addresses
+      (`0.0.0.0`, `::`) and zoneless `fe80::/10`: neither can
+      become an ICE candidate a browser will use, so ryll
+      refuses them at startup rather than at the first viewer.
 
 ## Troubleshooting
 
@@ -384,21 +412,30 @@ If it is absent, file a bug with ryll version and log.
 
 ### Every `/offer` returns 500 on a host with no network
 
-`--web` needs at least one non-loopback interface address, even
-when you are browsing from the same machine. WebRTC binds its own
-UDP sockets and advertises their addresses as ICE candidates;
-loopback is excluded because a candidate a remote browser cannot
-reach is worse than a clear failure. On a host with networking
-down, or a network-isolated container, `WebrtcBridge::new` has
-nothing to bind and fails the request rather than handing the
-browser an answer it can never connect to.
+By default `--web` needs at least one non-loopback interface
+address, even when you are browsing from the same machine.
+WebRTC binds its own UDP sockets and advertises their addresses
+as ICE candidates; loopback is excluded by default because a
+candidate a remote browser cannot reach is worse than a clear
+failure. On a host with networking down, or a network-isolated
+container, `WebrtcBridge::new` has nothing to bind and fails the
+request rather than handing the browser an answer it can never
+connect to.
 
-The error mentions ICE candidates and interface enumeration,
-which does not obviously translate to "bring up a network
-interface" — that is what it means. Connecting any interface,
-including a bridge or a VPN tunnel, is enough. There is no
-opt-in for loopback-only operation today; whether to add one
-remains an open question.
+Two fixes, depending on what you are doing:
+
+- Browsing from the same host: `--web-media-addr 127.0.0.1`.
+  Naming loopback explicitly overrides the default exclusion.
+  Candidates then work only for a browser on that host, which is
+  exactly the case this covers.
+- Otherwise: connect any interface, including a bridge or a VPN
+  tunnel.
+
+The error distinguishes the two ways this happens. "No bindable
+network interface" means the host offered nothing usable; "no
+media bind address matched" means `--web-media-addr` named
+something this host does not have — check the interface name
+against `ip addr`.
 
 ### Cert load errors at startup
 
