@@ -354,8 +354,9 @@ copy lives in shakenfist/development at
 
 - Plan files in `docs/plans/` are up to date — completed
   phases marked complete, deferred items listed, and the
-  *Plan Status* table in `docs/plans/index.md` reflects
-  reality.
+  *Master plans* table in `docs/plans/index.md` reflects
+  reality (one row per master plan: status and phase
+  arithmetic, not a row per phase).
 - If database schema changed, verify there is migration
   guidance (either in-tree migration code or a documented
   upgrade path).
