@@ -21,7 +21,9 @@ These things are checked:
 * each index row's `N of M` recomputes from the linked plan's Execution
   table, and no Execution row is too short to be counted;
 * every master plan in `docs/plans/` is registered in both `index.md` and
-  `order.yml`, and neither names a plan that is not there;
+  `order.yml`, and neither names a plan that is not there, nor names one
+  twice -- a second index row for a plan is never read, so it is free to
+  say anything at all;
 * every markdown link between plans resolves to a file that exists; and
 * every phase plan is linked from somewhere in `docs/plans/`.
 
@@ -40,6 +42,13 @@ sole path to a phase document. A phase filename written as bare text
 rather than a link is therefore a page nothing in the repository leads to.
 Thirty-eight of the ninety-two phase plans were in that state before this
 check existed.
+
+It checks that a link exists, not that the linking document is itself
+reachable from the index, so a phase plan linked only from an orphaned
+phase plan passes. The message says only what is checked. Walking the link
+graph transitively from the index would close that and would also catch an
+orphaned master plan, and is the obvious next move if the weaker rule ever
+misses something real.
 
 The published site is a weaker claim than it looks: `mkdocs.yml.tmpl`
 lists the Plans nav by hand and names three plans, so most master plans do
@@ -242,20 +251,28 @@ def masters(plans_dir):
 
 
 def index_rows(path):
-    """The index's plan rows, as {plan filename: (lineno, status, phases)}."""
+    """The index's plan rows, as {plan filename: [(lineno, status, phases)]}.
+
+    A list rather than one row per plan, because a dict keyed on the
+    filename silently discards a duplicate: a second row for a plan would
+    overwrite the first, and the stale one -- the whole point of this
+    checker -- would never be looked at. Fenced blocks are skipped here for
+    the same reason they are everywhere else in this file.
+    """
     rows = {}
     with open(path, encoding='utf-8') as f:
-        for lineno, line in enumerate(f, start=1):
-            if not INDEX_ROW_RE.match(line):
-                continue
-            row = cells(line)
-            if len(row) < 5:
-                continue
-            link = LINK_RE.search(row[1])
-            if not link:
-                continue
-            rows[os.path.basename(link.group(1).split('#')[0])] = (
-                lineno, row[3], row[4])
+        lines = outside_code(f.read().splitlines())
+    for lineno, line in enumerate(lines, start=1):
+        if not INDEX_ROW_RE.match(line):
+            continue
+        row = cells(line)
+        if len(row) < 5:
+            continue
+        link = LINK_RE.search(row[1])
+        if not link:
+            continue
+        name = os.path.basename(link.group(1).split('#')[0])
+        rows.setdefault(name, []).append((lineno, row[3], row[4]))
     return rows
 
 
@@ -354,7 +371,7 @@ def problems():
                          % (path, index))
             continue
 
-        lineno, status, phases = rows[name]
+        lineno, status, phases = rows[name][0]
         if status.lower() not in known:
             found.append('%s:%d: index status %r is not one of %s'
                          % (index, lineno, status, listed))
@@ -406,6 +423,14 @@ def problems():
             found.append('%s: lists %r, which is not a file in %s'
                          % (order, entry, plans_dir))
 
+    for name, entries in sorted(rows.items()):
+        if len(entries) > 1:
+            found.append(
+                '%s: %s has %d rows, at lines %s. Only one of them is read, '
+                'so the others can say anything at all.'
+                % (index, name, len(entries),
+                   ', '.join(str(entry[0]) for entry in entries)))
+
     for stale in sorted(set(rows) - set(plans)):
         found.append('%s: %s is listed but is not a master plan in %s'
                      % (index, stale, plans_dir))
@@ -423,9 +448,8 @@ def problems():
             continue
         if name not in inbound:
             found.append(
-                '%s: phase plan has no inbound link, so nothing in the '
-                'published documentation leads to it. Link it from its '
-                "master plan's Execution table."
+                '%s: phase plan has no inbound link from any plan document. '
+                "Link it from its master plan's Execution table."
                 % os.path.join(plans_dir, name))
 
     return found

@@ -173,9 +173,21 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
                 f.write(INDEX)
             rows = checker.index_rows(path)
             self.assertEqual({'FIXTURE-plan.md'}, set(rows))
-            _, status, phases = rows['FIXTURE-plan.md']
+            self.assertEqual(1, len(rows['FIXTURE-plan.md']))
+            _, status, phases = rows['FIXTURE-plan.md'][0]
             self.assertEqual('In progress', status)
             self.assertEqual('1 of 2', phases)
+
+    def test_index_rows_keeps_every_row_for_a_plan(self):
+        # A dict keyed on the filename would drop the stale row, which is
+        # the one worth complaining about.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'index.md')
+            with open(path, 'w') as f:
+                f.write(INDEX + (
+                    '| 2026-01-02 | [A plan](FIXTURE-plan.md) | Again | '
+                    'Complete | 99 of 99 |\n'))
+            self.assertEqual(2, len(checker.index_rows(path)['FIXTURE-plan.md']))
 
 
 class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
@@ -346,6 +358,31 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         self._write('order.yml', '- index.md: Plans index\n'
                                  '#- FIXTURE-plan.md: A plan\n')
         self.assertProblem('is commented out of')
+
+    def test_a_duplicated_index_row_fails(self):
+        # Only one row is ever read, so a second one can say anything at
+        # all -- including the stale arithmetic this checker exists to
+        # catch. Plausible in a 38-row table ordered by date, where a
+        # corrected date invites an insert rather than a move.
+        self._write('index.md', (
+            '# Plans\n\n'
+            '| Date | Plan | Intent | Status | Phases |\n'
+            '|------|------|--------|--------|--------|\n'
+            '| 2026-01-01 | [A plan](FIXTURE-plan.md) | Does a thing | '
+            'In progress | 1 of 2 |\n'
+            '| 2026-01-02 | [A plan](FIXTURE-plan.md) | Does a thing | '
+            'In progress | 1 of 2 |\n'))
+        self.assertProblem('has 2 rows, at lines')
+
+    def test_an_index_row_inside_a_fence_is_not_a_row(self):
+        # index.md has no fenced blocks today, but the preamble is prose
+        # which could grow an example, and the checker claims everywhere
+        # else that examples do not count.
+        self._write('index.md', INDEX + (
+            '\n```\n'
+            '| 2026-01-01 | [Ghost](FIXTURE-ghost.md) | x | Complete | 1 of 1 |\n'
+            '```\n'))
+        self.assertEqual([], checker.problems())
 
     def test_a_dangling_order_entry_fails(self):
         self._write('order.yml', '- index.md: Plans index\n'

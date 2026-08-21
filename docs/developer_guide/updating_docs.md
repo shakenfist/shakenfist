@@ -63,14 +63,17 @@ the link checker deliberately does not read. It recomputes what
   to agree: a plan cannot be `Complete` with an unfinished phase, or
   `Proposed`/`Not started` with every phase resolved.
 * **Registration** — every master plan appears in both `index.md` and
-  `order.yml`, and neither names a plan which is not there.
+  `order.yml`, and neither names a plan which is not there or lists one
+  twice.
 * **Reachability** — every plan-to-plan link resolves, and every phase plan
   has an inbound link. This one matters because phase plans are deliberately
   absent from `order.yml` and the index lists master plans only, which leaves
   the master plan's Execution table as the only route to a phase document. A
   phase filename written as bare text rather than a link is a page nothing
   leads to; thirty-eight of ninety-two were in that state before the check
-  existed.
+  existed. It checks that a link exists, not that the linking document is
+  itself reachable, so a phase plan linked only from an orphaned phase plan
+  passes.
 
 Example tables and links in prose do not count: fenced code blocks are
 skipped, and a table row must begin in column zero, which is what separates a
