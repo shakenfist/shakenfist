@@ -667,3 +667,66 @@ every unknown-parameter observation so far is a working caller using
 an undeclared feature, evidence that leans `RAISE`-with-declarations
 rather than `EXCLUDE`. Seven days of sfcbr traffic may still move
 this.
+
+**2026-08-21 — window closed, seven days read.** The window opened
+2026-08-13 and could not close before 2026-08-20; a daily cron
+watcher on kasm took a reading at 07:43 each morning over a 25 hour
+lookback (deliberate overlap, so a late run could not open a gap),
+aggregated to signatures, and alerted on any signature not already
+explained. Eight readings, 2026-08-14 to 2026-08-21. Real sfcbr
+traffic produced exactly one signature, on one evening:
+
+| n | signature | classification |
+|---|-----------|----------------|
+| 22 | type-mismatch on `value`, `PUT /auth/namespaces/<namespace>/metadata/<key>`, **200** | **Declaration bug, and a systemic one.** Namespace metadata values are stored as JSON, but all fourteen metadata `value` declarations across the API say `string`. |
+| 1 | unknown-parameter `banana`, `GET /instances`, 400 | The hand probe of 2026-08-13, caught by the first reading's lookback. Not real traffic. |
+
+All 22 arrived between 20:12 and 20:25 on 2026-08-17 from one
+namespace (`sfcbr-9mhMaxEKVRvg1inr`) writing four keys —
+`orchestrated_k3s_cluster_ci` (19), `orchestrated_k3s_clusters`,
+`orchestrated_k3s_cluster_k3s_version_cache` and
+`orchestrated_k3s_cluster_longhorn_version_cache`. That is the k3s
+orchestration work storing structured state: 21 findings carry
+`validation-value-type=dict` and one `list`, against a declaration
+of `('value', 'body', 'string', ...)` in `AuthMetadataEndpoint.put`.
+Every one answered **200** — the handler passes the value straight to
+`add_metadata_key()`, which serialises whatever it is given, so the
+declaration is narrower than the behaviour it describes.
+
+This is the same shape as the `namespace` finding of issue #3739 but
+wider: `grep -rn "'value', 'body'" shakenfist/external_api/` returns
+fifteen sites across auth, instance, network, artifact, blob, node
+and interface. Fourteen of them are the metadata `value` parameter,
+every one declared `string`; the fifteenth is an unrelated `value` in
+`network.py` declared `ipv4`, which is correct as it stands and is not
+part of this. Only the namespace endpoint
+was exercised by traffic in the window, but phase 4 would turn every
+one of them into a 400 for any caller storing a structure. **The
+declarations must be widened before enforcement**, which needs a
+vocabulary token for "any JSON value" that phase 2 did not define —
+the metadata family is the only place the API stores caller-supplied
+values it never interprets.
+
+For D10 the seven days add no new evidence and take none away: the
+undeclared-key populations are unchanged from the CI run above,
+because real sfcbr traffic produced no unknown-parameter findings at
+all. The nine `namespace` findings of #3739 did not recur, which is
+consistent with them being reached only by the artifact lookup paths
+CI exercises. The recommendation therefore still rests on the CI
+run's numbers: answered-first nine, reaches-handler zero.
+
+**The apparatus fought back a third time, and this one was silent.**
+The watcher's ntfy alerts failed on its last three runs — the new
+signature on 2026-08-18, and both attempts at the window-closed
+reminder on 08-20 and 08-21 — logging only "could not decrypt ntfy
+password; notification not sent". cron runs with
+`PATH=/usr/bin:/bin`, and `sops` is installed in `/usr/local/bin`, so
+the decrypt could never have run from cron. The readings themselves
+were unaffected, and the window's result is intact, but nobody was
+told the window had closed and nobody was told about the one finding
+in it. Third instance of the pattern this log already records twice:
+**the measurement survived; the thing that was supposed to speak up
+did not.** A quiet notifier is indistinguishable from a quiet system
+unless it is exercised. The watcher and its cron entry are now
+retired.
+
