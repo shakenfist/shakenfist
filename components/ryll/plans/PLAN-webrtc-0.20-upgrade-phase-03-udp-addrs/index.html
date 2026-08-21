@@ -10,31 +10,27 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/ryll/features/">
+        <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/">
       
       
-        <link rel="prev" href="../diagnostics/">
-      
-      
-        <link rel="next" href="../installation/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Features - Shaken Fist</title>
+        <title>webrtc-rs 0.20 upgrade — phase 03: socket binding configuration - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,9 +70,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#features" class="md-skip">
+        <a href="#webrtc-rs-020-upgrade-phase-03-socket-binding-configuration" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +113,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Features
+              webrtc-rs 0.20 upgrade — phase 03: socket binding configuration
             
           </span>
         </div>
@@ -253,7 +249,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -283,7 +279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../../../.." class="md-nav__link">
         
   
   
@@ -310,7 +306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../manifesto/" class="md-nav__link">
+      <a href="../../../../manifesto/" class="md-nav__link">
         
   
   
@@ -334,20 +330,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -368,7 +362,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -386,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
+      <a href="../../../overview/" class="md-nav__link">
         
   
   
@@ -461,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/" class="md-nav__link">
+      <a href="../../../cloudgood/" class="md-nav__link">
         
   
   
@@ -489,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -517,7 +511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -545,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/accounting/" class="md-nav__link">
+      <a href="../../../cloudgood/accounting/" class="md-nav__link">
         
   
   
@@ -573,7 +567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -601,7 +595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -629,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/instance-video/" class="md-nav__link">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -657,7 +651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/virtual-networking/" class="md-nav__link">
+      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
         
   
   
@@ -685,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/networking-shakenfist/" class="md-nav__link">
+      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
         
   
   
@@ -713,7 +707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
         
   
   
@@ -741,7 +735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/neutron-legacy/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
         
   
   
@@ -769,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/galera/" class="md-nav__link">
+      <a href="../../../cloudgood/galera/" class="md-nav__link">
         
   
   
@@ -852,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/" class="md-nav__link">
+      <a href="../../../agent-python/" class="md-nav__link">
         
   
   
@@ -880,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/developer-guide/" class="md-nav__link">
+      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
         
   
   
@@ -908,7 +902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/protocol/" class="md-nav__link">
+      <a href="../../../agent-python/protocol/" class="md-nav__link">
         
   
   
@@ -991,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/" class="md-nav__link">
+      <a href="../../../clingwrap/" class="md-nav__link">
         
   
   
@@ -1019,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/command-types/" class="md-nav__link">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -1047,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/configuration/" class="md-nav__link">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -1075,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/examples/" class="md-nav__link">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -1103,7 +1097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/installation/" class="md-nav__link">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -1186,7 +1180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/index.md" class="md-nav__link">
+      <a href="../../../development/index.md" class="md-nav__link">
         
   
   
@@ -1214,7 +1208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/automated-pr-review/" class="md-nav__link">
+      <a href="../../../development/automated-pr-review/" class="md-nav__link">
         
   
   
@@ -1242,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/ci-review-automation/" class="md-nav__link">
+      <a href="../../../development/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1270,7 +1264,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/code-review-tracking/" class="md-nav__link">
+      <a href="../../../development/code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1298,7 +1292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/release-automation/" class="md-nav__link">
+      <a href="../../../development/release-automation/" class="md-nav__link">
         
   
   
@@ -1373,7 +1367,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1401,7 +1395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
   
@@ -1492,7 +1486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/" class="md-nav__link">
+      <a href="../../../instar/" class="md-nav__link">
         
   
   
@@ -1520,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/amend/" class="md-nav__link">
+      <a href="../../../instar/amend/" class="md-nav__link">
         
   
   
@@ -1548,7 +1542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/bitmap/" class="md-nav__link">
+      <a href="../../../instar/bitmap/" class="md-nav__link">
         
   
   
@@ -1576,7 +1570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commit/" class="md-nav__link">
+      <a href="../../../instar/commit/" class="md-nav__link">
         
   
   
@@ -1604,7 +1598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/create/" class="md-nav__link">
+      <a href="../../../instar/create/" class="md-nav__link">
         
   
   
@@ -1632,7 +1626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/dd/" class="md-nav__link">
+      <a href="../../../instar/dd/" class="md-nav__link">
         
   
   
@@ -1660,7 +1654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/map/" class="md-nav__link">
+      <a href="../../../instar/map/" class="md-nav__link">
         
   
   
@@ -1688,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/measure/" class="md-nav__link">
+      <a href="../../../instar/measure/" class="md-nav__link">
         
   
   
@@ -1716,7 +1710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/rebase/" class="md-nav__link">
+      <a href="../../../instar/rebase/" class="md-nav__link">
         
   
   
@@ -1744,7 +1738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/resize/" class="md-nav__link">
+      <a href="../../../instar/resize/" class="md-nav__link">
         
   
   
@@ -1772,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/snapshot/" class="md-nav__link">
+      <a href="../../../instar/snapshot/" class="md-nav__link">
         
   
   
@@ -1800,7 +1794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/openstack-announcement-email/" class="md-nav__link">
+      <a href="../../../instar/openstack-announcement-email/" class="md-nav__link">
         
   
   
@@ -1828,7 +1822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/chain-discovery/" class="md-nav__link">
+      <a href="../../../instar/chain-discovery/" class="md-nav__link">
         
   
   
@@ -1856,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/chain-config/" class="md-nav__link">
+      <a href="../../../instar/chain-config/" class="md-nav__link">
         
   
   
@@ -1884,7 +1878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/check/" class="md-nav__link">
+      <a href="../../../instar/check/" class="md-nav__link">
         
   
   
@@ -1912,7 +1906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/compare/" class="md-nav__link">
+      <a href="../../../instar/compare/" class="md-nav__link">
         
   
   
@@ -1940,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/configuration/" class="md-nav__link">
+      <a href="../../../instar/configuration/" class="md-nav__link">
         
   
   
@@ -1968,7 +1962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/convert/" class="md-nav__link">
+      <a href="../../../instar/convert/" class="md-nav__link">
         
   
   
@@ -1996,7 +1990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/development/" class="md-nav__link">
+      <a href="../../../instar/development/" class="md-nav__link">
         
   
   
@@ -2024,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/format-detection-safety/" class="md-nav__link">
+      <a href="../../../instar/format-detection-safety/" class="md-nav__link">
         
   
   
@@ -2052,7 +2046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/format-coverage/" class="md-nav__link">
+      <a href="../../../instar/format-coverage/" class="md-nav__link">
         
   
   
@@ -2080,7 +2074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/guest-architecture/" class="md-nav__link">
+      <a href="../../../instar/guest-architecture/" class="md-nav__link">
         
   
   
@@ -2108,7 +2102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/security/" class="md-nav__link">
+      <a href="../../../instar/security/" class="md-nav__link">
         
   
   
@@ -2136,7 +2130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/info/" class="md-nav__link">
+      <a href="../../../instar/info/" class="md-nav__link">
         
   
   
@@ -2164,7 +2158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/installation/" class="md-nav__link">
+      <a href="../../../instar/installation/" class="md-nav__link">
         
   
   
@@ -2192,7 +2186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/bench/" class="md-nav__link">
+      <a href="../../../instar/bench/" class="md-nav__link">
         
   
   
@@ -2220,7 +2214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/testing/" class="md-nav__link">
+      <a href="../../../instar/testing/" class="md-nav__link">
         
   
   
@@ -2248,7 +2242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/format-internals/" class="md-nav__link">
+      <a href="../../../instar/format-internals/" class="md-nav__link">
         
   
   
@@ -2276,7 +2270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/output-formats/" class="md-nav__link">
+      <a href="../../../instar/output-formats/" class="md-nav__link">
         
   
   
@@ -2304,7 +2298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/quirks/" class="md-nav__link">
+      <a href="../../../instar/quirks/" class="md-nav__link">
         
   
   
@@ -2332,7 +2326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/usage/" class="md-nav__link">
+      <a href="../../../instar/usage/" class="md-nav__link">
         
   
   
@@ -2360,7 +2354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/security-audits/" class="md-nav__link">
+      <a href="../../../instar/security-audits/" class="md-nav__link">
         
   
   
@@ -2388,7 +2382,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/technology-primer/" class="md-nav__link">
+      <a href="../../../instar/technology-primer/" class="md-nav__link">
         
   
   
@@ -2416,7 +2410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/rust-rationale/" class="md-nav__link">
+      <a href="../../../instar/rust-rationale/" class="md-nav__link">
         
   
   
@@ -2491,7 +2485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commentary/" class="md-nav__link">
+      <a href="../../../instar/commentary/" class="md-nav__link">
         
   
   
@@ -2519,7 +2513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commentary/architectural-decisions/" class="md-nav__link">
+      <a href="../../../instar/commentary/architectural-decisions/" class="md-nav__link">
         
   
   
@@ -2547,7 +2541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commentary/reading-order/" class="md-nav__link">
+      <a href="../../../instar/commentary/reading-order/" class="md-nav__link">
         
   
   
@@ -2630,7 +2624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/crates/guest-protocol/" class="md-nav__link">
+      <a href="../../../instar/crates/guest-protocol/" class="md-nav__link">
         
   
   
@@ -2713,7 +2707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/cirros-qcow2/" class="md-nav__link">
+      <a href="../../../instar/image_notes/cirros-qcow2/" class="md-nav__link">
         
   
   
@@ -2741,7 +2735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/" class="md-nav__link">
+      <a href="../../../instar/image_notes/" class="md-nav__link">
         
   
   
@@ -2769,7 +2763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/qcow2-v2/" class="md-nav__link">
+      <a href="../../../instar/image_notes/qcow2-v2/" class="md-nav__link">
         
   
   
@@ -2797,7 +2791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/virtualpc-vhd/" class="md-nav__link">
+      <a href="../../../instar/image_notes/virtualpc-vhd/" class="md-nav__link">
         
   
   
@@ -2880,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/" class="md-nav__link">
+      <a href="../../../instar/plans/" class="md-nav__link">
         
   
   
@@ -2908,7 +2902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
         
   
   
@@ -2936,7 +2930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-release-v0.2/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-release-v0.2/" class="md-nav__link">
         
   
   
@@ -2964,7 +2958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-release-v0.3/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-release-v0.3/" class="md-nav__link">
         
   
   
@@ -2992,7 +2986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-release/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-release/" class="md-nav__link">
         
   
   
@@ -3020,7 +3014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-audit/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-audit/" class="md-nav__link">
         
   
   
@@ -3048,7 +3042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
         
   
   
@@ -3076,7 +3070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
         
   
   
@@ -3104,7 +3098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-convert-followups/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-convert-followups/" class="md-nav__link">
         
   
   
@@ -3132,7 +3126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-measure/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-measure/" class="md-nav__link">
         
   
   
@@ -3160,7 +3154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-create/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-create/" class="md-nav__link">
         
   
   
@@ -3188,7 +3182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-resize/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-resize/" class="md-nav__link">
         
   
   
@@ -3216,7 +3210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-rebase-commit/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-rebase-commit/" class="md-nav__link">
         
   
   
@@ -3244,7 +3238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-map/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-map/" class="md-nav__link">
         
   
   
@@ -3272,7 +3266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-snapshot/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-snapshot/" class="md-nav__link">
         
   
   
@@ -3300,7 +3294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-check-repair/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-check-repair/" class="md-nav__link">
         
   
   
@@ -3328,7 +3322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
   
@@ -3356,7 +3350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bug-fixes/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-bug-fixes/" class="md-nav__link">
         
   
   
@@ -3384,7 +3378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-amend/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-amend/" class="md-nav__link">
         
   
   
@@ -3412,7 +3406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-dd/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-dd/" class="md-nav__link">
         
   
   
@@ -3440,7 +3434,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bitmap/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-bitmap/" class="md-nav__link">
         
   
   
@@ -3468,7 +3462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bench/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-bench/" class="md-nav__link">
         
   
   
@@ -3496,7 +3490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
         
   
   
@@ -3524,7 +3518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
         
   
   
@@ -3552,7 +3546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-format-coverage/" class="md-nav__link">
+      <a href="../../../instar/plans/PLAN-format-coverage/" class="md-nav__link">
         
   
   
@@ -3635,7 +3629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/building-with-docker/" class="md-nav__link">
+      <a href="../../../instar/prototypes/building-with-docker/" class="md-nav__link">
         
   
   
@@ -3663,7 +3657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-comparison/" class="md-nav__link">
+      <a href="../../../instar/prototypes/data-transfer-comparison/" class="md-nav__link">
         
   
   
@@ -3691,7 +3685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
+      <a href="../../../instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
         
   
   
@@ -3719,7 +3713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/kvm/" class="md-nav__link">
+      <a href="../../../instar/prototypes/kvm/" class="md-nav__link">
         
   
   
@@ -3747,7 +3741,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/kvm-hello-world2/" class="md-nav__link">
+      <a href="../../../instar/prototypes/kvm-hello-world2/" class="md-nav__link">
         
   
   
@@ -3775,7 +3769,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/kvm-hello-world/" class="md-nav__link">
+      <a href="../../../instar/prototypes/kvm-hello-world/" class="md-nav__link">
         
   
   
@@ -3803,7 +3797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/performance-counters/" class="md-nav__link">
+      <a href="../../../instar/prototypes/performance-counters/" class="md-nav__link">
         
   
   
@@ -3831,7 +3825,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-other/" class="md-nav__link">
+      <a href="../../../instar/prototypes/data-transfer-other/" class="md-nav__link">
         
   
   
@@ -3859,7 +3853,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
+      <a href="../../../instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
         
   
   
@@ -3887,7 +3881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block/" class="md-nav__link">
+      <a href="../../../instar/prototypes/virtio-block/" class="md-nav__link">
         
   
   
@@ -3915,7 +3909,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block2/" class="md-nav__link">
+      <a href="../../../instar/prototypes/virtio-block2/" class="md-nav__link">
         
   
   
@@ -3943,7 +3937,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block3/" class="md-nav__link">
+      <a href="../../../instar/prototypes/virtio-block3/" class="md-nav__link">
         
   
   
@@ -3971,7 +3965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block4/" class="md-nav__link">
+      <a href="../../../instar/prototypes/virtio-block4/" class="md-nav__link">
         
   
   
@@ -3999,7 +3993,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block5/" class="md-nav__link">
+      <a href="../../../instar/prototypes/virtio-block5/" class="md-nav__link">
         
   
   
@@ -4027,7 +4021,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
+      <a href="../../../instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
         
   
   
@@ -4110,7 +4104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-compression/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-compression/" class="md-nav__link">
         
   
   
@@ -4138,7 +4132,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-encryption/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-encryption/" class="md-nav__link">
         
   
   
@@ -4166,7 +4160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-format/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-format/" class="md-nav__link">
         
   
   
@@ -4194,7 +4188,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
         
   
   
@@ -4222,7 +4216,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
         
   
   
@@ -4250,7 +4244,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-refcount/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-refcount/" class="md-nav__link">
         
   
   
@@ -4278,7 +4272,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-snapshots/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-snapshots/" class="md-nav__link">
         
   
   
@@ -4306,7 +4300,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-write-planner/" class="md-nav__link">
+      <a href="../../../instar/qcow2/qcow2-write-planner/" class="md-nav__link">
         
   
   
@@ -4389,7 +4383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/raw/raw-format/" class="md-nav__link">
+      <a href="../../../instar/raw/raw-format/" class="md-nav__link">
         
   
   
@@ -4472,7 +4466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-compression/" class="md-nav__link">
+      <a href="../../../instar/vmdk/vmdk-compression/" class="md-nav__link">
         
   
   
@@ -4500,7 +4494,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-extents/" class="md-nav__link">
+      <a href="../../../instar/vmdk/vmdk-extents/" class="md-nav__link">
         
   
   
@@ -4528,7 +4522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-format/" class="md-nav__link">
+      <a href="../../../instar/vmdk/vmdk-format/" class="md-nav__link">
         
   
   
@@ -4556,7 +4550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
+      <a href="../../../instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
         
   
   
@@ -4647,7 +4641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/" class="md-nav__link">
+      <a href="../../../kerbside/" class="md-nav__link">
         
   
   
@@ -4675,7 +4669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/configuration/" class="md-nav__link">
+      <a href="../../../kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -4703,7 +4697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/console-sources/" class="md-nav__link">
+      <a href="../../../kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -4731,7 +4725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/schema/" class="md-nav__link">
+      <a href="../../../kerbside/schema/" class="md-nav__link">
         
   
   
@@ -4759,7 +4753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/development/" class="md-nav__link">
+      <a href="../../../kerbside/development/" class="md-nav__link">
         
   
   
@@ -4787,7 +4781,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/installation/" class="md-nav__link">
+      <a href="../../../kerbside/installation/" class="md-nav__link">
         
   
   
@@ -4815,7 +4809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -4843,7 +4837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/testing/" class="md-nav__link">
+      <a href="../../../kerbside/testing/" class="md-nav__link">
         
   
   
@@ -4871,7 +4865,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/direct-qemu-harness/" class="md-nav__link">
+      <a href="../../../kerbside/direct-qemu-harness/" class="md-nav__link">
         
   
   
@@ -4946,7 +4940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/" class="md-nav__link">
+      <a href="../../../kerbside/plans/" class="md-nav__link">
         
   
   
@@ -4974,7 +4968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install/" class="md-nav__link">
         
   
   
@@ -5002,7 +4996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
         
   
   
@@ -5030,7 +5024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
         
   
   
@@ -5058,7 +5052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
         
   
   
@@ -5086,7 +5080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
   
@@ -5114,7 +5108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
   
@@ -5142,7 +5136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
         
   
   
@@ -5170,7 +5164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
         
   
   
@@ -5198,7 +5192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
         
   
   
@@ -5226,7 +5220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -5254,7 +5248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
         
   
   
@@ -5282,7 +5276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
         
   
   
@@ -5310,7 +5304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
         
   
   
@@ -5338,7 +5332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
   
@@ -5366,7 +5360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
   
@@ -5394,7 +5388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
         
   
   
@@ -5422,7 +5416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
   
@@ -5450,7 +5444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
         
   
   
@@ -5478,7 +5472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
   
@@ -5506,7 +5500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
         
   
   
@@ -5534,7 +5528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
         
   
   
@@ -5562,7 +5556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
         
   
   
@@ -5590,7 +5584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
   
@@ -5618,7 +5612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
         
   
   
@@ -5646,7 +5640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
         
   
   
@@ -5674,7 +5668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
   
@@ -5702,7 +5696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
         
   
   
@@ -5730,7 +5724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
         
   
   
@@ -5758,7 +5752,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
         
   
   
@@ -5786,7 +5780,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
         
   
   
@@ -5814,7 +5808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
   
@@ -5842,7 +5836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
   
@@ -5870,7 +5864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
         
   
   
@@ -5898,7 +5892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
         
   
   
@@ -5926,7 +5920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
         
   
   
@@ -5954,7 +5948,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
         
   
   
@@ -5982,7 +5976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
         
   
   
@@ -6010,7 +6004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -6038,7 +6032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
         
   
   
@@ -6066,7 +6060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
   
@@ -6094,7 +6088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
         
   
   
@@ -6122,7 +6116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
         
   
   
@@ -6150,7 +6144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
         
   
   
@@ -6178,7 +6172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
         
   
   
@@ -6206,7 +6200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
         
   
   
@@ -6234,7 +6228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
         
   
   
@@ -6262,7 +6256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-07-polling/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-07-polling/" class="md-nav__link">
         
   
   
@@ -6290,7 +6284,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
         
   
   
@@ -6318,7 +6312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-09-teardown/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-09-teardown/" class="md-nav__link">
         
   
   
@@ -6346,7 +6340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
   
@@ -6374,7 +6368,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
         
   
   
@@ -6402,7 +6396,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
         
   
   
@@ -6430,7 +6424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
         
   
   
@@ -6458,7 +6452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
         
   
   
@@ -6486,7 +6480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
   
@@ -6514,7 +6508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-use-case-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-use-case-docs/" class="md-nav__link">
         
   
   
@@ -6597,7 +6591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/console-vv-extensions/" class="md-nav__link">
+      <a href="../../../kerbside/spice/console-vv-extensions/" class="md-nav__link">
         
   
   
@@ -6625,7 +6619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/scancodes/" class="md-nav__link">
+      <a href="../../../kerbside/spice/scancodes/" class="md-nav__link">
         
   
   
@@ -6653,7 +6647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/capabilities/" class="md-nav__link">
+      <a href="../../../kerbside/spice/capabilities/" class="md-nav__link">
         
   
   
@@ -6681,7 +6675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/channel-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/spice/channel-protocols/" class="md-nav__link">
         
   
   
@@ -6709,7 +6703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/compression-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/spice/compression-protocols/" class="md-nav__link">
         
   
   
@@ -6737,7 +6731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/spice-link-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -6765,7 +6759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/protocol-overview/" class="md-nav__link">
+      <a href="../../../kerbside/spice/protocol-overview/" class="md-nav__link">
         
   
   
@@ -6793,7 +6787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/usb-redirection/" class="md-nav__link">
+      <a href="../../../kerbside/spice/usb-redirection/" class="md-nav__link">
         
   
   
@@ -6821,7 +6815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -6904,7 +6898,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/use-cases/ovirt/" class="md-nav__link">
+      <a href="../../../kerbside/use-cases/ovirt/" class="md-nav__link">
         
   
   
@@ -6995,7 +6989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/" class="md-nav__link">
+      <a href="../../../occystrap/" class="md-nav__link">
         
   
   
@@ -7023,7 +7017,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/command-reference/" class="md-nav__link">
+      <a href="../../../occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -7051,7 +7045,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/development/" class="md-nav__link">
+      <a href="../../../occystrap/development/" class="md-nav__link">
         
   
   
@@ -7079,7 +7073,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -7107,7 +7101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/internals/" class="md-nav__link">
+      <a href="../../../occystrap/internals/" class="md-nav__link">
         
   
   
@@ -7135,7 +7129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/installation/" class="md-nav__link">
+      <a href="../../../occystrap/installation/" class="md-nav__link">
         
   
   
@@ -7163,7 +7157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/performance/" class="md-nav__link">
+      <a href="../../../occystrap/performance/" class="md-nav__link">
         
   
   
@@ -7191,7 +7185,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/pipeline/" class="md-nav__link">
+      <a href="../../../occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -7219,7 +7213,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -7247,7 +7241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/use-cases/" class="md-nav__link">
+      <a href="../../../occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -7322,7 +7316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/" class="md-nav__link">
+      <a href="../../../occystrap/plans/" class="md-nav__link">
         
   
   
@@ -7350,7 +7344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -7378,7 +7372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -7406,7 +7400,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
         
   
   
@@ -7434,7 +7428,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
         
   
   
@@ -7462,7 +7456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
         
   
   
@@ -7490,7 +7484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
         
   
   
@@ -7518,7 +7512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
   
@@ -7546,7 +7540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
         
   
   
@@ -7574,7 +7568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
         
   
   
@@ -7602,7 +7596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
   
@@ -7630,7 +7624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
         
   
   
@@ -7658,7 +7652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
         
   
   
@@ -7686,7 +7680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
         
   
   
@@ -7714,7 +7708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
         
   
   
@@ -7742,7 +7736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
         
   
   
@@ -7770,7 +7764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
         
   
   
@@ -7798,7 +7792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
         
   
   
@@ -7826,7 +7820,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -7854,7 +7848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
         
   
   
@@ -7882,7 +7876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
         
   
   
@@ -7923,20 +7917,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
         
           
           <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
@@ -7957,7 +7949,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -7975,7 +7967,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../" class="md-nav__link">
         
   
   
@@ -8003,7 +7995,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../portability/" class="md-nav__link">
+      <a href="../../portability/" class="md-nav__link">
         
   
   
@@ -8031,7 +8023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development-macos/" class="md-nav__link">
+      <a href="../../development-macos/" class="md-nav__link">
         
   
   
@@ -8059,7 +8051,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../channel-diagnostics-audit/" class="md-nav__link">
+      <a href="../../channel-diagnostics-audit/" class="md-nav__link">
         
   
   
@@ -8087,7 +8079,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
+      <a href="../../configuration/" class="md-nav__link">
         
   
   
@@ -8115,7 +8107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ci/" class="md-nav__link">
+      <a href="../../ci/" class="md-nav__link">
         
   
   
@@ -8143,7 +8135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control-socket-protocol/" class="md-nav__link">
+      <a href="../../control-socket-protocol/" class="md-nav__link">
         
   
   
@@ -8171,7 +8163,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/" class="md-nav__link">
+      <a href="../../development/" class="md-nav__link">
         
   
   
@@ -8199,7 +8191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../device-redirection/" class="md-nav__link">
+      <a href="../../device-redirection/" class="md-nav__link">
         
   
   
@@ -8227,7 +8219,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../diagnostics/" class="md-nav__link">
+      <a href="../../diagnostics/" class="md-nav__link">
         
   
   
@@ -8252,37 +8244,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Features
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../features/" class="md-nav__link">
         
   
   
@@ -8298,186 +8263,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#rendering-and-display" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rendering and display
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#audio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Audio
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#input-and-interaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Input and interaction
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#devices-and-sharing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Devices and sharing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#connectivity-and-sessions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Connectivity and sessions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#diagnostics-and-debugging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diagnostics and debugging
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#modes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Modes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Modes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#capture-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capture mode
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#headless-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Headless mode
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#web-mode-web" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Web mode (--web)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#auto-snapshot-mode-auto-snapshot-interval" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Auto-snapshot mode (--auto-snapshot-interval)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#-pedantic-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        --pedantic mode
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#notifications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notifications
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#comparison-with-the-python-prototype" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Comparison with the Python prototype
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -8490,7 +8275,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../installation/" class="md-nav__link">
         
   
   
@@ -8518,7 +8303,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../design-decisions/" class="md-nav__link">
+      <a href="../../design-decisions/" class="md-nav__link">
         
   
   
@@ -8546,7 +8331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../libvirt-spice-recommendations/" class="md-nav__link">
+      <a href="../../libvirt-spice-recommendations/" class="md-nav__link">
         
   
   
@@ -8574,7 +8359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../macos-metrics-verification/" class="md-nav__link">
+      <a href="../../macos-metrics-verification/" class="md-nav__link">
         
   
   
@@ -8602,7 +8387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multi-mode-parity/" class="md-nav__link">
+      <a href="../../multi-mode-parity/" class="md-nav__link">
         
   
   
@@ -8630,7 +8415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../releasing/" class="md-nav__link">
+      <a href="../../releasing/" class="md-nav__link">
         
   
   
@@ -8658,7 +8443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rendering-pipeline/" class="md-nav__link">
+      <a href="../../rendering-pipeline/" class="md-nav__link">
         
   
   
@@ -8686,7 +8471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../web-frontend/" class="md-nav__link">
+      <a href="../../web-frontend/" class="md-nav__link">
         
   
   
@@ -8714,7 +8499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../session-lifecycle/" class="md-nav__link">
+      <a href="../../session-lifecycle/" class="md-nav__link">
         
   
   
@@ -8742,7 +8527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../spice-protocol/" class="md-nav__link">
+      <a href="../../spice-protocol/" class="md-nav__link">
         
   
   
@@ -8770,7 +8555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../troubleshooting/" class="md-nav__link">
+      <a href="../../troubleshooting/" class="md-nav__link">
         
   
   
@@ -8798,7 +8583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../web-mode-internals/" class="md-nav__link">
+      <a href="../../web-mode-internals/" class="md-nav__link">
         
   
   
@@ -8873,7 +8658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -8901,7 +8686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-initial/" class="md-nav__link">
+      <a href="../PLAN-initial/" class="md-nav__link">
         
   
   
@@ -8929,7 +8714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-capture/" class="md-nav__link">
+      <a href="../PLAN-capture/" class="md-nav__link">
         
   
   
@@ -8957,7 +8742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-packaging/" class="md-nav__link">
+      <a href="../PLAN-packaging/" class="md-nav__link">
         
   
   
@@ -8985,7 +8770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-usb-redir/" class="md-nav__link">
+      <a href="../PLAN-usb-redir/" class="md-nav__link">
         
   
   
@@ -9013,7 +8798,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-cursor-rendering/" class="md-nav__link">
+      <a href="../PLAN-cursor-rendering/" class="md-nav__link">
         
   
   
@@ -9041,7 +8826,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-bug-reports/" class="md-nav__link">
+      <a href="../PLAN-bug-reports/" class="md-nav__link">
         
   
   
@@ -9069,7 +8854,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-usb-ui/" class="md-nav__link">
+      <a href="../PLAN-usb-ui/" class="md-nav__link">
         
   
   
@@ -9097,7 +8882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-webdav/" class="md-nav__link">
+      <a href="../PLAN-webdav/" class="md-nav__link">
         
   
   
@@ -9125,7 +8910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-crate-extraction/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction/" class="md-nav__link">
         
   
   
@@ -9153,7 +8938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-remaining-issues/" class="md-nav__link">
+      <a href="../PLAN-remaining-issues/" class="md-nav__link">
         
   
   
@@ -9181,7 +8966,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-display-iteration-followups/" class="md-nav__link">
+      <a href="../PLAN-display-iteration-followups/" class="md-nav__link">
         
   
   
@@ -9209,7 +8994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../PLAN-pr20-followup/" class="md-nav__link">
         
   
   
@@ -9237,7 +9022,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../PLAN-pr23-followup/" class="md-nav__link">
         
   
   
@@ -9265,7 +9050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-deferred-debt/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt/" class="md-nav__link">
         
   
   
@@ -9293,7 +9078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-supply-chain-scanning/" class="md-nav__link">
+      <a href="../PLAN-supply-chain-scanning/" class="md-nav__link">
         
   
   
@@ -9321,7 +9106,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-supply-chain-followups/" class="md-nav__link">
+      <a href="../PLAN-supply-chain-followups/" class="md-nav__link">
         
   
   
@@ -9349,7 +9134,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+      <a href="../PLAN-screenshot-and-latency-hud/" class="md-nav__link">
         
   
   
@@ -9377,7 +9162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
+      <a href="../PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
   
@@ -9405,7 +9190,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-display-draw-ops/" class="md-nav__link">
+      <a href="../PLAN-display-draw-ops/" class="md-nav__link">
         
   
   
@@ -9433,7 +9218,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-android-apk/" class="md-nav__link">
+      <a href="../PLAN-android-apk/" class="md-nav__link">
         
   
   
@@ -9461,7 +9246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+      <a href="../PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
         
   
   
@@ -9489,7 +9274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
         
   
   
@@ -9517,7 +9302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
+      <a href="../PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
   
@@ -9545,7 +9330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-hamburger-menu/" class="md-nav__link">
+      <a href="../PLAN-hamburger-menu/" class="md-nav__link">
         
   
   
@@ -9573,7 +9358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-notifications/" class="md-nav__link">
+      <a href="../PLAN-notifications/" class="md-nav__link">
         
   
   
@@ -9601,7 +9386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-pr31-followup/" class="md-nav__link">
+      <a href="../PLAN-pr31-followup/" class="md-nav__link">
         
   
   
@@ -9629,7 +9414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-connection-properties/" class="md-nav__link">
+      <a href="../PLAN-connection-properties/" class="md-nav__link">
         
   
   
@@ -9657,7 +9442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-display-window-sizing/" class="md-nav__link">
+      <a href="../PLAN-display-window-sizing/" class="md-nav__link">
         
   
   
@@ -9685,7 +9470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-web-frontend/" class="md-nav__link">
+      <a href="../PLAN-web-frontend/" class="md-nav__link">
         
   
   
@@ -9713,7 +9498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../PLAN-opus-decoder/" class="md-nav__link">
         
   
   
@@ -9741,7 +9526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-crate-release/" class="md-nav__link">
+      <a href="../PLAN-crate-release/" class="md-nav__link">
         
   
   
@@ -9769,7 +9554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-session-001-feedback/" class="md-nav__link">
+      <a href="../PLAN-session-001-feedback/" class="md-nav__link">
         
   
   
@@ -9797,7 +9582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-video-keeping-up/" class="md-nav__link">
+      <a href="../PLAN-video-keeping-up/" class="md-nav__link">
         
   
   
@@ -9825,7 +9610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
+      <a href="../PLAN-macos-runtime-metrics/" class="md-nav__link">
         
   
   
@@ -9853,7 +9638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-ci-platform-matrix/" class="md-nav__link">
+      <a href="../PLAN-ci-platform-matrix/" class="md-nav__link">
         
   
   
@@ -9881,7 +9666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-egui-0.34-followups/" class="md-nav__link">
+      <a href="../PLAN-egui-0.34-followups/" class="md-nav__link">
         
   
   
@@ -9909,7 +9694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
+      <a href="../PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
   
@@ -9937,7 +9722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-streaming-test-automation/" class="md-nav__link">
+      <a href="../PLAN-streaming-test-automation/" class="md-nav__link">
         
   
   
@@ -9965,7 +9750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/OPEN-QUESTIONS/" class="md-nav__link">
+      <a href="../OPEN-QUESTIONS/" class="md-nav__link">
         
   
   
@@ -9993,7 +9778,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-self-hosted-runners/" class="md-nav__link">
+      <a href="../PLAN-self-hosted-runners/" class="md-nav__link">
         
   
   
@@ -10021,7 +9806,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
+      <a href="../PLAN-pip-distribution/" class="md-nav__link">
         
   
   
@@ -10049,7 +9834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
+      <a href="../PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
         
   
   
@@ -10077,7 +9862,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-two-stage-ci/" class="md-nav__link">
+      <a href="../PLAN-two-stage-ci/" class="md-nav__link">
         
   
   
@@ -10128,7 +9913,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../features/" class="md-nav__link">
+      <a href="../../../../features/" class="md-nav__link">
         
   
   
@@ -10155,7 +9940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../glossary/" class="md-nav__link">
+      <a href="../../../../glossary/" class="md-nav__link">
         
   
   
@@ -10229,7 +10014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -10264,7 +10049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/" class="md-nav__link">
+      <a href="../../../../community/" class="md-nav__link">
         
   
   
@@ -10338,7 +10123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/usage/" class="md-nav__link">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -10366,7 +10151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -10394,7 +10179,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -10422,7 +10207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -10450,7 +10235,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -10478,7 +10263,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -10506,7 +10291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/events/" class="md-nav__link">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -10534,7 +10319,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/objects/" class="md-nav__link">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -10562,7 +10347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -10691,7 +10476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -10719,7 +10504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -10747,7 +10532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -10775,7 +10560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -10803,7 +10588,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -10831,7 +10616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -10859,7 +10644,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -10887,7 +10672,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -10915,7 +10700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -10943,7 +10728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -10971,7 +10756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -10999,7 +10784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -11027,7 +10812,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -11063,7 +10848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -11091,7 +10876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -11119,7 +10904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -11147,7 +10932,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -11175,7 +10960,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/network_dispatcher/" class="md-nav__link">
+      <a href="../../../../developer_guide/network_dispatcher/" class="md-nav__link">
         
   
   
@@ -11203,7 +10988,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -11231,7 +11016,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -11259,7 +11044,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -11287,7 +11072,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -11315,7 +11100,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -11397,7 +11182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/" class="md-nav__link">
+      <a href="../../../../plans/" class="md-nav__link">
         
   
   
@@ -11425,7 +11210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -11453,7 +11238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -11535,7 +11320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -11563,7 +11348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -11591,7 +11376,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -11619,7 +11404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/database/" class="md-nav__link">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -11647,7 +11432,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/events/" class="md-nav__link">
+      <a href="../../../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -11675,7 +11460,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -11703,7 +11488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/load_balancing/" class="md-nav__link">
+      <a href="../../../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -11731,7 +11516,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -11759,7 +11544,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/logging/" class="md-nav__link">
+      <a href="../../../../operator_guide/logging/" class="md-nav__link">
         
   
   
@@ -11787,7 +11572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -11815,7 +11600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/node_health/" class="md-nav__link">
+      <a href="../../../../operator_guide/node_health/" class="md-nav__link">
         
   
   
@@ -11843,7 +11628,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -11871,7 +11656,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -11899,7 +11684,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/scheduler/" class="md-nav__link">
+      <a href="../../../../operator_guide/scheduler/" class="md-nav__link">
         
   
   
@@ -11927,7 +11712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -11955,7 +11740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -12010,10 +11795,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#rendering-and-display" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rendering and display
+        Prompt
       
     </span>
   </a>
@@ -12021,10 +11806,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#audio" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Audio
+        Scope
       
     </span>
   </a>
@@ -12032,10 +11817,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#input-and-interaction" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Input and interaction
+        What the survey found
       
     </span>
   </a>
@@ -12043,10 +11828,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#devices-and-sharing" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Devices and sharing
+        Decisions
       
     </span>
   </a>
@@ -12054,10 +11839,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#connectivity-and-sessions" class="md-nav__link">
+  <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Connectivity and sessions
+        Step plan
       
     </span>
   </a>
@@ -12065,10 +11850,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#diagnostics-and-debugging" class="md-nav__link">
+  <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Diagnostics and debugging
+        Risks and mitigations
       
     </span>
   </a>
@@ -12076,93 +11861,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#modes" class="md-nav__link">
+  <a href="#definition-of-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Modes
+        Definition of done
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Modes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#capture-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capture mode
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#headless-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Headless mode
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#web-mode-web" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Web mode (--web)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#auto-snapshot-mode-auto-snapshot-interval" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Auto-snapshot mode (--auto-snapshot-interval)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#-pedantic-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        --pedantic mode
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#notifications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notifications
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#comparison-with-the-python-prototype" class="md-nav__link">
+  <a href="#effort" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Comparison with the Python prototype
+        Effort
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-landed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What landed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-review-changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the review changed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
       
     </span>
   </a>
@@ -12190,231 +11947,458 @@
   
 
 
-<h1 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h1>
-<p>This is the detailed feature catalogue for ryll. For a quick overview
-see the <a href="https://github.com/shakenfist/ryll/blob/develop/README.md">README</a>;
-for how each subsystem works internally see
-<a href="/components/ryll/index/">docs/index.md</a>.</p>
-<h2 id="rendering-and-display">Rendering and display<a class="headerlink" href="#rendering-and-display" title="Permanent link">&para;</a></h2>
+<h1 id="webrtc-rs-020-upgrade-phase-03-socket-binding-configuration">webrtc-rs 0.20 upgrade — phase 03: socket binding configuration<a class="headerlink" href="#webrtc-rs-020-upgrade-phase-03-socket-binding-configuration" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Expose the UDP socket binding policy phase 02 invented as
+operator-facing configuration, and build the <code>WebrtcBridgeConfig</code>
+command-line plumbing that does not exist yet.</p>
+<p>Before executing any step, read
+<code>shakenfist-spice-webrtc/src/bind_addrs.rs</code> end to end — it is
+the module this phase makes configurable, and its module docs
+already state which filters are mechanical and which are policy.
+Then read Decision 4 and review items 18 and "interface
+allowlist" in
+<code>docs/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump.md</code>: this
+phase is the other half of a decision phase 02 deliberately made
+in two parts.</p>
+<p>Planning effort: high. The mechanical work is small, but what
+the flags <em>mean</em> — which of <code>bind_addrs</code>' filters an operator
+may override and which are non-negotiable — is a design decision
+that outlives the phase.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>In:</p>
 <ul>
-<li><strong>Immediate mode rendering</strong> - Uses egui for efficient display rendering without accumulating objects.</li>
-<li><strong>Full draw-op coverage</strong> - Handles <code>DRAW_FILL</code>, <code>DRAW_OPAQUE</code>, <code>DRAW_COPY</code>, <code>DRAW_BLEND</code>, <code>DRAW_BLACKNESS</code>, <code>DRAW_WHITENESS</code>, <code>DRAW_INVERS</code>, <code>DRAW_TRANSPARENT</code>, <code>DRAW_ALPHA_BLEND</code>, and <code>COPY_BITS</code>. BIOS, GRUB, and kernel-console rendering paint correctly (solid backgrounds, clean scroll regions). Deferred ops (<code>DRAW_ROP3</code>, <code>DRAW_STROKE</code>, <code>DRAW_TEXT</code>, <code>DRAW_COMPOSITE</code>) warn once per session with a first-occurrence hex dump so gaps are visible without flooding the log.</li>
-<li><strong>Image decompression</strong> - LZ, GLZ, ZLIB_GLZ_RGB, LZ4, JPEG, QUIC, and Pixmap image types; MJPEG via SPICE streaming with hardware-accelerated decoding where available (ImageIO on macOS, WIC on Windows, VA-API on Linux) and automatic fallback to software decoders.</li>
-<li><strong>Multi-monitor support</strong> - Connect multiple display channels with <code>--monitors N</code> for multi-head configurations.</li>
-<li><strong>Window auto-fit</strong> - The ryll window tracks the guest's display surface size: every primary <code>SURFACE_CREATE</code> resizes the window to match (modulo an 8-pixel alignment that mirrors what we send the guest via <code>VDAgentMonitorsConfig</code>). Maximised or fullscreen windows are left alone, and the surface renders at native size inside them. Toggle <code>Obey guest size hints</code> in the hamburger menu (or launch with <code>--no-obey-guest-size</code>) to pin the window — useful for fixed-size capture or for guests that flap between resolutions on their own. The toggle is a session-level preference and survives reconnect. Resolution changes are also surfaced as Info notifications ("Display resolution: WxH"), debounced over 500 ms so a boot-time mode probe storm or a drag-resize through many sizes collapses to a single entry rather than spamming the panel.</li>
-<li><strong>Cursor rendering</strong> - Server cursor shapes with fallback default arrow.</li>
-<li><strong>Display channel capabilities</strong> - Advertises COMPOSITE, MONITORS_CONFIG, SIZED_STREAM, and A8_SURFACE so the guest QXL driver uses efficient rendering paths instead of falling back to slow software blits.</li>
-<li><strong>Window persistence</strong> - Window size and position are restored across launches via eframe's <code>persistence</code> feature, which writes the egui memory snapshot to the platform's per-app config directory (<code>~/.local/share/ryll/</code> on Linux, <code>~/Library/Application Support/ryll/</code> on macOS, <code>%APPDATA%\ryll\</code> on Windows).</li>
+<li>Three new command-line flags on <code>ryll</code>: <code>--web-media-addr</code>
+  (repeatable), <code>--web-media-port</code>, <code>--web-ice-server</code>
+  (repeatable).</li>
+<li>The plumbing to carry them from <code>config::Args</code> through
+  <code>WebState</code> into <code>WebrtcBridgeConfig</code>. None of this path exists
+  today; <code>ice_servers</code> is hard-coded empty at the single
+  production construction site.</li>
+<li>A bind policy type in <code>shakenfist-spice-webrtc</code> that
+  <code>WebrtcBridge::new</code> resolves, replacing today's unconditional
+  <code>host_udp_bind_addrs()</code> call.</li>
+<li>Interface <em>names</em> as well as addresses in the selector, which
+  is the "interface allowlist, not just a port pin" item the
+  phase 02 review deferred here.</li>
+<li>Loopback-only operation as an explicit opt-in (phase 02 review
+  item 18).</li>
+<li><code>docs/configuration.md</code>, <code>docs/web-frontend.md</code>,
+  <code>docs/web-mode-internals.md</code>.</li>
 </ul>
-<h2 id="audio">Audio<a class="headerlink" href="#audio" title="Permanent link">&para;</a></h2>
+<p>Out:</p>
 <ul>
-<li><strong>Audio playback</strong> - SPICE playback channel with raw PCM and Opus codec support; lock-free ring buffer to dedicated audio thread via cpal.</li>
+<li>Anything about <em>which</em> codecs are offered, TURN credentials,
+  or ICE transport policy (<code>relay</code>-only). <code>--web-ice-server</code>
+  carries STUN/TURN URLs and nothing else; a TURN server that
+  needs a username and credential is a follow-up, recorded in
+  Future work rather than half-built here.</li>
+<li>Reconfiguring a running session. The flags are read at launch
+  and apply to every bridge the process builds.</li>
+<li>Firefox/H.264 (#289, #290), the audio-by-ear check, and the
+  soak. Those are phase 04.</li>
 </ul>
-<h2 id="input-and-interaction">Input and interaction<a class="headerlink" href="#input-and-interaction" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Multi-channel support</strong> - Handles main, display, cursor, inputs, playback, usbredir, and webdav channels.</li>
-<li><strong>Paste-as-keystrokes</strong> - Type arbitrary text into guests without vdagent by translating characters into US-QWERTY scancode sequences. Cooperative timer-driven state machine keeps the inputs channel responsive during long pastes. Triggered via Ctrl+Alt+V shortcut or Menu → Paste in the GUI (when enabled). Automatically disabled when vdagent is connected. Characters are mapped to US-QWERTY scancodes; guests with a different keyboard layout will see different characters. Maximum paste length is 4096 characters. CLI flags: <code>--enable-paste-as-keystrokes</code>, <code>--paste-text TEXT</code>, <code>--paste-char-delay-ms N</code>.</li>
-<li><strong>Screenshot capture</strong> - Press F8 or use Menu → Screenshot to save the current display as a PNG via a native file dialog. With multiple monitors, one PNG per surface is saved with <code>-1</code>, <code>-2</code> suffixes.</li>
-</ul>
-<h2 id="devices-and-sharing">Devices and sharing<a class="headerlink" href="#devices-and-sharing" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>USB device redirection</strong> - Forward physical USB devices (Linux only) or present RAW disk images as virtual USB mass storage devices on all platforms. Interactive USB panel in the GUI for device enumeration, connect/disconnect, and adding disk images at runtime. CLI flags (<code>--usb-disk</code>, <code>--usb-disk-ro</code>) for headless/scripted use.</li>
-<li><strong>USB device management</strong> - Use Menu → USB for a side panel to browse available devices, connect/disconnect physical or virtual USB devices, add RAW disk images via native file picker, and monitor connection status with elapsed time; USB errors integrate with bug reporting.</li>
-<li><strong>WebDAV folder sharing</strong> - Share a local directory with the guest VM via the SPICE WebDAV channel. The guest mounts the share via <code>spice-webdavd</code> + <code>davfs2</code>. Supports read-write and read-only modes. Interactive "Folders" panel in the GUI for directory selection and share management. CLI flags (<code>--share-dir</code>, <code>--share-dir-ro</code>) for headless/scripted use.</li>
-<li><strong>Folder sharing panel</strong> - Use Menu → Folders for a side panel to select a local directory to share with the guest, toggle read-only mode, and monitor sharing status with elapsed time.</li>
-</ul>
-<h2 id="connectivity-and-sessions">Connectivity and sessions<a class="headerlink" href="#connectivity-and-sessions" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>TLS support</strong> - Secure connections with inline CA certificates from .vv files.</li>
-<li><strong>Reconnect on disconnect</strong> - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See <a href="/components/ryll/session-lifecycle/">session-lifecycle.md</a> "Reconnection" for the full lifecycle.</li>
-<li><strong>Ticket lifecycle handling</strong> - Honours <code>delete-this-file=1</code> (single-use ticket: auto-reconnect suppressed) and the ryll extension key <code>ticket-valid-until</code> (expiry warning and modal) in .vv files. See <a href="/components/ryll/configuration/">configuration.md</a> for the full key reference.</li>
-<li><strong>Graceful Ctrl+C shutdown</strong> - Cross-platform signal handling via <code>ctrlc</code> crate; the GUI and headless event loops check a flag and shut down cleanly, ensuring capture files are finalized.</li>
-</ul>
-<h2 id="diagnostics-and-debugging">Diagnostics and debugging<a class="headerlink" href="#diagnostics-and-debugging" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Statistics tracking</strong> - Sliding-window FPS (from MARK boundaries), throughput, and latency measurements.</li>
-<li><strong>Bandwidth sparkline</strong> - Real-time bandwidth graph in the status bar showing rolling bytes/sec history.</li>
-<li><strong>Latency sparkline</strong> - Bottom stats panel shows client-observed inter-PING interval from the main channel (lower variance is better; spikes indicate network or server stalls).</li>
-<li><strong>Streaming indicator</strong> - Small triangle (▶) glyph in the status bar reflects the live SPICE display-stream state: grey (off), green (active), amber (a stream was destroyed in the last 5 s), red (≥3 destroys in 30 s with mean lifetime &lt;3 s — fires a <code>Warn</code> notification once per minute). Hover for per-stream codec, dimensions, and decoded-frame counts. See <a href="/components/ryll/troubleshooting/#streaming-indicator">troubleshooting § Streaming indicator</a>.</li>
-<li><strong>Protocol-gap counter</strong> - <code>Gaps: N</code> button in the status bar tracks the number of distinct protocol edge cases seen this session (unknown opcodes, deferred ops, recoverable decode failures). Highlights red when N &gt; 0; click to open a floating window listing the keys. Complements <code>--pedantic</code> mode.</li>
-<li><strong>File logging</strong> - Verbose mode writes to <code>/tmp/ryll.log</code> for debugging.</li>
-<li><strong>Unbuffered pcap I/O</strong> - Packet writes go directly to disk so pcap data survives abrupt termination.</li>
-<li><strong>Bug reports</strong> - Press F12 or use Menu → Report to capture a self-contained zip with metadata, channel state, pcap traffic, runtime metrics, and a screenshot taken the moment the dialog opened so transient display artefacts survive the form-filling delay; Display reports with a region selection also include a crop of the submit-time surface.</li>
-<li><strong>Live traffic viewer</strong> - Press F11 or use Menu → Traffic for a real-time colour-coded feed of SPICE protocol messages with per-channel filters and pause/resume.</li>
-<li><strong>In-app notifications panel</strong> - Surfaces protocol gaps, bug-report status, SPICE_MSG_NOTIFY messages (e.g. QEMU's "channel is insecure" warnings), and connection-state transitions (connect / reconnect cycle / channel drop / agent state) on a single bell + side-panel surface. Each entry carries a per-row "File…" button that produces a bug-report zip — when a live ring-buffer snapshot exists for the notification (≤ 60 s old, within the last 5 notifications), the report contains the pcap and channel state from the moment the notification fired; otherwise it falls back to post-event ring contents.</li>
-</ul>
-<h2 id="modes">Modes<a class="headerlink" href="#modes" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Headless mode</strong> - Run without GUI for automated testing and benchmarking.</li>
-<li><strong>Cadence mode</strong> - Automatic keystroke injection every 2 seconds for latency testing.</li>
-<li><strong>Web mode</strong> - Browser frontend over WebRTC with native TLS; see
-  <a href="/components/ryll/web-frontend/">web-frontend.md</a> for the operator guide.</li>
-</ul>
-<p>The sections below describe the non-GUI modes in more detail.</p>
-<h3 id="capture-mode">Capture mode<a class="headerlink" href="#capture-mode" title="Permanent link">&para;</a></h3>
-<p>Record protocol traffic and display frames for debugging:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--capture<span class="w"> </span>/tmp/capture
-</code></pre></div>
-<p>This writes:</p>
-<ul>
-<li><code>metadata.json</code> — session context (ryll version, platform, target host)
-  for self-describing capture directories in bug reports</li>
-<li><code>main.pcap</code>, <code>display.pcap</code>, <code>cursor.pcap</code>, <code>inputs.pcap</code>, <code>usbredir.pcap</code>,
-  <code>webdav.pcap</code> — per-channel pcap files with fake TCP/IP headers, openable
-  in Wireshark</li>
-<li><code>display.mp4</code> — H.264 video of the display surface at real timing</li>
-</ul>
-<p>See <a href="https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md">STYLEGUIDE.md</a>
-for capture conventions.</p>
-<h3 id="headless-mode">Headless mode<a class="headerlink" href="#headless-mode" title="Permanent link">&para;</a></h3>
-<p>For automated testing without a GUI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--headless<span class="w"> </span>--cadence
-</code></pre></div>
-<p>This will:</p>
-<ul>
-<li>Connect to the SPICE server</li>
-<li>Process display updates (decompress images)</li>
-<li>Send automatic keystrokes every 2 seconds</li>
-<li>Print statistics periodically</li>
-</ul>
-<p>Headless mode supports a Unix-socket control interface via
-<code>--control-socket &lt;path&gt;</code> for driving the session from external
-tools. See <a href="/components/ryll/control-socket-protocol/">control-socket-protocol.md</a>
-for the full verb and event reference, and
-<a href="https://github.com/shakenfist/ryll/blob/develop/examples/control-socket-demo.py"><code>examples/control-socket-demo.py</code></a>
-for a runnable Python example client.</p>
-<h3 id="web-mode-web">Web mode (<code>--web</code>)<a class="headerlink" href="#web-mode-web" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ryll<span class="w"> </span>--web<span class="w"> </span>session.vv
-</code></pre></div>
-<p>Open the printed <code>http://&lt;host&gt;:&lt;port&gt;/?token=...</code> URL in
-Firefox or Chrome. The desktop is visible and audible;
-keyboard and mouse work; the cursor is rendered as an overlay.
-Audio requires the SPICE server to negotiate Opus (xspice and
-QEMU defaults). Click the volume button on the page to enable
-audio after it loads (browser autoplay policy).</p>
-<p>Optional flags:</p>
-<ul>
-<li><code>--web-host 0.0.0.0</code> — bind address (defaults to loopback)</li>
-<li><code>--web-port 8080</code> — port (defaults to ephemeral)</li>
-<li><code>--web-tls-cert /path/cert.pem</code> + <code>--web-tls-key /path/key.pem</code> —
-  serve over HTTPS with native TLS (both required together; see
-  <a href="/components/ryll/web-frontend/">web-frontend.md</a> for cert recipes)</li>
-<li><code>--web-media-addr eth0</code> — address or interface name for the WebRTC
-  media sockets (repeatable; defaults to every non-loopback interface
-  address)</li>
-<li><code>--web-media-port 41000</code> — pin the media UDP port so one firewall
-  rule covers it (defaults to ephemeral)</li>
-<li><code>--web-ice-server stun:stun.example.com:3478</code> — STUN/TURN server
-  (repeatable; unnecessary when browser and host share a LAN)</li>
-</ul>
-<p>See <a href="/components/ryll/configuration/#web-mode">configuration.md</a> for the full flag
-reference, including what each of these refuses and why.</p>
-<p>Closing the browser tab reaps the bridge and encoder within ~1 second
-(the SPICE session stays live); reopening the same URL establishes
-a fresh connection. The browser auto-reconnects on transient
-ICE failures with 1 s/2 s/4 s/8 s/16 s backoff. A reference
-systemd unit is at <code>examples/ryll-web.service</code>. See
-<a href="/components/ryll/web-frontend/">web-frontend.md</a> for the full operator guide.</p>
-<h3 id="auto-snapshot-mode-auto-snapshot-interval">Auto-snapshot mode (<code>--auto-snapshot-interval</code>)<a class="headerlink" href="#auto-snapshot-mode-auto-snapshot-interval" title="Permanent link">&para;</a></h3>
-<p>When <code>--auto-snapshot-interval N</code> is set, ryll fires a complete
-bug-report zip every N seconds into a rolling subdirectory
-<code>&lt;bug-report-dir&gt;/auto-snapshots/</code>. This "flight-data-recorder"
-mode captures full session state regardless of whether the
-operator notices a symptom — useful for intermittent issues like
-audio silences that last only 30 seconds mid-session.</p>
-<p>A startup <code>Info</code> notification confirms the mode is active. The
-status bar shows <code>Auto-snapshot: {saved}/{cap}</code> while the mode
-is enabled. The default rolling cap is 20 zips; oldest are pruned
-when the cap is exceeded.</p>
-<p>Each zip is a full bug-report artefact (channel-state.json with
-all channels merged, traffic.pcap covering all channels, metadata,
-runtime-metrics, notifications) equivalent to a manual F12 report.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Fire every 30 s, keep last 20 zips</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Custom cap and output directory</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Minimum recommended interval is 10 s (assembly blocks ~2 s</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># for runtime-metrics sampling; shorter intervals cause</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># overlapping samples, which is harmless but wasteful).</span>
-</code></pre></div>
-<p>The zip filename encodes the UTC timestamp and session uptime:
-<code>ryll-auto-snapshot-2026-05-18T20-37-42Z-T+47.3s.zip</code></p>
-<h3 id="-pedantic-mode"><code>--pedantic</code> mode<a class="headerlink" href="#-pedantic-mode" title="Permanent link">&para;</a></h3>
-<p>When enabled with <code>--pedantic</code>, ryll writes a bug-report
-zip to <code>./ryll-pedantic-reports/</code> (or the directory
-specified with <code>--pedantic-dir &lt;path&gt;</code>) the first time
-each distinct protocol gap is seen — unsupported opcodes,
-unhandled sub-features, recoverable decode errors.
-Capped at 50 reports per session. Useful for surfacing
-implementation gaps against a specific guest workload.
-The always-visible <code>Gaps: N</code> status-bar counter works
-without <code>--pedantic</code> too; the counter only counts, it
-doesn't write.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--pedantic
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--pedantic<span class="w"> </span>--pedantic-dir<span class="w"> </span>/tmp/my-gaps
-</code></pre></div>
-<h3 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h3>
-<p>A bell icon in the status bar shows unread notifications. Click it to
-open the side panel; closing the panel marks everything read. The bell
-tints amber or red when there are unread Warn or Error-severity entries
-(such as SPICE "channel is insecure" warnings from QEMU).</p>
-<p>Entries are tagged with a source label — <code>Connection</code> for connect /
-disconnect / reconnect cycle / channel error / guest-agent state
-transitions, <code>Gap</code> for protocol gaps, <code>BugReport</code> for save status,
-<code>SPICE/&lt;channel&gt;</code> for server NOTIFY messages, <code>Internal</code> for everything
-else.</p>
-<p>Every entry carries a per-row <strong>File…</strong> button that produces a bug-report
-zip. ryll captures a snapshot of the traffic ring buffer at the moment a
-notification fires. If a live snapshot exists when the button is clicked
-(≤ 60 s old, within the last 5 notifications), the zip's pcap and channel
-state come from the moment the notification fired and the metadata records
-<code>notification_snapshot: "AtFire"</code>. After the snapshot has expired the
-button still produces a report, using the current ring contents, with
-<code>notification_snapshot: "PostEventOnly"</code> — the button's visual state
-(solid vs. dimmed + hover tooltip) tells you which path a click would
-take.</p>
-<h2 id="comparison-with-the-python-prototype">Comparison with the Python prototype<a class="headerlink" href="#comparison-with-the-python-prototype" title="Permanent link">&para;</a></h2>
-<p>Ryll started as a Python prototype (also called ryll); the Rust
-rewrite is the maintained implementation.</p>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The master plan's phase 03 section is accurate in substance.
+Four corrections and one omission, all fixed at source in this
+commit:</p>
+<ol>
+<li><strong><code>ice_servers</code> is empty at
+   <code>ryll/src/web/signalling.rs:300-303</code></strong>, not <code>:299</code> — the
+   master plan's line number drifted by one during phase 02.
+   The claim itself holds: it is a <code>vec![]</code> literal, and it is
+   the <em>only</em> production construction of <code>WebrtcBridgeConfig</code> in
+   the tree.</li>
+<li><strong><code>WebrtcBridgeConfig</code> has about twenty construction sites</strong>
+   (<code>shakenfist-spice-webrtc/src/bridge.rs:492-513</code> defines it;
+   <code>bridge.rs</code> unit tests, <code>tests/loopback.rs</code>,
+   <code>tests/lifecycle.rs</code> and <code>ryll/src/web/lifecycle.rs</code>
+   construct it). All but one are tests, and all of them use
+   struct literals even though <code>WebrtcBridgeConfig::new</code> exists
+   (<code>bridge.rs:504-513</code>). Adding a field touches every one of
+   them. Decision 4 says what to do about that.</li>
+<li><strong><code>docs/configuration.md</code> documents no <code>--web</code> flag at
+   all</strong> — <code>grep -- '--web' docs/configuration.md</code> returns
+   nothing, despite <code>--web</code>, <code>--web-host</code>, <code>--web-port</code>,
+   <code>--web-tls-cert</code> and <code>--web-tls-key</code> all shipping
+   (<code>ryll/src/config.rs:161-190</code>). So "touches
+   <code>docs/configuration.md</code>" is really "adds the web section that
+   was never written". <code>docs/web-frontend.md</code> is where those
+   flags are documented today (<code>:13-15</code>, <code>:117-119</code>).</li>
+<li><strong><code>bind_addrs</code> discards interface names.</strong>
+   <code>host_udp_bind_addrs</code> maps <code>iface.ip()</code>
+   (<code>bind_addrs.rs:128</code>), so the <code>if_addrs::Interface::name</code>
+   an allowlist needs is thrown away one line before it would be
+   used. The port is likewise hard-coded to 0 in
+   <code>bindable_udp_addrs</code> (<code>bind_addrs.rs:112</code>).</li>
+<li><strong>There is a second consumer.</strong>
+   <code>test_client.rs:263</code> and <code>:610</code> (<code>TestPeerBuilder</code>, behind
+   the <code>test-support</code> feature) call <code>host_udp_bind_addrs</code> and
+   reject an empty result exactly as <code>bridge.rs:715-724</code> does.
+   It does not need the config surface, but it must keep
+   compiling, and its duplicated error message must not drift
+   away from the bridge's.</li>
+</ol>
+<p><code>WebState</code> (<code>ryll/src/web/server.rs:53-148</code>) carries no
+configuration values whatsoever — only channels, slots and
+counters. Both constructors funnel through <code>build</code>
+(<code>server.rs:185</code>), and <code>WebState::new</code> is <code>#[cfg(test)]</code>, so a
+new field costs one default in the test constructor and one
+argument in <code>with_channels</code>.</p>
+<p>Nothing else in the master plan's phase 03 section was wrong.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<p><strong>1. Three flags, named for the <code>--web-*</code> family.</strong>
+<code>--web-media-addr &lt;IP|IFACE&gt;</code> (repeatable),
+<code>--web-media-port &lt;PORT&gt;</code>, <code>--web-ice-server &lt;URL&gt;</code>
+(repeatable). "media" rather than "udp" or "rtp" because it
+distinguishes them from <code>--web-host</code>/<code>--web-port</code> by <em>what they
+carry</em> rather than by transport trivia, and <code>docs/web-frontend.md:247</code>
+already warns that operators confuse those two things.</p>
+<p><strong>2. The bridge takes a policy, not a resolved address list.</strong>
+<code>WebrtcBridge::new</code> resolves the policy to socket addresses on
+every call, as it resolves <code>host_udp_bind_addrs()</code> today. The
+alternative — resolve once at launch and pass a
+<code>Vec&lt;SocketAddr&gt;</code> — is simpler but wrong for a process that
+outlives a DHCP lease or an interface flap: a session started
+before the VPN came up would keep advertising the addresses that
+existed at launch. Ryll still <em>validates</em> the flags at startup
+(parse the addresses, reject a malformed one) so bad input fails
+at launch rather than at the first <code>POST /offer</code>.</p>
+<p><strong>3. An explicit address list overrides policy filters, not
+mechanical ones.</strong> This is the decision most likely to be argued
+with. <code>bind_addrs</code>' module docs already separate the two:
+loopback and (implicitly) IPv4 link-local and IPv6 ULA are
+<em>policy</em> — reasonable defaults about what is worth advertising —
+while unspecified (<code>0.0.0.0</code>, <code>::</code>) and zoneless <code>fe80::/10</code> are
+<em>mechanical</em>: a <code>SocketAddr</code> cannot represent them in a way ICE
+can use. So <code>--web-media-addr 127.0.0.1</code> is honoured, and gives
+phase 02 review item 18 its loopback-only opt-in for free,
+without a fourth flag. <code>--web-media-addr 0.0.0.0</code> is rejected at
+startup with an error naming the unroutable-candidate failure,
+because it is not a preference, it is the exact bug
+<code>bind_addrs.rs</code> exists to prevent. The argument against: an
+operator who types <code>0.0.0.0</code> means "all interfaces", and we
+could helpfully expand it. The argument that wins: that is
+already the default with no flag at all, and silently
+reinterpreting an address as a wildcard is how a deployment ends
+up advertising an interface its operator thought they had
+excluded.</p>
+<p><strong>4. Add the field and migrate the test sites to
+<code>WebrtcBridgeConfig::new</code>.</strong> Twenty struct literals break on any
+new field, and they will break again in phase 04 or whenever the
+next option lands. Rather than reach for <code>#[non_exhaustive]</code>
+(which does nothing for <code>ryll</code>, an in-workspace consumer) or a
+full builder, the field is added and every <em>test</em> site is
+migrated to <code>WebrtcBridgeConfig::new(encoder_control)</code> followed
+by field assignment for whatever it actually cares about. The
+one production site keeps an explicit literal so a reviewer can
+see every value it chooses. The next field addition then costs
+one line, not twenty.</p>
+<p><strong>5. A pinned port applies to every selected address, and a
+bind failure is fatal.</strong> webrtc-rs binds with a plain
+<code>UdpSocket::bind</code> over the addresses handed to <code>with_udp_addrs</code>
+(<code>webrtc-0.20.2/src/peer_connection/mod.rs:691-697</code>), so a
+pinned port that is already in use surfaces as an error from
+<code>build()</code>. Do not catch it and fall back to an ephemeral port:
+an operator pins a port precisely because a firewall rule names
+it, and a silent fallback produces a bridge that no browser
+outside the LAN can reach — the same class of failure as phase
+02's <code>0.0.0.0</code>. Binding one pinned port across several interface
+addresses is fine (distinct addresses, same port), which is why
+the port pin and the address selector stay orthogonal flags
+rather than one <code>ADDR:PORT</code> argument.</p>
+<p><strong>6. <code>--web-ice-server</code> takes bare URLs.</strong> <code>RTCIceServer</code> has
+<code>username</code> and <code>credential</code> fields, and the bridge already maps
+a URL string into one (<code>bridge.rs:733-742</code>). Authenticated TURN
+needs a way to associate a credential pair with a specific URL,
+which is a flag-syntax question worth more thought than a
+half-hour of this phase; STUN and open TURN work with the URL
+alone. Recorded in Future work.</p>
+<p><strong>7. The published crate's surface changes.</strong>
+<code>shakenfist-spice-webrtc</code> is published, and a new public field
+on <code>WebrtcBridgeConfig</code> plus a new public policy type is a
+breaking change for downstream users. At <code>0.1.x</code> that is a minor
+bump handled by the existing release process
+(<code>docs/plans/PLAN-crate-release.md</code>); it needs no special
+handling here beyond not pretending it did not happen.</p>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Feature</th>
-<th>Python (ryll)</th>
-<th>Rust (ryll)</th>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Threading</td>
-<td>Python threads + queues</td>
-<td>Tokio async + channels</td>
+<td>3a</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Add the bind policy type to <code>shakenfist-spice-webrtc/src/bind_addrs.rs</code>. Introduce <code>pub struct UdpBindPolicy { pub selectors: Vec&lt;BindSelector&gt;, pub port: u16 }</code> and <code>pub enum BindSelector { Addr(IpAddr), Interface(String) }</code>, plus <code>UdpBindPolicy::resolve(&amp;self) -&gt; Vec&lt;SocketAddr&gt;</code>. Empty <code>selectors</code> must reproduce today's behaviour exactly — every non-loopback, non-unspecified, non-link-local-v6 interface address — so <code>Default</code> gives the current policy and <code>host_udp_bind_addrs()</code> becomes <code>UdpBindPolicy::default().resolve()</code>. Keep <code>host_udp_bind_addrs</code> as a public function (it is re-exported at <code>lib.rs:19</code> and used by <code>test_client.rs:263,610</code>). With a non-empty <code>selectors</code>, resolve each: <code>Addr(ip)</code> is taken as given, subject only to the mechanical rejections (unspecified and zoneless <code>fe80::/10</code>); <code>Interface(name)</code> matches <code>if_addrs::Interface::name</code> and yields that interface's addresses, again subject only to the mechanical rejections — see Decision 3, and note that this means the enumeration must stop discarding names at <code>bind_addrs.rs:128</code>. Apply <code>self.port</code> to every resolved address instead of the hard-coded <code>0</code> at <code>bind_addrs.rs:112</code>. Add a <code>pub fn validate(&amp;self) -&gt; Result&lt;()&gt;</code> that rejects an unspecified or zoneless-link-local <code>Addr</code> selector with a message naming the unroutable-candidate consequence; ryll calls it at startup. Unit-test the new paths with synthetic inputs only, following the existing tests' shape — the module docs at <code>bind_addrs.rs:38-45</code> explain at length why enumerating the real host is off-limits. Update the module docs: the "policy question for whoever decides what a deployment should advertise, which is phase 03's job" sentence now has an answer.</td>
 </tr>
 <tr>
-<td>GUI</td>
-<td>Tkinter (retained mode)</td>
-<td>egui (immediate mode)</td>
+<td>3b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Wire the policy into the bridge. Add <code>pub udp_bind: UdpBindPolicy</code> to <code>WebrtcBridgeConfig</code> (<code>bridge.rs:492-513</code>) with a doc comment, default it in <code>WebrtcBridgeConfig::new</code>, and make <code>bridge.rs:715</code> call <code>config.udp_bind.resolve()</code> in place of <code>host_udp_bind_addrs()</code>. Keep the empty-result error and extend its text: when the policy had explicit selectors, an empty result means the selectors matched nothing on this host, which is a different fix from "bring up an interface" — say which case happened. Then migrate every <em>test</em> construction site of <code>WebrtcBridgeConfig</code> to <code>WebrtcBridgeConfig::new(tx)</code> plus field assignment, per Decision 4: sites are in <code>bridge.rs</code> (around <code>:2119</code>, <code>:2131</code>, <code>:2174</code>, <code>:2225</code>, <code>:2258</code>, <code>:2309</code>, <code>:2318</code>, <code>:2438</code>, <code>:2542</code>, <code>:2596</code>, <code>:2626</code>, <code>:2660</code>, <code>:2690</code>), <code>tests/loopback.rs:39,266</code>, <code>tests/lifecycle.rs:36</code> and <code>ryll/src/web/lifecycle.rs:295,314,389</code>. Leave the production site at <code>ryll/src/web/signalling.rs:300</code> as an explicit literal. Add one unit test near the existing candidate-parsing tests (<code>bridge.rs:2438-2520</code> already filters <code>a=candidate:</code> lines out of an answer SDP): build a bridge with a pinned port and assert every host candidate carries that port. Do not add CLI flags — 3c does that.</td>
 </tr>
 <tr>
-<td>Image handling</td>
-<td>Pillow</td>
-<td>Direct pixel buffers</td>
+<td>3c</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Add the flags and the plumbing. In <code>ryll/src/config.rs</code>, alongside the existing <code>--web-*</code> block at <code>:161-190</code>, add <code>--web-media-addr</code> (<code>Vec&lt;String&gt;</code>, repeatable), <code>--web-media-port</code> (<code>u16</code>, default 0) and <code>--web-ice-server</code> (<code>Vec&lt;String&gt;</code>, repeatable), each with the doc comment clap renders as help — mention on <code>--web-media-addr</code> that it accepts an IP address or an interface name and that giving it explicitly is what enables loopback-only operation. Parse the strings into <code>BindSelector</code> values (an interface name is anything that does not parse as an <code>IpAddr</code>), build a <code>UdpBindPolicy</code>, call <code>validate()</code> and fail the launch on error — <code>ryll/src/main.rs:499-501</code> is where the other web args are read. Carry the policy and the ICE server list into <code>WebState</code> as new fields: add them as arguments to <code>WebState::with_channels</code> (<code>ryll/src/web/server.rs:170</code>) and <code>build</code> (<code>:185</code>), and default them in the <code>#[cfg(test)]</code> <code>WebState::new</code> (<code>:156</code>) so the existing test call sites do not change. Consume them at <code>ryll/src/web/signalling.rs:300-303</code>, replacing <code>ice_servers: vec![]</code>. Add a <code>config.rs</code> unit test that <code>--web-media-addr 0.0.0.0</code> is rejected and that an interface name and an IP both parse into the right <code>BindSelector</code> variant.</td>
 </tr>
 <tr>
-<td>Memory efficiency</td>
-<td>Object accumulation issues</td>
-<td>No accumulation</td>
-</tr>
-<tr>
-<td>Deployment</td>
-<td>Requires Python env</td>
-<td>Single binary</td>
+<td>3d</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Documentation. <code>docs/configuration.md</code> has no <code>--web</code> flags at all (see survey finding 3): add a "Web mode" table covering <code>--web</code>, <code>--web-host</code>, <code>--web-port</code>, <code>--web-tls-cert</code>, <code>--web-tls-key</code> and the three new flags, in the same table style as the existing sections, and link across to <code>docs/web-frontend.md</code> for the operator narrative rather than duplicating it. In <code>docs/web-frontend.md</code>, rewrite the firewall bullets at <code>:236-247</code>: "Pinning a specific port is not configurable yet, so a static firewall rule currently has to open the OS's whole ephemeral range" is now false — document <code>--web-media-port</code> and the single static rule it permits, keep and sharpen the <code>--web-host</code> versus media-address warning now that <code>--web-media-addr</code> exists, and add the loopback-only case. The troubleshooting entry phase 02 added about loopback-only hosts should now point at <code>--web-media-addr 127.0.0.1</code> as the fix. In <code>docs/web-mode-internals.md</code>, update the "UDP bind addresses" subsection at <code>:150-170</code> to describe the policy type rather than the unconditional enumeration. Check <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> and change them only if a convention or the shape of the system changed — adding flags is neither.</td>
 </tr>
 </tbody>
 </table>
+<p>Dependencies are linear: 3a → 3b → 3c → 3d. No back-brief gate;
+every step is reviewable on its own diff and none of them is
+expensive to redo.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The policy silently resolves to nothing</strong> — an operator
+  names an interface that does not exist, or one that is down,
+  and gets the same "no bindable network interface" error as a
+  loopback-only host. Mitigation: 3b's error text distinguishes
+  the two cases, and 3c's startup validation catches only what
+  it can catch statically (a malformed or unspecified address),
+  so the message the operator does see has to be the one that
+  tells them which happened. The management session checks that
+  text against both cases when reviewing 3b.</li>
+<li><strong>A pinned port collides and the error is unreadable.</strong> The
+  failure arrives from inside <code>PeerConnectionBuilder::build</code>,
+  which <code>bridge.rs:749-752</code> propagates with <code>?</code> — so an operator
+  may get a bare <code>Address already in use</code> with no mention of
+  <code>--web-media-port</code>. Mitigation: 3b wraps the <code>build()</code> error
+  with context naming the port and the flag when the policy
+  pinned one. Checked by review of the 3b diff, not by a test —
+  reliably occupying a port in a test is more fragile than the
+  thing it would protect.</li>
+<li><strong>Behaviour drift with no flags set.</strong> Every existing
+  deployment must keep the phase 02 behaviour exactly.
+  Mitigation: <code>UdpBindPolicy::default()</code> is the current policy by
+  construction (3a), and <code>make test</code> exercises the default path
+  throughout — a drift here fails <code>tests/loopback.rs</code>, which is
+  the same signal phase 02 relied on.</li>
+<li><strong>The bridge and <code>TestPeerBuilder</code> error messages diverge.</strong>
+  They are hand-duplicated today (<code>bridge.rs:716-723</code> versus
+  <code>test_client.rs:264-270</code> and <code>:611-617</code>). Mitigation: 3b
+  updates the bridge's; the reviewer checks whether the test
+  helper's is now stale, and either updates it or accepts the
+  divergence explicitly rather than by omission.</li>
+</ul>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Falsifiable, in the order a reviewer would check them:</p>
+<ul>
+<li><code>ryll --help</code> lists <code>--web-media-addr</code>, <code>--web-media-port</code> and
+  <code>--web-ice-server</code>, each with help text that says what it
+  takes.</li>
+<li><code>ryll --web --web-media-addr 0.0.0.0 …</code> exits at startup with
+  an error that names the unroutable-candidate consequence, not
+  at the first <code>POST /offer</code>.</li>
+<li>A unit test builds a bridge with a pinned port and asserts
+  every <code>a=candidate:</code> line in the answer SDP carries that port.</li>
+<li>A unit test asserts <code>--web-media-addr 127.0.0.1</code> produces a
+  <code>BindSelector::Addr</code> that survives validation — loopback is a
+  supported explicit choice, not a filtered one.</li>
+<li>A unit test asserts an argument that is not an <code>IpAddr</code>
+  becomes <code>BindSelector::Interface</code>.</li>
+<li><code>UdpBindPolicy::default().resolve()</code> and
+  <code>host_udp_bind_addrs()</code> return the same thing, and no test in
+  <code>tests/loopback.rs</code> or <code>tests/lifecycle.rs</code> changed behaviour
+  to accommodate this phase.</li>
+<li><code>grep -- '--web-media-port' docs/configuration.md
+  docs/web-frontend.md</code> matches in both, and
+  <code>grep -i 'not configurable' docs/web-frontend.md</code> returns
+  nothing.</li>
+<li>No fact about UDP bind behaviour is stated differently in
+  <code>docs/configuration.md</code>, <code>docs/web-frontend.md</code> and
+  <code>docs/web-mode-internals.md</code>.</li>
+<li><code>make test</code>, <code>make lint</code> and <code>pre-commit run --all-files</code> all
+  pass.</li>
+</ul>
+<h2 id="effort">Effort<a class="headerlink" href="#effort" title="Permanent link">&para;</a></h2>
+<p>The master plan estimates half a day. Revise to <strong>one day</strong>. The
+half-day estimate was written when phase 03 was "add a flag for
+the bind address"; the survey found that <code>WebrtcBridgeConfig</code>
+has no command-line path at all, that twenty construction sites
+move with any new field, that the interface allowlist and the
+loopback opt-in were both deferred into this phase by phase 02's
+review, and that <code>docs/configuration.md</code> never documented web
+mode in the first place. None of it is hard, and there is a lot
+of it.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Estimate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3a — bind policy type</td>
+<td>2 hours</td>
+</tr>
+<tr>
+<td>3b — bridge wiring and site migration</td>
+<td>2 hours</td>
+</tr>
+<tr>
+<td>3c — flags and plumbing</td>
+<td>2 hours</td>
+</tr>
+<tr>
+<td>3d — documentation</td>
+<td>2 hours</td>
+</tr>
+</tbody>
+</table>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<p>Complete. All four steps landed, <code>make test</code>, <code>make lint</code>,
+<code>make web-smoke</code>, <code>make web-smoke-tls</code> and
+<code>pre-commit run --all-files</code> are clean, and both browser-visible
+Definition-of-done items were checked against the built binary
+rather than only asserted in tests:</p>
+<div class="highlight"><pre><span></span><code>$ ryll --web --direct 127.0.0.1:5900 --web-media-addr 0.0.0.0
+Error: web media binding (`--web-media-addr` /
+`--web-media-port`): 0.0.0.0 cannot be used as a media bind
+address: it binds successfully and then advertises itself
+verbatim as an ICE host candidate, which every browser
+discards …
+</code></pre></div>
+<h2 id="what-landed">What landed<a class="headerlink" href="#what-landed" title="Permanent link">&para;</a></h2>
+<p>Nineteen <code>WebrtcBridgeConfig</code> construction sites moved to
+<code>WebrtcBridgeConfig::new</code>, which matches the "about twenty" the
+survey estimated.</p>
+<p>Five things differ from the plan as written:</p>
+<ol>
+<li><strong>Resolved addresses are deduplicated, which the plan did not
+   ask for.</strong> An operator can name an interface and one of its
+   addresses, and a host can report one address on two
+   interfaces. With an ephemeral port a duplicate is cosmetic —
+   two sockets, two candidates — but with a pinned port the
+   second <code>UdpSocket::bind</code> on the same address:port fails and
+   takes the whole peer connection with it. <code>dedup_with_port</code>
+   applies to the default path too, so the <code>--web-media-port</code>
+   pin is safe without any selectors.</li>
+<li><strong><code>bindable_udp_addrs</code> now returns <code>Vec&lt;IpAddr&gt;</code>, not
+   <code>Vec&lt;SocketAddr&gt;</code>.</strong> The port is applied once, at the end, by
+   <code>dedup_with_port</code>, rather than by each filtering path. The
+   existing unit tests kept their assertions verbatim through a
+   <code>bound()</code> helper in the test module.</li>
+<li><strong><code>WebState::build</code> carries an
+   <code>#[allow(clippy::too_many_arguments)]</code>.</strong> Two more arguments
+   pushed it past the threshold. The alternative — a config
+   struct for the constructor — is a larger refactor than this
+   phase should be doing, and <code>build</code> is private with two
+   callers.</li>
+<li><strong><code>ARCHITECTURE.md</code> changed by one annotation.</strong> The plan said
+   to touch it only if the shape of the system changed, and it
+   did not. But its <code>shakenfist-spice-webrtc/</code> file-tree
+   annotation named <code>host_udp_bind_addrs()</code> as what
+   <code>bind_addrs.rs</code> is, which is now the default case of
+   <code>UdpBindPolicy</code> rather than the whole module. Corrected in
+   place, not expanded.</li>
+<li><strong>Implemented in the management session, not by sub-agents.</strong>
+   The shared execution-model block calls for one sub-agent per
+   step. This session ran under Claude Code's auto mode, whose
+   standing policy is not to spawn sub-agents unless the operator
+   asks for them, and the operator's request was "implement the
+   phase plan" rather than "run it as sub-agents" — so the four
+   steps were executed directly, in order, with <code>make lint</code> and
+   the crate's tests between them. Nothing was disabled; the
+   capability was available and the mode's default is simply not
+   to reach for it unasked. Recorded because the convention
+   exists, not because anything about the output differs.</li>
+</ol>
+<p>The two risks the plan named as review-only checks were both
+handled: <code>WebrtcBridge::new</code> now distinguishes "no bindable
+network interface" from "no media bind address matched", and a
+<code>build()</code> failure under a pinned port is wrapped with the port
+number and the flag that chose it.</p>
+<h2 id="what-the-review-changed">What the review changed<a class="headerlink" href="#what-the-review-changed" title="Permanent link">&para;</a></h2>
+<p>The automated review of PR #298 raised three action items and
+eight suggestions. All three action items and six suggestions
+landed; two suggestions were declined, with reasons.</p>
+<p>The action items were the stale <code>host_udp_bind_addrs:</code> log prefix
+in <code>test_client.rs</code> (the divergence this plan explicitly asked a
+reviewer to decide on rather than leave to silence — it was
+stale, and both copies now say <code>bind_addrs:</code>), <code>docs/features.md</code>
+still listing the pre-PR web flag set, and the missing
+<code>docs/multi-mode-parity.md</code> row that <code>AGENTS.md</code> makes mandatory.</p>
+<p>Four suggestions closed gaps this plan had knowingly left open:</p>
+<ul>
+<li><strong>Interface-selector hit paths are now tested.</strong> <code>select_from</code>
+  was split out of <code>selected_addrs</code> as a pure function taking the
+  interface list, so name matching, an interface with several
+  addresses, one address on two interfaces, and a link-local-only
+  interface are all covered against a synthetic fixture. The
+  module docs rule out enumerating the real host in a test, which
+  argues for injecting the list rather than leaving the logic
+  uncovered.</li>
+<li><strong>The "no media bind address matched" branch has a test.</strong>
+  Risk 1 settled for a review-time check; it is deterministic via
+  a nonexistent interface name and binds no socket, so it is now
+  pinned rather than re-checked by eye each time.</li>
+<li><strong><code>--web-ice-server</code> is validated at launch.</strong> Decision 2 said
+  bad input fails at launch, and this flag was the one that did
+  not. It matters most here: an operator only reaches for an ICE
+  server when host candidates already fail, so a silently useless
+  URL is indistinguishable from WebRTC being broken.</li>
+<li><strong>A malformed address literal no longer becomes an interface
+  name.</strong> The address-or-interface fallback is ambiguous in one
+  direction only, and this plan's own error text steers people
+  into it: told that <code>fe80::1</code> needs a zone id, the natural next
+  attempt is <code>fe80::1%eth0</code>, which Rust cannot parse and which
+  therefore became a nonexistent interface name. A single colon
+  is still a name (<code>eth0:0</code> is a real alias label).</li>
+</ul>
+<p>Two more were diagnostic polish: a <code>build()</code> failure now names
+<code>--web-media-addr</code> as well as <code>--web-media-port</code>, each clause
+appearing only when that flag was actually set; and the
+whole-policy <code>validate()</code> error is prefixed with the flag family
+rather than <code>--web-media-addr</code>, so the first port-related check
+added later cannot inherit the wrong flag name.</p>
+<p>Declined:</p>
+<ul>
+<li><strong>Declaring <code>rust-version = "1.88"</code> for the <code>as_chunks</code>
+  rewrite.</strong> The floor is real, but it is set by the dependency
+  tree rather than by these three lines, and nothing in CI builds
+  on the oldest supported toolchain — so the number would be an
+  unverified promise on two published crates. Whether this
+  workspace declares an MSRV at all is a repo-wide decision that
+  deserves its own change, with a CI job that makes the claim
+  true.</li>
+<li><strong>Tightening the <code>--web-*</code> flags to require <code>--web</code>.</strong> Recorded
+  as an observation rather than an action item by the review
+  itself, and it is: <code>--web-host</code> and <code>--web-port</code> have always
+  behaved this way, so changing only the three new flags would
+  make them behave unlike their siblings.</li>
+</ul>
+<p>One informational item has no artefact to carry it: the review
+suggests noting in the crate's release notes that
+<code>host_udp_bind_addrs()</code> now deduplicates, since it is public and
+its observable output changed. There is no changelog in this
+repo, so it is recorded here and in deviation 1 above for
+whoever writes the next <code>shakenfist-spice-webrtc</code> release notes.</p>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step of this plan, back brief the operator
+on your understanding of it — in particular on Decision 3, which
+is the one a reviewer is most likely to disagree with, and on
+what "the default with no flags set must not change" means for
+the step you are about to run.</p>
 
 
 
@@ -12435,7 +12419,7 @@ rewrite is the maintained implementation.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/features.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/features.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/features/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -12476,10 +12460,10 @@ rewrite is the maintained implementation.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

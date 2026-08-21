@@ -12267,10 +12267,23 @@ behind a firewall or in a container.</p>
 <p>Note that <code>WebrtcBridgeConfig</code> currently has <em>no</em> path from the
 command line at all — <code>ice_servers</code> exists on the struct but ryll
 passes an empty vector unconditionally
-(<code>ryll/src/web/signalling.rs:299</code>). So phase 03 builds that
-plumbing rather than extending it, and should carry <code>ice_servers</code>
-along with the bind address while it is there.</p>
-<p>Touches <code>docs/configuration.md</code> and <code>docs/web-frontend.md</code>.</p>
+(<code>ryll/src/web/signalling.rs:300-303</code>, the only production
+construction site; the other twenty are tests). So phase 03 builds
+that plumbing rather than extending it, and should carry
+<code>ice_servers</code> along with the bind address while it is there.</p>
+<p>Phase 03's planning survey corrected two things this section said
+or assumed. The <code>signalling.rs</code> line number above drifted by one
+during phase 02. And "touches <code>docs/configuration.md</code>" turns out
+to mean <em>writing</em> its web section rather than extending it:
+<code>docs/configuration.md</code> documents no <code>--web</code> flag at all today,
+not even the <code>--web-host</code> and <code>--web-port</code> that have shipped since
+the web frontend landed. Phase 02's review also deferred two items
+into this phase — an interface allowlist rather than only a port
+pin, and an opt-in for loopback-only hosts — both of which
+<a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/">the phase plan</a>
+now carries.</p>
+<p>Touches <code>docs/configuration.md</code>, <code>docs/web-frontend.md</code> and
+<code>docs/web-mode-internals.md</code>.</p>
 <h3 id="phase-04-soak-validation-and-docs">Phase 04 — Soak validation and docs<a class="headerlink" href="#phase-04-soak-validation-and-docs" title="Permanent link">&para;</a></h3>
 <p>The 0.20 release notes headline UDP batching via GSO/GRO,
 elimination of tokio scheduler overhead in datachannel
@@ -12281,8 +12294,16 @@ minutes.</p>
 <ul>
 <li>A real browser session against a real SPICE guest, held long
   enough to see steady-state behaviour, with the latency HUD and
-  runtime metrics captured.</li>
-<li>Chrome and Firefox at minimum; Safari if a Mac is available.</li>
+  runtime metrics captured. <strong>Listen to the audio</strong> while it is
+  open: phase 02's browser session confirmed the playback channel
+  negotiated Opus but nobody confirmed sound by ear, so that
+  Definition-of-done clause is inherited here.</li>
+<li>Chrome and Firefox at minimum; Safari if a Mac is available.
+  <strong>Firefox is a known blocker inherited from phase 02</strong>: a Firefox
+  that does not offer H.264 gets no video at all, because ryll
+  encodes H.264 only. Land #289 (tell the viewer) before soaking,
+  and settle whether a Firefox with a working OpenH264 plugin is
+  enough for this criterion or whether ryll needs a second codec.</li>
 <li>Compare RSS and CPU against a 0.17 baseline captured before
   the bump — take that baseline during phase 01 while we are
   still on the old version.</li>
@@ -12313,12 +12334,12 @@ minutes.</p>
 <tr>
 <td>2. Atomic bump to 0.20</td>
 <td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">PLAN-webrtc-0.20-upgrade-phase-02-bump.md</a></td>
-<td>Code complete — awaiting the browser session, the one check the test suite cannot stand in for</td>
+<td>Complete — Chromium session on <code>7e2fb58e</code> confirms the bind address. Firefox has no video, for a reason that is not a port regression (#289, #290); it is phase 04's gate, as is the audio check nobody performed by ear</td>
 </tr>
 <tr>
 <td>3. Socket binding configuration</td>
-<td>PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/">PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs.md</a></td>
+<td>Complete — <code>--web-media-addr</code> (address or interface name), <code>--web-media-port</code> and <code>--web-ice-server</code>, carried through <code>WebState</code> into a <code>UdpBindPolicy</code> the bridge resolves per offer. Explicit addresses override the loopback default; <code>0.0.0.0</code> is refused at startup</td>
 </tr>
 <tr>
 <td>4. Soak validation and docs</td>
@@ -12360,7 +12381,7 @@ two weeks:</p>
 </tr>
 <tr>
 <td>03 — socket binding config</td>
-<td>½ day</td>
+<td>1 day (revised from ½ by the phase plan; actual)</td>
 </tr>
 <tr>
 <td>04 — soak and docs</td>
@@ -12550,7 +12571,10 @@ sized phase 02, and two of them moved work between phases.</p>
   but 0.20's <code>SettingEngine::set_ip_filter</code> /
   <code>set_interface_filter</code> still compile while doing nothing, so
   there is no way to narrow it today. Raised by the automated
-  review of PR #278.</li>
+  review of PR #278. <strong>Carried into phase 03's plan</strong> as
+  <code>--web-media-addr</code>, which takes an interface name as well as an
+  address; phase 02's other deferral, an opt-in for loopback-only
+  hosts, falls out of the same flag.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>Two, both found by the automated review of PR #278 and both

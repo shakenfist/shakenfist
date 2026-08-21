@@ -12719,7 +12719,8 @@ pair giving level-triggered, raise-exactly-once semantics — see
 the WebRTC conventions section of AGENTS.md for why a bare
 <code>Notify</code> is not safe here.</p>
 <p><code>WebrtcBridgeConfig</code> carries the ICE server list (empty for
-LAN-only use) and the <code>EncoderControl</code> sender.</p>
+LAN-only use, populated by <code>--web-ice-server</code>), the UDP bind
+policy described below, and the <code>EncoderControl</code> sender.</p>
 <h4 id="udp-bind-addresses">UDP bind addresses<a class="headerlink" href="#udp-bind-addresses" title="Permanent link">&para;</a></h4>
 <p>webrtc-rs 0.17 bound its own sockets and enumerated the host's
 interfaces internally; 0.20 inverts that — the caller binds the
@@ -12732,15 +12733,38 @@ every browser discards — and is invisible to the in-process test
 suite, since two Rust peers on one host agree about the bogus
 address and connect happily.
 <code>shakenfist-spice-webrtc/src/bind_addrs.rs</code> reproduces what 0.17
-did internally: <code>host_udp_bind_addrs()</code> enumerates the host's
-network interface addresses via the <code>if-addrs</code> crate and returns
-one ephemeral-port <code>SocketAddr</code> per address, skipping loopback,
-unspecified, and IPv6 link-local addresses. <code>WebrtcBridge::new</code>
-rejects an empty result rather than building a peer connection
-that could only ever offer unroutable candidates. This is
-independent of the <code>--web-host</code> flag, which only controls the
-HTTP/HTTPS signalling listener; see the reverse-proxy callout in
-the <a href="/components/ryll/web-frontend/">web frontend guide</a> for the operator-facing
+did internally, as a <code>UdpBindPolicy</code> the bridge resolves. With no
+selectors — the default, and what <code>host_udp_bind_addrs()</code> is — it
+enumerates the host's network interface addresses via the
+<code>if-addrs</code> crate and returns one ephemeral-port <code>SocketAddr</code> per
+address, skipping loopback, unspecified, and IPv6 link-local
+addresses. <code>--web-media-addr</code> fills the selectors with addresses
+or interface names, and <code>--web-media-port</code> replaces the ephemeral
+port.</p>
+<p>The module splits its exclusions into two kinds, and the split is
+what the configuration surface means:</p>
+<ul>
+<li><em>Policy</em> — loopback, and everything not filtered at all (RFC
+  1918, IPv4 link-local, IPv6 ULA). Defaults about what is worth
+  advertising, overridden by naming addresses explicitly. This is
+  what makes <code>--web-media-addr 127.0.0.1</code> a supported
+  loopback-only deployment.</li>
+<li><em>Mechanism</em> — unspecified (<code>0.0.0.0</code>, <code>::</code>) and zoneless
+  <code>fe80::/10</code>. A <code>SocketAddr</code> cannot represent either in a way ICE
+  can use, so <code>UdpBindPolicy::validate</code> refuses them at startup
+  and no flag re-enables them.</li>
+</ul>
+<p>The policy is resolved on every <code>WebrtcBridge::new</code> rather than
+once per process, so a session that outlives a DHCP lease or a
+VPN coming up binds what exists when the viewer arrives.
+<code>WebrtcBridge::new</code> rejects an empty result rather than building
+a peer connection that could only ever offer unroutable
+candidates, and distinguishes the two empty cases: nothing
+bindable on this host, versus nothing matching the configured
+selectors. All of this is independent of the <code>--web-host</code> flag,
+which only controls the HTTP/HTTPS signalling listener; see the
+reverse-proxy callout in the
+<a href="/components/ryll/web-frontend/">web frontend guide</a> for the operator-facing
 consequences.</p>
 <h3 id="sdp-flow">SDP flow<a class="headerlink" href="#sdp-flow" title="Permanent link">&para;</a></h3>
 <p><code>accept_offer(sdp: String) -&gt; Result&lt;String&gt;</code> is the single SDP

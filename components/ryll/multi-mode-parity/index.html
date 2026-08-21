@@ -12054,7 +12054,8 @@ is no standing gap-closure plan — gaps get closed by mode-specific
 work (the <a href="/components/ryll/plans/PLAN-web-frontend/">web frontend plan</a> closed the
 Web column's MVP set; the control socket work gave headless an
 interactive driving surface). Last full audit: the web frontend
-sweep; control-socket cells refreshed 2026-07-30.</p>
+sweep; control-socket cells refreshed 2026-07-30, media socket
+binding added 2026-08-21.</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12731,6 +12732,12 @@ sweep; control-socket cells refreshed 2026-07-30.</p>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>--web-tls-cert</code> / <code>--web-tls-key</code> flags; axum-server with rustls)</td>
+</tr>
+<tr>
+<td>WebRTC media socket binding</td>
+<td>n/a — intrinsic (no WebRTC)</td>
+<td>n/a — intrinsic (no WebRTC)</td>
+<td>available (<code>--web-media-addr</code> takes an address or an interface name, <code>--web-media-port</code> pins the UDP port for a firewall rule, <code>--web-ice-server</code> supplies STUN/TURN URLs)</td>
 </tr>
 <tr>
 <td><strong>Web frontend (--web mode)</strong></td>

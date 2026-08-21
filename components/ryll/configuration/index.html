@@ -8214,6 +8214,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#web-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#capture-and-debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12238,6 +12249,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#web-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#capture-and-debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12654,6 +12676,61 @@ configuration section below.</p>
 <td><code>--pedantic-dir &lt;DIR&gt;</code></td>
 <td>none</td>
 <td>Output directory for pedantic bug reports</td>
+</tr>
+</tbody>
+</table>
+<h3 id="web-mode">Web Mode<a class="headerlink" href="#web-mode" title="Permanent link">&para;</a></h3>
+<p><code>--web</code> runs ryll as a SPICE-to-browser transcoder instead of opening a GUI
+window. The operator guide, including reverse-proxy and TLS setup, is
+<a href="/components/ryll/web-frontend/">web-frontend.md</a>; this table is the flag reference.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--web</code></td>
+<td>false</td>
+<td>Run as a SPICE → browser transcoder. Serves a browser shell that consumes the SPICE display via WebRTC, and prints a URL carrying a per-launch random token. Mutually exclusive with <code>--headless</code> and the GUI default</td>
+</tr>
+<tr>
+<td><code>--web-host &lt;ADDR&gt;</code></td>
+<td><code>127.0.0.1</code></td>
+<td>Bind address for the HTTP/HTTPS signalling listener only. Use <code>0.0.0.0</code> for LAN access. Has no effect on which addresses WebRTC media binds or advertises — that is <code>--web-media-addr</code></td>
+</tr>
+<tr>
+<td><code>--web-port &lt;PORT&gt;</code></td>
+<td>0 (ephemeral)</td>
+<td>TCP port for the signalling listener</td>
+</tr>
+<tr>
+<td><code>--web-tls-cert &lt;PATH&gt;</code></td>
+<td>none</td>
+<td>PEM-encoded TLS certificate chain. Serving over HTTPS requires <code>--web-tls-key</code> as well</td>
+</tr>
+<tr>
+<td><code>--web-tls-key &lt;PATH&gt;</code></td>
+<td>none</td>
+<td>PEM-encoded TLS private key. Required with <code>--web-tls-cert</code></td>
+</tr>
+<tr>
+<td><code>--web-media-addr &lt;ADDR\|IFACE&gt;</code></td>
+<td>every non-loopback interface address</td>
+<td>Local address, or interface name, to bind the WebRTC media (UDP) sockets to. Repeatable. Naming addresses explicitly also overrides the default exclusion of loopback, which is how a loopback-only host is served (<code>--web-media-addr 127.0.0.1</code>). The unspecified addresses (<code>0.0.0.0</code>, <code>::</code>) and zoneless <code>fe80::/10</code> are refused at startup: neither can become an ICE candidate a browser will use</td>
+</tr>
+<tr>
+<td><code>--web-media-port &lt;PORT&gt;</code></td>
+<td>0 (ephemeral)</td>
+<td>UDP port for the media sockets. Pin it so a firewall rule can name one port instead of the OS's whole ephemeral range. Applies to every bound address; a port already in use fails loudly rather than falling back to an ephemeral one, since a silent fallback would no longer match the firewall rule</td>
+</tr>
+<tr>
+<td><code>--web-ice-server &lt;URL&gt;</code></td>
+<td>none</td>
+<td>STUN or TURN server URL (<code>stun:host:port</code>, <code>turn:host:port</code>). Repeatable. Empty by default: ryll assumes browser and host share a LAN, so ICE host candidates are usually enough. The scheme must be <code>stun:</code>, <code>stuns:</code>, <code>turn:</code> or <code>turns:</code> and is checked at startup, so a URL with the scheme left off fails the launch rather than producing an ICE server that silently does nothing</td>
 </tr>
 </tbody>
 </table>

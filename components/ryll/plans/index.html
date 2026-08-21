@@ -12191,7 +12191,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade/">webrtc-rs 0.20 upgrade</a></td>
 <td>Port <code>shakenfist-spice-webrtc</code> from webrtc-rs 0.17.1 to 0.20.x. 0.20 re-homes the crate on a sans-io <code>rtc</code> core behind a thin async layer, moving <code>RTCPeerConnection</code>'s operations onto a trait, collapsing the per-object callbacks into a single <code>PeerConnectionEventHandler</code>, dropping <code>gathering_complete_promise</code> and <code>connection_state</code>, and requiring explicit UDP bind addresses. Deferred from Renovate PR #245, which was repurposed to carry the <code>&lt; 0.18</code> pin and this plan.</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">1. Pre-work on 0.17</a> (complete), <a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">2. Atomic bump</a>, 3. Socket binding config, 4. Soak and docs (phases 3-4 plans pending)</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/">1. Pre-work on 0.17</a> (complete), <a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">2. Atomic bump</a> (complete), <a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/">3. Socket binding config</a> (complete), 4. Soak and docs (phase 4 plan pending)</td>
 </tr>
 <tr>
 <td>2026-08-09</td>

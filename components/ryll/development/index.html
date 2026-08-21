@@ -8366,19 +8366,19 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#helper-tools" class="md-nav__link">
+    <nav class="md-nav" aria-label="Manual verification against a desktop guest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-browser-with-no-h264-gets-no-video" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Helper tools
+        A browser with no H.264 gets no video
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Helper tools">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
   <a href="#inspecting-a-capture-pcap" class="md-nav__link">
@@ -12173,19 +12173,19 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#helper-tools" class="md-nav__link">
+    <nav class="md-nav" aria-label="Manual verification against a desktop guest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-browser-with-no-h264-gets-no-video" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Helper tools
+        A browser with no H.264 gets no video
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Helper tools">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
   <a href="#inspecting-a-capture-pcap" class="md-nav__link">
@@ -12555,8 +12555,26 @@ a symptom that looks like a client bug:</p>
 <li><code>web: encoder restarted at WxH@30fps</code> — the encode resolution. If
   it does not match the guest's surface, the browser is watching a
   scaled image.</li>
+<li><code>webrtc: no H.264 payload type negotiated</code> — the browser offered no
+  H.264, so there is no video at all. See below.</li>
 </ul>
-<h2 id="helper-tools">Helper tools<a class="headerlink" href="#helper-tools" title="Permanent link">&para;</a></h2>
+<h3 id="a-browser-with-no-h264-gets-no-video">A browser with no H.264 gets no video<a class="headerlink" href="#a-browser-with-no-h264-gets-no-video" title="Permanent link">&para;</a></h3>
+<p>ryll's web mode encodes H.264 and nothing else, so a browser that does
+not offer H.264 connects successfully and shows a black rectangle.
+Audio, input, cursor and viewport resize all keep working, which makes
+the symptom look like a rendering bug rather than a negotiation one.
+The server-side tell is the <code>no H.264 payload type negotiated</code> warning
+followed by an endless <code>Failed to send RTP: unsupported codec type by
+this transceiver</code>.</p>
+<p>Firefox is the browser this happens on. It ships H.264 for WebRTC via
+Cisco's OpenH264 plugin, and if that plugin has not loaded, Firefox
+still lists H.264 in <code>RTCRtpReceiver.getCapabilities('video')</code> while
+omitting it from the offer — so the capability list is not evidence.
+Check <code>about:addons</code> → Plugins for OpenH264, and confirm against a
+generated offer rather than against capabilities.</p>
+<p>Chromium carries H.264 in-tree and does not have this failure mode,
+which makes it the browser to reach for when deciding whether a
+problem is ryll's.</p>
 <h3 id="inspecting-a-capture-pcap">Inspecting a <code>--capture</code> pcap<a class="headerlink" href="#inspecting-a-capture-pcap" title="Permanent link">&para;</a></h3>
 <p><code>tools/pcap-inspect.py</code> is a pure-Python helper (no tshark
 or scapy dependency) for sifting through a ryll capture.
