@@ -12953,6 +12953,8 @@ step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>
 <li><code>tools/ci/test-report-fuzz-crash.sh</code>, <code>tools/ci/test-pick-fuzz-artifact.sh</code> - Tests for those two; run them after any change (the <code>ci-tooling</code> CI job does)</li>
 <li><code>tools/ci/check-glibc-floor.sh</code> - Fails if the built <code>instar</code> binary needs a glibc above the published floor (<code>GLIBC_2.31</code>, Debian 11; see <code>docs/installation.md</code>). Runs immediately after <code>make instar</code> in both <code>build-and-test</code> and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and <code>src/.devcontainer/build/Dockerfile</code> must stay on <code>debian:bullseye</code></li>
 <li><code>tools/ci/test-check-glibc-floor.sh</code> - Tests for that check; the <code>ci-tooling</code> CI job runs it</li>
+<li><code>tools/ci/stage-autofix-changes.sh</code> - Stages the tracked edits a Claude Code autofix run left in the working tree, before the steps that judge whether a fix exists read the index, and refuses the attempt (exit 3) if it created a file that cannot be staged safely. Called from <code>fuzz-autofix.yml</code>, and in <code>--tracked-only</code> mode from <code>tools/address-comments-with-claude.sh</code>; see "Automated bug fixes" in <code>docs/testing.md</code></li>
+<li><code>tools/ci/test-stage-autofix-changes.sh</code> - Tests for that stager; the <code>ci-tooling</code> CI job runs it</li>
 </ul>
 
 
