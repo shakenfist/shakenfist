@@ -57,13 +57,18 @@ own Execution table, and the `Phases` column here is arithmetic over that table;
 plan link for what each phase covers, and for why a plan is where it is. It counts
 *completed* phases, so a plan whose phases were abandoned or superseded rather than done can
 read `Complete` without the two numbers meeting, and `—` means the plan has no enumerated
-phases yet.
+phases yet, or has a table which is still a placeholder rather than a phase list.
 
 Four plans are counted by hand because they do not keep a phase table:
 [blob storage](blob-storage-roadmap.md), [API query
 batching](api-query-batching-roadmap.md) and [attribute field
 masks](PLAN-attribute-field-masks.md) carry their phases as headings, and [queue
 performance](PLAN-queue-performance.md) is numbered in steps rather than phases.
+Two more publish no arithmetic because their tables are placeholders: [owning more of the
+QEMU stack](PLAN-qemu-futures.md) names three phases and then an ellipsis, and [artifact UX
+rework](PLAN-artifact-ux-rework.md) a decisions pass and "(later phases)". Both sets are
+named in `tools/check-plan-status.py` as well, so the exemptions a reader sees and the ones
+the checker applies are the same list.
 
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|

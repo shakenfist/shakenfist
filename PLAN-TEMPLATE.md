@@ -363,14 +363,21 @@ the following files in `docs/plans/`:
   in the intended reading order. This registers the plan
   and is what the plan-status check reads; it does **not**
   by itself put the plan in the published site navigation,
-  which `mkdocs.yml.tmpl` currently lists by hand. Phase
-  files should *not* be added to `order.yml`; they are
-  linked from the master plan's Execution table only, which
-  makes that table the only path to them.
+  which `mkdocs.yml.tmpl` currently lists by hand. The file
+  is not ours: its format and its meaning as a per-directory
+  navigation allowlist come from `tools/sync_component_docs.py`
+  in shakenfist/actions, which is how a repository's docs are
+  synced into a documentation site. Keeping it complete is
+  what would make generating the nav from it a mechanical
+  change later. Phase files should *not* be added to
+  `order.yml`; they are linked from the master plan's
+  Execution table only, which makes that table the only path
+  to them.
 
 The index row carries the whole-plan status, so it only
-reaches `Complete` once every phase has. Update it as the
-arithmetic changes, not only at the end.
+reaches `Complete` once every phase has been completed,
+abandoned or superseded. Update it as the arithmetic
+changes, not only at the end.
 
 <!-- shared-block: plan-closeout-sections v1 -->
 Plan close-out sections (shared block; do not edit -- the
