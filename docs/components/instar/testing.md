@@ -1279,6 +1279,44 @@ per issue; failed issues are labelled `autofix-failed` for human
 attention. Complexity guardrails prevent runaway fixes (max 3 files,
 no cross-crate changes, no new dependencies).
 
+CI stages Claude's work, not Claude: `tools/ci/stage-autofix-changes.sh`
+runs immediately after each attempt and stages every tracked
+modification. That matters because every gate downstream -- the
+complexity count, the rebuild decision, the "did anything change"
+check -- reads the index rather than the working tree. Between 2026-04
+and 2026-08 the staging ran only in the create-PR step, downstream of
+those gates, so 28 issues were attempted, every one reported "No
+changes staged by Claude" with the fix sitting unstaged in the working
+tree, and no PR was ever opened. If an autofix report shows an empty
+`=== Staged Changes ===` block, that now means Claude changed nothing
+-- not that it forgot to stage.
+
+It stages tracked modifications and nothing else. A file the attempt
+*created* is refused, by name, and the run stops with the issue left
+labelled `autofix-failed` for a human: a new source file, a fixture
+`.gitignore` hides (git omits ignored paths from the untracked listing
+entirely, so these otherwise vanish without a trace -- `**/*.bin` is
+ignored and is exactly what a crash fixture gets called), or an edit
+under `.github/workflows/`, which cannot be pushed with the token CI
+holds. Staging those instead would mean classifying them, and a wrong
+guess ships a branch that does not compile behind a pull request
+saying "Build succeeded", because the verify build runs against the
+working tree where the file is present. A wrong refusal costs a look
+at an issue that was already going to get one. The script's header
+records an earlier revision that tried the classification and the
+sequence of defects it produced.
+
+Telling a file the attempt created from build output that was already
+there needs a before picture, and each attempt gets its own.
+`pre-run-ignored.txt` is taken after `Build instar` and before attempt
+1. `Prepare retry` then deletes the paths named in
+`stager-refused-1.txt` -- its `git clean -fd` has no `-x`, so an
+ignored file attempt 1 created would otherwise survive and refuse
+attempt 2 whatever attempt 2 did -- and snapshots again into
+`pre-retry-ignored.txt`, which attempt 2 is judged against. A single
+baseline would judge attempt 2 against a tree from before the verify
+build and the full test run, and refuse it for their output.
+
 ## Related Documentation
 
 - [Format Coverage](/components/instar/format-coverage/) - Comparison with oslo.utils format_inspector
