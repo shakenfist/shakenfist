@@ -90,9 +90,22 @@ jobs:
             # and would skip the unit tests -- including the guard which
             # recomputes the plan index. That is exactly the change the
             # guard exists to catch, so it gets its own output.
+            #
+            # Exactly one pattern, deliberately. predicate-quantifier is a
+            # step-level input, so 'every' applies to this filter too, and
+            # a file cannot be both under docs/plans/ and be a file at the
+            # repository root: a second pattern here makes the filter match
+            # nothing at all. PLAN-TEMPLATE.md does not need naming anyway,
+            # because it is not under docs/ and so already matches 'code'.
+            #
+            # A plan-only change therefore runs the whole sanity_checks job
+            # -- flake8, mypy, ansible-lint and the unit suite -- to reach a
+            # checker which finishes in under a second. That is a cost we
+            # are choosing: a separate cheap job would need its own entry in
+            # branch protection, and one gate in one place is worth more
+            # than the runner minutes.
             plans:
               - 'docs/plans/**'
-              - 'PLAN-TEMPLATE.md'
 
   # Scan git history for leaked credentials. Deliberately not gated on
   # check_paths: a credential pasted into documentation is still a
