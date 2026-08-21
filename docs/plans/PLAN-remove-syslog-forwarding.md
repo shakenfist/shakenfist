@@ -1215,11 +1215,12 @@ When this master plan is created from the template:
 * **`docs/plans/order.yml`** — add an entry for this master
   plan, in the intended reading order. Phase
   files are *not* added to `order.yml`; they are linked from the
-  Execution table and `index.md` only.
+  Execution table only, which makes that table the only path
+  to them.
 
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which consumes
-`order.yml`. Do not edit `mkdocs.yml` by hand.
+`order.yml` does not by itself reach this repository's site
+navigation: `mkdocs.yml.tmpl` lists the Plans nav by hand.
+The entry is registration and reading order.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md` and mark `PLAN-remove-primary.md` phase 1

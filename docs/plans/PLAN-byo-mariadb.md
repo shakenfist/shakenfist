@@ -900,12 +900,13 @@ update the following files in `docs/plans/`:
 * **`order.yml`** — add an entry for this master
   plan. Phase files are *not* added to
   `order.yml`; they are linked from the
-  Execution table and from `index.md` only.
+  Execution table only, which makes that table the
+  only path to them.
 
-The site navigation in `mkdocs.yml` is produced
-from `mkdocs.yml.tmpl` by the docs-sync workflow,
-which consumes `order.yml`. No manual
-`mkdocs.yml` edits are needed.
+`order.yml` does not by itself reach this
+repository's site navigation: `mkdocs.yml.tmpl`
+lists the Plans nav by hand. The entry is
+registration and reading order.
 
 When all phases are complete, update the status
 column in `docs/plans/index.md`.

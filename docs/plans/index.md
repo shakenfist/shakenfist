@@ -66,9 +66,8 @@ masks](PLAN-attribute-field-masks.md) carry their phases as headings, and [queue
 performance](PLAN-queue-performance.md) is numbered in steps rather than phases.
 Two more publish no arithmetic because their tables are placeholders: [owning more of the
 QEMU stack](PLAN-qemu-futures.md) names three phases and then an ellipsis, and [artifact UX
-rework](PLAN-artifact-ux-rework.md) a decisions pass and "(later phases)". Both sets are
-named in `tools/check-plan-status.py` as well, so the exemptions a reader sees and the ones
-the checker applies are the same list.
+rework](PLAN-artifact-ux-rework.md) a decisions pass and "(later phases)". These six are the
+checker's blind spot, and the only numbers here it cannot recompute.
 
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|

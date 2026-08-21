@@ -452,12 +452,12 @@ This plan has been registered in `docs/plans/`:
 * **`order.yml`** — an entry added next to
   `PLAN-remove-primary.md` so it appears in the documentation
   navigation. Phase files are *not* added to `order.yml`;
-  they are linked from this plan's Execution table and from
-  `index.md` only.
+  they are linked from this plan's Execution table only, which
+  makes that table the only path to them.
 
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which consumes
-`order.yml`; it does not need hand-editing.
+`order.yml` does not by itself reach this repository's site
+navigation: `mkdocs.yml.tmpl` lists the Plans nav by hand.
+The entry is registration and reading order.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md`.

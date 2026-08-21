@@ -310,8 +310,8 @@ _To be filled in as we go._
 
 This plan has been added to `docs/plans/index.md` (*Master plans* table) and
 `docs/plans/order.yml`. Phase files, once created, are linked from the
-Execution table above and from `index.md`, but are **not** added to
-`order.yml`.
+Execution table above only -- not from `index.md`, which lists master plans
+only, and not from `order.yml`. That table is the only path to them.
 
 ### Back brief
 

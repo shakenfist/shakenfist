@@ -623,7 +623,8 @@ When creating this master plan, update the following files in
   arithmetic, and a one-line intent.
 * **`order.yml`** — add an entry for this master plan, in
   the intended reading order. Phase files are
-  linked from the Execution table and `index.md` only.
+  linked from the Execution table only, which makes that
+  table the only path to them.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md`.
