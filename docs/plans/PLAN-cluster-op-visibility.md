@@ -621,8 +621,8 @@ When creating this master plan, update the following files in
 * **`index.md`** — add one row to the *Master plans* table
   with a link to this plan, its initial status, its phase
   arithmetic, and a one-line intent.
-* **`order.yml`** — add an entry for this master plan so it
-  appears in the documentation navigation. Phase files are
+* **`order.yml`** — add an entry for this master plan, in
+  the intended reading order. Phase files are
   linked from the Execution table and `index.md` only.
 
 When all phases are complete, update the status column in

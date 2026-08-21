@@ -25,12 +25,17 @@ Six things are checked:
 * every phase plan is linked from somewhere in `docs/plans/`.
 
 That last one is the invariant the template's own wording now rests on.
-Phase plans are deliberately absent from `order.yml`, so they are absent
-from the site navigation, and the index lists master plans only -- which
-leaves the master plan's Execution table as the sole path to a phase
-document. A phase filename written as bare text rather than a link is
-therefore a page no reader can reach. Thirty-eight of the ninety-two phase
-plans were in that state before this check existed.
+Phase plans are deliberately absent from `order.yml`, and the index lists
+master plans only, which leaves the master plan's Execution table as the
+sole path to a phase document. A phase filename written as bare text
+rather than a link is therefore a page nothing in the repository leads to.
+Thirty-eight of the ninety-two phase plans were in that state before this
+check existed.
+
+The published site is a weaker claim than it looks: `mkdocs.yml.tmpl`
+lists the Plans nav by hand and names three plans, so most master plans do
+not reach the navigation either. The rule here is about the repository's
+own navigability, which is where these documents are actually read.
 
 The vocabulary is read from the `plan-status-vocabulary` shared block in
 `PLAN-TEMPLATE.md` rather than copied here, so that a term added or renamed
@@ -84,6 +89,12 @@ PROVISIONAL = {
     'PLAN-qemu-futures.md',         # open-ended, table ends in an ellipsis row
     'PLAN-artifact-ux-rework.md',   # "0. Decisions pass" plus "(later phases)"
 }
+
+# The index status is asserted to follow the phase table, in the index
+# preamble and in the template's note. These are the two directions of that
+# rule which hold whatever a plan does with abandoned or superseded phases.
+UNFINISHED = {'proposed', 'not started', 'in progress', 'blocked'}
+STARTLESS = {'proposed', 'not started'}
 
 PHASE_FILE_RE = re.compile(r'-phase-\d')
 SEPARATOR_RE = re.compile(r'^\|[\s:|-]+\|$')
@@ -226,7 +237,13 @@ def plan_links(plans_dir):
     return targets, inbound
 
 
-def main():
+def problems():
+    """Every inconsistency found, as a list of human-readable strings.
+
+    Separate from main() so that the tests can assert on *which* rule fired
+    rather than on the exit code: a fixture broken one way usually trips
+    more than one rule, and an exit code cannot tell them apart.
+    """
     def under(*parts):
         return os.path.normpath(os.path.join(REPO_ROOT, *parts))
 
@@ -236,18 +253,18 @@ def main():
     template = under(TEMPLATE)
 
     if not os.path.isdir(plans_dir):
-        return 0
+        return []
 
     terms = vocabulary(template)
     if not terms:
-        print('%s carries no plan-status-vocabulary shared block, so there '
-              'is nothing to check statuses against. Copy it from '
-              'templates/shared-blocks/ in shakenfist/development.' % template)
-        return 1
+        return ['%s carries no plan-status-vocabulary shared block, so there '
+                'is nothing to check statuses against. Copy it from '
+                'templates/shared-blocks/ in shakenfist/development.'
+                % template]
     known = {term.lower() for term in terms}
     listed = ', '.join(terms)
 
-    problems = []
+    found = []
     plans = masters(plans_dir)
     rows = index_rows(index)
 
@@ -258,18 +275,18 @@ def main():
         if table:
             for lineno, value in table['rows']:
                 if value != ELLIPSIS and value.lower() not in known:
-                    problems.append('%s:%d: phase status %r is not one of %s'
-                                    % (path, lineno, value, listed))
+                    found.append('%s:%d: phase status %r is not one of %s'
+                                 % (path, lineno, value, listed))
 
         if name not in rows:
-            problems.append(
-                '%s: master plan is not registered in %s' % (path, index))
+            found.append(
+                         '%s: master plan is not registered in %s' % (path, index))
             continue
 
         lineno, status, phases = rows[name]
         if status.lower() not in known:
-            problems.append('%s:%d: index status %r is not one of %s'
-                            % (index, lineno, status, listed))
+            found.append('%s:%d: index status %r is not one of %s'
+                         % (index, lineno, status, listed))
 
         if name in HAND_COUNTED:
             continue
@@ -282,50 +299,67 @@ def main():
             expected = '%d of %d' % (done, len(counted))
 
         if phases != expected:
-            problems.append('%s:%d: %s says %r, but %s counts %r'
-                            % (index, lineno, name, phases, path, expected))
+            found.append('%s:%d: %s says %r, but %s counts %r'
+                         % (index, lineno, name, phases, path, expected))
+
+        if table is None:
+            continue
+        values = {v.lower() for _, v in table['rows'] if v != ELLIPSIS}
+        if status.lower() == 'complete' and values & UNFINISHED:
+            found.append(
+                '%s:%d: %s is Complete, but %s still has a phase which is '
+                'not. A phase may be Complete, Abandoned or Superseded for '
+                'the plan to be done.' % (index, lineno, name, path))
+        if status.lower() in STARTLESS and values and not (values & STARTLESS):
+            found.append(
+                '%s:%d: %s is %s, but every phase in %s has been resolved.'
+                % (index, lineno, name, status, path))
 
     with open(order, encoding='utf-8') as f:
         ordered = f.read()
     for name in plans:
         if ('- %s:' % name) not in ordered:
-            problems.append('%s: master plan is not registered in %s'
-                            % (os.path.join(plans_dir, name), order))
+            found.append('%s: master plan is not registered in %s'
+                         % (os.path.join(plans_dir, name), order))
 
     for stale in sorted(set(rows) - set(plans)):
-        problems.append('%s: %s is listed but is not a master plan in %s'
-                        % (index, stale, plans_dir))
+        found.append('%s: %s is listed but is not a master plan in %s'
+                     % (index, stale, plans_dir))
 
     targets, inbound = plan_links(plans_dir)
     for source, lineno, target in targets:
         resolved = os.path.normpath(
             os.path.join(os.path.dirname(source), target))
         if not os.path.isfile(resolved):
-            problems.append('%s:%d: link to %r, which does not exist'
-                            % (source, lineno, target))
+            found.append('%s:%d: link to %r, which does not exist'
+                         % (source, lineno, target))
 
     for name in sorted(os.listdir(plans_dir)):
         if not name.endswith('.md') or not PHASE_FILE_RE.search(name):
             continue
         if name not in inbound:
-            problems.append(
+            found.append(
                 '%s: phase plan has no inbound link, so nothing in the '
                 'published documentation leads to it. Link it from its '
                 "master plan's Execution table."
                 % os.path.join(plans_dir, name))
 
-    if problems:
+    return found
+
+
+def main():
+    found = problems()
+    if found:
         print('Plan status problems found:\n')
-        for problem in problems:
+        for problem in found:
             print('  %s' % problem)
         print('\n%d problem(s). The status vocabulary is the '
               'plan-status-vocabulary block in %s; the index\'s "N of M" is '
               'counted from each plan\'s Execution table; and a phase plan '
-              'is reachable only from that table.' % (len(problems), template))
+              'is reachable only from that table.' % (len(found), TEMPLATE))
         return 1
 
-    print('Plan statuses, index arithmetic and phase links agree '
-          '(%d master plans, %d terms).' % (len(plans), len(terms)))
+    print('Plan statuses, index arithmetic and phase links agree.')
     return 0
 
 

@@ -224,6 +224,10 @@ phases leave CI green.
 | 1. Document operator-provided load balancing (example apache2 + nginx configs, single-node escape hatch) | [PLAN-remove-apache-lb-phase-01-docs.md](PLAN-remove-apache-lb-phase-01-docs.md) | Complete |
 | 2. Remove Apache from the deployer; repoint single-node `api_url` to `:13000` | [PLAN-remove-apache-lb-phase-02-remove.md](PLAN-remove-apache-lb-phase-02-remove.md) | Complete |
 
+Phase 2 carried a "pending CI confirmation" caveat while it was in
+flight. It has since merged to `develop`, which the merge queue gates
+on CI, so the caveat is spent rather than dropped.
+
 Phase notes:
 
 - **Phase 1 (medium effort, docs-first).** Add a load

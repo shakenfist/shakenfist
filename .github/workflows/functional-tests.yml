@@ -66,6 +66,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       code_changed: ${{ steps.filter.outputs.code || 'true' }}
+      plans_changed: ${{ steps.filter.outputs.plans || 'true' }}
     steps:
       - uses: actions/checkout@v7
         if: github.event_name != 'workflow_dispatch'
@@ -85,6 +86,13 @@ jobs:
               - '!docs/**'
               - '!mkdocs.yml'
               - '!mkdocs.yml.tmpl'
+            # A plan-only edit is docs-only, so it does not match 'code'
+            # and would skip the unit tests -- including the guard which
+            # recomputes the plan index. That is exactly the change the
+            # guard exists to catch, so it gets its own output.
+            plans:
+              - 'docs/plans/**'
+              - 'PLAN-TEMPLATE.md'
 
   # Scan git history for leaked credentials. Deliberately not gated on
   # check_paths: a credential pasted into documentation is still a
@@ -149,7 +157,9 @@ jobs:
     # added later without one.
     timeout-minutes: 45
     needs: [check_paths]
-    if: needs.check_paths.outputs.code_changed != 'false'
+    if: >-
+      needs.check_paths.outputs.code_changed != 'false'
+      || needs.check_paths.outputs.plans_changed == 'true'
     outputs:
       flake8_failed: ${{ steps.flake8.outcome == 'failure' }}
     concurrency:

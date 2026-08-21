@@ -13,9 +13,13 @@ master plan's Execution table as the only path to them. Thirty-eight of the
 ninety-two phase plans had no inbound link at all when that check was
 written.
 
-The final test is the regression guard for `docs/plans/` itself, and is what
-gives this coverage in CI: no workflow runs pre-commit, so the hook alone
-would not catch a contributor who has not installed it, nor the merge queue.
+The final test is the regression guard for `docs/plans/` itself. No workflow
+runs pre-commit, so the hook alone would not catch a contributor who has not
+installed it, nor the merge queue. The guard only closes that gap because
+`functional-tests.yml` gates its unit test job on a `plans` paths-filter
+output as well as `code`: a plan-only edit is docs-only, so it does not match
+the `code` filter, and without that second output the job -- and this guard --
+would skip on exactly the changes it exists to police.
 """
 
 import importlib.util
@@ -59,15 +63,15 @@ MASTER = """# A plan
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. One | [PLAN-thing-phase-01-one.md](PLAN-thing-phase-01-one.md) | Complete |
-| 2. Two | [PLAN-thing-phase-02-two.md](PLAN-thing-phase-02-two.md) | Not started |
+| 1. One | [FIXTURE-plan-phase-01-one.md](FIXTURE-plan-phase-01-one.md) | Complete |
+| 2. Two | [FIXTURE-plan-phase-02-two.md](FIXTURE-plan-phase-02-two.md) | Not started |
 """
 
 INDEX = """# Plans
 
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|
-| 2026-01-01 | [A plan](PLAN-thing.md) | Does a thing | In progress | 1 of 2 |
+| 2026-01-01 | [A plan](FIXTURE-plan.md) | Does a thing | In progress | 1 of 2 |
 """
 
 
@@ -103,7 +107,7 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
 
     def test_execution_table_finds_the_status_column(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, 'PLAN-thing.md')
+            path = os.path.join(tmp, 'FIXTURE-plan.md')
             with open(path, 'w') as f:
                 f.write(MASTER)
             table = checker.execution_table(path)
@@ -112,7 +116,7 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
 
     def test_execution_table_ignores_a_table_without_phases(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, 'PLAN-thing.md')
+            path = os.path.join(tmp, 'FIXTURE-plan.md')
             with open(path, 'w') as f:
                 f.write('| Repo | Status |\n|------|--------|\n'
                         '| a | Complete |\n')
@@ -122,7 +126,7 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
         # A cross-repo plan tracks phases in a sibling repository too; the
         # plan's own table is the longer one.
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, 'PLAN-thing.md')
+            path = os.path.join(tmp, 'FIXTURE-plan.md')
             with open(path, 'w') as f:
                 f.write('| Phase | Status |\n|-------|--------|\n'
                         '| 1 | Complete |\n\nprose\n\n'
@@ -135,8 +139,8 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
             with open(path, 'w') as f:
                 f.write(INDEX)
             rows = checker.index_rows(path)
-            self.assertEqual({'PLAN-thing.md'}, set(rows))
-            _, status, phases = rows['PLAN-thing.md']
+            self.assertEqual({'FIXTURE-plan.md'}, set(rows))
+            _, status, phases = rows['FIXTURE-plan.md']
             self.assertEqual('In progress', status)
             self.assertEqual('1 of 2', phases)
 
@@ -152,12 +156,12 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         os.makedirs(self.plans)
 
         self._write('PLAN-TEMPLATE.md', VOCABULARY_BLOCK, root=True)
-        self._write('PLAN-thing.md', MASTER)
-        self._write('PLAN-thing-phase-01-one.md', '# One\n')
-        self._write('PLAN-thing-phase-02-two.md', '# Two\n')
+        self._write('FIXTURE-plan.md', MASTER)
+        self._write('FIXTURE-plan-phase-01-one.md', '# One\n')
+        self._write('FIXTURE-plan-phase-02-two.md', '# Two\n')
         self._write('index.md', INDEX)
         self._write('order.yml', '- index.md: Plans index\n'
-                                 '- PLAN-thing.md: A plan\n')
+                                 '- FIXTURE-plan.md: A plan\n')
 
         self.original_root = checker.REPO_ROOT
         checker.REPO_ROOT = self.tmp
@@ -169,40 +173,71 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
             f.write(content)
 
     def test_a_consistent_tree_passes(self):
-        self.assertEqual(0, checker.main())
+        self.assertEqual([], checker.problems())
+
+    def assertProblem(self, fragment):
+        """Exactly one problem, and it is the one the test is about.
+
+        Asserting on the exit code alone lets a test pass because some
+        *other* rule fired: breaking a status usually moves the arithmetic
+        too, so a vocabulary test written that way survives the vocabulary
+        check being deleted.
+        """
+        found = checker.problems()
+        matched = [p for p in found if fragment in p]
+        self.assertEqual(
+            1, len(matched),
+            'expected one problem containing %r, got %r' % (fragment, found))
 
     def test_a_status_outside_the_vocabulary_fails(self):
-        self._write('PLAN-thing.md', MASTER.replace('| Complete |', '| Done |'))
-        self.assertEqual(1, checker.main())
+        # Mutating the *unfinished* phase, so the completed count does not
+        # move and only the vocabulary rule can fire.
+        self._write('FIXTURE-plan.md',
+                    MASTER.replace('| Not started |', '| Done |'))
+        self.assertProblem("phase status 'Done' is not one of")
 
     def test_wrong_arithmetic_fails(self):
         self._write('index.md', INDEX.replace('1 of 2', '2 of 2'))
-        self.assertEqual(1, checker.main())
+        self.assertProblem("says '2 of 2', but")
+
+    def test_complete_with_an_unfinished_phase_fails(self):
+        self._write('index.md', INDEX.replace('| In progress |', '| Complete |'))
+        self.assertProblem('is Complete, but')
+
+    def test_not_started_with_every_phase_resolved_fails(self):
+        self._write('FIXTURE-plan.md',
+                    MASTER.replace('| Not started |', '| Complete |'))
+        self._write('index.md', INDEX.replace('| In progress | 1 of 2 |',
+                                              '| Not started | 2 of 2 |'))
+        self.assertProblem('every phase in')
 
     def test_an_unregistered_master_plan_fails(self):
-        self._write('PLAN-other.md', '# Other\n')
-        self.assertEqual(1, checker.main())
+        # A plan missing from the index is normally missing from order.yml
+        # too, so both rules fire; this asserts the index one specifically.
+        self._write('FIXTURE-other.md', '# Other\n')
+        self.assertProblem('is not registered in %s'
+                           % os.path.join(self.plans, 'index.md'))
 
     def test_a_master_plan_missing_from_order_fails(self):
         self._write('order.yml', '- index.md: Plans index\n')
-        self.assertEqual(1, checker.main())
+        self.assertProblem('order.yml')
 
     def test_an_unlinked_phase_plan_fails(self):
         # The regression this check exists for: a bare filename in the
         # Execution table is a page with no way in.
-        self._write('PLAN-thing.md', MASTER.replace(
-            '[PLAN-thing-phase-02-two.md](PLAN-thing-phase-02-two.md)',
-            'PLAN-thing-phase-02-two.md'))
-        self.assertEqual(1, checker.main())
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '[FIXTURE-plan-phase-02-two.md](FIXTURE-plan-phase-02-two.md)',
+            'FIXTURE-plan-phase-02-two.md'))
+        self.assertProblem('has no inbound link')
 
     def test_a_link_to_a_missing_file_fails(self):
-        self._write('PLAN-thing.md', MASTER.replace(
-            '(PLAN-thing-phase-02-two.md)', '(PLAN-thing-phase-99-gone.md)'))
-        self.assertEqual(1, checker.main())
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '(FIXTURE-plan-phase-02-two.md)', '(FIXTURE-plan-phase-99-gone.md)'))
+        self.assertProblem('which does not exist')
 
     def test_a_missing_vocabulary_block_fails(self):
         self._write('PLAN-TEMPLATE.md', 'nothing here\n', root=True)
-        self.assertEqual(1, checker.main())
+        self.assertProblem('carries no plan-status-vocabulary shared block')
 
 
 class PlanStatusRegressionTestCase(base.ShakenFistTestCase):
@@ -213,6 +248,6 @@ class PlanStatusRegressionTestCase(base.ShakenFistTestCase):
         original = checker.REPO_ROOT
         checker.REPO_ROOT = REPO_ROOT
         try:
-            self.assertEqual(0, checker.main())
+            self.assertEqual([], checker.problems())
         finally:
             checker.REPO_ROOT = original

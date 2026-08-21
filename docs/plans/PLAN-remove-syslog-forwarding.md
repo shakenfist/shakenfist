@@ -832,6 +832,9 @@ Loki and CI already checks them there. Phase 6 documents.
   branch, merged to `main`.
 - **Phase 5** additionally required the `loki-node-checks` branch on
   `shakenfist/actions` to merge before it could go green.
+- **Phases 2, 3 and 5** each carried a "pending CI" caveat while they
+  were in flight. All three have since merged to `develop`, which the
+  merge queue gates on CI, so the caveat is spent rather than dropped.
 
 ### Phase notes
 
@@ -1210,7 +1213,7 @@ When this master plan is created from the template:
   delivers the Loki-shipper story remove-primary phase 1 depends
   on, and that it can land in parallel with the other BYO work.
 * **`docs/plans/order.yml`** — add an entry for this master
-  plan so it appears in the documentation navigation. Phase
+  plan, in the intended reading order. Phase
   files are *not* added to `order.yml`; they are linked from the
   Execution table and `index.md` only.
 

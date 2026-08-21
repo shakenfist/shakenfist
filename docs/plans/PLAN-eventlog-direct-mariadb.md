@@ -706,8 +706,8 @@ following files in `docs/plans/` should be updated:
   for this master plan, keyed to a one-line intent and its
   current status. Phases are tracked in the Execution
   table above, not in the index.
-* **`order.yml`** — add an entry for this master plan so
-  it appears in the documentation navigation. Phase files
+* **`order.yml`** — add an entry for this master plan, in
+  the intended reading order. Phase files
   are *not* added to `order.yml`; they are linked from
   the Execution table and from `index.md` only.
 

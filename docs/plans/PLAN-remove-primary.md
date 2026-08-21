@@ -817,8 +817,8 @@ the following files in `docs/plans/`:
 * **`index.md`** — add one row to the *Master plans* table
   with a link to the plan, its initial status, its phase
   arithmetic, and a one-line intent.
-* **`order.yml`** — add an entry for the new master plan so
-  it appears in the documentation navigation in the
+* **`order.yml`** — add an entry for the new master plan,
+  in the
   intended order.
 
 ### Back brief

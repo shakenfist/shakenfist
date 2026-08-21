@@ -359,15 +359,14 @@ the following files in `docs/plans/`:
   phase — the phases are tracked in this plan's own
   Execution table, and duplicating them in the index is
   how the two drift apart. Rows run oldest first.
-* **`order.yml`** — add an entry for the new master plan so
-  it appears in the documentation navigation in the
-  intended order. Phase files should *not* be added to
-  `order.yml`; they are linked from the master plan's
-  Execution table only.
-
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which consumes
-`order.yml`. You do not need to edit `mkdocs.yml` by hand.
+* **`order.yml`** — add an entry for the new master plan,
+  in the intended reading order. This registers the plan
+  and is what the plan-status check reads; it does **not**
+  by itself put the plan in the published site navigation,
+  which `mkdocs.yml.tmpl` currently lists by hand. Phase
+  files should *not* be added to `order.yml`; they are
+  linked from the master plan's Execution table only, which
+  makes that table the only path to them.
 
 The index row carries the whole-plan status, so it only
 reaches `Complete` once every phase has. Update it as the
