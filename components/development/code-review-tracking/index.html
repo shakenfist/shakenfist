@@ -12184,13 +12184,18 @@ this repository and passes through to the script.</p>
    backlog has been worked off, since a repo's worth of workflow
    files arrives at once.</p>
 <ol>
-<li>
-<p>Add a thin wrapper (e.g. <code>tools/review-tracking.sh</code>, copied
+<li>Add a thin wrapper (e.g. <code>tools/review-tracking.sh</code>, copied
    from ryll) that locates a local clone of this repository --
    <code>$SHAKENFIST_DEVELOPMENT</code>, then a sibling <code>../development</code>,
    then <code>~/src/shakenfist/development</code> -- and passes its arguments
-   through to <code>scripts/review-tracking.py</code>.</p>
-</li>
+   through to <code>scripts/review-tracking.py</code>.</li>
+</ol>
+<p>This repository is the exception: its own wrapper does not go
+   looking, because <code>scripts/review-tracking.py</code> is in the tree
+   beside it. The search order above would find a <em>sibling</em> clone
+   and run that one's copy of the script, which is the wrong answer
+   in the one repository where the right answer is certain.</p>
+<ol>
 <li>
 <p>Bootstrap existing review marks, if any were made before the
    tooling was adopted. A stale pre-existing mark must not be
