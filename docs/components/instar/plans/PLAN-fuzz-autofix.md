@@ -2,15 +2,16 @@
 
 ## Status: In progress
 
-The workflow is built, scheduled, and running daily. It has **never
-produced a pull request**, and that is a bug in the workflow rather
-than a gap in the plan.
+The workflow is built, scheduled, and running daily. It had **never
+produced a pull request**, which was a bug in the workflow rather than
+a gap in the plan. PR #509 fixes it; the plan stays in progress until
+a run confirms that end to end.
 
-As of 2026-08-19: no `autofix/*` branch has ever reached origin, no PR
-has ever been opened, and 28 `security-audit` issues carry the
+As of 2026-08-19: no `autofix/*` branch had ever reached origin, no PR
+had ever been opened, and 28 `security-audit` issues carried the
 `autofix-failed` label (26 closed by hand, 2 open). `autofix-complex`
-has never been applied, so the complexity guardrails are not what is
-stopping it.
+had never been applied, so the complexity guardrails were not what
+stopped it.
 
 ### Diagnosis: the gate reads the index, the safety net stages too late
 
@@ -40,16 +41,72 @@ stage a substantive fix and still failed, later in verification. Both
 need to be true before a PR can appear, so fixing the gate is
 necessary but may not be sufficient.
 
+### Resolution (2026-08-20, PR #509)
+
+`tools/ci/stage-autofix-changes.sh` runs immediately after each Claude
+attempt, upstream of every gate that reads the index. It stages
+tracked modifications and deletions, and **nothing else**.
+
+The interesting half is what it refuses. A file the attempt *created*
+stops the run by name, with the issue left `autofix-failed` for a
+human, in three cases: an untracked file; a file `.gitignore` hides
+that was not in the pre-attempt baseline (git omits ignored paths from
+the untracked listing entirely, so these otherwise vanish without a
+trace, and `**/*.bin` is exactly what a crash fixture gets called); and
+any change under `.github/workflows/`, which cannot be pushed with the
+token CI holds — that one is actively unstaged, because an exclude
+pathspec does not remove what Claude may already have staged.
+
+Staging created files instead would mean classifying them, and a wrong
+guess ships a branch that does not compile behind a pull request
+saying "Build succeeded", because the verify build runs against the
+working tree where the file is present. A wrong refusal costs a look
+at an issue that was already going to get one. The review history on
+#509 is worth reading before revisiting this: the first four rounds
+built the classification — a source-root allowlist, an artifact
+denylist, gitignored-file reporting, collapsed-directory handling —
+and each refinement introduced the next defect. The script header
+records that sequence so the next person to reach for an allowlist has
+it.
+
+Telling a created file from build output needs a before picture.
+`pre-run-ignored.txt` is snapshotted after `Build instar` and before
+attempt 1; `Prepare retry` deletes the paths named in
+`stager-refused-1.txt` (its `git clean -fd` has no `-x`, so a refused
+file would otherwise survive and refuse attempt 2 whatever attempt 2
+did) and snapshots again into `pre-retry-ignored.txt` for attempt 2. A
+single baseline would judge attempt 2 against a tree from before the
+verify build and the full test run, and refuse it for their output.
+
+The behaviour is covered by `tools/ci/test-stage-autofix-changes.sh`
+in the `ci-tooling` job, for the same reason `pick-fuzz-artifact.sh`
+is a script with tests: logic that only runs inside a live daily run
+cannot be tested there, and the bugs in this area all hid in inline
+YAML.
+
 ### Remaining work
 
-* Stage tracked modifications immediately after each Claude attempt,
-  before the complexity and verification steps read the index (fix in
-  progress on a separate branch).
 * Re-run against the two open `autofix-failed` issues (#485, #492) and
   confirm at least one reaches a PR — this is the plan's own
-  outstanding success criterion.
+  outstanding success criterion, and the only thing that exercises the
+  workflow end to end. It needs the fix on `develop` first, because
+  the workflow checks out `develop`.
 * Refresh the hardcoded `Co-Authored-By: Claude Opus 4.6 (1M context)`
-  trailer at line 653, which no longer names the model that runs.
+  trailer in the Create PR step, which no longer names the model that
+  runs. Deliberately left: the workflow cannot introspect which model
+  the `claude` CLI resolves to, so any name hardcoded here goes stale
+  the same way. Deciding between a generic trailer and dropping the
+  line is a call for a human.
+* `tools/address-comments-with-claude.sh` has the same defect this
+  plan diagnosed, in the review-comment loop rather than the fuzz loop
+  (issue #510): it instructs Claude to stage, then reports an unstaged
+  fix as a skipped review item. PR #511 fixes it, reusing the stager
+  in `--tracked-only` mode; it lands after this one, because the
+  address-comments workflow checks its trusted tools out of the
+  default branch. It was not the one-line change it looked like: the
+  loop's Claude-failed and disagreement branches do not reset the
+  tree, so staging on Claude's behalf would attribute one item's
+  leftovers to the next item's commit.
 
 ## Prompt
 
@@ -175,14 +232,19 @@ Construct a prompt for Claude Code containing:
      for invalid input over adding arbitrary limits.
    - Run `pre-commit run --all-files` (via Make) to validate
      formatting.
-   - Stage changed files and provide a commit summary between
-     `COMMIT_SUMMARY_START` and `COMMIT_SUMMARY_END` markers.
+   - Provide a commit summary between `COMMIT_SUMMARY_START` and
+     `COMMIT_SUMMARY_END` markers. Do not stage, do not commit, and
+     do not create new files: CI stages the tracked edits, and an
+     attempt that creates a file is refused (see Resolution above).
 3. **Complexity rules** (from the design decisions above).
 4. **What NOT to do:**
    - Do not modify `instar-testdata`.
    - Do not run cargo or docker directly (use Make targets).
    - Do not add the crash reproducer as a test image in this
      PR (that is a separate step after the fix merges).
+   - Do not edit anything under `.github/workflows/`; such a commit
+     cannot be pushed with the token CI holds, and the run would fail
+     at the very end, after the build and the whole test suite.
 
 ### Step 4: First fix attempt
 
