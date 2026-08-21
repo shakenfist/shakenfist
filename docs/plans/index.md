@@ -54,7 +54,9 @@ reason belongs in the plan itself rather than in this table. The canonical wordi
 
 Every master plan tracks its own phases -- a phase plan and a status for each -- in its own
 Execution table. The `Phases` column here is only the arithmetic; follow the plan link for
-what each phase covers, and for why a plan is where it is.
+what each phase covers, and for why a plan is where it is. It counts *completed* phases, so
+a plan whose phases were abandoned or superseded rather than done can read `Complete`
+without the two numbers meeting, and `—` means the plan has no enumerated phases yet.
 
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|
@@ -65,19 +67,19 @@ what each phase covers, and for why a plan is where it is.
 | 2026-05-14 | [Fix `cluster_operation_targets` uniqueness](PLAN-fix-cluster-operation-targets-unique-constraint.md) | Composite UNIQUE so a multi-target operation records all of its target rows | Complete | — |
 | 2026-05-15 | [Network operations facade](PLAN-network-facade.md) | Split `Network` into a queue-enqueuing facade and a single-mutator worker | Complete | 10 of 10 |
 | 2026-05-16 | [Embrace TLS](PLAN-embrace-tls.md) | Operator-provided PKI and TLS on every internal and external listener | Not started | 0 of 8 |
-| 2026-05-16 | [Recurring cluster operations](PLAN-recurring-operations.md) | A cron-like framework absorbing the scheduled-task loops, plus user-facing recurrence | Proposed | — |
-| 2026-05-16 | [Remove the primary node](PLAN-remove-primary.md) | Retire the special primary node in favour of a BYO-infrastructure deployer | Complete | 7 of 7 |
+| 2026-05-16 | [Recurring cluster operations](PLAN-recurring-operations.md) | A cron-like framework absorbing the scheduled-task loops, plus user-facing recurrence | Proposed | 0 of 7 |
+| 2026-05-16 | [Remove the primary node](PLAN-remove-primary.md) | Retire the special primary node in favour of a BYO-infrastructure deployer | Complete | 5 of 7 |
 | 2026-05-16 | [Sticky blob transfers](PLAN-sticky-transfers.md) | Session affinity for blob transfers, deferred until OpenTelemetry supplies upload-path numbers | Not started | 0 of 5 |
 | 2026-05-17 | [Retry transient artifact fetches](PLAN-artifact-fetch-retry-with-backoff.md) | A per-operation retry budget, so a network blip during a fetch no longer errors the artifact | Complete | — |
 | 2026-05-17 | [Health checks, readiness and drain](PLAN-health-checks.md) | `/livez`, `/readyz`, `/healthz`, gRPC health, watchdog liveness and SIGTERM drain | Complete | 5 of 5 |
 | 2026-05-20 | [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Native netlink calls in place of shelling out to `ip`, `bridge` and friends | Not started | 0 of 7 |
-| 2026-05-22 | [Eventlog direct to MariaDB](PLAN-eventlog-direct-mariadb.md) | Remove the eventlog service and write events straight to MariaDB | Complete | 6 of 6 |
+| 2026-05-22 | [Eventlog direct to MariaDB](PLAN-eventlog-direct-mariadb.md) | Remove the eventlog service and write events straight to MariaDB | Complete | 7 of 7 |
 | 2026-05-22 | [Generic allocator](PLAN-generic-allocator.md) | Replace five ad-hoc finite-resource allocators with a single primitive | Not started | 0 of 7 |
 | 2026-05-22 | [Network carrier model](PLAN-network-carrier-model.md) | A lease-based per-network carrier with VIP advertisement, retiring the network-node singleton | Not started | 0 of 12 |
 | 2026-05-22 | [Network service ports](PLAN-network-service-ports.md) | Per-network DNAT'd ports for managed services | Not started | 0 of 7 |
 | 2026-05-22 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Guarded-UPDATE capacity counters and namespace claims in place of read-then-place scheduling | In progress | 4 of 10 |
 | 2026-05-24 | [Queue performance and coalescing](PLAN-queue-performance.md) | Batched dequeue, and worker- and enqueue-side dedup of redundant cluster operations | In progress | 6 of 7 |
-| 2026-06-01 | [OIDC authentication](PLAN-oidc-authentication.md) | Federated login against an external OIDC provider | Not started | — |
+| 2026-06-01 | [OIDC authentication](PLAN-oidc-authentication.md) | Federated login against an external OIDC provider | Not started | 0 of 10 |
 | 2026-06-02 | [Owning more of the QEMU stack](PLAN-qemu-futures.md) | Direct QMP control, and perhaps one day libvirt's job as well | Proposed | — |
 | 2026-06-03 | [BYO MariaDB and `sf-database` as a tier](PLAN-byo-mariadb.md) | A deployer-chosen database tier reached by client-side gRPC load balancing | Complete | 8 of 8 |
 | 2026-06-12 | [Remove the Apache load balancer](PLAN-remove-apache-lb.md) | An operator-provided load balancer in place of the bundled Apache | Complete | 2 of 2 |
@@ -88,11 +90,11 @@ what each phase covers, and for why a plan is where it is.
 | 2026-07-17 | [Attribute field masks everywhere](PLAN-attribute-field-masks.md) | Masked attribute writes, and the node instances list un-packed into `object_references` | Complete | 2 of 2 |
 | 2026-07-19 | [Truthful cluster operation visibility](PLAN-cluster-op-visibility.md) | An observational flag, so "is anything in flight?" stops counting background housekeeping | In progress | 2 of 6 |
 | 2026-07-19 | [Database load reduction](PLAN-database-load-reduction.md) | Cut steady-state MariaDB load from the `sf-database` tier, and keep it cut | In progress | 5 of 7 |
-| 2026-07-19 | [Kerbside VDI console tokens](PLAN-kerbside-vdi-tokens.md) | Cluster-signed tokens exchanged for a VDI console session, across four repositories | In progress | 7 of 8 |
-| 2026-07-19 | [Node resource health](PLAN-node-resource-health.md) | Declarative dependency checks driving node state, so a dead disk stops scheduling | Complete | 4 of 4 |
+| 2026-07-19 | [Kerbside VDI console tokens](PLAN-kerbside-vdi-tokens.md) | Cluster-signed tokens exchanged for a VDI console session, across four repositories | In progress | 9 of 10 |
+| 2026-07-19 | [Node resource health](PLAN-node-resource-health.md) | Declarative dependency checks driving node state, so a dead disk stops scheduling | Complete | 5 of 5 |
 | 2026-07-21 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | Per-node RAM, CPU and disk reservation overrides | Complete | 4 of 4 |
 | 2026-07-28 | [sf-netserv](PLAN-netserv.md) | Replace dnsmasq with a Rust per-network service plane | Proposed | — |
 | 2026-08-03 | [API input validation](PLAN-api-input-validation.md) | Declarative request validation and a consistent error contract for the REST API | In progress | 3 of 7 |
-| 2026-08-14 | [Agent operation deadlines](PLAN-agent-operation-deadlines.md) | Client-propagated deadlines and per-command progress timeouts for agent operations | In progress | 2 of 6 |
+| 2026-08-14 | [Agent operation deadlines](PLAN-agent-operation-deadlines.md) | Client-propagated deadlines and per-command progress timeouts for agent operations | In progress | 2 of 8 |
 | 2026-08-14 | [Dependency-aware agent operations](PLAN-agent-operation-dependencies.md) | `depends_on` and `runs_after` for agent operations, including cross-instance edges | Blocked | — |
 | 2026-08-16 | [Bound gRPC reply sizes](PLAN-grpc-bounded-replies.md) | Make `DatabaseService` replies bounded by construction rather than by the message size limit | Not started | 0 of 6 |

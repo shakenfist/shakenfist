@@ -372,15 +372,15 @@ Recommendations are recorded inline.
 | Phase | Repo | Plan | Status |
 |-------|------|------|--------|
 | 0. Decisions and token format | shakenfist | PLAN-kerbside-vdi-tokens-phase-00-decisions.md | Not started |
-| 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Done |
-| 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Done |
-| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Done |
-| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Done |
-| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Done |
-| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Done |
-| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Done |
-| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Done |
-| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Done |
+| 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Complete |
+| 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Complete |
+| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete |
+| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Complete |
+| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Complete |
+| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Complete |
+| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete |
+| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
 
 ### Phase 0: Decisions and token format
 

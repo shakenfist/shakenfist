@@ -815,13 +815,23 @@ Loki and CI already checks them there. Phase 6 documents.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete (see Decisions section above) |
-| 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | Complete (`shakenfist-utilities==0.8.5` released and pinned) |
-| 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete (pending CI) |
-| 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | [PLAN-remove-syslog-forwarding-phase-03-ci-loki.md](PLAN-remove-syslog-forwarding-phase-03-ci-loki.md) | Complete (pending CI) |
-| 4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned `shakenfist/actions`) | [PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md](PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md) | Complete (`loki-ci-tooling` merged to actions@main; pending CI) |
-| 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | [PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md](PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md) | Complete (pending CI; needs actions `loki-node-checks` merged) |
+| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete |
+| 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | Complete |
+| 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete |
+| 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | [PLAN-remove-syslog-forwarding-phase-03-ci-loki.md](PLAN-remove-syslog-forwarding-phase-03-ci-loki.md) | Complete |
+| 4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned `shakenfist/actions`) | [PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md](PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md) | Complete |
+| 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | [PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md](PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md) | Complete |
 | 6. Documentation: operator guide, field contract, ARCHITECTURE/README/AGENTS, index/order | [PLAN-remove-syslog-forwarding-phase-06-docs.md](PLAN-remove-syslog-forwarding-phase-06-docs.md) | Complete |
+
+Landing record:
+
+- **Phase 0**'s decisions are the Decisions section above.
+- **Phase 1** shipped as `shakenfist-utilities==0.8.5`, released to
+  PyPI and pinned here.
+- **Phase 4** landed on `shakenfist/actions` as the `loki-ci-tooling`
+  branch, merged to `main`.
+- **Phase 5** additionally required the `loki-node-checks` branch on
+  `shakenfist/actions` to merge before it could go green.
 
 Phase notes:
 

@@ -222,7 +222,7 @@ phases leave CI green.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Document operator-provided load balancing (example apache2 + nginx configs, single-node escape hatch) | PLAN-remove-apache-lb-phase-01-docs.md | Complete |
-| 2. Remove Apache from the deployer; repoint single-node `api_url` to `:13000` | PLAN-remove-apache-lb-phase-02-remove.md | Complete (pending CI confirmation) |
+| 2. Remove Apache from the deployer; repoint single-node `api_url` to `:13000` | PLAN-remove-apache-lb-phase-02-remove.md | Complete |
 
 Phase notes:
 
