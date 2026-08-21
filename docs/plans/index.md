@@ -87,7 +87,7 @@ performance](PLAN-queue-performance.md) is numbered in steps rather than phases.
 | 2026-05-22 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Guarded-UPDATE capacity counters and namespace claims in place of read-then-place scheduling | In progress | 4 of 10 |
 | 2026-05-24 | [Queue performance and coalescing](PLAN-queue-performance.md) | Batched dequeue, and worker- and enqueue-side dedup of redundant cluster operations | In progress | 6 of 7 |
 | 2026-06-01 | [OIDC authentication](PLAN-oidc-authentication.md) | Federated login against an external OIDC provider | Not started | 0 of 10 |
-| 2026-06-02 | [Owning more of the QEMU stack](PLAN-qemu-futures.md) | Direct QMP control, and perhaps one day libvirt's job as well | Proposed | — |
+| 2026-06-02 | [Owning more of the QEMU stack](PLAN-qemu-futures.md) | Direct QMP control, and perhaps one day libvirt's job as well | Not started | — |
 | 2026-06-03 | [BYO MariaDB and `sf-database` as a tier](PLAN-byo-mariadb.md) | A deployer-chosen database tier reached by client-side gRPC load balancing | Complete | 8 of 8 |
 | 2026-06-12 | [Remove the Apache load balancer](PLAN-remove-apache-lb.md) | An operator-provided load balancer in place of the bundled Apache | Complete | 2 of 2 |
 | 2026-06-13 | [Artifact UX rework](PLAN-artifact-ux-rework.md) | Rework the artifact, blob, label, upload and snapshot user interface | Proposed | — |
