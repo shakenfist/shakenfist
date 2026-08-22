@@ -159,12 +159,37 @@ class Job(util_concurrency.Job):
         return True
 
     def _warn_once(self, vxid: int, reason: str, **fields) -> None:
-        """Warn about a stray vxlan once per reason per stray episode."""
+        """Warn about a stray vxlan once per reason per stray episode.
+
+        This is the operator signal that matters: the reaper wanted to
+        act and could not tell whether it was safe, or the records and
+        the host disagree. Dispositions where the code has positively
+        established the device is in use go through _note_once()
+        instead (issue 3837).
+        """
         if not self._first_report(vxid, 'stray: %s' % reason):
             return
         LOG.with_fields(
             {'vxid': vxid, 'reason': reason, **fields}).warning(
                 'Extra vxlan present!')
+
+    def _note_once(self, vxid: int, reason: str, **fields) -> None:
+        """Note a stray vxlan which is legitimately in use, once per
+        reason per stray episode.
+
+        These dispositions mean the reaper positively established the
+        device is in use and correctly declined to act -- the expected
+        steady state on a healthy cluster, not a problem. They are
+        logged at INFO, and deliberately not with the 'Extra vxlan
+        present' text: that substring is a CI forbidden string (issue
+        1944) and a log mining key, both of which match on the text
+        regardless of level.
+        """
+        if not self._first_report(vxid, 'stray: %s' % reason):
+            return
+        LOG.with_fields(
+            {'vxid': vxid, 'reason': reason, **fields}).info(
+                'Stray vxlan is legitimately in use')
 
     def _foreign_bridge_members(self, vxid: int) -> list[str] | None:
         """Devices enslaved to br-vxlan-<vxid> which Shaken Fist did not put
@@ -369,8 +394,11 @@ class Job(util_concurrency.Job):
         enslaved to it that Shaken Fist did not put there is carrying a
         live domain, whatever the database records say.
 
-        Anything else is left alone and warned about once per reason
-        per stray episode rather than on every pass.
+        Anything else is left alone and reported once per reason per
+        stray episode rather than on every pass: at INFO when the code
+        has positively established the device is legitimately in use,
+        and at WARNING when it wanted to act but could not tell whether
+        that was safe.
         """
         # Re-check the networks table immediately before deleting
         # anything. We deliberately test for the presence of the static
@@ -407,7 +435,10 @@ class Job(util_concurrency.Job):
                 disposition = 'reap'
                 reason = 'no network claims this vxid'
             elif config.NODE_IS_NETWORK_NODE:
-                self._warn_once(
+                # The network node carries a device for every active
+                # network by design, so a claimed vxid here is the
+                # expected steady state, not an anomaly.
+                self._note_once(
                     vxid, 'network node hosts every active network')
                 continue
             elif protected_vxids is None:
@@ -418,7 +449,10 @@ class Job(util_concurrency.Job):
                     vxid, 'the instances on this node could not be determined')
                 continue
             elif vxid in protected_vxids:
-                self._warn_once(
+                # _local_instance_vxids() proved a local instance is
+                # attached to this network, so the device is exactly
+                # where it should be.
+                self._note_once(
                     vxid, 'an instance on this node is attached to it')
                 continue
             else:
