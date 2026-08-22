@@ -692,10 +692,13 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         # The node is only looked up once, not once per reaped vxid.
         active['node'].from_db.assert_called_once()
 
-    def test_stray_vxlan_claimed_by_network_warned_once_not_reaped(self):
+    def test_stray_vxlan_claimed_by_network_noted_once_not_reaped(self):
         """A stray vxlan whose vxid is still claimed by a network row in
-        the database must not be deleted, and is warned about once per
-        stray episode rather than on every pass."""
+        the database must not be deleted. The network node carries a
+        device for every active network by design, so this is the
+        expected steady state -- it is noted at INFO once per stray
+        episode, never warned about, and the message must not contain
+        the CI forbidden string 'Extra vxlan present' (issue 3837)."""
         from shakenfist.daemons.network import maintain
 
         maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
@@ -706,15 +709,17 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         )
 
         active['util_concurrency'].execute.assert_not_called()
-        active['log'].with_fields.return_value.warning.\
-            assert_called_once_with('Extra vxlan present!')
+        active['log'].with_fields.return_value.warning.assert_not_called()
+        active['log'].with_fields.return_value.info.assert_called_once()
+        message = active['log'].with_fields.return_value.info.call_args.args[0]
+        self.assertNotIn('Extra vxlan present', message)
         self.assertIn(0x123, maintain.EXTRA_VLANS_WARNED)
-        # Warn-only is the steady state for a stray we never touch, and
+        # Note-only is the steady state for a stray we never touch, and
         # it has nothing to record, so it must not read the node row on
         # every pass.
         active['node'].from_db.assert_not_called()
 
-        # A second pass over the same stray must not warn again.
+        # A second pass over the same stray must not report again.
         active = self._run_one_iteration(
             network_node=True,
             vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
@@ -722,6 +727,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         )
         active['util_concurrency'].execute.assert_not_called()
         active['log'].with_fields.return_value.warning.assert_not_called()
+        active['log'].with_fields.return_value.info.assert_not_called()
 
     def test_stray_vxlan_disappearance_resets_tracking(self):
         """When a stray vxlan disappears from the host its history and
@@ -923,7 +929,12 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         """An instance on this node which is not healthy -- still
         building, or errored with a domain which may still be running --
         keeps its network out of host_networks, so its vxlan looks
-        stray. It must not be torn down."""
+        stray. It must not be torn down.
+
+        The device being in use by a local instance is a positive
+        finding, not a problem, so it is noted at INFO rather than
+        warned about, and without the CI forbidden string 'Extra vxlan
+        present' (issue 3837)."""
         from shakenfist.daemons.network import maintain
 
         maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
@@ -936,8 +947,10 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['util_concurrency'].execute.assert_not_called()
         active['nn_create_and_enqueue'].assert_not_called()
-        active['log'].with_fields.return_value.warning.\
-            assert_called_once_with('Extra vxlan present!')
+        active['log'].with_fields.return_value.warning.assert_not_called()
+        active['log'].with_fields.return_value.info.assert_called_once()
+        message = active['log'].with_fields.return_value.info.call_args.args[0]
+        self.assertNotIn('Extra vxlan present', message)
         self.assertIn(0x123, maintain.EXTRA_VLANS_HISTORY)
 
     def test_delete_wait_error_instance_protects_its_vxlan(self):
@@ -1250,7 +1263,9 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         """Suppression is per reason, not per vxid. A stray which stops
         being protected for one reason and starts being protected for
         another is a different thing for an operator to look at, and
-        must not be silenced by the earlier report."""
+        must not be silenced by the earlier report -- even when the
+        earlier report was a benign INFO note and the new one is a
+        genuine warning."""
         from shakenfist.daemons.network import maintain
 
         maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
@@ -1260,11 +1275,12 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             db_network_vxids=[0x123],
             attached_vxids=[0x123],
         )
-        active['log'].with_fields.return_value.warning.\
-            assert_called_once_with('Extra vxlan present!')
+        active['log'].with_fields.return_value.info.assert_called_once()
+        active['log'].with_fields.return_value.warning.assert_not_called()
 
         # The same stray, but now this node's row cannot be read, so the
-        # reason it is protected has changed.
+        # reason it is protected has changed -- and the reaper is flying
+        # blind, which is worth a warning.
         active = self._run_one_iteration(
             network_node=False,
             vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
