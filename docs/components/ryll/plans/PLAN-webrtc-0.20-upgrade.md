@@ -307,48 +307,74 @@ Touches `docs/configuration.md`, `docs/web-frontend.md` and
 The 0.20 release notes headline UDP batching via GSO/GRO,
 elimination of tokio scheduler overhead in datachannel
 operations, and opt-in send back-pressure. All three land on the
-`run_video_pump` write path (`bridge.rs:644`). Integration tests
+`run_video_pump` write path (`bridge.rs:1576`). Integration tests
 exercise that path for seconds; a regression there shows up over
 minutes.
 
+Phase 04's planning survey corrected four claims this section
+made; they are fixed in place below, and
+[the phase plan](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-04-soak/)
+records what was wrong with each.
+
 - A real browser session against a real SPICE guest, held long
-  enough to see steady-state behaviour, with the latency HUD and
-  runtime metrics captured. **Listen to the audio** while it is
-  open: phase 02's browser session confirmed the playback channel
-  negotiated Opus but nobody confirmed sound by ear, so that
-  Definition-of-done clause is inherited here.
+  enough to see steady-state behaviour. **Listen to the audio**
+  while it is open: phase 02's browser session confirmed the
+  playback channel negotiated Opus but nobody confirmed sound by
+  ear, so that Definition-of-done clause is inherited here.
+  *Correction:* this section originally asked for "the latency
+  HUD and runtime metrics captured". Neither exists under
+  `--web` — both are GUI-mode-only — which phase 01 discovered
+  during 1a and worked around with external `/proc` sampling.
+  Phase 04 must sample the same way for the comparison to hold.
 - Chrome and Firefox at minimum; Safari if a Mac is available.
   **Firefox is a known blocker inherited from phase 02**: a Firefox
   that does not offer H.264 gets no video at all, because ryll
   encodes H.264 only. Land #289 (tell the viewer) before soaking,
   and settle whether a Firefox with a working OpenH264 plugin is
   enough for this criterion or whether ryll needs a second codec.
+  *Correction:* phase 01's Baseline conditions block concluded
+  Firefox "cannot be the phase-04 viewer on this host" after it
+  failed to establish ICE under 0.17. Phase 02 contradicted that
+  on 0.20 — ICE was fully healthy and everything but video
+  worked — so the blocker is codec-specific, not transport-specific.
 - Compare RSS and CPU against a 0.17 baseline captured before
   the bump — take that baseline during phase 01 while we are
-  still on the old version.
+  still on the old version. *Correction:* the baseline exists,
+  but the harness that produced it was never committed, so
+  reproducing its conditions is a phase 04 step
+  (`tools/web-soak.sh`) rather than a given.
 - Run `RYLL_GATHERING_SOAK=1 make test` on a quiet host: the
   20-iteration invariant-candidate-count check on the gathering
   signal is off by default (host interface churn makes it flaky
   in CI) and this soak is exactly the deliberate occasion it is
   gated for.
-- Update `ARCHITECTURE.md` and `AGENTS.md` if the bridge's task
-  and callback structure changed shape, which phase 02 makes
-  likely.
+- Check `ARCHITECTURE.md` and `AGENTS.md` against the bridge's
+  shipped task and callback structure. *Correction:* this asked
+  phase 04 to update them "if the bridge's task and callback
+  structure changed shape, which phase 02 makes likely". It did,
+  and phase 02 already wrote it up — `AGENTS.md` carries a
+  "WebRTC conventions" section and `ARCHITECTURE.md`'s file tree
+  was corrected by phase 03. Phase 04 verifies rather than
+  writes.
 
 ## Phase order
 
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Pre-work on 0.17 | [PLAN-webrtc-0.20-upgrade-phase-01-prework.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/) | Complete — baseline captured, 1g agrees within noise |
-| 2. Atomic bump to 0.20 | [PLAN-webrtc-0.20-upgrade-phase-02-bump.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/) | Complete — Chromium session on `7e2fb58e` confirms the bind address. Firefox has no video, for a reason that is not a port regression (#289, #290); it is phase 04's gate, as is the audio check nobody performed by ear |
+| 2. Atomic bump to 0.20 | [PLAN-webrtc-0.20-upgrade-phase-02-bump.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/) | Complete — Chromium session on `7e2fb58e` confirms the bind address. Its two deferrals were discharged in phase 04: the audio check was performed by ear, and #289/#290 are fixed |
 | 3. Socket binding configuration | [PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/) | Complete — `--web-media-addr` (address or interface name), `--web-media-port` and `--web-ice-server`, carried through `WebState` into a `UdpBindPolicy` the bridge resolves per offer. Explicit addresses override the loopback default; `0.0.0.0` is refused at startup |
-| 4. Soak validation and docs | PLAN-webrtc-0.20-upgrade-phase-04-soak.md | Not started |
+| 4. Soak validation and docs | [PLAN-webrtc-0.20-upgrade-phase-04-soak.md](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-04-soak/) | Complete — audio confirmed by ear at last; the bump costs no CPU and slightly less memory, bisected either side of the phase-02 merge; #289/#290 fixed, plus four input bugs the browser check found. Safari unexercised (#310), Firefox still has no video (#311; #289 makes it legible) |
 
 Phase 01 is a hard prerequisite for 02 only in the sense that it
 makes 02 tractable; 02 could be done standalone at higher risk.
 Phases 03 and 04 both depend on 02.
 
-Phase 02 is `Code complete` rather than `Complete`: the port
+Phase 02 is now `Complete`: phase 04's browser sessions supplied the
+verification it was waiting for. What follows is the reasoning it
+was left open with, kept because it explains why.
+
+The port
 itself has landed on `webrtc = "0.20.2"` and both Renovate rules
 are gone, `rtc` is now a direct dependency, the standalone `rtp`
 and `rustls` dependencies are gone, datachannels and remote
@@ -539,6 +565,17 @@ sized phase 02, and two of them moved work between phases.
   during the port so that negotiation differences stay
   attributable; worth revisiting once the phase-04 soak has a
   clean baseline.
+* Let `--web-ice-server` carry TURN credentials. `RTCIceServer`
+  has `username` and `credential` fields and the bridge already
+  maps a URL string into one, but the flag takes a bare URL, so
+  an authenticated TURN server cannot be configured — only STUN
+  and open TURN work today. Associating a credential pair with a
+  specific URL is a flag-syntax question phase 03 deliberately
+  did not answer in half an hour. Phase 03's plan says twice that
+  this was "recorded in Future work"; phase 04's planning survey
+  found it had not been recorded anywhere at all, which is why it
+  appears here rather than in phase 03's commit.
+
 * Give phase 03's configuration surface an interface allowlist,
   not just a port pin. Since 0.20 made socket binding the
   caller's job, `host_udp_bind_addrs` binds and advertises every

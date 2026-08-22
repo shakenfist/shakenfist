@@ -60,8 +60,9 @@ is no standing gap-closure plan — gaps get closed by mode-specific
 work (the [web frontend plan](/components/ryll/plans/PLAN-web-frontend/) closed the
 Web column's MVP set; the control socket work gave headless an
 interactive driving surface). Last full audit: the web frontend
-sweep; control-socket cells refreshed 2026-07-30, media socket
-binding added 2026-08-21.
+sweep; control-socket cells refreshed 2026-08-23 (web mode gained
+the socket, its `status` and event rows, and the shared digest
+poller), media socket binding added 2026-08-21.
 
 ## Parity matrix
 
@@ -74,9 +75,9 @@ binding added 2026-08-21.
 | TLS / secure channel (inline CA from .vv) | available | available | available |
 | Password authentication | available | available | available |
 | **Control socket** | | | |
-| Control socket (`--control-socket`) | n/a — intrinsic (requires `--headless`; combining with the GUI is a CLI error) | available | n/a — intrinsic (requires `--headless`; combining with `--web` is a CLI error) |
-| Session state query (`status` verb) | n/a — intrinsic | available | n/a — intrinsic |
-| Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | n/a — intrinsic |
+| Control socket (`--control-socket`) | n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error) | available | available |
+| Session state query (`status` verb) | n/a — intrinsic | available | available (`run_web` builds a `SessionStatus` from the same `spice_connected` / `agent_connected` flags and surface mirror headless uses) |
+| Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | available (same `event_broadcast_tx`; `digest_updated` needs the `digest-decode` build feature, and the poller is spawned only when `--control-socket` is given so an ordinary browser session does not pay to decode QR) |
 | **Display** | | | |
 | Display framebuffer (render SPICE draw ops) | available | partial (`ryll/src/app.rs:3513-3516` — headless counts frames but never paints continuously; with `--control-socket`, a `SurfaceMirror` renders draw ops on demand for the `screenshot` verb, instantiated on first use) | available (single monitor, MVP) |
 | Multi-monitor (`--monitors N`) | available | partial (`ryll/src/app.rs:3513-3516` — channel connects but frames are silently dropped; surfaces are never created in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
@@ -99,7 +100,7 @@ binding added 2026-08-21.
 | Keyboard input (key down/up, scancodes) | available | available (via the control socket `send_key` verb — down/up/press with AT-set-1 scancodes; without `--control-socket` only cadence and `--paste-text` generate input) | available (MVP; browser-side scancode table) |
 | Mouse input (position and buttons) | available | missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless) | available (MVP) |
 | Mouse mode negotiation (CLIENT/SERVER) | available | available (negotiation runs in `MainChannel` regardless of mode) | available (both modes drive the guest pointer: absolute `MouseMove` in client mode, relative `MouseMotion` derived from consecutive browser positions in server mode. Pointer Lock is still absent, so the derived deltas drift under guest pointer acceleration and dead-zone at the window edge — see docs/web-frontend.md) |
-| Extended key prefix (E0 for nav cluster) | available | available (the control socket `send_key` verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space) | available (browser shell builds its own AT table) |
+| Extended key prefix (E0 for nav cluster) | available | available (the control socket `send_key` verb accepts 0xE0-prefixed 16-bit scancodes in logical form and converts them; protocol 1.1 and earlier sent them prefix-second and unusable — see docs/control-socket-protocol.md. Cadence alone only sends space) | available (browser table is in logical form; ryll converts via `make_scancode`) |
 | Modifier state tracking (Ctrl/Shift/Alt) | available | partial (`ryll/src/channels/inputs.rs:77-82` — tracked internally but only used by paste state machine; cadence does not restore modifiers) | available (MVP) |
 | **Cadence mode** | | | |
 | Cadence mode (`--cadence`) | available | available | missing (out of MVP scope; no test-automation use case in browser) |

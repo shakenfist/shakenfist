@@ -100,16 +100,17 @@ nav:
             - "Automated PR Review with Claude Code": components/development/automated-pr-review.md
             - "CI Review Automation": components/development/ci-review-automation.md
             - "Code review tracking": components/development/code-review-tracking.md
+            - "Consistency audits": components/development/consistency-audits.md
             - "Release Automation": components/development/release-automation.md
             - Plans:
                 - "Plans index": components/development/plans/index.md
+                - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
-                - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
         - Instar:
             - "Introduction": components/instar/index.md
             - "`instar amend` — change qcow2 image options in place": components/instar/amend.md
@@ -334,7 +335,7 @@ nav:
             - "Channel diagnostics audit": components/ryll/channel-diagnostics-audit.md
             - "Configuration": components/ryll/configuration.md
             - "Continuous integration": components/ryll/ci.md
-            - "Control Socket Protocol — Version 1.1": components/ryll/control-socket-protocol.md
+            - "Control Socket Protocol — Version 1.2": components/ryll/control-socket-protocol.md
             - "Development": components/ryll/development.md
             - "Device redirection": components/ryll/device-redirection.md
             - "Diagnostics and instrumentation": components/ryll/diagnostics.md

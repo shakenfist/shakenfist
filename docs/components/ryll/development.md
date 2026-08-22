@@ -307,6 +307,49 @@ Integration testing against real traffic needs a SPICE server;
 `make test-qemu` starts one locally. Headless mode is what CI uses for
 protocol-level testing.
 
+### Soaking `--web` and comparing against a baseline
+
+`tools/web-soak.sh` samples a running `ryll --web` process while
+driving the guest, and prints a summary in the same shape as the
+0.17 baseline recorded in
+`docs/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework.md`. Reach for
+it when a change could plausibly affect memory or CPU over minutes
+rather than seconds — the WebRTC write path especially, where the
+integration tests only ever exercise a few seconds.
+
+```bash
+make test-qemu                       # guest, SPICE on 5900, QMP socket
+ryll --web --direct localhost:5900 & # the process to sample
+tools/web-soak.sh --pid $! --qmp /tmp/ryll-test-qemu-qmp.sock
+```
+
+Defaults are a 20-minute run sampled every 30 s, which is what the
+baseline used; both are overridable. Per sample it records RSS,
+per-thread CPU, whole-host CPU busy% and load average, to a CSV as
+well as the terminal. The host figures are there because these soaks
+usually run on a shared machine: contamination belongs in the data,
+not folded into the result.
+
+Two things it deliberately does not do. It does not start ryll or a
+browser — an attended session is the point, and the numbers are only
+comparable if the browser and its flags match whatever the baseline
+used. And it does not read the pump drop counters or reaper events,
+which ryll logs at `debug`; run ryll with `--verbose` and take them
+out of the session log.
+
+Note that `--verbose` turns on `debug` for the whole dependency tree,
+not just ryll — webrtc-rs is talkative at that level. That is enough
+log to affect the numbers on a long run, so take the counters from a
+short separate session rather than from the one being measured.
+`RUST_LOG` will not narrow it: ryll does not read it. Tracked as
+[#313](https://github.com/shakenfist/ryll/issues/313); when that
+lands, this paragraph goes away.
+
+If you are driving the uefi-latency-guest, note that any keypress
+advances a fixed eight-colour cycle and one step in eight is black,
+so the viewer legitimately goes black for one interval in eight. The
+script says so at startup.
+
 ## Manual verification against a desktop guest
 
 Some behaviour cannot be tested from the automated suite at all,
@@ -336,6 +379,21 @@ a symptom that looks like a client bug:
 | `intel-hda` + `hda-duplex` | The SPICE playback channel | Silence, indistinguishable from a broken audio path |
 | user-mode networking | cloud-init, `apt` in the guest | cloud-init waits out its datasource search on every boot |
 
+The image ships **no audio player** — no `alsa-utils`,
+`pulseaudio-utils` or libcanberra — so there is nothing in it that
+can make a sound, and the audio check below cannot be done until you
+add one:
+
+```bash
+sudo apt-get install -y alsa-utils      # in the guest
+speaker-test -t sine -f 440 -l 3
+```
+
+The guest has user-mode networking, so that works out of the box.
+Worth knowing before you conclude the audio path is broken: silence
+with no player installed looks exactly like silence with a broken
+playback channel.
+
 Worth checking in ryll's own log when verifying `--web`:
 
 - `main: mouse mode=N (...)` — `2` is client mode, which is what a
@@ -352,23 +410,50 @@ Worth checking in ryll's own log when verifying `--web`:
 ### A browser with no H.264 gets no video
 
 ryll's web mode encodes H.264 and nothing else, so a browser that does
-not offer H.264 connects successfully and shows a black rectangle.
-Audio, input, cursor and viewport resize all keep working, which makes
-the symptom look like a rendering bug rather than a negotiation one.
-The server-side tell is the `no H.264 payload type negotiated` warning
-followed by an endless `Failed to send RTP: unsupported codec type by
-this transceiver`.
+not offer H.264 connects successfully and gets no picture. Audio,
+input, cursor and viewport resize all keep working, which is what
+makes the symptom look like a rendering bug rather than a negotiation
+one.
+
+The browser is told: the page shows a panel over the video area
+explaining that this browser offered no H.264 and pointing at the
+OpenH264 plugin. The server logs `no H.264 payload type negotiated`
+once, stops the encoder for that session, and parks the video pump —
+so a session in this state costs no CPU and produces no further log
+output. Before that fix (issues #289 and #290) the only signal was a
+black rectangle, and the log filled with one
+`Failed to send RTP: unsupported codec type by this transceiver` per
+packet at the frame rate.
+
+The notice is sent in reply to the browser's `hello`, not pushed when
+negotiation settles: negotiation finishes inside `accept_offer`,
+before SCTP has opened the control datachannel, and anything written
+then is dropped. This is the same pull the mouse mode uses, for the
+same reason.
 
 Firefox is the browser this happens on. It ships H.264 for WebRTC via
 Cisco's OpenH264 plugin, and if that plugin has not loaded, Firefox
 still lists H.264 in `RTCRtpReceiver.getCapabilities('video')` while
 omitting it from the offer — so the capability list is not evidence.
-Check `about:addons` → Plugins for OpenH264, and confirm against a
-generated offer rather than against capabilities.
+`tools/browser-offer-probe.py` is the check that follows from that. It
+serves a page to a browser, prints the video codecs from the offer the
+page actually generated with `getCapabilities` beside them, and exits
+non-zero when the two disagree:
+
+```bash
+tools/browser-offer-probe.py --browser chromium
+tools/browser-offer-probe.py --browser firefox-esr --profile ~/.mozilla/firefox/<profile>
+```
+
+Pass a real `--profile` for Firefox. Without one it uses a throwaway
+profile, which has never downloaded OpenH264 and would report no H.264
+for a reason that has nothing to do with the browser you meant to
+test.
 
 Chromium carries H.264 in-tree and does not have this failure mode,
 which makes it the browser to reach for when deciding whether a
-problem is ryll's.
+problem is ryll's — and the control to run the probe against when
+deciding whether the probe itself is telling the truth.
 
 ### Inspecting a `--capture` pcap
 
