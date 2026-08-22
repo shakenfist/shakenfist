@@ -464,6 +464,31 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertIsNone(mariadb._demand_guard_clause(NODE1, 10.0, -1.0))
         self.assertIsNotNone(mariadb._demand_guard_clause(NODE1, 10.0, 0.75))
 
+    def test_the_demand_clause_does_not_charge_the_placement(self):
+        # Issue #3813: the clause compared a per-request charge against
+        # a per-node budget, which made it unsatisfiable below 3.34
+        # schedulable threads whatever the node's real headroom. The
+        # charge is gone from the comparison -- the placement's
+        # demand_add appears nowhere in the compiled WHERE -- while the
+        # same UPDATE still adds it to expected_demand for the next
+        # decision.
+        clause = mariadb._demand_guard_clause(NODE1, 7.5, 0.75)
+        text, params = _compiled(sa.select(sa.literal(1)).where(clause))
+        self.assertNotIn(7.5, params.values())
+        self.assertIn('cpu_load_1', text)
+        self.assertIn('cpu_schedulable', text)
+        self.assertIn('expected_demand', text)
+
+        # The charge does still reach the SET, so a burst spreads.
+        router = _PlacementRouter()
+        self._run(router)
+        update = self._node_update(router)
+        self.assertIn('expected_demand=(scheduler_node_capacity.'
+                      'expected_demand + %s)', update)
+        # ... and the comparison is now node state on both sides.
+        self.assertIn('scheduler_node_capacity.expected_demand <= %s * '
+                      '(SELECT node_metrics.cpu_schedulable', update)
+
     def test_enforce_false_keeps_the_counters_and_drops_the_guards(self):
         router = _PlacementRouter(claim=None)
         result = self._run(router, enforce=False)
@@ -600,6 +625,29 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual(10.0, detail['demand']['requested'])
         self.assertTrue(detail['demand']['exceeded'])
         self.assertFalse(detail['cpus']['exceeded'])
+
+    def test_a_node_under_target_does_not_report_demand_exceeded(self):
+        # The discriminating case for phase 4a. Measured load 4.0 plus
+        # expected_demand 0.5 is 4.5 against a budget of 12.0, so the
+        # clause passed on demand and the node refused on something
+        # else. Charging the placement's 10.0 would push 4.5 over 12.0
+        # and report a refusal the clause never made -- which would
+        # then make the denial look demand_only and fire the P9 waiver
+        # for a denial the waiver must not touch.
+        router = _PlacementRouter(
+            node_row=_capacity_row(expected_demand=0.5),
+            rowcounts={'node_claim': 0})
+        result = self._run(router)
+
+        detail = {d['dimension']: d for d in result['dimensions']}
+        self.assertEqual(12.0, detail['demand']['limit'])
+        self.assertEqual(4.5, detail['demand']['used'])
+        self.assertEqual(10.0, detail['demand']['requested'])
+        self.assertFalse(detail['demand']['exceeded'])
+
+        denial = exceptions.CapacityAdmissionDenied(
+            result['failing_stage'], result['dimensions'])
+        self.assertFalse(denial.demand_only)
 
     def test_denied_admission_is_not_an_rpc_failure(self):
         # A caller that conflated the two would walk to the next
@@ -1254,6 +1302,25 @@ class DimensionDetailTestCase(base.ShakenFistTestCase):
         self.assertIsInstance(detail['limit'], float)
         self.assertIsInstance(detail['used'], float)
         self.assertTrue(detail['exceeded'])
+
+    def test_an_uncharged_dimension_reports_state_not_state_plus_request(self):
+        # The demand dimension is the one caller: since phase 4a the
+        # clause tests the node's existing state alone, so the detail
+        # has to as well or it names refusals the guard did not make.
+        # requested is still reported, because an operator wants to
+        # know what the placement would have added.
+        for used, requested, limit, charged, expected in (
+                (11.0, 10.0, 12.0, True, True),
+                (11.0, 10.0, 12.0, False, False),
+                (12.5, 10.0, 12.0, False, True),
+                (12.0, 0.5, 12.0, False, False)):
+            detail = mariadb._capacity_dimension(
+                'demand', limit, used, requested, charged=charged)
+            self.assertEqual(
+                expected, detail['exceeded'],
+                f'used {used} requested {requested} limit {limit} '
+                f'charged {charged}')
+            self.assertEqual(float(requested), detail['requested'])
 
 
 class ServicerRoundTripTestCase(base.ShakenFistTestCase):

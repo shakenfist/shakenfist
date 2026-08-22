@@ -24936,21 +24936,36 @@ def _retry_transaction(fn: Callable[[], _T], op_name: str) -> _T:
 
 
 def _capacity_dimension(
-        dimension: str, limit: float, used: float,
-        requested: float) -> CapacityDimensionDetailDict:
+        dimension: str, limit: float, used: float, requested: float,
+        charged: bool = True) -> CapacityDimensionDetailDict:
     """Build one denial-detail entry, recomputing the guard comparison.
 
-    ``exceeded`` is the same ``used + requested <= limit`` test the SQL
-    guard made, evaluated here against the values read back after the
-    rollback. It names the dimensions that actually failed rather than
-    reporting every dimension of the failing stage as suspect.
+    ``exceeded`` is the same test the SQL guard made, evaluated here
+    against the values read back after the rollback. It names the
+    dimensions that actually failed rather than reporting every
+    dimension of the failing stage as suspect.
+
+    ``charged`` says whether this request is part of the comparison, and
+    exists for exactly one caller: the D13 demand dimension. The three
+    allocation dimensions are guarded as ``used + requested <= limit``,
+    but since phase 4a the demand clause compares only the node's
+    existing state (``cpu_load_1 + expected_demand <= target_load x
+    cpu_schedulable``) and does not charge the incoming placement --
+    that is what makes it satisfiable at every node size. Reporting
+    demand as ``used + requested > limit`` anyway would mark a denial
+    the clause did not make, and because
+    ``CapacityAdmissionDenied.demand_only`` is derived from the
+    ``exceeded`` set, that would in turn change whether the P9 waiver
+    fires. ``requested`` is still reported, because an operator reading
+    the event wants to know what the placement would have added.
     """
     return {
         'dimension': dimension,
         'limit': float(limit),
         'used': float(used),
         'requested': float(requested),
-        'exceeded': bool(used + requested > limit),
+        'exceeded': bool(
+            used + requested > limit if charged else used > limit),
     }
 
 
@@ -24978,12 +24993,30 @@ def _demand_guard_clause(
         target_load: float) -> Optional[sa.ColumnElement[bool]]:
     """The D13 feedforward clause of the node guard, or None to skip it.
 
-    ``measured cpu_load_1 + expected_demand + demand_add <= target_load x
+    ``measured cpu_load_1 + expected_demand <= target_load x
     cpu_schedulable``, with both measured inputs read from the typed
     node_metrics columns inside the admission transaction (P2). The
     scheduler's own measurement-denominated filters remain cheap
     pre-filters in find_candidates(); this is the clause that makes the
     decision atomic with the drawdown.
+
+    ``demand_add`` is deliberately *not* part of the comparison, though
+    the same UPDATE still adds it to ``expected_demand`` so it is
+    charged for the next decision. The clause asks whether the node is
+    already at or above its target load, not whether it would be after
+    this placement (phase 4a decision E2). Both sides are then node
+    state in units of runnable threads, where the old form compared a
+    per-request charge against a per-node budget: at the original seed
+    constants that made a 1-vCPU instance need 3.34 schedulable threads
+    before any node could admit it at zero load, so nodes below four
+    threads admitted nothing, ever (issue #3813). Check-then-charge is
+    safe here because this comparison and that increment are the same
+    guarded UPDATE in the same transaction, so two admissions against
+    one node serialise and the second sees the first's charge.
+
+    This is a spreader and never a capacity bound: the three allocation
+    dimensions in the same WHERE clause are what stop a node accepting
+    work it has no room for.
 
     NULL metrics inputs pass rather than deny. A node whose resources
     daemon has not yet published typed columns (mid-upgrade) has no
@@ -25010,7 +25043,7 @@ def _demand_guard_clause(
     return sa.or_(
         schedulable.is_(None),
         sa.func.coalesce(load, 0.0) + capacity.c.expected_demand
-        + demand_add <= target_load * schedulable)
+        <= target_load * schedulable)
 
 
 def _floored_node_decrement(
@@ -25414,7 +25447,9 @@ def _admission_denial_dimensions(
                     # The D13 demand clause is the other way the node
                     # guard can refuse, and a denial with no exceeded
                     # allocation dimension is exactly the case an
-                    # operator needs told about.
+                    # operator needs told about. charged=False because
+                    # the clause does not charge demand_add -- see
+                    # _capacity_dimension() and _demand_guard_clause().
                     metrics = _get_node_metrics_table()
                     measured = conn.execute(sa.select(
                         metrics.c.cpu_load_1, metrics.c.cpu_schedulable
@@ -25426,7 +25461,7 @@ def _admission_denial_dimensions(
                             target_load * measured.cpu_schedulable,
                             ((measured.cpu_load_1 or 0.0)
                              + row.expected_demand),
-                            demand_add))
+                            demand_add, charged=False))
     except OperationalError as e:
         # The detail is diagnostic, not load bearing: the denial itself
         # is already decided and the caller walks to the next candidate
