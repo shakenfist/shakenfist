@@ -12739,11 +12739,11 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tr>
 <tr>
 <td>await<br/><em>boolean</em></td>
-<td>Whether to wait for the instance to be created. Only works for when state is <code>present</code>. Default is <code>false</code>.</td>
+<td>Whether to wait for the instance to be created. Only works for when state is <code>present</code>. Default is <code>false</code>. The wait is bounded by <code>await_timeout</code>, as is the creation which precedes it.</td>
 </tr>
 <tr>
 <td>await_timeout<br/><em>integer</em></td>
-<td>How many seconds to wait in an <code>await</code>. Defaults to 600.</td>
+<td>How many seconds an <code>await</code> may take, counted from the start of the operation rather than from the start of the wait. Where an instance is being replaced, the time spent deleting the old one and creating the new one is deducted from this number before the wait begins. It is a budget rather than a hard deadline: a deletion or creation already underway is not interrupted, and a <code>shakenfist-client</code> of v0.8.3 or earlier cannot be told not to wait while creating. Defaults to 600.</td>
 </tr>
 </tbody>
 </table>
