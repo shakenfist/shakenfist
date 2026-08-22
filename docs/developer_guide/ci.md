@@ -63,6 +63,37 @@ The CI uses a two-stage merge queue pattern (see [this blog post](https://boinko
 in branch protection. `Can merge` is evaluated by the merge queue itself, not as
 a required check.
 
+### Superseded merge groups are cancelled
+
+Every job that can run in the queue and holds a scarce runner carries a
+`concurrency:` block whose key is merge-group aware — the four
+`functional_matrix_merge_collection` entries and `ansible_modules_collection`
+through the shared `smoke-cluster.yml`, and `node_lifecycle_collection`,
+`schema_enum_widening` and `automated_delinter` in this repository.
+
+`github.ref` is the obvious key and is right on every other event. On
+`merge_group` it is the per-attempt queue branch
+`gh-readonly-queue/develop/pr-<N>-<SHA>`, and GitHub mints a fresh SHA every
+time it rebuilds the group — which it does on every push to `develop`. Keyed
+on that, every rebuild lands in a concurrency group of its own,
+`cancel-in-progress` never matches, and superseded merge groups run to
+completion. Each one deploys several nested clusters onto the sfcbr
+under-cloud that every Shaken Fist repository shares, so the cost lands on
+the neighbours as well as here: `shakenfist/kerbside#284` records a kerbside
+merge group failing to place a 12 vCPU instance while two superseded
+shakenfist merge groups held the capacity. So the key branches on the event
+and uses `github.event.merge_group.base_ref` in the queue, with a
+`merge_group-` prefix so a queue run does not share a group with a
+`workflow_dispatch` run on `develop`.
+
+Cancelling is only safe because the queue is serial: the develop ruleset sets
+`max_entries_to_build: 1`, so any other in-flight `merge_group` run is by
+definition superseded and its queue branch already abandoned by GitHub.
+Raising that setting while keeping this key would cancel a live queue entry,
+which reports a failed required check and ejects the pull request — the two
+have to move together. This is audited fleet-wide; see
+[merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md).
+
 ## Exported Repository Configuration
 
 Repository settings (rulesets, branch protection, merge queue config) are
