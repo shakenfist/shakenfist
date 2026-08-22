@@ -314,8 +314,8 @@ actually running at:
 and compare it to the browser window. In the browser console,
 `[ryll] viewport sent: W x H` says the viewport message went out;
 `[ryll] viewport deferred` means the control channel was not open
-yet and it will be re-sent when it opens. Server-side, run with
-`RUST_LOG=info,ryll::web=debug` and look for:
+yet and it will be re-sent when it opens. Server-side, run ryll with
+`--verbose` and look for:
 
     web inputs: viewport WxH
 

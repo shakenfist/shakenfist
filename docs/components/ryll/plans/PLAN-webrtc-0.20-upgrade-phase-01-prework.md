@@ -349,6 +349,19 @@ must reproduce these conditions to compare against these numbers.
 | ryll alive at end | yes | yes |
 | Host CPU busy%, mean (max) | 8.3 (9) | 10.4 (29) |
 
+> **Correction, made during phase 04 (2026-08-22).** The three
+> "drops"/"events" rows above are not measurements. The conditions
+> below record running with
+> `RUST_LOG=info,shakenfist_spice_webrtc=debug,ryll=debug` because
+> "the drop counters only log at debug" — but ryll does not read
+> `RUST_LOG` at all. It selects `INFO` or `DEBUG` from `--verbose`
+> and builds a plain `LevelFilter` (`ryll/src/main.rs:161-169`), and
+> `RUST_LOG` appears nowhere in its history except inside a comment.
+> Both runs were therefore at `INFO`, where those counters are not
+> emitted, so the zeros mean "nothing logged" rather than "nothing
+> dropped". The RSS and CPU rows are unaffected — they were sampled
+> externally from `/proc`.
+
 **Verdict: no regression.** The phase-01 tip is at-or-below the
 baseline on both memory and CPU, and the differences are within
 run-to-run noise at this load. Both runs show RSS growing through

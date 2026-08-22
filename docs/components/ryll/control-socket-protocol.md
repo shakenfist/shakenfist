@@ -1,13 +1,14 @@
-# Control Socket Protocol — Version 1.1
+# Control Socket Protocol — Version 1.2
 
-This document specifies the wire protocol spoken between Ryll's headless
-mode and any external driver that connects to its Unix-domain control
-socket. It is the load-bearing contract for the automated
-SPICE-test-harness work: external drivers such as latency loadtests
-and Sextant scenario tests implement against this document. Read the
-whole document before writing a client or implementing a verb.
+This document specifies the wire protocol spoken between a Ryll session
+with no host window — `--headless` or `--web` — and any external driver
+that connects to its Unix-domain control socket. It is the load-bearing
+contract for the automated SPICE-test-harness work: external drivers
+such as latency loadtests and Sextant scenario tests implement against
+this document. Read the whole document before writing a client or
+implementing a verb.
 
-Protocol version: **1.1**
+Protocol version: **1.2**
 
 Version history:
 
@@ -22,6 +23,14 @@ Version history:
   Cargo feature.  Backwards-compatible at the major-version
   level: v1.0 clients can still hello and operate; they just
   do not subscribe to v1.1 events.
+- **1.2** — the socket became available in `--web` mode as well as
+  `--headless`; no wire change, but the flag combination a client
+  can expect to find a socket behind is wider.  Corrected
+  `send_key`'s encoding of 0xE0-prefixed extended scancodes, which
+  every version before this transmitted with the prefix byte second
+  and the break bit on the prefix rather than the scancode — see
+  the note under [`send_key`](#send_key).  Plain scancodes are
+  unaffected, so a client that only sends those sees no difference.
 
 ---
 
@@ -48,8 +57,9 @@ Version history:
 
 ### What this protocol covers
 
-- Driving a headless Ryll session from an external process over a
-  Unix-domain socket.
+- Driving a Ryll session that has no host window — `--headless` or
+  `--web` — from an external process over a Unix-domain socket. The
+  GUI cannot host the socket; see the Transport section.
 - Querying session state (SPICE connection status, surfaces, agent
   availability).
 - Sending keyboard input as individual scancodes or as paste-as-
@@ -58,8 +68,8 @@ Version history:
 - Subscribing to an asynchronous stream of events: SPICE latency
   samples, agent connect/disconnect transitions, paste completion
   notifications, per-draw surface notifications, decoded
-  visual-digest updates (on `digest-decode` builds), and
-  queue-overflow notifications.
+  visual-digest updates (on `digest-decode` builds, in both
+  `--headless` and `--web`), and queue-overflow notifications.
 - Negotiating the protocol version at connection time so clients and
   servers can evolve independently within a major version.
 
@@ -74,9 +84,11 @@ Version history:
 - **Multi-client concurrency.** Version 1 accepts exactly one client at
   a time. A second connection attempt while a client is connected
   receives a `busy` error and is closed immediately.
-- **Control socket in GUI or web mode.** The socket is only valid in
-  `--headless` mode. Combining `--control-socket` with the GUI or
-  `--web` flag is a CLI error.
+- **Control socket in GUI mode.** The socket is valid with
+  `--headless` or `--web`, both of which run a session with no host
+  window. Combining `--control-socket` with the GUI is a CLI error:
+  the window owns input and the surface, so a second driver
+  injecting events behind its back has no defined meaning.
 - **Replacing the `--cadence`, `--paste-text`, or `--latency-file`
   flags.** Those flags keep working unchanged. The control socket is a
   new, orthogonal interface.
@@ -87,9 +99,8 @@ Version history:
 
 The control socket is a **Unix-domain stream socket** (type
 `SOCK_STREAM`). Its path is supplied by the caller via Ryll's
-`--control-socket <path>` flag. This flag is only valid when
-`--headless` is also present; Ryll will reject the combination with
-any other operating mode.
+`--control-socket <path>` flag. This flag needs `--headless` or
+`--web`; Ryll rejects it in GUI mode at launch.
 
 On startup, Ryll:
 
@@ -240,7 +251,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 ```
 
 Result fields:
@@ -248,7 +259,7 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.1"`; in v1.0 servers it was `"1.0"`. Clients should not compare for exact equality — see the compat note below. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.2"`; older servers reported `"1.0"` or `"1.1"`. Clients should not compare for exact equality — see the compat note below. |
 | `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
@@ -338,7 +349,7 @@ Worked example:
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 ```
 
 ---
@@ -385,17 +396,36 @@ Params:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `scancode` | u16 | The AT-set 1 **make** code to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. `0xE04B` for left arrow. |
+| `scancode` | u16 | The AT-set 1 **make** code to send, in **logical** form — the way scancode tables are conventionally written. Extended scancodes (0xE0 prefix) are supplied as the full 16-bit value with the prefix byte in the **high** byte, e.g. `0xE04B` for left arrow. This is not the byte order SPICE uses on the wire; the server converts. Do not send a pre-swapped wire value. |
 | `state` | string | One of `"down"`, `"up"`, or `"press"`. `"press"` sends a down event immediately followed by an up event in a single operation. |
 
-The server applies the AT-set 1 release encoding itself: for `"up"`
-(and the up half of `"press"`) it sets the release bit
-(`scancode | 0x80`, which for extended scancodes lands on the low
-byte, after the 0xE0 prefix) before injecting the event. Clients
-supply the make code for every state. A client that passes an
-already-encoded release code for `"up"` still works — the release
-bit is not double-applied — but this is a compatibility affordance,
-not the documented interface.
+The server owns both halves of the AT-set 1 encoding, and a client
+should send the logical make code for every state:
+
+- **Byte order.** SPICE carries the scancode as a little-endian
+  32-bit value, and the wire wants the `0xE0` prefix *first*. The
+  server swaps the two bytes, so the logical `0xE04B` is transmitted
+  as `E0 4B`.
+- **Release bit.** For `"up"` (and the up half of `"press"`) the
+  server sets the break bit, which belongs on the scancode byte
+  rather than on the prefix.
+
+A client that passes a logical code with the release bit already set
+for `"up"` — `0x9E` rather than `0x1E`, or `0xE0CB` rather than
+`0xE04B` — still produces the identical wire value, because the
+server ORs the bit in and OR-ing a set bit is a no-op. That
+affordance is guaranteed and covered by a test.
+
+> **Protocol 1.1 and earlier got extended keys wrong.** Servers
+> before 1.2 injected the supplied value verbatim, so `0xE04B`
+> reached the guest as `4B E0` — prefix second — and `| 0x80` put
+> the break bit on the prefix byte. Every 0xE0-prefixed key was
+> wrong in both directions, and a client could only reach the guest
+> correctly by sending a pre-swapped wire value, which 1.2 rejects
+> as the malformed input it always was. Plain (non-extended)
+> scancodes are unaffected and behave identically across both
+> versions. A client that needs extended keys should require
+> `protocol_version` ≥ 1.2 from `hello`.
 
 Result on success: `{}`
 
@@ -961,7 +991,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.1**.
+version is **1.2**.
 
 Rules:
 
@@ -978,6 +1008,14 @@ Rules:
   but different minor versions SHOULD interoperate. The server accepts
   any `hello` whose `protocol_version` has a matching major, regardless
   of the minor component.
+- A minor bump is also used for a **correction to behaviour that was
+  never usable as specified** — 1.2's extended-scancode fix is the
+  only instance so far. It is not a major bump because nothing about
+  the envelope, verb set or field types changes, and a client cannot
+  have been depending on the broken behaviour while also reaching the
+  guest correctly. It gets a version number rather than passing
+  silently so that a client needing the fixed behaviour has something
+  to test for.
 
 Forward-compatibility obligations:
 
@@ -989,9 +1027,11 @@ Forward-compatibility obligations:
   error rather than panicking. Servers must also silently ignore unknown
   event names in `subscribe`/`unsubscribe` params.
 
-Version 1.0 was the first published version. Version 1.1 (the
-current version) added the `surface_drawn` and `digest_updated`
-events; see the version history at the top of this document.
+Version 1.0 was the first published version. Version 1.1 added the
+`surface_drawn` and `digest_updated` events. Version 1.2 (the
+current version) extended the socket to `--web` mode and corrected
+`send_key`'s extended-scancode encoding; see the version history at
+the top of this document.
 
 ---
 
@@ -1004,7 +1044,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1053,10 +1093,18 @@ Key observations from this transcript:
 Everything above this point is the contract. This section describes
 how ryll implements it, and is not binding on other implementations.
 
-The control socket is exposed by headless mode via the
-`--control-socket <path>` CLI flag. The flag is only valid when
-`--headless` is also present; combining it with the GUI or `--web`
-flag is a CLI error caught before the SPICE session starts.
+The control socket is exposed by headless and web mode via the
+`--control-socket <path>` CLI flag; the GUI rejects it at launch.
+Both modes spawn the same server through
+`shakenfist_spice_renderer::spawn_control_socket`, so the two cannot
+drift apart.
+
+Web mode gained a socket in the webrtc-rs 0.20 upgrade's phase 04. It
+was headless-only until then, which meant the scenario tests that
+drive a session through this protocol and assert on the QR visual
+digest could not observe web mode at all -- and web mode is the one
+mode with its own browser-side scancode table. Four input bugs
+shipped behind that gap.
 
 **Module layout.** The control surface lives entirely under
 `shakenfist-spice-renderer/src/control/`:

@@ -1,16 +1,17 @@
-# Title for the plan
+# Consistency audits v2
 
 ## Prompt
 
 Before responding to questions or discussion points in this
-document, explore the occystrap codebase thoroughly. Read relevant
-source files, understand existing patterns (project structure,
-command-line argument handling, input source abstractions, output
-formatting, error handling), and ground your answers in what the
-code actually does today. Do not speculate about the codebase when
-you could read it instead. Where a question touches on external
-concepts (OCI image specs, Docker/Podman compatibility, registry
-APIs), research as needed to give a confident answer. Flag any
+document, explore this repository thoroughly: `audits/`, the audit
+tooling in `scripts/`, `.github/workflows/consistency-audit.yml`, and
+the reusable workflows and composite actions in `shakenfist/actions`.
+Ground your answers in what the tooling does today rather than in what
+this plan said it would do -- the two have diverged in several places,
+and the divergences are the interesting part. Where a question touches
+on GitHub Actions security (token scope, what a cross-repository
+reusable workflow can and cannot grant itself, untrusted pull request
+input), research as needed to give a confident answer. Flag any
 uncertainty explicitly rather than guessing.
 
 ## Situation
@@ -159,6 +160,11 @@ that "the reviewer should also propose fixes" is correct -- when a
 review finds issues, the same context that identified the problem is
 best positioned to propose a fix.
 
+*(Written 2026-03. This turned out to be wrong, and usefully so: the
+human intervention between review and fix was the feature, not the
+friction. See Phase 3 item 4 below, which records the decision to
+retire the comment addresser rather than combine it with anything.)*
+
 This should remain a separate workflow rather than being folded into
 the existing review or test workflows, but it should have two trigger
 modes:
@@ -270,20 +276,28 @@ Rather than a big-bang migration, I'd suggest:
 
 ## Open questions
 
-* Should the CI audit workflow run daily, weekly, or on-push to
-  `development`? Daily seems right for drift detection without being
-  noisy.
+Answered:
+
+* **How often should the CI audit run?** Daily, at 06:00 UTC, after
+  `export-repo-config` at 00:30. Noise has not been a problem, because
+  the run only files an issue on a transition rather than every
+  morning.
+
+* **Should fixes be committed to the PR branch or proposed as review
+  suggestions?** Neither, in the end: fixes stay behind an explicit
+  `@shakenfist-bot please address comments`, so a human reads the
+  review before any commit is authored. See Phase 3 item 4.
+
+Still open:
 
 * Should audit issues be auto-assigned to anyone, or left unassigned
-  for triage?
-
-* For the combined review+fix workflow, should fixes be committed
-  directly to the PR branch or proposed as review suggestions? Direct
-  commits are simpler but suggestions give the author more control.
+  for triage? Unassigned by default today, with 116 open across the
+  organisation.
 
 * Do we want a dashboard (e.g. a generated README table or GitHub
   project board) that shows compliance status across all repos at a
-  glance?
+  glance? The per-criterion tables answer "who fails this check"; there
+  is nothing that answers "what is the state of the fleet".
 
 ## Execution
 
@@ -303,47 +317,142 @@ Rather than a big-bang migration, I'd suggest:
 5. ~~Create GitHub issues for all known non-compliant items.~~ 35
    issues created across 10 repos.
 
-### Phase 2: CI-based audit runner -- DONE
+The structure has since outgrown those numbers, which is the point of
+it: `audits/` now holds 34 criteria rather than 13, backed by 37
+registered checks (some criteria, such as `workflow-standards`,
+decompose into several), and the audit matrix covers 17 repositories
+rather than 10. `actions` and `development` were both moved off the
+exempt list -- the fleet depends on `actions` for every composite action
+it runs, and `development` is where these rules are written, so an
+exemption there is an exemption the authors of the standard wrote for
+themselves.
+
+### Phase 2: CI-based audit runner -- MOSTLY DONE
 
 1. ~~Write audit check scripts (shell or Python) for each
-   criterion.~~ `scripts/audit-check.py` checks 11 criteria
-   (4 subjective criteria skipped: security-sanitization,
-   console-logging, python-version, test-coverage).
+   criterion.~~ `scripts/audit-check.py` runs 37 registered checks
+   across 34 criteria (4 judged by reading rather than matching:
+   security-sanitization, console-logging, python-version,
+   test-coverage).
 2. ~~Create a scheduled workflow in `development` that runs all
    checks across all projects.~~
    `.github/workflows/consistency-audit.yml` runs daily at
-   06:00 UTC with a matrix of 10 repos.
+   06:00 UTC with a matrix of 17 repos.
 3. ~~Add issue creation/closure automation for audit results.~~
    `scripts/audit-manage-issues.py` creates issues for failures
    and closes them when checks pass, using exact title matching
    against existing manually-created issues.
-4. Verify drift detection works after first CI run. Requires
-   `AUDIT_TOKEN` secret to be configured on the development
-   repo with cross-repo issue permissions.
+4. ~~Verify drift detection works after first CI run.~~ Done. The
+   `AUDIT_TOKEN` secret is configured with cross-repo issue
+   permissions, and the daily run has been green other than the
+   2026-08-20 outage described under "Bugs fixed" below. Drift shows
+   up two ways: a table row flipping to non-compliant, and a
+   previously closed issue reopening.
+5. ~~Regenerate the per-project compliance tables from the audit
+   results rather than by hand.~~ `scripts/audit-update-docs.py`
+   rewrites the marker blocks in `audits/*.md` and
+   `scripts/commit-audit-docs.sh` pushes them back, so the published
+   status cannot drift from what the audit actually measured.
+6. ~~Make a failed scheduled run visible to a human.~~ The
+   `report-failure` job files or updates an `audit-failure` issue on
+   this repository. This matters more than it sounds: while the audit
+   is down the tables keep showing the previous run's verdicts, so a
+   broken audit looks like a healthy one from the outside.
+7. Check the audit matrix against the organisation's actual repository
+   list, so a repository added to the org is not silently unaudited.
+   Tracked as issue #40.
 
-### Phase 3: Combined review+fix workflow
+### Phase 3: Automatic review, and the fix/retest split -- MOSTLY DONE
 
-1. Design the combined workflow preserving the two-checkout security
-   model.
-2. Implement the "already reviewed" gate (check for existing bot
-   review comment).
-3. Add the automatic trigger on successful functional test
-   completion, gated by the above check.
-4. Add the manual trigger via `@shakenfist-bot please review and
-   fix`.
-5. Implement as a reusable workflow in `shakenfist/actions`.
-6. Pilot on `shakenfist` (the reference project).
-7. Roll out to remaining projects.
+This phase was planned as one workflow doing review, fix and retest.
+What was built automates the *review* half and deliberately leaves fix
+and retest as explicit human commands, which is a better answer than the
+one planned and is recorded here as a change of direction rather than as
+outstanding work.
 
-### Phase 4: Cleanup
+`shakenfist/actions/.github/workflows/pr-auto-review.yml` is a reusable
+workflow. A calling project adds a job naming its own test jobs in
+`needs:`, so "review only after the tests pass" is an ordinary job
+dependency rather than a `workflow_run` trigger plus a gate: a job
+skipped because a dependency failed never starts the workflow. The
+caller supplies `pull-requests: write` and `issues: write`, because a
+cross-repository reusable workflow cannot grant itself more token scope
+than its caller has, and callers must not add `secrets: inherit` --
+nothing in the chain reads a secret.
+
+1. ~~Design the combined workflow preserving the two-checkout security
+   model.~~ Superseded. The review half needs no write checkout at all:
+   it authenticates with `github.token` under permissions the caller
+   grants, and reads the diff through `gh pr diff`. There was nothing
+   for the two-checkout model to protect here, and nothing left for it
+   to protect anywhere once item 4 was done: it existed for the fix
+   step's write access to the pull request branch, and that step was
+   removed rather than combined.
+2. ~~Implement the "already reviewed" gate.~~ It lives in the
+   `review-pr-with-claude` action, which skips when it finds an existing
+   `shakenfist-bot` review unless its `force` input is set.
+   `pr-auto-review.yml` never passes `force` and `pr-re-review.yml`
+   always does, so an explicit human request is the only route to a
+   second review. Doing the check over the API rather than from a
+   checkout also let callers delete their `check-bot-commit` job.
+3. ~~Add the automatic trigger on successful functional test
+   completion.~~ The caller's `needs:` list, as above.
+4. ~~Add the manual trigger via `@shakenfist-bot please review and
+   fix`.~~ Answered by deletion rather than by building it. The
+   comment addresser was retired rather than combined with the
+   reviewer: it went unused, because review findings are worked
+   through interactively with the reviewer, and a bot authoring
+   commits from a review no human had read is exactly what stopped
+   anyone reaching for it. A retired addresser leaves no fix step for
+   a review to be combined with, so the two commands that survive are
+   `please re-review` and `please retest`. Removed in PR #43 -- from
+   this repository and from the template. Eleven of the sixteen
+   audited projects still carry the workflow (actions, agent-python,
+   client-python, client-python-k3s, clingwrap, instar, kerbside,
+   occystrap, ryll, shakenfist and sfui), so the command still answers
+   across most of the fleet; the `ci-review-automation` check files an
+   issue against each until it does not.
+5. ~~Implement as a reusable workflow in `shakenfist/actions`.~~
+6. ~~Pilot it.~~ Piloted on `actions` and on this repository, rather
+   than on `shakenfist` as originally written.
+7. Roll out to the remaining projects. Twelve of the sixteen audited
+   projects now call `pr-auto-review.yml`; `cloudgood`, `divergulent`,
+   `kerbside-patches` and `library-utilities` do not. Separately, and
+   larger, ten projects still hand-roll the bot trigger handling in
+   `pr-re-review.yml` instead of calling
+   `shakenfist/actions/pr-bot-trigger@main`. That is a security gap
+   rather than an untidiness: a hand-rolled copy does not inherit the
+   action's refusal to act on fork pull requests, and the `pr-ref` it
+   substitutes is a head-repository branch name that callers hand
+   straight to `checkout` and `git push` against their own repository.
+   The `standards-alignment` skill is the vehicle for this, one
+   repository per commit.
+
+### Phase 4: Cleanup -- DONE
 
 1. ~~Retire `PLAN-consistency.md` once issue tracking is
    live.~~ Done 2026-08-22. The file is now a record of what the
    plan was and why it was replaced; its per-project checklists
    were not carried over.
-2. Archive `PROJECT-CONSISTENCY-AUDITS.md` with a pointer to the
-   new `audits/` directory.
-3. Update all documentation in `docs/`.
+2. ~~Archive `PROJECT-CONSISTENCY-AUDITS.md` with a pointer to the
+   new `audits/` directory.~~ Not done, deliberately. The file became
+   the prose layer above the machine-readable specs rather than a
+   superseded copy of them: `ARCHITECTURE.md` names it the
+   authoritative prose, `AGENTS.md` requires it to be updated when a
+   criterion is added, and its sections link out to the matching
+   `audits/*.md`. Archiving it would have deleted the only place the
+   *reasoning* behind a rule is written down, leaving the machine
+   checks with nothing to explain themselves against.
+3. ~~Move the operational documentation into `docs/`.~~ Done.
+   `docs/consistency-audits.md` now describes the system: the three
+   layers a criterion lives in, what each stage of a daily run does,
+   how issues are filed and closed and why titles are an interface,
+   how the compliance tables are regenerated, how to add a criterion,
+   how to bring a repository into scope, and how to test a change
+   before it reaches the fleet. `AGENTS.md` drops from 169 lines to
+   101 and `ARCHITECTURE.md` from 125 to 112, each keeping a summary
+   and a link -- which is what `llm-doc-structure` asks of them, and
+   `AGENTS.md` is loaded into every session held here.
 
 ## Administration and logistics
 
@@ -369,16 +478,46 @@ because the following statements will be true:
 
 ### Future work
 
-We should list obvious extensions, known issues, unrelated bugs
-we encountered, and anything else we should one day do but have
-chosen to defer to here so that we don't forget them.
+* A fleet-wide compliance dashboard, per the open question above.
 
-...
+* Machine checks for the four criteria `audit-check.py` does not
+  measure -- `security-sanitization`, `console-logging`,
+  `python-version` and `test-coverage`. These are the only audit files
+  with no marker block, so they are also the only criteria whose
+  per-project status is nobody's job to keep current. Either automate
+  them or say in each file that it is judged by hand.
+
+* Automatic assignment or triage of audit issues.
+
+* Retire the four repositories that still have no automated review
+  (`cloudgood`, `divergulent`, `kerbside-patches`, `library-utilities`)
+  or adopt them properly, rather than leaving them permanently
+  non-compliant in the tables.
 
 ### Bugs fixed during this work
 
-This section should list and bugs we encounter during development
-that we fixed.
+* The daily audit began failing on 2026-08-20 because the runners
+  enforce PEP 668 and the bare `pip install skillsaw` was refused with
+  `externally-managed-environment`. Every leg of the matrix failed,
+  taking issue filing and table regeneration with it. Fixed by
+  installing into a venv and putting that venv on `PATH`.
+
+* A skillsaw that could not run did not fail the audit.
+  `skillsaw_errors()` caught `FileNotFoundError` and returned `None`,
+  which `check_llm_context_lint` turned into `not_applicable`, so a
+  broken install silently stopped measuring one criterion across the
+  entire fleet, and the tables reported it in a way that looked
+  deliberate. The workflow now asserts that skillsaw answers, at the
+  pinned version.
+
+* A failing scheduled run emailed whoever pushed last, which is nobody's
+  inbox in particular, so the outage above ran for a full day with the
+  tables still showing the previous morning's verdicts. Hence the
+  `report-failure` job.
+
+* Issue bodies built from an indented multi-line shell string rendered
+  as a code block on GitHub, because four leading spaces are a code
+  block in GitHub-flavoured Markdown. Rebuilt with `printf`.
 
 ### Back brief
 
