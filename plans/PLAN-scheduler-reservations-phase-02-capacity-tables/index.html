@@ -12548,6 +12548,12 @@ correction; the plumbing (deltas in the reply) is built now.</p>
 <p>New config: <code>SCHEDULER_DEMAND_PER_VCPU</code> (default 2.5, the
 00a-1 seed) and <code>SCHEDULER_DEMAND_DECAY_SECONDS</code> (default
 600), both marked <em>revisit when step 3 data lands</em>.</p>
+<p><em>Correction (2026-08-22, phase 4a):</em> 2.5 was not the 00a-1
+seed. That appendix names ~0.33 steady / 0.6 conservative for
+this constant; 2.5 is its allocated-vCPUs-per-thread packing
+figure, a different quantity. The default is now 0.6 — see
+issue #3813 and
+<a href="../PLAN-scheduler-reservations-phase-04a-demand-guard/">PLAN-scheduler-reservations-phase-04a-demand-guard.md</a>.</p>
 <h3 id="observability-the-point-of-the-phase">Observability (the point of the phase)<a class="headerlink" href="#observability-the-point-of-the-phase" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Prometheus, from the elected cluster daemon (module-level

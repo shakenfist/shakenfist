@@ -12072,28 +12072,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#diagnosing-a-placement-decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diagnosing a placement decision
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mixed-version-clusters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mixed-version clusters
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -12344,28 +12322,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#diagnosing-a-placement-decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diagnosing a placement decision
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mixed-version-clusters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mixed-version clusters
-      
-    </span>
-  </a>
   
 </li>
       
@@ -12820,8 +12776,8 @@ and set through each node's <code>/etc/sf/config</code>:</p>
 </tr>
 <tr>
 <td><code>SCHEDULER_DEMAND_PER_VCPU</code></td>
-<td>2.5</td>
-<td>Anticipated load per vCPU of a freshly placed instance (provisional)</td>
+<td>0.6</td>
+<td>Anticipated load per vCPU of a freshly placed instance</td>
 </tr>
 <tr>
 <td><code>SCHEDULER_DEMAND_DECAY_SECONDS</code></td>
@@ -12841,19 +12797,49 @@ the same node because none of them have started doing any work yet.</p>
 <p>Since scheduler-reservations phase 3 they do affect placement: each
 successful admission adds <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> to the
 target node's <code>expected_demand</code> counter in the same transaction, and
-the admission guard refuses a node whose <code>cpu_load_1 + expected_demand</code>
-would exceed <code>SCHEDULER_TARGET_LOAD × cpu_schedulable</code> -- a denial on
-this clause is reported as the <code>demand</code> dimension. The capacity
-reconciler still owns the decay: it recomputes each node's
+the admission guard refuses a node whose existing load is <em>already</em>
+above its target:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cpu_load_1 + expected_demand &lt;= SCHEDULER_TARGET_LOAD × cpu_schedulable
+</code></pre></div>
+<p>A denial on this clause is reported as the <code>demand</code> dimension.</p>
+<p>The placement asking is deliberately not part of that comparison. The
+question the clause asks is whether the node is already over target,
+not whether it would be afterwards, so a node with real allocation room
+can never be refused however large the instance or however small the
+node. The instance's own contribution is charged to <code>expected_demand</code>
+by the same statement, so it counts against the <em>next</em> placement. That
+is what makes this a spreader rather than a bound: what stops a node
+accepting work it has no room for is the <code>cpus</code>, <code>memory_mb</code> and
+<code>disk_gb</code> dimensions of the same guard, not this one.</p>
+<p>It was not always so. Until scheduler-reservations phase 4a the clause
+added the incoming placement's charge to the left-hand side while the
+budget stayed denominated per schedulable thread, and
+<code>SCHEDULER_DEMAND_PER_VCPU</code> was seeded at 2.5 -- a figure transcribed
+from a measurement of allocated vCPUs per thread rather than of load
+per vCPU. Together those meant a node needed at least 3.34 schedulable
+threads before it could admit a 1-vCPU instance at zero load, and
+fourteen before it could admit a 4-vCPU one, so on small nodes the
+clause refused everything and the spreader never operated (issue</p>
+<h1 id="3813-if-you-are-running-a-version-older-than-that-fix-and-your">3813). If you are running a version older than that fix and your<a class="headerlink" href="#3813-if-you-are-running-a-version-older-than-that-fix-and-your" title="Permanent link">&para;</a></h1>
+<p>hypervisors have fewer than four schedulable threads, expect the
+<code>waiving demand guard</code> events described below on every single create.</p>
+<p>The capacity reconciler still owns the decay: it recomputes each node's
 <code>expected_demand</code> from placement ages every five minutes, and also
 publishes the matching <code>scheduler_capacity_node_expected_demand</code>
 metric. A refusal on <code>demand</code> behaves like any other guard denial: the
 caller walks to the next candidate. Setting <code>SCHEDULER_TARGET_LOAD</code> to
 zero or below disables the demand clause entirely rather than refusing
 every placement, which matters for a mid-upgrade caller whose request
-carries an unset field. The defaults are provisional, pending an
-analysis of accumulated cluster data, so expect them to change. There
-is no reason to tune them yet.</p>
+carries an unset field.</p>
+<p><code>SCHEDULER_DEMAND_PER_VCPU</code>'s default of 0.6 is the burst-peak figure
+measured on a CI-dominated cluster, where steady-state demand ran
+0.12-0.35 load per allocated vCPU; the burst figure is the relevant one
+because bursts are what the term exists to spread. In practice it sets
+how many placements a quiet node absorbs before the scheduler starts
+preferring its neighbours: at the defaults, a 12-thread node absorbs
+about fifteen 1-vCPU instances' worth of anticipated load before it
+reaches target. <code>SCHEDULER_DEMAND_DECAY_SECONDS</code> is still an unmeasured
+provisional value.</p>
 <p>Unlike the real dimensions, demand alone can never fail a create. The
 term exists to spread correlated bursts across nodes, not to bound
 capacity, so when a walk admits nowhere but at least one candidate was
@@ -12870,9 +12856,28 @@ creates indefinitely while sitting essentially idle.</p>
 admission still adds demand, every create pays both walks -- twice the
 admission RPCs and an extra pair of audit events -- until churn slows
 enough for the reconciler's decay to catch up. That is the accepted
-trade (a second walk is cheaper than a failed create), and frequent
-<code>waiving demand guard</code> events are the signal that the demand constants
-are mis-sized for the cluster rather than that anything is wrong.</p>
+trade, since a second walk is cheaper than a failed create.</p>
+<p>One more thing to know before reading those events: <strong><code>expected_demand</code>
+is not credited back when an instance is deleted.</strong> A placement's
+contribution has usually decayed by then, so subtracting the original
+figure would over-credit the node; the reconciler owns the decay
+instead, and it runs every five minutes. Under rapid create/delete
+churn a node therefore carries demand from instances that no longer
+exist, and with the clause binding, that residue alone can put it over
+target. Compare <code>scheduler_capacity_node_expected_demand</code> against the
+node's live instance count to tell the two apart: demand well above
+what the placed instances justify is residue waiting for the next
+reconcile pass, not load.</p>
+<p>Read <code>waiving demand guard</code> events accordingly.</p>
+<ul>
+<li><strong>Occasional ones</strong> mean every candidate was over target. That is
+  usually real saturation, but on a cluster doing rapid create/delete
+  churn it can be the residue above rather than live load.</li>
+<li><strong>One on every create</strong> means something is wrong with the sizing
+  rather than with the cluster -- either the demand constants are
+  mis-sized for this hardware, or you are running a version predating
+  the #3813 fix, where they could not be satisfied at all.</li>
+</ul>
 <h2 id="diagnosing-a-placement-decision">Diagnosing a placement decision<a class="headerlink" href="#diagnosing-a-placement-decision" title="Permanent link">&para;</a></h2>
 <p>Every stage of the pipeline records an audit event on the
 instance (and the candidate nodes), so <code>sf-client instance events</code>

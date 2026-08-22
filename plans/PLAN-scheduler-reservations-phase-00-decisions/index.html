@@ -12040,128 +12040,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#namespace-claim-questions-14-19" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Namespace-claim questions 14-19
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-3-addendum-measured-claim-shapes-2026-08-13" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3 addendum: measured claim shapes (2026-08-13)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step 3 addendum: measured claim shapes (2026-08-13)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#data-basis-and-why-it-is-one-day-rather-than-two-weeks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Data basis, and why it is one day rather than two weeks
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#observed-claim-shapes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observed claim shapes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#constant-revisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Constant revisions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#new-finding-for-phase-3-disk-needs-an-overcommit-ratio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New finding for phase 3: disk needs an overcommit ratio
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -12602,9 +12480,14 @@ artifact objects where it already lives.</p>
 day one; the learner stays future work.</strong>
 <code>scheduler_node_capacity.expected_demand</code> accumulates the
 decayed demand estimate of recently-placed instances:
-placement adds <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> (seed 2.5
-from the 00a-1 measurements), and the reconciler recomputes
-the node's total each pass as a linear decay to zero over
+placement adds <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> (seed 0.6
+from the 00a-1 measurements; <em>corrected 2026-08-22</em> — this
+said 2.5, which was transcribed from that appendix's
+<em>packing</em> row of 2.3-3.0 allocated vCPUs per thread rather
+than its demand-per-vCPU row of 0.12-0.35 steady with a
+~0.6 burst peak. The units error is the whole of issue</p>
+<h1 id="3813-and-phase-4a-fixes-it-and-the-reconciler-recomputes">3813, and phase 4a fixes it), and the reconciler recomputes<a class="headerlink" href="#3813-and-phase-4a-fixes-it-and-the-reconciler-recomputes" title="Permanent link">&para;</a></h1>
+<p>the node's total each pass as a linear decay to zero over
 <code>SCHEDULER_DEMAND_DECAY_SECONDS</code> (provisional 600) of
 instance age. Admission asks <code>measured_load +
 expected_demand &lt;= SCHEDULER_TARGET_LOAD × schedulable
@@ -12623,6 +12506,14 @@ phase 3's first smoke CI run locked its single node out
 permanently (<code>expected_demand</code> 8–12 against a bound of
 <code>0.75 × 8 = 6</code>) while the node sat essentially idle, failing
 13 tests with 507s. See the phase 3 plan's decision P9.</p>
+<p><em>Amendment (2026-08-22, phase 4a):</em> the waiver stays, but it
+is no longer the only path a placement ever takes. With the
+seed corrected and the clause tested against the node's
+existing state rather than the incoming placement (phase 4a
+decision E2), the clause is satisfiable at every node size,
+so the waiver firing becomes a signal that the cluster is
+genuinely saturated rather than a signal that the guard is
+broken.</p>
 <h3 id="namespace-claim-questions-14-19">Namespace-claim questions 14-19<a class="headerlink" href="#namespace-claim-questions-14-19" title="Permanent link">&para;</a></h3>
 <p><strong>D14 (claims vs per-decision reservations): the per-decision
 reservation is subsumed; claims are cluster-wide.</strong> An
