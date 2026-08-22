@@ -375,10 +375,9 @@ is here.
 - **Phase 2** merged as PR #3614 on 2026-08-08. Its reconciler has
   been soaking cleanly on sfcbr since, on 5-minute passes with no
   drift.
-- **Phase 3** merged as PR #3754 on 2026-08-16, but its step 9 sfcbr
-  soak has not been run, and it carries an outstanding defect in its
-  D13 demand clause — issue #3813, see Future work. Both are
-  discharged by phase 4a, which fixes the clause first and then runs
+- **Phase 3** merged as PR #3754 on 2026-08-16. Its D13 demand clause
+  shipped the #3813 defect, fixed by phase 4a; its step 9 sfcbr soak
+  has still not been run and rides with phase 4a's step 5, which is
   one soak covering phases 3, 4 and 4a (its decision E6).
 - **Phase 4**'s steps 1-9 have landed, management review included;
   the operator review and the sfcbr soak are still outstanding, and
@@ -391,8 +390,9 @@ is here.
   `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the
   phase plan).
 - **Phase 4a** was inserted on 2026-08-22, between phases 4 and 5,
-  because #3813 is a live defect in phase 3's shipped admission code
-  and phase 5 makes that code the sole gate on placement. Its survey
+  because #3813 was a live defect in phase 3's shipped admission code
+  and phase 5 makes that code the sole gate on placement. Its code
+  steps have landed; what remains is the sfcbr soak. Its survey
   found that the D13 seed constant was transcribed from the wrong row
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's *What the
@@ -509,8 +509,8 @@ only if it picks one of them.
 
 *Correction (2026-08-19, restated 2026-08-22):* there is now
 a competing explanation for 3565, and phase 6 must rule it
-out before claiming the flake. Issue #3813 (Future work,
-below) shows the D13 demand clause refusing **every**
+out before claiming the flake. Issue #3813 (Bugs fixed,
+below) showed the D13 demand clause refusing **every**
 candidate on the CI hypervisors.
 
 The 2026-08-19 wording of this correction said the create
@@ -676,80 +676,13 @@ because the following statements will be true:
   day-to-day audit log is shorter than today's by design.
 * The D13 demand clause admits placements on a node that has
   real room for them, at every node size this project supports
-  — or it has been deliberately retired. Issue #3813 is closed,
-  or re-deferred with a written reason and a note saying which
-  node sizes it leaves the spreader inert on.
+  — or it has been deliberately retired. **Met by phase 4a**,
+  whose live sweep asserts admission for every combination of
+  16 node sizes and five instance sizes on an idle node; issue
+  #3813 closes once that phase's soak has been observed.
 * `pre-commit run --all-files` passes.
 
 ### Future work
-
-The first item below is **not** deferrable: it is a live
-defect in code this plan has already shipped, and it is
-listed here rather than under *Bugs fixed during this work*
-only because it is still open.
-
-- **The D13 demand clause is arithmetically unsatisfiable on
-  small nodes** (issue #3813, found 2026-08-19 during merge CI
-  triage of run 32227047799). `_demand_guard_clause()` in
-  `mariadb.py` asks `cpu_load_1 + expected_demand + demand_add
-  <= SCHEDULER_TARGET_LOAD × cpu_schedulable`. The budget is
-  denominated **per schedulable thread** and the charge **per
-  requested vCPU**, and the two were never reconciled: at the
-  seed constants a 1-vCPU instance is charged `1 × 2.5` against
-  a budget of `0.75 × cpu_schedulable`, so a node needs
-  `cpu_schedulable >= 3.34` before it can admit that instance
-  *at zero measured load and zero expected demand*. Any node
-  with fewer than four schedulable threads therefore admits
-  nothing, ever; a 2-vCPU instance needs seven threads and a
-  4-vCPU instance fourteen.
-
-  This is a sharpening of, not a discovery separate from, the
-  D13 amendment of 2026-08-14 in the phase 0 decisions
-  document. That amendment saw the same clause lock a node out
-  and responded with P9, the waiver re-walk. What was not seen
-  at the time is that the condition is not load-dependent — on
-  a node below the thread threshold the clause cannot pass
-  under *any* circumstances, so P9's waiver is not a fallback
-  for a rare case, it is the only path placement ever takes.
-  The consequence is that the demand spreader is inert
-  wherever it is most needed and costs a full candidate sweep
-  plus a re-walk on every create to accomplish nothing.
-
-  Evidence from the CI hypervisors (`cpu_schedulable: 2`,
-  budget 1.5, charge 2.5): all four candidates refused with
-  every allocation dimension reading `used: 0.0, exceeded:
-  false` and only `demand` exceeded, at `used` values of 3.24,
-  6.27, 11.94 and 12.29.
-
-  *Correction (2026-08-22, phase 4a survey):* the deferral
-  below is wrong about where the answer lives. D13 attributes
-  the 2.5 seed to "the 00a-1 measurements", but that
-  appendix's demand-per-vCPU row reads 0.12-0.35 steady with
-  a burst peak of ~0.6, and names "~0.33 steady / 0.6
-  conservative" as the seed for exactly this constant. The
-  only 2.5-shaped figure in the appendix is a different row
-  — 2.3-3.0 *allocated vCPUs per thread*, the packing figure
-  behind `CPU_OVERCOMMIT_RATIO`. The seed was transcribed
-  across rows, and the analysis this entry defers to had
-  already answered the question. Phase 4a owns the fix.
-
-  Fixing it is a **decision, not a patch** — the charge and the
-  budget have to be made dimensionally consistent, which is one
-  of: scale the charge by the node's thread count rather than
-  using an absolute sum; floor the clause so it can never
-  refuse a placement the node has real allocation room for; or
-  retune `SCHEDULER_DEMAND_PER_VCPU`. `config.py` describes
-  both demand constants as "a provisional seed pending the
-  scheduler reservations phase 0 step 3 data analysis", so the
-  third option in particular belongs with that analysis rather
-  than to a same-day fix. Whichever is chosen, the P9 waiver
-  should be re-examined at the same time: once the clause can
-  actually pass, a permanent unconditional waiver path is a
-  different trade-off than it was when the clause never
-  passed.
-
-  Also blocks a clean read on phase 6 — see the 2026-08-19
-  correction to the phase 6 stub above.
 
 - **Generic resource-claim primitive.** If phase 0 chooses to
   keep the reservation table instance-scheduling-specific,
@@ -865,6 +798,32 @@ only because it is still open.
 This section should list any bugs we encounter during
 development that we fixed.
 
+* **The D13 demand clause was arithmetically unsatisfiable on
+  small nodes** (issue #3813, found 2026-08-19 during merge CI
+  triage of run 32227047799; fixed by phase 4a). The clause
+  compared a per-request charge against a per-node budget --
+  `cpu_load_1 + expected_demand + demand_add <=
+  SCHEDULER_TARGET_LOAD × cpu_schedulable`, where the budget is
+  denominated per schedulable thread and `demand_add` per
+  requested vCPU. At the seed constants a node needed 3.34
+  schedulable threads before it could admit a 1-vCPU instance at
+  zero load, so the CI hypervisors (`cpu_schedulable: 2`)
+  refused every candidate, every time, on demand alone. The P9
+  waiver then admitted anyway, so the visible cost was two
+  candidate sweeps per create and a spreader that never
+  operated, rather than a failed create.
+
+  Two causes, both fixed. The seed constant was transcribed from
+  the wrong row of the 00a-1 measurements -- 2.5 is that
+  appendix's allocated-vCPUs-per-thread packing figure, while its
+  demand-per-vCPU row reads 0.12-0.35 steady with a ~0.6 burst
+  peak -- so `SCHEDULER_DEMAND_PER_VCPU` is now 0.6. And the
+  clause itself now compares only the node's existing state,
+  leaving `demand_add` to accumulate in `expected_demand` for the
+  next decision, which is the only form satisfiable at every
+  combination of node size and instance size. A live sweep over
+  16 node sizes and five instance sizes pins the property; it
+  refuses 54 of those 80 cells against the pre-fix code.
 * **KSM metrics were never published** (pre-existing, found by
   the phase 00a code review): the resources daemon's KSM block
   skipped every sysfs file (trailing-newline filter), used a
