@@ -344,6 +344,13 @@ New config: `SCHEDULER_DEMAND_PER_VCPU` (default 2.5, the
 00a-1 seed) and `SCHEDULER_DEMAND_DECAY_SECONDS` (default
 600), both marked *revisit when step 3 data lands*.
 
+*Correction (2026-08-22, phase 4a):* 2.5 was not the 00a-1
+seed. That appendix names ~0.33 steady / 0.6 conservative for
+this constant; 2.5 is its allocated-vCPUs-per-thread packing
+figure, a different quantity. The default is now 0.6 — see
+issue #3813 and
+[PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md).
+
 ### Observability (the point of the phase)
 
 * Prometheus, from the elected cluster daemon (module-level

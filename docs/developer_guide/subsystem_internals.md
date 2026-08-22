@@ -67,6 +67,38 @@ cleaner's placement rewrites and the queues daemon's reference
 reconciliation — pass `enforce=False`: they record where a libvirt
 domain already is, which a guard cannot refuse.
 
+The node stage carries a fifth clause beside the three allocation
+dimensions: D13's demand feedforward, `_demand_guard_clause()` in
+`mariadb.py`. It compares the node's *existing* state — `cpu_load_1 +
+expected_demand <= SCHEDULER_TARGET_LOAD × cpu_schedulable`, with both
+measured inputs read from the typed `node_metrics` columns inside the
+transaction — and deliberately does not include the incoming
+placement's charge, though the same `UPDATE` adds that charge to
+`expected_demand` so it counts against the next decision.
+
+That asymmetry is the fix for issue #3813 and is load bearing. Adding a
+per-request term to a per-node budget made the clause unsatisfiable
+below a threshold set by the instance size: at the original constants a
+1-vCPU instance needed 3.34 schedulable threads, so nodes below four
+threads admitted nothing whatever their real headroom. Comparing node
+state alone is the only form with no such threshold. Check-then-charge
+is safe because the comparison and the increment are one guarded
+`UPDATE` in one transaction, so concurrent admissions against a node
+serialise and the second sees the first's charge.
+
+Two consequences to keep in mind when touching this code. The clause is
+a spreader and never a bound — the three allocation dimensions are what
+stop a node taking work it has no room for — and callers may therefore
+waive it (decision P9: `enforce_demand=False` sends `target_load` as
+zero, and both walkers re-walk with it waived when every candidate was
+refused on demand alone). And `_capacity_dimension()` must build the
+demand dimension with `charged=False`, so the reported `exceeded` flag
+is the test the guard actually made:
+`CapacityAdmissionDenied.demand_only` is derived from the set of
+exceeded dimensions, so a demand dimension that reports `used +
+requested > limit` would make denials look waivable that the clause
+never made.
+
 There used to be a second ledger here: `Scheduler._committed_vcpus()`,
 a Python walk over each candidate's `INSTANCE_LOCATION` rows added as
 a stopgap for the CPU stage (issue 3498). It was deleted by the same
