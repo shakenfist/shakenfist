@@ -13634,6 +13634,29 @@ failure. Never leave a flag behind after its issue is fixed.</p>
 <code>paths:</code> filter, this workflow always runs in the queue — including for
 docs-only changes. That is deliberate (a required check that never runs
 hangs the queue), at the cost of matrix latency on doc merges.</p>
+<p><strong>Superseded merge groups are cancelled.</strong> <code>build-and-test</code>,
+<code>package-build</code> and <code>package-matrix</code> each carry a <code>concurrency:</code> block,
+and its key is merge-group aware. <code>github.ref</code> is the obvious key and is
+right on every other event, but on <code>merge_group</code> it is the per-attempt
+queue branch <code>gh-readonly-queue/develop/pr-&lt;N&gt;-&lt;SHA&gt;</code>, and GitHub mints a
+fresh SHA every time it rebuilds the group — which it does on every push
+to <code>develop</code>. Keyed on that, every rebuild lands in a concurrency group
+of its own, <code>cancel-in-progress</code> never matches, and superseded merge
+groups run seven <code>xl</code> distro entries to completion on runners the whole
+Shaken Fist fleet shares. So the key branches on the event and uses
+<code>github.event.merge_group.base_ref</code> in the queue, with a <code>merge_group-</code>
+prefix so a queue run does not share a group with a <code>workflow_dispatch</code>
+run on <code>develop</code>.</p>
+<p>Cancelling is only safe because the queue is serial: the develop ruleset
+sets <code>max_entries_to_build: 1</code>, so any other in-flight <code>merge_group</code> run
+is by definition superseded and its queue branch already abandoned.
+Raising that setting and keeping this key would cancel a live queue
+entry, which reports a failed required check and ejects the pull
+request; the two have to move together. See
+<a href="https://github.com/shakenfist/kerbside/issues/284">shakenfist/kerbside#284</a>
+for what the unfixed version cost across repositories, and the fleet
+audit
+<a href="https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md">merge-group-cancellation</a>.</p>
 <h3 id="ci-job-layout-and-the-partition-guard">CI job layout and the partition guard<a class="headerlink" href="#ci-job-layout-and-the-partition-guard" title="Permanent link">&para;</a></h3>
 <p>On a pull request the integration suite is split across several jobs
 (in <code>.github/workflows/functional-tests.yml</code>) so the long-running

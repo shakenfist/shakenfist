@@ -13143,10 +13143,10 @@ inside the work tree.</p>
 step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>.</p>
 <h2 id="scripts">Scripts<a class="headerlink" href="#scripts" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>tools/review-pr-with-claude.sh</code> - Performs automated PR reviews (outputs JSON)</li>
 <li><code>tools/address-comments-with-claude.sh</code> - Addresses review comments (reads JSON); CI stages each fix for it via <code>tools/ci/stage-autofix-changes.sh --tracked-only</code> (see "How Automated Comment Addressing Works" above)</li>
-<li><code>tools/create-review-issues.py</code> - Creates GitHub issues for actionable items</li>
-<li><code>tools/render-review.py</code> - Renders review JSON to markdown (includes issue links)</li>
+<li><code>tools/render-review.py</code> - Renders review JSON to markdown, and validates
+  it against <code>tools/review-schema.json</code> in <code>--validate</code> mode, which is how
+  <code>tools/address-comments-with-claude.sh</code> checks the review it was handed</li>
 <li><code>tools/review-schema.json</code> - JSON schema for review output validation</li>
 <li><code>scripts/differential-fuzz.py</code> - Differential fuzzing script (instar vs qemu-img + libyal)</li>
 <li><code>scripts/extract-fuzz-corpus.py</code> - Seeds + restores the coverage-fuzz corpus from instar-testdata</li>
