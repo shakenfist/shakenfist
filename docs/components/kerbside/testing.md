@@ -161,6 +161,15 @@ The sibling smoke workflows (`direct-qemu-functional.yml`,
 on `merge_group` but skip their heavy jobs there, so a piled-up run
 costs seconds and no cloud capacity.
 
+Fixing it here was not enough on its own, because sfcbr is shared. A
+merge group in this repository has failed to place its oVirt instance
+while two superseded `shakenfist/shakenfist` merge groups — the same
+defect, in a neighbouring repository — held the capacity. The pattern is
+now a fleet consistency audit,
+[merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md),
+which checks every repository whose workflows can run on `merge_group`,
+and every reusable workflow that inherits such an event.
+
 For the design rationale see
 [plans/PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/).
 
