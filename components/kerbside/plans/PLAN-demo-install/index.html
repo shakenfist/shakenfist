@@ -12476,7 +12476,7 @@ anything to wait on.</p>
 <tr>
 <td>5. Rewrite installation.md</td>
 <td><a href="/components/kerbside/plans/PLAN-demo-install-phase-05-docs/">PLAN-demo-install-phase-05-docs.md</a></td>
-<td>Implemented in PR #351, not yet merged</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -12646,6 +12646,14 @@ for.</p>
 <li>Migrations absent from every built artifact, making
   <code>pip install kerbside</code> unable to create its schema
   (phase 1).</li>
+<li><code>bindep.txt</code> was missing <code>python3-dev</code> / <code>python3-devel</code>,
+  so <code>tox -e bindep</code> reported the dependency list complete
+  while an install from it still failed in gcc: mysqlclient
+  compiles a C extension and ships no wheel. Found while
+  verifying phase 5's install instructions in clean
+  <code>debian:trixie</code> and <code>rockylinux:10</code> containers, which is
+  the only way it could have been found — the check the
+  repository already had could not see it.</li>
 </ul>
 <p>Issues filed while planning:</p>
 <ul>

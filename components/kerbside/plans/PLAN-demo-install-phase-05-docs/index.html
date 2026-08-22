@@ -5910,6 +5910,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-implementation-and-review-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What implementation and review found
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12318,6 +12329,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-implementation-and-review-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What implementation and review found
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12648,6 +12670,63 @@ a second copy of <code>configuration.md</code>. Name the keys that are
 required in practice and link for the rest. The test in phase
 2 guarantees <code>etc/kerbside.conf.example</code> is complete, so this
 page never has to be.</p>
+<h2 id="what-implementation-and-review-found">What implementation and review found<a class="headerlink" href="#what-implementation-and-review-found" title="Permanent link">&para;</a></h2>
+<p>Merged as <a href="https://github.com/shakenfist/kerbside/pull/351">PR #351</a>
+on 2026-08-22.</p>
+<p>Running every command from a clean clone, as the plan
+required, found four things the prose had wrong. Two were
+mine, from writing before running:</p>
+<ul>
+<li><code>docker compose ps</code> does not print the columns the draft
+  claimed. The page now uses
+  <code>--format 'table {{.Service}}\t{{.Status}}'</code> and quotes
+  its real output.</li>
+<li><code>ss ... | wc -l</code> counts its own header, so the socket
+  split read 13 and 1 rather than 12 and 0 — which would
+  have told a reader the plaintext port was in use. Fixed
+  with <code>-H</code>, and the page says why that flag matters.</li>
+<li><code>pip install</code> does not give you <code>demo/</code>, so <code>cd demo</code>
+  fails for exactly the reader the page had just created.
+  The walkthrough starts with <code>git clone</code>.</li>
+<li><code>remote-viewer</code> was never installed anywhere. The page now
+  names <code>virt-viewer</code> with apt and dnf commands.</li>
+</ul>
+<p>Review then found a fifth, and it was the load-bearing one:
+the page put <code>pip install</code> before the OS packages that
+install depends on. Confirming it needed a container rather
+than an argument — on a clean <code>debian:trixie</code>,
+<code>pip install kerbside</code> fails with <code>Can not find valid
+pkg-config name</code>, because <code>mysqlclient</code> compiles a C
+extension and publishes no wheel. The sections were
+reordered and the Debian, Ubuntu and RHEL package lists are
+now inline, because at that point in the page the reader has
+neither a checkout nor <code>tox</code>, and so cannot run
+<code>tox -e bindep</code>.</p>
+<p><strong>That verification found a defect in <code>bindep.txt</code> itself.</strong>
+With pkg-config satisfied the build still failed, in gcc:
+<code>python3-dev</code> and <code>python3-devel</code> were absent from the file.
+So <code>tox -e bindep</code> would have reported the dependency list
+complete while an install driven from it could not succeed.
+Confirmed on both <code>debian:trixie</code> and <code>rockylinux:10</code>, and
+fixed here rather than deferred, because the reordering
+above depends on <code>bindep.txt</code> being honest. This is the
+second time this plan has found a check that could not see
+the thing it was supposed to check, after phase 4's
+startup-log tautology.</p>
+<p>Step 5e's negative observation was taken in its window: the
+<code>demo-compose</code> lane did not run while the pull request held
+only the planning commit, and ran within seconds of
+<code>docs/installation.md</code> joining the diff. The first such run
+was then cancelled by the workflow's own concurrency group
+when the next commit arrived, which is why the phase 4
+checkbox records two run URLs and states that what is
+demonstrated is that the filter fires, not what the lane
+concluded.</p>
+<p>Also added in review: a test in
+<code>kerbside/tests/unit/test_demo_stack.py</code> asserting the page
+still quotes the demo it documents, demonstrated to fail
+before being trusted; and a correction to a stale
+description in <code>README.md</code> that predated this phase.</p>
 <h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>The dev-floor and contract-hash note stays on the

@@ -1398,41 +1398,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-the-comment-addresser-works" class="md-nav__link">
+  <a href="#the-comment-addresser-retired" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How the Comment Addresser Works
+        The comment addresser, retired
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="How the Comment Addresser Works">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#one-commit-per-issue" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One Commit Per Issue
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#disagreement-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Disagreement Handling
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1498,10 +1470,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#preventing-infinite-loops" class="md-nav__link">
+  <a href="#not-reviewing-the-bots-own-commits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preventing Infinite Loops
+        Not Reviewing The Bot's Own Commits
       
     </span>
   </a>
@@ -12417,41 +12389,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-the-comment-addresser-works" class="md-nav__link">
+  <a href="#the-comment-addresser-retired" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How the Comment Addresser Works
+        The comment addresser, retired
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="How the Comment Addresser Works">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#one-commit-per-issue" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One Commit Per Issue
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#disagreement-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Disagreement Handling
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -12517,10 +12461,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#preventing-infinite-loops" class="md-nav__link">
+  <a href="#not-reviewing-the-bots-own-commits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preventing Infinite Loops
+        Not Reviewing The Bot's Own Commits
       
     </span>
   </a>
@@ -12593,17 +12537,17 @@
 
 
 <h1 id="automated-pr-review-with-claude-code">Automated PR Review with Claude Code<a class="headerlink" href="#automated-pr-review-with-claude-code" title="Permanent link">&para;</a></h1>
-<p>This document describes the Claude Code-powered automated PR review system used in
-Shaken Fist projects. The system provides automated code review on pull requests
-and can automatically address review comments with one commit per issue.</p>
+<p>This document describes the Claude Code-powered automated PR review system used
+in Shaken Fist projects. It reviews pull requests once CI passes and posts its
+findings as a structured comment.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>The automated review system consists of two main components:</p>
-<ol>
-<li><strong>Automated Reviewer</strong> - Reviews PRs after CI passes and posts structured feedback</li>
-<li><strong>Comment Addresser</strong> - Addresses review comments when triggered by a bot command</li>
-</ol>
-<p>Both components use Claude Code running on self-hosted GitHub Actions runners with
-the <code>--dangerously-skip-permissions</code> flag for autonomous operation.</p>
+<p>The automated reviewer reviews a pull request once CI passes and posts
+structured feedback as a comment. It runs Claude Code on a self-hosted GitHub
+Actions runner with the <code>--dangerously-skip-permissions</code> flag for autonomous
+operation.</p>
+<p>A second component, the comment addresser, used to act on that feedback when a
+maintainer asked it to. It was retired in August 2026 -- see <a href="#the-comment-addresser-retired">The comment
+addresser</a> below.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────────────────────────────────────────────────────────────────┐
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│                          Pull Request Created                           │
@@ -12622,40 +12566,22 @@ the <code>--dangerously-skip-permissions</code> flag for autonomous operation.</
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│                                              markdown + embedded JSON   │
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│                                              (in &lt;details&gt; section)     │
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>└─────────────────────────────────────────────────────────────────────────┘
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                    │
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                                    ▼
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>┌─────────────────────────────────────────────────────────────────────────┐
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│            User comments: "@shakenfist-bot please address comments"     │
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>└─────────────────────────────────────────────────────────────────────────┘
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                                    │
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                                    ▼
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>┌─────────────────────────────────────────────────────────────────────────┐
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│                     PR Address Comments Workflow                        │
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│  ┌─────────────────────┐    ┌─────────────────────────────────────────┐│
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│  │ Extract JSON from   │───▶│ Address Comments with Claude Code       ││
-<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│  │ PR review comment   │    │ (one commit per actionable item)        ││
-<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│  └─────────────────────┘    └───────────┬─────────────────────────────┘│
-<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│                                         │                               │
-<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│                           ┌─────────────┴─────────────┐                 │
-<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│                           ▼                           ▼                 │
-<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│                    Push commits              Post summary comment       │
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>└─────────────────────────────────────────────────────────────────────────┘
 </code></pre></div>
 <h2 id="json-based-review-format">JSON-Based Review Format<a class="headerlink" href="#json-based-review-format" title="Permanent link">&para;</a></h2>
 <p>The key design decision is using structured JSON output from the reviewer instead
 of parsing markdown. This provides:</p>
 <ul>
 <li><strong>Deterministic validation</strong> via JSON schema</li>
-<li><strong>Clean data handoff</strong> between reviewer and addresser</li>
 <li><strong>No regex parsing</strong> of natural language output</li>
 <li><strong>Iteration until valid</strong> - reviewer can retry if JSON is malformed</li>
 <li><strong>Self-contained comments</strong> - JSON is embedded in the PR comment itself</li>
 </ul>
 <p>The JSON is embedded in a collapsed <code>&lt;details&gt;</code> section at the end of the
-human-readable markdown. This keeps the comment clean while making the data
-easily extractable by the address-comments automation.</p>
+human-readable markdown. This keeps the comment readable while leaving the
+findings machine-parseable.</p>
 <h3 id="review-schema">Review Schema<a class="headerlink" href="#review-schema" title="Permanent link">&para;</a></h3>
-<p>The review output follows a strict JSON schema (<code>tools/review-schema.json</code>):</p>
+<p>The review output follows a strict JSON schema, which ships with the reviewer
+in <code>shakenfist/actions/review-pr-with-claude/review-schema.json</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Brief overall assessment of the PR"</span><span class="p">,</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"items"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
@@ -12685,33 +12611,30 @@ easily extractable by the address-comments automation.</p>
 <tr>
 <th>Action</th>
 <th>Meaning</th>
-<th>Addressed by Bot</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>fix</code></td>
 <td>Must be fixed before merging</td>
-<td>Yes</td>
 </tr>
 <tr>
 <td><code>document</code></td>
 <td>Documentation should be added</td>
-<td>Yes</td>
 </tr>
 <tr>
 <td><code>consider</code></td>
 <td>Optional improvement (reviewer suggestion)</td>
-<td>No</td>
 </tr>
 <tr>
 <td><code>none</code></td>
 <td>Informational observation only</td>
-<td>No</td>
 </tr>
 </tbody>
 </table>
-<p>The comment addresser only processes items with <code>action: fix</code> or <code>action: document</code>.</p>
+<p><code>fix</code> and <code>document</code> used to be the two the comment addresser acted on
+automatically. Nothing consumes the field automatically now, so it is a triage
+aid for whoever reads the review.</p>
 <h3 id="category-types">Category Types<a class="headerlink" href="#category-types" title="Permanent link">&para;</a></h3>
 <p>Items are categorized for easier filtering and prioritization:</p>
 <ul>
@@ -12752,22 +12675,19 @@ easily extractable by the address-comments automation.</p>
 <td><code>@shakenfist-bot please attempt to fix</code></td>
 <td>Have Claude attempt to fix failing tests</td>
 </tr>
-<tr>
-<td><code>@shakenfist-bot please address comments</code></td>
-<td>Address automated review comments</td>
-</tr>
 </tbody>
 </table>
 <p>These commands are processed by GitHub Actions workflows that use shared actions
 from the <a href="https://github.com/shakenfist/actions">shakenfist/actions</a> repository.</p>
 <h2 id="how-the-reviewer-works">How the Reviewer Works<a class="headerlink" href="#how-the-reviewer-works" title="Permanent link">&para;</a></h2>
-<p>The automated reviewer (<code>tools/review-pr-with-claude.sh</code>):</p>
+<p>The automated reviewer (<code>review-pr-with-claude.sh</code>, in the
+<code>review-pr-with-claude</code> action in shakenfist/actions):</p>
 <ol>
 <li>Fetches PR diff and file list using <code>gh</code> CLI</li>
 <li>Reads AGENTS.md and ARCHITECTURE.md for project context</li>
 <li>Prompts Claude Code to review the changes</li>
 <li>Requests JSON output following the schema</li>
-<li>Validates JSON against the schema using <code>tools/render-review.py --validate</code></li>
+<li>Validates JSON against the schema using <code>render-review.py --validate</code></li>
 <li>Renders JSON to human-readable markdown with <code>--embed-json</code> flag</li>
 <li>Posts the combined markdown (human-readable + embedded JSON) as a PR comment</li>
 </ol>
@@ -12798,41 +12718,23 @@ comment, keeping the review readable while preserving machine-parseable data.</p
 <a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>Diff:
 <a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>[PR diff]
 </code></pre></div>
-<h2 id="how-the-comment-addresser-works">How the Comment Addresser Works<a class="headerlink" href="#how-the-comment-addresser-works" title="Permanent link">&para;</a></h2>
-<p>The comment addresser (<code>tools/address-comments-with-claude.sh</code>):</p>
-<ol>
-<li>Fetches PR review comments and finds the most recent automated review</li>
-<li>Extracts JSON from the <code>&lt;details&gt;</code> section in the review comment</li>
-<li>Validates JSON against the schema</li>
-<li>Extracts items where <code>action == "fix"</code> or <code>action == "document"</code></li>
-<li>For each actionable item:</li>
-<li>Prompts Claude Code with the specific issue details</li>
-<li>Claude either makes a fix or explains why it disagrees</li>
-<li>If changes are made, creates a commit with attribution</li>
-<li>Pushes all commits</li>
-<li>Posts a summary comment with results</li>
-</ol>
-<h3 id="one-commit-per-issue">One Commit Per Issue<a class="headerlink" href="#one-commit-per-issue" title="Permanent link">&para;</a></h3>
-<p>Each valid fix gets its own commit. This allows:</p>
-<ul>
-<li>Easy review of individual fixes</li>
-<li>Cherry-picking or dropping specific commits</li>
-<li>Clear attribution of what each commit addresses</li>
-</ul>
-<p>Commit messages include:
-- Short summary of the change
-- Reference to the review item ID and title
-- Category and severity
-- The original bot trigger command
-- Attribution to Claude Code</p>
-<h3 id="disagreement-handling">Disagreement Handling<a class="headerlink" href="#disagreement-handling" title="Permanent link">&para;</a></h3>
-<p>Claude may disagree with a review suggestion if:
-- The suggestion is incorrect
-- The issue is not actually a problem
-- The fix would break something else
-- The change is out of scope</p>
-<p>When Claude disagrees, it explains its rationale instead of making changes.
-This is tracked in the summary table posted to the PR.</p>
+<h2 id="the-comment-addresser-retired">The comment addresser, retired<a class="headerlink" href="#the-comment-addresser-retired" title="Permanent link">&para;</a></h2>
+<p><code>pr-address-comments.yml</code> and <code>tools/address-comments-with-claude.sh</code> answered
+<code>@shakenfist-bot please address comments</code> by taking each review item with
+<code>action</code> of <code>fix</code> or <code>document</code>, prompting Claude Code with it, and pushing one
+commit per item. They were removed in August 2026, along with the
+<code>tools/render-review.py</code> and <code>tools/review-schema.json</code> copies that existed
+only for that script to call.</p>
+<p>The reason is preference, not defect: review items are worked through
+interactively with the reviewer instead. A bot authoring commits from a review
+that no human had read is the part that stopped anyone reaching for it.</p>
+<p>Two consequences are worth knowing. The reviewer's JSON <code>action</code> field survives
+and is still worth setting accurately -- it is how a reader triages the review
+-- but nothing consumes it automatically any more. And the <code>ci-review-automation</code>
+consistency audit now fails a repository which still carries any part of the
+chain, because the workflow triggers on <code>issue_comment</code> and so holds
+<code>contents: write</code> against the pull request branch for a feature nobody wants.
+See <code>audits/ci-review-automation.md</code>.</p>
 <h2 id="workflow-files">Workflow Files<a class="headerlink" href="#workflow-files" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>.github/workflows/sanity-checks.yml</code> or <code>functional-tests.yml</code> - Main CI with
@@ -12841,7 +12743,6 @@ This is tracked in the summary table posted to the PR.</p>
 <li><code>.github/workflows/pr-re-review.yml</code> - Manual re-review trigger</li>
 <li><code>.github/workflows/pr-fix-tests.yml</code> - Test failure fixing trigger</li>
 <li><code>.github/workflows/test-drift-fix.yml</code> - Test failure fixing implementation</li>
-<li><code>.github/workflows/pr-address-comments.yml</code> - Review comment addressing</li>
 </ul>
 <h2 id="shared-actions">Shared Actions<a class="headerlink" href="#shared-actions" title="Permanent link">&para;</a></h2>
 <p>The trigger logic for bot commands is extracted into a reusable action in the
@@ -12880,23 +12781,23 @@ and user experience.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>tools/review-pr-with-claude.sh</code></td>
+<td><code>review-pr-with-claude.sh</code></td>
 <td>Performs automated PR reviews (outputs JSON)</td>
 </tr>
 <tr>
-<td><code>tools/address-comments-with-claude.sh</code></td>
-<td>Addresses review comments (reads JSON)</td>
-</tr>
-<tr>
-<td><code>tools/render-review.py</code></td>
+<td><code>render-review.py</code></td>
 <td>Validates JSON schema, renders to markdown</td>
 </tr>
 <tr>
-<td><code>tools/review-schema.json</code></td>
+<td><code>review-schema.json</code></td>
 <td>JSON schema for review output</td>
 </tr>
 </tbody>
 </table>
+<p>All three live in the <code>review-pr-with-claude</code> action in
+<a href="https://github.com/shakenfist/actions">shakenfist/actions</a>, not in the projects
+they review. A project carrying its own copy of <code>render-review.py</code> is a leftover
+of the retired comment addresser, and the consistency audit reports it.</p>
 <h2 id="self-hosted-runner-requirements">Self-Hosted Runner Requirements<a class="headerlink" href="#self-hosted-runner-requirements" title="Permanent link">&para;</a></h2>
 <p>The automation requires self-hosted runners with:</p>
 <ul>
@@ -12906,22 +12807,17 @@ and user experience.</p>
 <li><code>jq</code> for JSON processing</li>
 <li>Python 3 with <code>jsonschema</code> package for validation</li>
 </ul>
-<h2 id="preventing-infinite-loops">Preventing Infinite Loops<a class="headerlink" href="#preventing-infinite-loops" title="Permanent link">&para;</a></h2>
+<h2 id="not-reviewing-the-bots-own-commits">Not Reviewing The Bot's Own Commits<a class="headerlink" href="#not-reviewing-the-bots-own-commits" title="Permanent link">&para;</a></h2>
 <p>The sanity-checks workflow includes a <code>check-bot-commit</code> job that detects if the
-last commit was made by the bot. If so, the automated reviewer is skipped to
-prevent infinite loops where:</p>
-<ol>
-<li>Bot makes a commit</li>
-<li>CI runs</li>
-<li>Reviewer reviews the bot's commit</li>
-<li>Someone triggers "address comments"</li>
-<li>Bot makes another commit</li>
-<li>Repeat...</li>
-</ol>
+last commit was made by the bot. If so, the automated reviewer is skipped.</p>
+<p>A bot push -- from the test fixer -- triggers CI like any other push, so without
+the guard the reviewer would spend a claude-code run reviewing commits no human
+wrote, on a branch whose human-authored changes it has already reviewed. That
+waste is what the guard is for. It is not a loop any more: the comment addresser
+was the only thing that turned a review back into a commit, and it is retired.</p>
 <p>The check looks for commits with author email <code>bot@shakenfist.com</code>.</p>
 <h2 id="cost-and-rate-limiting">Cost and Rate Limiting<a class="headerlink" href="#cost-and-rate-limiting" title="Permanent link">&para;</a></h2>
-<p>Each review and comment-addressing session uses Claude Code API calls. To manage
-costs:</p>
+<p>Each review session uses Claude Code API calls. To manage costs:</p>
 <ul>
 <li>Reviews only run after CI passes (not on every push)</li>
 <li>Reviews skip bot-authored commits</li>
@@ -12929,43 +12825,40 @@ costs:</p>
 <li>The <code>--max-turns</code> flag limits Claude iterations per item</li>
 </ul>
 <h2 id="local-development">Local Development<a class="headerlink" href="#local-development" title="Permanent link">&para;</a></h2>
-<p>You can run the tools locally for testing:</p>
+<p>You can run the tools locally for testing, from a checkout of
+<a href="https://github.com/shakenfist/actions">shakenfist/actions</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Review a PR</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tools/review-pr-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--output-dir<span class="w"> </span>./review-output
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>review-pr-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--output-dir<span class="w"> </span>./review-output
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Validate review JSON</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>tools/render-review.py<span class="w"> </span>--validate<span class="w"> </span>review.json
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>render-review.py<span class="w"> </span>--validate<span class="w"> </span>review.json
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Render review JSON to markdown</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>tools/render-review.py<span class="w"> </span>review.json
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Address comments (dry run)</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>tools/address-comments-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--review-json<span class="w"> </span>review.json<span class="w"> </span>--dry-run
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># Address comments for real</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>tools/address-comments-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--review-json<span class="w"> </span>review.json
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>render-review.py<span class="w"> </span>review.json
 </code></pre></div>
 <h2 id="projects-using-this-system">Projects Using This System<a class="headerlink" href="#projects-using-this-system" title="Permanent link">&para;</a></h2>
-<p>The following Shaken Fist projects have implemented this automation:</p>
-<ul>
-<li><strong><a href="https://github.com/shakenfist/imago">imago</a></strong> - Disk image management tool
-  (Rust). The original implementation, with sophisticated structured review
-  output and issue creation.</li>
-<li><strong><a href="https://github.com/shakenfist/occystrap">occystrap</a></strong> - Container image
-  tools (Python). Adapted from imago with Python-specific test commands.</li>
-</ul>
-<p>Each project has its own <code>tools/</code> directory with the scripts, customized for
-the project's build system and test framework. The shared action handles the
-common trigger logic.</p>
+<p>Most of them, and the list moves: see the compliance table in
+<a href="https://github.com/shakenfist/development/blob/main/audits/ci-review-automation.md"><code>ci-review-automation.md</code></a>.
+imago was the original implementation and occystrap the first
+adaptation of it, which is why both turn up in the history above.</p>
+<p>A project does <strong>not</strong> carry its own copy of the scripts. They live in
+the <code>review-pr-with-claude</code> action in shakenfist/actions and are shared
+from there; only the trigger workflows are per-project. A project with
+its own <code>render-review.py</code> is a leftover of the retired comment
+addresser, and the consistency audit reports it.</p>
 <h2 id="future-improvements">Future Improvements<a class="headerlink" href="#future-improvements" title="Permanent link">&para;</a></h2>
 <p>Potential enhancements to consider:</p>
 <ul>
 <li><strong>Confidence scores</strong> - Add confidence field to review items</li>
 <li><strong>Learning from feedback</strong> - Track which suggestions are accepted/rejected</li>
 <li><strong>Custom review focus</strong> - Allow PR authors to request focus areas</li>
-<li><strong>Integration with issue tracker</strong> - Auto-create issues for deferred items</li>
 <li><strong>Metrics dashboard</strong> - Track review quality and fix rates over time</li>
 </ul>
+<p>Automatic issue creation for deferred items was on this list and is
+done: <code>create-review-issues.py</code> in the shared action files every <code>fix</code>
+and <code>document</code> item. Having the reviewer also apply its own fixes was
+tried, as the comment addresser, and retired -- see
+<a href="/components/development/ci-review-automation/"><code>ci-review-automation.md</code></a>.</p>
 
 
 
