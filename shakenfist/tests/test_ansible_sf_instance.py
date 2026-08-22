@@ -208,3 +208,121 @@ class SfInstanceDiskDirtinessTestCase(base.ShakenFistTestCase):
         ])
         dirty, _ = self._check(existing, self._params(disks=['10@debian:11']))
         self.assertTrue(dirty)
+
+
+class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
+    """await_timeout is the budget for the whole create, not one leg.
+
+    shakenfist/kerbside#355: the client is built with ASYNC_BLOCK, so
+    create_instance waited an hour for the instance to leave 'creating'
+    and then returned it still transitional. Only then did the 600 second
+    await start, on the same condition. The task took the sum, about 4200
+    seconds, and reported the 600 -- which is why three occurrences all
+    landed within twelve seconds of each other.
+    """
+
+    PARAMS = {
+        'name': 'test', 'uuid': None, 'cpu': 1, 'ram': 1024,
+        'disks': ['8@cirros'], 'diskspecs': None, 'networks': None,
+        'networkspecs': None, 'ssh_key': None, 'user_data': None,
+        'placement': None, 'video': None, 'nvram_template': None,
+        'configdrive': None, 'side_channels': None, 'uefi': None,
+        'secureboot': None, 'metadata': None, 'state': 'present',
+        'api_url': 'http://localhost:13000', 'namespace': 'ns',
+        'key': 'notreallyakey',
+    }
+
+    def _run(self, await_instance, client_takes_timeout=True,
+             create_seconds=0):
+        params = dict(self.PARAMS)
+        params['await'] = await_instance
+        params['await_timeout'] = 600
+
+        module = mock.MagicMock()
+        module.params = params
+        module.check_mode = False
+        # The real AnsibleModule.exit_json terminates the module; a bare
+        # MagicMock would let execution fall through into the deletion
+        # path below it.
+        module.exit_json.side_effect = SystemExit
+        module.fail_json.side_effect = SystemExit
+
+        created = {'uuid': 'notreallyauuid', 'state': 'creating'}
+        clock = iter(range(0, 100000, max(create_seconds, 1)))
+
+        # The signature is the thing under test on the compatibility
+        # path, so build create_instance from a real function rather than
+        # a bare mock, whose signature is always (*args, **kwargs).
+        if client_takes_timeout:
+            def create_instance(*args, timeout=None, **kwargs):
+                return created
+        else:
+            def create_instance(*args, **kwargs):
+                return created
+
+        client = mock.MagicMock()
+        # create_autospec rather than a spec'd MagicMock: only the former
+        # keeps a signature inspect.signature() can read, which is the
+        # thing _create_accepts_timeout() looks at.
+        client.create_instance = mock.create_autospec(
+            create_instance, side_effect=create_instance)
+        # Absent to begin with, so the module takes the create path; every
+        # later lookup (the exit_json payload) finds it.
+        client.get_instance.side_effect = [
+            sf_instance.apiclient.ResourceNotFoundException()] + [created] * 8
+
+        with mock.patch.object(
+                sf_instance, 'AnsibleModule', return_value=module), \
+                mock.patch.object(
+                    sf_instance, '_make_client', return_value=client), \
+                mock.patch.object(
+                    sf_instance.time, 'time', side_effect=lambda: next(clock)):
+            self.assertRaises(SystemExit, sf_instance.run_module)
+
+        return client
+
+    def test_awaiting_makes_the_create_return_immediately(self):
+        client = self._run(await_instance=True)
+
+        _args, kwargs = client.create_instance.call_args
+        self.assertEqual(0, kwargs.get('timeout'))
+
+        # The create returns straight away, so essentially the whole
+        # budget is left for the await -- which is the point: the task
+        # now fails at await_timeout rather than at 3600 + await_timeout.
+        _args, kwargs = client.await_instance_create.call_args
+        self.assertGreater(kwargs['timeout'], 590)
+
+    def test_not_awaiting_leaves_the_create_blocking(self):
+        # Without an await the create is the only thing that can wait, so
+        # the historical behaviour has to survive.
+        client = self._run(await_instance=False)
+
+        _args, kwargs = client.create_instance.call_args
+        self.assertNotIn('timeout', kwargs)
+        client.await_instance_create.assert_not_called()
+
+    def test_an_older_client_is_not_handed_the_new_argument(self):
+        # The collection requires shakenfist-client unpinned, so the
+        # control node may predate the timeout argument. Passing it there
+        # is a TypeError that stops every instance creation.
+        client = self._run(await_instance=True, client_takes_timeout=False)
+
+        _args, kwargs = client.create_instance.call_args
+        self.assertNotIn('timeout', kwargs)
+
+    def test_time_spent_creating_comes_out_of_the_await_budget(self):
+        # The fallback for an older client: it cannot get the task down to
+        # await_timeout, but the two waits stop being added together.
+        client = self._run(await_instance=True, client_takes_timeout=False,
+                           create_seconds=100)
+
+        _args, kwargs = client.await_instance_create.call_args
+        self.assertLess(kwargs['timeout'], 600)
+
+    def test_the_budget_never_goes_negative(self):
+        client = self._run(await_instance=True, client_takes_timeout=False,
+                           create_seconds=3600)
+
+        _args, kwargs = client.await_instance_create.call_args
+        self.assertEqual(0, kwargs['timeout'])

@@ -6,6 +6,7 @@
 # client-python's shakenfist_client/commandline/ansible.py.
 from __future__ import annotations
 
+import inspect
 import json
 import time
 
@@ -120,7 +121,12 @@ options:
     default: false
     type: bool
   await_timeout:
-    description: How long to wait, in seconds, when O(await) is true.
+    description:
+      - How long to wait, in seconds, when O(await) is true.
+      - This is the budget for the whole create, not just for the wait
+        that follows it. The instance creation call is told not to wait
+        at all when O(await) is set, so this number is what the task
+        actually spends.
     required: false
     default: 600
     type: int
@@ -198,6 +204,24 @@ SERVER_POPULATED_DISK_KEYS = ['blob_uuid', 'disk_base']
 
 class InstanceCreationException(Exception):
     ...
+
+
+def _create_accepts_timeout(client):
+    """Does this client's create_instance() take a timeout?
+
+    The collection requires shakenfist-client unpinned, so the control
+    node's client is whatever pip resolved and may predate the argument.
+    Feature-detect rather than assume: guessing wrong is a TypeError that
+    stops every instance creation, and there is no version to test
+    against that is not itself a guess about backports.
+    """
+    try:
+        signature = inspect.signature(client.create_instance)
+    except (TypeError, ValueError):
+        # A mock or a C-implemented callable. Assume the old shape; the
+        # elapsed-time deduction still applies.
+        return False
+    return 'timeout' in signature.parameters
 
 
 def _make_client(module):
@@ -536,6 +560,9 @@ def run_module():
             module.exit_json(
                 changed=needs_replacement, meta=(i or None), log=log)
 
+        # An instance that needs no replacement spent nothing on a
+        # create, so the await gets the whole budget.
+        create_elapsed = 0
         if needs_replacement:
             if i:
                 remaining = _delete_and_wait(client, log, identifier, namespace)
@@ -545,15 +572,41 @@ def run_module():
                         msg='Deletion of instance for update failed.',
                         meta=None, log=log)
 
+            # When we are going to await below, await_timeout is the
+            # budget for the whole operation, so the create must not wait
+            # as well. It used to: the client is built with ASYNC_BLOCK,
+            # so create_instance polled for an hour, returned an instance
+            # still in 'creating', and only then did the 600 second await
+            # start on the same condition. The task took the sum -- about
+            # 4200 seconds -- and reported the 600
+            # (shakenfist/kerbside#355).
+            #
+            # The collection requires shakenfist-client unpinned, so the
+            # control node can be running a client older than the one that
+            # grew this argument. Passing it blindly there is a TypeError
+            # and every instance creation in the fleet stops working, so
+            # ask before passing it. The elapsed-time deduction below
+            # covers the older client: it cannot get the task down to
+            # await_timeout, but it does stop the two budgets from being
+            # added together.
+            if module.params.get('await') and _create_accepts_timeout(client):
+                instance_kwargs['timeout'] = 0
+
+            create_started = time.time()
             i = client.create_instance(*instance_args, **instance_kwargs)
+            create_elapsed = time.time() - create_started
 
         if not module.params.get('await'):
             log.append('Not awaiting instance')
         else:
-            log.append('Awaiting instance %s' % i['uuid'])
+            # Whatever the create already spent comes out of the budget,
+            # so await_timeout bounds the pair rather than each of them.
+            remaining = max(
+                0, module.params.get('await_timeout') - create_elapsed)
+            log.append('Awaiting instance %s for %d seconds (create took %d)'
+                       % (i['uuid'], remaining, create_elapsed))
             try:
-                client.await_instance_create(
-                    i['uuid'], timeout=module.params.get('await_timeout'))
+                client.await_instance_create(i['uuid'], timeout=remaining)
             except Exception as e:
                 log.append('Waiting for instance failed: %s' % e)
                 module.fail_json(
