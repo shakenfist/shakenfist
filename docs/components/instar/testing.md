@@ -472,6 +472,31 @@ Because `merge_group` does not inherit the `pull_request` trigger's
 docs-only changes. That is deliberate (a required check that never runs
 hangs the queue), at the cost of matrix latency on doc merges.
 
+**Superseded merge groups are cancelled.** `build-and-test`,
+`package-build` and `package-matrix` each carry a `concurrency:` block,
+and its key is merge-group aware. `github.ref` is the obvious key and is
+right on every other event, but on `merge_group` it is the per-attempt
+queue branch `gh-readonly-queue/develop/pr-<N>-<SHA>`, and GitHub mints a
+fresh SHA every time it rebuilds the group — which it does on every push
+to `develop`. Keyed on that, every rebuild lands in a concurrency group
+of its own, `cancel-in-progress` never matches, and superseded merge
+groups run seven `xl` distro entries to completion on runners the whole
+Shaken Fist fleet shares. So the key branches on the event and uses
+`github.event.merge_group.base_ref` in the queue, with a `merge_group-`
+prefix so a queue run does not share a group with a `workflow_dispatch`
+run on `develop`.
+
+Cancelling is only safe because the queue is serial: the develop ruleset
+sets `max_entries_to_build: 1`, so any other in-flight `merge_group` run
+is by definition superseded and its queue branch already abandoned.
+Raising that setting and keeping this key would cancel a live queue
+entry, which reports a failed required check and ejects the pull
+request; the two have to move together. See
+[shakenfist/kerbside#284](https://github.com/shakenfist/kerbside/issues/284)
+for what the unfixed version cost across repositories, and the fleet
+audit
+[merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md).
+
 ### CI job layout and the partition guard
 
 On a pull request the integration suite is split across several jobs
