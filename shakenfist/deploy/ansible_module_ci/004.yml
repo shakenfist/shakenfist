@@ -117,6 +117,21 @@
         that: not ci_instance['failed']
         fail_msg: "failed should be false in {{ ci_instance }}"
 
+    # NOTE(mikal): regression coverage for shakenfist/kerbside#355, where the
+    # create blocked for an hour before the await started a fresh 600 second
+    # clock on the same condition and the task took the sum. This is the only
+    # place the real shakenfist_client is exercised on this path -- the unit
+    # tests stub the client out, so they can only assert which value the
+    # module passes, never what the client does with it. Both log lines are
+    # matched loosely because which of the two create paths runs depends on
+    # the client version pip resolved on the control node.
+    - name: Assert the await ran on a budget, not on its own fresh clock
+      assert:
+        that:
+          - ci_instance['log'] | select('search', 'create timeout') | list | length > 0
+          - ci_instance['log'] | select('search', 'already spent') | list | length > 0
+        fail_msg: "await budget not reported in {{ ci_instance['log'] }}"
+
     - name: Create the same test instance and check it hasn't changed
       sf_instance:
         name: "ansibleci-004"

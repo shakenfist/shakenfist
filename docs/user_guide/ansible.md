@@ -215,8 +215,8 @@ Delete a network:
 | metadata<br/>*dictionary* | Metadata key-value pairs to set on the instance. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
-| await<br/>*boolean* | Whether to wait for the instance to be created. Only works for when state is `present`. Default is `false`. |
-| await_timeout<br/>*integer* | How many seconds to wait in an `await`. Defaults to 600. |
+| await<br/>*boolean* | Whether to wait for the instance to be created. Only works for when state is `present`. Default is `false`. The wait is bounded by `await_timeout`, as is the creation which precedes it. |
+| await_timeout<br/>*integer* | How many seconds an `await` may take, counted from the start of the operation rather than from the start of the wait. Where an instance is being replaced, the time spent deleting the old one and creating the new one is deducted from this number before the wait begins. It is a budget rather than a hard deadline: a deletion or creation already underway is not interrupted, and a `shakenfist-client` of v0.8.3 or earlier cannot be told not to wait while creating. Defaults to 600. |
 
 ### Examples
 
