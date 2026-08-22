@@ -13072,47 +13072,47 @@ declarations or the sweep-on-delete behaviour.</p>
 </tr>
 <tr>
 <td>1. Per-node <code>sf-net</code> queue family (five priority lanes mirroring the existing taxonomy) + dispatcher changes: exponential back-off map (100 ms → 15 s, ×2, single-worker safety comment) and cancellation-check on dequeue (drop aborted/deleted ops, fix the latent <code>InvalidStateException</code> from executing a pre-aborted op)</td>
-<td>PLAN-network-facade-phase-01-per-node-queues.md</td>
+<td><a href="../PLAN-network-facade-phase-01-per-node-queues/">PLAN-network-facade-phase-01-per-node-queues.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. <code>BridgedVXLanNetwork</code> scaffold, <code>ErrorReport</code> infrastructure (class, <code>from_exception</code> registry, <code>to_http</code> mapping, <code>op.error_report</code> / <code>op.raise_for_error</code> API), and <code>ensure_mesh</code> migration</td>
-<td>PLAN-network-facade-phase-02-ensure-mesh.md</td>
+<td><a href="../PLAN-network-facade-phase-02-ensure-mesh/">PLAN-network-facade-phase-02-ensure-mesh.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>3. Floating-IP and route migration</td>
-<td>PLAN-network-facade-phase-03-floating-ip.md</td>
+<td><a href="../PLAN-network-facade-phase-03-floating-ip/">PLAN-network-facade-phase-03-floating-ip.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>4. dnsmasq operation migration</td>
-<td>PLAN-network-facade-phase-04-dnsmasq.md</td>
+<td><a href="../PLAN-network-facade-phase-04-dnsmasq/">PLAN-network-facade-phase-04-dnsmasq.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>5. <code>create_on_*</code> and <code>delete_on_*</code> migration</td>
-<td>PLAN-network-facade-phase-05-lifecycle.md</td>
+<td><a href="../PLAN-network-facade-phase-05-lifecycle/">PLAN-network-facade-phase-05-lifecycle.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>6. <code>maintain.py</code> rewrite as discovery-only</td>
-<td>PLAN-network-facade-phase-06-maintain.md</td>
+<td><a href="../PLAN-network-facade-phase-06-maintain/">PLAN-network-facade-phase-06-maintain.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>7. REST contract: remove <code>redirect_to_network_node</code> from three of its four sites, flip the two delete endpoints to 202+poll, add <code>/clusteroperations/&lt;uuid&gt;/chain</code> and <code>/clusteroperations?target_*=</code> endpoints, update <code>client-python</code></td>
-<td>PLAN-network-facade-phase-07-rest-contract.md</td>
+<td><a href="../PLAN-network-facade-phase-07-rest-contract/">PLAN-network-facade-phase-07-rest-contract.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>8. Remove the temporary <code>NodeLock</code>s from the stability fix (no per-method migration flags existed to remove — Phases 2–5 migrated each method cleanly in-place)</td>
-<td>PLAN-network-facade-phase-08-cleanup.md</td>
+<td><a href="../PLAN-network-facade-phase-08-cleanup/">PLAN-network-facade-phase-08-cleanup.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>9. Documentation and tests</td>
-<td>PLAN-network-facade-phase-09-docs.md</td>
+<td><a href="../PLAN-network-facade-phase-09-docs/">PLAN-network-facade-phase-09-docs.md</a></td>
 <td>Complete</td>
 </tr>
 </tbody>

@@ -12628,32 +12628,32 @@ post-decisions plan.</p>
 </tr>
 <tr>
 <td>1. <code>events</code>/<code>event_objects</code> schema, accessors, the <code>RecordEventBatch</code> RPC on sf-database, and the events-row-count gauge</td>
-<td>PLAN-eventlog-direct-mariadb-phase-01-schema.md</td>
+<td><a href="../PLAN-eventlog-direct-mariadb-phase-01-schema/">PLAN-eventlog-direct-mariadb-phase-01-schema.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. Swap the drainer's RPC target from sf-eventlog to sf-database; promote <code>event_uuid</code> and <code>request_id</code> to first-class fields; wire spool-depth, drop, and insert metrics</td>
-<td>PLAN-eventlog-direct-mariadb-phase-02-write.md</td>
+<td><a href="../PLAN-eventlog-direct-mariadb-phase-02-write/">PLAN-eventlog-direct-mariadb-phase-02-write.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>3. Move prune sweep into the cluster daemon's scheduled tasks, with prune-delete counter</td>
-<td>PLAN-eventlog-direct-mariadb-phase-03-prune.md</td>
+<td><a href="../PLAN-eventlog-direct-mariadb-phase-03-prune/">PLAN-eventlog-direct-mariadb-phase-03-prune.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>4. REST API direct-read path via a new <code>GetObjectEvents</code> RPC on sf-database</td>
-<td>PLAN-eventlog-direct-mariadb-phase-04-read.md</td>
+<td><a href="../PLAN-eventlog-direct-mariadb-phase-04-read/">PLAN-eventlog-direct-mariadb-phase-04-read.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>5. Delete <code>sf-eventlog</code> daemon, gRPC protos, systemd unit, config, the MariaDB <code>event_dlq</code>, and the on-disk sqlite chunks</td>
-<td>PLAN-eventlog-direct-mariadb-phase-05-remove.md</td>
+<td><a href="../PLAN-eventlog-direct-mariadb-phase-05-remove/">PLAN-eventlog-direct-mariadb-phase-05-remove.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>6. Documentation (operator guide for the new eventlog, ARCHITECTURE/README/AGENTS updates, cut-over loss called out in release notes)</td>
-<td>PLAN-eventlog-direct-mariadb-phase-06-docs.md</td>
+<td><a href="../PLAN-eventlog-direct-mariadb-phase-06-docs/">PLAN-eventlog-direct-mariadb-phase-06-docs.md</a></td>
 <td>Complete</td>
 </tr>
 </tbody>
@@ -12900,18 +12900,19 @@ development that we fixed.</p>
 <p>When creating this master plan from the template, the
 following files in <code>docs/plans/</code> should be updated:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table
-  for this master plan and each of its phase plans, keyed
-  to one-line descriptions and current status.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for this master plan so
-  it appears in the documentation navigation. Phase files
+<li><strong><code>index.md</code></strong> — add one row to the <em>Master plans</em> table
+  for this master plan, keyed to a one-line intent and its
+  current status. Phases are tracked in the Execution
+  table above, not in the index.</li>
+<li><strong><code>order.yml</code></strong> — add an entry for this master plan, in
+  the intended reading order. Phase files
   are <em>not</em> added to <code>order.yml</code>; they are linked from
-  the Execution table and from <code>index.md</code> only.</li>
+  the Execution table only, which makes that table the only
+  path to them.</li>
 </ul>
-<p>The site navigation in <code>mkdocs.yml</code> is produced from
-<code>mkdocs.yml.tmpl</code> by the docs-sync workflow, which
-consumes <code>order.yml</code>. No manual <code>mkdocs.yml</code> edits are
-needed.</p>
+<p><code>order.yml</code> does not by itself reach this repository's site
+navigation: <code>mkdocs.yml.tmpl</code> lists the Plans nav by hand.
+The entry is registration and reading order.</p>
 <p>When all phases are complete, update the status column in
 <code>docs/plans/index.md</code>.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>

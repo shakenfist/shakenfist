@@ -12192,6 +12192,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#landing-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landing record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13159,32 +13187,32 @@ Loki and CI already checks them there. Phase 6 documents.</p>
 <tr>
 <td>0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth)</td>
 <td><a href="../PLAN-remove-syslog-forwarding-phase-00-decisions/">PLAN-remove-syslog-forwarding-phase-00-decisions.md</a></td>
-<td>Complete (see Decisions section above)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump</td>
 <td><a href="../PLAN-remove-syslog-forwarding-phase-01-json-logging/">PLAN-remove-syslog-forwarding-phase-01-json-logging.md</a></td>
-<td>Complete (<code>shakenfist-utilities==0.8.5</code> released and pinned)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests</td>
 <td><a href="../PLAN-remove-syslog-forwarding-phase-02-loki-shipper/">PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md</a></td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test</td>
 <td><a href="../PLAN-remove-syslog-forwarding-phase-03-ci-loki/">PLAN-remove-syslog-forwarding-phase-03-ci-loki.md</a></td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned <code>shakenfist/actions</code>)</td>
 <td><a href="../PLAN-remove-syslog-forwarding-phase-04-ci-tooling/">PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md</a></td>
-<td>Complete (<code>loki-ci-tooling</code> merged to actions@main; pending CI)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1)</td>
 <td><a href="../PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog/">PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md</a></td>
-<td>Complete (pending CI; needs actions <code>loki-node-checks</code> merged)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>6. Documentation: operator guide, field contract, ARCHITECTURE/README/AGENTS, index/order</td>
@@ -13193,7 +13221,20 @@ Loki and CI already checks them there. Phase 6 documents.</p>
 </tr>
 </tbody>
 </table>
-<p>Phase notes:</p>
+<h3 id="landing-record">Landing record<a class="headerlink" href="#landing-record" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Phase 0</strong>'s decisions are the Decisions section above.</li>
+<li><strong>Phase 1</strong> shipped as <code>shakenfist-utilities==0.8.5</code>, released to
+  PyPI and pinned here.</li>
+<li><strong>Phase 4</strong> landed on <code>shakenfist/actions</code> as the <code>loki-ci-tooling</code>
+  branch, merged to <code>main</code>.</li>
+<li><strong>Phase 5</strong> additionally required the <code>loki-node-checks</code> branch on
+  <code>shakenfist/actions</code> to merge before it could go green.</li>
+<li><strong>Phases 2, 3 and 5</strong> each carried a "pending CI" caveat while they
+  were in flight. All three have since merged to <code>develop</code>, which the
+  merge queue gates on CI, so the caveat is spent rather than dropped.</li>
+</ul>
+<h3 id="phase-notes">Phase notes<a class="headerlink" href="#phase-notes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>Phase 0</strong> is a decisions phase in the style of
@@ -13552,20 +13593,22 @@ them as part of the relevant phase or note them here.</p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this master plan is created from the template:</p>
 <ul>
-<li><strong><code>docs/plans/index.md</code></strong> — add rows to the <em>Plan Status</em>
-  table for this plan and its phases, with links, status, and
-  one-line descriptions, grouped under this master plan. Add a
+<li><strong><code>docs/plans/index.md</code></strong> — add one row to the <em>Master
+  plans</em> table for this plan, with a link, its status and a
+  one-line intent. Phases are tracked in the Execution table
+  above, not in the index. Add a
   line to the <em>Plan sequencing</em> section noting that this plan
   delivers the Loki-shipper story remove-primary phase 1 depends
   on, and that it can land in parallel with the other BYO work.</li>
 <li><strong><code>docs/plans/order.yml</code></strong> — add an entry for this master
-  plan so it appears in the documentation navigation. Phase
+  plan, in the intended reading order. Phase
   files are <em>not</em> added to <code>order.yml</code>; they are linked from the
-  Execution table and <code>index.md</code> only.</li>
+  Execution table only, which makes that table the only path
+  to them.</li>
 </ul>
-<p>The site navigation in <code>mkdocs.yml</code> is produced from
-<code>mkdocs.yml.tmpl</code> by the docs-sync workflow, which consumes
-<code>order.yml</code>. Do not edit <code>mkdocs.yml</code> by hand.</p>
+<p><code>order.yml</code> does not by itself reach this repository's site
+navigation: <code>mkdocs.yml.tmpl</code> lists the Plans nav by hand.
+The entry is registration and reading order.</p>
 <p>When all phases are complete, update the status column in
 <code>docs/plans/index.md</code> and mark <code>PLAN-remove-primary.md</code> phase 1
 complete.</p>

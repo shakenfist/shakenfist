@@ -12499,13 +12499,13 @@ every consumer, so that:</p>
 <tbody>
 <tr>
 <td>1. CI await helper deflake</td>
-<td>PLAN-cluster-op-visibility-phase-01-ci-deflake.md</td>
-<td>Complete (CI green)</td>
+<td><a href="../PLAN-cluster-op-visibility-phase-01-ci-deflake/">PLAN-cluster-op-visibility-phase-01-ci-deflake.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>1b. Atomic target writes + by-target JOIN fix</td>
 <td>(folded into phase 1 PR; see below)</td>
-<td>Complete (CI green)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Observational flag: schema and query layer</td>
@@ -12856,12 +12856,13 @@ adjacent reports are #3432 (lock lifetime noise) and #3278
 <p>When creating this master plan, update the following files in
 <code>docs/plans/</code>:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table with
-  a link to this plan, its phase breakdown, initial status,
-  and a one-line description.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for this master plan so it
-  appears in the documentation navigation. Phase files are
-  linked from the Execution table and <code>index.md</code> only.</li>
+<li><strong><code>index.md</code></strong> — add one row to the <em>Master plans</em> table
+  with a link to this plan, its initial status, its phase
+  arithmetic, and a one-line intent.</li>
+<li><strong><code>order.yml</code></strong> — add an entry for this master plan, in
+  the intended reading order. Phase files are
+  linked from the Execution table only, which makes that
+  table the only path to them.</li>
 </ul>
 <p>When all phases are complete, update the status column in
 <code>docs/plans/index.md</code>.</p>

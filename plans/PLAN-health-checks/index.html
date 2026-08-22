@@ -12663,27 +12663,27 @@ Decisions section above and is no longer provisional.</p>
 <tbody>
 <tr>
 <td>0. Research and decisions document</td>
-<td>PLAN-health-checks-phase-00-decisions.md</td>
+<td><a href="../PLAN-health-checks-phase-00-decisions/">PLAN-health-checks-phase-00-decisions.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>1. sf-api <code>/livez</code> <code>/readyz</code> <code>/healthz</code> + readiness checker + SIGTERM drain</td>
-<td>PLAN-health-checks-phase-01-sf-api.md</td>
+<td><a href="../PLAN-health-checks-phase-01-sf-api/">PLAN-health-checks-phase-01-sf-api.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. Dependency-aware <code>grpc.health.v1</code> on sf-database</td>
-<td>PLAN-health-checks-phase-02-grpc-health.md</td>
+<td><a href="../PLAN-health-checks-phase-02-grpc-health/">PLAN-health-checks-phase-02-grpc-health.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>3. <code>WATCHDOG</code> liveness wiring (worker + elected daemons)</td>
-<td>PLAN-health-checks-phase-03-watchdog.md</td>
+<td><a href="../PLAN-health-checks-phase-03-watchdog/">PLAN-health-checks-phase-03-watchdog.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>4. Operator documentation and LB-config examples</td>
-<td>PLAN-health-checks-phase-04-operator-docs.md</td>
+<td><a href="../PLAN-health-checks-phase-04-operator-docs/">PLAN-health-checks-phase-04-operator-docs.md</a></td>
 <td>Complete</td>
 </tr>
 </tbody>
@@ -13296,7 +13296,7 @@ phases land.)</em></p>
 <p>When creating a new master plan from this template, update
 the following files in <code>docs/plans/</code>:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — add rows to the <em>Plan Status</em> table and
+<li><strong><code>index.md</code></strong> — add one row to the <em>Master plans</em> table and
   update the <em>Plan sequencing</em> section to reflect that
   the health-checks master plan now exists.</li>
 <li><strong><code>order.yml</code></strong> — add an entry for the new master plan.</li>

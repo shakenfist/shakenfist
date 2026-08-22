@@ -12512,7 +12512,7 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>3: Compile and warn</td>
-<td>In progress (measurement)</td>
+<td>In progress</td>
 <td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day — sfcbr deployed, apparatus hand-verified, a full functional CI run covered — and exits when every finding is explained, no earlier than 2026-08-20. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
 </tr>
 <tr>
@@ -12522,7 +12522,7 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>5: Narrow the handlers</td>
-<td>Partly overtaken</td>
+<td>Not started</td>
 <td>Narrow <code>except TypeError</code> to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below</td>
 </tr>
 <tr>

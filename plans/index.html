@@ -11427,10 +11427,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#plan-status" class="md-nav__link">
+  <a href="#status-vocabulary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Plan Status
+        Status vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#master-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Master plans
       
     </span>
   </a>
@@ -12049,10 +12060,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#plan-status" class="md-nav__link">
+  <a href="#status-vocabulary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Plan Status
+        Status vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#master-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Master plans
       
     </span>
   </a>
@@ -12090,989 +12112,359 @@
 <p>The set of incomplete plans has grown to the point where the order they land in matters. The intended sequencing is:</p>
 <ol>
 <li><strong><a href="PLAN-network-facade/">Network operations facade</a></strong> — complete. Landed via the <code>network-facade</code> branch.</li>
-<li><strong>Retire etcd</strong> — <em>(absorbed into <a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a> phase 0; the standalone <code>PLAN-remove-etcd.md</code> has been removed.)</em> Inspection confirmed the etcd data drain is complete (the <code>DATA_MIGRATIONS</code> dict is empty), but the supporting machinery — <code>shakenfist/etcd.py</code>, <code>etcd3gw</code>, the etcd proto stubs, the drain test files, <code>is_etcd_master</code>, the migration-era <code>sf-ctl</code> aliases — is still in tree. Phase 0 of the BYO-MariaDB plan deletes it as a single sweep. The <code>etcd_master</code> ansible group name rename stays with <code>PLAN-remove-primary</code> phase 7 as a deploy-scope concern.</li>
+<li><strong>Retire etcd</strong> — <em>(absorbed into <a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a> phase 0; the standalone <code>PLAN-remove-etcd.md</code> has been removed.)</em> Done. The data drain was already complete (the <code>DATA_MIGRATIONS</code> dict is empty), and the supporting machinery — <code>shakenfist/etcd.py</code>, <code>etcd3gw</code>, the etcd proto stubs, the drain test files, the migration-era <code>sf-ctl</code> aliases — was deleted as a single sweep by the BYO-MariaDB plan. The <code>etcd_master</code> ansible group rename landed with <code>PLAN-remove-primary</code>. What survives is deliberate: the vestigial <code>is_etcd_master</code> flag is pinned False for one release as a rollback fallback.</li>
 <li><strong><a href="PLAN-health-checks/">Health checks, readiness, and graceful drain</a></strong> — <strong>complete.</strong> A precondition for the BYO load-balancer story in remove-primary being operationally honest. Delivered sf-api <code>/livez</code>/<code>/readyz</code>/<code>/healthz</code> with SIGTERM drain, dependency-aware <code>grpc.health.v1</code> on sf-database, systemd <code>WATCHDOG</code> liveness on the worker/elected daemons (which also closes the cluster-lock proof-of-life gap), and operator LB/upgrade docs. Landed on the <code>health-checks</code> branch. <strong><a href="PLAN-node-resource-health/">Node resource health</a></strong> is a <em>sibling</em> (complete) on a different axis — it drives <code>node.state</code> from the health of the storage/resource dependencies a node's hosted object types declare, so a dead disk or hung NFS mount takes a node out of scheduling. It was not sequenced against the BYO thread; it grew out of the sf-6 blob-NVMe incident and landed independently on the <code>node-resource-health</code> branch.</li>
-<li><strong><a href="PLAN-remove-primary/">Remove the primary node</a></strong> — the BYO-infrastructure scope reduction. Phase 7 finishes the deployer-level <code>etcd_master</code> → <code>database_node</code> rename, by which point the drain code itself is long gone. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.</li>
-<li><strong><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></strong> — lifted out of remove-primary because it grew into its own master plan. Removes MariaDB-server install from the deployer entirely, reshapes <code>sf-database</code> into a deployer-chosen tier of equal stateless instances reached via client-side gRPC load balancing (not leader election), and carves schema/migration execution out of daemon startup into an operator-run <code>sf-ctl ensure-mariadb-schema</code> command. Can land in parallel with remove-primary's remaining phases; its phase 1 also performs the scope-shift edit to remove-primary itself.</li>
+<li><strong><a href="PLAN-remove-primary/">Remove the primary node</a></strong> — the BYO-infrastructure scope reduction. Complete: the deployer-level <code>etcd_master</code> → <code>database_node</code> rename landed with one-release fallbacks, and the deployer is now the <code>shakenfist.shakenfist</code> collection. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.</li>
+<li><strong><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></strong> — lifted out of remove-primary because it grew into its own master plan. Removes MariaDB-server install from the deployer entirely, reshapes <code>sf-database</code> into a deployer-chosen tier of equal stateless instances reached via client-side gRPC load balancing (not leader election), and carves schema/migration execution out of daemon startup into an operator-run <code>sf-ctl ensure-mariadb-schema</code> command. Complete. It landed in parallel with remove-primary's remaining phases, and its first phase performed the scope-shift edit to remove-primary itself.</li>
 </ol>
 <p><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a> delivers the "Loki-shipper story" that remove-primary phase 1 is explicitly gated on — it adds structured-JSON logging and an in-process, on-disk-spooled Loki push (modelled on the eventlog spool/drainer) before deleting the rsyslog wiring. It can land in parallel with the other BYO work and is sequenced ahead of remove-primary phase 1, which it realises.</p>
-<p>The remaining incomplete plans — <a href="PLAN-embrace-tls/">Embrace TLS</a>, <a href="PLAN-sticky-transfers/">Sticky blob transfers</a>, <a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a>, <a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a>, the connected <a href="PLAN-generic-allocator/">Generic allocator</a> / <a href="PLAN-network-service-ports/">Network service ports</a> / <a href="PLAN-network-carrier-model/">Network carrier model</a> triple, and the not-yet-drafted OpenTelemetry instrumentation thread — are intentionally <strong>not ordered relative to each other</strong> here. They each have specific dependencies on either remove-primary having established the BYO shape (the operator-provides-PKI surface for TLS, the streaming-proxy baseline for sticky transfers, the sf-database election pattern for the others) or network-facade having landed (the netlink plan, whose privilege-separation phases need network-facade's single-mutator property), but among themselves the order is a triage decision best made when remove-primary is close to landing rather than now. The scheduler-reservations plan is independent of the BYO shape but benefits from the OpenTelemetry thread landing first so that phase 0's design choices can be informed by real load and contention numbers.</p>
+<p>The remaining incomplete plans — <a href="PLAN-embrace-tls/">Embrace TLS</a>, <a href="PLAN-sticky-transfers/">Sticky blob transfers</a>, <a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a>, <a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a>, the connected <a href="PLAN-generic-allocator/">Generic allocator</a> / <a href="PLAN-network-service-ports/">Network service ports</a> / <a href="PLAN-network-carrier-model/">Network carrier model</a> triple, and the not-yet-drafted OpenTelemetry instrumentation thread — are intentionally <strong>not ordered relative to each other</strong> here. They each have specific dependencies on either remove-primary having established the BYO shape (the operator-provides-PKI surface for TLS, the streaming-proxy baseline for sticky transfers, the sf-database election pattern for the others) or network-facade having landed (the netlink plan, whose privilege-separation phases need network-facade's single-mutator property), but among themselves the order is a triage decision still to be made now that remove-primary has landed. The scheduler-reservations plan is independent of the BYO shape but benefits from the OpenTelemetry thread landing first so that phase 0's design choices can be informed by real load and contention numbers.</p>
 <p><a href="PLAN-database-load-reduction/">Database load reduction</a> sits outside that triage: it addresses a measured production problem (the sf-database tier serving ~527 ops/second at idle, 57% of it one polling loop). Phases 1–5 are complete and took that to 89–92 ops/second at its best, largely by removing fixed-rate idle polling and restoring the etcd-era “objects are cacheable, attributes of objects are not” principle in a MariaDB form. Its phase 4 (caller attribution via gRPC metadata and a per-caller counter) is also the first concrete slice of the OpenTelemetry instrumentation thread — the caller-identity plumbing is what a later span-propagation phase would reuse, it is designed to compose with the mTLS peer-identity model from <a href="PLAN-embrace-tls/">Embrace TLS</a> rather than duplicate it, and it is what made every subsequent diagnosis possible. The gain has since partially rotted — load is back to ~142 ops/second — so phase 6 chases the residual load and that regression, and phase 7 makes regression detection something any deployer can run rather than something only our own operations tooling can see.</p>
 <p>The <strong>generic-allocator / network-service-ports / network-carrier-model triple</strong> is internally ordered. Generic-allocator is the foundational refactor (replaces five ad-hoc allocators with one primitive and is independently shippable). Network-service-ports builds on the allocator to expose per-network DNAT'd ports for managed services (web consoles, transfer agents, managed VPN endpoints). Network-carrier-model layers a smeared lease-based per-network carrier role with VIP advertisement on top, removing the network-node singleton; it depends on both prior plans and is the largest of the three. The triple supersedes the "network node failover" thread that was previously a not-yet-drafted line item.</p>
 <p><a href="PLAN-api-input-validation/">Declarative API input validation</a> is independent of all of the above and gated on nothing, so it can start whenever there is appetite. It closes a cluster of reported issues going back to 2020 (#528 and #936 are the parent issues) whose common cause is that request body values reach handlers untyped. It is drafted now because a per-endpoint fix for one instance of it (#3609) was attempted and abandoned: seven hand-rolled guards, two of them wrong on the first attempt, and the defect class still not covered. Its one coordination point is with the <a href="api-query-batching-roadmap/">API query batching roadmap</a>, which needs the same bounded <code>limit</code>/<code>offset</code> parameter types for #1974.</p>
 <p><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines and progress detection</a> is similarly independent and gated on nothing. It is driven by CI reliability, but the defect is user-facing too: the #3516 <code>sf-sidechannel</code> wedge (a <code>get-file</code> stuck in <code>executing</code> until the client times out, with the agent-side trigger tracked as #2240) is one of the two most frequent merge-queue flakes as of 2026-08, and because each instance runs at most one executor, a wedged operation also blocks every other agent operation against that instance until the 900-second backstop fires. It adds client-propagated wall-clock deadlines and per-command progress timeouts to agent operations, plus a retry path for operations that fail in <code>executing</code>. Its API-facing phase follows the parameter declaration rules that <a href="PLAN-api-input-validation/">Declarative API input validation</a> enforces, but does not depend on that plan's remaining phases. Its follow-on, <a href="PLAN-agent-operation-dependencies/">Dependency-aware agent operations</a>, extends the cluster operation <code>depends_on</code>/<code>runs_after</code> vocabulary to agent operations (including cross-instance edges, enabling fire-and-await fleet orchestration such as rolling updates) and elevates documentation-with-worked-examples to a deliverable, with <code>client-python-k3s</code> as the first of an example-application suite; it is explicitly gated on the deadlines plan landing, because dependency waiting relies on deadline expiry to break user-created cycles.</p>
 <p><a href="PLAN-grpc-bounded-replies/">Bound the size of DatabaseService gRPC replies</a> is independent and gated on nothing, but it is driven by a production defect rather than an ambition, so it should not sit indefinitely. Several <code>DatabaseService</code> replies are unbounded by construction and the only ceiling on them is gRPC's message size limit, which the sfcbr cluster has now crossed twice from two daemons on two RPCs (#3638). A stopgap has raised the client cap and made the affected callers honest about failed reads — including one that was using an unreadable list as a licence to delete a node's blob store — but the protocol still permits replies whose size we discover by having one fail. Its phase 2 (sweep callers ask for a bounded page rather than everything) is small and independently shippable; its phase 3 is a protocol change and inherits the eventlog plan's deferred cursor-pagination work.</p>
-<p>The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing.</p>
-<h2 id="plan-status">Plan Status<a class="headerlink" href="#plan-status" title="Permanent link">&para;</a></h2>
+<p>The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing. Neither are the plans which appear only in the table below: <a href="PLAN-netserv/">sf-netserv</a>, <a href="PLAN-ci-node-exec-assertions/">CI node-exec assertions</a>, <a href="PLAN-attribute-field-masks/">attribute field masks</a>, <a href="PLAN-artifact-fetch-retry-with-backoff/">retry transient artifact fetches</a>, <a href="PLAN-fix-cluster-operation-targets-unique-constraint/">fix cluster_operation_targets uniqueness</a> and <a href="PLAN-kerbside-vdi-tokens/">Kerbside VDI console tokens</a> — the first is a thoughtbubble and the rest are self-contained pieces of work that were never sequenced against this thread.</p>
+<h2 id="status-vocabulary">Status vocabulary<a class="headerlink" href="#status-vocabulary" title="Permanent link">&para;</a></h2>
+<p>The <code>Status</code> column below holds exactly one of these terms and nothing else. It is the
+whole-plan status, so it only reads <code>Complete</code> once every phase has landed. Where a plan
+is <code>In progress</code> or <code>Blocked</code> for a reason the <code>Phases</code> column does not make obvious, that
+reason belongs in the plan itself rather than in this table. The canonical wording is the
+<code>plan-status-vocabulary</code> shared block in
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/PLAN-TEMPLATE.md">PLAN-TEMPLATE.md</a>.</p>
 <table>
 <thead>
 <tr>
-<th>Plan</th>
-<th>Phase</th>
 <th>Status</th>
-<th>Description</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="blob-storage-roadmap/">Blob Storage Roadmap</a></td>
-<td>Phase 1: Hash Tracking</td>
-<td>Complete</td>
-<td>Move hash storage to MariaDB</td>
+<td>Proposed</td>
+<td>Written down as a concept, not yet scheduled.</td>
 </tr>
 <tr>
-<td><a href="blob-storage-roadmap/">Blob Storage Roadmap</a></td>
-<td>Phase 2: Lazy Dedup</td>
-<td>Future</td>
-<td>Composite blobs and deduplication</td>
-</tr>
-<tr>
-<td><a href="blob-storage-roadmap/">Blob Storage Roadmap</a></td>
-<td>Phase 3: Chunking</td>
-<td>Future</td>
-<td>Content-defined chunking</td>
-</tr>
-<tr>
-<td><a href="api-query-batching-roadmap/">API Query Batching</a></td>
-<td>Phase 1: Batch Infrastructure</td>
-<td>Planning</td>
-<td>Add batch query functions</td>
-</tr>
-<tr>
-<td><a href="api-query-batching-roadmap/">API Query Batching</a></td>
-<td>Phase 2: Prefetch Pattern</td>
-<td>Future</td>
-<td>Modify API to prefetch related data</td>
-</tr>
-<tr>
-<td><a href="api-query-batching-roadmap/">API Query Batching</a></td>
-<td>Phase 3: Generic Framework</td>
-<td>Future</td>
-<td>Declarative prefetch requirements</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 1: Query Infrastructure</td>
-<td>Complete</td>
-<td>Typed criteria + generic <code>find_objects</code> primitive</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 2: Artifact Pushdown</td>
-<td>Complete</td>
-<td>Push state/namespace/name for Artifact lookups to SQL</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 3: Instance and Network Pushdown</td>
-<td>Complete</td>
-<td>Mirror Artifact pushdown for Instance and Network</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 4: Iterator Rework</td>
-<td>Complete</td>
-<td>Port iterators to single pushed-down query</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 5: Ad-hoc Bulk Scan Cleanup</td>
-<td>Complete</td>
-<td>Eliminate remaining full-table scans on filter paths</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 6: Tests and Documentation</td>
-<td>Complete</td>
-<td>Coverage and docs updates</td>
-</tr>
-<tr>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown Filtering</a></td>
-<td>Phase 7: Denormalised Child-UUID List Removal</td>
-<td>Complete</td>
-<td>Replace cached UUID lists on attributes tables with SQL queries</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
-<td>Phase 1: <code>has_pending_cluster_operation</code> query</td>
-<td>Complete</td>
-<td>New query API and tests</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
-<td>Phase 2: Switch gating callers</td>
-<td>Complete</td>
-<td>Move <code>is_okay()</code> and siblings off the single-pointer read</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
-<td>Phase 3: Auto-target tracking</td>
-<td>Complete</td>
-<td><code>*_create_and_enqueue</code> writes target rows automatically</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
-<td>Phase 4: Remove explicit setters</td>
-<td>Complete</td>
-<td>Drop redundant <code>set_last_cluster_operation</code> callers</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
-<td>Phase 5: Documentation and final audit</td>
-<td>Complete</td>
-<td>Update docs, verify CI</td>
-</tr>
-<tr>
-<td><a href="PLAN-fix-cluster-operation-targets-unique-constraint/">Fix cluster_operation_targets UNIQUE constraint</a></td>
-<td>Schema fix</td>
-<td>Complete</td>
-<td>Replace column-level <code>UNIQUE(operation_uuid)</code> with composite <code>UNIQUE(operation_uuid, target_object_type, target_uuid)</code> so multi-target ops record all their target rows</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-facade/">Network operations facade</a></td>
-<td>Master plan</td>
-<td>Complete</td>
-<td>Split <code>Network</code> into a queue-enqueuing facade and a single-mutator worker so local daemons can no longer bypass <code>net-worker</code>'s serialisation</td>
-</tr>
-<tr>
-<td><a href="PLAN-queue-performance/">Queue performance and coalescing</a></td>
-<td>Steps 1-6</td>
-<td>In Progress</td>
-<td>Unified batched dequeue, coalescible-task metadata, worker- and enqueue-side dedup of redundant cluster operations. Step 7 (measure with CI data, decide on fairness) outstanding.</td>
-</tr>
-<tr>
-<td><a href="PLAN-recurring-operations/">Recurring cluster operations</a></td>
-<td>Master plan</td>
-<td>Stub</td>
-<td>Cron-like framework for recurring cluster operations; absorbs the cluster and cleaner <code>scheduled_tasks.py</code> and <code>daemons/network/maintain.py</code>; adds user-facing recurring tasks (e.g. snapshot every 24 hours)</td>
-</tr>
-<tr>
-<td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 0: Research and decisions</td>
-<td>Complete</td>
-<td>Routing principle (LB probes only sf-api) collapsed OQ1/2/4/9; decided readiness cache, drain-grace/timeout reconciliation, WATCHDOG liveness + lock proof-of-life, auth, daemon classification</td>
-</tr>
-<tr>
-<td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 1: sf-api endpoints and drain</td>
-<td>Complete</td>
-<td><code>/livez</code>, <code>/readyz</code>, <code>/healthz</code> on sf-api; per-worker readiness checker; SIGTERM-driven drain (<code>API_DRAIN_GRACE</code>, reconciled timeouts)</td>
-</tr>
-<tr>
-<td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 2: gRPC health on sf-database</td>
-<td>Complete</td>
-<td><code>grpc.health.v1.Health</code> <code>Check</code> now tracks live MariaDB reachability via the daemon's ~10s loop; schema currency stays a startup refuse-to-start precondition; no Watch, no client <code>healthCheckConfig</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 3: WATCHDOG liveness wiring</td>
-<td>Complete</td>
-<td>Wired systemd <code>WATCHDOG</code> into the eight non-trivial daemons (<code>WatchdogSec=60s</code>, pet in <code>idle()</code> + cluster/cleaner heavy iterators); closes lock proof-of-life via watchdog-kill → lease-expiry failover</td>
-</tr>
-<tr>
-<td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 4: Operator documentation</td>
-<td>Complete</td>
-<td><code>load_balancing.md</code> HAProxy/nginx-FOSS/ALB probe configs; rolling-upgrade-with-drain in <code>upgrades.md</code>; live <code>ci_drain_check.sh</code> (in the actions repo) wired into functional-tests</td>
-</tr>
-<tr>
-<td><a href="PLAN-node-resource-health/">Node resource health</a></td>
-<td>Phases 1-4: Checks, evaluator, cascade, docs</td>
-<td>Complete</td>
-<td>Timeout-guarded path check; sf-resources marks a dead-storage node <code>error</code> (stops scheduling, discounts blob replicas) and exposes a <code>node_resource_health</code> gauge; cluster-daemon cascade errors instances + re-replicates blobs; <code>sf-ctl clear-node-error</code> recovery and operator docs. Decisions ratified inline (no separate phase-0 doc).</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 1: Remove monitoring</td>
-<td>Complete</td>
-<td>Realised by <a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a> phase 5 (Grafana and the primary-node Prometheus server already removed as warmup)</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 2: ~~Bootstrap CLI~~</td>
-<td>Dissolved</td>
-<td>Reassessed to nothing — config stays in the idempotent role, <code>AUTH_SECRET_SEED</code> caller-supplied, <code>system</code> namespace via the existing <code>bootstrap-system-key</code>; no <code>bootstrap_operations</code> table or <code>bootstrap-cluster</code> command. The role-config remainder folds into phase 6</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 3: Remove LB</td>
-<td>Complete</td>
-<td>Realised by <a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phases 4-5: <em>(moved to BYO MariaDB)</em></td>
-<td><em>(moved)</em></td>
-<td>MariaDB BYO and <code>sf-database</code>-as-tier lifted into <a href="PLAN-byo-mariadb/">PLAN-byo-mariadb.md</a></td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td><a href="PLAN-remove-primary-phase-06-galaxy-role/">Phase 6: Galaxy collection</a></td>
-<td>Complete</td>
-<td>Deployer repackaged as the <code>shakenfist.shakenfist</code> collection (parameterised <code>node</code> role + component roles, native ansible modules under <code>plugins/modules/</code>, <code>release.yml</code> galaxy publish jobs); the reusable <code>smoke-cluster.yml</code> + <code>tools/</code> on <code>shakenfist/actions</code> drive all CI topologies; the getsf/topology installer chain and legacy roles are deleted</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td><a href="PLAN-remove-primary-phase-07-rename-cleanup/">Phase 7: Rename and cleanup</a></td>
-<td>Complete</td>
-<td><code>etcd_master</code> → <code>database_node</code> rename landed with one-release fallbacks (legacy inventory group union + deprecation warning, vestigial <code>is_etcd_master</code>/<code>is_eventlog_node</code> flags pinned False); the deferred-removal PR is scheduled for the release after v0.8.0 ships</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td><a href="PLAN-remove-primary-phase-08-shared-ci/">Phase 8: Roll out shared smoke-cluster CI</a></td>
-<td>Complete</td>
-<td><code>build-smoke-cluster</code> composite action extracted; <code>client-python</code> adopted the reusable workflow (replacing its broken getsf-era CI); kerbside-mode recipe documented in the actions README; dead-topology deletion deferred while <code>v0.6</code>/<code>v0.7-releases</code> CI still consumes them</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
-<td><a href="PLAN-remove-apache-lb-phase-01-docs/">Phase 1: Document operator-provided LB</a></td>
-<td>Complete</td>
-<td>Example apache2 + nginx configs and the <code>localhost:13000</code> single-node escape hatch (realises remove-primary phase 3)</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
-<td><a href="PLAN-remove-apache-lb-phase-02-remove/">Phase 2: Remove Apache from the deployer</a></td>
-<td>Complete</td>
-<td>Delete <code>apache2.yml</code> + <code>apache-site-primary.conf</code>; repoint single-node <code>api_url</code> to <code>:13000</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-00-decisions/">Phase 0: Decisions and design</a></td>
-<td>Complete</td>
-<td>Config surface, Loki label/field-name contract, spool factoring, auth, CI Loki topology — answers recorded in the master plan's Decisions section</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-01-json-logging/">Phase 1: Default structured JSON logging</a></td>
-<td>Complete</td>
-<td><code>shakenfist-utilities==0.8.5</code> (JSON-only daemon logging, clean record, field contract, tests, draft superseded) released to PyPI and pinned in shakenfist</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-02-loki-shipper/">Phase 2: Loki shipper in shakenfist</a></td>
-<td>Complete</td>
-<td><code>logship_spool.py</code> / <code>logship_drainer.py</code> + a <code>logging.Handler</code> modelled on the eventlog spool/drainer; HTTP push, <code>LOKI_*</code> config, lifecycle wiring, metrics, <code>LOG_EVENTS_TO_LOKI</code> echo guard, mypy-covered, tests</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-03-ci-loki/">Phase 3: CI Loki</a></td>
-<td>Complete</td>
-<td><code>tools/ci-install-loki.sh</code> stands up Loki on the primary, <code>LOKI_BASE_URL</code> plumbed through getsf/deploy into <code>/etc/sf/config</code>, and <code>test_loki.py</code> asserts SF logs reach Loki end-to-end</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-04-ci-tooling/">Phase 4: Rework CI tooling</a></td>
-<td>Complete</td>
-<td>New versioned <code>shakenfist/actions</code> log-checks querying Loki (structured <code>\| json</code> LogQL) + clingwrap bundle dumping the logship spool, per-node journald, and Loki (so a shipper failure stays debuggable); system-origin checks deferred to a phase-5 per-node check</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog/">Phase 5: Remove rsyslog forwarding</a></td>
-<td>Complete</td>
-<td>Atomic cut-over: delete rsyslog configs/<code>syslog_target</code>/install, route gunicorn logs + drop <code>--log-syslog</code>, add tenant/auth plumbing, switch both CI workflows to the phase-4 Loki tooling (realises remove-primary phase 1)</td>
-</tr>
-<tr>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
-<td><a href="PLAN-remove-syslog-forwarding-phase-06-docs/">Phase 6: Documentation</a></td>
-<td>Complete</td>
-<td><code>docs/operator_guide/logging.md</code> (BYO-Loki contract), events-vs-logs convention in AGENTS, ARCHITECTURE/README/installation, nav</td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-00-retire-etcd/">Phase 0: Retire etcd machinery</a></td>
-<td>Complete</td>
-<td>Supersedes <code>PLAN-remove-etcd</code>; deleted <code>etcd.py</code>, <code>etcd3gw</code>, etcd protos, <code>DATA_MIGRATIONS</code> framework, drain tests, dead <code>sf-ctl</code> helpers and <code>show/set-etcd-config</code> aliases, stale <code>migrate-*</code> comments, <code>.claude/skills/migrate-etcd-to-mariadb.md</code> (<code>is_etcd_master</code> deferred to <code>PLAN-remove-primary</code> phase 7)</td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-01-statelessness/">Phase 1: Statelessness and scope shift</a></td>
-<td>Complete</td>
-<td>Schema-versions lock; stop sf-database calling <code>ensure_schema()</code> at startup; daemon startup-version check; MariaDB compat check (version/engine/charset) on <code>ensure-mariadb-schema</code> and sf-database; lift scope out of remove-primary</td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-02-config-untangle/">Phase 2: Config untangle</a></td>
-<td>Complete</td>
-<td>Untangle <code>MARIADB_HOST</code> from "I am the database node"; rename <code>DATABASE_NODE_IP</code> → <code>MARIADB_GATEWAY_HOSTS</code> (plural list); bind sf-database on <code>NODE_MESH_IP</code> instead of <code>DATABASE_NODE_IP</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-03-grpc-tier/">Phase 3: gRPC tier</a></td>
-<td>Complete</td>
-<td>Multi-endpoint client-side gRPC LB; minimal <code>grpc.health.v1.Health</code> on sf-database; channel factory at <code>shakenfist/util/grpc_channel.py</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-04-deploy-byo/">Phase 4: Deploy BYO</a></td>
-<td>Complete</td>
-<td><code>getsf</code> prompts for connection details; <code>roles/mariadb/</code> deleted; <code>tools/bootstrap-mariadb.sql</code> ships; <code>deploy.py</code> stops generating a password; tuning <code>.cnf</code> moves to <code>examples/</code>; <code>SHAKENFIST_MARIADB_HOST=localhost</code> escape hatch dissolved</td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-05-ci-byo/">Phase 5: CI workflow step</a></td>
-<td>Complete</td>
-<td>New tools/ci-install-mariadb.sh helper + five workflow sites in functional-tests.yml/scheduled-tests.yml install MariaDB and pass GETSF_MARIADB_* env vars to getsf-wrapper</td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-06-ci-tier/">Phase 6: CI tier coverage</a></td>
-<td>Complete</td>
-<td>Multi-instance sf-database startup; <code>MARIADB_GATEWAY_HOSTS</code> rendered as a list; bind-all drop-in; <code>ci-topology-slim-tier</code> in <code>shakenfist/actions</code>; merge-queue matrix entry; functional LB-fanout test asserting each etcd_master saw at least 5% of traffic</td>
-</tr>
-<tr>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a></td>
-<td><a href="PLAN-byo-mariadb-phase-07-docs/">Phase 7: Documentation</a></td>
-<td>Complete</td>
-<td><code>docs/operator_guide/database.md</code> restructured to lead with BYO and stripped of historical etcd content; tier-model note added to <code>ARCHITECTURE.md</code>; deleted-skill bullet dropped from <code>README.md</code>; "Bring your own MariaDB" section appended to <code>docs/release_notes/v07-v08.md</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 0: Research and decisions</td>
 <td>Not started</td>
-<td>Resolve open TLS questions into a decisions document</td>
+<td>Scheduled, but no work has begun.</td>
 </tr>
 <tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 1: Cert reload</td>
-<td>Not started</td>
-<td>Graceful TLS material reload across daemons</td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 2: sf-database mTLS</td>
-<td>Not started</td>
-<td>Canary mTLS path for the highest-traffic gRPC channel</td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 3: Other gRPC mTLS</td>
-<td>Not started</td>
-<td>Extend mTLS to the remaining inter-daemon channels</td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 4: MariaDB TLS</td>
-<td>Not started</td>
-<td>TLS on the SF-to-MariaDB connection</td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 5: sf-api TLS</td>
-<td>Not started</td>
-<td>Optional native TLS on sf-api; document operator-LB story</td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 6: Expiry monitoring</td>
-<td>Not started</td>
-<td>Cert expiry warnings as events + prometheus metrics</td>
-</tr>
-<tr>
-<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
-<td>Phase 7: Dev CA</td>
-<td>Not started</td>
-<td>Repurpose <code>pki_internal_ca</code> as dev/test convenience only</td>
-</tr>
-<tr>
-<td><a href="PLAN-sticky-transfers/">Sticky blob transfers</a></td>
-<td>Phase 0: Research and decisions</td>
-<td>Not started</td>
-<td>Resolve cookie format, LB coverage, and placement-interaction questions</td>
-</tr>
-<tr>
-<td><a href="PLAN-sticky-transfers/">Sticky blob transfers</a></td>
-<td>Phase 1: Server-side cookies</td>
-<td>Not started</td>
-<td>sf-api emits and honours server-set sticky cookies</td>
-</tr>
-<tr>
-<td><a href="PLAN-sticky-transfers/">Sticky blob transfers</a></td>
-<td>Phase 2: LB documentation</td>
-<td>Not started</td>
-<td>Document HAProxy / Envoy / cloud-LB / nginx configurations</td>
-</tr>
-<tr>
-<td><a href="PLAN-sticky-transfers/">Sticky blob transfers</a></td>
-<td>Phase 3: Client verification</td>
-<td>Not started</td>
-<td>Verify SF Python client cookie handling end-to-end</td>
-</tr>
-<tr>
-<td><a href="PLAN-sticky-transfers/">Sticky blob transfers</a></td>
-<td>Phase 4: Failover behaviour</td>
-<td>Not started</td>
-<td>Define recovery path when the sticky backend dies mid-session</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 0: Research and decisions</td>
-<td>Not started</td>
-<td>Pick <code>pyroute2.nftables</code> vs <code>python-nftables</code>, handle sysctl / arping corners, scope the privexec split, pick auth model</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 1: rtnetlink for link / addr / route / neigh</td>
-<td>Not started</td>
-<td>Port <code>ip</code> exec sites to <code>pyroute2.IPRoute</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 2: Bridge attributes via <code>IFLA_BR_*</code></td>
-<td>Not started</td>
-<td>Replace <code>brctl</code> with rtnetlink bridge link attributes</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 3: nftables rules via netlink</td>
-<td>Not started</td>
-<td>Port iptables rules to nftables in atomic transactions</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 4: Stand up <code>sf-net-privexec</code></td>
-<td>Not started</td>
-<td>New typed-API daemon holding <code>CAP_NET_ADMIN</code>, with <code>net-worker</code> as its only client</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 5: Shrink <code>sf-privexec</code></td>
-<td>Not started</td>
-<td>Drop <code>CAP_NET_ADMIN</code> and network RPCs from the existing privexec daemon</td>
-</tr>
-<tr>
-<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
-<td>Phase 6: Cleanup</td>
-<td>Not started</td>
-<td>Close out remaining <code>sf-net</code> direct-exec sites and the sysctl / arping corners</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td><a href="PLAN-scheduler-reservations-phase-00a-load-aware-ordering/">Phase 00a: Load-aware ordering and system reservations</a></td>
-<td>Implemented (awaiting sfcbr soak)</td>
-<td>Static quick wins for sfcbr: load-per-thread ordering, core-denominated OS / infra-role reservations (CPU and RAM), headroom-weighted selection, CPU topology tracking, measured overcommit default</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td><a href="PLAN-scheduler-reservations-phase-00-decisions/">Phase 0: Research and decisions</a></td>
-<td>Complete</td>
-<td>Approved 2026-07-30: guarded UPDATE on materialised counters (no reservation rows), claims cluster-wide, batch API deferred; step 3 data addendum landed 2026-08-13</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td><a href="PLAN-scheduler-reservations-phase-01-node-metrics-columns/">Phase 1: Typed capacity columns</a></td>
-<td>Complete</td>
-<td>Capacity-relevant <code>node_metrics</code> fields promoted to typed columns; merged as PR #3578, 2026-07-31</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td><a href="PLAN-scheduler-reservations-phase-02-capacity-tables/">Phase 2: Capacity tables, reconciler and migration</a></td>
-<td>Complete</td>
-<td><code>scheduler_node_capacity</code> / <code>namespace_claims</code> / <code>cluster_capacity</code> plus the elected-leader reconciler; merged as PR #3614, 2026-08-08; soaking cleanly on sfcbr</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td><a href="PLAN-scheduler-reservations-phase-03-primitive/">Phase 3: Claim primitive and placement</a></td>
-<td>Complete (merged as PR #3754, 2026-08-16; sfcbr soak still outstanding)</td>
-<td>Atomic <code>AdmitInstancePlacement</code>/<code>ReleaseInstancePlacement</code> RPCs draw down <code>scheduler_node_capacity</code> at <code>place_instance()</code>, guarded UPDATE first in the transaction for snapshot-isolation safety; pick-then-claim walk in the create path and preflight redirect; deletes the issue-3498 stopgap and the legacy <code>node_attributes.instances</code> column</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td><a href="PLAN-scheduler-reservations-phase-04-claims-api/">Phase 4: Namespace claims object and API</a></td>
-<td>Implemented (review and sfcbr soak outstanding)</td>
-<td><code>NamespaceClaim</code> as a first-class object with admin-only REST CRUD at <code>/auth/namespaces/&lt;namespace&gt;/claims</code>, backed by five guarded <code>*NamespaceClaim</code> RPCs; creation migrates the namespace's existing drawdown out of the cluster's unclaimed sums and onto the claim, deletion migrates it back; ceiling exceedances are admitted and recorded as an audit event, not refused (advisory), with the refusal itself deferred to phase 5. Client verbs are out of scope — CI installs the released client, so functional coverage drives the API directly</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td>Phase 5: Caller migration and hard ceiling</td>
-<td>Not started</td>
-<td>Migrate the three <code>Scheduler()</code> call sites; remove legacy in-Python capacity filtering; flip the ceiling to hard</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td>Phase 6: Affinity model rework</td>
-<td>Not started</td>
-<td>Binary soft affinity plus hard require constraints; closes the issue-3565 flake class</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td>Phase 7: Diagnostic-mode rejection logging</td>
-<td>Not started</td>
-<td>Restore per-rejection detail on failed schedules without paying the cost on every success</td>
-</tr>
-<tr>
-<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
-<td>Phase 8: Documentation</td>
-<td>Not started</td>
-<td>Operator guide for claims and capacity; developer-guide write-up of the guarded-UPDATE idiom</td>
-</tr>
-<tr>
-<td><a href="PLAN-eventlog-direct-mariadb/">Remove the eventlog service</a></td>
-<td><a href="PLAN-eventlog-direct-mariadb-phase-01-schema/">Phase 1: Schema, accessors, RPC, row-count gauge</a></td>
-<td>Complete</td>
-<td><code>events</code> / <code>event_objects</code> tables, <code>RecordEventBatch</code> on sf-database, <code>database_events_rows</code> gauge</td>
-</tr>
-<tr>
-<td><a href="PLAN-eventlog-direct-mariadb/">Remove the eventlog service</a></td>
-<td><a href="PLAN-eventlog-direct-mariadb-phase-02-write/">Phase 2: Write cut-over and metrics</a></td>
-<td>Complete</td>
-<td>Swap drainer's gRPC target to sf-database; promote <code>event_uuid</code> / <code>request_id</code>; wire spool-depth, drop, insert metrics</td>
-</tr>
-<tr>
-<td><a href="PLAN-eventlog-direct-mariadb/">Remove the eventlog service</a></td>
-<td><a href="PLAN-eventlog-direct-mariadb-phase-03-prune/">Phase 3: Prune in cluster daemon</a></td>
-<td>Complete</td>
-<td>Move per-event-type prune sweep into the cluster maintainer with multi-object semantics</td>
-</tr>
-<tr>
-<td><a href="PLAN-eventlog-direct-mariadb/">Remove the eventlog service</a></td>
-<td><a href="PLAN-eventlog-direct-mariadb-phase-04-read/">Phase 4: REST API direct-read</a></td>
-<td>Complete</td>
-<td>Event-list endpoints call <code>GetObjectEvents</code> on sf-database; no sqlite locality</td>
-</tr>
-<tr>
-<td><a href="PLAN-eventlog-direct-mariadb/">Remove the eventlog service</a></td>
-<td><a href="PLAN-eventlog-direct-mariadb-phase-05-remove/">Phase 5: Delete the daemon</a></td>
-<td>Complete</td>
-<td>Remove <code>sf-eventlog</code>, gRPC protos, systemd unit, config, <code>event_dlq</code>, and on-disk sqlite chunks</td>
-</tr>
-<tr>
-<td><a href="PLAN-eventlog-direct-mariadb/">Remove the eventlog service</a></td>
-<td><a href="PLAN-eventlog-direct-mariadb-phase-06-docs/">Phase 6: Documentation</a></td>
-<td>Complete</td>
-<td>Operator guide for new eventlog, history-loss called out in release notes, ARCHITECTURE/README/AGENTS</td>
-</tr>
-<tr>
-<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
-<td>Phase 0: Decisions</td>
-<td>Not started</td>
-<td>Streaming vs keyset pagination vs bounded-by-construction, per RPC class; caller taxonomy; bound policy</td>
-</tr>
-<tr>
-<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
-<td>Phase 1: Audit and measure</td>
-<td>Not started</td>
-<td>Classify every <code>repeated</code> reply field and its callers; add a server-side reply-size histogram</td>
-</tr>
-<tr>
-<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
-<td>Phase 2: Bounded by construction</td>
-<td>Not started</td>
-<td>Sweep callers ask for "next N, oldest first" with an explicit more-available signal</td>
-</tr>
-<tr>
-<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
-<td>Phase 3: General mechanism</td>
-<td>Not started</td>
-<td><code>GetObjectEvents</code>, <code>GetObjectsByState</code> and the <code>Get*Uuids</code> family</td>
-</tr>
-<tr>
-<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
-<td>Phase 4: Enforcement</td>
-<td>Not started</td>
-<td>CI fails when a new unbounded <code>repeated</code> reply field appears unregistered</td>
-</tr>
-<tr>
-<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
-<td>Phase 5: Close-out</td>
-<td>Not started</td>
-<td>Lower the client message cap, retire the stopgaps, document the contract</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 0: Research and decisions</td>
-<td>Not started</td>
-<td>Pick allocation strategy, per-pool policy shape, leased-vs-permanent semantics, migration plan</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 1: Schema and primitive</td>
-<td>Not started</td>
-<td><code>resource_pool_allocations</code> table and conditional-INSERT allocator</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 2: Port VXLAN allocator</td>
-<td>Not started</td>
-<td>First migration; sets the template</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 3: Port console / VDI ports</td>
-<td>Not started</td>
-<td>Drop the local <code>socket.bind()</code> race-check</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 4: Port vsock CID allocator</td>
-<td>Not started</td>
-<td>Drop the global cluster lock</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 5: Port MAC allocator</td>
-<td>Not started</td>
-<td>Fix today's probabilistic-only correctness</td>
-</tr>
-<tr>
-<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
-<td>Phase 6: Documentation</td>
-<td>Not started</td>
-<td>Audit-log surface and developer docs</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 0: Research and decisions</td>
-<td>Not started</td>
-<td>Pick port range, TLS-on-shared-IP, token model, two-stage cleanup ordering, carrier-coupling contract</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 1: Pool registration</td>
-<td>Not started</td>
-<td>Register service-port pool with the generic allocator</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 2: API and token issuance</td>
-<td>Not started</td>
-<td><code>allocate_service_port</code> / <code>release_service_port</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 3: Carrier-side DNAT</td>
-<td>Not started</td>
-<td>Network daemon programs DNAT rules per allocation</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 4: Reaper and reconciler</td>
-<td>Not started</td>
-<td>Drift detection and repair across DB and iptables state</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 5: Validation surface</td>
-<td>Not started</td>
-<td>Smoke-test caller or first real caller</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
-<td>Phase 6: Documentation</td>
-<td>Not started</td>
-<td>Operator and developer docs including threat-surface change</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 0: Research and decisions</td>
-<td>Not started</td>
-<td>Resolve pool config, lease TTL, advertisement modes, DHCP state, VLAN-trunk forward compatibility</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 1: Carrier pool config</td>
-<td>Not started</td>
-<td>Eligible-carrier set and node-capability declaration</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 2: Per-network carrier lease</td>
-<td>Not started</td>
-<td>Lease primitive backed by <code>cluster_locks</code> and the generic allocator</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 3: Renderer process</td>
-<td>Not started</td>
-<td>Carrier-side process that materialises leased state to kernel</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 4: SNAT and floating IP</td>
-<td>Not started</td>
-<td>Render SNAT and egress IP via the carrier</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 5: Service ports via renderer</td>
-<td>Not started</td>
-<td>Carrier-side hookup for <code>PLAN-network-service-ports</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 6: DHCP persistence</td>
-<td>Not started</td>
-<td>DHCP leases survive carrier change</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 7: DNS via renderer</td>
-<td>Not started</td>
-<td>DNS records rendered from data</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 8: BGP advertisement</td>
-<td>Not started</td>
-<td>Embedded or operator-external BGP speaker</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 9: L2 / GARP advertisement</td>
-<td>Not started</td>
-<td>Alternative for non-routed deployments</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 10: Migration</td>
-<td>Not started</td>
-<td>Cutover from singleton network node to smeared carriers</td>
-</tr>
-<tr>
-<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
-<td>Phase 11: Operator documentation</td>
-<td>Not started</td>
-<td>VIP failover modes and pool sizing</td>
-</tr>
-<tr>
-<td><a href="PLAN-oidc-authentication/">OIDC authentication</a></td>
-<td>Master plan</td>
-<td>Not started</td>
-<td>Human login with a corporate identity, on top of the federation infrastructure phases 1 to 4 of the auth federation plan built. What remains is OIDC discovery, interactive CLI flows in <code>client-python</code>, claim-driven multi-namespace authorisation, admin as a claim, worked Keycloak and Authentik examples, and functional coverage against a containerised IdP. Its phase 0 must first settle whether a human session is the IdP's own token or a credential exchanged for it</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-01-glossary/">Phase 1: Terminology and glossary</a></td>
-<td>Complete</td>
-<td>Pin authentication vocabulary and other overloaded codebase terms in a docs/ glossary</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-02-key-objects/">Phase 2: Namespace keys as first-class objects</a></td>
-<td>Complete</td>
-<td>Keys become DBOs with events, soft delete, expiry, scopes, and provenance; cleaner reaps expired keys</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-03-exchange/">Phase 3: Federated exchange and scope enforcement</a></td>
-<td>Complete</td>
-<td>Exchange an external identity token (GitHub Actions first, issuer-generic) for a scoped expiring namespace key</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-04-docs/">Phase 4: Authentication documentation</a></td>
-<td>Complete</td>
-<td>Update the three authentication guides for keys, scopes, and federation without depending on private CI internals. Phase 3 shipped the developer and operator guide coverage; the user guide page is three phases stale and the developer guide needs re-spining rather than appending</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-05-oidc-plan-refresh/">Phase 5: OIDC plan refresh</a></td>
-<td>Complete</td>
-<td>Rewrite the human-login OIDC stub plan against the as-built federation infrastructure. The survey found the stub's phase 2 only half superseded — JWKS handling shipped in phase 3, OIDC discovery was never built and the device-code flow needs it — and that the CLI flow phases land in <code>client-python</code>, not this repository</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-06-secret-types/">Phase 6: Secrets that cannot be logged by accident</a></td>
-<td>Complete</td>
-<td>Key material and the three secret config fields are pydantic SecretStr, so stringifying a secret renders asterisks instead. Closed two live leaks found by querying Loki for the credential rather than by review: <code>sf-queues</code> logged every config item at INFO, shipping <code>AUTH_SECRET_SEED</code> and <code>MARIADB_PASSWORD</code> off the node, and <code>BlobTransfer.external_view()</code> published the transfer authorisation token into events and log fields. Also found that <code>SecretStr</code> silently maps to LONGTEXT unless the table generator is taught otherwise, that two leak-guard tests became vacuous rather than failing when the field type changed, and that comparing a SecretStr against a string sentinel would have made the unconfigured-seed refusal unreachable</td>
-</tr>
-<tr>
-<td><a href="PLAN-auth-federation/">Auth federation</a></td>
-<td><a href="PLAN-auth-federation-phase-07-leak-detection/">Phase 7: Leak detection</a></td>
-<td>Complete</td>
-<td>Detect the <code>sfk_</code> credential format once it escapes: a Loki query in functional CI, a drop-in Loki alert rule for production, a gitleaks scan of git history gating the merge queue, and a unit test refusing a real credential in the tree — each carrying a positive control so it cannot pass by being broken. The survey found that <code>docs/user_guide/authentication.md</code> has a checksum-valid credential committed to it, that functional CI already has a Loki query harness, and that Debian trixie pins gitleaks to 8.16 whose config schema predates current upstream documentation. The gitleaks baseline found one real (long revoked) SSH private key in 2020 history, accepted by fingerprint, and that scanning every ref costs five minutes and misattributes <code>gh-pages</code> findings to <code>develop</code> merge commits — scoping to <code>HEAD</code> gives the same historical claim in three seconds</td>
-</tr>
-<tr>
-<td><a href="PLAN-artifact-ux-rework/">Artifact UX rework</a></td>
-<td>Master plan</td>
-<td>Stub</td>
-<td>Rework the upload/blob/artifact/label/snapshot surface to remove usability sharp edges (ambiguous name resolution, blob-UUID juggling, underpowered labels, instance-costumed snapshots); adopts #3271, #1634, #1167, #592, #877, #1386, #833, #422</td>
-</tr>
-<tr>
-<td><a href="PLAN-kerbside-vdi-tokens/">Kerbside VDI console tokens</a></td>
-<td>Master plan</td>
-<td>In Progress</td>
-<td>Cross-repo (shakenfist / client-python / kerbside / ryll): per-instance console authorisation via short-lived Ed25519-signed tokens minted by a new vdiconsoleproxy endpoint and validated offline by Kerbside; cluster signing key in <code>cluster_config</code>, pubkey published API-side, kerbside exchange endpoint mirrors the Nova token flow; pip-installable ryll so <code>sf-client instance vdiconsole</code> lands the user in a session seamlessly</td>
-</tr>
-<tr>
-<td><a href="PLAN-cluster-op-visibility/">Cluster op visibility</a></td>
-<td>Phase 1: <a href="PLAN-cluster-op-visibility-phase-01-ci-deflake/">CI await helper deflake</a></td>
-<td>Complete</td>
-<td>Rewrite CI await helpers onto the history-aware by-target ops endpoint</td>
-</tr>
-<tr>
-<td><a href="PLAN-cluster-op-visibility/">Cluster op visibility</a></td>
-<td>Phase 2: Observational flag schema</td>
-<td>Not started</td>
-<td><code>cluster_operation_targets</code> v3: mark measurement ops so they stop permuting <code>last_cluster_operation</code></td>
-</tr>
-<tr>
-<td><a href="PLAN-cluster-op-visibility/">Cluster op visibility</a></td>
-<td>Phase 3: Mark observational sites</td>
-<td>Not started</td>
-<td>Audit and classify every <code>create_and_enqueue()</code> caller</td>
-</tr>
-<tr>
-<td><a href="PLAN-cluster-op-visibility/">Cluster op visibility</a></td>
-<td>Phase 4: API surface</td>
-<td>Not started</td>
-<td><code>has_pending_operations</code> in <code>external_view()</code>; truthful <code>/operations</code> endpoints; client support</td>
-</tr>
-<tr>
-<td><a href="PLAN-cluster-op-visibility/">Cluster op visibility</a></td>
-<td>Phase 5: Coverage and docs</td>
-<td>Not started</td>
-<td>Functional coverage, helper simplification, operator/developer docs</td>
-</tr>
-<tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-01-idle-loop/">Phase 1: Stop the idle-loop polls</a></td>
-<td>Complete</td>
-<td>Remove the 5 Hz <code>get_node</code>/<code>get_node_daemon_state</code> polling from <code>Daemon.idle()</code> (~57% of measured sf-database load)</td>
-</tr>
-<tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-02-static-cache/">Phase 2: Static object value caching</a></td>
-<td>Complete</td>
-<td>Narrow client-side cache for immutable static object values; restores the objects-cacheable/attributes-not principle</td>
-</tr>
-<tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-03-client-consolidation/">Phase 3: Consolidate the gRPC client stacks</a></td>
-<td>Complete</td>
-<td>Remove the orphaned <code>database.py</code> client (dead since commit e48d3257f) so the live <code>mariadb.py</code> stack is the sole interceptor seam for attribution</td>
-</tr>
-<tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-04-attribution/">Phase 4: Caller attribution on counters</a></td>
-<td>Complete</td>
-<td>gRPC metadata caller identity + an additive <code>database_requests_total{operation, caller_daemon}</code> counter; mTLS-compatible, first slice of the OpenTelemetry thread</td>
-</tr>
-<tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-05-next-tier/">Phase 5: Next-tier reductions</a></td>
-<td>Complete</td>
-<td>Reduced <code>dequeue</code>/<code>get_ipam</code>/locks/blob-transfer idle polling from ~78/s to ~9.5/s (#3499-#3502), and made per-caller load a watched, baselined signal</td>
-</tr>
-<tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-06-residual-load/">Phase 6: Residual load and the regression</a></td>
 <td>In progress</td>
-<td>Steps 6a-6f landed (PR #3818): the ~19/s was <code>reap_expired_namespace_keys()</code> reading state per key (#3814), not the maintenance sweep, and ~12/s of the climb was the cluster growing 4 to 6 nodes rather than any regression; #3655 fixed. 6g, the 24h re-measurement on sfcbr, is outstanding</td>
+<td>Work has begun and has not finished.</td>
 </tr>
 <tr>
-<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td><a href="PLAN-database-load-reduction-phase-07-regression-detection/">Phase 7: Deployer-visible regression detection</a></td>
-<td>Not started</td>
-<td>Ship the load model, a CI check that fails on a new fixed-rate poll, drop-in Prometheus rules, <code>sf-ctl database-load</code>, and a public dashboard that is not worse than our private one</td>
+<td>Blocked</td>
+<td>Cannot proceed until something outside the plan changes.</td>
 </tr>
 <tr>
-<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
-<td><a href="PLAN-per-host-resource-reservations-phase-01-config-cpu-ram/">Phase 1: Config keys + CPU/RAM math</a></td>
 <td>Complete</td>
-<td>New <code>NODE_*</code> reservation keys; flat per-node CPU (threads) / RAM math, dropping the infra-role branch</td>
+<td>The work is done.</td>
 </tr>
 <tr>
-<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
-<td><a href="PLAN-per-host-resource-reservations-phase-02-disk-metric/">Phase 2: Disk reservation model</a></td>
-<td>Complete</td>
-<td>Per-node disk floor at the instances/blobs allocation points; publish <code>disk_reservation_gb</code> and convert <code>MINIMUM_FREE_DISK</code> consumers</td>
+<td>Abandoned</td>
+<td>Deliberately dropped without being done.</td>
 </tr>
 <tr>
-<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
-<td><a href="PLAN-per-host-resource-reservations-phase-03-ansible-templating/">Phase 3: Ansible templating</a></td>
-<td>Complete</td>
-<td>Per-host defaults templated into <code>/etc/sf/config</code>; stop <code>set-config</code>'ing reservations; inventory override</td>
-</tr>
-<tr>
-<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
-<td><a href="PLAN-per-host-resource-reservations-phase-04-docs-cleanup/">Phase 4: Docs and cleanup</a></td>
-<td>Complete</td>
-<td>Operator docs, plan index, <code>sf-ctl unset-config</code> + inert-row retirement</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td><a href="PLAN-api-input-validation-phase-00-decisions/">Phase 0: Research and decisions</a></td>
-<td>Complete</td>
-<td>Measured declaration accuracy (97% of declared names match a real kwarg); chose webargs + marshmallow, compiling the existing declarations, chain placement, error shape and the warn-only exit criterion</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td><a href="PLAN-api-input-validation-phase-01-declaration-audit/">Phase 1: Declaration audit</a></td>
-<td>Complete</td>
-<td>Correct 116 path-parameter locations from the route table, 2 invalid tokens, 5 wrong names, 20 undeclared parameters; reject unknown locations at import time; add a test that keeps declarations honest</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td><a href="PLAN-api-input-validation-phase-02-type-vocabulary/">Phase 2: Type vocabulary</a></td>
-<td>Complete</td>
-<td>Specification validated in CI (129 errors to zero): one schema-carrying body parameter per operation, <code>schemes</code>/<code>securityDefinitions</code> fixed, new type tokens and constraints rendered into the OpenAPI</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td><a href="PLAN-api-input-validation-phase-03-compile-and-warn/">Phase 3: Compile and warn</a></td>
-<td>In progress (measurement)</td>
-<td>Code landed via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers. Measurement window opened 2026-08-13: sfcbr deployed, apparatus hand-verified, functional CI covered; exits when every finding is explained, no earlier than 2026-08-20</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td>Phase 4: Enforce</td>
-<td>Not started</td>
-<td>Turn on rejection; fold the four hand-authored schemas into the compiled path</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td>Phase 5: Narrow the handlers</td>
-<td>Not started</td>
-<td>Narrow <code>except TypeError</code>; fix attribution issues #3523, #3371, #3606, #3615</td>
-</tr>
-<tr>
-<td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td>Phase 6: Required and semantics</td>
-<td>Not started</td>
-<td>Enforce <code>required</code>; semantic validators for #534, #3269, #323, #936</td>
-</tr>
-<tr>
-<td><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines</a></td>
-<td>Master plan</td>
-<td>In Progress</td>
-<td>Phase 7 also absorbs #3770 (the CI base class's own instance and agent-state awaits renew their "deadline" from any event, so they never time out). Client-propagated wall-clock deadlines (600s server default) and per-command progress timeouts for agent operations, with queue-time expiry, a node-local reaper and retry-until-deadline; converts the #3516 <code>get-file</code> wedge (a top merge-queue CI flake) from test-fatal to a retried blip</td>
-</tr>
-<tr>
-<td><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines</a></td>
-<td><a href="PLAN-agent-operation-deadlines-phase-00-decisions/">Phase 0: Research and decisions</a></td>
-<td>Complete</td>
-<td>All six questions decided: distinct <code>expired</code> state (three-repo audit: zero breaking consumers), 30s progress-timeout default (measured: worst CI transfer 625MB in 2.83s), retry cap 3, deadline applies in preflight around <code>ensure_local()</code>, reaper extends <code>reap_instance_executors()</code>, <code>execute</code> not retried (per-command retryable flag). Filed <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a> (awaits poll to full timeout on terminal failures)</td>
-</tr>
-<tr>
-<td><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines</a></td>
-<td><a href="PLAN-agent-operation-deadlines-phase-01-groundwork/">Phase 1: Groundwork</a></td>
-<td>Complete</td>
-<td>Groundwork with no behaviour change bar one. Field mask through all three layers of <code>update_agent_operation_attributes</code> plus the proto and servicer (survey: one caller, <code>add_result()</code>), per-command handler classes replacing the dispatch if/elif chain and declaring <code>reports_progress</code>/<code>retryable</code> for phases 4 and 5, and initialising the get-file transfer state so its existing "unknown file transfer" guard raises <code>GetException</code> rather than <code>AttributeError</code> (the one behaviour change). Corrections applied at source: the registry cannot own reply handlers, which are keyed on protobuf field rather than command name; and five of the phase plan's own checks were wrong in ways that would have failed on correct code</td>
-</tr>
-<tr>
-<td><a href="PLAN-agent-operation-dependencies/">Dependency-aware agent operations</a></td>
-<td>Master plan</td>
-<td>Blocked on preconditions</td>
-<td>Extends <code>depends_on</code>/<code>runs_after</code> to agent operations with cross-instance edges and per-edge settle delays, enabling fire-and-await chains ("transactions" without rollback); plus the agent operation docs overhaul and an example-application suite starting with <code>client-python-k3s</code>. Gated on the deadlines plan landing</td>
-</tr>
-<tr>
-<td>### Status Definitions</td>
-<td></td>
-<td></td>
-<td></td>
+<td>Superseded</td>
+<td>Replaced by another plan, which the plan names.</td>
 </tr>
 </tbody>
 </table>
-<ul>
-<li><strong>Stub</strong>: Framing recorded for future detailed planning; not yet ready to execute</li>
-<li><strong>Not started</strong>: Plan exists, work not yet begun</li>
-<li><strong>Planning</strong>: Design complete, implementation not yet started</li>
-<li><strong>In Progress</strong>: Currently being implemented</li>
-<li><strong>Complete</strong>: Implemented and released</li>
-<li><strong>Future</strong>: Planned but not yet designed in detail</li>
-<li><strong>Blocked on preconditions</strong>: Plan exists but explicitly waits on another plan or external event before work can begin</li>
-</ul>
+<h2 id="master-plans">Master plans<a class="headerlink" href="#master-plans" title="Permanent link">&para;</a></h2>
+<p>Most master plans track their own phases -- a phase plan and a status for each -- in their
+own Execution table, and the <code>Phases</code> column here is arithmetic over that table; follow the
+plan link for what each phase covers, and for why a plan is where it is. It counts
+<em>completed</em> phases, so a plan whose phases were abandoned or superseded rather than done can
+read <code>Complete</code> without the two numbers meeting, and <code>—</code> means the plan has no enumerated
+phases yet, or has a table which is still a placeholder rather than a phase list.</p>
+<p>Four plans are counted by hand because they do not keep a phase table:
+<a href="blob-storage-roadmap/">blob storage</a>, <a href="api-query-batching-roadmap/">API query
+batching</a> and <a href="PLAN-attribute-field-masks/">attribute field
+masks</a> carry their phases as headings, and <a href="PLAN-queue-performance/">queue
+performance</a> is numbered in steps rather than phases.
+Two more publish no arithmetic because their tables are placeholders: <a href="PLAN-qemu-futures/">owning more of the
+QEMU stack</a> names three phases and then an ellipsis, and <a href="PLAN-artifact-ux-rework/">artifact UX
+rework</a> a decisions pass and "(later phases)". These six are the
+checker's blind spot, and the only numbers here it cannot recompute.</p>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Plan</th>
+<th>Intent</th>
+<th>Status</th>
+<th>Phases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-01-08</td>
+<td><a href="blob-storage-roadmap/">Blob storage roadmap</a></td>
+<td>Composite blobs, lazy deduplication and content-defined chunking</td>
+<td>In progress</td>
+<td>1 of 3</td>
+</tr>
+<tr>
+<td>2026-01-10</td>
+<td><a href="api-query-batching-roadmap/">API query batching</a></td>
+<td>Batch and prefetch related objects so list endpoints stop issuing per-object queries</td>
+<td>Not started</td>
+<td>0 of 3</td>
+</tr>
+<tr>
+<td>2026-04-23</td>
+<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown filtering</a></td>
+<td>Push object filtering into MariaDB instead of scanning and filtering in Python</td>
+<td>Complete</td>
+<td>7 of 7</td>
+</tr>
+<tr>
+<td>2026-05-06</td>
+<td><a href="PLAN-replace-last-cluster-operation/">Replace <code>last_cluster_operation</code></a></td>
+<td>Trade the single-pointer gate for an append-only <code>cluster_operation_targets</code> history</td>
+<td>Complete</td>
+<td>5 of 5</td>
+</tr>
+<tr>
+<td>2026-05-14</td>
+<td><a href="PLAN-fix-cluster-operation-targets-unique-constraint/">Fix <code>cluster_operation_targets</code> uniqueness</a></td>
+<td>Composite UNIQUE so a multi-target operation records all of its target rows</td>
+<td>Complete</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-05-15</td>
+<td><a href="PLAN-network-facade/">Network operations facade</a></td>
+<td>Split <code>Network</code> into a queue-enqueuing facade and a single-mutator worker</td>
+<td>Complete</td>
+<td>10 of 10</td>
+</tr>
+<tr>
+<td>2026-05-16</td>
+<td><a href="PLAN-embrace-tls/">Embrace TLS</a></td>
+<td>Operator-provided PKI and TLS on every internal and external listener</td>
+<td>Not started</td>
+<td>0 of 8</td>
+</tr>
+<tr>
+<td>2026-05-16</td>
+<td><a href="PLAN-recurring-operations/">Recurring cluster operations</a></td>
+<td>A cron-like framework absorbing the scheduled-task loops, plus user-facing recurrence</td>
+<td>Proposed</td>
+<td>0 of 7</td>
+</tr>
+<tr>
+<td>2026-05-16</td>
+<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
+<td>Retire the special primary node in favour of a BYO-infrastructure deployer</td>
+<td>Complete</td>
+<td>5 of 7</td>
+</tr>
+<tr>
+<td>2026-05-16</td>
+<td><a href="PLAN-sticky-transfers/">Sticky blob transfers</a></td>
+<td>Session affinity for blob transfers, deferred until OpenTelemetry supplies upload-path numbers</td>
+<td>Not started</td>
+<td>0 of 5</td>
+</tr>
+<tr>
+<td>2026-05-17</td>
+<td><a href="PLAN-artifact-fetch-retry-with-backoff/">Retry transient artifact fetches</a></td>
+<td>A per-operation retry budget, so a network blip during a fetch no longer errors the artifact</td>
+<td>Complete</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-05-17</td>
+<td><a href="PLAN-health-checks/">Health checks, readiness and drain</a></td>
+<td><code>/livez</code>, <code>/readyz</code>, <code>/healthz</code>, gRPC health, watchdog liveness and SIGTERM drain</td>
+<td>Complete</td>
+<td>5 of 5</td>
+</tr>
+<tr>
+<td>2026-05-20</td>
+<td><a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a></td>
+<td>Native netlink calls in place of shelling out to <code>ip</code>, <code>bridge</code> and friends</td>
+<td>Not started</td>
+<td>0 of 7</td>
+</tr>
+<tr>
+<td>2026-05-22</td>
+<td><a href="PLAN-eventlog-direct-mariadb/">Eventlog direct to MariaDB</a></td>
+<td>Remove the eventlog service and write events straight to MariaDB</td>
+<td>Complete</td>
+<td>7 of 7</td>
+</tr>
+<tr>
+<td>2026-05-22</td>
+<td><a href="PLAN-generic-allocator/">Generic allocator</a></td>
+<td>Replace five ad-hoc finite-resource allocators with a single primitive</td>
+<td>Not started</td>
+<td>0 of 7</td>
+</tr>
+<tr>
+<td>2026-05-22</td>
+<td><a href="PLAN-network-carrier-model/">Network carrier model</a></td>
+<td>A lease-based per-network carrier with VIP advertisement, retiring the network-node singleton</td>
+<td>Not started</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>2026-05-22</td>
+<td><a href="PLAN-network-service-ports/">Network service ports</a></td>
+<td>Per-network DNAT'd ports for managed services</td>
+<td>Not started</td>
+<td>0 of 7</td>
+</tr>
+<tr>
+<td>2026-05-22</td>
+<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
+<td>Guarded-UPDATE capacity counters and namespace claims in place of read-then-place scheduling</td>
+<td>In progress</td>
+<td>4 of 10</td>
+</tr>
+<tr>
+<td>2026-05-24</td>
+<td><a href="PLAN-queue-performance/">Queue performance and coalescing</a></td>
+<td>Batched dequeue, and worker- and enqueue-side dedup of redundant cluster operations</td>
+<td>In progress</td>
+<td>6 of 7</td>
+</tr>
+<tr>
+<td>2026-06-01</td>
+<td><a href="PLAN-oidc-authentication/">OIDC authentication</a></td>
+<td>Federated login against an external OIDC provider</td>
+<td>Not started</td>
+<td>0 of 10</td>
+</tr>
+<tr>
+<td>2026-06-02</td>
+<td><a href="PLAN-qemu-futures/">Owning more of the QEMU stack</a></td>
+<td>Direct QMP control, and perhaps one day libvirt's job as well</td>
+<td>Not started</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-06-03</td>
+<td><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></td>
+<td>A deployer-chosen database tier reached by client-side gRPC load balancing</td>
+<td>Complete</td>
+<td>8 of 8</td>
+</tr>
+<tr>
+<td>2026-06-12</td>
+<td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
+<td>An operator-provided load balancer in place of the bundled Apache</td>
+<td>Complete</td>
+<td>2 of 2</td>
+</tr>
+<tr>
+<td>2026-06-13</td>
+<td><a href="PLAN-artifact-ux-rework/">Artifact UX rework</a></td>
+<td>Rework the artifact, blob, label, upload and snapshot user interface</td>
+<td>Proposed</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-06-19</td>
+<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding</a></td>
+<td>Structured JSON logging shipped to Loki, replacing the rsyslog wiring</td>
+<td>Complete</td>
+<td>7 of 7</td>
+</tr>
+<tr>
+<td>2026-07-13</td>
+<td><a href="PLAN-ci-node-exec-assertions/">CI node-exec assertions</a></td>
+<td>Run an assertion on a named cluster node, and the floating-IP and network lifecycle tests that use it</td>
+<td>Complete</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-07-14</td>
+<td><a href="PLAN-auth-federation/">Workload identity federation</a></td>
+<td>Federated workload identity and first-class namespace keys</td>
+<td>Complete</td>
+<td>7 of 7</td>
+</tr>
+<tr>
+<td>2026-07-17</td>
+<td><a href="PLAN-attribute-field-masks/">Attribute field masks everywhere</a></td>
+<td>Masked attribute writes, and the node instances list un-packed into <code>object_references</code></td>
+<td>Complete</td>
+<td>2 of 2</td>
+</tr>
+<tr>
+<td>2026-07-19</td>
+<td><a href="PLAN-cluster-op-visibility/">Truthful cluster operation visibility</a></td>
+<td>An observational flag, so "is anything in flight?" stops counting background housekeeping</td>
+<td>In progress</td>
+<td>2 of 6</td>
+</tr>
+<tr>
+<td>2026-07-19</td>
+<td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
+<td>Cut steady-state MariaDB load from the <code>sf-database</code> tier, and keep it cut</td>
+<td>In progress</td>
+<td>5 of 7</td>
+</tr>
+<tr>
+<td>2026-07-19</td>
+<td><a href="PLAN-kerbside-vdi-tokens/">Kerbside VDI console tokens</a></td>
+<td>Cluster-signed tokens exchanged for a VDI console session, across four repositories</td>
+<td>In progress</td>
+<td>9 of 10</td>
+</tr>
+<tr>
+<td>2026-07-19</td>
+<td><a href="PLAN-node-resource-health/">Node resource health</a></td>
+<td>Declarative dependency checks driving node state, so a dead disk stops scheduling</td>
+<td>Complete</td>
+<td>5 of 5</td>
+</tr>
+<tr>
+<td>2026-07-21</td>
+<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
+<td>Per-node RAM, CPU and disk reservation overrides</td>
+<td>Complete</td>
+<td>4 of 4</td>
+</tr>
+<tr>
+<td>2026-07-28</td>
+<td><a href="PLAN-netserv/">sf-netserv</a></td>
+<td>Replace dnsmasq with a Rust per-network service plane</td>
+<td>Proposed</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-08-03</td>
+<td><a href="PLAN-api-input-validation/">API input validation</a></td>
+<td>Declarative request validation and a consistent error contract for the REST API</td>
+<td>In progress</td>
+<td>3 of 7</td>
+</tr>
+<tr>
+<td>2026-08-14</td>
+<td><a href="PLAN-agent-operation-deadlines/">Agent operation deadlines</a></td>
+<td>Client-propagated deadlines and per-command progress timeouts for agent operations</td>
+<td>In progress</td>
+<td>2 of 8</td>
+</tr>
+<tr>
+<td>2026-08-14</td>
+<td><a href="PLAN-agent-operation-dependencies/">Dependency-aware agent operations</a></td>
+<td><code>depends_on</code> and <code>runs_after</code> for agent operations, including cross-instance edges</td>
+<td>Blocked</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-08-16</td>
+<td><a href="PLAN-grpc-bounded-replies/">Bound gRPC reply sizes</a></td>
+<td>Make <code>DatabaseService</code> replies bounded by construction rather than by the message size limit</td>
+<td>Not started</td>
+<td>0 of 6</td>
+</tr>
+</tbody>
+</table>
 
 
 

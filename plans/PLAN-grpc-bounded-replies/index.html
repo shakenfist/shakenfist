@@ -12957,15 +12957,15 @@ two contract changes as well as the bound itself.</p>
 <p>When creating this master plan from the template, the following files
 in <code>docs/plans/</code> should be updated:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table for this master
-  plan and each of its phase plans.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for this master plan so it appears in
-  the documentation navigation. Phase files are <em>not</em> added to
+<li><strong><code>index.md</code></strong> — add one row to the <em>Master plans</em> table for this
+  master plan. Phases are tracked in the Execution table above.</li>
+<li><strong><code>order.yml</code></strong> — add an entry for this master plan, in the intended
+  reading order. Phase files are <em>not</em> added to
   <code>order.yml</code>.</li>
 </ul>
-<p>The site navigation in <code>mkdocs.yml</code> is produced from <code>mkdocs.yml.tmpl</code>
-by the docs-sync workflow, which consumes <code>order.yml</code>. No manual
-<code>mkdocs.yml</code> edits are needed.</p>
+<p><code>order.yml</code> does not by itself reach this repository's site navigation:
+<code>mkdocs.yml.tmpl</code> lists the Plans nav by hand. The entry is registration
+and reading order.</p>
 <p>When all phases are complete, update the status column in
 <code>docs/plans/index.md</code>.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>

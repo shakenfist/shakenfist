@@ -12527,7 +12527,7 @@ care.</p>
 <tr>
 <td>2. ~~<code>bootstrap_operations</code> table and idempotent <code>sf-ctl bootstrap-cluster</code>~~</td>
 <td><em>(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)</em></td>
-<td>Dissolved</td>
+<td>Abandoned</td>
 </tr>
 <tr>
 <td>3. Remove Apache reverse proxy from deployer</td>
@@ -12537,7 +12537,7 @@ care.</p>
 <tr>
 <td>4-5. <em>(MariaDB BYO and sf-database tier — moved to <a href="../PLAN-byo-mariadb/">PLAN-byo-mariadb.md</a>)</em></td>
 <td><em>(separate plan)</em></td>
-<td><em>(see byo-mariadb)</em></td>
+<td>Superseded</td>
 </tr>
 <tr>
 <td>6. Repackage deployer as the <code>shakenfist.shakenfist</code> galaxy collection; delete the getsf installer chain; example consumers</td>
@@ -13051,11 +13051,11 @@ development that we fixed.</p>
 <p>When creating a new master plan from this template, update
 the following files in <code>docs/plans/</code>:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table
-  with a link to the plan, its phase breakdown, initial
-  status, and a one-line description.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for the new master plan so
-  it appears in the documentation navigation in the
+<li><strong><code>index.md</code></strong> — add one row to the <em>Master plans</em> table
+  with a link to the plan, its initial status, its phase
+  arithmetic, and a one-line intent.</li>
+<li><strong><code>order.yml</code></strong> — add an entry for the new master plan,
+  in the
   intended order.</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>

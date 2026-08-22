@@ -12431,16 +12431,19 @@ phases leave CI green.</p>
 <tbody>
 <tr>
 <td>1. Document operator-provided load balancing (example apache2 + nginx configs, single-node escape hatch)</td>
-<td>PLAN-remove-apache-lb-phase-01-docs.md</td>
+<td><a href="../PLAN-remove-apache-lb-phase-01-docs/">PLAN-remove-apache-lb-phase-01-docs.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. Remove Apache from the deployer; repoint single-node <code>api_url</code> to <code>:13000</code></td>
-<td>PLAN-remove-apache-lb-phase-02-remove.md</td>
-<td>Complete (pending CI confirmation)</td>
+<td><a href="../PLAN-remove-apache-lb-phase-02-remove/">PLAN-remove-apache-lb-phase-02-remove.md</a></td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
+<p>Phase 2 carried a "pending CI confirmation" caveat while it was in
+flight. It has since merged to <code>develop</code>, which the merge queue gates
+on CI, so the caveat is spent rather than dropped.</p>
 <p>Phase notes:</p>
 <ul>
 <li><strong>Phase 1 (medium effort, docs-first).</strong> Add a load
@@ -12640,18 +12643,18 @@ development that we fixed.</p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>This plan has been registered in <code>docs/plans/</code>:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — a row added to the <em>Plan Status</em> table
-  linking this plan, its phases, status, and one-line
-  description.</li>
+<li><strong><code>index.md</code></strong> — a row added to the <em>Master plans</em> table
+  linking this plan, its status, phase arithmetic and
+  one-line intent.</li>
 <li><strong><code>order.yml</code></strong> — an entry added next to
   <code>PLAN-remove-primary.md</code> so it appears in the documentation
   navigation. Phase files are <em>not</em> added to <code>order.yml</code>;
-  they are linked from this plan's Execution table and from
-  <code>index.md</code> only.</li>
+  they are linked from this plan's Execution table only, which
+  makes that table the only path to them.</li>
 </ul>
-<p>The site navigation in <code>mkdocs.yml</code> is produced from
-<code>mkdocs.yml.tmpl</code> by the docs-sync workflow, which consumes
-<code>order.yml</code>; it does not need hand-editing.</p>
+<p><code>order.yml</code> does not by itself reach this repository's site
+navigation: <code>mkdocs.yml.tmpl</code> lists the Plans nav by hand.
+The entry is registration and reading order.</p>
 <p>When all phases are complete, update the status column in
 <code>docs/plans/index.md</code>.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>

@@ -12019,6 +12019,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#phase-status-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase status notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#phase-scope-stubs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12536,33 +12547,33 @@ table entirely (decision D8).</p>
 <tbody>
 <tr>
 <td>00a. Load-aware ordering and system reservations (static quick wins)</td>
-<td>PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md</td>
-<td>Implemented (awaiting sfcbr soak)</td>
+<td><a href="../PLAN-scheduler-reservations-phase-00a-load-aware-ordering/">PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md</a></td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>0. Research and decisions document</td>
-<td>PLAN-scheduler-reservations-phase-00-decisions.md</td>
-<td>Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3)</td>
+<td><a href="../PLAN-scheduler-reservations-phase-00-decisions/">PLAN-scheduler-reservations-phase-00-decisions.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>1. Promote node capacity fields to typed columns</td>
-<td>PLAN-scheduler-reservations-phase-01-node-metrics-columns.md</td>
-<td>Complete — merged as PR #3578, 2026-07-31</td>
+<td><a href="../PLAN-scheduler-reservations-phase-01-node-metrics-columns/">PLAN-scheduler-reservations-phase-01-node-metrics-columns.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Capacity tables, reconciler and migration</td>
-<td>PLAN-scheduler-reservations-phase-02-capacity-tables.md</td>
-<td>Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift)</td>
+<td><a href="../PLAN-scheduler-reservations-phase-02-capacity-tables/">PLAN-scheduler-reservations-phase-02-capacity-tables.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. Claim primitive and placement integration</td>
-<td>PLAN-scheduler-reservations-phase-03-primitive.md</td>
-<td>Complete — merged as PR #3754, 2026-08-16. The step 9 sfcbr soak has not been run yet. <strong>Carries an outstanding defect in its D13 demand clause, issue #3813 — see Future work</strong></td>
+<td><a href="../PLAN-scheduler-reservations-phase-03-primitive/">PLAN-scheduler-reservations-phase-03-primitive.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4. Namespace claims object and API</td>
-<td>PLAN-scheduler-reservations-phase-04-claims-api.md</td>
-<td>Implemented — steps 1-8 landed; management review, operator review and the sfcbr soak still outstanding. <code>NamespaceClaim</code> is a first-class object with admin-only REST CRUD at <code>/auth/namespaces/&lt;namespace&gt;/claims</code>; creation migrates the namespace's existing drawdown out of the cluster's unclaimed sums and onto the claim. Ceilings are <strong>advisory</strong> this release: an exceedance is admitted and recorded as an audit event, and phase 5 flips <code>CLAIM_ENFORCEMENT_HARD</code>. Client verbs moved out of scope (D7 in the phase plan)</td>
+<td><a href="../PLAN-scheduler-reservations-phase-04-claims-api/">PLAN-scheduler-reservations-phase-04-claims-api.md</a></td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>5. Caller migration and hard ceiling</td>
@@ -12586,6 +12597,33 @@ table entirely (decision D8).</p>
 </tr>
 </tbody>
 </table>
+<h3 id="phase-status-notes">Phase status notes<a class="headerlink" href="#phase-status-notes" title="Permanent link">&para;</a></h3>
+<p>Where a phase's status does not tell the whole story, the rest of it
+is here.</p>
+<ul>
+<li><strong>Phase 00a</strong> is implemented but has not yet soaked on sfcbr, which
+  is what its status turns on.</li>
+<li><strong>Phase 0</strong>'s decisions were approved on 2026-07-30, and the step 3
+  data addendum landed on 2026-08-13: D4 unchanged, D14 upgraded to
+  required, D18's sizing key sharpened, and the disk-overcommit
+  constant flagged for phase 3.</li>
+<li><strong>Phase 1</strong> merged as PR #3578 on 2026-07-31.</li>
+<li><strong>Phase 2</strong> merged as PR #3614 on 2026-08-08. Its reconciler has
+  been soaking cleanly on sfcbr since, on 5-minute passes with no
+  drift.</li>
+<li><strong>Phase 3</strong> merged as PR #3754 on 2026-08-16, but its step 9 sfcbr
+  soak has not been run, and it carries an outstanding defect in its
+  D13 demand clause — issue #3813, see Future work.</li>
+<li><strong>Phase 4</strong>'s steps 1-8 have landed; management review, operator
+  review and the sfcbr soak are all still outstanding. <code>NamespaceClaim</code>
+  is a first-class object with admin-only REST CRUD at
+  <code>/auth/namespaces/&lt;namespace&gt;/claims</code>, and creation migrates the
+  namespace's existing drawdown out of the cluster's unclaimed sums and
+  onto the claim. Ceilings are <strong>advisory</strong> this release: an exceedance
+  is admitted and recorded as an audit event, and phase 5 flips
+  <code>CLAIM_ENFORCEMENT_HARD</code>. Client verbs moved out of scope (D7 in the
+  phase plan).</li>
+</ul>
 <h3 id="phase-scope-stubs">Phase scope stubs<a class="headerlink" href="#phase-scope-stubs" title="Permanent link">&para;</a></h3>
 <p>Each stub is the seed for that phase's plan file; decisions
 referenced as D-numbers are in the phase 0 decisions document.</p>
@@ -13010,7 +13048,7 @@ development that we fixed.</p>
 <p>When creating a new master plan from this template, update the
 following files in <code>docs/plans/</code>:</p>
 <ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table.</li>
+<li><strong><code>index.md</code></strong> — add one row to the <em>Master plans</em> table.</li>
 <li><strong><code>order.yml</code></strong> — add an entry for the new master plan.</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>

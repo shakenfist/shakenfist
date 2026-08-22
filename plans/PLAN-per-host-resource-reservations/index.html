@@ -12385,22 +12385,22 @@ plan file.</p>
 <tbody>
 <tr>
 <td>1. Config keys + CPU/RAM reservation math</td>
-<td>PLAN-per-host-resource-reservations-phase-01-config-cpu-ram.md</td>
+<td><a href="../PLAN-per-host-resource-reservations-phase-01-config-cpu-ram/">PLAN-per-host-resource-reservations-phase-01-config-cpu-ram.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>2. Disk reservation model (metric + consumers)</td>
-<td>PLAN-per-host-resource-reservations-phase-02-disk-metric.md</td>
+<td><a href="../PLAN-per-host-resource-reservations-phase-02-disk-metric/">PLAN-per-host-resource-reservations-phase-02-disk-metric.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>3. Ansible templating and default computation</td>
-<td>PLAN-per-host-resource-reservations-phase-03-ansible-templating.md</td>
+<td><a href="../PLAN-per-host-resource-reservations-phase-03-ansible-templating/">PLAN-per-host-resource-reservations-phase-03-ansible-templating.md</a></td>
 <td>Complete</td>
 </tr>
 <tr>
 <td>4. Docs, plan index, and cleanup</td>
-<td>PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md</td>
+<td><a href="../PLAN-per-host-resource-reservations-phase-04-docs-cleanup/">PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md</a></td>
 <td>Complete</td>
 </tr>
 </tbody>
@@ -12483,9 +12483,9 @@ Use <code>isolation: "worktree"</code> for risky steps.</p>
 <p><em>(Scan the shakenfist GitHub issue tracker for other open issues touching
 reservations, scheduling headroom, or <code>MINIMUM_FREE_DISK</code>.)</em></p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<p>On creation of this master plan, <code>docs/plans/index.md</code> gains a Plan Status row
-group and <code>docs/plans/order.yml</code> gains a master-plan entry (phase files are not
-listed in <code>order.yml</code>). Update the status column as phases complete.</p>
+<p>On creation of this master plan, <code>docs/plans/index.md</code> gains one <em>Master plans</em>
+row and <code>docs/plans/order.yml</code> gains a master-plan entry (phase files are listed
+in neither). Update the status column as phases complete.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step, the implementing agent must back-brief the operator
 on its understanding of the plan and how the intended work aligns with it.</p>

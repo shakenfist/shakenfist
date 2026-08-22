@@ -11360,6 +11360,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#plan-status-checking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan Status Checking
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -12125,6 +12136,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#plan-status-checking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan Status Checking
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -12178,6 +12200,42 @@ at all, so nothing else looks at their links.</p>
 <p><code>docs/plans/</code> and <code>docs/components/</code> are excluded as link <em>sources</em>: plans are
 point-in-time records which are not maintained after they land, and components
 are synchronised in from the sibling repositories. Both remain valid targets.</p>
+<h2 id="plan-status-checking">Plan Status Checking<a class="headerlink" href="#plan-status-checking" title="Permanent link">&para;</a></h2>
+<p><code>tools/check-plan-status.py</code> covers <code>docs/plans/</code> and the plan template, which
+the link checker deliberately does not read. It recomputes what
+<code>docs/plans/index.md</code> publishes about each master plan from the plan itself:</p>
+<ul>
+<li><strong>Statuses</strong> come from the <code>plan-status-vocabulary</code> shared block in
+  <code>PLAN-TEMPLATE.md</code> rather than a constant here, so a term renamed upstream
+  cannot leave the checker rejecting a status the template tells authors to
+  write. Every status cell in a master plan's Execution table, and every
+  status in the index, must be one of those terms and nothing else.</li>
+<li><strong>The <code>Phases</code> column</strong> is arithmetic over the plan's own Execution table,
+  recomputed rather than trusted. The index status and that table also have
+  to agree: a plan cannot be <code>Complete</code> with an unfinished phase, or
+  <code>Proposed</code>/<code>Not started</code> with every phase resolved.</li>
+<li><strong>Registration</strong> — every master plan appears in both <code>index.md</code> and
+  <code>order.yml</code>, and neither names a plan which is not there or lists one
+  twice.</li>
+<li><strong>Reachability</strong> — every plan-to-plan link resolves, and every phase plan
+  has an inbound link. This one matters because phase plans are deliberately
+  absent from <code>order.yml</code> and the index lists master plans only, which leaves
+  the master plan's Execution table as the only route to a phase document. A
+  phase filename written as bare text rather than a link is a page nothing
+  leads to; thirty-eight of ninety-two were in that state before the check
+  existed. It checks that a link exists, not that the linking document is
+  itself reachable, so a phase plan linked only from an orphaned phase plan
+  passes.</li>
+</ul>
+<p>Example tables and links in prose do not count: fenced code blocks are
+skipped, and a table row must begin in column zero, which is what separates a
+plan's own table from the indented one in the <code>plan-file-conventions</code> shared
+block.</p>
+<p>Like the link checker, it runs as a pre-commit hook and as
+<code>shakenfist/tests/test_plan_status.py</code> in CI. The unit test job skips
+docs-only changes, so <code>functional-tests.yml</code> carries a <code>plans</code> paths filter
+alongside <code>code</code> — without it the guard would skip on precisely the changes
+it polices.</p>
 
 
 

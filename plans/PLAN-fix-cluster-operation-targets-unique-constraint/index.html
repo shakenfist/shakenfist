@@ -12162,7 +12162,10 @@
 
 <h1 id="plan-fix-cluster_operation_targets-unique-constraint">PLAN: Fix cluster_operation_targets UNIQUE constraint<a class="headerlink" href="#plan-fix-cluster_operation_targets-unique-constraint" title="Permanent link">&para;</a></h1>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>Proposed. Root cause confirmed from CI artifact bundle for run
+<p>Complete.</p>
+<p>The composite constraint is in the tree, in the
+<code>cluster_operation_targets</code> table definition and its migration.
+The root cause was confirmed from the CI artifact bundle for run
 <code>25727839217</code> (Guests job, 2026-05-12), with the diagnostic
 instrumentation added in commit <code>5d0bf73c</code>. See "Evidence" below.</p>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
