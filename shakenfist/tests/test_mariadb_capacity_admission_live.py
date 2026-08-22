@@ -53,6 +53,7 @@ import sqlalchemy as sa
 from testtools import content
 
 from shakenfist.constants import GiB
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
@@ -89,7 +90,7 @@ SOAK_INSTANCES = 12
 
 # SCHEDULER_DEMAND_PER_VCPU's default, so the accumulated feedforward
 # term can be asserted as admitted vCPUs x this constant.
-DEMAND_PER_VCPU = 2.5
+DEMAND_PER_VCPU = 0.6
 
 
 class _LiveCapacityFixture(base.ShakenFistTestCase):
@@ -415,11 +416,13 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
 
     def test_the_demand_clause_refuses_on_measured_load(self):
         # cpu_schedulable 64 x target load 0.75 = 48. Publish a load
-        # that leaves less headroom than the placement's demand.
+        # already past that budget: since phase 4a the clause tests the
+        # node's existing state, so what refuses is the node being over
+        # target, not the size of the placement asking.
         metrics_t = mariadb._get_node_metrics_table()
         with self.engine.connect() as conn:
             conn.execute(sa.update(metrics_t).where(
-                metrics_t.c.node_uuid == self.node_b).values(cpu_load_1=45.0))
+                metrics_t.c.node_uuid == self.node_b).values(cpu_load_1=50.0))
             conn.commit()
 
         result = self._admit(self.node_b, demand_add=10.0)
@@ -427,11 +430,69 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual('node', result['failing_stage'])
         detail = {d['dimension']: d for d in result['dimensions']}
         self.assertEqual(48.0, detail['demand']['limit'])
-        self.assertEqual(45.0, detail['demand']['used'])
+        self.assertEqual(50.0, detail['demand']['used'])
         self.assertTrue(detail['demand']['exceeded'])
         # No allocation dimension is at fault, which is exactly the case
-        # a bare "denied" reply could not explain.
+        # a bare "denied" reply could not explain -- and it is what
+        # makes the denial waivable by the P9 re-walk.
         self.assertFalse(detail['cpus']['exceeded'])
+        self.assertTrue(exceptions.CapacityAdmissionDenied(
+            result['failing_stage'], result['dimensions']).demand_only)
+
+    def test_the_demand_clause_admits_the_smallest_node(self):
+        # Issue #3813, at the smallest node this project supports. One
+        # schedulable thread gives a budget of 0.75, and the old clause
+        # charged the placement against it, so an idle single-thread
+        # node refused an 8-vCPU instance -- and every other instance
+        # size too. Now only the node's own state is compared, so an
+        # idle node admits whatever it has allocation room for.
+        metrics_t = mariadb._get_node_metrics_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(metrics_t).where(
+                metrics_t.c.node_uuid == self.node_b).values(
+                    cpu_schedulable=1, cpu_load_1=0.0))
+            conn.commit()
+
+        result = self._admit(self.node_b, cpus=8, memory_mb=8192,
+                             disk_gb=80, demand_add=8 * DEMAND_PER_VCPU)
+        self.assertTrue(result['admitted'], result['error'])
+        # And the charge still landed, so the next create spreads.
+        self.assertEqual(8 * DEMAND_PER_VCPU,
+                         self._capacity(self.node_b).expected_demand)
+
+    def test_the_demand_clause_is_satisfiable_at_every_size(self):
+        # The property #3813 violated, swept rather than sampled: for
+        # every node size and every instance size, an idle node admits.
+        # Evaluated as SQL against the real server, because the clause
+        # is SQL and the arithmetic that broke was the server's.
+        metrics_t = mariadb._get_node_metrics_table()
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        refused = []
+
+        for schedulable in range(1, 17):
+            with self.engine.connect() as conn:
+                conn.execute(sa.update(metrics_t).where(
+                    metrics_t.c.node_uuid == self.node_b).values(
+                        cpu_schedulable=schedulable, cpu_load_1=0.0))
+                conn.execute(sa.update(capacity_t).where(
+                    capacity_t.c.node_uuid == self.node_b).values(
+                        expected_demand=0.0))
+                conn.commit()
+
+            for cpus in (1, 2, 4, 8, 16):
+                clause = mariadb._demand_guard_clause(
+                    self.node_b, cpus * DEMAND_PER_VCPU, TARGET_LOAD)
+                with self.engine.connect() as conn:
+                    admits = conn.execute(
+                        sa.select(clause).select_from(capacity_t).where(
+                            capacity_t.c.node_uuid == self.node_b)).scalar()
+                if not admits:
+                    refused.append((schedulable, cpus))
+
+        self.assertEqual(
+            [], refused,
+            'idle nodes refused, as (cpu_schedulable, instance vCPUs): '
+            f'{refused}')
 
     def test_the_demand_clause_passes_on_null_metrics(self):
         # A node whose resources daemon has not published typed columns
@@ -893,7 +954,10 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
     def test_admit_release_cycling_returns_to_the_seeded_counters(self):
         # The reconciler recomputes from ground truth, so admission and
         # release have to agree with each other in between passes.
-        for round_number in range(4):
+        # node_a's budget is 0.75 x 64 schedulable threads = 48, and it
+        # carries a measured load of 0.5, so five rounds of demand_add
+        # 10.0 accumulate 50.0 and take it past target.
+        for round_number in range(5):
             admitted = self._admit(self.node_a)
             self.assertTrue(admitted['admitted'],
                             f'round {round_number}: {admitted["error"]}')
@@ -908,13 +972,14 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(80, cluster.unclaimed_used_disk_gb)
         # expected_demand only ever accumulates here; the reconciler
         # decays it (D13), and release deliberately does not credit it
-        # back. A fifth round would be denied by the demand clause even
+        # back. A sixth round is denied by the demand clause even
         # though every allocation dimension has room, which is the
-        # feedforward term doing exactly its job.
-        self.assertEqual(40.0, node.expected_demand)
-        fifth = self._admit(self.node_a)
-        self.assertFalse(fifth['admitted'])
-        self.assertEqual('node', fifth['failing_stage'])
+        # feedforward term doing exactly its job: the node is now over
+        # its target load, so the next create is spread elsewhere.
+        self.assertEqual(50.0, node.expected_demand)
+        sixth = self._admit(self.node_a)
+        self.assertFalse(sixth['admitted'])
+        self.assertEqual('node', sixth['failing_stage'])
 
 
 @unittest.skipUnless(
