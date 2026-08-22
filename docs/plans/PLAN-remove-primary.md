@@ -289,9 +289,9 @@ care.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete |
-| 2. ~~`bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster`~~ | _(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)_ | Dissolved |
+| 2. ~~`bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster`~~ | _(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)_ | Abandoned |
 | 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](PLAN-remove-apache-lb.md))_ | Complete |
-| 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
+| 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | Superseded |
 | 6. Repackage deployer as the `shakenfist.shakenfist` galaxy collection; delete the getsf installer chain; example consumers | [PLAN-remove-primary-phase-06-galaxy-role.md](PLAN-remove-primary-phase-06-galaxy-role.md) | Complete |
 | 7. Rename `etcd_master` → `database_node`; final cleanup | [PLAN-remove-primary-phase-07-rename-cleanup.md](PLAN-remove-primary-phase-07-rename-cleanup.md) | Complete |
 | 8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5) | [PLAN-remove-primary-phase-08-shared-ci.md](PLAN-remove-primary-phase-08-shared-ci.md) | Complete |
@@ -814,11 +814,11 @@ development that we fixed.
 When creating a new master plan from this template, update
 the following files in `docs/plans/`:
 
-* **`index.md`** — add a row to the *Plan Status* table
-  with a link to the plan, its phase breakdown, initial
-  status, and a one-line description.
-* **`order.yml`** — add an entry for the new master plan so
-  it appears in the documentation navigation in the
+* **`index.md`** — add one row to the *Master plans* table
+  with a link to the plan, its initial status, its phase
+  arithmetic, and a one-line intent.
+* **`order.yml`** — add an entry for the new master plan,
+  in the
   intended order.
 
 ### Back brief

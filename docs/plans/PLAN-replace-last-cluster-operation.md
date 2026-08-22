@@ -171,11 +171,11 @@ can reference the chosen path without re-litigating.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Add `has_pending_cluster_operation` query and tests | PLAN-replace-last-cluster-operation-phase-01-query.md | Complete |
-| 2. Switch `Network.is_okay()` and other gating callers | PLAN-replace-last-cluster-operation-phase-02-gating.md | Complete |
-| 3. Auto-target tracking, remove explicit callers, privatise setter | PLAN-replace-last-cluster-operation-phase-03-auto-target.md | Complete |
-| 4. Drop `object_metadata.last_cluster_operation_json` column | PLAN-replace-last-cluster-operation-phase-04-drop-column.md | Complete |
-| 5. Documentation and final audit | PLAN-replace-last-cluster-operation-phase-05-docs.md | Complete |
+| 1. Add `has_pending_cluster_operation` query and tests | [PLAN-replace-last-cluster-operation-phase-01-query.md](PLAN-replace-last-cluster-operation-phase-01-query.md) | Complete |
+| 2. Switch `Network.is_okay()` and other gating callers | [PLAN-replace-last-cluster-operation-phase-02-gating.md](PLAN-replace-last-cluster-operation-phase-02-gating.md) | Complete |
+| 3. Auto-target tracking, remove explicit callers, privatise setter | [PLAN-replace-last-cluster-operation-phase-03-auto-target.md](PLAN-replace-last-cluster-operation-phase-03-auto-target.md) | Complete |
+| 4. Drop `object_metadata.last_cluster_operation_json` column | [PLAN-replace-last-cluster-operation-phase-04-drop-column.md](PLAN-replace-last-cluster-operation-phase-04-drop-column.md) | Complete |
+| 5. Documentation and final audit | [PLAN-replace-last-cluster-operation-phase-05-docs.md](PLAN-replace-last-cluster-operation-phase-05-docs.md) | Complete |
 
 ### Phase outlines
 

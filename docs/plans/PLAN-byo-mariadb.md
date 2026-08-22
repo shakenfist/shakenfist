@@ -504,14 +504,14 @@ Phase 07 documents the end state.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Retire etcd machinery and migration-era scaffolding (supersedes `PLAN-remove-etcd`; deletes `etcd.py`, `etcd3gw`, etcd protos, `DATA_MIGRATIONS` framework, drain tests, dead `sf-ctl` helpers and `show/set-etcd-config` aliases, stale `migrate-*` comments, `ETCDCTL_API` docs line, the `.claude/skills/migrate-etcd-to-mariadb.md` skill; `is_etcd_master` left for `PLAN-remove-primary` phase 7) | PLAN-byo-mariadb-phase-00-retire-etcd.md | Complete |
-| 1. PLAN-remove-primary scope lift; `_get_schema_versions_table()` lock fix; stop sf-database calling `ensure_schema()`/`ensure_data_migrations()` at startup; add a startup schema-version check that refuses to start on mismatch; add a hard MariaDB compatibility check (server version against a pinned floor, InnoDB engine, `utf8mb4` charset) to both `sf-ctl ensure-mariadb-schema` and sf-database startup | PLAN-byo-mariadb-phase-01-statelessness.md | Complete |
-| 2. Untangle `MARIADB_HOST` from "I am the database node"; rename `DATABASE_NODE_IP` → `MARIADB_GATEWAY_HOSTS` (plural list); rewrite the `config.py` bootstrap conditional | PLAN-byo-mariadb-phase-02-config-untangle.md | Complete |
-| 3. Multi-endpoint client-side gRPC LB; minimal `grpc.health.v1.Health` server-side support on sf-database; channel factory helper | PLAN-byo-mariadb-phase-03-grpc-tier.md | Complete |
-| 4. `getsf` reworked to prompt for BYO connection details; `roles/mariadb/` deleted; `tools/bootstrap-mariadb.sql` shipped; `deploy.py` stops generating a password; tuning `.cnf` moved to `examples/` | PLAN-byo-mariadb-phase-04-deploy-byo.md | Complete |
-| 5. CI workflow step installs MariaDB and applies the SQL snippet before getsf runs; cluster_ci updated to drive the new path | PLAN-byo-mariadb-phase-05-ci-byo.md | Complete |
-| 6. CI deployment shape with N=2 sf-database instances against the same MariaDB; functional test exercising the LB path; regression coverage | PLAN-byo-mariadb-phase-06-ci-tier.md | Complete |
-| 7. Documentation: `docs/operator_guide/database.md` rewritten lead-with-BYO, `ARCHITECTURE.md` / `README.md` / `AGENTS.md` updates, release notes calling out the breaking change | PLAN-byo-mariadb-phase-07-docs.md | Complete |
+| 0. Retire etcd machinery and migration-era scaffolding (supersedes `PLAN-remove-etcd`; deletes `etcd.py`, `etcd3gw`, etcd protos, `DATA_MIGRATIONS` framework, drain tests, dead `sf-ctl` helpers and `show/set-etcd-config` aliases, stale `migrate-*` comments, `ETCDCTL_API` docs line, the `.claude/skills/migrate-etcd-to-mariadb.md` skill; `is_etcd_master` left for `PLAN-remove-primary` phase 7) | [PLAN-byo-mariadb-phase-00-retire-etcd.md](PLAN-byo-mariadb-phase-00-retire-etcd.md) | Complete |
+| 1. PLAN-remove-primary scope lift; `_get_schema_versions_table()` lock fix; stop sf-database calling `ensure_schema()`/`ensure_data_migrations()` at startup; add a startup schema-version check that refuses to start on mismatch; add a hard MariaDB compatibility check (server version against a pinned floor, InnoDB engine, `utf8mb4` charset) to both `sf-ctl ensure-mariadb-schema` and sf-database startup | [PLAN-byo-mariadb-phase-01-statelessness.md](PLAN-byo-mariadb-phase-01-statelessness.md) | Complete |
+| 2. Untangle `MARIADB_HOST` from "I am the database node"; rename `DATABASE_NODE_IP` → `MARIADB_GATEWAY_HOSTS` (plural list); rewrite the `config.py` bootstrap conditional | [PLAN-byo-mariadb-phase-02-config-untangle.md](PLAN-byo-mariadb-phase-02-config-untangle.md) | Complete |
+| 3. Multi-endpoint client-side gRPC LB; minimal `grpc.health.v1.Health` server-side support on sf-database; channel factory helper | [PLAN-byo-mariadb-phase-03-grpc-tier.md](PLAN-byo-mariadb-phase-03-grpc-tier.md) | Complete |
+| 4. `getsf` reworked to prompt for BYO connection details; `roles/mariadb/` deleted; `tools/bootstrap-mariadb.sql` shipped; `deploy.py` stops generating a password; tuning `.cnf` moved to `examples/` | [PLAN-byo-mariadb-phase-04-deploy-byo.md](PLAN-byo-mariadb-phase-04-deploy-byo.md) | Complete |
+| 5. CI workflow step installs MariaDB and applies the SQL snippet before getsf runs; cluster_ci updated to drive the new path | [PLAN-byo-mariadb-phase-05-ci-byo.md](PLAN-byo-mariadb-phase-05-ci-byo.md) | Complete |
+| 6. CI deployment shape with N=2 sf-database instances against the same MariaDB; functional test exercising the LB path; regression coverage | [PLAN-byo-mariadb-phase-06-ci-tier.md](PLAN-byo-mariadb-phase-06-ci-tier.md) | Complete |
+| 7. Documentation: `docs/operator_guide/database.md` rewritten lead-with-BYO, `ARCHITECTURE.md` / `README.md` / `AGENTS.md` updates, release notes calling out the breaking change | [PLAN-byo-mariadb-phase-07-docs.md](PLAN-byo-mariadb-phase-07-docs.md) | Complete |
 
 Sequencing constraints between phases:
 
@@ -889,22 +889,24 @@ during development that we fixed.
 When creating this master plan from the template,
 update the following files in `docs/plans/`:
 
-* **`index.md`** — add rows to the *Plan Status*
-  table for this master plan and each of its
-  phase plans, keyed to one-line descriptions
-  and current status. Also update the *Plan
+* **`index.md`** — add one row to the *Master
+  plans* table for this master plan, keyed to a
+  one-line intent and its current status. Phases
+  are tracked in this plan's own Execution table,
+  not in the index. Also update the *Plan
   sequencing* prose to reflect that this plan
   now carries the MariaDB scope and that remove-
   primary's scope has shrunk accordingly.
 * **`order.yml`** — add an entry for this master
   plan. Phase files are *not* added to
   `order.yml`; they are linked from the
-  Execution table and from `index.md` only.
+  Execution table only, which makes that table the
+  only path to them.
 
-The site navigation in `mkdocs.yml` is produced
-from `mkdocs.yml.tmpl` by the docs-sync workflow,
-which consumes `order.yml`. No manual
-`mkdocs.yml` edits are needed.
+`order.yml` does not by itself reach this
+repository's site navigation: `mkdocs.yml.tmpl`
+lists the Plans nav by hand. The entry is
+registration and reading order.
 
 When all phases are complete, update the status
 column in `docs/plans/index.md`.

@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposed. Root cause confirmed from CI artifact bundle for run
+Complete.
+
+The composite constraint is in the tree, in the
+`cluster_operation_targets` table definition and its migration.
+The root cause was confirmed from the CI artifact bundle for run
 `25727839217` (Guests job, 2026-05-12), with the diagnostic
 instrumentation added in commit `5d0bf73c`. See "Evidence" below.
 

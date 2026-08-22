@@ -348,16 +348,44 @@ table entirely (decision D8).
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
-| 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Complete — decisions approved 2026-07-30; step 3 data addendum landed 2026-08-13 (D4 unchanged, D14 upgraded to required, D18 sizing key sharpened, disk-overcommit constant flagged for phase 3) |
-| 1. Promote node capacity fields to typed columns | PLAN-scheduler-reservations-phase-01-node-metrics-columns.md | Complete — merged as PR #3578, 2026-07-31 |
-| 2. Capacity tables, reconciler and migration | PLAN-scheduler-reservations-phase-02-capacity-tables.md | Complete — merged as PR #3614, 2026-08-08; reconciler soaking cleanly on sfcbr (5-minute passes, no drift) |
-| 3. Claim primitive and placement integration | PLAN-scheduler-reservations-phase-03-primitive.md | Complete — merged as PR #3754, 2026-08-16. The step 9 sfcbr soak has not been run yet. **Carries an outstanding defect in its D13 demand clause, issue #3813 — see Future work** |
-| 4. Namespace claims object and API | PLAN-scheduler-reservations-phase-04-claims-api.md | Implemented — steps 1-8 landed; management review, operator review and the sfcbr soak still outstanding. `NamespaceClaim` is a first-class object with admin-only REST CRUD at `/auth/namespaces/<namespace>/claims`; creation migrates the namespace's existing drawdown out of the cluster's unclaimed sums and onto the claim. Ceilings are **advisory** this release: an exceedance is admitted and recorded as an audit event, and phase 5 flips `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the phase plan) |
+| 00a. Load-aware ordering and system reservations (static quick wins) | [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md) | In progress |
+| 0. Research and decisions document | [PLAN-scheduler-reservations-phase-00-decisions.md](PLAN-scheduler-reservations-phase-00-decisions.md) | Complete |
+| 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete |
+| 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
+| 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
+| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | In progress |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
+
+### Phase status notes
+
+Where a phase's status does not tell the whole story, the rest of it
+is here.
+
+- **Phase 00a** is implemented but has not yet soaked on sfcbr, which
+  is what its status turns on.
+- **Phase 0**'s decisions were approved on 2026-07-30, and the step 3
+  data addendum landed on 2026-08-13: D4 unchanged, D14 upgraded to
+  required, D18's sizing key sharpened, and the disk-overcommit
+  constant flagged for phase 3.
+- **Phase 1** merged as PR #3578 on 2026-07-31.
+- **Phase 2** merged as PR #3614 on 2026-08-08. Its reconciler has
+  been soaking cleanly on sfcbr since, on 5-minute passes with no
+  drift.
+- **Phase 3** merged as PR #3754 on 2026-08-16, but its step 9 sfcbr
+  soak has not been run, and it carries an outstanding defect in its
+  D13 demand clause — issue #3813, see Future work.
+- **Phase 4**'s steps 1-8 have landed; management review, operator
+  review and the sfcbr soak are all still outstanding. `NamespaceClaim`
+  is a first-class object with admin-only REST CRUD at
+  `/auth/namespaces/<namespace>/claims`, and creation migrates the
+  namespace's existing drawdown out of the cluster's unclaimed sums and
+  onto the claim. Ceilings are **advisory** this release: an exceedance
+  is admitted and recorded as an audit event, and phase 5 flips
+  `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the
+  phase plan).
 
 ### Phase scope stubs
 
@@ -813,7 +841,7 @@ development that we fixed.
 When creating a new master plan from this template, update the
 following files in `docs/plans/`:
 
-* **`index.md`** — add a row to the *Plan Status* table.
+* **`index.md`** — add one row to the *Master plans* table.
 * **`order.yml`** — add an entry for the new master plan.
 
 ### Back brief

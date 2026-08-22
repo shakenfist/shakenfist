@@ -1396,8 +1396,9 @@ Phase 2:
 
 When this plan changes status:
 
-* `docs/plans/index.md` — rows for this plan's phases live
-  in the Plan Status table; keep them current.
+* `docs/plans/index.md` — one row for this plan lives in the
+  *Master plans* table; keep its status current. Its phases
+  are tracked in the Execution table above.
 * `docs/plans/order.yml` — this master plan is registered;
   phase files are not.
 

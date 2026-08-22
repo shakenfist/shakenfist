@@ -221,8 +221,12 @@ phases leave CI green.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Document operator-provided load balancing (example apache2 + nginx configs, single-node escape hatch) | PLAN-remove-apache-lb-phase-01-docs.md | Complete |
-| 2. Remove Apache from the deployer; repoint single-node `api_url` to `:13000` | PLAN-remove-apache-lb-phase-02-remove.md | Complete (pending CI confirmation) |
+| 1. Document operator-provided load balancing (example apache2 + nginx configs, single-node escape hatch) | [PLAN-remove-apache-lb-phase-01-docs.md](PLAN-remove-apache-lb-phase-01-docs.md) | Complete |
+| 2. Remove Apache from the deployer; repoint single-node `api_url` to `:13000` | [PLAN-remove-apache-lb-phase-02-remove.md](PLAN-remove-apache-lb-phase-02-remove.md) | Complete |
+
+Phase 2 carried a "pending CI confirmation" caveat while it was in
+flight. It has since merged to `develop`, which the merge queue gates
+on CI, so the caveat is spent rather than dropped.
 
 Phase notes:
 
@@ -442,18 +446,18 @@ development that we fixed.
 
 This plan has been registered in `docs/plans/`:
 
-* **`index.md`** — a row added to the *Plan Status* table
-  linking this plan, its phases, status, and one-line
-  description.
+* **`index.md`** — a row added to the *Master plans* table
+  linking this plan, its status, phase arithmetic and
+  one-line intent.
 * **`order.yml`** — an entry added next to
   `PLAN-remove-primary.md` so it appears in the documentation
   navigation. Phase files are *not* added to `order.yml`;
-  they are linked from this plan's Execution table and from
-  `index.md` only.
+  they are linked from this plan's Execution table only, which
+  makes that table the only path to them.
 
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which consumes
-`order.yml`; it does not need hand-editing.
+`order.yml` does not by itself reach this repository's site
+navigation: `mkdocs.yml.tmpl` lists the Plans nav by hand.
+The entry is registration and reading order.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md`.

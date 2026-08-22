@@ -618,10 +618,9 @@ cache needs no server change.
 ### Documentation index maintenance
 
 When this plan file lands, add it to `docs/plans/index.md`
-(Plan Status table, one row per phase) and
+(*Master plans* table, one row for the whole plan) and
 `docs/plans/order.yml` (master plan only). Phase files are
-linked from the Execution table above and from `index.md`
-only.
+linked from the Execution table above only.
 
 ### Back brief
 

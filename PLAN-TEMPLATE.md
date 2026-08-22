@@ -62,6 +62,44 @@ copy lives in shakenfist/development at
 
 ## Execution
 
+<!-- shared-block: plan-status-vocabulary v1 -->
+Plan status vocabulary (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+`templates/shared-blocks/plan-status-vocabulary.md`):
+
+A status cell -- in the master plan's own Execution phase table, and
+in the row `docs/plans/index.md` carries for the plan -- holds
+exactly one of these terms and nothing else:
+
+- `Proposed` -- written down as a concept, not yet scheduled.
+- `Not started` -- scheduled, but no work has begun.
+- `In progress` -- work has begun and has not finished.
+- `Blocked` -- cannot proceed until something outside the plan
+  changes. Say what, in the plan.
+- `Complete` -- the work is done.
+- `Abandoned` -- deliberately dropped without being done.
+- `Superseded` -- replaced by another plan, which the plan names.
+
+The term is the whole cell. No dates, no phase arithmetic, no
+parenthetical qualifiers, no summary of what happened: a status is
+read to decide whether a plan still wants attention, and prose in
+that column has repeatedly grown until it could no longer be read
+either by a person scanning the table or by tooling. Detail belongs
+in the plan file, and a one-line summary belongs in the index's own
+Intent column.
+
+Matching is case-insensitive, so `In Progress` is accepted, but the
+spelling above is the one to write.
+<!-- shared-block-end -->
+
+!!! note "In this project"
+
+    The same term is written twice: once in the phase table
+    below, and once in the row this plan carries in
+    `docs/plans/index.md`. Keep them in step -- the index row is
+    the whole-plan status, so it only reaches `Complete` once
+    every phase has been completed, abandoned or superseded.
+
 ...
 
 ## Agent guidance
@@ -313,22 +351,33 @@ because the following statements will be true:
 When creating a new master plan from this template, update
 the following files in `docs/plans/`:
 
-* **`index.md`** — add a row to the *Plan Status* table
-  with a link to the plan, its phase breakdown, initial
-  status, and a one-line description. Keep entries grouped
-  by master plan.
-* **`order.yml`** — add an entry for the new master plan so
-  it appears in the documentation navigation in the
-  intended order. Phase files should *not* be added to
+* **`index.md`** — add one row to the *Master plans*
+  table: the date the plan was written, a link to it, a
+  one-line intent, its status from the vocabulary above,
+  and its phase arithmetic (`0 of 7`, or `—` for a plan
+  with no phases). One row per master plan, never one per
+  phase — the phases are tracked in this plan's own
+  Execution table, and duplicating them in the index is
+  how the two drift apart. Rows run oldest first.
+* **`order.yml`** — add an entry for the new master plan,
+  in the intended reading order. This registers the plan
+  and is what the plan-status check reads; it does **not**
+  by itself put the plan in the published site navigation,
+  which `mkdocs.yml.tmpl` currently lists by hand. The file
+  is not ours: its format and its meaning as a per-directory
+  navigation allowlist come from `tools/sync_component_docs.py`
+  in shakenfist/actions, which is how a repository's docs are
+  synced into a documentation site. Keeping it complete is
+  what would make generating the nav from it a mechanical
+  change later. Phase files should *not* be added to
   `order.yml`; they are linked from the master plan's
-  Execution table and from `index.md` only.
+  Execution table only, which makes that table the only path
+  to them.
 
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which consumes
-`order.yml`. You do not need to edit `mkdocs.yml` by hand.
-
-When all phases of a plan are complete, update the status
-column in `docs/plans/index.md`.
+The index row carries the whole-plan status, so it only
+reaches `Complete` once every phase has been completed,
+abandoned or superseded. Update it as the arithmetic
+changes, not only at the end.
 
 <!-- shared-block: plan-closeout-sections v1 -->
 Plan close-out sections (shared block; do not edit -- the

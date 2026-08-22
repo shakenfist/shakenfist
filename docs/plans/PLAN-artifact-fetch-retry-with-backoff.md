@@ -2,7 +2,9 @@
 
 ## Status
 
-Implemented in the `stability` branch.
+Complete.
+
+Landed via the `stability` branch.
 
 ## Problem
 

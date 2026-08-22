@@ -10,6 +10,7 @@
 - api-query-batching-roadmap.md: API query batching roadmap
 - PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
 - PLAN-replace-last-cluster-operation.md: Replace last_cluster_operation with cluster_operation_targets gating
+- PLAN-fix-cluster-operation-targets-unique-constraint.md: Fix cluster_operation_targets UNIQUE constraint
 - PLAN-network-facade.md: Network operations facade and queue-only mutation
 - PLAN-queue-performance.md: Queue performance and coalescing
 - PLAN-recurring-operations.md: Recurring cluster operations framework
@@ -21,17 +22,21 @@
 - PLAN-byo-mariadb.md: Bring-your-own MariaDB and sf-database as a tier
 - PLAN-embrace-tls.md: Embrace TLS across Shaken Fist
 - PLAN-sticky-transfers.md: Sticky session affinity for SF blob transfers
+- PLAN-artifact-fetch-retry-with-backoff.md: Retry transient artifact fetches with backoff
 - PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations
 - PLAN-scheduler-reservations.md: Atomic scheduling via a reservations table
 - PLAN-per-host-resource-reservations.md: Per-host RAM/CPU/disk reservation overrides for nodes
 - PLAN-eventlog-direct-mariadb.md: Remove the eventlog service and write events directly to MariaDB
 - PLAN-generic-allocator.md: Unify finite-resource allocation onto one primitive
+- PLAN-attribute-field-masks.md: Attribute field masks everywhere, and un-packing the node instances list
+- PLAN-ci-node-exec-assertions.md: CI node-exec assertions and floating / network lifecycle tests
 - PLAN-network-service-ports.md: Per-network DNAT'd service ports for managed services
 - PLAN-network-carrier-model.md: Lease-based per-network carrier model with VIP advertisement
 - PLAN-api-input-validation.md: Declarative validation and a consistent error contract for the REST API
 - PLAN-oidc-authentication.md: OIDC authentication for Shaken Fist
 - PLAN-auth-federation.md: Workload identity federation and first-class namespace keys
 - PLAN-qemu-futures.md: Owning more of the QEMU stack — QMP, and one day maybe libvirt's job too
+- PLAN-netserv.md: Replace dnsmasq with a Rust per-network service plane (sf-netserv)
 - PLAN-artifact-ux-rework.md: Rework the artifact, blob, label, upload, and snapshot user interface
 - PLAN-kerbside-vdi-tokens.md: VDI console access via Kerbside signed tokens
 - PLAN-cluster-op-visibility.md: Truthful cluster operation visibility

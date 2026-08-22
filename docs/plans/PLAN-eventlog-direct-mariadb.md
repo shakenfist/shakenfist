@@ -439,12 +439,12 @@ post-decisions plan.
 | Phase | Plan | Status |
 |-------|------|--------|
 | -1. Local sqlite spool + batched-RPC drainer (caller side) | _(delivered in the network-facade branch ahead of this plan)_ | Complete |
-| 1. `events`/`event_objects` schema, accessors, the `RecordEventBatch` RPC on sf-database, and the events-row-count gauge | PLAN-eventlog-direct-mariadb-phase-01-schema.md | Complete |
-| 2. Swap the drainer's RPC target from sf-eventlog to sf-database; promote `event_uuid` and `request_id` to first-class fields; wire spool-depth, drop, and insert metrics | PLAN-eventlog-direct-mariadb-phase-02-write.md | Complete |
-| 3. Move prune sweep into the cluster daemon's scheduled tasks, with prune-delete counter | PLAN-eventlog-direct-mariadb-phase-03-prune.md | Complete |
-| 4. REST API direct-read path via a new `GetObjectEvents` RPC on sf-database | PLAN-eventlog-direct-mariadb-phase-04-read.md | Complete |
-| 5. Delete `sf-eventlog` daemon, gRPC protos, systemd unit, config, the MariaDB `event_dlq`, and the on-disk sqlite chunks | PLAN-eventlog-direct-mariadb-phase-05-remove.md | Complete |
-| 6. Documentation (operator guide for the new eventlog, ARCHITECTURE/README/AGENTS updates, cut-over loss called out in release notes) | PLAN-eventlog-direct-mariadb-phase-06-docs.md | Complete |
+| 1. `events`/`event_objects` schema, accessors, the `RecordEventBatch` RPC on sf-database, and the events-row-count gauge | [PLAN-eventlog-direct-mariadb-phase-01-schema.md](PLAN-eventlog-direct-mariadb-phase-01-schema.md) | Complete |
+| 2. Swap the drainer's RPC target from sf-eventlog to sf-database; promote `event_uuid` and `request_id` to first-class fields; wire spool-depth, drop, and insert metrics | [PLAN-eventlog-direct-mariadb-phase-02-write.md](PLAN-eventlog-direct-mariadb-phase-02-write.md) | Complete |
+| 3. Move prune sweep into the cluster daemon's scheduled tasks, with prune-delete counter | [PLAN-eventlog-direct-mariadb-phase-03-prune.md](PLAN-eventlog-direct-mariadb-phase-03-prune.md) | Complete |
+| 4. REST API direct-read path via a new `GetObjectEvents` RPC on sf-database | [PLAN-eventlog-direct-mariadb-phase-04-read.md](PLAN-eventlog-direct-mariadb-phase-04-read.md) | Complete |
+| 5. Delete `sf-eventlog` daemon, gRPC protos, systemd unit, config, the MariaDB `event_dlq`, and the on-disk sqlite chunks | [PLAN-eventlog-direct-mariadb-phase-05-remove.md](PLAN-eventlog-direct-mariadb-phase-05-remove.md) | Complete |
+| 6. Documentation (operator guide for the new eventlog, ARCHITECTURE/README/AGENTS updates, cut-over loss called out in release notes) | [PLAN-eventlog-direct-mariadb-phase-06-docs.md](PLAN-eventlog-direct-mariadb-phase-06-docs.md) | Complete |
 
 Sequencing constraints between phases:
 
@@ -702,18 +702,19 @@ development that we fixed.
 When creating this master plan from the template, the
 following files in `docs/plans/` should be updated:
 
-* **`index.md`** — add a row to the *Plan Status* table
-  for this master plan and each of its phase plans, keyed
-  to one-line descriptions and current status.
-* **`order.yml`** — add an entry for this master plan so
-  it appears in the documentation navigation. Phase files
+* **`index.md`** — add one row to the *Master plans* table
+  for this master plan, keyed to a one-line intent and its
+  current status. Phases are tracked in the Execution
+  table above, not in the index.
+* **`order.yml`** — add an entry for this master plan, in
+  the intended reading order. Phase files
   are *not* added to `order.yml`; they are linked from
-  the Execution table and from `index.md` only.
+  the Execution table only, which makes that table the only
+  path to them.
 
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which
-consumes `order.yml`. No manual `mkdocs.yml` edits are
-needed.
+`order.yml` does not by itself reach this repository's site
+navigation: `mkdocs.yml.tmpl` lists the Plans nav by hand.
+The entry is registration and reading order.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md`.

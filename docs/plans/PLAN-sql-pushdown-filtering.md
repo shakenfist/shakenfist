@@ -163,13 +163,13 @@ begins.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Query infrastructure | PLAN-sql-pushdown-filtering-phase-01-infrastructure.md | Complete |
-| 2. Artifact pushdown | PLAN-sql-pushdown-filtering-phase-02-artifact.md | Complete |
-| 3. Instance and Network pushdown | PLAN-sql-pushdown-filtering-phase-03-instance-network.md | Complete |
-| 4. Iterator rework | PLAN-sql-pushdown-filtering-phase-04-iterators.md | Complete |
-| 5. Ad-hoc bulk scan cleanup | PLAN-sql-pushdown-filtering-phase-05-adhoc.md | Complete |
-| 6. Tests and documentation | PLAN-sql-pushdown-filtering-phase-06-tests-docs.md | Complete |
-| 7. Denormalised child-UUID list removal | PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md | Complete |
+| 1. Query infrastructure | [PLAN-sql-pushdown-filtering-phase-01-infrastructure.md](PLAN-sql-pushdown-filtering-phase-01-infrastructure.md) | Complete |
+| 2. Artifact pushdown | [PLAN-sql-pushdown-filtering-phase-02-artifact.md](PLAN-sql-pushdown-filtering-phase-02-artifact.md) | Complete |
+| 3. Instance and Network pushdown | [PLAN-sql-pushdown-filtering-phase-03-instance-network.md](PLAN-sql-pushdown-filtering-phase-03-instance-network.md) | Complete |
+| 4. Iterator rework | [PLAN-sql-pushdown-filtering-phase-04-iterators.md](PLAN-sql-pushdown-filtering-phase-04-iterators.md) | Complete |
+| 5. Ad-hoc bulk scan cleanup | [PLAN-sql-pushdown-filtering-phase-05-adhoc.md](PLAN-sql-pushdown-filtering-phase-05-adhoc.md) | Complete |
+| 6. Tests and documentation | [PLAN-sql-pushdown-filtering-phase-06-tests-docs.md](PLAN-sql-pushdown-filtering-phase-06-tests-docs.md) | Complete |
+| 7. Denormalised child-UUID list removal | [PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md](PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md) | Complete |
 
 Phase outlines (detailed plans to be written when each phase
 starts):
@@ -589,7 +589,7 @@ decisions:
 
 When this master plan was created:
 
-* A row was added to the *Plan Status* table in
+* A row was added to the *Master plans* table in
   `docs/plans/index.md`.
 * An entry was added to `docs/plans/order.yml`.
 

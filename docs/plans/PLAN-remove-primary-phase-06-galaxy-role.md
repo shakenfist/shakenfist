@@ -296,7 +296,7 @@ adds the new CI path beside the old. Step 6 deletes the old.
   `release.yml` collection job builds the tarball (publish is
   gated on the token/namespace prerequisites). The operator
   has the explicit actions-repo + secret to-do list.
-- After step 6: `grep -rn 'getsf\|deploy\.py\|deploy\.yml\|
+- After [step 6](PLAN-remove-primary-phase-06-step6-legacy-removal.md): `grep -rn 'getsf\|deploy\.py\|deploy\.yml\|
   roles/primary' shakenfist/ .github/` returns only
   intentional historical hits; the legacy CI job is gone; an
   operator reading `docs/operator_guide/installation.md`

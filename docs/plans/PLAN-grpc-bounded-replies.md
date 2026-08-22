@@ -683,15 +683,15 @@ two contract changes as well as the bound itself.
 When creating this master plan from the template, the following files
 in `docs/plans/` should be updated:
 
-* **`index.md`** — add a row to the *Plan Status* table for this master
-  plan and each of its phase plans.
-* **`order.yml`** — add an entry for this master plan so it appears in
-  the documentation navigation. Phase files are *not* added to
+* **`index.md`** — add one row to the *Master plans* table for this
+  master plan. Phases are tracked in the Execution table above.
+* **`order.yml`** — add an entry for this master plan, in the intended
+  reading order. Phase files are *not* added to
   `order.yml`.
 
-The site navigation in `mkdocs.yml` is produced from `mkdocs.yml.tmpl`
-by the docs-sync workflow, which consumes `order.yml`. No manual
-`mkdocs.yml` edits are needed.
+`order.yml` does not by itself reach this repository's site navigation:
+`mkdocs.yml.tmpl` lists the Plans nav by hand. The entry is registration
+and reading order.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md`.

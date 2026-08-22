@@ -300,10 +300,10 @@ the code.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 0. Research and decisions | (folded into phases 1–4; decisions ratified inline against the code) | Complete |
-| 1. Check abstraction + path check + tests | PLAN-node-resource-health-phase-01-checks.md | Complete |
-| 2. sf-resources evaluator: hosted-type checks → `node.state` | PLAN-node-resource-health-phase-02-evaluator.md | Complete |
-| 3. Cluster-daemon cascade (blob locations + instances) | PLAN-node-resource-health-phase-03-cascade.md | Complete |
-| 4. Operator docs + observability | PLAN-node-resource-health-phase-04-docs.md | Complete |
+| 1. Check abstraction + path check + tests | [PLAN-node-resource-health-phase-01-checks.md](PLAN-node-resource-health-phase-01-checks.md) | Complete |
+| 2. sf-resources evaluator: hosted-type checks → `node.state` | [PLAN-node-resource-health-phase-02-evaluator.md](PLAN-node-resource-health-phase-02-evaluator.md) | Complete |
+| 3. Cluster-daemon cascade (blob locations + instances) | [PLAN-node-resource-health-phase-03-cascade.md](PLAN-node-resource-health-phase-03-cascade.md) | Complete |
+| 4. Operator docs + observability | [PLAN-node-resource-health-phase-04-docs.md](PLAN-node-resource-health-phase-04-docs.md) | Complete |
 
 **All phases complete** on the `node-resource-health` branch. Phase 0
 was not written as a separate document — its decisions (D1–D8) are
@@ -425,6 +425,6 @@ node-error mark vs slow surviving-node cascade).
 
 ## Documentation index maintenance
 
-This master plan is registered in `docs/plans/index.md` (Plan Status
-table + sequencing note) and `docs/plans/order.yml`. Keep both in
-sync as phases land.
+This master plan is registered in `docs/plans/index.md` (*Master
+plans* table + sequencing note) and `docs/plans/order.yml`. Keep
+both in sync as phases land.

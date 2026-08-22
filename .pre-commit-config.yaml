@@ -111,6 +111,19 @@ repos:
         files: ^(docs/.*\.md|AGENTS\.md|ARCHITECTURE\.md|CLAUDE\.md|README\.md)$
         pass_filenames: false
 
+      - id: check-plan-status
+        name: Check plan statuses and index arithmetic agree
+        description: >-
+          The index's status and "N of M" for a plan are derived from that
+          plan's own Execution table, so they drift the moment one is updated
+          without the other. Recompute them, reject a status cell outside the
+          shared vocabulary, and catch a master plan missing from index.md or
+          order.yml.
+        entry: python3 tools/check-plan-status.py
+        language: system
+        files: ^(docs/plans/.*\.(md|yml)|PLAN-TEMPLATE\.md)$
+        pass_filenames: false
+
   # Type checking with mypy (incremental rollout via tox)
   # Requires: pip install tox mypy
   - repo: local

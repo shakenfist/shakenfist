@@ -815,15 +815,28 @@ Loki and CI already checks them there. Phase 6 documents.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete (see Decisions section above) |
-| 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | Complete (`shakenfist-utilities==0.8.5` released and pinned) |
-| 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete (pending CI) |
-| 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | [PLAN-remove-syslog-forwarding-phase-03-ci-loki.md](PLAN-remove-syslog-forwarding-phase-03-ci-loki.md) | Complete (pending CI) |
-| 4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned `shakenfist/actions`) | [PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md](PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md) | Complete (`loki-ci-tooling` merged to actions@main; pending CI) |
-| 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | [PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md](PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md) | Complete (pending CI; needs actions `loki-node-checks` merged) |
+| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete |
+| 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | Complete |
+| 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete |
+| 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | [PLAN-remove-syslog-forwarding-phase-03-ci-loki.md](PLAN-remove-syslog-forwarding-phase-03-ci-loki.md) | Complete |
+| 4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned `shakenfist/actions`) | [PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md](PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md) | Complete |
+| 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | [PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md](PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md) | Complete |
 | 6. Documentation: operator guide, field contract, ARCHITECTURE/README/AGENTS, index/order | [PLAN-remove-syslog-forwarding-phase-06-docs.md](PLAN-remove-syslog-forwarding-phase-06-docs.md) | Complete |
 
-Phase notes:
+### Landing record
+
+- **Phase 0**'s decisions are the Decisions section above.
+- **Phase 1** shipped as `shakenfist-utilities==0.8.5`, released to
+  PyPI and pinned here.
+- **Phase 4** landed on `shakenfist/actions` as the `loki-ci-tooling`
+  branch, merged to `main`.
+- **Phase 5** additionally required the `loki-node-checks` branch on
+  `shakenfist/actions` to merge before it could go green.
+- **Phases 2, 3 and 5** each carried a "pending CI" caveat while they
+  were in flight. All three have since merged to `develop`, which the
+  merge queue gates on CI, so the caveat is spent rather than dropped.
+
+### Phase notes
 
 - **Phase 0** is a decisions phase in the style of
   `PLAN-health-checks-phase-00-decisions.md`. It resolves every
@@ -1192,20 +1205,22 @@ them as part of the relevant phase or note them here.
 
 When this master plan is created from the template:
 
-* **`docs/plans/index.md`** — add rows to the *Plan Status*
-  table for this plan and its phases, with links, status, and
-  one-line descriptions, grouped under this master plan. Add a
+* **`docs/plans/index.md`** — add one row to the *Master
+  plans* table for this plan, with a link, its status and a
+  one-line intent. Phases are tracked in the Execution table
+  above, not in the index. Add a
   line to the *Plan sequencing* section noting that this plan
   delivers the Loki-shipper story remove-primary phase 1 depends
   on, and that it can land in parallel with the other BYO work.
 * **`docs/plans/order.yml`** — add an entry for this master
-  plan so it appears in the documentation navigation. Phase
+  plan, in the intended reading order. Phase
   files are *not* added to `order.yml`; they are linked from the
-  Execution table and `index.md` only.
+  Execution table only, which makes that table the only path
+  to them.
 
-The site navigation in `mkdocs.yml` is produced from
-`mkdocs.yml.tmpl` by the docs-sync workflow, which consumes
-`order.yml`. Do not edit `mkdocs.yml` by hand.
+`order.yml` does not by itself reach this repository's site
+navigation: `mkdocs.yml.tmpl` lists the Plans nav by hand.
+The entry is registration and reading order.
 
 When all phases are complete, update the status column in
 `docs/plans/index.md` and mark `PLAN-remove-primary.md` phase 1
