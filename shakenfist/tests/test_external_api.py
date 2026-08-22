@@ -711,7 +711,7 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
         self.mock_mariadb.set_node_capacity(
             node, limit_cpus=16, limit_memory_mb=65536, limit_disk_gb=500)
 
-    def _post(self, name):
+    def _post(self, name, cpus=1):
         # A sizeless-base disk, so no artifact fetch is enqueued and the
         # create is entirely about placement.
         return self.client.post(
@@ -719,7 +719,7 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
             headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'name': name,
-                'cpus': 1,
+                'cpus': cpus,
                 'memory': 1024,
                 'network': [],
                 'disk': [{'size': 8}],
@@ -782,6 +782,37 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
         row = self.mock_mariadb.node_capacity[self.NODE_A]
         self.assertEqual(1, row['used_cpus'])
         self.assertLess(9.2, row['expected_demand'])
+
+    def test_an_idle_node_admits_a_large_instance_on_the_first_walk(self):
+        # Issue #3813 as the walkers see it, rather than as the SQL
+        # clause sees it. A CI-sized hypervisor -- two schedulable
+        # threads, so a demand budget of 0.75 x 2 = 1.5 -- sitting
+        # completely idle must admit an 8-vCPU create on the *first*
+        # walk, with no waiver. The clause compares the node's existing
+        # demand against that budget and ignores the size of the
+        # placement asking; before phase 4a the placement's charge
+        # (8 x 0.6 = 4.8) went on the left-hand side, so this refused
+        # and only the P9 waiver rescued it -- a second walk, and a
+        # spreader that never spread, for a node that was never busy.
+        self.mock_mariadb.set_node_capacity(
+            self.NODE_A, limit_cpus=16, limit_memory_mb=65536,
+            limit_disk_gb=500, expected_demand=0.0, demand_limit=1.5)
+
+        with mock.patch('shakenfist.instance.Instance.add_event') as events:
+            with self._candidates(self.NODE_A):
+                resp = self._post('idle-node-large-instance', cpus=8)
+
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(self.NODE_A, resp.get_json()['node'])
+        self.assertNotIn(
+            'waiving demand guard',
+            ' '.join(str(c) for c in events.call_args_list))
+        # The charge still landed, so the next create sees a node over
+        # budget and spreads.
+        row = self.mock_mariadb.node_capacity[self.NODE_A]
+        self.assertEqual(8, row['used_cpus'])
+        self.assertAlmostEqual(4.8, row['expected_demand'])
+        self.assertLess(row['demand_limit'], row['expected_demand'])
 
     def test_the_waiver_reaches_past_a_genuinely_full_node(self):
         # A mixed exhaustion -- one node full on real capacity, another

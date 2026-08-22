@@ -440,8 +440,13 @@ artifact objects where it already lives.
 day one; the learner stays future work.**
 `scheduler_node_capacity.expected_demand` accumulates the
 decayed demand estimate of recently-placed instances:
-placement adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` (seed 2.5
-from the 00a-1 measurements), and the reconciler recomputes
+placement adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` (seed 0.6
+from the 00a-1 measurements; *corrected 2026-08-22* — this
+said 2.5, which was transcribed from that appendix's
+*packing* row of 2.3-3.0 allocated vCPUs per thread rather
+than its demand-per-vCPU row of 0.12-0.35 steady with a
+~0.6 burst peak. The units error is the whole of issue
+#3813, and phase 4a fixes it), and the reconciler recomputes
 the node's total each pass as a linear decay to zero over
 `SCHEDULER_DEMAND_DECAY_SECONDS` (provisional 600) of
 instance age. Admission asks `measured_load +
@@ -462,6 +467,15 @@ phase 3's first smoke CI run locked its single node out
 permanently (`expected_demand` 8–12 against a bound of
 `0.75 × 8 = 6`) while the node sat essentially idle, failing
 13 tests with 507s. See the phase 3 plan's decision P9.
+
+*Amendment (2026-08-22, phase 4a):* the waiver stays, but it
+is no longer the only path a placement ever takes. With the
+seed corrected and the clause tested against the node's
+existing state rather than the incoming placement (phase 4a
+decision E2), the clause is satisfiable at every node size,
+so the waiver firing becomes a signal that the cluster is
+genuinely saturated rather than a signal that the guard is
+broken.
 
 ### Namespace-claim questions 14-19
 

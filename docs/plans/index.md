@@ -88,7 +88,7 @@ checker's blind spot, and the only numbers here it cannot recompute.
 | 2026-05-22 | [Generic allocator](PLAN-generic-allocator.md) | Replace five ad-hoc finite-resource allocators with a single primitive | Not started | 0 of 7 |
 | 2026-05-22 | [Network carrier model](PLAN-network-carrier-model.md) | A lease-based per-network carrier with VIP advertisement, retiring the network-node singleton | Not started | 0 of 12 |
 | 2026-05-22 | [Network service ports](PLAN-network-service-ports.md) | Per-network DNAT'd ports for managed services | Not started | 0 of 7 |
-| 2026-05-22 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Guarded-UPDATE capacity counters and namespace claims in place of read-then-place scheduling | In progress | 4 of 10 |
+| 2026-05-22 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Guarded-UPDATE capacity counters and namespace claims in place of read-then-place scheduling | In progress | 4 of 11 |
 | 2026-05-24 | [Queue performance and coalescing](PLAN-queue-performance.md) | Batched dequeue, and worker- and enqueue-side dedup of redundant cluster operations | In progress | 6 of 7 |
 | 2026-06-01 | [OIDC authentication](PLAN-oidc-authentication.md) | Federated login against an external OIDC provider | Not started | 0 of 10 |
 | 2026-06-02 | [Owning more of the QEMU stack](PLAN-qemu-futures.md) | Direct QMP control, and perhaps one day libvirt's job as well | Not started | — |

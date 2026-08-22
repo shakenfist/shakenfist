@@ -351,7 +351,7 @@ class SFConfig(BaseSettings):
         )
     )
     SCHEDULER_DEMAND_PER_VCPU: float = Field(
-        2.5,
+        0.6,
         description=(
             'The expected-demand feedforward term for scheduler '
             'reservations: each placement adds this much anticipated '
@@ -361,8 +361,16 @@ class SFConfig(BaseSettings):
             'measured metrics. The capacity reconciler decays each '
             'placement\'s contribution linearly to zero over '
             'SCHEDULER_DEMAND_DECAY_SECONDS of instance age. The '
-            'default is a provisional seed pending the scheduler '
-            'reservations phase 0 step 3 data analysis.'
+            'default is the conservative burst figure measured on a '
+            'CI-dominated cluster, where steady-state demand ran '
+            '0.12-0.35 load per allocated vCPU and a burst peak was '
+            'estimated at 0.6; the burst figure is the relevant one '
+            'because bursts are what the term exists to spread. A node '
+            'is refused only once its measured load plus expected '
+            'demand exceeds SCHEDULER_TARGET_LOAD per schedulable '
+            'thread, so this value sets how many '
+            'placements a quiet node absorbs before the scheduler '
+            'prefers its neighbours.'
         )
     )
     SCHEDULER_DEMAND_DECAY_SECONDS: int = Field(

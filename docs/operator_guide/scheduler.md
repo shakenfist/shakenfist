@@ -433,7 +433,7 @@ and set through each node's `/etc/sf/config`:
 | `CPU_OVERCOMMIT_RATIO` | 3.0 | vCPUs admitted per schedulable thread |
 | `SCHEDULER_TARGET_LOAD` | 0.75 | Target sustained load per schedulable thread, used for selection weighting |
 | `SCHEDULER_CACHE_TIMEOUT` | 5 | Seconds an sf-api worker caches its metrics view |
-| `SCHEDULER_DEMAND_PER_VCPU` | 2.5 | Anticipated load per vCPU of a freshly placed instance (provisional) |
+| `SCHEDULER_DEMAND_PER_VCPU` | 0.6 | Anticipated load per vCPU of a freshly placed instance |
 | `SCHEDULER_DEMAND_DECAY_SECONDS` | 600 | Seconds over which that anticipated load decays to zero (provisional) |
 
 ### Expected demand
@@ -449,19 +449,56 @@ the same node because none of them have started doing any work yet.
 Since scheduler-reservations phase 3 they do affect placement: each
 successful admission adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` to the
 target node's `expected_demand` counter in the same transaction, and
-the admission guard refuses a node whose `cpu_load_1 + expected_demand`
-would exceed `SCHEDULER_TARGET_LOAD × cpu_schedulable` -- a denial on
-this clause is reported as the `demand` dimension. The capacity
-reconciler still owns the decay: it recomputes each node's
+the admission guard refuses a node whose existing load is *already*
+above its target:
+
+```
+cpu_load_1 + expected_demand <= SCHEDULER_TARGET_LOAD × cpu_schedulable
+```
+
+A denial on this clause is reported as the `demand` dimension.
+
+The placement asking is deliberately not part of that comparison. The
+question the clause asks is whether the node is already over target,
+not whether it would be afterwards, so a node with real allocation room
+can never be refused however large the instance or however small the
+node. The instance's own contribution is charged to `expected_demand`
+by the same statement, so it counts against the *next* placement. That
+is what makes this a spreader rather than a bound: what stops a node
+accepting work it has no room for is the `cpus`, `memory_mb` and
+`disk_gb` dimensions of the same guard, not this one.
+
+It was not always so. Until scheduler-reservations phase 4a the clause
+added the incoming placement's charge to the left-hand side while the
+budget stayed denominated per schedulable thread, and
+`SCHEDULER_DEMAND_PER_VCPU` was seeded at 2.5 -- a figure transcribed
+from a measurement of allocated vCPUs per thread rather than of load
+per vCPU. Together those meant a node needed at least 3.34 schedulable
+threads before it could admit a 1-vCPU instance at zero load, and
+fourteen before it could admit a 4-vCPU one, so on small nodes the
+clause refused everything and the spreader never operated (issue
+#3813). If you are running a version older than that fix and your
+hypervisors have fewer than four schedulable threads, expect the
+`waiving demand guard` events described below on every single create.
+
+The capacity reconciler still owns the decay: it recomputes each node's
 `expected_demand` from placement ages every five minutes, and also
 publishes the matching `scheduler_capacity_node_expected_demand`
 metric. A refusal on `demand` behaves like any other guard denial: the
 caller walks to the next candidate. Setting `SCHEDULER_TARGET_LOAD` to
 zero or below disables the demand clause entirely rather than refusing
 every placement, which matters for a mid-upgrade caller whose request
-carries an unset field. The defaults are provisional, pending an
-analysis of accumulated cluster data, so expect them to change. There
-is no reason to tune them yet.
+carries an unset field.
+
+`SCHEDULER_DEMAND_PER_VCPU`'s default of 0.6 is the burst-peak figure
+measured on a CI-dominated cluster, where steady-state demand ran
+0.12-0.35 load per allocated vCPU; the burst figure is the relevant one
+because bursts are what the term exists to spread. In practice it sets
+how many placements a quiet node absorbs before the scheduler starts
+preferring its neighbours: at the defaults, a 12-thread node absorbs
+about fifteen 1-vCPU instances' worth of anticipated load before it
+reaches target. `SCHEDULER_DEMAND_DECAY_SECONDS` is still an unmeasured
+provisional value.
 
 Unlike the real dimensions, demand alone can never fail a create. The
 term exists to spread correlated bursts across nodes, not to bound
@@ -480,9 +517,29 @@ Note the steady-state cost on a cluster that stays demand-saturated
 admission still adds demand, every create pays both walks -- twice the
 admission RPCs and an extra pair of audit events -- until churn slows
 enough for the reconciler's decay to catch up. That is the accepted
-trade (a second walk is cheaper than a failed create), and frequent
-`waiving demand guard` events are the signal that the demand constants
-are mis-sized for the cluster rather than that anything is wrong.
+trade, since a second walk is cheaper than a failed create.
+
+One more thing to know before reading those events: **`expected_demand`
+is not credited back when an instance is deleted.** A placement's
+contribution has usually decayed by then, so subtracting the original
+figure would over-credit the node; the reconciler owns the decay
+instead, and it runs every five minutes. Under rapid create/delete
+churn a node therefore carries demand from instances that no longer
+exist, and with the clause binding, that residue alone can put it over
+target. Compare `scheduler_capacity_node_expected_demand` against the
+node's live instance count to tell the two apart: demand well above
+what the placed instances justify is residue waiting for the next
+reconcile pass, not load.
+
+Read `waiving demand guard` events accordingly.
+
+* **Occasional ones** mean every candidate was over target. That is
+  usually real saturation, but on a cluster doing rapid create/delete
+  churn it can be the residue above rather than live load.
+* **One on every create** means something is wrong with the sizing
+  rather than with the cluster -- either the demand constants are
+  mis-sized for this hardware, or you are running a version predating
+  the #3813 fix, where they could not be satisfied at all.
 
 ## Diagnosing a placement decision
 
