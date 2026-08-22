@@ -1298,6 +1298,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/consistency-audits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/release-automation/" class="md-nav__link">
         
   
@@ -1334,10 +1362,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_7" id="__nav_3_5_7_label" tabindex="0">
             
   
   
@@ -1355,8 +1383,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_6">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1381,6 +1409,34 @@
     
   
     Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits v2
   
 
     
@@ -1549,34 +1605,6 @@
     
   
     Systematic whole-codebase review tracking
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Title for the plan
   
 
     
@@ -8318,7 +8346,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.1
+    Control Socket Protocol — Version 1.2
   
 
     
@@ -12456,33 +12484,54 @@ now carries.</p>
 <p>The 0.20 release notes headline UDP batching via GSO/GRO,
 elimination of tokio scheduler overhead in datachannel
 operations, and opt-in send back-pressure. All three land on the
-<code>run_video_pump</code> write path (<code>bridge.rs:644</code>). Integration tests
+<code>run_video_pump</code> write path (<code>bridge.rs:1576</code>). Integration tests
 exercise that path for seconds; a regression there shows up over
 minutes.</p>
+<p>Phase 04's planning survey corrected four claims this section
+made; they are fixed in place below, and
+<a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-04-soak/">the phase plan</a>
+records what was wrong with each.</p>
 <ul>
 <li>A real browser session against a real SPICE guest, held long
-  enough to see steady-state behaviour, with the latency HUD and
-  runtime metrics captured. <strong>Listen to the audio</strong> while it is
-  open: phase 02's browser session confirmed the playback channel
-  negotiated Opus but nobody confirmed sound by ear, so that
-  Definition-of-done clause is inherited here.</li>
+  enough to see steady-state behaviour. <strong>Listen to the audio</strong>
+  while it is open: phase 02's browser session confirmed the
+  playback channel negotiated Opus but nobody confirmed sound by
+  ear, so that Definition-of-done clause is inherited here.
+  <em>Correction:</em> this section originally asked for "the latency
+  HUD and runtime metrics captured". Neither exists under
+  <code>--web</code> — both are GUI-mode-only — which phase 01 discovered
+  during 1a and worked around with external <code>/proc</code> sampling.
+  Phase 04 must sample the same way for the comparison to hold.</li>
 <li>Chrome and Firefox at minimum; Safari if a Mac is available.
   <strong>Firefox is a known blocker inherited from phase 02</strong>: a Firefox
   that does not offer H.264 gets no video at all, because ryll
   encodes H.264 only. Land #289 (tell the viewer) before soaking,
   and settle whether a Firefox with a working OpenH264 plugin is
-  enough for this criterion or whether ryll needs a second codec.</li>
+  enough for this criterion or whether ryll needs a second codec.
+  <em>Correction:</em> phase 01's Baseline conditions block concluded
+  Firefox "cannot be the phase-04 viewer on this host" after it
+  failed to establish ICE under 0.17. Phase 02 contradicted that
+  on 0.20 — ICE was fully healthy and everything but video
+  worked — so the blocker is codec-specific, not transport-specific.</li>
 <li>Compare RSS and CPU against a 0.17 baseline captured before
   the bump — take that baseline during phase 01 while we are
-  still on the old version.</li>
+  still on the old version. <em>Correction:</em> the baseline exists,
+  but the harness that produced it was never committed, so
+  reproducing its conditions is a phase 04 step
+  (<code>tools/web-soak.sh</code>) rather than a given.</li>
 <li>Run <code>RYLL_GATHERING_SOAK=1 make test</code> on a quiet host: the
   20-iteration invariant-candidate-count check on the gathering
   signal is off by default (host interface churn makes it flaky
   in CI) and this soak is exactly the deliberate occasion it is
   gated for.</li>
-<li>Update <code>ARCHITECTURE.md</code> and <code>AGENTS.md</code> if the bridge's task
-  and callback structure changed shape, which phase 02 makes
-  likely.</li>
+<li>Check <code>ARCHITECTURE.md</code> and <code>AGENTS.md</code> against the bridge's
+  shipped task and callback structure. <em>Correction:</em> this asked
+  phase 04 to update them "if the bridge's task and callback
+  structure changed shape, which phase 02 makes likely". It did,
+  and phase 02 already wrote it up — <code>AGENTS.md</code> carries a
+  "WebRTC conventions" section and <code>ARCHITECTURE.md</code>'s file tree
+  was corrected by phase 03. Phase 04 verifies rather than
+  writes.</li>
 </ul>
 <h2 id="phase-order">Phase order<a class="headerlink" href="#phase-order" title="Permanent link">&para;</a></h2>
 <table>
@@ -12502,7 +12551,7 @@ minutes.</p>
 <tr>
 <td>2. Atomic bump to 0.20</td>
 <td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/">PLAN-webrtc-0.20-upgrade-phase-02-bump.md</a></td>
-<td>Complete — Chromium session on <code>7e2fb58e</code> confirms the bind address. Firefox has no video, for a reason that is not a port regression (#289, #290); it is phase 04's gate, as is the audio check nobody performed by ear</td>
+<td>Complete — Chromium session on <code>7e2fb58e</code> confirms the bind address. Its two deferrals were discharged in phase 04: the audio check was performed by ear, and #289/#290 are fixed</td>
 </tr>
 <tr>
 <td>3. Socket binding configuration</td>
@@ -12511,15 +12560,18 @@ minutes.</p>
 </tr>
 <tr>
 <td>4. Soak validation and docs</td>
-<td>PLAN-webrtc-0.20-upgrade-phase-04-soak.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-04-soak/">PLAN-webrtc-0.20-upgrade-phase-04-soak.md</a></td>
+<td>Complete — audio confirmed by ear at last; the bump costs no CPU and slightly less memory, bisected either side of the phase-02 merge; #289/#290 fixed, plus four input bugs the browser check found. Safari unexercised (#310), Firefox still has no video (#311; #289 makes it legible)</td>
 </tr>
 </tbody>
 </table>
 <p>Phase 01 is a hard prerequisite for 02 only in the sense that it
 makes 02 tractable; 02 could be done standalone at higher risk.
 Phases 03 and 04 both depend on 02.</p>
-<p>Phase 02 is <code>Code complete</code> rather than <code>Complete</code>: the port
+<p>Phase 02 is now <code>Complete</code>: phase 04's browser sessions supplied the
+verification it was waiting for. What follows is the reasoning it
+was left open with, kept because it explains why.</p>
+<p>The port
 itself has landed on <code>webrtc = "0.20.2"</code> and both Renovate rules
 are gone, <code>rtc</code> is now a direct dependency, the standalone <code>rtp</code>
 and <code>rustls</code> dependencies are gone, datachannels and remote
@@ -12729,7 +12781,20 @@ sized phase 02, and two of them moved work between phases.</p>
   during the port so that negotiation differences stay
   attributable; worth revisiting once the phase-04 soak has a
   clean baseline.</li>
-<li>Give phase 03's configuration surface an interface allowlist,
+<li>
+<p>Let <code>--web-ice-server</code> carry TURN credentials. <code>RTCIceServer</code>
+  has <code>username</code> and <code>credential</code> fields and the bridge already
+  maps a URL string into one, but the flag takes a bare URL, so
+  an authenticated TURN server cannot be configured — only STUN
+  and open TURN work today. Associating a credential pair with a
+  specific URL is a flag-syntax question phase 03 deliberately
+  did not answer in half an hour. Phase 03's plan says twice that
+  this was "recorded in Future work"; phase 04's planning survey
+  found it had not been recorded anywhere at all, which is why it
+  appears here rather than in phase 03's commit.</p>
+</li>
+<li>
+<p>Give phase 03's configuration surface an interface allowlist,
   not just a port pin. Since 0.20 made socket binding the
   caller's job, <code>host_udp_bind_addrs</code> binds and advertises every
   non-loopback address the host has — including RFC 1918,
@@ -12742,7 +12807,8 @@ sized phase 02, and two of them moved work between phases.</p>
   review of PR #278. <strong>Carried into phase 03's plan</strong> as
   <code>--web-media-addr</code>, which takes an interface name as well as an
   address; phase 02's other deferral, an opt-in for loopback-only
-  hosts, falls out of the same flag.</li>
+  hosts, falls out of the same flag.</p>
+</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>Two, both found by the automated review of PR #278 and both

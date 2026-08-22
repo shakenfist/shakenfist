@@ -27,7 +27,7 @@
     
     
       
-        <title>Control Socket Protocol — Version 1.1 - Shaken Fist</title>
+        <title>Control Socket Protocol — Version 1.2 - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#control-socket-protocol-version-11" class="md-skip">
+        <a href="#control-socket-protocol-version-12" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Control Socket Protocol — Version 1.1
+              Control Socket Protocol — Version 1.2
             
           </span>
         </div>
@@ -1298,6 +1298,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/consistency-audits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1334,10 +1362,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_7" id="__nav_3_5_7_label" tabindex="0">
             
   
   
@@ -1355,8 +1383,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_6">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1381,6 +1409,34 @@
     
   
     Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits v2
   
 
     
@@ -1549,34 +1605,6 @@
     
   
     Systematic whole-codebase review tracking
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Title for the plan
   
 
     
@@ -8327,7 +8355,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.1
+    Control Socket Protocol — Version 1.2
   
 
     
@@ -8345,7 +8373,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.1
+    Control Socket Protocol — Version 1.2
   
 
     
@@ -12934,14 +12962,15 @@
   
 
 
-<h1 id="control-socket-protocol-version-11">Control Socket Protocol — Version 1.1<a class="headerlink" href="#control-socket-protocol-version-11" title="Permanent link">&para;</a></h1>
-<p>This document specifies the wire protocol spoken between Ryll's headless
-mode and any external driver that connects to its Unix-domain control
-socket. It is the load-bearing contract for the automated
-SPICE-test-harness work: external drivers such as latency loadtests
-and Sextant scenario tests implement against this document. Read the
-whole document before writing a client or implementing a verb.</p>
-<p>Protocol version: <strong>1.1</strong></p>
+<h1 id="control-socket-protocol-version-12">Control Socket Protocol — Version 1.2<a class="headerlink" href="#control-socket-protocol-version-12" title="Permanent link">&para;</a></h1>
+<p>This document specifies the wire protocol spoken between a Ryll session
+with no host window — <code>--headless</code> or <code>--web</code> — and any external driver
+that connects to its Unix-domain control socket. It is the load-bearing
+contract for the automated SPICE-test-harness work: external drivers
+such as latency loadtests and Sextant scenario tests implement against
+this document. Read the whole document before writing a client or
+implementing a verb.</p>
+<p>Protocol version: <strong>1.2</strong></p>
 <p>Version history:</p>
 <ul>
 <li><strong>1.0</strong> — initial.  <code>hello</code>, <code>status</code>, <code>send_key</code>, <code>paste</code>,
@@ -12955,6 +12984,14 @@ whole document before writing a client or implementing a verb.</p>
   Cargo feature.  Backwards-compatible at the major-version
   level: v1.0 clients can still hello and operate; they just
   do not subscribe to v1.1 events.</li>
+<li><strong>1.2</strong> — the socket became available in <code>--web</code> mode as well as
+  <code>--headless</code>; no wire change, but the flag combination a client
+  can expect to find a socket behind is wider.  Corrected
+  <code>send_key</code>'s encoding of 0xE0-prefixed extended scancodes, which
+  every version before this transmitted with the prefix byte second
+  and the break bit on the prefix rather than the scancode — see
+  the note under <a href="#send_key"><code>send_key</code></a>.  Plain scancodes are
+  unaffected, so a client that only sends those sees no difference.</li>
 </ul>
 <hr />
 <h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">&para;</a></h2>
@@ -12978,8 +13015,9 @@ whole document before writing a client or implementing a verb.</p>
 <h2 id="scope-and-non-goals">Scope and non-goals<a class="headerlink" href="#scope-and-non-goals" title="Permanent link">&para;</a></h2>
 <h3 id="what-this-protocol-covers">What this protocol covers<a class="headerlink" href="#what-this-protocol-covers" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Driving a headless Ryll session from an external process over a
-  Unix-domain socket.</li>
+<li>Driving a Ryll session that has no host window — <code>--headless</code> or
+  <code>--web</code> — from an external process over a Unix-domain socket. The
+  GUI cannot host the socket; see the Transport section.</li>
 <li>Querying session state (SPICE connection status, surfaces, agent
   availability).</li>
 <li>Sending keyboard input as individual scancodes or as paste-as-
@@ -12988,8 +13026,8 @@ whole document before writing a client or implementing a verb.</p>
 <li>Subscribing to an asynchronous stream of events: SPICE latency
   samples, agent connect/disconnect transitions, paste completion
   notifications, per-draw surface notifications, decoded
-  visual-digest updates (on <code>digest-decode</code> builds), and
-  queue-overflow notifications.</li>
+  visual-digest updates (on <code>digest-decode</code> builds, in both
+  <code>--headless</code> and <code>--web</code>), and queue-overflow notifications.</li>
 <li>Negotiating the protocol version at connection time so clients and
   servers can evolve independently within a major version.</li>
 </ul>
@@ -13004,9 +13042,11 @@ whole document before writing a client or implementing a verb.</p>
 <li><strong>Multi-client concurrency.</strong> Version 1 accepts exactly one client at
   a time. A second connection attempt while a client is connected
   receives a <code>busy</code> error and is closed immediately.</li>
-<li><strong>Control socket in GUI or web mode.</strong> The socket is only valid in
-  <code>--headless</code> mode. Combining <code>--control-socket</code> with the GUI or
-  <code>--web</code> flag is a CLI error.</li>
+<li><strong>Control socket in GUI mode.</strong> The socket is valid with
+  <code>--headless</code> or <code>--web</code>, both of which run a session with no host
+  window. Combining <code>--control-socket</code> with the GUI is a CLI error:
+  the window owns input and the surface, so a second driver
+  injecting events behind its back has no defined meaning.</li>
 <li><strong>Replacing the <code>--cadence</code>, <code>--paste-text</code>, or <code>--latency-file</code>
   flags.</strong> Those flags keep working unchanged. The control socket is a
   new, orthogonal interface.</li>
@@ -13015,9 +13055,8 @@ whole document before writing a client or implementing a verb.</p>
 <h2 id="transport">Transport<a class="headerlink" href="#transport" title="Permanent link">&para;</a></h2>
 <p>The control socket is a <strong>Unix-domain stream socket</strong> (type
 <code>SOCK_STREAM</code>). Its path is supplied by the caller via Ryll's
-<code>--control-socket &lt;path&gt;</code> flag. This flag is only valid when
-<code>--headless</code> is also present; Ryll will reject the combination with
-any other operating mode.</p>
+<code>--control-socket &lt;path&gt;</code> flag. This flag needs <code>--headless</code> or
+<code>--web</code>; Ryll rejects it in GUI mode at launch.</p>
 <p>On startup, Ryll:</p>
 <ol>
 <li>Unlinks any existing file at the path (so a stale socket from a
@@ -13213,7 +13252,7 @@ order should be able to recover without reconnecting.</p>
 </tbody>
 </table>
 <h3 id="hello-response-success">Hello response — success<a class="headerlink" href="#hello-response-success" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"server_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">,</span><span class="w"> </span><span class="nt">"protocol_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"supported_methods"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"hello"</span><span class="p">,</span><span class="w"> </span><span class="s2">"status"</span><span class="p">,</span><span class="w"> </span><span class="s2">"send_key"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste"</span><span class="p">,</span><span class="w"> </span><span class="s2">"screenshot"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscribe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"unsubscribe"</span><span class="p">],</span><span class="w"> </span><span class="nt">"supported_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"latency"</span><span class="p">,</span><span class="w"> </span><span class="s2">"agent_connected"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_completed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_failed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"dropped"</span><span class="p">,</span><span class="w"> </span><span class="s2">"surface_drawn"</span><span class="p">]}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"server_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">,</span><span class="w"> </span><span class="nt">"protocol_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.2"</span><span class="p">,</span><span class="w"> </span><span class="nt">"supported_methods"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"hello"</span><span class="p">,</span><span class="w"> </span><span class="s2">"status"</span><span class="p">,</span><span class="w"> </span><span class="s2">"send_key"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste"</span><span class="p">,</span><span class="w"> </span><span class="s2">"screenshot"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscribe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"unsubscribe"</span><span class="p">],</span><span class="w"> </span><span class="nt">"supported_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"latency"</span><span class="p">,</span><span class="w"> </span><span class="s2">"agent_connected"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_completed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_failed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"dropped"</span><span class="p">,</span><span class="w"> </span><span class="s2">"surface_drawn"</span><span class="p">]}}</span>
 </code></pre></div>
 <p>Result fields:</p>
 <table>
@@ -13233,7 +13272,7 @@ order should be able to recover without reconnecting.</p>
 <tr>
 <td><code>protocol_version</code></td>
 <td>string</td>
-<td>The version the server will speak. In v1.x this is <code>"1.1"</code>; in v1.0 servers it was <code>"1.0"</code>. Clients should not compare for exact equality — see the compat note below.</td>
+<td>The version the server will speak. In v1.x this is <code>"1.2"</code>; older servers reported <code>"1.0"</code> or <code>"1.1"</code>. Clients should not compare for exact equality — see the compat note below.</td>
 </tr>
 <tr>
 <td><code>supported_methods</code></td>
@@ -13359,7 +13398,7 @@ completeness as a verb-reference entry.</p>
 </table>
 <p>Worked example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 </code></pre></div>
 <hr />
 <h3 id="status"><code>status</code><a class="headerlink" href="#status" title="Permanent link">&para;</a></h3>
@@ -13445,7 +13484,7 @@ completeness as a verb-reference entry.</p>
 <tr>
 <td><code>scancode</code></td>
 <td>u16</td>
-<td>The AT-set 1 <strong>make</strong> code to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. <code>0xE04B</code> for left arrow.</td>
+<td>The AT-set 1 <strong>make</strong> code to send, in <strong>logical</strong> form — the way scancode tables are conventionally written. Extended scancodes (0xE0 prefix) are supplied as the full 16-bit value with the prefix byte in the <strong>high</strong> byte, e.g. <code>0xE04B</code> for left arrow. This is not the byte order SPICE uses on the wire; the server converts. Do not send a pre-swapped wire value.</td>
 </tr>
 <tr>
 <td><code>state</code></td>
@@ -13454,14 +13493,34 @@ completeness as a verb-reference entry.</p>
 </tr>
 </tbody>
 </table>
-<p>The server applies the AT-set 1 release encoding itself: for <code>"up"</code>
-(and the up half of <code>"press"</code>) it sets the release bit
-(<code>scancode | 0x80</code>, which for extended scancodes lands on the low
-byte, after the 0xE0 prefix) before injecting the event. Clients
-supply the make code for every state. A client that passes an
-already-encoded release code for <code>"up"</code> still works — the release
-bit is not double-applied — but this is a compatibility affordance,
-not the documented interface.</p>
+<p>The server owns both halves of the AT-set 1 encoding, and a client
+should send the logical make code for every state:</p>
+<ul>
+<li><strong>Byte order.</strong> SPICE carries the scancode as a little-endian
+  32-bit value, and the wire wants the <code>0xE0</code> prefix <em>first</em>. The
+  server swaps the two bytes, so the logical <code>0xE04B</code> is transmitted
+  as <code>E0 4B</code>.</li>
+<li><strong>Release bit.</strong> For <code>"up"</code> (and the up half of <code>"press"</code>) the
+  server sets the break bit, which belongs on the scancode byte
+  rather than on the prefix.</li>
+</ul>
+<p>A client that passes a logical code with the release bit already set
+for <code>"up"</code> — <code>0x9E</code> rather than <code>0x1E</code>, or <code>0xE0CB</code> rather than
+<code>0xE04B</code> — still produces the identical wire value, because the
+server ORs the bit in and OR-ing a set bit is a no-op. That
+affordance is guaranteed and covered by a test.</p>
+<blockquote>
+<p><strong>Protocol 1.1 and earlier got extended keys wrong.</strong> Servers
+before 1.2 injected the supplied value verbatim, so <code>0xE04B</code>
+reached the guest as <code>4B E0</code> — prefix second — and <code>| 0x80</code> put
+the break bit on the prefix byte. Every 0xE0-prefixed key was
+wrong in both directions, and a client could only reach the guest
+correctly by sending a pre-swapped wire value, which 1.2 rejects
+as the malformed input it always was. Plain (non-extended)
+scancodes are unaffected and behave identically across both
+versions. A client that needs extended keys should require
+<code>protocol_version</code> ≥ 1.2 from <code>hello</code>.</p>
+</blockquote>
 <p>Result on success: <code>{}</code></p>
 <p>Verb-specific error codes:</p>
 <table>
@@ -14181,7 +14240,7 @@ domain-specific codes.</p>
 <hr />
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
 <p>The protocol version is a dotted <code>major.minor</code> string. The current
-version is <strong>1.1</strong>.</p>
+version is <strong>1.2</strong>.</p>
 <p>Rules:</p>
 <ul>
 <li>A <strong>major</strong> version bump (e.g. 1.x → 2.0) indicates a breaking
@@ -14197,6 +14256,14 @@ version is <strong>1.1</strong>.</p>
   but different minor versions SHOULD interoperate. The server accepts
   any <code>hello</code> whose <code>protocol_version</code> has a matching major, regardless
   of the minor component.</li>
+<li>A minor bump is also used for a <strong>correction to behaviour that was
+  never usable as specified</strong> — 1.2's extended-scancode fix is the
+  only instance so far. It is not a major bump because nothing about
+  the envelope, verb set or field types changes, and a client cannot
+  have been depending on the broken behaviour while also reaching the
+  guest correctly. It gets a version number rather than passing
+  silently so that a client needing the fixed behaviour has something
+  to test for.</li>
 </ul>
 <p>Forward-compatibility obligations:</p>
 <ul>
@@ -14208,9 +14275,11 @@ version is <strong>1.1</strong>.</p>
   error rather than panicking. Servers must also silently ignore unknown
   event names in <code>subscribe</code>/<code>unsubscribe</code> params.</li>
 </ul>
-<p>Version 1.0 was the first published version. Version 1.1 (the
-current version) added the <code>surface_drawn</code> and <code>digest_updated</code>
-events; see the version history at the top of this document.</p>
+<p>Version 1.0 was the first published version. Version 1.1 added the
+<code>surface_drawn</code> and <code>digest_updated</code> events. Version 1.2 (the
+current version) extended the socket to <code>--web</code> mode and corrected
+<code>send_key</code>'s extended-scancode encoding; see the version history at
+the top of this document.</p>
 <hr />
 <h2 id="end-to-end-worked-example">End-to-end worked example<a class="headerlink" href="#end-to-end-worked-example" title="Permanent link">&para;</a></h2>
 <p>The following transcript shows a complete client session: connect,
@@ -14218,7 +14287,7 @@ hello, status, subscribe, a latency event arriving, a key press, a
 paste with async completion, and then disconnect. Arrow direction
 indicates the sender: <code>→</code> is client-to-server, <code>←</code> is server-to-client.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 <a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>→ {"id": 2, "method": "status", "params": {}}
 <a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 <a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>→ {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -14262,10 +14331,17 @@ listening for the next client.</p>
 <h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
 <p>Everything above this point is the contract. This section describes
 how ryll implements it, and is not binding on other implementations.</p>
-<p>The control socket is exposed by headless mode via the
-<code>--control-socket &lt;path&gt;</code> CLI flag. The flag is only valid when
-<code>--headless</code> is also present; combining it with the GUI or <code>--web</code>
-flag is a CLI error caught before the SPICE session starts.</p>
+<p>The control socket is exposed by headless and web mode via the
+<code>--control-socket &lt;path&gt;</code> CLI flag; the GUI rejects it at launch.
+Both modes spawn the same server through
+<code>shakenfist_spice_renderer::spawn_control_socket</code>, so the two cannot
+drift apart.</p>
+<p>Web mode gained a socket in the webrtc-rs 0.20 upgrade's phase 04. It
+was headless-only until then, which meant the scenario tests that
+drive a session through this protocol and assert on the QR visual
+digest could not observe web mode at all -- and web mode is the one
+mode with its own browser-side scancode table. Four input bugs
+shipped behind that gap.</p>
 <p><strong>Module layout.</strong> The control surface lives entirely under
 <code>shakenfist-spice-renderer/src/control/</code>:</p>
 <table>

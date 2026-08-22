@@ -117,6 +117,10 @@
          <lastmod>2026-08-22</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/consistency-audits/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/release-automation/</loc>
          <lastmod>2026-08-22</lastmod>
     </url>
@@ -2390,6 +2394,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-04-soak/</loc>
          <lastmod>2026-08-22</lastmod>
     </url>
     <url>

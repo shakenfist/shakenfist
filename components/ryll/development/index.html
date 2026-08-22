@@ -1298,6 +1298,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/consistency-audits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1334,10 +1362,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_7" id="__nav_3_5_7_label" tabindex="0">
             
   
   
@@ -1355,8 +1383,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_6">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1381,6 +1409,34 @@
     
   
     Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits v2
   
 
     
@@ -1549,34 +1605,6 @@
     
   
     Systematic whole-codebase review tracking
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Title for the plan
   
 
     
@@ -8318,7 +8346,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.1
+    Control Socket Protocol — Version 1.2
   
 
     
@@ -8522,6 +8550,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Test suite specifics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#soaking-web-and-comparing-against-a-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Soaking --web and comparing against a baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -12330,6 +12375,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Test suite specifics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#soaking-web-and-comparing-against-a-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Soaking --web and comparing against a baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -12685,6 +12747,41 @@ still surface only in the merge tier.</p>
 <p>Integration testing against real traffic needs a SPICE server;
 <code>make test-qemu</code> starts one locally. Headless mode is what CI uses for
 protocol-level testing.</p>
+<h3 id="soaking-web-and-comparing-against-a-baseline">Soaking <code>--web</code> and comparing against a baseline<a class="headerlink" href="#soaking-web-and-comparing-against-a-baseline" title="Permanent link">&para;</a></h3>
+<p><code>tools/web-soak.sh</code> samples a running <code>ryll --web</code> process while
+driving the guest, and prints a summary in the same shape as the
+0.17 baseline recorded in
+<code>docs/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework.md</code>. Reach for
+it when a change could plausibly affect memory or CPU over minutes
+rather than seconds — the WebRTC write path especially, where the
+integration tests only ever exercise a few seconds.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>test-qemu<span class="w">                       </span><span class="c1"># guest, SPICE on 5900, QMP socket</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span><span class="p">&amp;</span><span class="w"> </span><span class="c1"># the process to sample</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tools/web-soak.sh<span class="w"> </span>--pid<span class="w"> </span><span class="nv">$!</span><span class="w"> </span>--qmp<span class="w"> </span>/tmp/ryll-test-qemu-qmp.sock
+</code></pre></div>
+<p>Defaults are a 20-minute run sampled every 30 s, which is what the
+baseline used; both are overridable. Per sample it records RSS,
+per-thread CPU, whole-host CPU busy% and load average, to a CSV as
+well as the terminal. The host figures are there because these soaks
+usually run on a shared machine: contamination belongs in the data,
+not folded into the result.</p>
+<p>Two things it deliberately does not do. It does not start ryll or a
+browser — an attended session is the point, and the numbers are only
+comparable if the browser and its flags match whatever the baseline
+used. And it does not read the pump drop counters or reaper events,
+which ryll logs at <code>debug</code>; run ryll with <code>--verbose</code> and take them
+out of the session log.</p>
+<p>Note that <code>--verbose</code> turns on <code>debug</code> for the whole dependency tree,
+not just ryll — webrtc-rs is talkative at that level. That is enough
+log to affect the numbers on a long run, so take the counters from a
+short separate session rather than from the one being measured.
+<code>RUST_LOG</code> will not narrow it: ryll does not read it. Tracked as
+<a href="https://github.com/shakenfist/ryll/issues/313">#313</a>; when that
+lands, this paragraph goes away.</p>
+<p>If you are driving the uefi-latency-guest, note that any keypress
+advances a fixed eight-colour cycle and one step in eight is black,
+so the viewer legitimately goes black for one interval in eight. The
+script says so at startup.</p>
 <h2 id="manual-verification-against-a-desktop-guest">Manual verification against a desktop guest<a class="headerlink" href="#manual-verification-against-a-desktop-guest" title="Permanent link">&para;</a></h2>
 <p>Some behaviour cannot be tested from the automated suite at all,
 because it needs a guest with a desktop session in it. <code>make
@@ -12693,8 +12790,8 @@ with <code>spice-vdagent</code>, an <code>intel-hda</code> audio device, user-mo
 networking and a cloud-init seed ISO. XFCE autologins as <code>debian</code>
 (password <code>ryll</code>), and the image ships with the screensaver and
 lock screen disabled.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>test-qemu-desktop
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>target/release/ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make<span class="w"> </span>test-qemu-desktop
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>target/release/ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900
 </code></pre></div>
 <p>Each run starts from a fresh qcow2 overlay, so the downloaded base
 image stays pristine and repeated runs begin from identical state.
@@ -12728,6 +12825,17 @@ a symptom that looks like a client bug:</p>
 </tr>
 </tbody>
 </table>
+<p>The image ships <strong>no audio player</strong> — no <code>alsa-utils</code>,
+<code>pulseaudio-utils</code> or libcanberra — so there is nothing in it that
+can make a sound, and the audio check below cannot be done until you
+add one:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>alsa-utils<span class="w">      </span><span class="c1"># in the guest</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>speaker-test<span class="w"> </span>-t<span class="w"> </span>sine<span class="w"> </span>-f<span class="w"> </span><span class="m">440</span><span class="w"> </span>-l<span class="w"> </span><span class="m">3</span>
+</code></pre></div>
+<p>The guest has user-mode networking, so that works out of the box.
+Worth knowing before you conclude the audio path is broken: silence
+with no player installed looks exactly like silence with a broken
+playback channel.</p>
 <p>Worth checking in ryll's own log when verifying <code>--web</code>:</p>
 <ul>
 <li><code>main: mouse mode=N (...)</code> — <code>2</code> is client mode, which is what a
@@ -12743,28 +12851,50 @@ a symptom that looks like a client bug:</p>
 </ul>
 <h3 id="a-browser-with-no-h264-gets-no-video">A browser with no H.264 gets no video<a class="headerlink" href="#a-browser-with-no-h264-gets-no-video" title="Permanent link">&para;</a></h3>
 <p>ryll's web mode encodes H.264 and nothing else, so a browser that does
-not offer H.264 connects successfully and shows a black rectangle.
-Audio, input, cursor and viewport resize all keep working, which makes
-the symptom look like a rendering bug rather than a negotiation one.
-The server-side tell is the <code>no H.264 payload type negotiated</code> warning
-followed by an endless <code>Failed to send RTP: unsupported codec type by
-this transceiver</code>.</p>
+not offer H.264 connects successfully and gets no picture. Audio,
+input, cursor and viewport resize all keep working, which is what
+makes the symptom look like a rendering bug rather than a negotiation
+one.</p>
+<p>The browser is told: the page shows a panel over the video area
+explaining that this browser offered no H.264 and pointing at the
+OpenH264 plugin. The server logs <code>no H.264 payload type negotiated</code>
+once, stops the encoder for that session, and parks the video pump —
+so a session in this state costs no CPU and produces no further log
+output. Before that fix (issues #289 and #290) the only signal was a
+black rectangle, and the log filled with one
+<code>Failed to send RTP: unsupported codec type by this transceiver</code> per
+packet at the frame rate.</p>
+<p>The notice is sent in reply to the browser's <code>hello</code>, not pushed when
+negotiation settles: negotiation finishes inside <code>accept_offer</code>,
+before SCTP has opened the control datachannel, and anything written
+then is dropped. This is the same pull the mouse mode uses, for the
+same reason.</p>
 <p>Firefox is the browser this happens on. It ships H.264 for WebRTC via
 Cisco's OpenH264 plugin, and if that plugin has not loaded, Firefox
 still lists H.264 in <code>RTCRtpReceiver.getCapabilities('video')</code> while
 omitting it from the offer — so the capability list is not evidence.
-Check <code>about:addons</code> → Plugins for OpenH264, and confirm against a
-generated offer rather than against capabilities.</p>
+<code>tools/browser-offer-probe.py</code> is the check that follows from that. It
+serves a page to a browser, prints the video codecs from the offer the
+page actually generated with <code>getCapabilities</code> beside them, and exits
+non-zero when the two disagree:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tools/browser-offer-probe.py<span class="w"> </span>--browser<span class="w"> </span>chromium
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>tools/browser-offer-probe.py<span class="w"> </span>--browser<span class="w"> </span>firefox-esr<span class="w"> </span>--profile<span class="w"> </span>~/.mozilla/firefox/&lt;profile&gt;
+</code></pre></div>
+<p>Pass a real <code>--profile</code> for Firefox. Without one it uses a throwaway
+profile, which has never downloaded OpenH264 and would report no H.264
+for a reason that has nothing to do with the browser you meant to
+test.</p>
 <p>Chromium carries H.264 in-tree and does not have this failure mode,
 which makes it the browser to reach for when deciding whether a
-problem is ryll's.</p>
+problem is ryll's — and the control to run the probe against when
+deciding whether the probe itself is telling the truth.</p>
 <h3 id="inspecting-a-capture-pcap">Inspecting a <code>--capture</code> pcap<a class="headerlink" href="#inspecting-a-capture-pcap" title="Permanent link">&para;</a></h3>
 <p><code>tools/pcap-inspect.py</code> is a pure-Python helper (no tshark
 or scapy dependency) for sifting through a ryll capture.
 Three subcommands:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
 </code></pre></div>
 <p>Typical use: when investigating a rendering artefact,
 <code>opcodes</code> tells you whether the problem window even
@@ -12781,7 +12911,7 @@ stream. The helper handles that without any extra flags.</p>
 <p><code>tools/web-smoke.sh</code> verifies that <code>ryll --web</code> starts,
 binds the HTTP server, and shuts down cleanly on SIGTERM.
 Usage:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
 </code></pre></div>
 <p>Defaults to <code>target/release/ryll</code>; <code>WEB_PORT</code> env var
 overrides the port (default <code>18080</code>). The script creates a

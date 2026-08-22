@@ -1298,6 +1298,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/consistency-audits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1334,10 +1362,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_7" id="__nav_3_5_7_label" tabindex="0">
             
   
   
@@ -1355,8 +1383,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_6">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1381,6 +1409,34 @@
     
   
     Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits v2
   
 
     
@@ -1549,34 +1605,6 @@
     
   
     Systematic whole-codebase review tracking
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Title for the plan
   
 
     
@@ -8318,7 +8346,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.1
+    Control Socket Protocol — Version 1.2
   
 
     
@@ -12222,8 +12250,9 @@ is no standing gap-closure plan — gaps get closed by mode-specific
 work (the <a href="/components/ryll/plans/PLAN-web-frontend/">web frontend plan</a> closed the
 Web column's MVP set; the control socket work gave headless an
 interactive driving surface). Last full audit: the web frontend
-sweep; control-socket cells refreshed 2026-07-30, media socket
-binding added 2026-08-21.</p>
+sweep; control-socket cells refreshed 2026-08-23 (web mode gained
+the socket, its <code>status</code> and event rows, and the shared digest
+poller), media socket binding added 2026-08-21.</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12279,21 +12308,21 @@ binding added 2026-08-21.</p>
 </tr>
 <tr>
 <td>Control socket (<code>--control-socket</code>)</td>
-<td>n/a — intrinsic (requires <code>--headless</code>; combining with the GUI is a CLI error)</td>
+<td>n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error)</td>
 <td>available</td>
-<td>n/a — intrinsic (requires <code>--headless</code>; combining with <code>--web</code> is a CLI error)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>Session state query (<code>status</code> verb)</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
-<td>n/a — intrinsic</td>
+<td>available (<code>run_web</code> builds a <code>SessionStatus</code> from the same <code>spice_connected</code> / <code>agent_connected</code> flags and surface mirror headless uses)</td>
 </tr>
 <tr>
 <td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>digest_updated</code>)</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>digest_updated</code> needs the <code>digest-decode</code> build feature)</td>
-<td>n/a — intrinsic</td>
+<td>available (same <code>event_broadcast_tx</code>; <code>digest_updated</code> needs the <code>digest-decode</code> build feature, and the poller is spawned only when <code>--control-socket</code> is given so an ordinary browser session does not pay to decode QR)</td>
 </tr>
 <tr>
 <td><strong>Display</strong></td>
@@ -12430,8 +12459,8 @@ binding added 2026-08-21.</p>
 <tr>
 <td>Extended key prefix (E0 for nav cluster)</td>
 <td>available</td>
-<td>available (the control socket <code>send_key</code> verb accepts 0xE0-prefixed 16-bit scancodes; cadence alone only sends space)</td>
-<td>available (browser shell builds its own AT table)</td>
+<td>available (the control socket <code>send_key</code> verb accepts 0xE0-prefixed 16-bit scancodes in logical form and converts them; protocol 1.1 and earlier sent them prefix-second and unusable — see docs/control-socket-protocol.md. Cadence alone only sends space)</td>
+<td>available (browser table is in logical form; ryll converts via <code>make_scancode</code>)</td>
 </tr>
 <tr>
 <td>Modifier state tracking (Ctrl/Shift/Alt)</td>

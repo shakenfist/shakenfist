@@ -1298,6 +1298,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/consistency-audits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1334,10 +1362,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_7" id="__nav_3_5_7_label" tabindex="0">
             
   
   
@@ -1355,8 +1383,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_6">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1381,6 +1409,34 @@
     
   
     Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audits v2
   
 
     
@@ -1549,34 +1605,6 @@
     
   
     Systematic whole-codebase review tracking
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Title for the plan
   
 
     
@@ -8318,7 +8346,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.1
+    Control Socket Protocol — Version 1.2
   
 
     
@@ -13170,8 +13198,8 @@ actually running at:</p>
 <p>and compare it to the browser window. In the browser console,
 <code>[ryll] viewport sent: W x H</code> says the viewport message went out;
 <code>[ryll] viewport deferred</code> means the control channel was not open
-yet and it will be re-sent when it opens. Server-side, run with
-<code>RUST_LOG=info,ryll::web=debug</code> and look for:</p>
+yet and it will be re-sent when it opens. Server-side, run ryll with
+<code>--verbose</code> and look for:</p>
 <div class="highlight"><pre><span></span><code>web inputs: viewport WxH
 </code></pre></div>
 <p>If that never appears, the guest is not being told to resize — the
