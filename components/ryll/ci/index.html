@@ -8492,6 +8492,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#build-network-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build network isolation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#supply-chain-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12327,6 +12338,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#build-network-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build network isolation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#supply-chain-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12744,6 +12766,100 @@ another. The PR number does.</p>
 <p>Scheduled, push-to-default, and release workflows must <strong>not</strong>
 enable <code>cancel-in-progress</code>. Cancelling a release mid-publish,
 or a renovate run mid-PR-creation, leaves partial state behind.</p>
+<h2 id="build-network-isolation">Build network isolation<a class="headerlink" href="#build-network-isolation" title="Permanent link">&para;</a></h2>
+<p>Cargo runs a dependency's <code>build.rs</code> as ordinary code at compile
+time, so a compromised crate can execute during a plain <code>cargo
+build</code> — before any ryll code runs, and on every job that merely
+compiles. To contain that, the Makefile splits the build in two:</p>
+<ul>
+<li><code>make fetch</code> (<code>cargo fetch</code>) downloads every crate named in
+  <code>Cargo.lock</code> but compiles nothing, so no build script runs. It
+  is the only build step allowed network access.</li>
+<li>the targets that compile the workspace — <code>build</code>,
+  <code>build-tokio-console</code>, <code>release</code>, <code>check-windows</code>, <code>test</code>, <code>lint</code>
+  and <code>lint-fix</code> — then run in the devcontainer with <code>--network
+  none</code> and the cargo cache mounted read-only. A malicious build
+  script cannot reach a C2 or exfiltrate secrets (its download call
+  fails and the build aborts loudly), and it cannot poison the
+  cache for the rest of the job.</li>
+</ul>
+<p>This is the same reason docs.rs builds every crate offline, and is
+what would have turned the 2026-08-20 <code>arrayref</code> / <code>proc-macro1</code>
+build-script dropper (reported as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/rustsec/advisory-db/issues/3161" title="GitHub Issue: rustsec/advisory-db #3161">rustsec/advisory-db#3161</a>; no
+<code>RUSTSEC-YYYY-NNNN</code> id had been assigned at the time of writing)
+into a loud build failure rather than a silent compromise.</p>
+<p>Three targets still compile with the network up, and both of the
+lanes they serve are real: <code>fuzz</code> runs on every merge-group entry
+and <code>publish-crates</code> on every release.</p>
+<ul>
+<li><code>fuzz-build-%</code> and <code>fuzz-smoke-%</code> build the detached fuzz
+  workspace (see <code>shakenfist-spice-protocol/fuzz/Cargo.toml</code>'s
+  <code>[workspace]</code> table), which <code>make fetch</code> does not populate, so
+  they must still resolve and download at compile time. Isolating
+  them needs a second <code>cargo fetch</code> against that workspace first,
+  tracked in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/306" title="GitHub Issue: shakenfist/ryll #306">ryll#306</a>.</li>
+<li><code>publish-crates</code> runs <code>cargo publish</code>, which builds each crate as
+  part of its verify step and genuinely needs the network to
+  upload. This one cannot be isolated.</li>
+</ul>
+<p>(<code>fuzz-fmt-check</code> also runs networked, but it only runs <code>cargo
+fmt --check</code> and compiles nothing. So do <code>deb</code>, <code>rpm</code> and the
+<code>web-smoke</code> targets, which repackage or run the binary <code>release</code>
+already produced.)</p>
+<p>Outside the Makefile entirely: release's <code>build-ryll-wheels</code> job
+runs <code>tools/build-ryll-wheel.sh</code>, which builds ryll with maturin
+inside <code>quay.io/pypa/manylinux_2_28_*</code> rather than the
+devcontainer, with network and without <code>--frozen</code>. That is a
+shipped artifact — it is what <code>pip install ryll</code> gets — so it is
+the most significant gap here. Closing it needs the same
+fetch/compile split inside the manylinux image, tracked in
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/305" title="GitHub Issue: shakenfist/ryll #305">ryll#305</a>; until then the wheel is built on the same
+terms as before this change.</p>
+<p>Because those jobs write the cargo cache with the network up,
+they save it under their own <code>actions/cache</code> key prefix
+(<code>fuzz-cargo-cache</code>, <code>publish-cargo-cache</code>) rather than the shared
+one. Otherwise a networked, writable-cache job could hand the next
+run's isolated build the very cache the read-only mount exists to
+protect — the mount stops poisoning within a job, not across them.</p>
+<p>What the isolation does not buy: the checkout stays mounted
+read-write, because the build has to write <code>target/</code>. A build
+script running offline can therefore still modify the source tree,
+<code>tools/*.sh</code> and the build output — the defence stops exfiltration
+and cache poisoning, not tampering. That matters because networked
+steps run afterwards in the same workspace (<code>make deb</code>, <code>make
+rpm</code>, <code>make web-smoke</code>, and the release job's upload of
+<code>target/release/ryll</code> as a shipped artifact), against a tree an
+earlier build script could have touched.</p>
+<p>The download cache lives in <code>.cargo-cache</code> and is persisted across
+runs by an <code>actions/cache</code> step, keyed on <code>Cargo.lock</code>, inserted
+after <code>actions/checkout</code> — whose default <code>clean: true</code> runs <code>git
+clean -ffdx</code> and would otherwise delete the gitignored cache every
+run. Point <code>CARGO_CACHE</code> at a path outside the checkout to
+relocate it. (The cross-platform merge-tier jobs build with a
+natively installed cargo rather than in the devcontainer and use
+<code>Swatinem/rust-cache</code>; the <code>--network none</code> isolation applies only
+to the containerised Linux builds.)</p>
+<p>Severing the network namespace leaves the container with only
+<code>lo</code>, which the WebRTC tests notice: the default UDP bind policy
+excludes loopback, so on such a host it correctly resolves to
+nothing and refuses to build a peer connection (see
+<code>shakenfist-spice-webrtc/src/bind_addrs.rs</code>). Tests go through
+<code>bind_addrs_for_tests</code>, <code>bind_policy_for_tests</code> and
+<code>WebrtcBridgeConfig::for_tests</code> instead, which fall back to
+binding loopback when the host offers nothing else — the peers
+they connect are in the same process, so a loopback candidate
+serves. The production default is deliberately left alone: a
+server that quietly bound loopback would advertise candidates no
+browser could reach, which is what <code>--web-media-addr 127.0.0.1</code>
+exists to make a deliberate choice.</p>
+<p>The trade-off to know about: under isolation those tests no
+longer exercise binding a real interface address, which is the
+failure a wrong bind address produces. Nothing in CI covers that
+— it is what the browser session in the webrtc-rs 0.20 upgrade's
+soak phase is for. The inversion is worth stating too: every CI
+run of the WebRTC suite now takes the loopback fallback, so the
+branch that picks a real interface address runs only on developer
+machines.</p>
 <h2 id="supply-chain-policy">Supply-chain policy<a class="headerlink" href="#supply-chain-policy" title="Permanent link">&para;</a></h2>
 <p>The scanner jobs above enforce policy that lives in files at the
 repository root, and changing that policy has rules the files

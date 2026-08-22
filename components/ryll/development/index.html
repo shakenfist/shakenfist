@@ -12445,6 +12445,21 @@ coding assistant conventions see
 <a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="c1"># Stop the test QEMU instance</span>
 <a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>make<span class="w"> </span>test-qemu-stop
 </code></pre></div>
+<p><code>make build</code>, <code>make release</code> and <code>make test</code> first run <code>make fetch</code>
+to populate the cargo cache over the network, then compile inside
+the devcontainer with networking disabled and the cache mounted
+read-only, so a dependency's <code>build.rs</code> cannot phone home at compile
+time (see <a href="/components/ryll/ci/#build-network-isolation">build network isolation</a>).
+Run <code>make fetch</code> on its own to pre-download without building. After
+adding or bumping a dependency in a <code>Cargo.toml</code>, run <code>make lock</code>
+first: <code>fetch</code> is <code>--locked</code> and every compile is <code>--frozen</code>, so
+<code>make lock</code> is the only target that will write <code>Cargo.lock</code>, and
+without it the next build stops with "the lock file needs to be
+updated". The cache lives in <code>.cargo-cache</code>;
+override <code>CARGO_CACHE</code> to move it (for example to a location a CI
+runner keeps between jobs). <code>make clean</code> removes the cache only
+when it sits inside the checkout, so a shared out-of-tree cache
+survives.</p>
 <h2 id="building-with-a-local-rust-installation">Building with a local Rust installation<a class="headerlink" href="#building-with-a-local-rust-installation" title="Permanent link">&para;</a></h2>
 <p>If you have Rust installed locally with the required dependencies:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release
