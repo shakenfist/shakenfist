@@ -276,6 +276,69 @@ required in practice and link for the rest. The test in phase
 2 guarantees `etc/kerbside.conf.example` is complete, so this
 page never has to be.
 
+## What implementation and review found
+
+Merged as [PR #351](https://github.com/shakenfist/kerbside/pull/351)
+on 2026-08-22.
+
+Running every command from a clean clone, as the plan
+required, found four things the prose had wrong. Two were
+mine, from writing before running:
+
+* `docker compose ps` does not print the columns the draft
+  claimed. The page now uses
+  `--format 'table {{.Service}}\t{{.Status}}'` and quotes
+  its real output.
+* `ss ... | wc -l` counts its own header, so the socket
+  split read 13 and 1 rather than 12 and 0 — which would
+  have told a reader the plaintext port was in use. Fixed
+  with `-H`, and the page says why that flag matters.
+* `pip install` does not give you `demo/`, so `cd demo`
+  fails for exactly the reader the page had just created.
+  The walkthrough starts with `git clone`.
+* `remote-viewer` was never installed anywhere. The page now
+  names `virt-viewer` with apt and dnf commands.
+
+Review then found a fifth, and it was the load-bearing one:
+the page put `pip install` before the OS packages that
+install depends on. Confirming it needed a container rather
+than an argument — on a clean `debian:trixie`,
+`pip install kerbside` fails with `Can not find valid
+pkg-config name`, because `mysqlclient` compiles a C
+extension and publishes no wheel. The sections were
+reordered and the Debian, Ubuntu and RHEL package lists are
+now inline, because at that point in the page the reader has
+neither a checkout nor `tox`, and so cannot run
+`tox -e bindep`.
+
+**That verification found a defect in `bindep.txt` itself.**
+With pkg-config satisfied the build still failed, in gcc:
+`python3-dev` and `python3-devel` were absent from the file.
+So `tox -e bindep` would have reported the dependency list
+complete while an install driven from it could not succeed.
+Confirmed on both `debian:trixie` and `rockylinux:10`, and
+fixed here rather than deferred, because the reordering
+above depends on `bindep.txt` being honest. This is the
+second time this plan has found a check that could not see
+the thing it was supposed to check, after phase 4's
+startup-log tautology.
+
+Step 5e's negative observation was taken in its window: the
+`demo-compose` lane did not run while the pull request held
+only the planning commit, and ran within seconds of
+`docs/installation.md` joining the diff. The first such run
+was then cancelled by the workflow's own concurrency group
+when the next commit arrived, which is why the phase 4
+checkbox records two run URLs and states that what is
+demonstrated is that the filter fires, not what the lane
+concluded.
+
+Also added in review: a test in
+`kerbside/tests/unit/test_demo_stack.py` asserting the page
+still quotes the demo it documents, demonstrated to fail
+before being trusted; and a correction to a stale
+description in `README.md` that predated this phase.
+
 ## Decisions
 
 1. **The dev-floor and contract-hash note stays on the

@@ -1,18 +1,19 @@
 # Automated PR Review with Claude Code
 
-This document describes the Claude Code-powered automated PR review system used in
-Shaken Fist projects. The system provides automated code review on pull requests
-and can automatically address review comments with one commit per issue.
+This document describes the Claude Code-powered automated PR review system used
+in Shaken Fist projects. It reviews pull requests once CI passes and posts its
+findings as a structured comment.
 
 ## Overview
 
-The automated review system consists of two main components:
+The automated reviewer reviews a pull request once CI passes and posts
+structured feedback as a comment. It runs Claude Code on a self-hosted GitHub
+Actions runner with the `--dangerously-skip-permissions` flag for autonomous
+operation.
 
-1. **Automated Reviewer** - Reviews PRs after CI passes and posts structured feedback
-2. **Comment Addresser** - Addresses review comments when triggered by a bot command
-
-Both components use Claude Code running on self-hosted GitHub Actions runners with
-the `--dangerously-skip-permissions` flag for autonomous operation.
+A second component, the comment addresser, used to act on that feedback when a
+maintainer asked it to. It was retired in August 2026 -- see [The comment
+addresser](#the-comment-addresser-retired) below.
 
 ## Architecture
 
@@ -34,24 +35,6 @@ the `--dangerously-skip-permissions` flag for autonomous operation.
 │                                              markdown + embedded JSON   │
 │                                              (in <details> section)     │
 └─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│            User comments: "@shakenfist-bot please address comments"     │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     PR Address Comments Workflow                        │
-│  ┌─────────────────────┐    ┌─────────────────────────────────────────┐│
-│  │ Extract JSON from   │───▶│ Address Comments with Claude Code       ││
-│  │ PR review comment   │    │ (one commit per actionable item)        ││
-│  └─────────────────────┘    └───────────┬─────────────────────────────┘│
-│                                         │                               │
-│                           ┌─────────────┴─────────────┐                 │
-│                           ▼                           ▼                 │
-│                    Push commits              Post summary comment       │
-└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## JSON-Based Review Format
@@ -60,18 +43,18 @@ The key design decision is using structured JSON output from the reviewer instea
 of parsing markdown. This provides:
 
 - **Deterministic validation** via JSON schema
-- **Clean data handoff** between reviewer and addresser
 - **No regex parsing** of natural language output
 - **Iteration until valid** - reviewer can retry if JSON is malformed
 - **Self-contained comments** - JSON is embedded in the PR comment itself
 
 The JSON is embedded in a collapsed `<details>` section at the end of the
-human-readable markdown. This keeps the comment clean while making the data
-easily extractable by the address-comments automation.
+human-readable markdown. This keeps the comment readable while leaving the
+findings machine-parseable.
 
 ### Review Schema
 
-The review output follows a strict JSON schema (`tools/review-schema.json`):
+The review output follows a strict JSON schema, which ships with the reviewer
+in `shakenfist/actions/review-pr-with-claude/review-schema.json`:
 
 ```json
 {
@@ -101,14 +84,16 @@ The review output follows a strict JSON schema (`tools/review-schema.json`):
 
 Each review item has an `action` field indicating what should be done:
 
-| Action | Meaning | Addressed by Bot |
-|--------|---------|------------------|
-| `fix` | Must be fixed before merging | Yes |
-| `document` | Documentation should be added | Yes |
-| `consider` | Optional improvement (reviewer suggestion) | No |
-| `none` | Informational observation only | No |
+| Action | Meaning |
+|--------|---------|
+| `fix` | Must be fixed before merging |
+| `document` | Documentation should be added |
+| `consider` | Optional improvement (reviewer suggestion) |
+| `none` | Informational observation only |
 
-The comment addresser only processes items with `action: fix` or `action: document`.
+`fix` and `document` used to be the two the comment addresser acted on
+automatically. Nothing consumes the field automatically now, so it is a triage
+aid for whoever reads the review.
 
 ### Category Types
 
@@ -138,20 +123,20 @@ Comment on a PR with these commands (requires write access to the repository):
 | `@shakenfist-bot please retest` | Re-run the functional test suite |
 | `@shakenfist-bot please re-review` | Request a fresh automated code review |
 | `@shakenfist-bot please attempt to fix` | Have Claude attempt to fix failing tests |
-| `@shakenfist-bot please address comments` | Address automated review comments |
 
 These commands are processed by GitHub Actions workflows that use shared actions
 from the [shakenfist/actions](https://github.com/shakenfist/actions) repository.
 
 ## How the Reviewer Works
 
-The automated reviewer (`tools/review-pr-with-claude.sh`):
+The automated reviewer (`review-pr-with-claude.sh`, in the
+`review-pr-with-claude` action in shakenfist/actions):
 
 1. Fetches PR diff and file list using `gh` CLI
 2. Reads AGENTS.md and ARCHITECTURE.md for project context
 3. Prompts Claude Code to review the changes
 4. Requests JSON output following the schema
-5. Validates JSON against the schema using `tools/render-review.py --validate`
+5. Validates JSON against the schema using `render-review.py --validate`
 6. Renders JSON to human-readable markdown with `--embed-json` flag
 7. Posts the combined markdown (human-readable + embedded JSON) as a PR comment
 
@@ -187,46 +172,26 @@ Diff:
 [PR diff]
 ```
 
-## How the Comment Addresser Works
+## The comment addresser, retired
 
-The comment addresser (`tools/address-comments-with-claude.sh`):
+`pr-address-comments.yml` and `tools/address-comments-with-claude.sh` answered
+`@shakenfist-bot please address comments` by taking each review item with
+`action` of `fix` or `document`, prompting Claude Code with it, and pushing one
+commit per item. They were removed in August 2026, along with the
+`tools/render-review.py` and `tools/review-schema.json` copies that existed
+only for that script to call.
 
-1. Fetches PR review comments and finds the most recent automated review
-2. Extracts JSON from the `<details>` section in the review comment
-3. Validates JSON against the schema
-4. Extracts items where `action == "fix"` or `action == "document"`
-4. For each actionable item:
-   - Prompts Claude Code with the specific issue details
-   - Claude either makes a fix or explains why it disagrees
-   - If changes are made, creates a commit with attribution
-5. Pushes all commits
-6. Posts a summary comment with results
+The reason is preference, not defect: review items are worked through
+interactively with the reviewer instead. A bot authoring commits from a review
+that no human had read is the part that stopped anyone reaching for it.
 
-### One Commit Per Issue
-
-Each valid fix gets its own commit. This allows:
-
-- Easy review of individual fixes
-- Cherry-picking or dropping specific commits
-- Clear attribution of what each commit addresses
-
-Commit messages include:
-- Short summary of the change
-- Reference to the review item ID and title
-- Category and severity
-- The original bot trigger command
-- Attribution to Claude Code
-
-### Disagreement Handling
-
-Claude may disagree with a review suggestion if:
-- The suggestion is incorrect
-- The issue is not actually a problem
-- The fix would break something else
-- The change is out of scope
-
-When Claude disagrees, it explains its rationale instead of making changes.
-This is tracked in the summary table posted to the PR.
+Two consequences are worth knowing. The reviewer's JSON `action` field survives
+and is still worth setting accurately -- it is how a reader triages the review
+-- but nothing consumes it automatically any more. And the `ci-review-automation`
+consistency audit now fails a repository which still carries any part of the
+chain, because the workflow triggers on `issue_comment` and so holds
+`contents: write` against the pull request branch for a feature nobody wants.
+See `audits/ci-review-automation.md`.
 
 ## Workflow Files
 
@@ -236,7 +201,6 @@ This is tracked in the summary table posted to the PR.
 - `.github/workflows/pr-re-review.yml` - Manual re-review trigger
 - `.github/workflows/pr-fix-tests.yml` - Test failure fixing trigger
 - `.github/workflows/test-drift-fix.yml` - Test failure fixing implementation
-- `.github/workflows/pr-address-comments.yml` - Review comment addressing
 
 ## Shared Actions
 
@@ -277,10 +241,14 @@ and user experience.
 
 | Script | Purpose |
 |--------|---------|
-| `tools/review-pr-with-claude.sh` | Performs automated PR reviews (outputs JSON) |
-| `tools/address-comments-with-claude.sh` | Addresses review comments (reads JSON) |
-| `tools/render-review.py` | Validates JSON schema, renders to markdown |
-| `tools/review-schema.json` | JSON schema for review output |
+| `review-pr-with-claude.sh` | Performs automated PR reviews (outputs JSON) |
+| `render-review.py` | Validates JSON schema, renders to markdown |
+| `review-schema.json` | JSON schema for review output |
+
+All three live in the `review-pr-with-claude` action in
+[shakenfist/actions](https://github.com/shakenfist/actions), not in the projects
+they review. A project carrying its own copy of `render-review.py` is a leftover
+of the retired comment addresser, and the consistency audit reports it.
 
 ## Self-Hosted Runner Requirements
 
@@ -292,25 +260,22 @@ The automation requires self-hosted runners with:
 - `jq` for JSON processing
 - Python 3 with `jsonschema` package for validation
 
-## Preventing Infinite Loops
+## Not Reviewing The Bot's Own Commits
 
 The sanity-checks workflow includes a `check-bot-commit` job that detects if the
-last commit was made by the bot. If so, the automated reviewer is skipped to
-prevent infinite loops where:
+last commit was made by the bot. If so, the automated reviewer is skipped.
 
-1. Bot makes a commit
-2. CI runs
-3. Reviewer reviews the bot's commit
-4. Someone triggers "address comments"
-5. Bot makes another commit
-6. Repeat...
+A bot push -- from the test fixer -- triggers CI like any other push, so without
+the guard the reviewer would spend a claude-code run reviewing commits no human
+wrote, on a branch whose human-authored changes it has already reviewed. That
+waste is what the guard is for. It is not a loop any more: the comment addresser
+was the only thing that turned a review back into a commit, and it is retired.
 
 The check looks for commits with author email `bot@shakenfist.com`.
 
 ## Cost and Rate Limiting
 
-Each review and comment-addressing session uses Claude Code API calls. To manage
-costs:
+Each review session uses Claude Code API calls. To manage costs:
 
 - Reviews only run after CI passes (not on every push)
 - Reviews skip bot-authored commits
@@ -319,38 +284,32 @@ costs:
 
 ## Local Development
 
-You can run the tools locally for testing:
+You can run the tools locally for testing, from a checkout of
+[shakenfist/actions](https://github.com/shakenfist/actions):
 
 ```bash
 # Review a PR
-tools/review-pr-with-claude.sh --pr 123 --output-dir ./review-output
+review-pr-with-claude.sh --pr 123 --output-dir ./review-output
 
 # Validate review JSON
-tools/render-review.py --validate review.json
+render-review.py --validate review.json
 
 # Render review JSON to markdown
-tools/render-review.py review.json
-
-# Address comments (dry run)
-tools/address-comments-with-claude.sh --pr 123 --review-json review.json --dry-run
-
-# Address comments for real
-tools/address-comments-with-claude.sh --pr 123 --review-json review.json
+render-review.py review.json
 ```
 
 ## Projects Using This System
 
-The following Shaken Fist projects have implemented this automation:
+Most of them, and the list moves: see the compliance table in
+[`ci-review-automation.md`](https://github.com/shakenfist/development/blob/main/audits/ci-review-automation.md).
+imago was the original implementation and occystrap the first
+adaptation of it, which is why both turn up in the history above.
 
-- **[imago](https://github.com/shakenfist/imago)** - Disk image management tool
-  (Rust). The original implementation, with sophisticated structured review
-  output and issue creation.
-- **[occystrap](https://github.com/shakenfist/occystrap)** - Container image
-  tools (Python). Adapted from imago with Python-specific test commands.
-
-Each project has its own `tools/` directory with the scripts, customized for
-the project's build system and test framework. The shared action handles the
-common trigger logic.
+A project does **not** carry its own copy of the scripts. They live in
+the `review-pr-with-claude` action in shakenfist/actions and are shared
+from there; only the trigger workflows are per-project. A project with
+its own `render-review.py` is a leftover of the retired comment
+addresser, and the consistency audit reports it.
 
 ## Future Improvements
 
@@ -359,5 +318,10 @@ Potential enhancements to consider:
 - **Confidence scores** - Add confidence field to review items
 - **Learning from feedback** - Track which suggestions are accepted/rejected
 - **Custom review focus** - Allow PR authors to request focus areas
-- **Integration with issue tracker** - Auto-create issues for deferred items
 - **Metrics dashboard** - Track review quality and fix rates over time
+
+Automatic issue creation for deferred items was on this list and is
+done: `create-review-issues.py` in the shared action files every `fix`
+and `document` item. Having the reviewer also apply its own fixes was
+tried, as the comment addresser, and retired -- see
+[`ci-review-automation.md`](/components/development/ci-review-automation/).

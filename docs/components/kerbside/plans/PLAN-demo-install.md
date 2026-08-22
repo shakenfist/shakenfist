@@ -326,7 +326,7 @@ anything to wait on.
 | 2. `etc/kerbside.conf.example` | [PLAN-demo-install-phase-02-conf-example.md](/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/) | Complete |
 | 3. The compose demo | [PLAN-demo-install-phase-03-compose-demo.md](/components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/) | Complete |
 | 4. CI lane for the demo | [PLAN-demo-install-phase-04-ci-lane.md](/components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/) | Complete |
-| 5. Rewrite installation.md | [PLAN-demo-install-phase-05-docs.md](/components/kerbside/plans/PLAN-demo-install-phase-05-docs/) | Implemented in PR #351, not yet merged |
+| 5. Rewrite installation.md | [PLAN-demo-install-phase-05-docs.md](/components/kerbside/plans/PLAN-demo-install-phase-05-docs/) | Complete |
 
 The ordering is a dependency chain, not a preference. Phase
 3's container entrypoint calls `kerbside db upgrade` from
@@ -485,6 +485,14 @@ for.
 * Migrations absent from every built artifact, making
   `pip install kerbside` unable to create its schema
   (phase 1).
+* `bindep.txt` was missing `python3-dev` / `python3-devel`,
+  so `tox -e bindep` reported the dependency list complete
+  while an install from it still failed in gcc: mysqlclient
+  compiles a C extension and ships no wheel. Found while
+  verifying phase 5's install instructions in clean
+  `debian:trixie` and `rockylinux:10` containers, which is
+  the only way it could have been found — the check the
+  repository already had could not see it.
 
 Issues filed while planning:
 
