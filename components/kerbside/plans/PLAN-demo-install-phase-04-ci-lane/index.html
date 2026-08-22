@@ -12986,16 +12986,30 @@ runs on pull request #336:</p>
       delta reports 4 channels rather than a cumulative count,
       confirming finding 23's fix against a fresh stack.</li>
 </ul>
-<p>Still outstanding, and deliberately left for phase 5:</p>
+<p>Settled by phase 5 on 2026-08-22, both directions demonstrated
+on the same pull request (#351):</p>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The lane does not run on a pull request touching only
-      <code>docs/</code> outside <code>installation.md</code> — demonstrated, not
-      assumed. This needs a docs-only pull request, which this
-      phase has no reason to raise on its own. Phase 5 edits
-      <code>docs/installation.md</code>, which is <em>in</em> the filter, so it is
-      the natural place to demonstrate both directions: that lane
-      fires for that page, and does not fire for a <code>docs/</code> change
-      outside it.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>Negative.</strong> While #351 held only the phase 5 planning
+      commit (<code>8b85f1c</code>, touching <code>docs/plans/</code> and nothing else),
+      <code>gh run list --workflow=demo-compose.yml</code> had no entry for
+      branch <code>demo-install-phase-5-docs</code>. Every other lane on that
+      pull request reported its work as skipped through the path
+      gates, and the five required gate jobs passed, so the
+      absence is the filter working rather than CI being asleep.
+      Corroborated independently by PR #344 (sfui conversion phase
+      9, merged 2026-08-20, after this lane landed), which touched
+      <code>docs/</code>, <code>docs/plans/</code> and <code>ARCHITECTURE.md</code> and never
+      appears in the lane's run list.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>Positive.</strong> Pushing <code>8a9f5ef</code>, which adds
+      <code>docs/installation.md</code> to the same pull request, started
+      <a href="https://github.com/shakenfist/kerbside/actions/runs/32545893284">https://github.com/shakenfist/kerbside/actions/runs/32545893284</a>
+      within seconds. That run was later cancelled by the
+      workflow's concurrency group when the next commit was
+      pushed, and re-triggered as
+      <a href="https://github.com/shakenfist/kerbside/actions/runs/32546415623">https://github.com/shakenfist/kerbside/actions/runs/32546415623</a> —
+      which is the same observation twice. What is being
+      demonstrated here is that the filter fires, not what the
+      lane concluded.</li>
 </ul>
 <h2 id="registration">Registration<a class="headerlink" href="#registration" title="Permanent link">&para;</a></h2>
 <p>Recorded in the master plan's Execution table and in

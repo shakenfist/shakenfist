@@ -12710,6 +12710,14 @@ branch. <strong>Raising <code>max_entries_to_build</code> above 1 would make thi
 <code>sf-e2e-functional.yml</code>) still key on <code>github.ref</code> alone. They trigger
 on <code>merge_group</code> but skip their heavy jobs there, so a piled-up run
 costs seconds and no cloud capacity.</p>
+<p>Fixing it here was not enough on its own, because sfcbr is shared. A
+merge group in this repository has failed to place its oVirt instance
+while two superseded <code>shakenfist/shakenfist</code> merge groups — the same
+defect, in a neighbouring repository — held the capacity. The pattern is
+now a fleet consistency audit,
+<a href="https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md">merge-group-cancellation</a>,
+which checks every repository whose workflows can run on <code>merge_group</code>,
+and every reusable workflow that inherits such an event.</p>
 <p>For the design rationale see
 <a href="/components/kerbside/plans/PLAN-two-tier-ci/">plans/PLAN-two-tier-ci.md</a>.</p>
 <h2 id="end-to-end-ci-coverage">End-to-end CI coverage<a class="headerlink" href="#end-to-end-ci-coverage" title="Permanent link">&para;</a></h2>

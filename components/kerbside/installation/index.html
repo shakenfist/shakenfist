@@ -5017,6 +5017,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#before-you-install-os-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you install: OS packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installing-with-pip" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5028,10 +5039,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#checking-os-package-dependencies" class="md-nav__link">
+  <a href="#what-a-running-kerbside-needs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Checking OS package dependencies
+        What a running Kerbside needs
       
     </span>
   </a>
@@ -5039,10 +5050,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#deployment" class="md-nav__link">
+  <a href="#try-it-the-demo-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deployment
+        Try it: the demo stack
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Try it: the demo stack">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-the-token-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the token comes from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-demo-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the demo is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying-for-real" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying for real
       
     </span>
   </a>
@@ -12051,6 +12101,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#before-you-install-os-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you install: OS packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installing-with-pip" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12062,10 +12123,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#checking-os-package-dependencies" class="md-nav__link">
+  <a href="#what-a-running-kerbside-needs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Checking OS package dependencies
+        What a running Kerbside needs
       
     </span>
   </a>
@@ -12073,10 +12134,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#deployment" class="md-nav__link">
+  <a href="#try-it-the-demo-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deployment
+        Try it: the demo stack
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Try it: the demo stack">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-the-token-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the token comes from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-demo-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the demo is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying-for-real" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying for real
       
     </span>
   </a>
@@ -12105,8 +12205,34 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
+<p>This page takes you from nothing to a working, proxied SPICE console,
+and then points at the guide for the cloud you actually run. If you
+would rather see Kerbside working before reading about it, skip to
+<a href="#try-it-the-demo-stack">Try it: the demo stack</a>.</p>
+<h2 id="before-you-install-os-packages">Before you install: OS packages<a class="headerlink" href="#before-you-install-os-packages" title="Permanent link">&para;</a></h2>
+<p><code>pip install kerbside</code> builds <code>mysqlclient</code> from source — that package
+ships no wheel — so a clean machine needs a compiler, the MariaDB
+client headers and <code>pkg-config</code> before pip will get anywhere. Without
+them the install fails at <code>Can not find valid pkg-config name</code>, or
+later in the compile, which reads as a Python problem and is not one.</p>
+<p>On Debian:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>build-essential<span class="w"> </span>pkg-config<span class="w"> </span>python3-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>libmariadb-dev-compat<span class="w"> </span>libxml2-dev<span class="w"> </span>libxslt1-dev
+</code></pre></div>
+<p>On Ubuntu the same list applies with <code>libmysqlclient-dev</code> in place of
+<code>libmariadb-dev-compat</code>. On RHEL, CentOS and Fedora:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>gcc<span class="w"> </span>pkgconfig<span class="w"> </span>python3-devel<span class="w"> </span>mariadb-devel<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>libxml2-devel<span class="w"> </span>libxslt-devel
+</code></pre></div>
+<p>You will also want a MariaDB or MySQL server, either locally or
+reachable over the network — see
+<a href="#what-a-running-kerbside-needs">What a running Kerbside needs</a>.</p>
+<p>From a checkout, <code>tox -e bindep</code> reports the same thing against
+<code>bindep.txt</code>, per platform. It needs the source tree and <code>tox</code>, so it
+is a developer convenience rather than a step for someone installing
+from PyPI.</p>
 <h2 id="installing-with-pip">Installing with pip<a class="headerlink" href="#installing-with-pip" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>kerbside
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>kerbside
 </code></pre></div>
 <p>Kerbside is split into two packages: the pure-Python <code>kerbside</code> (the
 REST API, the console-source drivers, the SQLAlchemy data model, and
@@ -12132,33 +12258,286 @@ refuses to launch a binary whose gRPC contract does not match this
 to fix it. <code>KERBSIDE_SKIP_CONTRACT_CHECK=1</code> is the explicit, unsupported
 escape hatch that downgrades the refusal to a logged warning. See
 <a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a> for how the check works.</p>
-<h2 id="checking-os-package-dependencies">Checking OS package dependencies<a class="headerlink" href="#checking-os-package-dependencies" title="Permanent link">&para;</a></h2>
-<p>Kerbside requires certain OS-level packages to be installed. You can
-check for missing dependencies using bindep via tox:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tox<span class="w"> </span>-e<span class="w"> </span>bindep
+<h2 id="what-a-running-kerbside-needs">What a running Kerbside needs<a class="headerlink" href="#what-a-running-kerbside-needs" title="Permanent link">&para;</a></h2>
+<p>Installing the package gives you commands, not a running system. This
+section is the mental model: what has to exist before a console works.
+<a href="/components/kerbside/configuration/">configuration.md</a> is the reference for every
+setting; this is the short list of things you cannot skip.</p>
+<p><strong>Two processes, co-located.</strong> The REST API is a WSGI application
+served by gunicorn, and the SPICE proxy is a daemon that supervises
+the Rust binary:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gunicorn<span class="w"> </span>--bind<span class="w"> </span><span class="m">0</span>.0.0.0:13002<span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s1">'kerbside.api:app'</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>kerbside<span class="w"> </span>daemon<span class="w"> </span>run
 </code></pre></div>
-<p>This will read the <code>bindep.txt</code> file and report any missing system
-packages that need to be installed for your platform. The bindep tool
-automatically detects your operating system and checks for
-platform-specific packages.</p>
-<p>After running the bindep check, install any missing packages using
-your system's package manager:</p>
-<p><strong>Debian/Ubuntu:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>&lt;package-names&gt;
-</code></pre></div></p>
-<p><strong>RHEL/CentOS/Fedora:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>&lt;package-names&gt;
-</code></pre></div></p>
-<p>The <code>bindep.txt</code> file includes dependencies for MariaDB/MySQL client
-libraries, XML parsing libraries, and build tools needed for compiling
-Python extensions.</p>
-<h2 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h2>
-<p>Kerbside is deployed as a component of the cloud it serves. For
-OpenStack there is a sample Kolla-Ansible deployment implementation in
-the <a href="https://github.com/shakenfist/kerbside-patches">kerbside-patches</a>
-repository. See <a href="/components/kerbside/console-sources/">console-sources.md</a> for
-configuring console sources and <a href="/components/kerbside/configuration/">configuration.md</a>
-for the full configuration reference.</p>
+<p>Neither is optional and they are not interchangeable: the API is where
+brokers and users ask for consoles, and <code>daemon run</code> is what discovers
+consoles and moves SPICE traffic. They talk to each other over a unix
+socket (<code>API_SOCKET_PATH</code>, default <code>/run/kerbside/api.sock</code>), so <strong>they
+must be co-located</strong> — the same host, the same container, or two
+containers sharing that path. Note that the API's port is a gunicorn
+argument rather than a Kerbside setting; <code>PUBLIC_FQDN</code> is how Kerbside
+tells clients where to find it.</p>
+<p>That gunicorn line is the demo's shape, not a recommendation: it
+serves plain HTTP on every interface, and the API carries bearer
+tokens and Keystone credentials. A real deployment binds it to an
+interface you have chosen and puts TLS in front of it — a reverse
+proxy, or gunicorn's own <code>--certfile</code> and <code>--keyfile</code>. The proxy leg's
+TLS settings below do not cover the API leg; they are separate.</p>
+<p><strong>A database.</strong> MySQL or MariaDB, reached via <code>SQL_URL</code>. Create the
+database and its user yourself, then let Kerbside create its own
+schema:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kerbside<span class="w"> </span>db<span class="w"> </span>upgrade
+</code></pre></div>
+<p>Run that before starting either process, and again after every
+upgrade. It is idempotent, so a service unit or container entrypoint
+can call it unconditionally. It reads <code>SQL_URL</code> from the configuration
+described below, so write that first: with no configuration at all,
+<code>SQL_URL</code> still has a Kolla-shaped placeholder default and the command
+fails with <code>Unknown server host 'kolla'</code>, which is a missing config
+file rather than a database problem.</p>
+<p><strong>TLS material for the proxy leg.</strong> Clients reach the proxy over TLS
+and verify it against a CA you provide. Four settings carry this:
+<code>CACERT_PATH</code>, <code>PROXY_HOST_CERT_PATH</code>, <code>PROXY_HOST_CERT_KEY_PATH</code> and
+<code>PROXY_HOST_SUBJECT</code>. The last is the trap — it is the subject string
+clients are told to expect, so it must match the subject of the
+certificate the proxy actually presents. When those disagree, the
+viewer refuses the connection and the error does not explain itself.</p>
+<p><strong>A console source.</strong> Kerbside proxies consoles it has discovered, so
+it needs at least one source in the file named by <code>SOURCES_PATH</code>,
+conventionally <code>/etc/kerbside/sources.yaml</code>. The drivers are Shaken
+Fist, oVirt, OpenStack, and <code>static</code> for fixed targets — see
+<a href="/components/kerbside/console-sources/">console-sources.md</a>.</p>
+<p><strong>The minimum configuration set.</strong> Configuration is an INI file at
+<code>/etc/kerbside/kerbside.ini</code>; that path is hardcoded, and environment
+variables prefixed with <code>KERBSIDE_</code> override it. These eight settings
+are the ones with no useful default, and they are exactly the ones
+left live in
+<a href="https://github.com/shakenfist/kerbside/blob/develop/etc/kerbside.conf.example">etc/kerbside.conf.example</a>,
+which documents every setting Kerbside has:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sql_url</code></td>
+<td>The database, as a SQLAlchemy URL</td>
+</tr>
+<tr>
+<td><code>auth_secret_seed</code></td>
+<td>The seed session tokens are signed with; generate a fresh one per deployment</td>
+</tr>
+<tr>
+<td><code>sources_path</code></td>
+<td>Where <code>sources.yaml</code> lives</td>
+</tr>
+<tr>
+<td><code>public_fqdn</code></td>
+<td>The name clients should reach this Kerbside by</td>
+</tr>
+<tr>
+<td><code>cacert_path</code></td>
+<td>The CA clients verify the proxy against</td>
+</tr>
+<tr>
+<td><code>proxy_host_cert_path</code></td>
+<td>The proxy's certificate</td>
+</tr>
+<tr>
+<td><code>proxy_host_cert_key_path</code></td>
+<td>Its key</td>
+</tr>
+<tr>
+<td><code>proxy_host_subject</code></td>
+<td>The subject clients are told to expect</td>
+</tr>
+</tbody>
+</table>
+<h2 id="try-it-the-demo-stack">Try it: the demo stack<a class="headerlink" href="#try-it-the-demo-stack" title="Permanent link">&para;</a></h2>
+<p><code>demo/</code> in this repository brings all of that up in three containers,
+so you can watch a proxied console work before deciding how to deploy
+one. It needs nothing but Docker Engine 23.0 or newer with the Compose
+v2 plugin — no Python, no database, and no certificates of your own.
+On Debian 12, install Docker from
+<a href="https://docs.docker.com/engine/install/debian/">Docker's own repository</a>
+rather than from the distribution, which ships an engine too old to
+build the image.</p>
+<p><code>pip install</code> does not give you <code>demo/</code>, so start from a checkout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/kerbside
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>kerbside/demo
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>One thing to know about that pairing: the clone lands on <code>develop</code>,
+but the image installs the most recent <em>release</em> from PyPI, so the
+demo's glue comes from the checkout while Kerbside itself does not.
+That is deliberate — what you evaluate is what you can install — and
+CI does not exercise it, because the lane builds from the checkout
+instead. If you have changed anything under <code>demo/</code>, or want a
+stack that matches the tree you are sitting in, build it that way:
+<code>KERBSIDE_SOURCE=/src docker compose build kerbside</code>, which needs an
+ordinary clone rather than a git worktree.
+<a href="https://github.com/shakenfist/kerbside/blob/develop/demo/README.md">demo/README.md</a>
+covers both forms.</p>
+<p>The first run builds the image and takes a few minutes; afterwards the
+stack comes up in seconds. When it returns, three containers are
+running — MariaDB, a disk-less qemu with a SPICE server, and Kerbside
+with both of its processes:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>$ docker compose ps --format 'table {{.Service}}\t{{.Status}}'
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>SERVICE        STATUS
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>db             Up 7 minutes (healthy)
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>kerbside       Up 7 minutes (healthy)
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>spice-target   Up 7 minutes
+</code></pre></div>
+<p>Now mint a token and fetch a console file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>./get-console.sh
+</code></pre></div>
+<p>The script mints a bearer token, finds the demo console, writes
+<code>demo-console.vv</code>, and then proves the TLS leg rather than assuming
+it: it connects to the port the <code>.vv</code> advertises and verifies the
+presented certificate against the CA embedded in that same file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>[demo] Waiting for the stack to finish starting...
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>[demo] Minting a bearer token...
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>WARNING: this is a demonstration token, minted directly from
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>AUTH_SECRET_SEED because kerbside has no non-Keystone login (issue
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>#300). Do not use this pattern in production.
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>Token written to /tmp/demo-token.169928
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>[demo] Waiting for the console list...
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>[demo] Looking up the console...
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>[demo] Console: demo-console (demo/0d3f6a52-0000-0000-0000-0000000dec01)
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>[demo] Fetching the .vv file...
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>[demo] Verifying the TLS leg...
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>    TLSv1.3, certificate verified against the CA in the .vv
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    subject matches host-subject=C=US,O=Kerbside CI,CN=kerbside-ci
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>[demo] Wrote ./demo-console.vv
+</code></pre></div>
+<p>(The script then repeats the <code>remote-viewer</code> command and the
+expectation below, which is the next step here.)</p>
+<p>Then open it. <code>remote-viewer</code> ships in the <code>virt-viewer</code> package
+(<code>sudo apt-get install virt-viewer</code>, or <code>sudo dnf install
+virt-viewer</code>), and it is the only thing you need on the client side:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>remote-viewer<span class="w"> </span>./demo-console.vv
+</code></pre></div>
+<p><strong>Expect a black screen with boot firmware text, and expect the boot
+to fail.</strong> The demo VM has no disk, so it tries the network, then a
+floppy, then gives up:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>iPXE (PCI 00:02.0) starting execution...ok
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>net0: 52:54:00:12:34:56 using 82574l on 0000:00:02.0 (Ethernet) [open]
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Nothing to boot: No such file or directory
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>Booting from Floppy...
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Boot failed: could not read the boot disk
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>No bootable device.
+</code></pre></div>
+<p>That screen <em>is</em> the SPICE session: it is being drawn by a real qemu
+and relayed through Kerbside over TLS. The viewer's title bar names
+the proxy session it is attached to. If you want to confirm the
+traffic took the TLS port rather than the plaintext one, count
+established sockets while the viewer is open — they should all be on
+5900, and none on 5901:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>ss<span class="w"> </span>-H<span class="w"> </span>-tn<span class="w"> </span>state<span class="w"> </span>established<span class="w"> </span><span class="s1">'( dport = :5900 or sport = :5900 )'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>ss<span class="w"> </span>-H<span class="w"> </span>-tn<span class="w"> </span>state<span class="w"> </span>established<span class="w"> </span><span class="s1">'( dport = :5901 or sport = :5901 )'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+</code></pre></div>
+<p>On a live session that prints <code>12</code> and <code>0</code>. The <code>-H</code> matters: without
+it <code>ss</code> emits a header line and both counts come back one too high,
+which makes the plaintext port look used when it is not.</p>
+<p>When you are finished:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>down<span class="w"> </span>-v
+</code></pre></div>
+<p>That removes the containers, the database, and the generated CA and
+signing seed — both of which are created on first start rather than
+baked into the image.</p>
+<h3 id="where-the-token-comes-from">Where the token comes from<a class="headerlink" href="#where-the-token-comes-from" title="Permanent link">&para;</a></h3>
+<p><code>get-console.sh</code> runs <code>kerbside demo token</code> inside the container, and
+that command prints a warning every time it succeeds. The warning is
+worth reading: the command exists because interactive login is
+Keystone-only today
+(<a href="https://github.com/shakenfist/kerbside/issues/300">#300</a>), so a
+static deployment gives a human no way to log in at all. It stands in
+for authentication in a demonstration; it is not a preview of how your
+users will get consoles.</p>
+<p>It also refuses to mint unless every configured source is <code>static</code>,
+and refuses while the signing seed is unconfigured. Those refusals are
+deliberate rather than configuration problems to work around — in a
+real deployment a broker mints session tokens through the API. If
+<code>kerbside demo token</code> refuses on the demo stack, something else is
+genuinely wrong.</p>
+<h3 id="what-the-demo-is-not">What the demo is not<a class="headerlink" href="#what-the-demo-is-not" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Limitation</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No real authentication</td>
+<td>Login is Keystone-only (<a href="https://github.com/shakenfist/kerbside/issues/300">#300</a>), and the session JWT scheme has no revocation or issuance audit (<a href="https://github.com/shakenfist/kerbside/issues/301">#301</a>). The web UI on <code>http://127.0.0.1:13002</code> cannot be logged into</td>
+</tr>
+<tr>
+<td>A self-signed CA</td>
+<td>Generated into a volume on first start, and destroyed by <code>down -v</code></td>
+</tr>
+<tr>
+<td>Loopback only</td>
+<td>Every published port binds to <code>127.0.0.1</code> on purpose. Widening it puts an unauthenticated console proxy on your network</td>
+</tr>
+<tr>
+<td>Two processes in one container</td>
+<td>The shortest way to co-locate them for a demo, not a shape to copy. Real deployments run them as separate units sharing the socket</td>
+</tr>
+<tr>
+<td>A plaintext backend leg</td>
+<td>Kerbside talks plaintext SPICE to the qemu container. Real deployments should pin the backend too; <a href="/components/kerbside/use-cases/ovirt/">ovirt.md</a> shows what that looks like</td>
+</tr>
+<tr>
+<td>A static source, not a cloud</td>
+<td>The <code>static</code> driver points at a fixed target, so nothing is being discovered from a real cloud</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://github.com/shakenfist/kerbside/blob/develop/demo/README.md">demo/README.md</a>
+is the reference for the stack itself: what each container is, how to
+build it against a checkout rather than the released package, and why
+each of these choices was made.</p>
+<h2 id="deploying-for-real">Deploying for real<a class="headerlink" href="#deploying-for-real" title="Permanent link">&para;</a></h2>
+<p>Kerbside is deployed as a component of the cloud it serves, so the
+shape of a real deployment depends on which cloud that is. Start with
+the guide for yours:</p>
+<table>
+<thead>
+<tr>
+<th>Deployment</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>oVirt</td>
+<td><a href="/components/kerbside/use-cases/ovirt/">use-cases/ovirt.md</a></td>
+</tr>
+<tr>
+<td>OpenStack</td>
+<td>A sample Kolla-Ansible deployment lives in <a href="https://github.com/shakenfist/kerbside-patches">kerbside-patches</a></td>
+</tr>
+<tr>
+<td>Shaken Fist</td>
+<td><a href="/components/kerbside/console-sources/#shaken-fist">console-sources.md</a>, until the use-case page is written</td>
+</tr>
+<tr>
+<td>Static targets</td>
+<td>The demo above is the worked example</td>
+</tr>
+</tbody>
+</table>
+<p>Whichever you pick, the pieces described in
+<a href="#what-a-running-kerbside-needs">What a running Kerbside needs</a> are
+the same, and two references apply throughout:
+<a href="/components/kerbside/configuration/">configuration.md</a> for every setting, and
+<a href="/components/kerbside/console-sources/">console-sources.md</a> for configuring sources.</p>
 
 
 
