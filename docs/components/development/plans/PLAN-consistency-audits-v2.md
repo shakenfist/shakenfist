@@ -337,7 +337,10 @@ Rather than a big-bang migration, I'd suggest:
 
 ### Phase 4: Cleanup
 
-1. Retire `PLAN-consistency.md` once issue tracking is live.
+1. ~~Retire `PLAN-consistency.md` once issue tracking is
+   live.~~ Done 2026-08-22. The file is now a record of what the
+   plan was and why it was replaced; its per-project checklists
+   were not carried over.
 2. Archive `PROJECT-CONSISTENCY-AUDITS.md` with a pointer to the
    new `audits/` directory.
 3. Update all documentation in `docs/`.
