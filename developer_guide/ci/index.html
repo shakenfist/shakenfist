@@ -12010,6 +12010,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Merge Queue Pattern">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#superseded-merge-groups-are-cancelled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Superseded merge groups are cancelled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -12286,6 +12303,33 @@ rather than a deployed cluster.</p>
 <p><strong>Important</strong>: Only <code>Can see status</code> and <code>Can enqueue</code> are required status checks
 in branch protection. <code>Can merge</code> is evaluated by the merge queue itself, not as
 a required check.</p>
+<h3 id="superseded-merge-groups-are-cancelled">Superseded merge groups are cancelled<a class="headerlink" href="#superseded-merge-groups-are-cancelled" title="Permanent link">&para;</a></h3>
+<p>Every job that can run in the queue and holds a scarce runner carries a
+<code>concurrency:</code> block whose key is merge-group aware — the four
+<code>functional_matrix_merge_collection</code> entries and <code>ansible_modules_collection</code>
+through the shared <code>smoke-cluster.yml</code>, and <code>node_lifecycle_collection</code>,
+<code>schema_enum_widening</code> and <code>automated_delinter</code> in this repository.</p>
+<p><code>github.ref</code> is the obvious key and is right on every other event. On
+<code>merge_group</code> it is the per-attempt queue branch
+<code>gh-readonly-queue/develop/pr-&lt;N&gt;-&lt;SHA&gt;</code>, and GitHub mints a fresh SHA every
+time it rebuilds the group — which it does on every push to <code>develop</code>. Keyed
+on that, every rebuild lands in a concurrency group of its own,
+<code>cancel-in-progress</code> never matches, and superseded merge groups run to
+completion. Each one deploys several nested clusters onto the sfcbr
+under-cloud that every Shaken Fist repository shares, so the cost lands on
+the neighbours as well as here: <code>shakenfist/kerbside#284</code> records a kerbside
+merge group failing to place a 12 vCPU instance while two superseded
+shakenfist merge groups held the capacity. So the key branches on the event
+and uses <code>github.event.merge_group.base_ref</code> in the queue, with a
+<code>merge_group-</code> prefix so a queue run does not share a group with a
+<code>workflow_dispatch</code> run on <code>develop</code>.</p>
+<p>Cancelling is only safe because the queue is serial: the develop ruleset sets
+<code>max_entries_to_build: 1</code>, so any other in-flight <code>merge_group</code> run is by
+definition superseded and its queue branch already abandoned by GitHub.
+Raising that setting while keeping this key would cancel a live queue entry,
+which reports a failed required check and ejects the pull request — the two
+have to move together. This is audited fleet-wide; see
+<a href="https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md">merge-group-cancellation</a>.</p>
 <h2 id="exported-repository-configuration">Exported Repository Configuration<a class="headerlink" href="#exported-repository-configuration" title="Permanent link">&para;</a></h2>
 <p>Repository settings (rulesets, branch protection, merge queue config) are
 exported to <code>.github/exported-config/</code> for version control and audit purposes:</p>
