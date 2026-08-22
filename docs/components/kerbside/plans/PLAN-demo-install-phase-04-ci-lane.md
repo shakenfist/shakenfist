@@ -874,16 +874,30 @@ runs on pull request #336:
       delta reports 4 channels rather than a cumulative count,
       confirming finding 23's fix against a fresh stack.
 
-Still outstanding, and deliberately left for phase 5:
+Settled by phase 5 on 2026-08-22, both directions demonstrated
+on the same pull request (#351):
 
-- [ ] The lane does not run on a pull request touching only
-      `docs/` outside `installation.md` — demonstrated, not
-      assumed. This needs a docs-only pull request, which this
-      phase has no reason to raise on its own. Phase 5 edits
-      `docs/installation.md`, which is *in* the filter, so it is
-      the natural place to demonstrate both directions: that lane
-      fires for that page, and does not fire for a `docs/` change
-      outside it.
+- [x] **Negative.** While #351 held only the phase 5 planning
+      commit (`8b85f1c`, touching `docs/plans/` and nothing else),
+      `gh run list --workflow=demo-compose.yml` had no entry for
+      branch `demo-install-phase-5-docs`. Every other lane on that
+      pull request reported its work as skipped through the path
+      gates, and the five required gate jobs passed, so the
+      absence is the filter working rather than CI being asleep.
+      Corroborated independently by PR #344 (sfui conversion phase
+      9, merged 2026-08-20, after this lane landed), which touched
+      `docs/`, `docs/plans/` and `ARCHITECTURE.md` and never
+      appears in the lane's run list.
+- [x] **Positive.** Pushing `8a9f5ef`, which adds
+      `docs/installation.md` to the same pull request, started
+      https://github.com/shakenfist/kerbside/actions/runs/32545893284
+      within seconds. That run was later cancelled by the
+      workflow's concurrency group when the next commit was
+      pushed, and re-triggered as
+      https://github.com/shakenfist/kerbside/actions/runs/32546415623 —
+      which is the same observation twice. What is being
+      demonstrated here is that the filter fires, not what the
+      lane concluded.
 
 ## Registration
 
