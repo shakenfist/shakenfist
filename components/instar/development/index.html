@@ -1373,6 +1373,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-llm-doc-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-template-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-stestr-testtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: stestr / testtools version pin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review coverage steady state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist Project Consistency Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
         
   
@@ -12911,12 +13079,47 @@ so issues are automatically closed when the PR merges.</p>
 <li>It extracts items where <code>action</code> is <code>fix</code> or <code>document</code></li>
 <li>For each actionable item, Claude Code:</li>
 <li>Analyzes whether the item should be addressed</li>
-<li>If valid: makes the fix, runs pre-commit, and stages changes</li>
+<li>If valid: makes the fix and runs pre-commit, staging nothing</li>
 <li>If disagreeing: provides a rationale explaining why</li>
+<li>CI stages what the fix touched, via
+   <code>tools/ci/stage-autofix-changes.sh --tracked-only</code> and the new files
+   the item created.</li>
 <li>Each valid fix gets its own commit with attribution</li>
 <li>All commits are pushed and a summary is posted to the PR</li>
 </ol>
 <p>This allows reviewers to cherry-pick or drop individual fixes as needed.</p>
+<p>Claude Code edits the working tree and does not reliably stage, and the
+script judges an item by reading the index, so before step 4 existed an
+unstaged fix reached that test with an empty index and was recorded as
+"No changes needed" (#510). Past runs of this workflow are worth
+re-reading with that in mind before their skipped rows are believed.</p>
+<p>New files are staged here, unlike in the fuzz autofix, which refuses an
+attempt that created one: a review item can legitimately ask for a new
+file, and the result lands on a pull request a human reads before it goes
+anywhere. Only files the item itself created, though -- the untracked and
+ignored listings are snapshotted before Claude runs and compared
+afterwards, so a scratch file that was already in the tree is not swept
+into someone else's commit.</p>
+<p>Two kinds of file are named rather than staged, because neither can go in
+the commit:</p>
+<ul>
+<li>Edits under <code>.github/workflows/</code>, because a commit touching one cannot
+  be pushed with the token the workflow holds -- and since the loop
+  commits per item and pushes once at the end, that failure would discard
+  every other item's commit with it. An item whose whole fix was a
+  workflow edit is reported as "Not pushable".</li>
+<li>New files matching a <code>.gitignore</code> rule, which need <code>git add -f</code> and a
+  human deciding they belong in the tree. <code>**/*.bin</code> is in this repo's
+  <code>.gitignore</code>, which is what a fuzz regression fixture is called. These
+  are reported as "Not staged".</li>
+</ul>
+<p>Every path that abandons an item resets the work tree with
+<code>tools/ci/reset-autofix-worktree.sh</code>, so the next item's commit holds
+only its own work, and so does the path that succeeds -- the workflow
+edits the stager refused are still in the tree after the commit. Because
+that reset is unconditional and repo-wide, a local run refuses to start
+on a dirty tree unless <code>--ci</code> is passed, and refuses an <code>--output-dir</code>
+inside the work tree.</p>
 <h2 id="workflow-files">Workflow Files<a class="headerlink" href="#workflow-files" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>.github/workflows/functional-tests.yml</code> - Main CI, and the caller for the
@@ -12941,7 +13144,7 @@ step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>
 <h2 id="scripts">Scripts<a class="headerlink" href="#scripts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>tools/review-pr-with-claude.sh</code> - Performs automated PR reviews (outputs JSON)</li>
-<li><code>tools/address-comments-with-claude.sh</code> - Addresses review comments (reads JSON)</li>
+<li><code>tools/address-comments-with-claude.sh</code> - Addresses review comments (reads JSON); CI stages each fix for it via <code>tools/ci/stage-autofix-changes.sh --tracked-only</code> (see "How Automated Comment Addressing Works" above)</li>
 <li><code>tools/create-review-issues.py</code> - Creates GitHub issues for actionable items</li>
 <li><code>tools/render-review.py</code> - Renders review JSON to markdown (includes issue links)</li>
 <li><code>tools/review-schema.json</code> - JSON schema for review output validation</li>
@@ -12955,6 +13158,10 @@ step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>
 <li><code>tools/ci/test-check-glibc-floor.sh</code> - Tests for that check; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/ci/stage-autofix-changes.sh</code> - Stages the tracked edits a Claude Code autofix run left in the working tree, before the steps that judge whether a fix exists read the index, and refuses the attempt (exit 3) if it created a file that cannot be staged safely. Called from <code>fuzz-autofix.yml</code>, and in <code>--tracked-only</code> mode from <code>tools/address-comments-with-claude.sh</code>; see "Automated bug fixes" in <code>docs/testing.md</code></li>
 <li><code>tools/ci/test-stage-autofix-changes.sh</code> - Tests for that stager; the <code>ci-tooling</code> CI job runs it</li>
+<li><code>tools/ci/reset-autofix-worktree.sh</code> - Discards staged edits, unstaged edits and new files, keeping ignored build output, and fails if the tree is still dirty afterwards; called on every path that finishes a review item, so the next item's commit holds only its own work</li>
+<li><code>tools/ci/autofix-artifact-patterns.sh</code> - Sourced, not executed: the editor leftovers and build output that are not part of a fix, shared by the stager and the review-comment addresser so the two cannot drift</li>
+<li><code>tools/ci/test-reset-autofix-worktree.sh</code> - Tests for that reset; the <code>ci-tooling</code> CI job runs it</li>
+<li><code>tools/ci/test-address-comments-staging.sh</code> - Drives the <code>tools/address-comments-with-claude.sh</code> item loop against a scratch repo with <code>claude</code> and <code>gh</code> stubbed; the <code>ci-tooling</code> CI job runs it</li>
 </ul>
 
 

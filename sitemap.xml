@@ -121,11 +121,35 @@
          <lastmod>2026-08-22</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/plans/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-code-review-tracking/</loc>
          <lastmod>2026-08-22</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-consistency-audits-v2/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-consistency/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-llm-doc-structure/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-plan-template-blocks/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-review-coverage/</loc>
+         <lastmod>2026-08-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-stestr-testtools/</loc>
          <lastmod>2026-08-22</lastmod>
     </url>
     <url>
