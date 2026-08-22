@@ -808,10 +808,10 @@ step -- see "Self-hosted runners and Docker" in `docs/development.md`.
 
 ## Scripts
 
-- `tools/review-pr-with-claude.sh` - Performs automated PR reviews (outputs JSON)
 - `tools/address-comments-with-claude.sh` - Addresses review comments (reads JSON); CI stages each fix for it via `tools/ci/stage-autofix-changes.sh --tracked-only` (see "How Automated Comment Addressing Works" above)
-- `tools/create-review-issues.py` - Creates GitHub issues for actionable items
-- `tools/render-review.py` - Renders review JSON to markdown (includes issue links)
+- `tools/render-review.py` - Renders review JSON to markdown, and validates
+  it against `tools/review-schema.json` in `--validate` mode, which is how
+  `tools/address-comments-with-claude.sh` checks the review it was handed
 - `tools/review-schema.json` - JSON schema for review output validation
 - `scripts/differential-fuzz.py` - Differential fuzzing script (instar vs qemu-img + libyal)
 - `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata

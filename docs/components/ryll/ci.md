@@ -309,6 +309,37 @@ Comment-triggered workflows (`pr-retest`, `pr-re-review`,
 events, so it does not distinguish one pull request from
 another. The PR number does.
 
+Merge queue jobs need a different key again. On `merge_group`,
+`github.ref` is the per-attempt queue branch
+`gh-readonly-queue/develop/pr-<N>-<SHA>`, and GitHub mints a
+fresh SHA every time it rebuilds the group — which it does on
+every push to `develop`. A group keyed on it is therefore unique
+per rebuild, `cancel-in-progress` never matches, and superseded
+merge groups run to completion holding runners the whole fleet
+shares. Branch the key on the event:
+
+```yaml
+      group: >-
+        ${{ github.workflow }}-my-job-${{
+        github.event_name == 'merge_group'
+        && format('merge_group-{0}', github.event.merge_group.base_ref)
+        || github.ref }}
+```
+
+The `merge_group-` prefix keeps a queue run from sharing a group
+with a `workflow_dispatch` run on `develop`, whose `github.ref`
+is the same string.
+
+Cancelling a merge group is only safe because the queue is
+serial: the develop ruleset sets `max_entries_to_build: 1`, so
+the queue builds one entry at a time and any other in-flight
+`merge_group` run is by definition superseded, its queue branch
+already abandoned by GitHub. That setting and this key have to
+move together. See
+[shakenfist/kerbside#284](https://github.com/shakenfist/kerbside/issues/284)
+for what the unfixed version cost, and the fleet audit
+[merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md).
+
 Scheduled, push-to-default, and release workflows must **not**
 enable `cancel-in-progress`. Cancelling a release mid-publish,
 or a renovate run mid-PR-creation, leaves partial state behind.
