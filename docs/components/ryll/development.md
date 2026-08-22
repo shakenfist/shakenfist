@@ -35,6 +35,22 @@ make test-qemu-desktop
 make test-qemu-stop
 ```
 
+`make build`, `make release` and `make test` first run `make fetch`
+to populate the cargo cache over the network, then compile inside
+the devcontainer with networking disabled and the cache mounted
+read-only, so a dependency's `build.rs` cannot phone home at compile
+time (see [build network isolation](/components/ryll/ci/#build-network-isolation)).
+Run `make fetch` on its own to pre-download without building. After
+adding or bumping a dependency in a `Cargo.toml`, run `make lock`
+first: `fetch` is `--locked` and every compile is `--frozen`, so
+`make lock` is the only target that will write `Cargo.lock`, and
+without it the next build stops with "the lock file needs to be
+updated". The cache lives in `.cargo-cache`;
+override `CARGO_CACHE` to move it (for example to a location a CI
+runner keeps between jobs). `make clean` removes the cache only
+when it sits inside the checkout, so a shared out-of-tree cache
+survives.
+
 ## Building with a local Rust installation
 
 If you have Rust installed locally with the required dependencies:
