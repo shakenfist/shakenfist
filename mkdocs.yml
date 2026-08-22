@@ -102,6 +102,12 @@ nav:
             - "Code review tracking": components/development/code-review-tracking.md
             - "Release Automation": components/development/release-automation.md
             - Plans:
+                - "Plans index": components/development/plans/index.md
+                - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
+                - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
+                - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
+                - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
+                - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
                 - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
         - Instar:
