@@ -354,6 +354,7 @@ table entirely (decision D8).
 | 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | In progress |
+| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | In progress |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
@@ -376,9 +377,12 @@ is here.
   drift.
 - **Phase 3** merged as PR #3754 on 2026-08-16, but its step 9 sfcbr
   soak has not been run, and it carries an outstanding defect in its
-  D13 demand clause — issue #3813, see Future work.
-- **Phase 4**'s steps 1-8 have landed; management review, operator
-  review and the sfcbr soak are all still outstanding. `NamespaceClaim`
+  D13 demand clause — issue #3813, see Future work. Both are
+  discharged by phase 4a, which fixes the clause first and then runs
+  one soak covering phases 3, 4 and 4a (its decision E6).
+- **Phase 4**'s steps 1-9 have landed, management review included;
+  the operator review and the sfcbr soak are still outstanding, and
+  ride with phase 4a's step 5. `NamespaceClaim`
   is a first-class object with admin-only REST CRUD at
   `/auth/namespaces/<namespace>/claims`, and creation migrates the
   namespace's existing drawdown out of the cluster's unclaimed sums and
@@ -386,6 +390,13 @@ is here.
   is admitted and recorded as an audit event, and phase 5 flips
   `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the
   phase plan).
+- **Phase 4a** was inserted on 2026-08-22, between phases 4 and 5,
+  because #3813 is a live defect in phase 3's shipped admission code
+  and phase 5 makes that code the sole gate on placement. Its survey
+  found that the D13 seed constant was transcribed from the wrong row
+  of its own measurements, which reclassifies the fix from a deferred
+  tuning question to a correction; see the phase plan's *What the
+  survey found*.
 
 ### Phase scope stubs
 
@@ -496,17 +507,36 @@ already landed as PR 3722 — see the D6 correction of
 trail and the three positions on offer. Phase 6 closes 3565
 only if it picks one of them.
 
-*Correction (2026-08-19):* there is now a competing
-explanation for 3565, and phase 6 must rule it out before
-claiming the flake. Issue #3813 (Future work, below)
-shows the D13 demand clause refusing **every** candidate on
-the CI hypervisors, after which the create places through a
-single forced candidate and the affinity stage has nothing
-left to rank. If that is the mechanism, then no choice among
-D6's three positions closes 3565, because soft affinity is
-never reached to bid at all. Establish which of the two is
-operating **before** spending phase 6's decision budget on
-the bid-against-a-hard-ceiling question.
+*Correction (2026-08-19, restated 2026-08-22):* there is now
+a competing explanation for 3565, and phase 6 must rule it
+out before claiming the flake. Issue #3813 (Future work,
+below) shows the D13 demand clause refusing **every**
+candidate on the CI hypervisors.
+
+The 2026-08-19 wording of this correction said the create
+then "places through a single forced candidate and the
+affinity stage has nothing left to rank". Phase 4a's survey
+established that this is not the mechanism: the P9 re-walk
+iterates the same candidate list in the same order
+(`external_api/instance.py:881-921`,
+`operations/node_inst_netdesc_op.py:194-232`), so the
+scheduler's ranking — affinity included — is preserved
+exactly and the waived walk takes the top-ranked candidate.
+
+What is actually lost is the **spreading**. Because the
+clause can never pass, nothing makes the top-ranked
+candidate less attractive to the next create in a burst, and
+the ranking it competes against is `cpu_load_1 /
+cpu_schedulable` from a metrics row up to 60 seconds stale.
+A burst piles onto one node until a real allocation
+dimension bites. That is a plausible contributor to 3565 —
+soft affinity bidding against a candidate set skewed by
+pile-up — but it is not "affinity is never reached", so
+D6's three positions remain live rather than moot.
+Establish which mechanism is operating **before** spending
+phase 6's decision budget, now against the corrected
+premise. Phase 4a fixes the clause, so phase 6 can measure
+3565 on a cluster where the spreader actually spreads.
 
 **Phase 7 — diagnostics.** Failure-path verbose diagnostic
 against the same snapshot, success-path drawdown events,
@@ -690,6 +720,18 @@ only because it is still open.
   every allocation dimension reading `used: 0.0, exceeded:
   false` and only `demand` exceeded, at `used` values of 3.24,
   6.27, 11.94 and 12.29.
+
+  *Correction (2026-08-22, phase 4a survey):* the deferral
+  below is wrong about where the answer lives. D13 attributes
+  the 2.5 seed to "the 00a-1 measurements", but that
+  appendix's demand-per-vCPU row reads 0.12-0.35 steady with
+  a burst peak of ~0.6, and names "~0.33 steady / 0.6
+  conservative" as the seed for exactly this constant. The
+  only 2.5-shaped figure in the appendix is a different row
+  — 2.3-3.0 *allocated vCPUs per thread*, the packing figure
+  behind `CPU_OVERCOMMIT_RATIO`. The seed was transcribed
+  across rows, and the analysis this entry defers to had
+  already answered the question. Phase 4a owns the fix.
 
   Fixing it is a **decision, not a patch** — the charge and the
   budget have to be made dimensionally consistent, which is one
