@@ -123,10 +123,19 @@ options:
   await_timeout:
     description:
       - How long to wait, in seconds, when O(await) is true.
-      - This is the budget for the whole create, not just for the wait
-        that follows it. The instance creation call is told not to wait
-        at all when O(await) is set, so this number is what the task
-        actually spends.
+      - This is the budget for the whole operation rather than for the
+        wait at the end of it. Where an instance is being replaced, the
+        time spent deleting the old one and creating the new one is
+        deducted from this number before the wait begins, so the task no
+        longer takes the sum of two independent budgets on the same
+        condition.
+      - It is a budget rather than a hard deadline. This module cannot
+        interrupt a deletion or a creation already underway, so a task
+        can still overrun -- it just cannot spend the same budget twice.
+        That matters most with a shakenfist-client older than the one
+        which grew a timeout argument on instance creation (anything up
+        to and including v0.8.3), because such a client cannot be told
+        not to wait while creating.
     required: false
     default: 600
     type: int
@@ -218,8 +227,11 @@ def _create_accepts_timeout(client):
     try:
         signature = inspect.signature(client.create_instance)
     except (TypeError, ValueError):
-        # A mock or a C-implemented callable. Assume the old shape; the
-        # elapsed-time deduction still applies.
+        # A callable inspect cannot describe, such as some C
+        # implementations. Assume the old shape; the elapsed-time
+        # deduction still applies. Note that a mock does not land here --
+        # inspect.signature() happily reports (*args, **kwargs) for one,
+        # which has no timeout parameter and so returns False below.
         return False
     return 'timeout' in signature.parameters
 
@@ -483,8 +495,10 @@ def _check_instance(client, existing, params, log):
 
 
 def _delete_and_wait(client, log, identifier, namespace):
-    start_time = time.time()
-    while time.time() - start_time < 180:
+    # monotonic() rather than time(): this is a duration, and an NTP step
+    # mid-loop would otherwise shorten or extend it arbitrarily.
+    start_time = time.monotonic()
+    while time.monotonic() - start_time < 180:
         try:
             log.append('Attempt deletion...')
             client.delete_instance(identifier, namespace=namespace)
@@ -560,9 +574,14 @@ def run_module():
             module.exit_json(
                 changed=needs_replacement, meta=(i or None), log=log)
 
-        # An instance that needs no replacement spent nothing on a
-        # create, so the await gets the whole budget.
-        create_elapsed = 0
+        # The budget starts here rather than at the create, because a
+        # replacement deletes the old instance first and that time is
+        # spent inside the task like any other. An instance which needs
+        # no replacement spends nothing between here and the await, and
+        # so gets the whole budget for it. monotonic() because this is a
+        # duration: a wall clock step mid-create would otherwise inflate
+        # the budget past await_timeout or collapse it to nothing.
+        operation_started = time.monotonic()
         if needs_replacement:
             if i:
                 remaining = _delete_and_wait(client, log, identifier, namespace)
@@ -581,36 +600,72 @@ def run_module():
             # 4200 seconds -- and reported the 600
             # (shakenfist/kerbside#355).
             #
+            # timeout=0 is not a falsy "unset" to the client: it tests
+            # "if timeout is None" and then bounds the POST's dependency
+            # retries and the wait afterwards at now + 0, so the call
+            # returns as soon as the POST is accepted
+            # (shakenfist/client-python#369).
+            #
             # The collection requires shakenfist-client unpinned, so the
             # control node can be running a client older than the one that
-            # grew this argument. Passing it blindly there is a TypeError
+            # grew this argument -- it is not in any release up to and
+            # including v0.8.3. Passing it blindly there is a TypeError
             # and every instance creation in the fleet stops working, so
             # ask before passing it. The elapsed-time deduction below
             # covers the older client: it cannot get the task down to
             # await_timeout, but it does stop the two budgets from being
             # added together.
+            #
+            # sf_snapshot solves its version of this at client
+            # construction, by selecting ASYNC_CONTINUE, and that would
+            # avoid this branch entirely. It is not done here because the
+            # strategy is a property of the client and this same client
+            # also runs _delete_and_wait() above, where delete_instance
+            # blocks today. That loop polls for itself and would probably
+            # tolerate the change, but "probably" is not a thing to find
+            # out on the deletion path, so the narrower per-call argument
+            # is used instead.
             if module.params.get('await') and _create_accepts_timeout(client):
                 instance_kwargs['timeout'] = 0
+                log.append('Client accepts a create timeout, so the create '
+                           'will not wait')
+            elif module.params.get('await'):
+                log.append('Client predates the create timeout argument, so '
+                           'the create will wait and what it spends is '
+                           'deducted from the await budget instead')
 
-            create_started = time.time()
             i = client.create_instance(*instance_args, **instance_kwargs)
-            create_elapsed = time.time() - create_started
 
         if not module.params.get('await'):
             log.append('Not awaiting instance')
         else:
-            # Whatever the create already spent comes out of the budget,
-            # so await_timeout bounds the pair rather than each of them.
-            remaining = max(
-                0, module.params.get('await_timeout') - create_elapsed)
-            log.append('Awaiting instance %s for %d seconds (create took %d)'
-                       % (i['uuid'], remaining, create_elapsed))
+            # Whatever the delete and the create already spent comes out
+            # of the budget, so await_timeout bounds the sequence rather
+            # than each leg of it.
+            await_timeout = module.params.get('await_timeout')
+            elapsed = time.monotonic() - operation_started
+            await_budget = max(0, await_timeout - elapsed)
+            log.append('Awaiting instance %s for %d seconds (%d already '
+                       'spent)' % (i['uuid'], await_budget, elapsed))
             try:
-                client.await_instance_create(i['uuid'], timeout=remaining)
+                # A budget of zero is still worth handing over: the
+                # client checks the instance once before consulting its
+                # clock, so an instance which is already created is
+                # reported as created rather than as a timeout.
+                client.await_instance_create(i['uuid'], timeout=await_budget)
             except Exception as e:
-                log.append('Waiting for instance failed: %s' % e)
-                module.fail_json(
-                    msg='Waiting for instance failed: %s' % e, meta=None, log=log)
+                if await_budget <= 0:
+                    # The client's own message would name a zero second
+                    # timeout, which is the symptom rather than the
+                    # cause. Say where the budget actually went.
+                    msg = ('The entire await_timeout budget of %d seconds '
+                           'was consumed deleting and creating the '
+                           'instance, leaving nothing to wait with: %s'
+                           % (await_timeout, e))
+                else:
+                    msg = 'Waiting for instance failed: %s' % e
+                log.append(msg)
+                module.fail_json(msg=msg, meta=None, log=log)
 
         module.exit_json(
             changed=needs_replacement, meta=client.get_instance(i['uuid']), log=log)

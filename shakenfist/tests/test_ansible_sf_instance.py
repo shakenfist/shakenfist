@@ -210,6 +210,14 @@ class SfInstanceDiskDirtinessTestCase(base.ShakenFistTestCase):
         self.assertTrue(dirty)
 
 
+class _Succeeded(SystemExit):
+    """The module called exit_json()."""
+
+
+class _Failed(SystemExit):
+    """The module called fail_json()."""
+
+
 class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
     """await_timeout is the budget for the whole create, not one leg.
 
@@ -232,8 +240,18 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         'key': 'notreallyakey',
     }
 
-    def _run(self, await_instance, client_takes_timeout=True,
-             create_seconds=0):
+    def _run(self, *args, **kwargs):
+        _module, client = self._run_module_and_client(*args, **kwargs)
+        return client
+
+    def _run_module(self, *args, **kwargs):
+        module, _client = self._run_module_and_client(*args, **kwargs)
+        return module
+
+    def _run_module_and_client(self, await_instance,
+                               client_takes_timeout=True, create_seconds=0,
+                               existing=None, await_raises=None,
+                               expect_failure=False):
         params = dict(self.PARAMS)
         params['await'] = await_instance
         params['await_timeout'] = 600
@@ -243,12 +261,21 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         module.check_mode = False
         # The real AnsibleModule.exit_json terminates the module; a bare
         # MagicMock would let execution fall through into the deletion
-        # path below it.
-        module.exit_json.side_effect = SystemExit
-        module.fail_json.side_effect = SystemExit
+        # path below it. Distinct exception types rather than a shared
+        # SystemExit, because assertRaises(SystemExit) cannot tell a
+        # success from an early bail-out, and a test whose body is two
+        # negative assertions would then pass without running any of the
+        # code it names.
+        module.exit_json.side_effect = _Succeeded
+        module.fail_json.side_effect = _Failed
 
         created = {'uuid': 'notreallyauuid', 'state': 'creating'}
-        clock = iter(range(0, 100000, max(create_seconds, 1)))
+
+        # An explicit pair rather than an open ended counter: the module
+        # reads the clock exactly twice on this path (once before the
+        # create, once before the await), so a third read from anywhere
+        # fails loudly instead of quietly shifting the elapsed time.
+        clock = iter([0, create_seconds])
 
         # The signature is the thing under test on the compatibility
         # path, so build create_instance from a real function rather than
@@ -266,20 +293,28 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         # thing _create_accepts_timeout() looks at.
         client.create_instance = mock.create_autospec(
             create_instance, side_effect=create_instance)
-        # Absent to begin with, so the module takes the create path; every
-        # later lookup (the exit_json payload) finds it.
-        client.get_instance.side_effect = [
-            sf_instance.apiclient.ResourceNotFoundException()] + [created] * 8
+        if existing is None:
+            # Absent to begin with, so the module takes the create path;
+            # every later lookup (the exit_json payload) finds it.
+            first = sf_instance.apiclient.ResourceNotFoundException()
+        else:
+            first = existing
+        client.get_instance.side_effect = [first] + [created] * 8
+        if await_raises:
+            client.await_instance_create.side_effect = await_raises
 
         with mock.patch.object(
                 sf_instance, 'AnsibleModule', return_value=module), \
                 mock.patch.object(
                     sf_instance, '_make_client', return_value=client), \
                 mock.patch.object(
-                    sf_instance.time, 'time', side_effect=lambda: next(clock)):
-            self.assertRaises(SystemExit, sf_instance.run_module)
+                    sf_instance.time, 'monotonic',
+                    side_effect=lambda: next(clock)):
+            self.assertRaises(
+                _Failed if expect_failure else _Succeeded,
+                sf_instance.run_module)
 
-        return client
+        return module, client
 
     def test_awaiting_makes_the_create_return_immediately(self):
         client = self._run(await_instance=True)
@@ -287,11 +322,11 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         _args, kwargs = client.create_instance.call_args
         self.assertEqual(0, kwargs.get('timeout'))
 
-        # The create returns straight away, so essentially the whole
-        # budget is left for the await -- which is the point: the task
-        # now fails at await_timeout rather than at 3600 + await_timeout.
+        # The create returns straight away, so the whole budget is left
+        # for the await -- which is the point: the task now fails at
+        # await_timeout rather than at 3600 + await_timeout.
         _args, kwargs = client.await_instance_create.call_args
-        self.assertGreater(kwargs['timeout'], 590)
+        self.assertEqual(600, kwargs['timeout'])
 
     def test_not_awaiting_leaves_the_create_blocking(self):
         # Without an await the create is the only thing that can wait, so
@@ -318,7 +353,7 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
                            create_seconds=100)
 
         _args, kwargs = client.await_instance_create.call_args
-        self.assertLess(kwargs['timeout'], 600)
+        self.assertEqual(500, kwargs['timeout'])
 
     def test_the_budget_never_goes_negative(self):
         client = self._run(await_instance=True, client_takes_timeout=False,
@@ -326,3 +361,87 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
 
         _args, kwargs = client.await_instance_create.call_args
         self.assertEqual(0, kwargs['timeout'])
+
+    def test_an_exhausted_budget_names_the_real_cause(self):
+        # The client's own message would report a zero second timeout,
+        # which is the symptom of the budget having gone rather than an
+        # explanation of where it went -- and an unhelpful message is
+        # what kerbside#355 was reported as in the first place.
+        module = self._run_module(
+            await_instance=True, client_takes_timeout=False,
+            create_seconds=3600, await_raises=Exception('not created'),
+            expect_failure=True)
+
+        msg = module.fail_json.call_args[1]['msg']
+        self.assertIn(
+            'entire await_timeout budget of 600 seconds was consumed', msg)
+
+    def test_an_instance_needing_no_replacement_gets_the_whole_budget(self):
+        # No delete and no create happen on this path at all, so there
+        # is nothing to deduct and the whole budget reaches the await.
+        client = self._run(
+            await_instance=True,
+            existing={
+                'uuid': 'notreallyauuid',
+                'name': 'test',
+                'cpus': 1,
+                'memory': 1024,
+                'namespace': 'ns',
+                'interfaces': [],
+                'disk_spec': [
+                    {'base': 'cirros', 'bus': None, 'size': 8, 'type': 'disk'}
+                ]
+            })
+
+        client.create_instance.assert_not_called()
+        _args, kwargs = client.await_instance_create.call_args
+        self.assertEqual(600, kwargs['timeout'])
+
+    def test_the_chosen_path_is_recorded_in_the_log(self):
+        # The fallback is otherwise invisible: an operator debugging a
+        # recurrence from the task output alone cannot tell whether the
+        # fix engaged or the module quietly took the old behaviour.
+        module = self._run_module(await_instance=True)
+        self.assertIn('Client accepts a create timeout, so the create will '
+                      'not wait', module.exit_json.call_args[1]['log'])
+
+        module = self._run_module(
+            await_instance=True, client_takes_timeout=False)
+        self.assertIn('Client predates the create timeout argument, so the '
+                      'create will wait and what it spends is deducted from '
+                      'the await budget instead',
+                      module.exit_json.call_args[1]['log'])
+
+
+class SfInstanceCreateTimeoutDetectionTestCase(base.ShakenFistTestCase):
+    """Feature detection, rather than a version test.
+
+    The collection requires shakenfist-client unpinned, so the control
+    node's client is whatever pip resolved. There is no version to test
+    against which is not itself a guess about backports.
+    """
+
+    def test_a_new_client_is_detected(self):
+        client = mock.MagicMock()
+        client.create_instance = mock.create_autospec(
+            lambda *args, timeout=None, **kwargs: None)
+        self.assertTrue(sf_instance._create_accepts_timeout(client))
+
+    def test_an_old_client_is_detected(self):
+        client = mock.MagicMock()
+        client.create_instance = mock.create_autospec(
+            lambda *args, **kwargs: None)
+        self.assertFalse(sf_instance._create_accepts_timeout(client))
+
+    def test_a_callable_inspect_cannot_describe_is_assumed_old(self):
+        # Some C implementations have no signature to read. Guessing
+        # "new" there is a TypeError which stops every instance creation
+        # in the fleet, so the unreadable case has to fall back.
+        client = mock.MagicMock()
+        client.create_instance = dict.update
+        self.assertFalse(sf_instance._create_accepts_timeout(client))
+
+    def test_a_bare_mock_is_assumed_old(self):
+        # A MagicMock does not raise from inspect.signature() -- it
+        # reports (*args, **kwargs), which has no timeout parameter.
+        self.assertFalse(sf_instance._create_accepts_timeout(mock.MagicMock()))
