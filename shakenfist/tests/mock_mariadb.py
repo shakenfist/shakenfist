@@ -2746,6 +2746,11 @@ class MockMariaDB():
         ``expected_demand``). ``None``, the default, leaves the demand
         clause out of the guard entirely, as a real deployment with
         ``SCHEDULER_TARGET_LOAD`` at or below zero would.
+
+        Seed ``expected_demand`` above ``demand_limit`` to make the
+        clause refuse: the guard compares those two alone and ignores
+        the size of the placement asking, so seeding them equal or
+        below admits however large a request arrives.
         """
         self.node_capacity[str(node_uuid)] = {
             'limit_cpus': limit_cpus,
@@ -3036,6 +3041,18 @@ class MockMariaDB():
         accumulates the placement's demand contribution whether or not
         the clause was enforced -- also like the real UPDATE.
 
+        That clause is **check-then-charge**, matching the real one
+        since phase 4a: it compares the node's existing
+        ``expected_demand`` against ``demand_limit`` and does *not* add
+        the incoming ``demand_add``, which is reported as ``requested``
+        but not tested. An under-target node therefore admits a
+        placement of any size. Keeping this in step with
+        ``mariadb._demand_guard_clause()`` matters more than it looks:
+        ``CapacityAdmissionDenied.demand_only`` is derived from which
+        dimensions report ``exceeded``, so a mock that charged the
+        placement would refuse where production admits and send the P9
+        waiver tests down a second walk the real code never takes.
+
         The claim stage applies to namespaces seeded with
         set_namespace_claim(), and matches the real implementation's
         semantics rather than approximating them: it is skipped by a
@@ -3117,13 +3134,21 @@ class MockMariaDB():
                     'requested': float(requested),
                     'exceeded': used + requested > limit})
             if enforce_demand and row['demand_limit'] is not None:
+                # Check-then-charge, as the real clause does since phase
+                # 4a: the incoming placement's demand_add is reported but
+                # not compared, so an under-target node admits whatever
+                # size asks and the charge lands for the next decision.
+                # Charging it here would refuse placements the real guard
+                # admits, and -- because demand_only is derived from the
+                # exceeded set -- would make the P9 waiver tests in
+                # test_external_api.py exercise a walk the real code
+                # never takes.
                 dimensions.append({
                     'dimension': 'demand',
                     'limit': float(row['demand_limit']),
                     'used': float(row['expected_demand']),
                     'requested': float(demand_add),
-                    'exceeded': (row['expected_demand'] + demand_add
-                                 > row['demand_limit'])})
+                    'exceeded': row['expected_demand'] > row['demand_limit']})
             if any(d['exceeded'] for d in dimensions):
                 result['failing_stage'] = 'node'
                 result['dimensions'] = dimensions

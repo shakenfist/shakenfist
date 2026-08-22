@@ -16,6 +16,7 @@ uuid forms actually have to match and the driver's rowcount semantics
 actually matter -- is test_mariadb_capacity_admission_live.py.
 """
 
+import inspect
 from types import SimpleNamespace
 from unittest import mock
 from uuid import UUID
@@ -460,24 +461,33 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
     def test_demand_clause_is_skipped_for_a_non_positive_target_load(self):
         # An unset proto3 double reads as 0.0. A caller mid-upgrade that
         # does not send target_load must not have every placement denied.
-        self.assertIsNone(mariadb._demand_guard_clause(NODE1, 10.0, 0.0))
-        self.assertIsNone(mariadb._demand_guard_clause(NODE1, 10.0, -1.0))
-        self.assertIsNotNone(mariadb._demand_guard_clause(NODE1, 10.0, 0.75))
+        self.assertIsNone(mariadb._demand_guard_clause(NODE1, 0.0))
+        self.assertIsNone(mariadb._demand_guard_clause(NODE1, -1.0))
+        self.assertIsNotNone(mariadb._demand_guard_clause(NODE1, 0.75))
 
     def test_the_demand_clause_does_not_charge_the_placement(self):
         # Issue #3813: the clause compared a per-request charge against
         # a per-node budget, which made it unsatisfiable below 3.34
         # schedulable threads whatever the node's real headroom. The
-        # charge is gone from the comparison -- the placement's
-        # demand_add appears nowhere in the compiled WHERE -- while the
-        # same UPDATE still adds it to expected_demand for the next
-        # decision.
-        clause = mariadb._demand_guard_clause(NODE1, 7.5, 0.75)
+        # charge is gone, and structurally so -- the helper does not
+        # take one, so wiring it back in cannot be a one-line edit at
+        # the call site -- while the same UPDATE still adds it to
+        # expected_demand for the next decision.
+        self.assertNotIn(
+            'demand_add',
+            inspect.signature(mariadb._demand_guard_clause).parameters)
+
+        clause = mariadb._demand_guard_clause(NODE1, 0.75)
         text, params = _compiled(sa.select(sa.literal(1)).where(clause))
-        self.assertNotIn(7.5, params.values())
         self.assertIn('cpu_load_1', text)
         self.assertIn('cpu_schedulable', text)
         self.assertIn('expected_demand', text)
+        # The only numbers bound into the comparison are the target load
+        # and the coalesce default for a NULL measured load. Anything
+        # else is a per-request term that does not belong here.
+        self.assertEqual(
+            {0.0, 0.75},
+            {v for v in params.values() if isinstance(v, float)})
 
         # The charge does still reach the SET, so a burst spreads.
         router = _PlacementRouter()
@@ -625,6 +635,30 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual(10.0, detail['demand']['requested'])
         self.assertTrue(detail['demand']['exceeded'])
         self.assertFalse(detail['cpus']['exceeded'])
+
+    def test_an_allocation_denial_with_quiet_demand_is_not_waivable(self):
+        # The converse of the demand-only case, and the one that decides
+        # the waiver does *not* fire: a node refused on cpus while its
+        # demand sits comfortably under target must report exactly
+        # {'cpus'} as exceeded. Asserting this alongside
+        # test_a_node_under_target_does_not_report_demand_exceeded
+        # matters because that test passes for the weaker reason that
+        # nothing at all is exceeded.
+        router = _PlacementRouter(
+            node_row=_capacity_row(used_cpus=47, expected_demand=0.5),
+            rowcounts={'node_claim': 0})
+        result = self._run(router)
+
+        detail = {d['dimension']: d for d in result['dimensions']}
+        self.assertTrue(detail['cpus']['exceeded'])
+        self.assertFalse(detail['demand']['exceeded'])
+        self.assertEqual(
+            {'cpus'},
+            {d['dimension'] for d in result['dimensions'] if d['exceeded']})
+
+        denial = exceptions.CapacityAdmissionDenied(
+            result['failing_stage'], result['dimensions'])
+        self.assertFalse(denial.demand_only)
 
     def test_a_node_under_target_does_not_report_demand_exceeded(self):
         # The discriminating case for phase 4a. Measured load 4.0 plus

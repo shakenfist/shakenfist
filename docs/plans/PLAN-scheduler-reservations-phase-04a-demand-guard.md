@@ -273,7 +273,7 @@ denomination changes. Rejected as a patch over a units error
 rather than a correction of it.
 
 **E3. Keep the P9 waiver.** It is still reachable and still
-correct: when every candidate is genuinely at or above target
+correct: when every candidate is genuinely above target
 load, refusing the create would turn a spreader into a rate
 limit, which is what P9 exists to prevent. What changes is
 that it stops being the only path a placement ever takes. The
@@ -428,6 +428,24 @@ one dimension.
   exactly 54 of the 80 cells against the pre-fix clause and seed, which
   is the figure computed from the arithmetic before any code was
   written.
+* **Review round 1 (2026-08-22)** raised ten items, of which five
+  changed the code. The mock database's demand comparison still
+  implemented the pre-fix arithmetic, so the caller-side P9 waiver
+  tests were exercising a walk production no longer takes; it is now
+  check-then-charge like the real clause, with a caller-side test that
+  fails against the old mock. `_demand_guard_clause()` no longer takes
+  the charge it does not read, which turns "do not wire this back in"
+  from a docstring into a signature. `_capacity_dimension()`'s
+  `charged` flag is keyword-only. The live sweep's instance-size axis
+  was degenerate -- the clause cannot vary by instance size any more --
+  so it split into a clause-level node-size sweep and a behavioural
+  instance-size sweep through a real admission, and the prose in both
+  plans that claimed an 80-cell grid was corrected to say what the
+  tests actually run. Two wording items (the `<=` boundary, and demand
+  residue surviving release) were documentation fixes. One item was
+  declined with reasons recorded in Future work: a smoke-CI assertion
+  that no waiver event fires would flake whenever the CI cluster is
+  legitimately at target.
 
 ## Risks and mitigations
 
@@ -450,6 +468,26 @@ one dimension.
   a demand-only refusal reports exactly that, and the
   management review reading `_capacity_dimension()` and
   `exceptions.py:134-149` together.
+* **The denial-detail re-read can now suppress a waiver that
+  should fire** (raised in review). `_admission_denial_dimensions()`
+  reads its numbers after the transaction rolled back, and
+  `charged=False` makes the demand dimension's `exceeded` a
+  strictly tighter test than before -- the placement's charge
+  used to act as accidental slack against drift between the
+  guard and that read. If `cpu_load_1` or `expected_demand`
+  falls in between, a genuine demand-only refusal reports
+  nothing exceeded, `demand_only` is False (it requires
+  `exceeded == {'demand'}`, and the empty set is not that), the
+  walker does not re-walk, and an exhausted candidate list
+  507s a create the waiver would have admitted. Narrow: both
+  inputs move on 60-second and five-minute cycles against a
+  read milliseconds later, and `expected_demand` is only ever
+  increased except by the reconciler. Checked by: step 5's
+  soak looking for unexplained 507s. If any appear, the cheap
+  fix is to treat an empty `exceeded` set at the node stage as
+  waivable -- such a denial already means the detail read
+  disagrees with the guard, and the allocation dimensions
+  still bound the re-walk. Recorded in Future work.
 * **0.6 is still wrong.** It is an estimate from one incident
   on one cluster, and this phase promotes it from provisional
   to cited. Mitigated by it now being dimensionally
@@ -473,13 +511,22 @@ one dimension.
 
 Falsifiable, and mostly runnable:
 
-* For every `cpu_schedulable` in 1..16 and every instance
-  size in {1, 2, 4, 8, 16} vCPU, an idle node with zero
-  `expected_demand` admits -- 80 of 80. Against the
-  pre-change clause and seed the same test fails 54 cells,
-  and against the corrected seed with the old clause shape it
-  fails 22 (both mutation-tested, not asserted by
-  inspection).
+* An idle node with zero `expected_demand` admits, at every
+  `cpu_schedulable` in 1..16 (clause-level, evaluated as SQL)
+  and at every instance size in {1, 2, 4, 8, 16} vCPU on a
+  two-thread node (behavioural, through a real admission).
+  These are two tests rather than an 80-cell grid, and
+  deliberately so: after the fix the clause does not take the
+  placement's charge at all, so a grid over both axes would
+  evaluate 16 distinct expressions five times each and claim
+  more evidence than it produces. The instance-size axis is
+  therefore exercised where it can still vary the outcome,
+  which is a real admission.
+
+  Mutation-tested rather than asserted by inspection. Against
+  the pre-change clause and seed the combined property fails
+  54 of those 80 combinations; against the corrected seed with
+  the old clause shape it still fails 22.
 * A node whose `cpu_load_1 + expected_demand` already exceeds
   `SCHEDULER_TARGET_LOAD x cpu_schedulable` refuses, the
   denial's demand dimension reports `exceeded` true, every
@@ -547,6 +594,37 @@ _(Filled by step 5.)_
 * Issue #3759 (a MariaDB 11 CI job for the ER_CHECKREAD
   invariant) is unchanged by this phase but gates how much
   the step 2 live tests actually prove in CI.
+* **An empty `exceeded` set at the node stage is not waivable**
+  (see the risk above). Whether `demand_only` should treat it
+  as waivable turns on whether step 5's soak sees any
+  unexplained 507s; it is a behaviour change to the walkers
+  and does not belong in a phase whose job is to make the
+  clause satisfiable.
+* **`expected_demand` is not credited back on release**, so a
+  cluster under rapid create/delete churn can read as over
+  target on demand accumulated by instances that are already
+  gone, until the next five-minute reconcile pass. This is
+  pre-existing and deliberate -- the contribution has partly
+  decayed, so crediting the original figure would over-credit
+  -- but the clause binding for the first time is what makes
+  it observable, and the operator guide now documents how to
+  tell residue from load. Step 5 should measure how often it
+  happens; if it is frequent, the options are crediting a
+  decayed figure on release or shortening the reconcile
+  interval.
+* **No functional-CI coverage of the end-to-end property**
+  (raised in review): that a create on a two-thread hypervisor
+  succeeds on the first walk with no waiver. Deliberately not
+  added. The obvious form -- assert no `waiving demand guard`
+  event on a create in the cluster suite -- is a flake
+  generator, because a CI cluster genuinely at target during a
+  burst fires that event correctly and the test would fail for
+  the right reason. The property is covered at the database
+  level by the live suite (which does run in CI via
+  `tools/ci-enum-widening-test.sh`) and at the caller level by
+  `test_an_idle_node_admits_a_large_instance_on_the_first_walk`,
+  which asserts the absence of the waiver event against the
+  mock. Real-hardware proof stays with step 5.
 
 ## Back brief
 

@@ -367,8 +367,8 @@ class SFConfig(BaseSettings):
             'estimated at 0.6; the burst figure is the relevant one '
             'because bursts are what the term exists to spread. A node '
             'is refused only once its measured load plus expected '
-            'demand already reaches SCHEDULER_TARGET_LOAD per '
-            'schedulable thread, so this value sets how many '
+            'demand exceeds SCHEDULER_TARGET_LOAD per schedulable '
+            'thread, so this value sets how many '
             'placements a quiet node absorbs before the scheduler '
             'prefers its neighbours.'
         )

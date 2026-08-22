@@ -24936,7 +24936,7 @@ def _retry_transaction(fn: Callable[[], _T], op_name: str) -> _T:
 
 
 def _capacity_dimension(
-        dimension: str, limit: float, used: float, requested: float,
+        dimension: str, limit: float, used: float, requested: float, *,
         charged: bool = True) -> CapacityDimensionDetailDict:
     """Build one denial-detail entry, recomputing the guard comparison.
 
@@ -24946,7 +24946,11 @@ def _capacity_dimension(
     dimension of the failing stage as suspect.
 
     ``charged`` says whether this request is part of the comparison, and
-    exists for exactly one caller: the D13 demand dimension. The three
+    exists for exactly one caller: the D13 demand dimension. It is
+    keyword-only because it cannot be got wrong quietly -- the value
+    decides which dimensions report ``exceeded``, and a wrong one there
+    changes whether the P9 waiver fires (below), so it must never be
+    supplied by landing in the right argument position by accident. The three
     allocation dimensions are guarded as ``used + requested <= limit``,
     but since phase 4a the demand clause compares only the node's
     existing state (``cpu_load_1 + expected_demand <= target_load x
@@ -24989,7 +24993,7 @@ def _empty_admit_result() -> AdmitPlacementResult:
 
 
 def _demand_guard_clause(
-        node_key: UUID, demand_add: float,
+        node_key: UUID,
         target_load: float) -> Optional[sa.ColumnElement[bool]]:
     """The D13 feedforward clause of the node guard, or None to skip it.
 
@@ -25000,8 +25004,8 @@ def _demand_guard_clause(
     pre-filters in find_candidates(); this is the clause that makes the
     decision atomic with the drawdown.
 
-    ``demand_add`` is deliberately *not* part of the comparison, though
-    the same UPDATE still adds it to ``expected_demand`` so it is
+    The placement's own charge is deliberately not a parameter here,
+    though the same UPDATE still adds it to ``expected_demand`` so it is
     charged for the next decision. The clause asks whether the node is
     already at or above its target load, not whether it would be after
     this placement (phase 4a decision E2). Both sides are then node
@@ -25716,8 +25720,7 @@ def _direct_admit_instance_placement(
                         (capacity.c.used_disk_gb + disk_gb
                          <= capacity.c.limit_disk_gb),
                     ]
-                    demand = _demand_guard_clause(
-                        node_key, demand_add, target_load)
+                    demand = _demand_guard_clause(node_key, target_load)
                     if demand is not None:
                         where.append(demand)
                 if conn.execute(sa.update(capacity).where(

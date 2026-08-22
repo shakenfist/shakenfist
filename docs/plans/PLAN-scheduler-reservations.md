@@ -677,9 +677,11 @@ because the following statements will be true:
 * The D13 demand clause admits placements on a node that has
   real room for them, at every node size this project supports
   — or it has been deliberately retired. **Met by phase 4a**,
-  whose live sweep asserts admission for every combination of
-  16 node sizes and five instance sizes on an idle node; issue
-  #3813 closes once that phase's soak has been observed.
+  which asserts admission on an idle node at every one of 16
+  node sizes (clause-level) and at every one of five instance
+  sizes on the smallest node size the CI fleet runs
+  (behavioural); issue #3813 closes once that phase's soak has
+  been observed.
 * `pre-commit run --all-files` passes.
 
 ### Future work
@@ -821,9 +823,15 @@ development that we fixed.
   clause itself now compares only the node's existing state,
   leaving `demand_add` to accumulate in `expected_demand` for the
   next decision, which is the only form satisfiable at every
-  combination of node size and instance size. A live sweep over
-  16 node sizes and five instance sizes pins the property; it
-  refuses 54 of those 80 cells against the pre-fix code.
+  combination of node size and instance size. Two live tests pin
+  the property -- a clause-level sweep over 16 node sizes, and a
+  real admission at each of five instance sizes on a two-thread
+  node -- which between them fail 54 of those 80 combinations
+  against the pre-fix code. They are deliberately not one
+  80-cell grid: the clause no longer takes the placement's
+  charge, so sweeping instance size against it would evaluate
+  one expression five times and claim evidence it did not
+  produce.
 * **KSM metrics were never published** (pre-existing, found by
   the phase 00a code review): the resources daemon's KSM block
   skipped every sysfs file (trailing-newline filter), used a

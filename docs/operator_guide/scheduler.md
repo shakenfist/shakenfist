@@ -449,8 +449,8 @@ the same node because none of them have started doing any work yet.
 Since scheduler-reservations phase 3 they do affect placement: each
 successful admission adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` to the
 target node's `expected_demand` counter in the same transaction, and
-the admission guard refuses a node which is *already* at or above its
-target load:
+the admission guard refuses a node whose existing load is *already*
+above its target:
 
 ```
 cpu_load_1 + expected_demand <= SCHEDULER_TARGET_LOAD × cpu_schedulable
@@ -519,13 +519,27 @@ admission RPCs and an extra pair of audit events -- until churn slows
 enough for the reconciler's decay to catch up. That is the accepted
 trade, since a second walk is cheaper than a failed create.
 
-Read `waiving demand guard` events accordingly. Occasional ones mean
-the cluster genuinely has every node at or above target, which is
-information about capacity. Seeing one on *every* create means
-something is wrong with the sizing rather than with the cluster --
-either the demand constants are mis-sized for this hardware, or you are
-running a version predating the #3813 fix, where they could not be
-satisfied at all.
+One more thing to know before reading those events: **`expected_demand`
+is not credited back when an instance is deleted.** A placement's
+contribution has usually decayed by then, so subtracting the original
+figure would over-credit the node; the reconciler owns the decay
+instead, and it runs every five minutes. Under rapid create/delete
+churn a node therefore carries demand from instances that no longer
+exist, and with the clause binding, that residue alone can put it over
+target. Compare `scheduler_capacity_node_expected_demand` against the
+node's live instance count to tell the two apart: demand well above
+what the placed instances justify is residue waiting for the next
+reconcile pass, not load.
+
+Read `waiving demand guard` events accordingly.
+
+* **Occasional ones** mean every candidate was over target. That is
+  usually real saturation, but on a cluster doing rapid create/delete
+  churn it can be the residue above rather than live load.
+* **One on every create** means something is wrong with the sizing
+  rather than with the cluster -- either the demand constants are
+  mis-sized for this hardware, or you are running a version predating
+  the #3813 fix, where they could not be satisfied at all.
 
 ## Diagnosing a placement decision
 

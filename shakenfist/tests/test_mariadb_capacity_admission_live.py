@@ -460,11 +460,22 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(8 * DEMAND_PER_VCPU,
                          self._capacity(self.node_b).expected_demand)
 
-    def test_the_demand_clause_is_satisfiable_at_every_size(self):
-        # The property #3813 violated, swept rather than sampled: for
-        # every node size and every instance size, an idle node admits.
-        # Evaluated as SQL against the real server, because the clause
-        # is SQL and the arithmetic that broke was the server's.
+    def test_the_demand_clause_is_satisfiable_at_every_node_size(self):
+        # Half of the property #3813 violated: an idle node admits, at
+        # every node size this project supports. Evaluated as SQL
+        # against the real server, because the clause is SQL and the
+        # arithmetic that broke was the server's.
+        #
+        # There is no instance-size axis here, and that is the point:
+        # since the fix, `_demand_guard_clause()` does not take the
+        # placement's charge at all, so instance size cannot enter this
+        # comparison. Re-adding it would have to change the helper's
+        # signature, which the unit suite pins directly
+        # (test_the_demand_clause_does_not_charge_the_placement). The
+        # instance-size half of the property is behavioural and lives in
+        # test_an_idle_small_node_admits_every_instance_size below,
+        # which goes through a real admission rather than the clause
+        # alone.
         metrics_t = mariadb._get_node_metrics_table()
         capacity_t = mariadb._get_scheduler_node_capacity_table()
         refused = []
@@ -479,19 +490,55 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
                         expected_demand=0.0))
                 conn.commit()
 
-            for cpus in (1, 2, 4, 8, 16):
-                clause = mariadb._demand_guard_clause(
-                    self.node_b, cpus * DEMAND_PER_VCPU, TARGET_LOAD)
-                with self.engine.connect() as conn:
-                    admits = conn.execute(
-                        sa.select(clause).select_from(capacity_t).where(
-                            capacity_t.c.node_uuid == self.node_b)).scalar()
-                if not admits:
-                    refused.append((schedulable, cpus))
+            clause = mariadb._demand_guard_clause(self.node_b, TARGET_LOAD)
+            with self.engine.connect() as conn:
+                admits = conn.execute(
+                    sa.select(clause).select_from(capacity_t).where(
+                        capacity_t.c.node_uuid == self.node_b)).scalar()
+            if not admits:
+                refused.append(schedulable)
 
         self.assertEqual(
             [], refused,
-            'idle nodes refused, as (cpu_schedulable, instance vCPUs): '
+            f'idle nodes refused at cpu_schedulable values: {refused}')
+
+    def test_an_idle_small_node_admits_every_instance_size(self):
+        # The other half, and the one the clause-level sweep cannot
+        # prove: a real admission, at the node size #3813 was found on
+        # (two schedulable threads, a demand budget of 0.75 x 2 = 1.5),
+        # for every instance size. Before the fix the charge was
+        # compared against that budget, so everything from 1 vCPU up
+        # was refused here; now nothing is, and each admission's charge
+        # is released again so the sizes stay independent.
+        metrics_t = mariadb._get_node_metrics_table()
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        refused = []
+
+        for cpus in (1, 2, 4, 8, 16):
+            with self.engine.connect() as conn:
+                conn.execute(sa.update(metrics_t).where(
+                    metrics_t.c.node_uuid == self.node_b).values(
+                        cpu_schedulable=2, cpu_load_1=0.0))
+                conn.execute(sa.update(capacity_t).where(
+                    capacity_t.c.node_uuid == self.node_b).values(
+                        expected_demand=0.0))
+                conn.commit()
+
+            result = self._admit(
+                self.node_b, cpus=cpus, memory_mb=1024, disk_gb=10,
+                demand_add=cpus * DEMAND_PER_VCPU)
+            if not result['admitted']:
+                refused.append((cpus, result['dimensions']))
+            else:
+                # The charge landed even though it was not compared.
+                self.assertAlmostEqual(
+                    cpus * DEMAND_PER_VCPU,
+                    self._capacity(self.node_b).expected_demand)
+                self._release(cpus=cpus, memory_mb=1024, disk_gb=10)
+
+        self.assertEqual(
+            [], refused,
+            f'an idle two-thread node refused these instance sizes: '
             f'{refused}')
 
     def test_the_demand_clause_passes_on_null_metrics(self):
