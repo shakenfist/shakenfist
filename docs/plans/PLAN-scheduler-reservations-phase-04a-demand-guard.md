@@ -569,7 +569,104 @@ Falsifiable, and mostly runnable:
 
 ## Soak observations
 
-_(Filled by step 5.)_
+### Pre-fix baseline (48h to 2026-08-23 06:19 UTC)
+
+Recorded before the phase 4a deploy, and not something the plan
+anticipated having. PR #3843 merged at 2026-08-22 11:26 UTC but sfcbr
+was not redeployed until 2026-08-23, so the two days of production
+traffic either side of the merge all ran the **old** clause. That makes
+this window a genuine control arm rather than a recollection, and the
+post-deploy numbers below are a measured delta rather than a judgement
+call.
+
+The window was confirmed to be pre-fix from the audit events
+themselves, not from deploy records. A refusal at 2026-08-23 06:19:17Z
+read:
+
+```
+{'dimension': 'demand', 'limit': 16.5, 'used': 9.36,
+ 'requested': 10.0, 'exceeded': True}
+```
+
+Both fields date the code. `requested: 10.0` for a 4-vCPU instance is
+2.5 per vCPU, the pre-retune `SCHEDULER_DEMAND_PER_VCPU`; the shipped
+default of 0.6 would read 2.4. And `exceeded: True` while
+`used 9.36 < limit 16.5` can only be `used + requested > limit`, the
+charged comparison this phase replaced with `charged=False`. Under the
+shipped code that node admits.
+
+**Every refusal was a demand refusal.** Across 3,904
+`schedule candidate refused by capacity guard` events, the count whose
+`exceeded` set contained any of `cpus`, `memory_mb` or `disk_gb` was
+zero:
+
+| node | cpu limit | refusals | demand-only |
+|------|-----------|----------|-------------|
+| `6046afdf` | 66 | 686 | 686 (100%) |
+| `f6b7e913` | 66 | 682 | 682 (100%) |
+| `bed5996d` | 30 | 669 | 669 (100%) |
+| `963d4df9` | 30 | 639 | 639 (100%) |
+| `f4ba9b6c` | 24 | 651 | 651 (100%) |
+| `7ce66641` | 18 | 577 | 577 (100%) |
+| **total** | | **3,904** | **3,904 (100%)** |
+
+This is #3813 stated as a measurement. The demand term was not one
+input to placement among several -- it was the *only* input that ever
+refused anything, on every node, at every size -- including the two
+largest, refusing a 4-vCPU request while holding 20 of an admissible
+66 vCPUs. The allocation dimensions the
+capacity tables exist to enforce never once bound.
+
+Consequently the P9 waiver, designed for genuine saturation, carried
+the majority of all traffic:
+
+| measure | pre-fix |
+|---------|---------|
+| placements | 1,052 |
+| P9 waivers (`enforce_demand` false) | 648 (**62%**) |
+| hourly waiver rate | 25% -- 86% |
+
+The hourly spread is worth keeping, because it sets the bar for what
+counts as evidence after the fix: an unchanged clause varies by a
+factor of three from hour to hour, so a one- or two-hour post-deploy
+sample cannot distinguish the fix from ordinary variance. The
+discriminating hours are the busy ones -- 2026-08-22 22:00Z placed 72
+instances at an 82% waiver rate.
+
+Placement concentrated on the two largest nodes, which is the spreading
+failure the term exists to prevent:
+
+| node | cpu limit | placements | share |
+|------|-----------|------------|-------|
+| `6046afdf` | 66 | 330 | 31% |
+| `f6b7e913` | 66 | 303 | 29% |
+| `bed5996d` | 30 | 130 | 12% |
+| `963d4df9` | 30 | 125 | 12% |
+| `f4ba9b6c` | 24 | 102 | 10% |
+| `7ce66641` | 18 | 62 | 6% |
+
+Two caveats on reading the concentration figure. It is *not* a clean
+measure of the demand term's spreading. With the guard refusing every
+candidate, 62% of placements were made by the P9 waiver's second
+`place_walk(False)`, which iterates the *same* ranked candidate list as
+the first (`external_api/instance.py:881-921`) but with the clause
+waived -- so it simply takes the highest-ranked candidate, and the
+demand term contributed nothing to where those instances went. The 60%
+on the top two nodes therefore reflects the scheduler's affinity-then-
+load-bucket ranking (`scheduler.py:653-691`) preferring the largest
+nodes, which is partly correct behaviour. What the fix should change is
+the *mechanism* before it changes the distribution: placements should
+be made by the first walk with `enforce_demand` true. Second, the node column here is capacity limit
+(vCPUs admitted at the 3.0 overcommit ratio), not physical size, so the
+66/30/24/18 spread is roughly a 22/10/8/6 thread spread.
+
+### Post-deploy observations
+
+_(Filled by step 5, after the 2026-08-23 deploy. The five observations
+the Definition of done requires -- demand clause behaviour, P9 waiver
+frequency, burst distribution, reconciler drift, and the phase 4 claim
+drawdown -- are recorded separately below, each against its pre-fix row
+above where one exists.)_
 
 ## Future work
 
