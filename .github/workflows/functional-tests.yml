@@ -306,8 +306,29 @@ jobs:
           needs.check_bot_commit.outputs.is_bot != 'true' &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository) }}
+    # github.ref is the right key on every event except merge_group,
+    # where it is the per-attempt queue branch
+    # gh-readonly-queue/develop/pr-<N>-<SHA> and GitHub mints a fresh
+    # SHA every time it rebuilds the group -- which it does on every
+    # push to develop. Keyed on that, every rebuild landed in a group
+    # of its own, cancel-in-progress never matched, and superseded
+    # merge groups ran to completion on the shared under-cloud. See
+    # shakenfist/kerbside#284, which recorded this repository's
+    # superseded merge groups starving a neighbour's, and
+    # shakenfist/development audits/merge-group-cancellation.md.
+    #
+    # Cancelling is safe because this queue is serial
+    # (max_entries_to_build: 1), so any other in-flight merge_group run
+    # is by definition superseded and its queue branch already
+    # abandoned. The merge_group- prefix keeps a queue run from sharing
+    # a group with a workflow_dispatch run on develop, whose github.ref
+    # is the same string.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-delinter
+      group: >-
+        ${{ github.workflow }}-delinter-${{
+        github.event_name == 'merge_group'
+        && format('merge_group-{0}', github.event.merge_group.base_ref)
+        || github.ref }}
       cancel-in-progress: true
 
     steps:
@@ -503,7 +524,11 @@ jobs:
     # is still far short of GitHub's six hour default.
     timeout-minutes: 180
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle-collection
+      group: >-
+        ${{ github.workflow }}-nodelifecycle-collection-${{
+        github.event_name == 'merge_group'
+        && format('merge_group-{0}', github.event.merge_group.base_ref)
+        || github.ref }}
       cancel-in-progress: true
 
     steps:
@@ -681,7 +706,11 @@ jobs:
     runs-on: [self-hosted, vm, debian-12]
     timeout-minutes: 30
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-schema-enum-widening
+      group: >-
+        ${{ github.workflow }}-schema-enum-widening-${{
+        github.event_name == 'merge_group'
+        && format('merge_group-{0}', github.event.merge_group.base_ref)
+        || github.ref }}
       cancel-in-progress: true
 
     steps:

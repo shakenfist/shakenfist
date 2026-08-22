@@ -33,6 +33,10 @@
 
 name: Fix test failures with Claude Code
 
+# audit-ok: merge-group-cancellation -- this workflow is reusable, but
+# its only caller is pr-fix-tests.yml on issue_comment, so it can never
+# run under a merge_group event and has no queue entry to supersede.
+
 on:
   workflow_dispatch:
     inputs:
