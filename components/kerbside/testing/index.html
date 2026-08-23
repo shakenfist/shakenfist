@@ -5145,6 +5145,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-credential-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The credential scan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The credential scan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#accepting-a-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepting a finding
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -12318,6 +12346,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-credential-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The credential scan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The credential scan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#accepting-a-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepting a finding
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -12578,7 +12634,10 @@ trigger-level <code>paths-ignore</code> (safe there because CodeQL is not a
 required check); keep the copies in sync. In the merge queue only
 <code>functional-tests.yml</code> runs its filter, so a review-marks-only or
 docs-only queue entry skips the cloud matrices too — confirmed
-live on the queue entry for PR 304.</p>
+live on the queue entry for PR 304. The one job exempt from all of
+this is the <a href="#the-credential-scan">credential scan</a>: a credential
+pasted into a code sample is still a credential, so it runs on every
+change.</p>
 <table>
 <thead>
 <tr>
@@ -12591,6 +12650,11 @@ live on the queue entry for PR 304.</p>
 <tr>
 <td><code>functional-tests.yml</code> (<code>sanity_checks</code>)</td>
 <td>pull_request, merge_group</td>
+<td>smoke</td>
+</tr>
+<tr>
+<td><code>functional-tests.yml</code> (<code>credential_scan</code>)</td>
+<td>pull_request, merge_group, never path-filtered</td>
 <td>smoke</td>
 </tr>
 <tr>
@@ -12686,7 +12750,7 @@ assert that everything it depends on succeeded or skipped:</p>
 </tr>
 <tr>
 <td><code>Can enqueue</code></td>
-<td>the smoke-tier jobs in <code>functional-tests.yml</code>, on non-merge_group events</td>
+<td>the smoke-tier jobs in <code>functional-tests.yml</code>, including the credential scan, on non-merge_group events</td>
 </tr>
 <tr>
 <td><code>Can enqueue: direct-qemu</code></td>
@@ -12698,7 +12762,7 @@ assert that everything it depends on succeeded or skipped:</p>
 </tr>
 <tr>
 <td><code>Can merge</code></td>
-<td>the cloud matrices, on merge_group events only</td>
+<td>the cloud matrices and the credential scan, on merge_group events only</td>
 </tr>
 </tbody>
 </table>
@@ -12748,6 +12812,80 @@ which checks every repository whose workflows can run on <code>merge_group</code
 and every reusable workflow that inherits such an event.</p>
 <p>For the design rationale see
 <a href="/components/kerbside/plans/PLAN-two-tier-ci/">plans/PLAN-two-tier-ci.md</a>.</p>
+<h3 id="the-credential-scan">The credential scan<a class="headerlink" href="#the-credential-scan" title="Permanent link">&para;</a></h3>
+<p>The <code>credential_scan</code> job runs <code>gitleaks</code> over every commit reachable
+from <code>HEAD</code> — on a pull request that is the branch under test plus all
+of develop — and fails the build on any finding. It is the only job in
+either tier which is not gated on <code>check_paths</code>: every other lane can
+skip a documentation-only change, but a credential pasted into a code
+sample is a credential, and the review notes under <code>.vscode/</code> are
+prose the rewriting pre-commit hooks deliberately leave alone so that
+a content scanner can read them.</p>
+<p>Run it the same way CI does:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tools/gitleaks-scan.sh<span class="w">                     </span><span class="c1"># gitleaks on $PATH</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>tools/gitleaks-scan.sh<span class="w"> </span>--gitleaks<span class="w"> </span>/tmp/gitleaks
+</code></pre></div>
+<p>The script does two things, and the second matters more. It scans, and
+before scanning it plants an SSH private key and a JWT in a scratch
+directory and fails unless <code>gitleaks</code> reports both. A scan that finds
+nothing is otherwise indistinguishable from a scan that <em>cannot</em> find
+anything — a shallow clone, a broken rule, an allowlist that has grown
+until it forgives everything. Those two shapes are the ones Kerbside
+actually handles: private keys move through the CI lanes and the
+deployment tooling, and the API authenticates callers with JWTs.</p>
+<p>Two flags in the job are load bearing. <code>fetch-depth: 0</code>, because a
+secret committed and then reverted is still in the history and still
+needs rotating; the script refuses to run against a shallow clone
+rather than report a clean history it never looked at. And
+<code>--log-opts="HEAD"</code>, because the gitleaks default is to scan <em>every
+ref</em>, which on a repository that publishes a site from a branch turns
+seconds into minutes of duplicate findings misattributed to unrelated
+merge commits.</p>
+<p><code>gitleaks</code> is downloaded with a pinned version and sha256 rather than
+installed from apt: the package first appears in Debian 13 while these
+runners are Debian 12, and the shared static pool grants no
+passwordless sudo. The pin is also protection against the tool
+changing under us — <code>.gitleaks.toml</code> is written against 8.16's schema,
+in which per-rule allowlists are a single <code>[rules.allowlist]</code> table
+rather than the repeatable array later releases and the current
+upstream documentation describe. To move the pin, run
+<code>tools/gitleaks-scan.sh</code> against the new version locally first and
+check that the positive control still passes.</p>
+<h4 id="accepting-a-finding">Accepting a finding<a class="headerlink" href="#accepting-a-finding" title="Permanent link">&para;</a></h4>
+<p>History cannot be rewritten to unpublish anything from a public
+repository — the objects survive in every fork — so accepting a
+finding is a claim that the credential has been revoked where it was
+trusted, not that it has been tidied out of sight. Never suppress a
+finding for a credential that still authorises something.</p>
+<p>There are two mechanisms and they are not interchangeable:</p>
+<ul>
+<li><strong>Content that recurs</strong> — a documentation placeholder, a test
+  fixture, an upstream default — goes in an <code>[allowlist]</code> <code>regexes</code>
+  entry in <code>.gitleaks.toml</code>, keyed on the text. Editing the paragraph
+  around a placeholder produces a new finding in a new commit, so
+  anything keyed on a commit would need replacing every time. Prefer a
+  regex to a path: blinding a whole file also blinds a real credential
+  added to it later.</li>
+<li><strong>A specific historical event</strong> goes in <code>.gitleaksignore</code> as a
+  <code>commit:path:rule-id:line</code> fingerprint, which forgives that one
+  occurrence and nothing else — the same secret in a new commit fails
+  the scan again. Comment each entry with what the credential was and
+  what was done about it; an undocumented entry is indistinguishable
+  from a mistake.</li>
+</ul>
+<p>The history is clean as scanned, so neither file carries an entry
+today and <code>.gitleaksignore</code> does not exist yet.</p>
+<p>One known gap: the SPICE console token minted by
+<code>kerbside/consoletoken.py</code> is 48 characters of unadorned base62, which
+no regex can tell apart from any other identifier of that length, so a
+leaked one would not be caught. Giving it an identifying prefix — the
+way GitHub uses <code>ghp_</code> and Shaken Fist uses <code>sfk_</code> — would make it
+scannable, but it is a wire-format change to a value SPICE carries as
+a password. Issue #357 tracks it.</p>
+<p>This is distinct from GitHub's own secret scanning, which detects
+known third-party credential formats and needs GitHub Advanced
+Security for custom patterns. The fleet audit behind this lane is
+<a href="https://github.com/shakenfist/development/blob/main/audits/secret-handling.md">secret-handling</a>.</p>
 <h2 id="end-to-end-ci-coverage">End-to-end CI coverage<a class="headerlink" href="#end-to-end-ci-coverage" title="Permanent link">&para;</a></h2>
 <p>The proxy is exercised end to end in CI: the direct-qemu functional
 lane boots a real qemu/SPICE guest, drives it with the ryll headless
@@ -12780,10 +12918,10 @@ default any VM named <code>smoke-test-*</code>), checks that SPICE display is
 configured, and performs a SPICE protocol handshake against the
 console port. This is the Kerbside-specific check and lives here
 because we iterate on it alongside the proxy.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>tools/test-ovirt-console.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--url<span class="w"> </span>https://ovirt-engine.example/ovirt-engine/api<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>--password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span>--ca-file<span class="w"> </span>/path/to/ca.pem
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>tools/test-ovirt-console.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>--url<span class="w"> </span>https://ovirt-engine.example/ovirt-engine/api<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>--ca-file<span class="w"> </span>/path/to/ca.pem
 </code></pre></div>
 <p>The generic plumbing it builds on lives in the
 <a href="https://github.com/shakenfist/actions">shakenfist/actions</a> repo,
@@ -12969,7 +13107,7 @@ seconds, collects SPICE PING/PONG round-trip latency samples, and
 writes them to a CSV (one float per line, seconds). See the
 <a href="#ryll">Ryll section</a> above for a note on the metric definition.</p>
 <p>To build this OCI image, do this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker build . -f loadtests/latency/Dockerfile -t kerbside-latency:latest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker build . -f loadtests/latency/Dockerfile -t kerbside-latency:latest
 </code></pre></div>
 <p>For your convenience, there is also a version of this image at
 <a href="https://images.shakenfist.com/testimages/kerbside-latency.tar.gz">https://images.shakenfist.com/testimages/kerbside-latency.tar.gz</a></p>

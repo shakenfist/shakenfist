@@ -12843,6 +12843,29 @@ produces:</p>
 comment. The canonical case is pydantic-core, which each pydantic
 release exact-pins itself, and which broke every CI install when
 Renovate moved the two out of lockstep (PR #198).</p>
+<p>Renovate also reads <code>.pre-commit-config.yaml</code>, because <code>renovate.json</code>
+turns its <code>pre-commit</code> manager on — it is opt-in, and a repository
+that leaves it off has its linters as the one set of pins nobody
+watches. Two of those hooks have a partner pin elsewhere in the tree,
+and in both cases the pair must move together or CI and the pre-commit
+hook disagree about what passes:</p>
+<ul>
+<li><strong>shellcheck</strong> is pinned as a hook revision and as a <code>shellcheck-py</code>
+  dependency of the <code>shellcheck</code> tox environment, which is what CI
+  runs.</li>
+<li><strong>skillsaw</strong> is pinned as a hook revision and as the <code>skillsaw==</code>
+  version the <code>sanity_checks</code> job installs into its test venv. CI
+  installs the linter rather than using <code>stbenjam/skillsaw@v0</code>: that
+  composite action begins with <code>actions/setup-python</code> pinned to a
+  version <code>actions/python-versions</code> publishes no Debian 12 build of,
+  and the self-hosted runners carry no tool cache, so the action fails
+  before it lints anything.</li>
+</ul>
+<p>Neither partner pin is visible to a stock Renovate manager — there is
+no tox manager, and the <code>skillsaw==</code> pin sits in a <code>run:</code> block rather
+than a <code>uses:</code> — so a <code>customManagers</code> regex picks each one up, and the
+<code>shellcheck</code> and <code>skillsaw</code> groups land both halves of a bump in one
+pull request.</p>
 <h2 id="development-configuration">Development configuration<a class="headerlink" href="#development-configuration" title="Permanent link">&para;</a></h2>
 <p>Configuration is loaded from environment variables (<code>KERBSIDE_*</code>), then
 an INI file at <code>/etc/kerbside/kerbside.ini</code>, then the field defaults in
