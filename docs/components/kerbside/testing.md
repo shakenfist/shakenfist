@@ -62,11 +62,15 @@ trigger-level `paths-ignore` (safe there because CodeQL is not a
 required check); keep the copies in sync. In the merge queue only
 `functional-tests.yml` runs its filter, so a review-marks-only or
 docs-only queue entry skips the cloud matrices too — confirmed
-live on the queue entry for PR 304.
+live on the queue entry for PR 304. The one job exempt from all of
+this is the [credential scan](#the-credential-scan): a credential
+pasted into a code sample is still a credential, so it runs on every
+change.
 
 | Workflow | Runs on | Tier |
 |----------|---------|------|
 | `functional-tests.yml` (`sanity_checks`) | pull_request, merge_group | smoke |
+| `functional-tests.yml` (`credential_scan`) | pull_request, merge_group, never path-filtered | smoke |
 | `functional-tests.yml` (`ovirt_matrix`, `openstack_matrix`) | merge_group, workflow_dispatch | merge |
 | `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
@@ -114,10 +118,10 @@ assert that everything it depends on succeeded or skipped:
 | Check | Asserts |
 |-------|---------|
 | `Can see status` | nothing; it always succeeds, proving the workflow was evaluated at all |
-| `Can enqueue` | the smoke-tier jobs in `functional-tests.yml`, on non-merge_group events |
+| `Can enqueue` | the smoke-tier jobs in `functional-tests.yml`, including the credential scan, on non-merge_group events |
 | `Can enqueue: direct-qemu` | the direct-qemu lane |
 | `Can enqueue: sf-e2e` | the Shaken Fist end-to-end lane |
-| `Can merge` | the cloud matrices, on merge_group events only |
+| `Can merge` | the cloud matrices and the credential scan, on merge_group events only |
 
 Those five names are the entire required-check list on the develop
 ruleset. Because a skipped required check satisfies the rule, one
@@ -172,6 +176,93 @@ and every reusable workflow that inherits such an event.
 
 For the design rationale see
 [plans/PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/).
+
+### The credential scan
+
+The `credential_scan` job runs `gitleaks` over every commit reachable
+from `HEAD` — on a pull request that is the branch under test plus all
+of develop — and fails the build on any finding. It is the only job in
+either tier which is not gated on `check_paths`: every other lane can
+skip a documentation-only change, but a credential pasted into a code
+sample is a credential, and the review notes under `.vscode/` are
+prose the rewriting pre-commit hooks deliberately leave alone so that
+a content scanner can read them.
+
+Run it the same way CI does:
+
+```bash
+tools/gitleaks-scan.sh                     # gitleaks on $PATH
+tools/gitleaks-scan.sh --gitleaks /tmp/gitleaks
+```
+
+The script does two things, and the second matters more. It scans, and
+before scanning it plants an SSH private key and a JWT in a scratch
+directory and fails unless `gitleaks` reports both. A scan that finds
+nothing is otherwise indistinguishable from a scan that *cannot* find
+anything — a shallow clone, a broken rule, an allowlist that has grown
+until it forgives everything. Those two shapes are the ones Kerbside
+actually handles: private keys move through the CI lanes and the
+deployment tooling, and the API authenticates callers with JWTs.
+
+Two flags in the job are load bearing. `fetch-depth: 0`, because a
+secret committed and then reverted is still in the history and still
+needs rotating; the script refuses to run against a shallow clone
+rather than report a clean history it never looked at. And
+`--log-opts="HEAD"`, because the gitleaks default is to scan *every
+ref*, which on a repository that publishes a site from a branch turns
+seconds into minutes of duplicate findings misattributed to unrelated
+merge commits.
+
+`gitleaks` is downloaded with a pinned version and sha256 rather than
+installed from apt: the package first appears in Debian 13 while these
+runners are Debian 12, and the shared static pool grants no
+passwordless sudo. The pin is also protection against the tool
+changing under us — `.gitleaks.toml` is written against 8.16's schema,
+in which per-rule allowlists are a single `[rules.allowlist]` table
+rather than the repeatable array later releases and the current
+upstream documentation describe. To move the pin, run
+`tools/gitleaks-scan.sh` against the new version locally first and
+check that the positive control still passes.
+
+#### Accepting a finding
+
+History cannot be rewritten to unpublish anything from a public
+repository — the objects survive in every fork — so accepting a
+finding is a claim that the credential has been revoked where it was
+trusted, not that it has been tidied out of sight. Never suppress a
+finding for a credential that still authorises something.
+
+There are two mechanisms and they are not interchangeable:
+
+- **Content that recurs** — a documentation placeholder, a test
+  fixture, an upstream default — goes in an `[allowlist]` `regexes`
+  entry in `.gitleaks.toml`, keyed on the text. Editing the paragraph
+  around a placeholder produces a new finding in a new commit, so
+  anything keyed on a commit would need replacing every time. Prefer a
+  regex to a path: blinding a whole file also blinds a real credential
+  added to it later.
+- **A specific historical event** goes in `.gitleaksignore` as a
+  `commit:path:rule-id:line` fingerprint, which forgives that one
+  occurrence and nothing else — the same secret in a new commit fails
+  the scan again. Comment each entry with what the credential was and
+  what was done about it; an undocumented entry is indistinguishable
+  from a mistake.
+
+The history is clean as scanned, so neither file carries an entry
+today and `.gitleaksignore` does not exist yet.
+
+One known gap: the SPICE console token minted by
+`kerbside/consoletoken.py` is 48 characters of unadorned base62, which
+no regex can tell apart from any other identifier of that length, so a
+leaked one would not be caught. Giving it an identifying prefix — the
+way GitHub uses `ghp_` and Shaken Fist uses `sfk_` — would make it
+scannable, but it is a wire-format change to a value SPICE carries as
+a password. Issue #357 tracks it.
+
+This is distinct from GitHub's own secret scanning, which detects
+known third-party credential formats and needs GitHub Advanced
+Security for custom patterns. The fleet audit behind this lane is
+[secret-handling](https://github.com/shakenfist/development/blob/main/audits/secret-handling.md).
 
 ## End-to-end CI coverage
 
