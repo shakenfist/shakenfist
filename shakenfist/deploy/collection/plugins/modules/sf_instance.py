@@ -495,20 +495,35 @@ def _check_instance(client, existing, params, log):
 
 
 def _delete_and_wait(client, log, identifier, namespace):
+    # Ask for the deletion, not for the wait. The client is built with
+    # ASYNC_BLOCK, so a plain delete_instance() runs its own poll loop for
+    # up to an hour inside a single call, and the 180 second bound below
+    # was only ever a "do not start another attempt" check evaluated
+    # between calls -- an instance which never reached 'deleted' held this
+    # function for 3600 seconds while it advertised 180 (issue 3851).
+    # async_request has been an argument since client v0.4.8, so unlike
+    # the create timeout in run_module() no feature detection is needed; it
+    # returns {} rather than the instance, which nothing here reads.
+    #
+    # The DELETE is issued once rather than per iteration: with a
+    # non-blocking call, the old retrying shape would have enqueued one
+    # deletion per second against a stuck instance.
+    #
     # monotonic() rather than time(): this is a duration, and an NTP step
     # mid-loop would otherwise shorten or extend it arbitrarily.
     start_time = time.monotonic()
-    while time.monotonic() - start_time < 180:
-        try:
-            log.append('Attempt deletion...')
-            client.delete_instance(identifier, namespace=namespace)
+    log.append('Attempt deletion...')
+    try:
+        client.delete_instance(
+            identifier, namespace=namespace, async_request=True)
+        while time.monotonic() - start_time < 180:
             time.sleep(1)
             i = client.get_instance(identifier, namespace=namespace)
             if not i or i['state'] == 'deleted':
                 return None
-        except apiclient.ResourceNotFoundException:
-            return None
-    return client.get_instance(identifier, namespace=namespace)
+        return client.get_instance(identifier, namespace=namespace)
+    except apiclient.ResourceNotFoundException:
+        return None
 
 
 def run_module():
@@ -619,12 +634,10 @@ def run_module():
             # sf_snapshot solves its version of this at client
             # construction, by selecting ASYNC_CONTINUE, and that would
             # avoid this branch entirely. It is not done here because the
-            # strategy is a property of the client and this same client
-            # also runs _delete_and_wait() above, where delete_instance
-            # blocks today. That loop polls for itself and would probably
-            # tolerate the change, but "probably" is not a thing to find
-            # out on the deletion path, so the narrower per-call argument
-            # is used instead.
+            # strategy is a property of the whole client, and the narrower
+            # per-call arguments (this one, and async_request on the
+            # delete in _delete_and_wait()) keep each call site's waiting
+            # behaviour explicit at the call itself.
             if module.params.get('await') and _create_accepts_timeout(client):
                 instance_kwargs['timeout'] = 0
                 log.append('Client accepts a create timeout, so the create '
