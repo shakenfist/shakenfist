@@ -435,14 +435,18 @@ nothing in the chain reads a secret.
    plan was and why it was replaced; its per-project checklists
    were not carried over.
 2. ~~Archive `PROJECT-CONSISTENCY-AUDITS.md` with a pointer to the
-   new `audits/` directory.~~ Not done, deliberately. The file became
-   the prose layer above the machine-readable specs rather than a
-   superseded copy of them: `ARCHITECTURE.md` names it the
-   authoritative prose, `AGENTS.md` requires it to be updated when a
-   criterion is added, and its sections link out to the matching
-   `audits/*.md`. Archiving it would have deleted the only place the
-   *reasoning* behind a rule is written down, leaving the machine
-   checks with nothing to explain themselves against.
+   new `audits/` directory.~~ Done 2026-08-23, by dissolving it
+   rather than archiving it. The concern that held this up was that
+   the file was the only place the *reasoning* behind a rule was
+   written down, so archiving it would leave the machine checks with
+   nothing to explain themselves against. That was a reason not to
+   move the prose to an attic, not a reason to keep a second
+   authority: each section went into the `docs/audits/<criterion>.md`
+   it described, so the reasoning now sits beside the check it
+   justifies, and the in-scope and excluded project lists went into
+   `docs/audits/README.md`. `ARCHITECTURE.md` and `AGENTS.md` no
+   longer point at a root file, and the whole tree moved under
+   `docs/` in the same change so that it publishes.
 3. ~~Move the operational documentation into `docs/`.~~ Done.
    `docs/consistency-audits.md` now describes the system: the three
    layers a criterion lives in, what each stage of a daily run does,

@@ -10,27 +10,25 @@ repository.
 
 This page is about the audit machinery itself -- how a run works, how
 to add a criterion, how to bring a repository into scope, and how to
-test a change before it reaches the fleet. What we audit *for*, and why
-each rule exists, is in
-[`PROJECT-CONSISTENCY-AUDITS.md`](https://github.com/shakenfist/development/blob/main/PROJECT-CONSISTENCY-AUDITS.md).
+test a change before it reaches the fleet. What we audit *for*, and
+why each rule exists, is in
+[`docs/audits/`](/components/development/audits/README/), one page per criterion.
 
-## The three layers
+## The two layers
 
-A criterion exists in three places, and all three have to agree.
+A criterion exists in two places, and both have to agree.
 
 | Layer | Lives in | Audience |
 |-------|----------|----------|
-| Prose | `PROJECT-CONSISTENCY-AUDITS.md` | Humans. Why the rule exists, what it is worth, what it does not cover. |
-| Specification | `audits/<check-id>.md` | Both. What is checked, which template implements it, and a generated per-project compliance table. |
+| Specification | `docs/audits/<check-id>.md` | Humans and agents. Why the rule exists, what is checked, what it does not cover, which template implements it, and a generated per-project compliance table. |
 | Check | `scripts/audit-check.py` | The runner. A function returning `pass`, `fail` or `not_applicable` with a reason. |
 
-The split is deliberate. The prose is the only place a rule explains
-itself, which is why it survived the move to machine-readable specs
-rather than being archived. The spec file is what an agent or a person
-reads when they pick up an issue, so it links the template that
-implements the rule. The check is what actually measures, and it is
-allowed to be narrower than the prose: some criteria have no check at
-all, because judging them takes reading rather than matching. A
+The split is deliberate. The specification is where a rule explains
+itself, and it is what an agent or a person reads when they pick up an
+issue, so it links the template that implements the rule. The check is
+what actually measures, and it is allowed to be narrower than the
+specification: some criteria have no check at all, because judging
+them takes reading rather than matching. A
 criterion with no check has no `consistency-audit` marker block in its
 spec file, which is how to find the current set -- at the time of
 writing, `security-sanitization`, `console-logging`, `python-version`
@@ -68,7 +66,7 @@ compliance table for reasons nobody chose.
 
 **3. `update-docs`** -- runs `scripts/audit-update-docs.py`, which
 rewrites the compliance table between the `<!-- consistency-audit:begin
--->` and `<!-- consistency-audit:end -->` markers in each `audits/*.md`
+-->` and `<!-- consistency-audit:end -->` markers in each `docs/audits/*.md`
 from the same results, linking the issues the previous job just filed.
 `scripts/commit-audit-docs.sh` then commits and pushes the result to
 `main` as `shakenfist-bot`, rebasing first in case another push landed
@@ -123,7 +121,7 @@ A check that starts passing closes its issue. A check that becomes
 
 ## Adding a criterion
 
-Five files, plus a sixth when the check shares a spec file with
+Four files, plus a fifth when the check shares a spec file with
 another, and they have to stay in sync. The invariants that span them
 are the ones that break, so they are the ones under test:
 `scripts/test_audit_check.py` holds the `check_calls()` scheduling
@@ -141,21 +139,18 @@ ones.
    (spec file, optional template) and `ISSUE_TITLES`. Both
    `audit-manage-issues.py` and `audit-update-docs.py` read this
    module.
-3. **`audits/<check-id>.md`** -- the specification, following the
-   structure in `audits/README.md`. Include an empty
+3. **`docs/audits/<check-id>.md`** -- the specification, following the
+   structure in `docs/audits/README.md`. Include an empty
    `consistency-audit` marker block under `## Projects`; the first run
    fills it in.
 4. **`scripts/audit-update-docs.py`** -- only if the check joins an
    existing spec file rather than getting its own. Add a column heading
    for the id to `COLUMN_NAMES`.
-5. **`audits/README.md`** -- add the file to the index.
-6. **`PROJECT-CONSISTENCY-AUDITS.md`** -- describe the expectation in
-   prose. This is the authoritative human-readable statement of the
-   rule.
+5. **`docs/audits/README.md`** -- add the file to the index.
 
 Step 4 is the one that bites. Its absence broke the 2026-08-12 run:
 `review-marks-pre-commit` joined the workflow-standards spec without a
-heading, and rendering crashed *after* rewriting every `audits/*.md`
+heading, and rendering crashed *after* rewriting every `docs/audits/*.md`
 but before committing any -- so the whole fleet's tables silently stayed
 a day stale. Both halves of that are now fixed. `column_name()` prints
 an ugly heading and a warning rather than raising, because a run that
@@ -170,9 +165,9 @@ measures it everywhere and files the issues.
 
 ## Bringing a repository into scope
 
-Add it to the matrix in `.github/workflows/consistency-audit.yml` and
-to the in-scope list in `audits/README.md`, and remove it from the
-excluded list in `PROJECT-CONSISTENCY-AUDITS.md`.
+Add it to the matrix in `.github/workflows/consistency-audit.yml`,
+and in `docs/audits/README.md` add it to the in-scope list and remove
+it from the excluded list.
 
 Adding a repository subjects it to every check at once, and every
 failure becomes an issue on the next run. Check what that would file
@@ -196,14 +191,14 @@ omitted -- `audit-update-docs.py` renders a check it cannot find as
 `unknown`, and "we decided not to" must not read as "we did not
 measure".
 
-A scoped repository does not follow the three steps above. It goes in
-the matrix, but stays *off* the in-scope list in `audits/README.md` and
-*on* the excluded list in `PROJECT-CONSISTENCY-AUDITS.md`: both
-statements are true of it, because it is excluded from the conventions
-and audited for one thing anyway.
+A scoped repository does not follow the steps above. It goes in the
+matrix, but stays *off* the in-scope list in `docs/audits/README.md`
+and *on* the excluded list on the same page: both statements are true
+of it, because it is excluded from the conventions and audited for one
+thing anyway.
 `test_matrix_matches_the_documented_scope` in
 `scripts/test_audit_check.py` subtracts the scoped repositories before
-comparing, so onboarding one the way the three steps say will fail that
+comparing, so onboarding one the way the steps above say will fail that
 test.
 
 ## Testing a change
@@ -237,8 +232,8 @@ python3 scripts/audit-update-docs.py --results-dir /tmp/results/ --no-issues
 
 Always pass `--dry-run` to `audit-manage-issues.py`. Without it the
 script creates and closes real issues on real repositories.
-`audit-update-docs.py` rewrites `audits/*.md` in place; discard the
-result with `git restore audits/` afterwards, because a locally
+`audit-update-docs.py` rewrites `docs/audits/*.md` in place; discard the
+result with `git restore docs/audits/` afterwards, because a locally
 generated table only covers the repositories you fed it.
 
 `ci.yml` also runs the audit against this repository as a smoke test,
@@ -251,10 +246,9 @@ design.
 
 ## Related
 
-- [`PROJECT-CONSISTENCY-AUDITS.md`](https://github.com/shakenfist/development/blob/main/PROJECT-CONSISTENCY-AUDITS.md)
-  -- the prose specification of what we audit for.
-- `audits/README.md` -- the criterion index and the in-scope project
-  list.
+- [`docs/audits/README.md`](/components/development/audits/README/) -- what we audit for: the
+  criterion index, and which repositories are in scope, excluded, or
+  scoped to part of the audit.
 - [`ci-review-automation.md`](/components/development/ci-review-automation/) and
   [`automated-pr-review.md`](/components/development/automated-pr-review/) -- the review
   automation several criteria check for.

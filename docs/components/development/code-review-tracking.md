@@ -5,7 +5,7 @@ review: periodically reading a repository file by file to catch the
 inconsistencies in style, architecture, and approach that creep in
 over years of incremental change. It is complementary to both PR
 review (which only ever examines deltas) and the consistency audits
-(which catch mechanical drift like missing files -- see `audits/`).
+(which catch mechanical drift like missing files -- see `docs/audits/`).
 The full design rationale is in
 `docs/plans/PLAN-code-review-tracking.md`.
 
@@ -47,8 +47,12 @@ this repository and passes through to the script.
   files count as reviewable: `include` and `exclude` lists of
   fnmatch patterns matched against repo-relative paths (`*` matches
   across directory separators; an empty or absent `include` means
-  all tracked files). The tracking machinery (`.vscode/*`,
-  `REVIEWS.md`) is always excluded. Scope should cover the
+  all tracked files). An `exclude` entry beginning with `!` is a
+  re-include, so a directory can be excluded except for one file
+  without naming every other file by hand; it cannot put the
+  tracking machinery (`.vscode/*`, `REVIEWS.md`) back, which is
+  always excluded, since those files describe the reviews and can
+  never attest to themselves. Scope should cover the
   executable artifacts (source code in every language the repo
   uses, plus shell scripts), the declarative configuration that is
   executable in practice (CI workflows, container and deployment
@@ -73,6 +77,18 @@ this repository and passes through to the script.
    !.vscode/*.weaudit
    !.vscode/*.weaudit-shas.json
    !.vscode/review-scope.toml
+   ```
+
+   Exceptions rather than un-ignoring `.vscode/` wholesale, because
+   weAudit also writes `.vscode/.weauditdaylog`, a log of which files
+   each session opened. Nothing reads it, it is not attestation, and
+   it churns every session -- so if the repository does *not* ignore
+   `.vscode/` it needs the opposite entry, or the day log rides along
+   in every review commit and triggers the expensive CI lane that
+   step 8's `paths-ignore` block exists to skip:
+
+   ```
+   .vscode/.weauditdaylog
    ```
 
    Then, *if the repository runs a pre-commit hook that rewrites the
@@ -163,6 +179,26 @@ this repository and passes through to the script.
    keep generated code (`*_pb2.py` and friends), vendored trees
    (`vendor/*`, minified third-party JavaScript), and ephemeral
    archives out of the queue.
+
+   Prefix an `exclude` entry with `!` to re-include something the
+   pattern above it takes away:
+
+   ```toml
+   exclude = [
+       'docs/audits/*',
+       '!docs/audits/README.md',
+   ]
+   ```
+
+   Reach for this when a directory is excluded because its files are
+   machine-rewritten and one file in it is not. Prefer it to naming
+   the keepers individually, which is a list that has to be edited on
+   the day a file changes category and therefore will not be. Do not
+   reach for it to carve out several files from a directory that is
+   excluded for a reason those files will grow into -- a spec awaiting
+   its check has no generated table today and will have one the day
+   the check lands, so re-including it buys a review that the next
+   audit run invalidates.
 
    Widening scope in a repo that has already been adopted needs no
    migration -- the newly in-scope files simply have no review mark,
@@ -383,7 +419,13 @@ Three behaviours worth knowing about:
 * A stamped entry is never re-stamped while it exists: if a
   reviewed file changes, the only path forward is prune then
   re-review. This is what prevents a stale review being silently
-  refreshed at the file's current content.
+  refreshed at the file's current content. `stamp` reports such a
+  file and exits non-zero rather than passing over it, so the
+  pre-commit hook stops the commit that would carry the stale mark:
+  until this was checked it skipped the file in silence, and because
+  a review-only commit is exempt from CI, the mark then survived to
+  the default branch where `prune-reviews` deleted it -- discarding
+  the review rather than the staleness, which is the wrong half.
 * When every file in a directory is reviewed, weAudit adds a
   derived *directory* entry to `auditedFiles` alongside the
   per-file entries. The tooling treats these as pure UI state:
@@ -397,6 +439,18 @@ Once a repository approaches full coverage, the interesting
 questions change: reviews go stale as PRs merge, and someone needs
 to notice when enough staleness has accumulated to be worth a
 session. Two pieces of automation cover this.
+
+One consequence of `REVIEWS.md` being generated is worth stating
+before either of them: the header count is a property of the whole
+tree, so adding or removing *any* in-scope file changes it. Running
+`regen` and committing the result belongs with such a change, the
+same way a regenerated lockfile does. `prune-reviews` heals a
+forgotten one on the next push to main, so it is a tidiness rule
+rather than a correctness one -- but this repository additionally
+asserts it at commit time (`review-tracking-tests`), because
+`REVIEWS.md` that is not reproducible from the committed state is how
+a missing stamp sidecar hides. An adopting repository that copies
+that hook inherits the rule; one that does not, does not.
 
 **Automatic pruning.** Each adopting repository carries a
 `prune-reviews` workflow (see ryll's
@@ -423,7 +477,7 @@ deletes marks weakens nothing. Removing a mark is always safe; it
 merely queues the file for re-review.
 
 **Backlog alerting.** The daily consistency audit runs a
-`review-coverage` check (`audits/review-coverage.md`) against
+`review-coverage` check (`docs/audits/review-coverage.md`) against
 every repository in its matrix. Repositories without a
 `.vscode/review-scope.toml` are reported as not applicable, so
 adopting the tooling automatically opts a repository in. The check

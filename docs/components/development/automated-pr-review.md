@@ -174,24 +174,15 @@ Diff:
 
 ## The comment addresser, retired
 
-`pr-address-comments.yml` and `tools/address-comments-with-claude.sh` answered
-`@shakenfist-bot please address comments` by taking each review item with
-`action` of `fix` or `document`, prompting Claude Code with it, and pushing one
-commit per item. They were removed in August 2026, along with the
-`tools/render-review.py` and `tools/review-schema.json` copies that existed
-only for that script to call.
+Nothing acts on a review automatically any more. `pr-address-comments.yml`
+used to take each item with an `action` of `fix` or `document`, prompt Claude
+Code with it, and push a commit per item; it is retired, and
+[`docs/audits/ci-review-automation.md`](/components/development/audits/ci-review-automation/) has the
+reasoning and the list of files a repository must not still carry.
 
-The reason is preference, not defect: review items are worked through
-interactively with the reviewer instead. A bot authoring commits from a review
-that no human had read is the part that stopped anyone reaching for it.
-
-Two consequences are worth knowing. The reviewer's JSON `action` field survives
-and is still worth setting accurately -- it is how a reader triages the review
--- but nothing consumes it automatically any more. And the `ci-review-automation`
-consistency audit now fails a repository which still carries any part of the
-chain, because the workflow triggers on `issue_comment` and so holds
-`contents: write` against the pull request branch for a feature nobody wants.
-See `audits/ci-review-automation.md`.
+What matters for the review format is that the `action` field survives its
+consumer. It is still worth setting accurately, because it is how a human
+triages the review -- but it is read by people now, not by a workflow.
 
 ## Workflow Files
 
@@ -262,8 +253,9 @@ The automation requires self-hosted runners with:
 
 ## Not Reviewing The Bot's Own Commits
 
-The sanity-checks workflow includes a `check-bot-commit` job that detects if the
-last commit was made by the bot. If so, the automated reviewer is skipped.
+The shared `pr-auto-review.yml` detects whether the last commit was made by the
+bot, and skips the reviewer if it was. Callers get this by calling the reusable
+workflow; there is nothing to add.
 
 A bot push -- from the test fixer -- triggers CI like any other push, so without
 the guard the reviewer would spend a claude-code run reviewing commits no human
@@ -272,6 +264,15 @@ waste is what the guard is for. It is not a loop any more: the comment addresser
 was the only thing that turned a review back into a commit, and it is retired.
 
 The check looks for commits with author email `bot@shakenfist.com`.
+
+The legacy form of the same guard was a `check-bot-commit` job written out in
+the project's own CI workflow, which the reviewer job then listed in `needs:`.
+The reusable workflow replaced it with an API call it makes itself, so a project
+still carrying that job should delete it. Nothing measures that: the
+`ci-review-automation` audit checks the shape of the reviewer call and the
+retired comment addresser, but not for a leftover `check-bot-commit`, so
+migrating is a step somebody has to remember. The template README has the
+procedure, including the case where another job depends on its output.
 
 ## Cost and Rate Limiting
 
@@ -301,7 +302,7 @@ render-review.py review.json
 ## Projects Using This System
 
 Most of them, and the list moves: see the compliance table in
-[`ci-review-automation.md`](https://github.com/shakenfist/development/blob/main/audits/ci-review-automation.md).
+[`docs/audits/ci-review-automation.md`](/components/development/audits/ci-review-automation/).
 imago was the original implementation and occystrap the first
 adaptation of it, which is why both turn up in the history above.
 

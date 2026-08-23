@@ -6,7 +6,7 @@ tracking was live. Nothing here is a work list any more.
 
 The current answer to "what is this repository missing" is measured
 daily rather than written down. The criteria live in
-[`audits/`](https://github.com/shakenfist/development/blob/main/audits/README.md),
+[`docs/audits/`](https://github.com/shakenfist/development/blob/main/docs/audits/README.md),
 `scripts/audit-check.py` measures them against a fresh clone of every
 in-scope repository each morning, and what it finds is filed as issues
 on the repository concerned:
@@ -15,11 +15,11 @@ on the repository concerned:
 ## What this plan was
 
 From 2026-02-18, a hand audit of every Shaken Fist repository against
-the thirteen criteria
-[`PROJECT-CONSISTENCY-AUDITS.md`](https://github.com/shakenfist/development/blob/main/PROJECT-CONSISTENCY-AUDITS.md)
-described at the time, with a checklist per project of the cleanups it
-needed. It ran that way for about three weeks, and most of what the
-fleet's automation is built from came out of it:
+the thirteen criteria `PROJECT-CONSISTENCY-AUDITS.md` described at the
+time (that file has since been dissolved into
+[`docs/audits/`](/components/development/audits/README/)), with a checklist per project of
+the cleanups it needed. It ran that way for about three weeks, and
+most of what the fleet's automation is built from came out of it:
 
 * The `export-repo-config` reusable workflow and the
   `review-pr-with-claude` composite action in `shakenfist/actions`,
