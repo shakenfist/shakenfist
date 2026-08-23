@@ -1099,12 +1099,13 @@ Both modes spawn the same server through
 `shakenfist_spice_renderer::spawn_control_socket`, so the two cannot
 drift apart.
 
-Web mode gained a socket in the webrtc-rs 0.20 upgrade's phase 04. It
-was headless-only until then, which meant the scenario tests that
-drive a session through this protocol and assert on the QR visual
-digest could not observe web mode at all -- and web mode is the one
-mode with its own browser-side scancode table. Four input bugs
-shipped behind that gap.
+Web mode's socket carries disproportionate weight: web mode is the one
+mode with its own browser-side scancode table, so the scenario tests
+that drive a session through this protocol and assert on the QR visual
+digest are the only automated check on that table. The socket was
+headless-only for a long time, and four input bugs shipped behind that
+gap -- which is why both modes now spawn the same server rather than
+growing separate implementations.
 
 **Module layout.** The control surface lives entirely under
 `shakenfist-spice-renderer/src/control/`:

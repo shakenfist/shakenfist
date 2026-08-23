@@ -41,6 +41,7 @@ enqueue` status check:
 | `gitleaks` | self-hosted `s` | Secret scanning over full history |
 | `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh` |
 | `bidi and zero-width` | self-hosted `s` | `tools/check-bidi.sh` |
+| `skillsaw` | self-hosted `s` | `pre-commit run skillsaw` over the agent context |
 
 The **merge tier** runs on `merge_group` and gates `Can merge`:
 
