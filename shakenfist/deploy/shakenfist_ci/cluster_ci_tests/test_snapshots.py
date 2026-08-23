@@ -96,6 +96,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertFalse('blob_location' in blob1_info['references_to'])
         self.assertFalse('locations' in blob1_info)
 
+        # ... but non-Node references such as the snapshot artifact's index
+        # entry should still be visible to the owning namespace (issue 3862)
+        self.assertTrue('artifact_index' in blob1_info['references_to'])
+
         # Admins _should_ be able to see location information
         blob1_admin_info = self.system_client.get_blob(blob_uuid)
         self.addDetail('blob1_admin_info', content.text_content(json.dumps(

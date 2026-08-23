@@ -120,6 +120,13 @@ def references_to_grouped_dict(
     their relationship type, returning a dictionary where keys are relationship
     type strings and values are lists of serialized reference dictionaries.
 
+    References with a Node endpoint (blob_location, instance_location)
+    describe the placement of objects on physical infrastructure and are
+    only included for the system namespace, matching the visibility of the
+    blob 'locations' field. All other references link objects reachable via
+    the object whose external_view() is being rendered, which the caller
+    has already been authorised to see.
+
     Args:
         references: A list of ObjectReference objects to group.
 
@@ -141,12 +148,11 @@ def references_to_grouped_dict(
     for ref in references:
         rel_key = str(ref.relationship)
 
-        # Ensure that the requester can see this object
-        if hasattr(ref, 'namespace'):
-            ref_namespace = ref.namespace
-        else:
-            ref_namespace = 'system'
-        if requesting_namespace not in [ref_namespace, 'system']:
+        # Reference rows do not record the namespaces of their endpoint
+        # objects, so visibility is decided by object type: Node objects are
+        # only visible to the system namespace.
+        if requesting_namespace != 'system' and ObjectType.NODE in (
+                ref.source_object_type, ref.target_object_type):
             continue
 
         if rel_key not in grouped:
