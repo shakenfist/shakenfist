@@ -330,10 +330,20 @@ grep -q 'last_progress: Optional\[float\]' shakenfist/schema/agentoperation_attr
 grep -q 'attempts: int' shakenfist/schema/agentoperation_attributes.py
 
 # 2. Both table versions moved, and the migrations are additive and
-#    idempotent. Two ADD COLUMN IF NOT EXISTS per table.
+#    idempotent: four column definitions, added through an
+#    ADD COLUMN IF NOT EXISTS in each of the two ensure functions.
+#    Counting column definitions rather than whole ALTER statements,
+#    because the statement is built in a loop -- the original form of
+#    this check assumed four literal ALTERs and failed against a
+#    perfectly good implementation.
 grep -q '^AGENT_OPERATIONS_VERSION = 3' shakenfist/mariadb.py
 grep -q '^AGENT_OPERATION_ATTRIBUTES_VERSION = 3' shakenfist/mariadb.py
-test 4 -eq "$(grep -c 'ALTER TABLE agent_operation.* ADD COLUMN IF NOT EXISTS' shakenfist/mariadb.py)"
+test 4 -eq "$(grep -cE "'(deadline|progress_timeout|last_progress|attempts) (DOUBLE|BIGINT)" shakenfist/mariadb.py)"
+# Both ensure functions add their columns through the idempotent
+# guard. Counted file-wide rather than per-function range, because a
+# sed range whose start pattern also matches its end line swallows the
+# second function -- which it did, on the first attempt at this check.
+test 2 -eq "$(grep -c "ADD COLUMN IF NOT EXISTS {column}" shakenfist/mariadb.py)"
 
 # 3. The mask's vocabulary grew, so the new attributes are writable.
 #    Without this the columns exist and can never be set.
