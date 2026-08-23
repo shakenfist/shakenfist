@@ -909,7 +909,7 @@ values (immutable data set at creation time):
 | `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
 | `networks` | Network | uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version |
-| `agent_operations` | AgentOperation | uuid, namespace, instance_uuid (indexed), commands (JSON list), version |
+| `agent_operations` | AgentOperation | uuid, namespace, instance_uuid (indexed), commands (JSON list), deadline (nullable), progress_timeout (nullable), version |
 | `instances` | Instance | uuid, cpus, disk_spec (JSON), memory, name, namespace (indexed), requested_placement (JSON), ssh_key, user_data, video (JSON), uefi, configdrive, nvram_template, secure_boot, machine_type, side_channels (JSON), version |
 
 These tables use the object's UUID as the primary key, except for
@@ -932,7 +932,7 @@ dedicated attribute tables:
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
 | `network_attributes` | Network | uuid, floating_gateway, hosteddns (JSON dict) |
-| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
+| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict), last_progress (nullable), attempts |
 | `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
 
 Node attributes consolidate observed state, roles, daemons and versions
@@ -948,6 +948,27 @@ read-modify-write cycles are reserved for row creation and schema
 upgrades: with concurrent writers on different nodes, an unmasked write
 pushes a stale snapshot of the other columns over any update committed
 since the writer read the row (a cross-attribute lost update).
+
+An agent operation's `deadline` and `progress_timeout` are the caller's
+timing intent, fixed at submission time. Three values are possible in
+each column and they mean three different things:
+
+- **NULL** — no client intent was recorded, so the server default
+  applies. This is what a row written before deadlines existed looks
+  like, and what a row written by a not-yet-upgraded API node during a
+  rolling upgrade looks like. It does **not** mean "no deadline".
+- **0** — the client explicitly asked for none: no wall-clock deadline,
+  or the progress timeout disabled.
+- **Anything else** — the client's request. `deadline` is an absolute
+  unix timestamp, not a duration: the API server computes it at request
+  receipt, so queue time and preflight time count against it.
+  `progress_timeout` is a number of seconds.
+
+`last_progress` is the unix timestamp of the most recent observed
+forward progress, NULL when none has been observed, and `attempts`
+counts dispatches for the retry bound. Nothing enforces any of these
+values yet; that arrives with the rest of
+`docs/plans/PLAN-agent-operation-deadlines.md`.
 
 Namespace keys used to be anonymous entries inside that row's `keys`
 JSON dict. They are now objects in their own right, so that a key can
