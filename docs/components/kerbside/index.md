@@ -197,8 +197,9 @@ Guides for working on Kerbside itself:
   vendored web assets, and debugging
 
 - [Testing](/components/kerbside/testing/) - Running the test suite, the CI tiers and lane
-  mechanics, the Ryll-based harnesses, the oVirt console probe, the
-  Tempest plugin, and the load-test container images
+  mechanics, the credential scan and how to accept a finding, the
+  Ryll-based harnesses, the oVirt console probe, the Tempest plugin,
+  and the load-test container images
 
 - [Direct-qemu Harness](/components/kerbside/direct-qemu-harness/) - Exercising the Rust
   proxy locally against qemu with a mock control plane: end-to-end
@@ -212,8 +213,8 @@ Internal design of the Kerbside proxy:
   the process model, the connection state machine, the relay, and the SPICE
   firewall
 
-- [ARCHITECTURE.md](/components/kerbside/../ARCHITECTURE/) - High-level system architecture
-  overview (in project root)
+- [ARCHITECTURE.md](https://github.com/shakenfist/kerbside/blob/develop/ARCHITECTURE.md) -
+  High-level system architecture overview (in project root)
 
 ### SPICE Protocol Documentation
 
