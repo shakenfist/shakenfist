@@ -59,11 +59,10 @@ plan link for what each phase covers, and for why a plan is where it is. It coun
 read `Complete` without the two numbers meeting, and `—` means the plan has no enumerated
 phases yet, or has a table which is still a placeholder rather than a phase list.
 
-Four plans are counted by hand because they do not keep a phase table:
+Three plans are counted by hand because they do not keep a phase table:
 [blob storage](blob-storage-roadmap.md), [API query
 batching](api-query-batching-roadmap.md) and [attribute field
-masks](PLAN-attribute-field-masks.md) carry their phases as headings, and [queue
-performance](PLAN-queue-performance.md) is numbered in steps rather than phases.
+masks](PLAN-attribute-field-masks.md) carry their phases as headings.
 Two more publish no arithmetic because their tables are placeholders: [owning more of the
 QEMU stack](PLAN-qemu-futures.md) names three phases and then an ellipsis, and [artifact UX
 rework](PLAN-artifact-ux-rework.md) a decisions pass and "(later phases)". These six are the
@@ -89,7 +88,7 @@ checker's blind spot, and the only numbers here it cannot recompute.
 | 2026-05-22 | [Network carrier model](PLAN-network-carrier-model.md) | A lease-based per-network carrier with VIP advertisement, retiring the network-node singleton | Not started | 0 of 12 |
 | 2026-05-22 | [Network service ports](PLAN-network-service-ports.md) | Per-network DNAT'd ports for managed services | Not started | 0 of 7 |
 | 2026-05-22 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Guarded-UPDATE capacity counters and namespace claims in place of read-then-place scheduling | In progress | 4 of 11 |
-| 2026-05-24 | [Queue performance and coalescing](PLAN-queue-performance.md) | Batched dequeue, and worker- and enqueue-side dedup of redundant cluster operations | In progress | 6 of 7 |
+| 2026-05-24 | [Queue performance and coalescing](PLAN-queue-performance.md) | Batched dequeue and cluster-operation coalescing, now measuring whether the queue-wait tail is gone | In progress | 6 of 7 |
 | 2026-06-01 | [OIDC authentication](PLAN-oidc-authentication.md) | Federated login against an external OIDC provider | Not started | 0 of 10 |
 | 2026-06-02 | [Owning more of the QEMU stack](PLAN-qemu-futures.md) | Direct QMP control, and perhaps one day libvirt's job as well | Not started | — |
 | 2026-06-03 | [BYO MariaDB and `sf-database` as a tier](PLAN-byo-mariadb.md) | A deployer-chosen database tier reached by client-side gRPC load balancing | Complete | 8 of 8 |

@@ -4,9 +4,21 @@
 
 In progress.
 
-Steps 1-6 are implemented, on the `network-facade` branch. Step 7
-(measure, decide on fairness) is left until the per-op
-`'started executing'` event from step 1 produces real CI data.
+Steps 1-6 merged to `develop` as PR #3194 on 2026-05-26. Step 7
+(measure, decide on fairness) is planned in
+[PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md).
+
+## Execution
+
+| Phase | Plan | Status |
+|-------|------|--------|
+| 1. Visibility | (in PR #3194) | Complete |
+| 2. Unified batched dequeue | (in PR #3194) | Complete |
+| 3. Coalescible-task metadata | (in PR #3194) | Complete |
+| 4. Worker-side dedup | (in PR #3194) | Complete |
+| 5. Enqueue-side dedup | (in PR #3194) | Complete |
+| 6. Caller-site audit | (in PR #3194) | Complete |
+| 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | In progress |
 
 ## Problem
 
@@ -30,12 +42,18 @@ the queue+state-machine overhead, and the work backed up.
 
 Six discrete changes plus one measurement step:
 
-1. **Visibility**: emit a `'started executing'` event at the
-   dispatcher-pickup boundary carrying `wait_seconds`,
-   `defer_count` and `queue_name`. This is the only place in the
-   pipeline that observes both `op.created_at` (insert time) and
-   `start_time` (when the worker is about to call `op.execute()`),
-   so the per-op queue-wait latency lands directly in eventlog.
+1. **Visibility**: carry `wait_seconds`, `defer_count` and
+   `queue_name` on the per-op event the dispatcher emits. The
+   dispatcher is the only place in the pipeline that observes both
+   `op.created_at` (insert time) and `start_time` (when the worker
+   is about to call `op.execute()`), so the per-op queue-wait
+   latency lands directly in eventlog. As implemented, these fields
+   ride on the existing end-of-op `'execution duration'` event
+   rather than a separate `'started executing'` event at the pickup
+   boundary: a second event doubles the eventlog cost on the
+   dispatcher's critical path, which profiling identified as the
+   largest per-op overhead this plan added. See
+   `docs/operator_guide/networking/overview.md`.
 
 2. **Unified batched dequeue**: replace `dequeue_work_item(qn)`
    and its direct/gRPC pair with `dequeue_work_items(queue_names,
@@ -75,11 +93,13 @@ Six discrete changes plus one measurement step:
    collapse before they hit `create_and_enqueue`. See the
    findings section below.
 
-7. **Re-measure**: once steps 1-6 are deployed in CI, the
-   `'started executing'` event distribution tells us whether the
-   wait tail is gone or whether explicit fairness (bounded
-   staleness, reserved-slot lottery) is still needed for
-   lower-priority queues.
+7. **Re-measure**: once steps 1-6 are deployed, the per-op
+   wait distribution tells us whether the tail is gone or whether
+   explicit fairness (bounded staleness, reserved-slot lottery) is
+   still needed for lower-priority queues. Planned in
+   [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md),
+   which also records why the events have to be read from the log
+   stream rather than from the events table.
 
 ## Audit findings (step 6)
 
