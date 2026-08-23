@@ -78,7 +78,7 @@ dependencies = [
     # that lock inline), armed by client-side healthCheckConfig in
     # our channel factory. Fixed by disabling Watch-based client-side
     # health checking in shakenfist/util/grpc_channel.py.
-    "protobuf==7.35.1",                   # bsd
+    "protobuf==7.36.0",                   # bsd
     "grpcio==1.83.0",                     # apache2
     "grpcio-health-checking==1.83.0",     # apache2
     "grpcio-status==1.83.0",              # apache2
