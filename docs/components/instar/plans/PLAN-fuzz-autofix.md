@@ -90,23 +90,44 @@ YAML.
   confirm at least one reaches a PR — this is the plan's own
   outstanding success criterion, and the only thing that exercises the
   workflow end to end. It needs the fix on `develop` first, because
-  the workflow checks out `develop`.
+  the workflow checks out `develop`. That fix is on `develop` as of
+  2026-08-20, and six scheduled runs have since completed with every
+  step after `Find eligible issue` skipped: both issues are blocked by
+  their own `autofix-failed` label, and the third open
+  `security-audit` issue (#483) is hand-written prose that the JSON
+  gate correctly rejects. Nothing is broken; there is no input. A
+  `workflow_dispatch` with an explicit `issue_number` bypasses the
+  label check, which is how phase 1 proves the loop.
 * Refresh the hardcoded `Co-Authored-By: Claude Opus 4.6 (1M context)`
   trailer in the Create PR step, which no longer names the model that
-  runs. Deliberately left: the workflow cannot introspect which model
-  the `claude` CLI resolves to, so any name hardcoded here goes stale
-  the same way. Deciding between a generic trailer and dropping the
-  line is a call for a human.
-* `tools/address-comments-with-claude.sh` has the same defect this
+  runs. This was previously recorded here as a call for a human on the
+  grounds that the workflow cannot introspect which model the `claude`
+  CLI resolves to. **That is no longer true**, and phase 1's survey
+  measured it: `claude -p --output-format json` reports `.modelUsage`
+  keyed by the resolved model with its `contextWindow`, so the trailer
+  can be derived per run and cannot go stale again. The same defect
+  exists in `.github/workflows/test-drift-fix.yml` and
+  `tools/address-comments-with-claude.sh`, which carry a *different*
+  stale name; phase 1 fixes all three behind one tested helper.
+* `tools/address-comments-with-claude.sh` had the same defect this
   plan diagnosed, in the review-comment loop rather than the fuzz loop
-  (issue #510): it instructs Claude to stage, then reports an unstaged
-  fix as a skipped review item. PR #511 fixes it, reusing the stager
-  in `--tracked-only` mode; it lands after this one, because the
-  address-comments workflow checks its trusted tools out of the
-  default branch. It was not the one-line change it looked like: the
-  loop's Claude-failed and disagreement branches do not reset the
-  tree, so staging on Claude's behalf would attribute one item's
-  leftovers to the next item's commit.
+  (issue #510): it instructed Claude to stage, then reported an
+  unstaged fix as a skipped review item. **Done** — PR #511 merged as
+  `7b1afe4`, reusing the stager in `--tracked-only` mode. It was not
+  the one-line change it looked like: the loop's Claude-failed and
+  disagreement branches do not reset the tree, so staging on Claude's
+  behalf would attribute one item's leftovers to the next item's
+  commit.
+
+## Execution
+
+The workflow, and the staging fix that made it able to open a pull
+request, predate this table and were tracked inline in the sections
+above. Phase 1 is the remaining close-out.
+
+| Phase | Plan | Status |
+|-------|------|--------|
+| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | In progress |
 
 ## Prompt
 

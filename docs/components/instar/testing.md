@@ -1331,6 +1331,18 @@ at an issue that was already going to get one. The script's header
 records an earlier revision that tried the classification and the
 sequence of defects it produced.
 
+The commit trailer names the model the CLI actually resolved to,
+rather than a hardcoded string: `tools/ci/claude-result.sh --trailer`
+derives it from the run's own JSON stream, reading the resolved model
+and its context window out of the final result line's `.modelUsage`.
+A run whose stream could not be read -- a killed process, a pre-flight
+CLI refusal -- falls back to an unqualified `Co-Authored-By: Claude`.
+The same derivation backs the trailers that `test-drift-fix.yml` and
+`tools/address-comments-with-claude.sh` commit, so no model name is
+written down in any of the three: when the CLI resolves to something
+new, the trailers follow it with no edit at all. They had previously
+drifted to two different stale names between them.
+
 Telling a file the attempt created from build output that was already
 there needs a before picture, and each attempt gets its own.
 `pre-run-ignored.txt` is taken after `Build instar` and before attempt
