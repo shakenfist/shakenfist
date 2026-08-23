@@ -46,6 +46,8 @@ class AgentOperation(BaseOperation):
         self.__namespace = static_values['namespace']
         self.__instance_uuid = static_values['instance_uuid']
         self.__commands = static_values['commands']
+        self.__deadline = static_values.get('deadline')
+        self.__progress_timeout = static_values.get('progress_timeout')
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
@@ -70,6 +72,8 @@ class AgentOperation(BaseOperation):
             namespace=metadata.get('namespace', ''),
             instance_uuid=_instance_uuid,
             commands=metadata.get('commands', []),
+            deadline=metadata.get('deadline'),
+            progress_timeout=metadata.get('progress_timeout'),
             version=metadata['version']
         )
         mariadb.create_agent_operation(data)
@@ -93,6 +97,8 @@ class AgentOperation(BaseOperation):
                 'namespace': data.namespace,
                 'instance_uuid': str(data.instance_uuid),
                 'commands': data.commands,
+                'deadline': data.deadline,
+                'progress_timeout': data.progress_timeout,
                 'version': data.version
             }
             if result.get('version', 0) != cls.current_version:
@@ -106,12 +112,26 @@ class AgentOperation(BaseOperation):
         return None
 
     @classmethod
-    def new(cls, operation_uuid, namespace, instance_uuid, commands):
+    def new(cls, operation_uuid, namespace, instance_uuid, commands,
+            deadline=None, progress_timeout=None):
+        """Create a new AgentOperation.
+
+        deadline is an absolute unix timestamp after which the
+        operation must not be dispatched or continue executing, and
+        progress_timeout is the number of seconds without forward
+        progress which are fatal to it. For both of them None means
+        no client intent was recorded, so the server default applies,
+        while an explicit 0.0 means the caller asked for none. The
+        API server computes the deadline at request receipt; nothing
+        reads either value yet.
+        """
         AgentOperation._db_create(operation_uuid, {
             'uuid': operation_uuid,
             'namespace': namespace,
             'instance_uuid': instance_uuid,
             'commands': commands,
+            'deadline': deadline,
+            'progress_timeout': progress_timeout,
             'version': cls.current_version
         })
         o = AgentOperation.from_db(operation_uuid)
@@ -120,13 +140,20 @@ class AgentOperation(BaseOperation):
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
-        # expect
+        # expect. The attributes row is read once and three values taken
+        # from it, rather than through the per-value properties, so the
+        # view does not cost one database round trip per attribute.
+        attrs = self._attributes()
         retval = self._external_view()
         retval.update({
             'namespace': self.namespace,
             'instance_uuid': self.instance_uuid,
             'commands': self.commands,
-            'results': self.results
+            'deadline': self.deadline,
+            'progress_timeout': self.progress_timeout,
+            'results': attrs.results,
+            'last_progress': attrs.last_progress,
+            'attempts': attrs.attempts
         })
 
         # Add object references (what references this agent operation and what
@@ -153,7 +180,20 @@ class AgentOperation(BaseOperation):
         return self.__commands
 
     @property
-    def results(self):
+    def deadline(self):
+        return self.__deadline
+
+    @property
+    def progress_timeout(self):
+        return self.__progress_timeout
+
+    def _attributes(self):
+        """Read this operation's mutable attributes, creating the row if absent.
+
+        Every attribute reader goes through here so the get-or-create
+        dance exists once, and so a caller wanting more than one
+        attribute can take them from a single read.
+        """
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
         attrs = mariadb.get_agent_operation_attributes(_uuid)
         if not attrs:
@@ -161,7 +201,19 @@ class AgentOperation(BaseOperation):
             if not mariadb.create_agent_operation_attributes(attrs):
                 # Another thread created the record; re-read it
                 attrs = mariadb.get_agent_operation_attributes(_uuid)
-        return attrs.results
+        return attrs
+
+    @property
+    def results(self):
+        return self._attributes().results
+
+    @property
+    def last_progress(self):
+        return self._attributes().last_progress
+
+    @property
+    def attempts(self):
+        return self._attributes().attempts
 
     def add_result(self, index, value):
         if 'command' in value:
@@ -171,11 +223,7 @@ class AgentOperation(BaseOperation):
 
         with self.get_lock_attr('results', op='add result'):
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
-            attrs = mariadb.get_agent_operation_attributes(_uuid)
-            if not attrs:
-                attrs = AgentOperationAttributesData(uuid=_uuid, results={})
-                if not mariadb.create_agent_operation_attributes(attrs):
-                    attrs = mariadb.get_agent_operation_attributes(_uuid)
+            attrs = self._attributes()
 
             results = dict(attrs.results)
             results[str(index)] = value
