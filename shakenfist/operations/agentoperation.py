@@ -197,10 +197,17 @@ class AgentOperation(BaseOperation):
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
         attrs = mariadb.get_agent_operation_attributes(_uuid)
         if not attrs:
-            attrs = AgentOperationAttributesData(uuid=_uuid, results={})
-            if not mariadb.create_agent_operation_attributes(attrs):
-                # Another thread created the record; re-read it
-                attrs = mariadb.get_agent_operation_attributes(_uuid)
+            default = AgentOperationAttributesData(uuid=_uuid, results={})
+            if mariadb.create_agent_operation_attributes(default):
+                return default
+
+            # Another thread created the record; re-read it. If that
+            # read also comes back empty -- the row was created and
+            # then deleted between the two calls -- fall back to the
+            # defaults rather than returning None, because every
+            # caller here dereferences the result and external_view()
+            # does so on a user-facing path.
+            attrs = mariadb.get_agent_operation_attributes(_uuid) or default
         return attrs
 
     @property

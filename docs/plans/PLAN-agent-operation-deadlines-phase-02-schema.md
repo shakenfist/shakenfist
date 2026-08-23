@@ -276,6 +276,27 @@ Each step is its own commit. 2a and 2b both edit `shakenfist/mariadb.py`
 and should be done in that order; 2c depends on both; 2d depends on 2a
 only; 2e last, so it describes what actually landed.
 
+## Departures from the plan
+
+- **Step 2a's brief was wrong about error handling.** It said to wrap
+  each `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in the
+  `try/except (IntegrityError, OperationalError)` with a `LOG.debug`
+  that `_ensure_instance_attributes_schema`'s v2->v3 block uses. That
+  brief copied the wrong precedent. The v2->v3 block is a
+  `DROP COLUMN IF EXISTS`, where a swallowed failure leaves a harmless
+  leftover column; the v1->v2 `ADD COLUMN` block a few lines above it
+  has no `try/except` at all, and that asymmetry is deliberate.
+  Swallowing a failed `ADD COLUMN` and then bumping the version
+  regardless produces a schema which passes `verify_schema_versions()`
+  (it compares versions, not columns) while every insert fails on an
+  unknown column, and which re-running `sf-ctl ensure-mariadb-schema`
+  can never repair, because `current_ver < VERSION` is false from then
+  on. `IF NOT EXISTS` already makes the benign case a no-op, so the
+  handler could only ever have caught real failures. Both blocks now
+  let the ALTER propagate, and
+  `test_failed_migration_does_not_advance_the_version` pins it.
+  Raised by the automated reviewer on PR #3858.
+
 ## Risks and mitigations
 
 - **Decisions 1 and 2 both contradict the master plan, and a reviewer
@@ -393,9 +414,21 @@ And, by inspection:
   `docs/operator_guide/database.md`, and the master plan's design
   sketch. All four say: NULL means no client intent was recorded and
   the server default applies; `0` means none.
-- Nothing outside this phase's files reads the new values. `grep -rn
-  'deadline\|progress_timeout\|last_progress' shakenfist/daemons/`
-  finds no new consumer.
+- Nothing outside this phase's files reads the new values. The
+  daemons contain no consumer of them:
+
+  ```
+  grep -rnE '\.(deadline|progress_timeout|last_progress|attempts)\b' \
+      shakenfist/daemons/ --include='*.py' \
+      | grep -vc '^shakenfist/daemons/database/main.py:'
+  ```
+
+  must print `0`. The exclusion is the four transport converters step
+  2b required, which move the values across the gRPC boundary without
+  acting on them; enforcement arrives in phase 4. Matching attribute
+  access rather than the bare words matters, because "deadline" occurs
+  a dozen times in the daemons as gRPC call-deadline prose and would
+  make a word-match check unfalsifiable.
 - `pre-commit run --all-files` passes (flake8, stestr, mypy).
 - Cluster CI's `test_agentops` passes on the branch, proving the
   schema change did not disturb the existing agent operation path.

@@ -12,7 +12,7 @@ can point at a local instance).
 
 The rest of the unit suite mocks MariaDB completely, so nothing else in
 the repository can tell the difference between a migration which works
-and one which raises inside its try block. That matters more than usual
+and one which raises. That matters more than usual
 here because the agent_operations and agent_operation_attributes tables
 had never been migrated before: both ensure functions consisted of a
 create-if-absent block and nothing else, so there was no established
@@ -34,6 +34,7 @@ from uuid import UUID
 from uuid import uuid4
 
 import sqlalchemy as sa
+from sqlalchemy.exc import DatabaseError
 
 from shakenfist import mariadb
 from shakenfist.schema.agentoperation_attributes import (
@@ -253,6 +254,57 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
             present = self._columns(table_name)
             for column in columns:
                 self.assertIn(column, present)
+
+        # Nullability has to be asserted on this path as well as the
+        # migrated one. The two are produced by different code --
+        # create_all() from the pydantic model here, the hand written
+        # ALTER there -- so test_migration_preserves_nullability says
+        # nothing about a fresh install, and a later change making
+        # attempts Optional would silently diverge the two.
+        self.assertTrue(
+            self._column_is_nullable('agent_operations', 'deadline'))
+        self.assertTrue(
+            self._column_is_nullable('agent_operations', 'progress_timeout'))
+        self.assertTrue(
+            self._column_is_nullable(
+                'agent_operation_attributes', 'last_progress'))
+        self.assertFalse(
+            self._column_is_nullable(
+                'agent_operation_attributes', 'attempts'))
+
+    def test_failed_migration_does_not_advance_the_version(self):
+        # A migration which cannot add its columns must not record
+        # itself as done. verify_schema_versions() compares versions
+        # rather than columns, so a version written past a column that
+        # was never added yields a schema which reports itself healthy
+        # while every insert fails on an unknown column -- and which
+        # re-running ensure-mariadb-schema can never repair, because
+        # the `current_ver < VERSION` guard is false from then on.
+        #
+        # The failure is induced by removing the table out from under a
+        # version row that still claims 2. Any real ALTER failure --
+        # metadata lock timeout on a busy table, missing privilege,
+        # disk full -- arrives at the same place. Asserted against
+        # DatabaseError rather than a leaf class because the induced
+        # failure surfaces as ProgrammingError (unknown table) while a
+        # lock timeout would be OperationalError; what the test is
+        # about is the version, not which leaf was raised.
+        self._rewind()
+        with self.engine.connect() as conn:
+            for table_name in NEW_COLUMNS:
+                conn.execute(sa.text(f'DROP TABLE {table_name}'))
+            conn.commit()
+
+        self.assertRaises(
+            DatabaseError,
+            mariadb._ensure_agent_operations_schema, self.engine)
+        self.assertRaises(
+            DatabaseError,
+            mariadb._ensure_agent_operation_attributes_schema, self.engine)
+
+        for table_name in NEW_COLUMNS:
+            self.assertEqual(
+                2, mariadb._get_table_version(self.engine, table_name))
 
 
 @unittest.skipUnless(

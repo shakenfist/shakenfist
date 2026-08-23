@@ -946,6 +946,23 @@ class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, view['attempts'])
         self.assertEqual({}, view['results'])
 
+    def test_attributes_survive_a_lost_get_or_create_race(self):
+        # _attributes() is a get-or-create, so it has to cope with
+        # losing the create to another thread. It re-reads, but the row
+        # can be gone again by then -- the operation was deleted
+        # between the two calls. Returning None there would raise
+        # AttributeError in every caller, including external_view() on
+        # a user-facing path, so the fallback is the defaults.
+        op = self._make_agentop()
+        with mock.patch('shakenfist.mariadb.get_agent_operation_attributes',
+                        return_value=None), \
+            mock.patch(
+                'shakenfist.mariadb.create_agent_operation_attributes',
+                return_value=False):
+            self.assertEqual({}, op.results)
+            self.assertIsNone(op.last_progress)
+            self.assertEqual(0, op.attempts)
+
     def test_external_view_reads_attributes_once(self):
         # The three attribute values are taken from a single read
         # rather than through their properties, which would each cost

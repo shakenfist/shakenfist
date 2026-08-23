@@ -18491,18 +18491,25 @@ def _ensure_agent_operations_schema(
         LOG.info(
             f'Upgrading {table_name} table to version '
             f'{AGENT_OPERATIONS_VERSION} (add deadline columns)')
+        #
+        # A failure here is deliberately not caught. IF NOT EXISTS
+        # already makes "the column is there" a no-op, so anything
+        # this could swallow is a genuine failure -- a metadata lock
+        # timeout against a busy table, a privilege problem, disk
+        # full. Swallowing it and bumping the version anyway would
+        # leave a schema which reports itself healthy to
+        # verify_schema_versions() (it compares versions, not
+        # columns) while every insert fails on an unknown column,
+        # and which ensure-mariadb-schema can no longer repair
+        # because the `current_ver < VERSION` guard would now be
+        # false. Failing loudly keeps the migration re-runnable.
         with engine.connect() as conn:
             for column in ('deadline DOUBLE NULL',
                            'progress_timeout DOUBLE NULL'):
-                try:
-                    conn.execute(sa.text(
-                        f'ALTER TABLE {table_name} '
-                        f'ADD COLUMN IF NOT EXISTS {column}'))
-                    conn.commit()
-                except (IntegrityError, OperationalError) as e:
-                    LOG.debug(
-                        f'Column {column} could not be added to '
-                        f'{table_name}: {e}')
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} '
+                    f'ADD COLUMN IF NOT EXISTS {column}'))
+                conn.commit()
 
         current_ver = AGENT_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
@@ -18561,18 +18568,19 @@ def _ensure_agent_operation_attributes_schema(
             f'Upgrading {table_name} table to version '
             f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
             '(add progress and attempt columns)')
+        #
+        # As in _ensure_agent_operations_schema, a failing ALTER is
+        # allowed to propagate rather than being logged and stepped
+        # over: bumping the version past a column which was never
+        # added produces a schema that passes verify_schema_versions()
+        # and can never be repaired by re-running the migration.
         with engine.connect() as conn:
             for column in ('last_progress DOUBLE NULL',
                            'attempts BIGINT NOT NULL DEFAULT 0'):
-                try:
-                    conn.execute(sa.text(
-                        f'ALTER TABLE {table_name} '
-                        f'ADD COLUMN IF NOT EXISTS {column}'))
-                    conn.commit()
-                except (IntegrityError, OperationalError) as e:
-                    LOG.debug(
-                        f'Column {column} could not be added to '
-                        f'{table_name}: {e}')
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} '
+                    f'ADD COLUMN IF NOT EXISTS {column}'))
+                conn.commit()
 
         current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
