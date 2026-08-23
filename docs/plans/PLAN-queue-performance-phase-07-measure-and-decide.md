@@ -2,9 +2,11 @@
 
 Master plan: [PLAN-queue-performance.md](PLAN-queue-performance.md)
 
-**Status: Not started.** This is step 7 of the master plan; the master
+**Status: Complete.** This is step 7 of the master plan; the master
 plan numbers its work in steps and this file is that step's detailed
-plan, so "step 7" and "phase 7" are the same thing throughout.
+plan, so "step 7" and "phase 7" are the same thing throughout. What
+the measurement found is in "Findings" at the end of this document,
+which corrects one thing this plan's own survey got wrong.
 
 **Planning effort: high.** The mechanical part (extract a distribution
 from a log stream) is easy. The judgement is in deciding what the
@@ -308,6 +310,88 @@ the tree accurately.
   Execution table carry the same status, and
   `python3 tools/check-plan-status.py` passes.
 * `pre-commit run --all-files` passes.
+
+## Findings
+
+Executed 2026-08-23. All six steps done.
+
+### The verdict
+
+The 26 hour `sfcbr` window and the 33 minute CI window agree with each
+other and with the planning survey: **the queue-wait tail this plan set
+out to remove is gone, and explicit fairness is not needed.** The
+numbers, and the three exclusions the verdict rests on, are written up
+in the master plan under "What step 7 measured" and are not repeated
+here.
+
+The hypothesis this plan told step 7b to falsify rather than confirm
+survived falsification. Two of the three tails were tested directly
+against the alternative explanation rather than argued away:
+
+* `node_inst_netdesc_op`'s 15.78 s median falls to 0.77 s once
+  deferred operations are excluded, on 1,013 samples. That is the
+  `defer_count == 0` split from decision 3 doing exactly the job it
+  was added for.
+* `node_blob_op`'s 403 s p90 was tested by measuring how much work its
+  own queue completed during each of the eight worst waits: between
+  1,281 and 1,334 seconds, which exceeds the wait itself because
+  several workers run concurrently. A starved queue does no work
+  during its wait; this one was saturated throughout. That test turned
+  out to be stronger than the disk-busy correlation decision 5 called
+  for, and was used instead of it.
+* `networknode`/`background`'s 4.45 s median resolved the same way:
+  during its largest burst the background lane ran 34.5 s of its own
+  work in 29 s while the user-facing lane on the same queue ran 2.9 s
+  in total.
+
+### What the survey got wrong
+
+One thing. This plan's survey listed three sources of delay inside
+`wait_seconds` plus "actual queue wait". It missed a fourth queue
+*class*: `artifact_fetch_op` enqueues against a target of literally
+`any` when no node is specified
+(`shakenfist/schema/operations/artifact_fetch_op.py:64`), which is
+neither `networknode` nor a uuid. The first version of
+`tools/queue-wait-report.py` classified those 27 CI samples as
+`unknown`. Fixed in the tool as an `any-node` class, with a test. No
+`any` queue appeared in the `sfcbr` window, so only the CI numbers
+were ever affected, and only by being filed under the wrong row.
+
+Everything else the survey asserted held, including the parts it was
+least sure of: the events really are unreachable 30 seconds after an
+operation completes, and the `~1.8 s` p90 floor really is the idle
+poll cap and appears on every quiet queue in both windows.
+
+### Deviations from the plan
+
+* **Decision 5's disk-busy correlation was not used.** The
+  same-queue-occupancy test above answers the same question from the
+  log stream alone, without needing the node metrics, and is a
+  stronger negative: it shows the queue was busy, not merely that the
+  gate was open. Decision 5's requirement -- that a
+  `background_high_io` tail is not starvation until the alternative is
+  excluded -- was met, by a different exclusion.
+* **The Loki capture had to be paged.** A single `query_range` request
+  is capped at 5,000 entries, which is about nine hours of this
+  cluster's traffic, and `--since` alone always returns the newest
+  entries in its window, so it cannot walk backwards. The 26 hour
+  capture was assembled from thirteen two-hour windows. Anyone
+  repeating this should expect to page rather than raise `--limit`.
+* **Only two of the three candidate issues were filed.** #3863 (the
+  flat 15 second dependency defer) and #3864 (operation events
+  unreachable 30 seconds after completion). The third,
+  `background_high_io`, was conditional on 7b confirming it was not
+  self-inflicted, and 7b found that it was, so there is nothing to
+  file: a queue saturated with its own work is the system working.
+
+### Follow-ups still not landed
+
+The master plan's two deferred follow-ups are unchanged by this
+measurement, and neither is now urgent.
+`NodeNetOp.network_apply_create_hypervisor` coalescing would reduce
+enqueue volume at node startup, but `node_net_op` measures a p90 wait
+of 1.86 s -- the poll floor -- so there is no latency to win, only
+work. Explicit fairness is answered above.
 
 ## Back brief
 

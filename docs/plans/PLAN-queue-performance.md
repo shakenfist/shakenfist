@@ -2,11 +2,13 @@
 
 ## Status
 
-In progress.
+Complete.
 
 Steps 1-6 merged to `develop` as PR #3194 on 2026-05-26. Step 7
-(measure, decide on fairness) is planned in
-[PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md).
+measured the result and decided against explicit fairness; the
+measurement, the exclusions it rests on and the decision are in
+[PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
+and summarised under "What step 7 measured" below.
 
 ## Execution
 
@@ -18,7 +20,7 @@ Steps 1-6 merged to `develop` as PR #3194 on 2026-05-26. Step 7
 | 4. Worker-side dedup | (in PR #3194) | Complete |
 | 5. Enqueue-side dedup | (in PR #3194) | Complete |
 | 6. Caller-site audit | (in PR #3194) | Complete |
-| 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | In progress |
+| 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
 
 ## Problem
 
@@ -96,10 +98,77 @@ Six discrete changes plus one measurement step:
 7. **Re-measure**: once steps 1-6 are deployed, the per-op
    wait distribution tells us whether the tail is gone or whether
    explicit fairness (bounded staleness, reserved-slot lottery) is
-   still needed for lower-priority queues. Planned in
-   [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md),
-   which also records why the events have to be read from the log
-   stream rather than from the events table.
+   still needed for lower-priority queues. Done -- see "What step 7
+   measured" below,
+   [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
+   for the method, and `tools/queue-wait-report.py` for the tool
+   which produced the numbers.
+
+## What step 7 measured
+
+Two windows, both through `tools/queue-wait-report.py`:
+
+* **`sfcbr`**, 25h58m, 17,936 operations
+  (2026-08-22T16:33Z to 2026-08-23T18:30Z). Production steady state.
+* **Cluster CI**, 33 minutes, 1,248 operations (merge-queue run
+  32597511463, all five cluster nodes' journals). The site where the
+  original >60 s waits were seen.
+
+### The tail this plan set out to remove is gone
+
+`net_op` -- the family containing `network_apply_update_dnsmasq` --
+against a starting point of over 60 seconds:
+
+| Window | n | p50 | p90 | p99 | max |
+|--------|---|-----|-----|-----|-----|
+| `sfcbr`, 26h | 6310 | 0.78 | 1.81 | 7.77 | 27.60 |
+| CI, 33m | 313 | 0.56 | 1.72 | 2.19 | 23.96 |
+
+A p90 of 1.8 s is the dispatcher's idle poll cap
+(`IDLE_POLL_MAX_SECONDS = 2.0`), so on both clusters the median
+operation now waits roughly one poll interval and nothing else.
+
+### Explicit fairness is not needed
+
+Three tails in the `sfcbr` window sit above that floor. None of them
+is a lower-priority queue being starved by a higher-priority one, and
+each was excluded on evidence rather than on argument:
+
+* **`user_waiting`, p50 15.78 s** (`node_inst_netdesc_op`). Entirely
+  deferral: restricted to operations which never deferred, the same
+  p50 is 0.77 s, and 962 of 1013 samples had deferred at least once.
+  A dependency wait re-enqueues an operation a flat 15 seconds into
+  the future. This is the largest user-visible latency in the whole
+  sample and it has nothing to do with queue order. Filed as #3863.
+* **`background_high_io`, p90 403 s** (`node_blob_op`), with a defer
+  count of zero, which is the shape starvation would have. It is not:
+  during each of the eight worst waits, the *same queue* executed
+  between 1,281 and 1,334 seconds of its own work, which is more than
+  the wait itself (several workers run concurrently). The queue was
+  saturated with its own blob transfers throughout, not held off by
+  user-facing work, and not gated off by the disk-busy check.
+* **`networknode`/`background`, p50 4.45 s**. All 103 samples are
+  bursts of 20-40 operations arriving within seconds of each other.
+  In the largest, the background lane ran 34.5 s of its own work in a
+  29 s span while `networknode`/`user_facing` ran 2.9 s in total. The
+  rising wait across a burst is position in that burst, not
+  higher-priority work crowding in ahead of it.
+
+So the `FIELD()` ordering's theoretical starvation risk
+(`shakenfist/mariadb.py`) did not materialise in 26 hours of
+production traffic which included exactly the bursty contention it
+would show up in. Bounded-staleness ordering and reserved slots are
+**not** being added. If the question is reopened, reopen it with a
+measurement: the tool is committed and the exclusions above are what
+any future claim of starvation has to survive.
+
+### What the measurement cost us to build
+
+The events could not be read back out of the database at all: an
+operation is hard deleted 30 seconds after it completes and takes its
+events' object references with it, so the numbers had to come from the
+log echo instead. That gap is filed as #3864 and the operator
+documentation, which claimed 30 day retention, is corrected.
 
 ## Audit findings (step 6)
 
