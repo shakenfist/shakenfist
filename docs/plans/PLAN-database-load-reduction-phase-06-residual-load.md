@@ -2,7 +2,7 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
-**Status: In progress.** 6a, 6b, 6c, 6d, 6e and 6f are done; 6g (re-measurement after deploy) is outstanding and needs a full 24h window on `sfcbr`. What the work actually found is recorded in "Findings" below, which corrects this plan's own survey in two places.
+**Status: Complete.** 6a through 6g are all done. What the work actually found is recorded in "Findings" below, which corrects this plan's own survey in two places, and in "6g -- the re-measurement" at the end, which corrects one of the Findings in turn.
 
 ## Why this phase exists
 
@@ -239,13 +239,18 @@ It decomposes:
 the top-40 cutoff* to 18.95/s. It is 38% of the whole regression in one
 pair. Diagnosis below.
 
-**~+12/s is node count, not regression.** The per-node fixed-rate pairs
-all grew by almost exactly 50% on 2026-08-12: `Dequeue`/net 2.03 to 3.04,
-`GetBlobTransfersForNode`/transfers 2.03 to 3.04, and every one of the
-seven `GetNodeDaemonState` pairs 1.99 to 2.98. `GetNodeDaemonState` is
+**~+12/s is a node count, not a regression.** The per-node fixed-rate
+pairs all grew by almost exactly 50% on 2026-08-12: `Dequeue`/net 2.03 to
+3.04, `GetBlobTransfersForNode`/transfers 2.03 to 3.04, and every one of
+the seven `GetNodeDaemonState` pairs 1.99 to 2.98. `GetNodeDaemonState` is
 one read per `DAEMON_STATE_POLL_INTERVAL` per daemon per node, so its rate
 divided by the poll interval *is* a node count: it reads 3.9 nodes before
-2026-08-12 and 5.8 after. The cluster gained two nodes.
+2026-08-12 and 5.8 after.
+
+*Superseded by 6g.* The arithmetic is right and the conclusion drawn from
+it -- "the cluster gained two nodes" -- is wrong. The count that rose is
+the number of nodes the **counter can see**, not the number of nodes that
+exist. See "6g -- the re-measurement" below.
 
 That is the most important finding for phase 7, and it is a gap in the
 model rather than a bug in the code: **the ratchet's baselines scale with
@@ -316,8 +321,11 @@ exactly one `get_references_from` per view, inside the `attribute_memo()`
 that #3654 added. There is no per-view duplication to remove.
 
 Per this step's brief, reporting rather than fixing: the growth is request
-volume, and it correlates with the same 2026-08-12 node-count change. Two
-more nodes means more concurrent CI, which means more API polling, and the
+volume, and it correlates with the same 2026-08-12 step. That step turned
+out to be a coverage change rather than two new nodes (see 6g), so the
+mechanism below is wrong in its cause while remaining right in its shape:
+two more *visible* nodes means two nodes' worth of API polling entering
+the counter for the first time, and the
 `/instances` list endpoint costs one reference read per instance returned —
 so its cost scales with instances *times* poll rate while the ratchet's
 coefficient captures only instances. Same model gap as above, seen through
@@ -343,3 +351,207 @@ matters (that the read count does not grow with address count). Both new
 guards were mutation tested: re-introducing the per-address read fails
 them, and the first version of the namespace-key guard did *not* fail and
 was rewritten until it did.
+
+## 6g — the re-measurement (2026-08-24)
+
+The changes reached `sfcbr` at 22:30-22:40Z on 2026-08-20. The CI
+conductor was then broken from 09:46Z to 20:30Z on 2026-08-21, so this
+step waited for three clean days rather than the one the step brief
+asked for. That turned out to matter for a reason unrelated to the
+outage, described below.
+
+### Both fixes landed and are holding
+
+24h means from `database_requests_total`, against a 12h window ending
+2026-08-20 20:00Z (the last pre-deploy period):
+
+| Pair | Pre-deploy | 2026-08-23 | Delta |
+|------|-----------|------------|-------|
+| `GetObjectState` / `cluster` (#3814) | 14.76 | 2.22 | -12.54 |
+| `GetReservation` / `net` (#3655) | 11.93 | 0.00 | -11.93 |
+| `GetReservationsForIPAM` / `net` (its bulk replacement) | 0.20 | 0.60 | +0.40 |
+
+`GetReservation`/`net` reading exactly zero is the sweep conversion, not
+a renamed metric: the bulk accessor it now calls is the third row, and
+it is present at the rate one call per pass predicts.
+
+Cluster-wide the effect has to be read against standing instance count,
+which swings between 12.4 and 31.4 day to day — more than the effect
+being measured. Fitting the nine regression-era days (2026-08-12 to
+2026-08-20) gives
+
+```
+QPS = 82.50 + 4.648 x standing_instances     r2 = 0.974, n = 9
+```
+
+and every post-fix day sits below that line by the same amount:
+
+| Day | Standing instances | Measured | Fit predicts | Residual |
+|-----|-------------------|----------|--------------|----------|
+| 2026-08-21 | 13.12 | 122.79 | 143.48 | -20.69 |
+| 2026-08-22 | 21.93 | 163.10 | 184.43 | -21.33 |
+| 2026-08-23 | 16.65 | 138.98 | 159.89 | -20.91 |
+
+Three independent days agreeing within 0.6/s, against the ~24/s the two
+per-pair deltas above predict less the ~2.3/s `GetReferencesFrom`/api
+grew over the same window. The reductions are real and they are the size
+they were designed to be.
+
+### The 2026-08-12 step is a measurement change, not two new nodes
+
+6a attributed ~+12/s of the climb to the cluster growing from four nodes
+to six. It did not. `count(instances_active)` returns 6.00 on 2026-08-05
+and 6.00 on 2026-08-23, and the series is `sf-1` through `sf-6`
+throughout. What changed is what the counter could see.
+
+`database_requests_total` is incremented by a server interceptor in
+`shakenfist/daemons/database/main.py`, so it counts **gRPC** calls only.
+Until `5a53ab353` ("Route non-database daemons via the gRPC tier",
+#3708), `_use_database_service()` treated `MARIADB_HOST` as a per-process
+signal, and `MARIADB_HOST` is rendered into the shared systemd
+`EnvironmentFile` — so on a database-tier node *every* daemon bypassed
+the tier and was invisible to the counter. `sfcbr` has two such nodes,
+`sf-1` (roles DHN) and `sf-2` (roles DH). Four of six nodes were being
+counted. The commit message says as much: it hides those daemons' load
+"from the tier's per-caller request metrics and connection accounting".
+
+Bisecting by hour puts the step at 2026-08-11 20:00-21:00Z, `sfcbr`'s
+deploy of that commit. Across a tight 4h window either side, the total
+goes 68.05/s to 145.74/s, and the shape is unmistakable:
+
+```
+GetObjectState      / cluster    0.00 -> 16.69
+CountReferencesTo   / cluster    0.00 ->  1.73
+GetBlobAttributes   / cluster    0.00 ->  1.50
+GetBlob             / cluster    0.00 ->  1.41
+GetNodeDaemonState  / net        1.99 ->  2.98   (x1.50 exactly)
+GetNodeDaemonState  / transfers  1.99 ->  2.99   (x1.50)
+Dequeue             / queues     2.08 ->  3.15   (x1.51)
+```
+
+Every per-node poll multiplies by exactly 1.5 — four visible nodes
+becoming six — and the entire cluster daemon appears from literal zero.
+
+### Which means the target was never actually met
+
+The cluster daemon is a single elected singleton, so whether its ~21/s
+was counted depended on which node happened to hold the maintenance
+lock. Tracking `caller_daemon="cluster"` back through the hunt shows it
+flapping:
+
+```
+07-25  27.85   07-31   2.76   08-05   2.79   08-08  23.08   08-11   8.61
+07-28   2.78   08-02  24.48   08-06   2.78   08-09   2.84
+                08-04  26.29   08-07   2.79   08-10  19.53
+```
+
+The ~2.8/s floor is the five non-elected candidates; the ~20-27/s peaks
+are windows where the leader sat on a node the counter could see.
+
+**2026-08-05, 2026-08-06 and 2026-08-07 are exactly the days it could
+not.** Those are the three days recorded in the master plan as
+"89-92/s, target met". The load was there; the metric was not looking at
+it. Adding the cluster daemon's contribution back puts those days at
+roughly 110/s, and they were also missing `sf-1` and `sf-2`'s other
+daemons. **The under-100/s criterion was never met, and the "regression"
+this phase was created to chase was in substantial part the leader
+moving back onto a visible node and then #3708 making it permanent.**
+
+That does not make the phase wasted. #3814 and #3655 were real defects
+costing a real ~24/s of real database work, and they had been costing it
+for as long as they had existed — invisibly, some of the time. Finding
+them by chasing a measurement artefact is luck, but the fixes are not.
+
+### The verdict against the criterion
+
+Measured the way the criterion actually specifies — a quiet window, not
+a 24h mean that folds in CI workload — on a 30 minute window at
+2026-08-23 02:10Z with `sfcbr` at its floor of 8 standing instances:
+
+**102.38 operations per second. Not met, by 2.4%.**
+
+The same measurement pre-fix (2026-08-17 02:00Z, 8.71 instances) reads
+133.97/s. The criterion has been restated in the master plan rather than
+declared met; the number stays at 100 because moving a target after
+missing it by 2.4% is not a re-derivation, it is an excuse.
+
+### The model, which is the durable output
+
+Splitting the load three ways survives contact with the data. The
+fixed-rate per-node polls (`GetNodeDaemonState`, `Dequeue`,
+`GetBlobTransfersForNode`) are flat against workload and flat across the
+fix:
+
+| Day | Poll subtotal | Per node | Standing instances |
+|-----|--------------|----------|-------------------|
+| 2026-08-16 | 28.60 | 4.77 | 13.77 |
+| 2026-08-18 | 27.32 | 4.55 | 12.38 |
+| 2026-08-22 | 29.90 | 4.98 | 21.93 |
+| 2026-08-23 | 29.64 | 4.94 | 16.57 |
+
+which gives
+
+```
+QPS ~= 32 + 4.9 x nodes + 4.65 x standing_instances
+```
+
+At six nodes this predicts 163.4/s and 138.5/s for 2026-08-22 and
+2026-08-23 against 163.10 and 138.87 measured. It is the form phase 7
+needs and the evidence that a per-node term is not optional: on `sfcbr`
+the per-node term is 29.6/s, 29% of the quiet floor, and it would be
+59/s on a twelve node cluster with no change in behaviour whatsoever.
+
+`GetNodeDaemonState` alone is 20.29/s of that, and it is exactly at its
+arithmetic floor: seven polling daemon types across six nodes is 42
+processes, less the one elected cluster daemon (below), at one read per
+2s = 20.5/s. Closing the remaining 2.4/s to the criterion most plausibly
+comes from here — `DAEMON_STATE_POLL_INTERVAL` at 4s rather than 2s
+halves it — but that trades against how quickly an externally written
+stop request is noticed, so it is a phase 7 decision with a stated cost,
+not a free win.
+
+### The elected cluster daemon does not poll its own daemon state
+
+`GetNodeDaemonState`/`cluster` reads 2.48/s where every other daemon
+reads ~2.97/s — precisely five sixths. There is no missing node.
+`check_daemon_state()` is called from `idle()`, and the elected cluster
+daemon does not idle: `_await_election()` calls `self.idle(5)` then
+`self.check_daemon_state()` on each pass, but once elected the inner
+loop in `_run_inner()` sleeps on `self.lock.lost_event.wait(5)` and
+never calls it (`shakenfist/daemons/cluster/main.py`). Five candidates
+poll; the leader does not.
+
+The consequence is small but real: `sf-ctl stop cluster`
+(`shakenfist/client/ctl.py`) works by writing `DAEMON_STATE_STOPPING`
+for the daemon to notice, and on the elected node nothing is reading it,
+so the request is ignored until the node loses election. Local SIGTERM
+is unaffected — that goes through `exit_gracefully()` and the abort path,
+which the elected loop does check. Filed as #3874; out of scope here.
+
+### What 6g leaves unattributed
+
+`GetReferencesFrom`/`api` is the one target this phase does not close.
+6e reported it as request volume driven by "two more nodes means more
+concurrent CI", which inherits the mistake above — there were no two
+more nodes. Re-reading it as a per-standing-instance coefficient, against
+the 0.32 ceiling the survey used:
+
+| Day | QPS | Standing instances | Per instance | Coverage |
+|-----|-----|-------------------|--------------|----------|
+| 2026-08-09 | 5.00 | 17.81 | 0.281 | 4 of 6 nodes |
+| 2026-08-18 | 6.58 | 12.38 | 0.531 | 6 of 6 |
+| 2026-08-22 | 13.04 | 21.93 | 0.595 | 6 of 6 |
+| 2026-08-23 | 9.75 | 16.57 | 0.588 | 6 of 6 |
+
+Scaling the pre-#3708 figure by the 1.5 the fixed-rate polls show gives
+0.42 per instance, so roughly half the apparent rise is the API on `sf-1`
+and `sf-2` entering the counter. The remaining ~40% is real and is
+**recorded here as unattributed**. It is not a duplicated read — 6e
+established that `Instance.external_view()` already issues exactly one
+`get_references_from` per view — so it is either request volume this
+phase has not explained or a coefficient that was always wrong for a
+six-node cluster and only looked right while two nodes were invisible.
+
+Phase 7 should not carry 0.32 forward. Either number it re-derives will
+be defensible; this one is not, because it was measured across
+two thirds of the cluster.
