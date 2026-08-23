@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-agent-operation-deadlines/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-02-schema/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Agent operation deadlines and progress detection - Shaken Fist</title>
+        <title>Agent operation deadlines phase 2: schema for deadlines and progress - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#agent-operation-deadlines-and-progress-detection" class="md-skip">
+        <a href="#agent-operation-deadlines-phase-2-schema-for-deadlines-and-progress" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Agent operation deadlines and progress detection
+              Agent operation deadlines phase 2: schema for deadlines and progress
             
           </span>
         </div>
@@ -12002,10 +12002,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Scope
       
     </span>
   </a>
@@ -12013,10 +12013,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decisions-already-made" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Decisions already made
+        What the survey found
       
     </span>
   </a>
@@ -12024,115 +12024,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#design-sketch" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Design sketch
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Design sketch">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#object-model-and-schema" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Object model and schema
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#api-surface" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API surface
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#enforcement-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enforcement points
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#retry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Retry
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failure-semantics-between-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failure semantics between operations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#connection-teardown-and-agent-side-recovery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Connection teardown and agent-side recovery
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#command-dispatch-restructure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Command dispatch restructure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#client-sibling-client-python-repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Client (sibling client-python repository)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#decisions-from-phase-0" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decisions from phase 0
+        Decisions
       
     </span>
   </a>
@@ -12140,58 +12035,68 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#non-goals" class="md-nav__link">
+  <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Non-goals
+        Step plan
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Non-goals">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-concurrency-stays-out-of-scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why concurrency stays out of scope
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#phases" class="md-nav__link">
+  <a href="#departures-from-the-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phases
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Phases">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The CI suite's own awaits have the bug this plan fixes (#3770)
+        Departures from the plan
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
   
 </li>
       
@@ -12216,599 +12121,501 @@
   
 
 
-<h1 id="agent-operation-deadlines-and-progress-detection">Agent operation deadlines and progress detection<a class="headerlink" href="#agent-operation-deadlines-and-progress-detection" title="Permanent link">&para;</a></h1>
+<h1 id="agent-operation-deadlines-phase-2-schema-for-deadlines-and-progress">Agent operation deadlines phase 2: schema for deadlines and progress<a class="headerlink" href="#agent-operation-deadlines-phase-2-schema-for-deadlines-and-progress" title="Permanent link">&para;</a></h1>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this document,
-explore the shakenfist codebase thoroughly. Read the sidechannel daemon
-(<code>shakenfist/daemons/sidechannel/main.py</code>, especially
-<code>SideChannelExecutorJob</code> and <code>_execute_inner</code>), the agent operation
-object (<code>shakenfist/operations/agentoperation.py</code> and
-<code>shakenfist/operations/baseoperation.py</code>), the instance-side queue
-(<code>Instance.agent_operation_next</code> and <code>agent_operation_enqueue</code> in
-<code>shakenfist/instance.py</code>), the three REST endpoints that create agent
-operations (<code>InstanceAgentPutBlobEndpoint</code>, <code>InstanceAgentGetEndpoint</code>,
-<code>InstanceAgentExecuteEndpoint</code> in
-<code>shakenfist/external_api/instance.py</code>), and the MariaDB accessors for
-agent operations in <code>shakenfist/mariadb.py</code>. The client-side await
-loop lives in the sibling <code>client-python</code> repository. Ground your
-answers in what the code actually does today rather than guessing.</p>
-<p>All planning documents go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the system architecture overview and
-<code>CLAUDE.md</code> for build commands, project conventions, the API parameter
-declaration rules, the attribute field-mask rule, and the state
-machine documentation pointer.</p>
-<p>When we get to detailed planning, I prefer a separate plan file per
-detailed phase, named for the master plan with <code>-phase-NN-descriptive</code>
-appended before the <code>.md</code> extension.</p>
-<p>I prefer one commit per logical change, and at minimum one commit per
-phase. Do not batch unrelated changes into a single commit.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>Issue #3516: <code>sf-sidechannel</code> can leave an agent operation wedged in
-<code>executing</code> until the client gives up. The trigger (issue #2240, a
-<code>get-file</code> that never delivers) is agent-side and still open, but the
-hypervisor-side handling turns a transient hiccup into a test-fatal
-hang. This is currently one of the two most frequent merge-queue CI
-flakes (<code>test_agentops.TestAgentOperations.test_instance_put_and_get_blob</code>,
-three occurrences in the week to 2026-08-14).</p>
-<p>This is not just a CI problem. The sidechannel dispatch loop runs at
-most one executor per instance (<code>_dispatch_loop</code> skips any instance
-with a live executor), so a wedged operation monopolises the
-instance's executor slot: the user loses the ability to run <em>any</em>
-agent operation against that instance until the 900-second backstop
-fires. A single stuck <code>get-file</code> takes out the whole agent surface of
-the instance for a quarter of an hour.</p>
-<p>PR #3506 already landed two mitigations: a try/finally in
-<code>SideChannelExecutorJob.execute()</code> that marks a still-<code>EXECUTING</code>
-operation <code>ERROR</code> on abnormal executor exit, and a whole-operation
-execution deadline (<code>AGENT_OPERATION_EXECUTION_TIMEOUT</code>, hardcoded to
-900 seconds in <code>shakenfist/daemons/sidechannel/main.py</code>). CI
-occurrences post-dating those fixes show why they are insufficient:</p>
+<p>This phase gives an <code>AgentOperation</code> somewhere to record the caller's
+timing intent and the executor's progress, and changes no behaviour at
+all: nothing in this phase reads the values it stores. Phase 3 sets
+them from the REST API, phase 4 enforces them, phase 5 retries against
+them.</p>
+<p>Ground every change in the tree rather than in this document's
+description of it: <code>shakenfist/schema/agentoperation_data.py</code> and
+<code>shakenfist/schema/agentoperation_attributes.py</code> (the pydantic models
+that <em>are</em> the table definitions), <code>shakenfist/schema/sqlalchemy.py</code>
+(<code>pydantic_to_sqlalchemy_table</code>, and how <code>Optional[X]</code> becomes a
+nullable column), <code>shakenfist/mariadb.py</code> (the three-layer
+direct/gRPC/public pattern, the table version constants, and the
+<code>_ensure_*_schema</code> migration functions), <code>protos/database.proto</code> and
+<code>shakenfist/daemons/database/main.py</code> (the gRPC servicer),
+<code>shakenfist/tests/mock_mariadb.py</code>, and
+<code>shakenfist/operations/agentoperation.py</code> (the object).</p>
+<p>Consult <code>CLAUDE.md</code> for the attribute field-mask rule, the two uuid
+formats in MariaDB, and the <code>tox -e genprotos</code> requirement.</p>
+<p><strong>Planning effort:</strong> high. The mechanical half of this phase -- adding
+two nullable columns to each of two tables -- follows patterns already
+in the tree. The half that is not mechanical is what NULL is allowed
+to mean in each column, and whether the object version bumps, and both
+of those turned out to be wrong in the master plan. See decisions 1
+and 2.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>In:</p>
+<ul>
+<li>Two new static values on <code>AgentOperationData</code>, <code>deadline</code> and
+  <code>progress_timeout</code>, and two new mutable attributes on
+  <code>AgentOperationAttributesData</code>, <code>last_progress</code> and <code>attempts</code>.</li>
+<li>The <code>agent_operations</code> and <code>agent_operation_attributes</code> table
+  version bumps and the additive migrations that go with them, run by
+  <code>sf-ctl ensure-mariadb-schema</code>.</li>
+<li>The new fields through all three MariaDB layers, the proto, the gRPC
+  servicer, the test mock and the field-mask helper.</li>
+<li><code>AgentOperation.new()</code> accepting the two static values, defaulted so
+  the three existing API call sites are unchanged.</li>
+<li><code>external_view()</code> returning all four values.</li>
+<li>A live-MariaDB test that the migration actually migrates.</li>
+<li>The <code>docs/operator_guide/database.md</code> schema tables, and the agent
+  operation API reference's example response.</li>
+</ul>
+<p>Out:</p>
+<ul>
+<li>Every reader of the new values. Nothing in this phase enforces a
+  deadline, observes progress, counts an attempt, or removes
+  <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code>
+  (<code>daemons/sidechannel/main.py:56</code>). Phase 2 is revertible on its
+  own precisely because nothing depends on it yet.</li>
+<li>The REST parameters <code>deadline_seconds</code> and
+  <code>progress_timeout_seconds</code>, their declarations, their
+  <code>STRUCTURED_PARAMETERS</code> entries, and the two config defaults. All
+  phase 3.</li>
+<li>The <code>expired</code> state and its <code>state_targets</code> / <code>FINAL_OBJECT_STATES</code>
+  obligations. Phase 4.</li>
+<li>The <code>last_progress</code> write throttle. It is a property of the writer,
+  and phase 4 owns the writer.</li>
+<li>Fixing <code>baseobject.upgrade()</code>'s inability to read an object written
+  by a newer node -- see decision 2 and <em>Future work</em>.</li>
+</ul>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>Every factual claim in the master plan's phase 2 scope was checked
+against the tree. The mechanical claims hold. Two of the design claims
+do not, and both are corrected at source in the master plan by the
+same commit that adds this file.</p>
 <ol>
-<li><strong>The 900s backstop is longer than every client await.</strong> The guest
-   CI awaits give up after 120-377 seconds, so from the client's
-   perspective the operation is still wedged in <code>executing</code> when it
-   times out. The server then grinds on for the remainder of the 900
-   seconds doing work nobody wants, holding the per-instance executor
-   slot.</li>
-<li><strong>A failed operation is never retried.</strong>
-   <code>Instance.agent_operation_next()</code> pops the queue entry as soon as
-   the operation leaves <code>QUEUED</code>, so an <code>EXECUTING</code> operation is never
-   re-dispatched. A transient agent hiccup is fatal to the operation.</li>
-<li><strong>The whole-operation deadline cannot distinguish a stalled
-   transfer from a genuinely large one.</strong> A single wall-clock number
-   has to be big enough for the biggest legitimate transfer, which
-   makes it useless for detecting stalls quickly.</li>
-<li><strong>There is no server-side notion of the client's intent.</strong> The
-   client knows exactly how long it is willing to wait (its await
-   timeout) but has no way to communicate it. Periodic callers (an
-   operation every N seconds) would rather skip a cycle than queue
-   deeper and deeper behind a backlog.</li>
+<li><strong>The two pydantic models are the table definitions, and
+   <code>Optional[X]</code> is all that nullability requires.</strong>
+   <code>pydantic_to_sqlalchemy_table</code> (<code>schema/sqlalchemy.py:392</code>) sets
+   <code>nullable=is_optional and not is_pk</code> at line 446, and the type map
+   at lines 272-273 gives <code>int -&gt; sa.BigInteger()</code> and <code>float -&gt;
+   sa.Double()</code>. So <code>Optional[float] = None</code> is exactly a nullable
+   <code>DOUBLE</code>. There is <strong>no</strong> server-default support in the generator,
+   which decision 3 has to account for.</li>
+<li><strong>Neither <code>_ensure_agent_operations_schema</code> (<code>mariadb.py:18454</code>)
+   nor <code>_ensure_agent_operation_attributes_schema</code> (<code>mariadb.py:18491</code>)
+   has ever had a migration step.</strong> Both consist of a create-if-absent
+   block and nothing else; their comments say the historical v1-&gt;v2
+   step was the etcd import marker. This phase therefore writes the
+   first real migration for both tables, rather than adding a step to
+   an established ladder. The shape to copy is
+   <code>_ensure_instance_attributes_schema</code>'s v1-&gt;v2 block
+   (<code>mariadb.py:19161-19176</code>), which is an <code>ADD COLUMN IF NOT EXISTS</code>
+   with a comment explaining why re-running is safe.</li>
+<li><strong>The field mask phase 1 added is exactly what phase 2 needs, and
+   is currently a one-element dict.</strong>
+   <code>_agent_operation_attributes_column_values</code> (<code>mariadb.py:18688</code>)
+   builds <code>{'results': ...}</code> and raises <code>ValueError</code> on an unknown
+   field name; <code>add_result()</code>
+   (<code>operations/agentoperation.py:183</code>) passes <code>fields=['results']</code>.
+   Adding <code>last_progress</code> and <code>attempts</code> to that dict is the whole
+   change, and from that moment <code>add_result()</code>'s mask is load-bearing
+   rather than decorative.</li>
+<li><strong>The static-value read and write paths enumerate columns by hand
+   and will not pick the new ones up for free.</strong>
+   <code>_direct_create_agent_operation</code> (<code>mariadb.py:18533</code>) names five
+   columns in its <code>insert().values()</code>, <code>_direct_get_agent_operation</code>
+   (<code>mariadb.py:18566</code>) names five in its <code>AgentOperationData(...)</code>
+   construction, and the gRPC pair
+   (<code>mariadb.py:18763</code>/<code>18785</code>) plus the servicer's
+   <code>_agentop_from_proto</code>/<code>_agentop_to_proto</code>
+   (<code>daemons/database/main.py:4291</code>/<code>4306</code>) do the same. The
+   attributes pair (<code>mariadb.py:18633</code>/<code>18656</code>, servicer <code>4419</code>/<code>4431</code>)
+   likewise. Six places per field, and the compiler catches none of
+   them, which is why the step plan names all of them.</li>
+<li><strong>The test mock needs no per-field work.</strong>
+   <code>_mariadb_update_agent_operation_attributes</code>
+   (<code>tests/mock_mariadb.py:2555</code>) applies the mask with
+   <code>setattr(stored, field, getattr(data, field))</code>, and the create/get
+   mocks store the pydantic object whole, so new model fields flow
+   through unchanged. Only a mock that reconstructs the model by hand
+   would have needed editing, and this one does not.</li>
+<li><strong>proto3 field presence is available and already used for exactly
+   this problem.</strong> <code>NamespaceKeyAttributesProto.expiry</code>
+   (<code>protos/database.proto:1836</code>) is <code>optional double expiry = 4;</code>
+   with the comment "absent = never expires", read back with
+   <code>d.HasField('expiry')</code> at <code>mariadb.py:13160</code>. Without <code>optional</code>, a
+   proto3 <code>double</code> cannot distinguish "unset" from <code>0.0</code>, which is
+   precisely the distinction decision 1 depends on -- and the gRPC
+   path is the one every daemon except <code>sf-database</code> itself actually
+   uses.</li>
+<li><strong>The master plan's "NULL means no wall-clock deadline" is wrong,
+   and inconsistent with its own progress timeout.</strong> The design sketch
+   says NULL <code>deadline</code> means the client asked for no deadline, while
+   NULL <code>progress_timeout</code> means "use the server default". The same
+   absence would mean opposite things in two adjacent columns, and the
+   deadline reading is the unsafe one: every row written before this
+   release, and every row written by a not-yet-upgraded API node
+   during the rollout, is NULL, so at the moment phase 4 deletes the
+   900-second constant those operations would become unbounded rather
+   than defaulted. Decision 1 resolves it.</li>
+<li><strong>The master plan's "version bump 3 -&gt; 4" would break agent
+   operations during a rolling upgrade.</strong> <code>AgentOperation.current_version</code>
+   is 3 (<code>operations/agentoperation.py:23</code>) as claimed, but
+   <code>baseobject.upgrade()</code> (<code>baseobject.py:198</code>) cannot read a row
+   whose version is <em>higher</em> than the reader's: it loops while
+   <code>version != current_version</code>, so for a v4 row on a v3 node it looks
+   up <code>_upgrade_step_4_to_5</code> via <code>getattr(self, step)</code> with no default
+   and raises <code>AttributeError</code>. The <code>if not step_func: raise
+   UpgradeException</code> immediately below (lines 208-211) is dead code
+   for that reason. Transcribing the loop and running it with
+   <code>{'version': 4}</code> against a class whose <code>current_version</code> is 3
+   reproduces it. Agent operations are created on an API node and read
+   on the hypervisor's <code>sf-sidechannel</code>, so a bump would break agent
+   operations on every not-yet-rolled hypervisor for the length of the
+   rollout. Decision 2 declines the bump; the underlying
+   <code>baseobject</code> defect is recorded in <em>Future work</em> as out of scope.</li>
+<li><strong>A live-MariaDB migration test costs no CI wiring.</strong>
+   <code>tools/ci-enum-widening-test.sh</code> runs
+   <code>stestr run --serial 'shakenfist\.tests\.test_mariadb_.*_live\.'</code>,
+   deliberately regex-matched so that "a live test module added later
+   is picked up without touching this script", and the workflow job
+   that calls it (<code>.github/workflows/functional-tests.yml:700-728</code>,
+   "Schema ENUM widening") runs on <code>merge_group</code>. A new
+   <code>test_mariadb_agent_operations_live.py</code> therefore runs in the merge
+   queue against a real MariaDB with no workflow edit. The script also
+   fails the job if zero live tests ran, so the module cannot silently
+   skip.</li>
+<li><strong>The documentation that enumerates these columns is two table
+    rows.</strong> <code>docs/operator_guide/database.md:912</code> and <code>:935</code> list the
+    columns of <code>agent_operations</code> and <code>agent_operation_attributes</code>
+    respectively. <code>docs/developer_guide/api_reference/agentoperations.md</code>
+    carries an example response body that will gain fields.</li>
 </ol>
-<h2 id="decisions-already-made">Decisions already made<a class="headerlink" href="#decisions-already-made" title="Permanent link">&para;</a></h2>
-<p>These were settled in discussion before this plan was written and are
-not open questions:</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Two independent timeout knobs per operation.</strong></li>
-<li>A <strong>wall-clock deadline</strong>, expressed by the client as "seconds
-     since this REST request was received". Queue time (and preflight
-     time, for put-blob) counts against it. The API server converts it
-     to an absolute expiry timestamp at request receipt and stores
-     that on the operation.</li>
-<li>A <strong>progress timeout</strong>: "no forward progress for N seconds is
-     fatal". Only meaningful for commands that can observe progress.</li>
-<li><strong>The server default deadline is 600 seconds</strong> (a new config
-   option, replacing the hardcoded 900s
-   <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code> constant). A client may pass an
-   explicit sentinel (0) meaning "no wall-clock deadline".</li>
-<li><strong>The no-deadline + progress-timeout combination is a first-class
-   use case.</strong> Streaming a 1TB file out of an instance should set
-   deadline=none and rely on the progress timeout to detect fatal
-   stalls (and permit retry) without ever timing out just for being
-   big.</li>
-<li><strong>Progress observation is a declared capability of each agent
-   command.</strong> The command dispatch in <code>SideChannelExecutorJob</code> (today
-   an if/elif chain at the bottom of <code>_execute_inner</code>) is restructured
-   so that each command declares whether it reports progress, making
-   progress support an obvious thing to implement for future
-   commands. <code>get-file</code> and <code>put-blob</code> report progress via file
-   chunks; <code>execute</code> cannot (a shell command that produces no output
-   until completion is indistinguishable from a stalled one) and is
-   covered by the wall-clock deadline only.</li>
-<li><strong>Aggressive defaults live client-side, not server-side.</strong> The
-   client library populates the deadline from its own await timeout by
-   default; the server default stays conservative so existing callers
-   with slow-but-legitimate operations do not break.</li>
-<li><strong>Retry is in scope.</strong> An operation that fails in <code>EXECUTING</code>
-   before its deadline (executor death, progress stall) is
-   re-dispatched rather than failed, within an attempt bound.</li>
+<li><strong>NULL means "no client intent recorded, use the server default",
+   in both new static columns; an explicit <code>0.0</code> means "none".</strong> So
+   <code>deadline</code> NULL -&gt; phase 4 applies <code>AGENT_OPERATION_DEFAULT_DEADLINE</code>,
+   <code>deadline = 0.0</code> -&gt; no wall-clock deadline at all; <code>progress_timeout</code>
+   NULL -&gt; the server default for progress-capable commands,
+   <code>progress_timeout = 0.0</code> -&gt; progress timeout disabled. This
+   contradicts the master plan (survey finding 7) and is corrected
+   there. Three reasons: absence should not mean opposite things in
+   adjacent columns; the unsafe reading is the one being replaced,
+   because NULL is what every legacy row and every row written by a
+   not-yet-upgraded API node contains, and phase 4 deletes the 900s
+   backstop those rows currently rely on; and <code>0.0</code> is an unambiguous
+   sentinel for <code>deadline</code> because a real deadline is an absolute unix
+   timestamp of order 1.7e9 and can never legitimately be zero. The
+   REST sentinel the master plan already specified -- the client
+   passing <code>deadline_seconds=0</code> to mean "no deadline" -- maps onto the
+   stored <code>0.0</code> directly, so phase 3's API contract is unchanged.
+   Phase 4 inherits one obligation from this: a NULL deadline needs an
+   anchor for the default, and the operation has no stored creation
+   timestamp, so the fallback anchor is dispatch time. That is
+   strictly a fallback for rows no deadline-aware API server wrote,
+   and it is written into the master plan's enforcement section by
+   this commit.</li>
+<li><strong><code>AgentOperation.current_version</code> stays at 3. There is no object
+   version bump and no <code>_upgrade_step_3_to_4</code>.</strong> This contradicts the
+   master plan (survey finding 8) and is corrected there. A bump would
+   make every not-yet-rolled node raise <code>AttributeError</code> on any agent
+   operation created by an already-rolled API node, for the length of
+   the rollout, and this is the one object type whose write and read
+   nodes are reliably different processes on different machines. It
+   would also buy nothing: there is no data to migrate, because NULL
+   is a meaningful value under decision 1 rather than a gap to fill,
+   so the step would be an empty no-op like the existing
+   <code>_upgrade_step_2_to_3</code>. The fact a deployment actually needs to
+   know -- "does this database have the columns?" -- is carried by the
+   <em>table</em> schema version, which <code>sf-database</code> refuses to start
+   against if it is behind. This is the decision most likely to be
+   argued with, since the project's habit is to bump on any change to
+   an object's static values; the counter-argument is that the habit
+   is harmless only because most bumps have not previously landed on
+   an object read by a different daemon than the one that writes it.</li>
+<li><strong><code>attempts</code> is a non-nullable integer defaulting to 0;
+   <code>last_progress</code> is a nullable float.</strong> An attempt count has no
+   "unknown" state worth representing, and a non-nullable column means
+   phase 5 never has to write <code>attempts or 0</code>. Because the table
+   generator has no server-default support (survey finding 1), the
+   migration adds it as <code>BIGINT NOT NULL DEFAULT 0</code> while a fresh
+   <code>create_all</code> produces <code>BIGINT NOT NULL</code> with no default. That
+   divergence is deliberate and harmless -- every insert supplies the
+   value -- and the live test asserts the behaviour that matters
+   (existing rows read back 0) rather than the DDL text.</li>
+<li><strong>Both proto messages use proto3 explicit presence.</strong> <code>optional
+   double deadline</code>, <code>optional double progress_timeout</code> on
+   <code>AgentOperationStaticData</code>; <code>optional double last_progress</code> on
+   <code>AgentOperationAttributesProto</code>, and a plain <code>int64 attempts</code> since
+   it is never NULL. Copy <code>NamespaceKeyAttributesProto.expiry</code>
+   (<code>protos/database.proto:1836</code>) and its <code>HasField</code> read at
+   <code>mariadb.py:13160</code>. Without presence the wire cannot distinguish
+   "unset" from <code>0.0</code>, and decision 1 dies at the gRPC boundary, which
+   is the boundary every daemon except <code>sf-database</code> crosses.</li>
+<li><strong><code>AgentOperation.new()</code> gains <code>deadline=None, progress_timeout=None</code>
+   keyword arguments now</strong>, defaulted so the three call sites in
+   <code>external_api/instance.py</code> (lines 1701, 1745, 1789) are untouched
+   by this phase. Phase 3 then only has to declare the REST parameters
+   and pass them. Adding the parameters with the columns keeps the
+   object layer's story in one commit.</li>
+<li><strong><code>external_view()</code> returns all four values and costs no extra
+   database round trip.</strong> The master plan asks for the two static
+   values; <code>attempts</code> and <code>last_progress</code> come along because they are
+   what makes a wedged operation diagnosable from <code>sf-client</code> while
+   phases 4 and 5 are being brought up, and because they are free: the
+   view already reads the attributes row once via <code>self.results</code>
+   (<code>operations/agentoperation.py:129</code>, <code>156-164</code>). Restructure it to
+   read the attributes row once into a local and take all three values
+   from it, rather than adding two more properties that would each
+   repeat the read.</li>
+<li><strong>The two table versions both go 2 -&gt; 3, and the migrations are
+   additive <code>ADD COLUMN IF NOT EXISTS</code>.</strong> No backfill, no index, no
+   constraint. <code>ADD COLUMN</code> for trailing nullable columns is an
+   instant operation on InnoDB, and <code>agent_operations</code> is a small
+   table, so no online-DDL care is required beyond what
+   <code>ensure-mariadb-schema</code> already does.</li>
+<li><strong>The live migration test is a required part of this phase, not a
+   nice-to-have.</strong> The unit suite mocks MariaDB completely, so nothing
+   else in the repository can tell the difference between a migration
+   that works and one that raises inside its <code>try</code>. Survey finding 9
+   means the test runs in the merge queue for free.</li>
 </ol>
-<h2 id="design-sketch">Design sketch<a class="headerlink" href="#design-sketch" title="Permanent link">&para;</a></h2>
-<h3 id="object-model-and-schema">Object model and schema<a class="headerlink" href="#object-model-and-schema" title="Permanent link">&para;</a></h3>
-<p><code>AgentOperation</code> gains two new static values, stored as nullable
-columns on the <code>agent_operations</code> table:</p>
-<ul>
-<li><code>deadline</code> — absolute unix timestamp (float) after which the
-  operation must not be dispatched and must not continue executing.
-  Computed by the API server at request receipt as
-  <code>time.time() + deadline_seconds</code>. NULL means no client intent was
-  recorded, so the server default applies; an explicit <code>0.0</code> means
-  the client asked for no wall-clock deadline at all (it passed the
-  0 sentinel).</li>
-<li><code>progress_timeout</code> — float seconds. NULL means the same thing it
-  means for <code>deadline</code>: no client intent recorded, so the server
-  default for progress-capable commands applies. An explicit <code>0.0</code>
-  disables the progress timeout.</li>
-</ul>
-<p>The NULL semantics were corrected during phase 2 planning. This
-section previously said a NULL <code>deadline</code> meant "no deadline", which
-made the same absence mean opposite things in two adjacent columns
-and — because NULL is what every legacy row and every row written by
-a not-yet-upgraded API node contains — would have left exactly those
-operations unbounded at the moment phase 4 deletes the 900-second
-constant. <code>0.0</code> is an unambiguous sentinel because a real deadline is
-an absolute timestamp of order 1.7e9.</p>
-<p>There is <strong>no object version bump</strong>: <code>AgentOperation.current_version</code>
-stays at 3. <code>baseobject.upgrade()</code> cannot read a row whose version is
-higher than the reader's — it looks up <code>_upgrade_step_4_to_5</code> with a
-<code>getattr</code> that has no default and raises <code>AttributeError</code> — and an
-agent operation is created on an API node and read on the
-hypervisor's <code>sf-sidechannel</code>, so a bump would break agent operations
-on every not-yet-rolled node for the length of a rolling upgrade.
-There is also nothing to migrate, since NULL is a meaningful value
-rather than a gap. "Does this database have the columns?" is answered
-by the <em>table</em> schema version, which <code>sf-database</code> refuses to start
-against if it is behind. See
-<code>PLAN-agent-operation-deadlines-phase-02-schema.md</code> decision 2.</p>
-<p>Static values are immutable, which fits: the client's intent is fixed
-at submission time.</p>
-<p><code>AgentOperationAttributesData</code> gains two new mutable fields:</p>
-<ul>
-<li><code>last_progress</code> — float unix timestamp of the most recent observed
-  progress, persisted with a throttle (at most one write every ~10
-  seconds) so a fast chunk stream does not hammer the attributes
-  table. Needed so that a reaper on the hypervisor node can reason
-  about a no-deadline operation whose executor died without running
-  its finally block.</li>
-<li><code>attempts</code> — integer dispatch counter for the retry bound.</li>
-</ul>
-<p>Per the field-mask rule in CLAUDE.md,
-<code>update_agent_operation_attributes</code> must take a <code>fields</code> mask before
-these fields are added — today it only carries <code>results</code>, so
-<code>add_result()</code>'s unmasked write would clobber concurrent
-<code>last_progress</code>/<code>attempts</code> updates (exactly the cross-attribute lost
-update the rule exists to prevent). Schema migration runs via
-<code>sf-ctl ensure-mariadb-schema</code> as usual; migrations must be
-idempotent.</p>
-<p>All four values appear in <code>external_view()</code> so clients (and CI
-diagnostics) can see them. The view already reads the attributes row
-once for <code>results</code>, so <code>last_progress</code> and <code>attempts</code> come along for
-no extra database round trip.</p>
-<h3 id="api-surface">API surface<a class="headerlink" href="#api-surface" title="Permanent link">&para;</a></h3>
-<p>The three creating endpoints (<code>.../agent/execute</code>, <code>.../agent/get</code>,
-<code>.../agent/put</code>) gain two optional body parameters:</p>
-<ul>
-<li><code>deadline_seconds</code> — number, minimum 0. 0 means "no deadline".
-  Omitted means the server default (600).</li>
-<li><code>progress_timeout_seconds</code> — number, minimum 0. 0 means "disabled".
-  Omitted means the server default for progress-capable commands.</li>
-</ul>
-<p>Both are declared per the parameter declaration rules (body location,
-<code>number</code> type token, constraints dict with <code>minimum</code>), and both get
-<code>STRUCTURED_PARAMETERS</code> entries describing what the handler actually
-accepts. New config options:</p>
-<ul>
-<li><code>AGENT_OPERATION_DEFAULT_DEADLINE</code> = 600</li>
-<li><code>AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT</code> = 30 (see decisions)</li>
-</ul>
-<h3 id="enforcement-points">Enforcement points<a class="headerlink" href="#enforcement-points" title="Permanent link">&para;</a></h3>
-<p>The deadline and progress timeout are enforced at three places, in
-increasing order of reach:</p>
-<ol>
-<li><strong>At dequeue</strong> — <code>Instance.agent_operation_next()</code> checks the
-   deadline before returning an operation. An expired queued operation
-   is transitioned to <code>expired</code>, popped, and the next
-   entry considered. This is the "skip a cycle" behaviour for periodic
-   callers: work the caller has already abandoned never occupies the
-   executor.</li>
-<li><strong>In the executor</strong> — <code>_execute_inner()</code> replaces the fixed
-   <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code> check with two checks: the
-   operation's absolute deadline (if any), and
-   <code>time.time() - last_progress &gt; progress_timeout</code> while a
-   progress-capable command is in flight. Note that <code>last_data</code> in the
-   executor loop is refreshed by <em>any</em> socket traffic including ping
-   replies, so it is not a progress signal; progress must be observed
-   in the command reply handlers (<code>file_chunk</code>, <code>file_chunk_reply</code>,
-   <code>stat_result</code>, <code>execute_reply</code>) via an explicit
-   <code>observe_progress()</code> hook.</li>
-<li><strong>By a node-local reaper</strong> — the sidechannel daemon's main loop
-   (which already iterates this node's instances and knows which
-   executors are live) sweeps for operations in <code>EXECUTING</code> with no
-   live executor thread. If the operation's deadline has passed, or
-   its persisted <code>last_progress</code> is older than its progress timeout
-   plus the persistence throttle slack, the reaper resolves it
-   (retry or expire, below). This covers the case PR #3506's finally
-   block cannot: the sidechannel process dying outright.</li>
-</ol>
-<p>Because only the sidechannel daemon on the instance's placement node
-dispatches executors, the reaper has no cross-node race: reaping and
-dispatching are serialised in one process.</p>
-<p>All three read a NULL <code>deadline</code> as "apply
-<code>AGENT_OPERATION_DEFAULT_DEADLINE</code>" rather than as "no deadline" (see
-the object model section). Since such a row carries no receipt
-timestamp to anchor the default against — it was written by an API
-node that predates this work — the fallback anchor is dispatch time,
-which is a node-local number the executor and the reaper both already
-have. This path exists only for legacy rows and for the window of a
-rolling upgrade; a deadline-aware API server always writes an
-absolute timestamp or the explicit <code>0.0</code> sentinel.</p>
-<p>Clock skew note: the absolute deadline is computed on the API node and
-enforced on the hypervisor node. Shaken Fist already assumes
-NTP-synchronised cluster nodes; a skew of a few seconds is immaterial
-against a 600-second default, and the progress timeout is computed
-entirely node-locally.</p>
-<h3 id="retry">Retry<a class="headerlink" href="#retry" title="Permanent link">&para;</a></h3>
-<p>A retried operation must not lose its place in line: appending it
-back onto the tail of the instance queue would reorder it behind
-operations submitted after it, violating the linear model (op1 "put a
-file" retrying behind op2 "execute the script that reads it" runs
-them in the wrong order). Equally, having the executor silently
-re-execute in place would bypass dispatch (losing the 5-second
-attempt throttle as natural backoff, and the per-dispatch audit
-events) and would still need a second, queue-based mechanism for the
-case where the executor died with the daemon.</p>
-<p>Instead, retry exploits the pop being lazy. Today the queue entry is
-still at the head <em>while</em> the operation executes;
-<code>agent_operation_next()</code> only pops it on a later call, once the state
-has provably left <code>QUEUED</code>. So: the pop rule changes to "pop only
-operations in a terminal state" (an <code>EXECUTING</code> head with a live
-executor returns nothing, as dispatch skips instances with executors
-anyway), and retry is nothing more than the state transition
-<code>EXECUTING -&gt; QUEUED</code> (a new edge in <code>state_targets</code>) applied to an
-operation whose entry never left the head. The dispatcher then
-re-dispatches it exactly like a first attempt: same position, fresh
-connection, throttled, evented. There is no re-enqueue and therefore
-no reordering; the retrying operation deliberately blocks later
-operations until it completes, errors, or expires — which is the
-linear contract working as intended, now bounded by the deadline and
-attempt cap rather than open-ended.</p>
-<p>The transition is applied either by the executor's exit path
-(deadline, progress stall, exception, with attempts and deadline
-checked) or by the reaper for a dead executor; both run in the one
-sidechannel process per instance, serialised with dispatch, so the
-transition cannot race a concurrent pop. The invariant becomes "the
-queue entry lives at the head until the operation reaches a terminal
-state", a strict strengthening of today's model. The
-single-executor-per-instance guarantee is unchanged. Otherwise —
-deadline passed or attempts exhausted — the operation goes to its
-terminal failure state and the lazy pop removes it as today. The
-retry policy is therefore "retry until the deadline expires or
-attempts are exhausted, whichever is first"; the attempt cap exists
-so no-deadline operations cannot retry forever.</p>
-<p>Partial results on retry need care: a retried <code>get-file</code> restarts the
-transfer from offset 0 and must not append to or duplicate the
-previous attempt's blob. The first attempt's incomplete blob (if any)
-must be cleaned up when the retry is scheduled.</p>
-<h3 id="failure-semantics-between-operations">Failure semantics between operations<a class="headerlink" href="#failure-semantics-between-operations" title="Permanent link">&para;</a></h3>
-<p>Linear execution raises the question: when an operation fails
-terminally (error or expiry), should the operations queued behind it
-be cancelled, since they may depend on the failed operation having
-prepared something for them?</p>
-<p>No — and deliberately so. The instance queue is shared by every
-caller authorised for the instance (two API clients' operations, and
-system-generated operations, interleave in the one queue), so a
-queue-wide cascade would cancel unrelated callers' work because
-someone else's operation failed. The promise of the linear model is
-<strong>ordering, not dependency</strong>: operations execute one at a time in
-submission order, and each has an independent outcome — shell <code>;</code>,
-not <code>&amp;&amp;</code>. This is today's contract (a queue simply continues past an
-<code>ERROR</code> operation) and this plan preserves it; it must be documented
-explicitly in the user guide as part of phase 7.</p>
-<p>Dependency semantics do exist, but scoped where they can be correct:</p>
-<ul>
-<li><strong>Within one operation</strong>, the commands list is already a fail-fast
-  transaction: on <code>ERROR</code> the executor clears the remaining commands
-  (<code>self.commands = []</code>), so a put-blob whose transfer fails never
-  runs its chmod. This is the transactional primitive — it is just
-  not currently composable from the public API, which builds only
-  fixed command lists per endpoint.</li>
-<li><strong>Across operations</strong>, the pattern already exists in the codebase:
-  cluster operations carry <code>depends_on</code> (fate-sharing — at dequeue a
-  dependency in <code>ERROR</code>/<code>DELETED</code>/<code>ABORT</code> aborts the dependent
-  operation, a missing dependency errors it, an in-flight one defers
-  it; see <code>daemons/queues/workitem.py</code>) and, separately, <code>runs_after</code>
-  (ordering only — wait for the operation to finish, outcome
-  irrelevant). That is precisely the <code>&amp;&amp;</code>-versus-<code>;</code> distinction,
-  with the cascade following declared edges rather than queue
-  adjacency, which is what makes it correct in a shared queue. The
-  future direction for agent operations is to extend this existing
-  vocabulary rather than invent a lane identifier — see non-goals.</li>
-</ul>
-<p>In practice the hazard window is narrow: the dominant client pattern
-(including the CI suite) is submit-and-await, where a dependent
-operation is only submitted after its predecessor succeeded. Only
-callers who pipeline submissions without awaiting can observe a
-dependent operation running after its predecessor failed, and those
-callers can already cancel their own queued operations via the
-existing agent operation DELETE endpoint. Deadline propagation also
-softens the expiry case specifically: a pipelined chain submitted
-with one client timeout carries the same deadline on every
-operation, so when the first expires the rest typically expire with
-it rather than executing against missing preparation.</p>
-<h3 id="connection-teardown-and-agent-side-recovery">Connection teardown and agent-side recovery<a class="headerlink" href="#connection-teardown-and-agent-side-recovery" title="Permanent link">&para;</a></h3>
-<p>A question raised during planning: if the hypervisor closes its side
-of the virtio-vsock connection, does the agent abort and can we
-reconnect? Inspection of both sides shows recovery-by-reconnect
-already works at the transport level, which is what makes the abort +
-retry design above sufficient without any agent protocol change:</p>
-<ul>
-<li>The executor's vsock connection is scoped to the executor job
-  (<code>with self.instance.socket_on_vsock_channel('sf-agent2')</code> in
-  <code>SideChannelJob.execute()</code>), so any executor exit — deadline,
-  progress stall, exception — already closes the hypervisor side.</li>
-<li>The agent (<code>shakenfist_agent/commandline/daemon.py</code> in the sibling
-  <code>agent-python</code> repository) accepts <strong>concurrent connections</strong>: each
-  <code>accept()</code> spawns a fresh daemon worker thread. A retried dispatch
-  therefore connects and is welcomed even if a previous worker is
-  still wedged; a stuck worker does not block the listener.</li>
-<li>A worker blocked in <code>recv()</code> sees EOF on close and exits cleanly. A
-  worker mid-transfer hits <code>BrokenPipeError</code> on its next send, which
-  is caught, abandons the command, and the worker then exits via EOF.</li>
-<li>The one non-recovering case is a worker wedged in something that
-  neither sends nor receives — an <code>execute</code> child (the agent runs
-  <code>obj.communicate(None, timeout=None)</code> with no cancellation on
-  connection close) or a file read hung in the guest kernel. That
-  thread stays wedged and any in-guest side effects continue, but
-  because workers are per-connection daemon threads this costs the
-  guest a thread, not the operation path.</li>
-</ul>
-<p>Consequently a retried attempt may run concurrently with a zombie
-prior attempt inside the guest. For <code>get-file</code> (concurrent reads of
-the same file) this is harmless; for retried <code>execute</code> it would mean
-running the command twice, which is why <code>execute</code> is not retried
-(decision 6).</p>
-<h3 id="command-dispatch-restructure">Command dispatch restructure<a class="headerlink" href="#command-dispatch-restructure" title="Permanent link">&para;</a></h3>
-<p>The if/elif chain in <code>_execute_inner()</code> (<code>execute</code> / <code>put-blob</code> /
-<code>chmod</code> / <code>get-file</code>) becomes one handler class per command,
-instantiated once per <code>SideChannelExecutorJob</code> and looked up by
-command name, where each handler declares:</p>
-<ul>
-<li><code>reports_progress</code> (bool) — whether the progress timeout applies
-  while this command is in flight;</li>
-<li><code>retryable</code> (bool) — whether phase 5 may retry it;</li>
-<li>its dispatch method.</li>
-</ul>
-<p>The registry does not own reply handling. Replies are dispatched on
-the protobuf field they carry rather than on a command name, and the
-two do not map one-to-one — <code>file_chunk_reply</code> acks put-blob chunks
-while <code>file_chunk</code> carries get-file payloads, and the same handler
-serves whichever command is in flight. Phase 4's <code>observe_progress()</code>
-calls therefore go inside the existing reply handlers, and the
-registry answers only "may this command's progress be timed out, and
-may it be retried".</p>
-<p>The registry makes "does this command support progress, and where
-would I observe it?" a question with an obvious answer for the next
-command someone adds. This is a mechanical refactor with no behaviour
-change, done as its own commit before the enforcement logic lands.</p>
-<h3 id="client-sibling-client-python-repository">Client (sibling <code>client-python</code> repository)<a class="headerlink" href="#client-sibling-client-python-repository" title="Permanent link">&para;</a></h3>
-<ul>
-<li>The SDK's agent-operation await helpers pass their await timeout as
-  <code>deadline_seconds</code> by default, so the server never keeps working
-  after the client has given up. An explicit kwarg overrides.</li>
-<li>New CLI flags on the relevant <code>sf-client instance</code> verbs:
-  <code>--deadline</code> and <code>--progress-timeout</code> (0 meaning none/disabled).</li>
-<li>The await loop treats the expiry outcome as terminal.</li>
-</ul>
-<p>Old clients keep working: they simply never send the new parameters
-and get the 600-second server default, which is tighter than the 900s
-constant it replaces but far above observed legitimate operation
-times.</p>
-<h2 id="decisions-from-phase-0">Decisions from phase 0<a class="headerlink" href="#decisions-from-phase-0" title="Permanent link">&para;</a></h2>
-<p>Resolved 2026-08-15 with the operator, on the evidence in
-<code>PLAN-agent-operation-deadlines-phase-00-decisions.md</code> (a 50-transfer
-measurement across five recent merge-queue CI runs, and a
-three-repository audit of every consumer of agent operation state).</p>
-<ol>
-<li><strong>Expiry is a distinct terminal state, <code>expired</code>.</strong> It cleanly
-   distinguishes "the caller's budget ran out" from "the operation
-   failed" and makes skipped cycles queryable. The audit found no
-   consumer that breaks on the new state — old clients already treat
-   <code>error</code> and <code>expired</code> identically (they recognise neither, a
-   fail-fast gap tracked as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>) — and enumerated the
-   phase 4 obligations: <code>state_targets</code> edges (into <code>expired</code> from
-   every non-terminal state, plus <code>expired -&gt; deleted</code>), adding
-   <code>expired</code> to <code>FINAL_OBJECT_STATES</code> (<code>constants.py:190</code>) so the
-   hard-delete sweep reaps it rather than leaking state rows, guarding
-   the five unguarded <code>state = STATE_ERROR</code> writes (sidechannel
-   <code>main.py:470,476,794,848</code>; <code>node_aop_op.py:89</code>) that would raise
-   <code>InvalidStateException</code> from <code>expired</code>, and including <code>expired</code> in
-   the executor's command-abort check (<code>main.py:869</code>).</li>
-<li><strong>The progress timeout default is 30 seconds</strong>
-   (<code>AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT</code>). Measurement: the
-   worst complete transfer observed in CI was 625 MB in 2.83 s
-   (~220 MB/s), and 48 of 50 transfers finished in under 0.44 s, so
-   30 seconds is ~10x headroom over the worst <em>total</em> duration, let
-   alone any internal gap — while detecting the #3516 wedge 30x
-   faster than the 900 s constant it replaces.</li>
-<li><strong>The retry attempt cap is 3</strong> (initial dispatch plus two
-   retries), as a config option.</li>
-<li><strong>The deadline applies during <code>PREFLIGHT</code></strong>, checked inside
-   <code>NodeAgentopOp._preflight()</code> before and after the potentially long
-   <code>Blob.ensure_local()</code> copy — the longest pre-queue delay in the
-   system, and precisely the time a receipt-anchored deadline exists
-   to count.</li>
-<li><strong>The reaper is an extension of <code>reap_instance_executors()</code></strong>
-   (<code>daemons/sidechannel/main.py:972</code>), which already runs at the top
-   of every dispatcher pass serialised with dispatch. It must cover
-   both a dead executor thread and the no-entry case after a daemon
-   restart, with the database read gated on the instance actually
-   having a non-terminal operation so the idle fast path stays cheap.</li>
-<li><strong><code>execute</code> is not retried.</strong> Retryability is a per-command
-   capability flag alongside <code>reports_progress</code> in the dispatch
-   registry — true for transfers, false for <code>execute</code> — because a
-   retried <code>execute</code> re-runs a possibly non-idempotent command while
-   the agent cannot cancel the prior attempt's child process, so both
-   attempts' side effects could land.</li>
-</ol>
-<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Fixing the agent-side get-file delivery bug itself (#2240). This
-  plan converts it from test-fatal to a logged, retried blip; the
-  agent bug remains open and separately tracked.</li>
-<li>Progress reporting for <code>execute</code>. If the agent ever streams command
-  output, <code>execute</code> can declare <code>reports_progress</code> then; nothing in
-  this design precludes it.</li>
-<li>Agent-side cancellation of in-flight work. When the hypervisor
-  abandons a connection, an <code>execute</code> child keeps running in the
-  guest and a wedged worker thread is leaked until the guest agent
-  restarts. A cancellation protocol (kill the child on
-  <code>hypervisor_departure</code> or connection close) is an <code>agent-python</code>
-  change worth its own issue, but nothing here depends on it.</li>
-<li>Concurrent agent operations on one instance. The
-  one-executor-per-instance rule is load-bearing across the
-  orchestration model, and relaxing it is a re-engineering of
-  dispatch, durability and ordering semantics together — see
-  "Why concurrency stays out of scope" below. The dependency-based
-  future is captured separately in
-  <code>PLAN-agent-operation-dependencies.md</code>.</li>
-<li>Deadlines for cluster operations (<code>ClusterOperation</code>). The
-  mechanism is deliberately agent-operation-scoped for now; if it
-  proves useful the schema pattern can be lifted to <code>BaseOperation</code>
-  later.</li>
-</ul>
-<h3 id="why-concurrency-stays-out-of-scope">Why concurrency stays out of scope<a class="headerlink" href="#why-concurrency-stays-out-of-scope" title="Permanent link">&para;</a></h3>
-<p>The one-executor-per-instance rule is not a transport limitation —
-the agent already runs a worker thread per connection. But it is
-load-bearing in three places:</p>
-<ol>
-<li>The strict FIFO queue is a user-visible semantic that callers rely
-   on to chain operations ("put a file, then execute it"), so
-   parallelism would need explicit dependency declaration in the API,
-   the way cluster operations chain.</li>
-<li><code>agent_operation_next()</code>'s crash-safety argument is literally "the
-   head of the queue cannot double dispatch because there is one
-   executor"; concurrency would replace that head pointer with
-   per-operation claims or leases.</li>
-<li>This plan's own reaper and retry designs are race-free <em>because</em>
-   dispatch and reaping for an instance serialise in one process.</li>
-</ol>
-<p>Relaxing it is therefore its own master plan if ever wanted. The
-nearer future — explicit ordering and fate-sharing without
-concurrency — is already planned:
-<code>PLAN-agent-operation-dependencies.md</code> extends the cluster operation
-<code>depends_on</code>/<code>runs_after</code> vocabulary to agent operations (including
-cross-instance edges and per-edge settle delays), gated on this plan
-landing because a dependency-blocked operation accrues queue time
-against its deadline, so user-created dependency cycles resolve by
-expiry rather than deadlocking.</p>
-<p>Meanwhile this plan shrinks the cost of serialisation itself:
-head-of-line blocking drops from 900 seconds to roughly the progress
-timeout, and queue-time expiry stops abandoned work from occupying
-the slot at all.</p>
-<h2 id="phases">Phases<a class="headerlink" href="#phases" title="Permanent link">&para;</a></h2>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-<th>Content</th>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>0</td>
-<td><a href="../PLAN-agent-operation-deadlines-phase-00-decisions/">PLAN-agent-operation-deadlines-phase-00-decisions.md</a></td>
-<td>Complete</td>
-<td>Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan</td>
+<td>2a</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Add the four fields to the pydantic models, bump both table versions, and write both migrations. In <code>shakenfist/schema/agentoperation_data.py</code>, add <code>deadline: Optional[float] = None</code> and <code>progress_timeout: Optional[float] = None</code> to <code>AgentOperationData</code> after <code>commands</code> and before <code>version</code>, each with a docstring-level comment stating the decision 1 semantics verbatim: NULL means no client intent was recorded and the server default applies, <code>0.0</code> means the client explicitly asked for none, and <code>deadline</code> is an absolute unix timestamp. Extend the class docstring's Attributes list the same way. In <code>shakenfist/schema/agentoperation_attributes.py</code>, add <code>last_progress: Optional[float] = None</code> (unix timestamp of the most recent observed progress; NULL means none observed yet) and <code>attempts: int = 0</code> (dispatch counter for phase 5's retry bound), extending its docstring too. Note <code>AgentOperationData</code> is <code>frozen=True</code> and <code>AgentOperationAttributesData</code> is not; do not change either. In <code>shakenfist/mariadb.py</code>: bump <code>AGENT_OPERATIONS_VERSION</code> (line 351) and <code>AGENT_OPERATION_ATTRIBUTES_VERSION</code> (line 352) from 2 to 3 -- <code>EXPECTED_SCHEMA_VERSIONS</code> at lines 449-450 is derived from the constants so needs no edit, and no new table means <code>EXPECTED_TABLE_NAMES</code> in <code>tests/test_mariadb_schema_concurrency.py:154</code> needs none either. Add a <code>if current_ver &lt; AGENT_OPERATIONS_VERSION:</code> block to <code>_ensure_agent_operations_schema</code> (line 18454) after the create block and before the return, issuing <code>ALTER TABLE agent_operations ADD COLUMN IF NOT EXISTS deadline DOUBLE NULL</code> and the same for <code>progress_timeout</code>, then <code>_set_table_version</code>; model it on <code>_ensure_instance_attributes_schema</code>'s v1-&gt;v2 block at lines 19161-19176 including its comment about why re-running is safe, and wrap the executes in the <code>try/except (IntegrityError, OperationalError)</code> with a <code>LOG.debug</code> the way the v2-&gt;v3 block at 19177-19196 does. Do the same in <code>_ensure_agent_operation_attributes_schema</code> (line 18491) for <code>last_progress DOUBLE NULL</code> and <code>attempts BIGINT NOT NULL DEFAULT 0</code>; the <code>DEFAULT 0</code> is required so existing rows are valid and is a deliberate divergence from what <code>create_all</code> produces on a fresh database (see decision 3), so say so in the comment. Then extend the direct layer: <code>_direct_create_agent_operation</code> (line 18533) adds <code>deadline=data.deadline, progress_timeout=data.progress_timeout</code> to its <code>insert().values()</code>; <code>_direct_get_agent_operation</code> (line 18566) passes <code>deadline=result.deadline, progress_timeout=result.progress_timeout</code> into the <code>AgentOperationData(...)</code> it builds; <code>_direct_create_agent_operation_attributes</code> (line 18633) and <code>_direct_get_agent_operation_attributes</code> (line 18656) do the equivalent for <code>last_progress</code> and <code>attempts</code>; and <code>_agent_operation_attributes_column_values</code> (line 18688) gains <code>'last_progress': data.last_progress</code> and <code>'attempts': data.attempts</code> in its <code>all_values</code> dict -- that dict is the mask's vocabulary, so a field missing from it cannot be written. Do not touch the gRPC layer, the proto, the servicer or the object; those are 2b and 2c.</td>
 </tr>
 <tr>
-<td>1</td>
-<td><a href="../PLAN-agent-operation-deadlines-phase-01-groundwork/">PLAN-agent-operation-deadlines-phase-01-groundwork.md</a></td>
-<td>Complete</td>
-<td>Field mask for <code>update_agent_operation_attributes</code>; per-command handler classes replacing the dispatch if/elif chain, declaring <code>reports_progress</code> and <code>retryable</code> for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises <code>GetException</code> rather than <code>AttributeError</code></td>
+<td>2b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Carry the four new fields across the gRPC boundary with proto3 explicit presence. In <code>protos/database.proto</code>, add to <code>AgentOperationStaticData</code> (line 2108) <code>optional double deadline = 6;</code> and <code>optional double progress_timeout = 7;</code>, and to <code>AgentOperationAttributesProto</code> (line 2137) <code>optional double last_progress = 3;</code> and <code>int64 attempts = 4;</code>. Comment each in the style of <code>NamespaceKeyAttributesProto.expiry</code> at line 1836 -- absent means SQL NULL, which for these two means "no client intent recorded, server default applies", while an explicit 0 means "none"; <code>attempts</code> is not optional because it is never NULL. Regenerate with <code>tox -e genprotos</code> -- <strong>never</strong> run <code>grpc_tools.protoc</code> directly -- and commit the regenerated <code>shakenfist/protos/</code> files in the same commit. In <code>shakenfist/mariadb.py</code>, set the new fields on the request in <code>_grpc_create_agent_operation</code> (line 18763) and <code>_grpc_create_agent_operation_attributes</code> (line 18826), and read them back with <code>HasField</code> in <code>_grpc_get_agent_operation</code> (line 18785) and <code>_grpc_get_agent_operation_attributes</code> (line 18844), copying the <code>expiry=d.expiry if d.HasField('expiry') else None</code> idiom at line 13160. <code>_grpc_update_agent_operation_attributes</code> (line 18868) already forwards <code>fields</code>; it must now also populate <code>last_progress</code> and <code>attempts</code> on the proto it sends, because the mask names columns and the servicer reads their values off the message. Note that a proto3 <code>optional</code> field cannot be set to None in Python -- build the message and then assign only when the value is not None, or use a kwargs dict, whichever reads better against the surrounding code. In <code>shakenfist/daemons/database/main.py</code>, extend <code>_agentop_from_proto</code> (line 4291), <code>_agentop_to_proto</code> (line 4306), <code>_agentop_attrs_from_proto</code> (line 4419) and <code>_agentop_attrs_to_proto</code> (line 4431) with the same presence handling. Register no new metrics counters -- these are existing RPCs. <code>shakenfist/tests/mock_mariadb.py</code> needs no edit: its agent operation mocks store and mask the pydantic objects whole (see <code>_mariadb_update_agent_operation_attributes</code> at line 2555), so new model fields flow through unchanged; confirm this by reading it rather than by assuming.</td>
 </tr>
 <tr>
-<td>2</td>
-<td><a href="../PLAN-agent-operation-deadlines-phase-02-schema/">PLAN-agent-operation-deadlines-phase-02-schema.md</a></td>
-<td>Complete</td>
-<td>Schema: <code>deadline</code>/<code>progress_timeout</code> columns, <code>last_progress</code>/<code>attempts</code> attributes, both table versions 2 -&gt; 3, additive migrations, and a live-MariaDB test that they migrate. Survey corrections applied at source: NULL means "server default" rather than "no deadline", and there is deliberately no object version bump</td>
+<td>2c</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Expose the new values on the object. In <code>shakenfist/operations/agentoperation.py</code>: give <code>new()</code> (line 109) <code>deadline=None, progress_timeout=None</code> keyword arguments after <code>commands</code> and thread them into the <code>_db_create</code> metadata dict; do <strong>not</strong> touch the three call sites in <code>shakenfist/external_api/instance.py</code> (lines 1701, 1745, 1789), which is phase 3's work. In <code>_db_create</code> (line 57), pass <code>deadline=metadata.get('deadline')</code> and <code>progress_timeout=metadata.get('progress_timeout')</code> into the <code>AgentOperationData(...)</code> construction; leave the initial <code>AgentOperationAttributesData(uuid=..., results={})</code> alone, since <code>last_progress</code> and <code>attempts</code> take their model defaults. In <code>_db_get</code> (line 85), add <code>'deadline': data.deadline</code> and <code>'progress_timeout': data.progress_timeout</code> to the result dict. In <code>__init__</code> (line 41), store them as private attributes alongside <code>__commands</code> and add <code>deadline</code> and <code>progress_timeout</code> read-only properties in the "Static values" block after <code>commands</code> (line 151). <strong>Do not change <code>current_version</code> and do not add an upgrade step</strong> -- see decision 2 in the plan; a reviewer expecting a bump should be pointed at that decision. Restructure <code>external_view()</code> (line 121) so it reads the attributes row once into a local -- reusing the get-or-create dance the <code>results</code> property performs at lines 156-164, which is what it is implicitly calling today via <code>self.results</code> -- and adds <code>results</code>, <code>attempts</code> and <code>last_progress</code> from that one read plus <code>deadline</code> and <code>progress_timeout</code> from the static values; the point is that the view gains three fields without gaining a database round trip. Add unit tests to <code>shakenfist/tests/test_instance.py</code> alongside <code>AgentOperationQueueTestCase</code> (line 732), or a new module if that reads better: that <code>AgentOperation.new()</code> with no deadline arguments stores None for both and that an operation created with <code>deadline=1.5, progress_timeout=2.5</code> reads them back, that <code>attempts</code> defaults to 0 and <code>last_progress</code> to None, and that <code>external_view()</code> contains all five of <code>deadline</code>, <code>progress_timeout</code>, <code>attempts</code>, <code>last_progress</code> and <code>results</code>.</td>
 </tr>
 <tr>
-<td>3</td>
-<td></td>
-<td>Not started</td>
-<td>API: new body parameters, declarations, <code>STRUCTURED_PARAMETERS</code> entries, config defaults</td>
+<td>2d</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Write <code>shakenfist/tests/test_mariadb_agent_operations_live.py</code>, a live-MariaDB test that the phase 2 migration migrates. Model it closely on <code>shakenfist/tests/test_mariadb_enum_columns_live.py</code>: the same <code>@unittest.skipUnless(os.environ.get('SF_MARIADB_TEST_DSN'), ...)</code> gate, the same DESTRUCTIVE docstring warning, the same <code>sa.create_engine(os.environ[DSN_ENV])</code> setUp with an <code>addCleanup</code> that drops the tables it touched (<code>agent_operations</code>, <code>agent_operation_attributes</code>, <code>schema_versions</code>). The test builds the current schema via the public <code>ensure_schema()</code> path, then <em>rewinds</em> the database to what a pre-phase-2 deployment looks like -- <code>ALTER TABLE ... DROP COLUMN</code> for all four new columns and <code>_set_table_version(engine, table, 2)</code> for both tables -- inserts a row into each table using only the pre-phase-2 columns, runs <code>ensure_schema()</code> again, and asserts: both tables report version 3; all four columns exist (query <code>information_schema.columns</code>); the pre-existing <code>agent_operations</code> row reads back NULL for <code>deadline</code> and <code>progress_timeout</code>; the pre-existing <code>agent_operation_attributes</code> row reads back <code>attempts = 0</code> and NULL <code>last_progress</code> (this is the assertion that catches an <code>ADD COLUMN ... NOT NULL</code> without a <code>DEFAULT</code>, which would fail outright on a non-empty table); and a third <code>ensure_schema()</code> call is a clean no-op that leaves the versions at 3. <strong>Mutation-test every assertion before you are done</strong>: temporarily break the migration (drop the <code>DEFAULT 0</code>, then drop one <code>ADD COLUMN</code>, then leave the version un-bumped) and confirm the test fails each time for the right reason, then restore. A live test that passes against a broken migration is worse than no test. Run the module the way CI does -- <code>SF_MARIADB_TEST_DSN=... stestr run --serial 'shakenfist\.tests\.test_mariadb_agent_operations_live\.'</code> -- against a disposable MariaDB; <code>tools/ci-install-mariadb.sh</code> with <code>tools/bootstrap-mariadb.sql</code> stands one up, or use a local instance. Do not edit <code>tools/ci-enum-widening-test.sh</code> or <code>.github/workflows/functional-tests.yml</code>: the script's regex already matches any <code>test_mariadb_*_live.py</code> module by design, and confirming that by reading it is part of this step.</td>
 </tr>
 <tr>
-<td>4</td>
-<td></td>
-<td>Not started</td>
-<td>Enforcement: dequeue expiry, executor deadline + progress timeout, <code>observe_progress()</code> hooks; remove <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code>; the <code>expired</code> state with its audit-enumerated obligations (<code>state_targets</code>, <code>FINAL_OBJECT_STATES</code>, guarded error writes, command-abort check)</td>
-</tr>
-<tr>
-<td>5</td>
-<td></td>
-<td>Not started</td>
-<td>Retry: <code>EXECUTING -&gt; QUEUED</code> edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep</td>
-</tr>
-<tr>
-<td>6</td>
-<td></td>
-<td>Not started</td>
-<td>client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>: await loops poll to their full timeout on terminal failure states instead of failing fast)</td>
-</tr>
-<tr>
-<td>7</td>
-<td></td>
-<td>Not started</td>
-<td>Docs (state machine, operator + developer guides), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below)</td>
+<td>2e</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Documentation for the schema change. In <code>docs/operator_guide/database.md</code>, extend the <code>agent_operations</code> row (line 912) to list <code>deadline</code>, <code>progress_timeout</code> and the <code>agent_operation_attributes</code> row (line 935) to list <code>last_progress</code>, <code>attempts</code>, matching the terse column-list style of the surrounding rows. Then add a short paragraph -- in the section those tables live in, wherever that section's prose already sits -- stating the decision 1 semantics once, in the words the pydantic docstrings use: for <code>deadline</code> and <code>progress_timeout</code>, NULL means no client intent was recorded and the server default applies, an explicit <code>0</code> means the client asked for none, and <code>deadline</code> is an absolute unix timestamp rather than a duration. This is the fact most likely to be restated wrongly elsewhere later, so it wants exactly one home. In <code>docs/developer_guide/api_reference/agentoperations.md</code>, add the new keys to the example response body so it matches what <code>external_view()</code> now returns. Do not document the REST parameters <code>deadline_seconds</code> / <code>progress_timeout_seconds</code> or the config options -- they do not exist until phase 3, and documenting them now would be documenting a lie.</td>
 </tr>
 </tbody>
 </table>
-<p>Each phase gets its own detailed plan file before implementation.
-Unit tests land with each phase; the functional test in phase 7
-exercises at minimum: an explicit short deadline expiring a queued
-operation, the default deadline appearing in <code>external_view()</code>, an
-<code>execute</code> of a long-running command surviving longer than the
-progress timeout (proving the progress timeout does not apply to
-non-progress commands), and a follow-up operation dispatching
-promptly after a first operation is expired (proving the executor
-slot is actually freed).</p>
-<h3 id="the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770">The CI suite's own awaits have the bug this plan fixes (#3770)<a class="headerlink" href="#the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770" title="Permanent link">&para;</a></h3>
-<p>Found during merge CI triage of PR #3764 and verified against the
-tree. <code>_await_agent_state</code>
-(<code>shakenfist/deploy/shakenfist_ci/base.py:436</code>) looks like a
-500-second deadline and is not one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">time_since_last_progress</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">while</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">time_since_last_progress</span> <span class="o">&lt;</span> <span class="mi">500</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">...</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">system_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">if</span> <span class="n">events</span><span class="p">:</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">last_event</span> <span class="o">=</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">time_since_last_progress</span> <span class="o">=</span> <span class="n">last_event</span><span class="p">[</span><span class="s1">'timestamp'</span><span class="p">]</span>
+<p>Each step is its own commit. 2a and 2b both edit <code>shakenfist/mariadb.py</code>
+and should be done in that order; 2c depends on both; 2d depends on 2a
+only; 2e last, so it describes what actually landed.</p>
+<h2 id="departures-from-the-plan">Departures from the plan<a class="headerlink" href="#departures-from-the-plan" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Step 2a's brief was wrong about error handling.</strong> It said to wrap
+  each <code>ALTER TABLE ... ADD COLUMN IF NOT EXISTS</code> in the
+  <code>try/except (IntegrityError, OperationalError)</code> with a <code>LOG.debug</code>
+  that <code>_ensure_instance_attributes_schema</code>'s v2-&gt;v3 block uses. That
+  brief copied the wrong precedent. The v2-&gt;v3 block is a
+  <code>DROP COLUMN IF EXISTS</code>, where a swallowed failure leaves a harmless
+  leftover column; the v1-&gt;v2 <code>ADD COLUMN</code> block a few lines above it
+  has no <code>try/except</code> at all, and that asymmetry is deliberate.
+  Swallowing a failed <code>ADD COLUMN</code> and then bumping the version
+  regardless produces a schema which passes <code>verify_schema_versions()</code>
+  (it compares versions, not columns) while every insert fails on an
+  unknown column, and which re-running <code>sf-ctl ensure-mariadb-schema</code>
+  can never repair, because <code>current_ver &lt; VERSION</code> is false from then
+  on. <code>IF NOT EXISTS</code> already makes the benign case a no-op, so the
+  handler could only ever have caught real failures. Both blocks now
+  let the ALTER propagate, and
+  <code>test_failed_migration_does_not_advance_the_version</code> pins it.
+  Raised by the automated reviewer on PR #3858.</li>
+</ul>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Decisions 1 and 2 both contradict the master plan, and a reviewer
+  reading the master plan alone would find this phase wrong.</strong>
+  Mitigation: the planning commit corrects the master plan's design
+  sketch and phase table at source, and both decisions here carry the
+  reproduction or the file reference that motivated them. The
+  <code>baseobject.upgrade()</code> behaviour in particular is reproducible in
+  four lines and the plan says so.</li>
+<li><strong>Decision 1 is a phase 2 decision with a phase 4 obligation.</strong> If
+  phase 4 enforces "NULL means no deadline" anyway, the columns are
+  fine and the behaviour is the unsafe one this phase was trying to
+  avoid, and nothing in phase 2 can fail to notice. Mitigations: the
+  semantics are written into the pydantic field comments and the
+  proto comments, which phase 4 must read to use the fields at all;
+  they are stated once in <code>docs/operator_guide/database.md</code> by step
+  2e; and the master plan's enforcement section is edited by the
+  planning commit to name the dispatch-time fallback anchor.</li>
+<li><strong>Six hand-enumerated column lists per field, none of them checked
+  by the compiler</strong> (survey finding 4). A missed one is a silently
+  dropped value on one of the two paths, and the direct path is only
+  exercised on database-tier nodes. Mitigations: the 2a and 2b briefs
+  name every site with a line number; the live test in 2d exercises
+  the direct path against a real server; and the definition-of-done
+  script greps each layer for both field names.</li>
+<li><strong><code>optional</code> on a proto3 scalar cannot be assigned None in Python.</strong>
+  A naive <code>AgentOperationStaticData(deadline=data.deadline)</code> raises
+  when the value is None, and the failure would be at runtime on the
+  gRPC path only. Mitigation: called out in the 2b brief; the unit
+  suite's gRPC-routing tests and <code>pre-commit</code> will not catch it, so
+  the management session reads those four converters specifically.</li>
+<li><strong>An old <code>sf-database</code> during a rolling upgrade silently drops the
+  new fields</strong>, because proto3 ignores unknown fields, so an operation
+  created through it has NULL deadline. Under decision 1 that means
+  "apply the server default", which is the safe direction and needs no
+  mitigation -- it is recorded here so nobody later reads it as a bug.</li>
+<li><strong>The migration runs against a table nobody has migrated before.</strong>
+  Mitigation: both migrations are additive <code>ADD COLUMN IF NOT EXISTS</code>
+  with no backfill and no constraint, they are idempotent by
+  construction, and 2d proves the whole path on a real MariaDB with
+  its assertions mutation-tested.</li>
+</ul>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>The first six are a script, run from the repository root:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># 1. The four fields exist on the two pydantic models.</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'deadline: Optional\[float\]'</span><span class="w"> </span>shakenfist/schema/agentoperation_data.py
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'progress_timeout: Optional\[float\]'</span><span class="w"> </span>shakenfist/schema/agentoperation_data.py
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'last_progress: Optional\[float\]'</span><span class="w"> </span>shakenfist/schema/agentoperation_attributes.py
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'attempts: int'</span><span class="w"> </span>shakenfist/schema/agentoperation_attributes.py
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># 2. Both table versions moved, and the migrations are additive and</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1">#    idempotent: four column definitions, added through an</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1">#    ADD COLUMN IF NOT EXISTS in each of the two ensure functions.</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1">#    Counting column definitions rather than whole ALTER statements,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1">#    because the statement is built in a loop -- the original form of</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1">#    this check assumed four literal ALTERs and failed against a</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1">#    perfectly good implementation.</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'^AGENT_OPERATIONS_VERSION = 3'</span><span class="w"> </span>shakenfist/mariadb.py
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'^AGENT_OPERATION_ATTRIBUTES_VERSION = 3'</span><span class="w"> </span>shakenfist/mariadb.py
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="nb">test</span><span class="w"> </span><span class="m">4</span><span class="w"> </span>-eq<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>grep<span class="w"> </span>-cE<span class="w"> </span><span class="s2">"'(deadline|progress_timeout|last_progress|attempts) (DOUBLE|BIGINT)"</span><span class="w"> </span>shakenfist/mariadb.py<span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="c1"># Both ensure functions add their columns through the idempotent</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="c1"># guard. Counted file-wide rather than per-function range, because a</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># sed range whose start pattern also matches its end line swallows the</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="c1"># second function -- which it did, on the first attempt at this check.</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="nb">test</span><span class="w"> </span><span class="m">2</span><span class="w"> </span>-eq<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>grep<span class="w"> </span>-c<span class="w"> </span><span class="s2">"ADD COLUMN IF NOT EXISTS {column}"</span><span class="w"> </span>shakenfist/mariadb.py<span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="c1"># 3. The mask's vocabulary grew, so the new attributes are writable.</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="c1">#    Without this the columns exist and can never be set.</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'/^def _agent_operation_attributes_column_values/,/^def /p'</span><span class="w"> </span>shakenfist/mariadb.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s2">"'last_progress'"</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'/^def _agent_operation_attributes_column_values/,/^def /p'</span><span class="w"> </span>shakenfist/mariadb.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s2">"'attempts'"</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="c1"># 4. Both MariaDB layers carry both static values. The direct layer is</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="c1">#    only exercised on database-tier nodes and the gRPC layer</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="c1">#    everywhere else, so a value dropped on one path is invisible to</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="c1">#    the other's tests.</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>_direct_create_agent_operation<span class="w"> </span>_direct_get_agent_operation<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="w">         </span>_grpc_create_agent_operation<span class="w"> </span>_grpc_get_agent_operation<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="w">    </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s2">"/^def </span><span class="si">${</span><span class="nv">f</span><span class="si">}</span><span class="s2">(/,/^def [a-z_]*(/p"</span><span class="w"> </span>shakenfist/mariadb.py<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span>deadline
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="w">    </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s2">"/^def </span><span class="si">${</span><span class="nv">f</span><span class="si">}</span><span class="s2">(/,/^def [a-z_]*(/p"</span><span class="w"> </span>shakenfist/mariadb.py<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span>progress_timeout
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="k">done</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="c1"># 5. The proto uses explicit presence for the three nullable fields,</span>
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="c1">#    and the stubs were regenerated in the same commit.</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'optional double deadline'</span><span class="w"> </span>protos/database.proto
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'optional double progress_timeout'</span><span class="w"> </span>protos/database.proto
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'optional double last_progress'</span><span class="w"> </span>protos/database.proto
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>git<span class="w"> </span>diff<span class="w"> </span>--name-only<span class="w"> </span>HEAD~1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'shakenfist/protos/database_pb2'</span>
+<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="c1"># 6. The object version did NOT move, and no upgrade step appeared.</span>
+<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="c1">#    This is decision 2, and it is the one a well-meaning reviewer or</span>
+<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="c1">#    a later agent is most likely to "fix".</span>
+<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'    current_version = 3'</span><span class="w"> </span>shakenfist/operations/agentoperation.py
+<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="nb">test</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>-eq<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>grep<span class="w"> </span>-c<span class="w"> </span><span class="s1">'_upgrade_step_3_to_4'</span><span class="w"> </span>shakenfist/operations/agentoperation.py<span class="k">)</span><span class="s2">"</span>
 </code></pre></div>
-<p><code>get_instance_events(..., limit=1)</code> returns the most recent event of
-<em>any</em> type, so an instance going nowhere while still emitting events
-on any sub-500s cadence renews the window forever. The variable is
-named for progress; nothing in the query restricts it to progress.
-<code>_await_instance_create</code> (<code>base.py:471</code>) is the identical
-construction with a 180-second window. In run 31856630647 this cost
-the Guests job its entire 60-minute budget: two agent-awaiting tests
-never completed, and because the step was killed rather than failed,
-stestr wrote no results and the job named no failing test at all.</p>
-<p>This is the same two-knob confusion the plan resolves server-side --
-a progress window is not a deadline -- so phase 7 fixes it the same
-way: keep the event-renewed progress window, add an absolute ceiling
-on the whole await, and prefer restricting renewal to events that
-actually represent progress. The ceiling is the part that converts a
-future occurrence from a silent budget fire into a diagnosable test
-failure with a console dump. While there, correct the timeout
-message, which says "no progress in 5 minutes" for a 500-second (8m
-20s) window.</p>
-<p>Note the causal link to #3516 is plausible but unproven: both stalled
-tests await an agent, but nothing in that run confirms an orphaned
-agent operation, and #3696 is a distinct symptom (there the runner
-lost communication and uploaded nothing).</p>
+<p>And, by inspection:</p>
+<ul>
+<li><code>shakenfist/tests/test_mariadb_agent_operations_live.py</code> exists,
+  every assertion in it has been mutation-tested against a
+  deliberately broken migration, and the module passes against a real
+  MariaDB with <code>SF_MARIADB_TEST_DSN</code> set. A live test nobody has seen
+  fail proves nothing.</li>
+<li><code>external_view()</code> returns <code>deadline</code>, <code>progress_timeout</code>, <code>attempts</code>
+  and <code>last_progress</code> in addition to what it returns today, and reads
+  the attributes row exactly once -- asserted by a test, since the
+  round-trip count is the reason the fields were restructured rather
+  than added as properties.</li>
+<li>No fact about what NULL means is stated differently in
+  <code>shakenfist/schema/agentoperation_data.py</code>, <code>protos/database.proto</code>,
+  <code>docs/operator_guide/database.md</code>, and the master plan's design
+  sketch. All four say: NULL means no client intent was recorded and
+  the server default applies; <code>0</code> means none.</li>
+<li>Nothing outside this phase's files reads the new values. The
+  daemons contain no consumer of them:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep -rnE '\.(deadline|progress_timeout|last_progress|attempts)\b' \
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    shakenfist/daemons/ --include='*.py' \
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    | grep -vc '^shakenfist/daemons/database/main.py:'
+</code></pre></div>
+<p>must print <code>0</code>. The exclusion is the four transport converters step
+  2b required, which move the values across the gRPC boundary without
+  acting on them; enforcement arrives in phase 4. Matching attribute
+  access rather than the bare words matters, because "deadline" occurs
+  a dozen times in the daemons as gRPC call-deadline prose and would
+  make a word-match check unfalsifiable.
+- <code>pre-commit run --all-files</code> passes (flake8, stestr, mypy).
+- Cluster CI's <code>test_agentops</code> passes on the branch, proving the
+  schema change did not disturb the existing agent operation path.</p>
+<h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>baseobject.upgrade()</code> cannot read an object written by a newer
+  node.</strong> Survey finding 8: for a row whose version exceeds the
+  reader's <code>current_version</code>, the loop looks up the next
+  <code>_upgrade_step_N_to_M</code> with <code>getattr(self, step)</code> and no default,
+  so it raises <code>AttributeError</code> rather than the <code>UpgradeException</code>
+  the author clearly intended — the <code>if not step_func: raise
+  exceptions.UpgradeException(...)</code> at <code>baseobject.py:208-211</code> is
+  unreachable. This affects every object type, not agent operations
+  in particular, and <code>docs/operator_guide/upgrades.md</code> currently
+  promises rolling upgrades are safe without qualifying it. Out of
+  scope here for two reasons: the fix is a <code>baseobject</code> behaviour
+  change touching every object type and deserves its own review, and
+  decision 2 means this phase does not depend on it. It wants an
+  issue of its own, and the fix is a judgement call between raising a
+  clean <code>UpgradeException</code>, and treating a newer row as readable
+  when the reader can still make sense of its fields.</li>
+<li><strong>A "created at" timestamp on <code>AgentOperation</code>.</strong> Decision 1's
+  fallback anchor for a NULL deadline is dispatch time only because
+  the operation has no stored creation timestamp; <code>object_states</code>
+  carries one for the <code>initial</code> transition but reading it is an extra
+  query on a hot path. If a creation timestamp is ever wanted for
+  other reasons, the fallback anchor should move to it.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, back brief the operator on the plan as
+understood. In particular, confirm agreement on decisions 1 and 2
+before step 2a begins -- both contradict the master plan, both are
+cheap to change now and expensive to change once phases 3 to 5 are
+written against them, and decision 2 in particular is a deliberate
+departure from the project's habit of bumping an object version
+whenever its static values change.</p>
+<p>Additionally, gate step 2d: bring the mutation-test results to the
+management session (which assertion failed for which break) before
+the step is considered complete, since a live test is only worth its
+CI minutes if it has been seen to fail.</p>
 
 
 
@@ -12829,7 +12636,7 @@ lost communication and uploaded nothing).</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-agent-operation-deadlines.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-agent-operation-deadlines.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-agent-operation-deadlines/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-agent-operation-deadlines-phase-02-schema.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-agent-operation-deadlines-phase-02-schema.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-02-schema/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

@@ -14354,7 +14354,7 @@ values (immutable data set at creation time):</p>
 <tr>
 <td><code>agent_operations</code></td>
 <td>AgentOperation</td>
-<td>uuid, namespace, instance_uuid (indexed), commands (JSON list), version</td>
+<td>uuid, namespace, instance_uuid (indexed), commands (JSON list), deadline (nullable), progress_timeout (nullable), version</td>
 </tr>
 <tr>
 <td><code>instances</code></td>
@@ -14430,7 +14430,7 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>agent_operation_attributes</code></td>
 <td>AgentOperation</td>
-<td>uuid, results (JSON dict)</td>
+<td>uuid, results (JSON dict), last_progress (nullable), attempts</td>
 </tr>
 <tr>
 <td><code>instance_attributes</code></td>
@@ -14450,6 +14450,26 @@ read-modify-write cycles are reserved for row creation and schema
 upgrades: with concurrent writers on different nodes, an unmasked write
 pushes a stale snapshot of the other columns over any update committed
 since the writer read the row (a cross-attribute lost update).</p>
+<p>An agent operation's <code>deadline</code> and <code>progress_timeout</code> are the caller's
+timing intent, fixed at submission time. Three values are possible in
+each column and they mean three different things:</p>
+<ul>
+<li><strong>NULL</strong> — no client intent was recorded, so the server default
+  applies. This is what a row written before deadlines existed looks
+  like, and what a row written by a not-yet-upgraded API node during a
+  rolling upgrade looks like. It does <strong>not</strong> mean "no deadline".</li>
+<li><strong>0</strong> — the client explicitly asked for none: no wall-clock deadline,
+  or the progress timeout disabled.</li>
+<li><strong>Anything else</strong> — the client's request. <code>deadline</code> is an absolute
+  unix timestamp, not a duration: the API server computes it at request
+  receipt, so queue time and preflight time count against it.
+  <code>progress_timeout</code> is a number of seconds.</li>
+</ul>
+<p><code>last_progress</code> is the unix timestamp of the most recent observed
+forward progress, NULL when none has been observed, and <code>attempts</code>
+counts dispatches for the retry bound. Nothing enforces any of these
+values yet; that arrives with the rest of
+<code>docs/plans/PLAN-agent-operation-deadlines.md</code>.</p>
 <p>Namespace keys used to be anonymous entries inside that row's <code>keys</code>
 JSON dict. They are now objects in their own right, so that a key can
 carry an expiry, be listed, reaped, and (in a later release) scoped.
