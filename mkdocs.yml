@@ -102,6 +102,43 @@ nav:
             - "Code review tracking": components/development/code-review-tracking.md
             - "Consistency audits": components/development/consistency-audits.md
             - "Release Automation": components/development/release-automation.md
+            - Audits:
+                - "Audit: AGENTS.md / ARCHITECTURE.md structure": components/development/audits/llm-doc-structure.md
+                - "Audit: CI review automation and developer automation": components/development/audits/ci-review-automation.md
+                - "Audit: Console script logging setup": components/development/audits/console-logging.md
+                - "Audit: Credential handling and leak detection": components/development/audits/secret-handling.md
+                - "Audit: Default branch naming": components/development/audits/default-branch-naming.md
+                - "Audit: Delete branch on merge": components/development/audits/delete-branch-on-merge.md
+                - "Audit: Dependency name normalization": components/development/audits/dependency-name-normalization.md
+                - "Audit: Expensive lane path filtering": components/development/audits/expensive-lane-path-filter.md
+                - "Audit: Exporting repo configuration changes": components/development/audits/export-repo-config.md
+                - "Audit: Generated version file": components/development/audits/version-file-gitignore.md
+                - "Audit: GitHub security settings and CodeQL": components/development/audits/github-security.md
+                - "Audit: HTTP header and file path sanitization": components/development/audits/security-sanitization.md
+                - "Audit: Human review coverage": components/development/audits/review-coverage.md
+                - "Audit: Links out of docs/ are absolute": components/development/audits/docs-external-links.md
+                - "Audit: LLM context linting": components/development/audits/llm-context-lint.md
+                - "Audit: LLM context linting in pre-commit and CI": components/development/audits/llm-context-lint-ci.md
+                - "Audit: LLM tooling": components/development/audits/llm-tooling.md
+                - "Audit: Merge group run cancellation": components/development/audits/merge-group-cancellation.md
+                - "Audit: Merge queue reasonability": components/development/audits/merge-queue-config.md
+                - "Audit: Pinning indirect dependencies": components/development/audits/pin-indirect-dependencies.md
+                - "Audit: Plan index": components/development/audits/plan-index.md
+                - "Audit: Plan phase references": components/development/audits/plan-phase-references.md
+                - "Audit: Plan references in source": components/development/audits/plan-source-references.md
+                - "Audit: Plan template": components/development/audits/plan-template.md
+                - "Audit: Pre-push audit file": components/development/audits/push-audit.md
+                - "Audit: pyproject.toml usage": components/development/audits/pyproject-usage.md
+                - "Audit: Python version and type hints": components/development/audits/python-version.md
+                - "Audit: README absolute links": components/development/audits/readme-absolute-links.md
+                - "Audit: README structure": components/development/audits/readme-structure.md
+                - "Audit: Release process": components/development/audits/release-process.md
+                - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
+                - "Audit: Rust unwrap lint": components/development/audits/rust-unwrap-lint.md
+                - "Audit: sfui vendored copy": components/development/audits/sfui-vendor.md
+                - "Audit: Test coverage": components/development/audits/test-coverage.md
+                - "Audit: Workflow standards": components/development/audits/workflow-standards.md
+                - "Consistency Audit Specifications": components/development/audits/README.md
             - Plans:
                 - "Plans index": components/development/plans/index.md
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
