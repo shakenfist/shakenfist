@@ -18547,13 +18547,16 @@ def _ensure_agent_operation_attributes_schema(
     if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION:
         # Add the progress and retry bookkeeping columns.
         # last_progress is nullable (NULL means no progress observed
-        # yet), attempts is not, so it needs a DEFAULT for the rows
-        # which already exist -- without one the ALTER fails outright
-        # on a non-empty table. That DEFAULT is a deliberate
-        # divergence from what create_all() produces on a fresh
-        # database, since pydantic_to_sqlalchemy_table has no
-        # server-default support; it is harmless because every insert
-        # supplies the value. Safe to run repeatedly.
+        # yet); attempts is not, and carries an explicit DEFAULT 0.
+        # MariaDB would fill existing rows with the implicit type
+        # default anyway, so the DEFAULT is not rescuing a failing
+        # ALTER -- it is there so the value backfilled into existing
+        # rows is deterministic rather than a function of sql_mode.
+        # It is a deliberate divergence from what create_all()
+        # produces on a fresh database, since
+        # pydantic_to_sqlalchemy_table has no server-default support,
+        # and it is harmless because every insert supplies the value.
+        # Safe to run repeatedly.
         LOG.info(
             f'Upgrading {table_name} table to version '
             f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
