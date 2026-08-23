@@ -6889,6 +6889,14 @@ class AgentOperationStaticData(_message.Message):
     These manage AgentOperation static values. AgentOperations represent
     in-guest agent tasks (execute, get-file, put-blob, chmod) queued
     against an Instance.
+
+    deadline and progress_timeout use proto3 field presence: absent
+    means SQL NULL, which for both of them means "no client intent was
+    recorded, so the server default applies". An explicit 0 is
+    different and means the client asked for none -- no wall-clock
+    deadline, or the progress timeout disabled. Without presence the
+    wire cannot tell those two apart, and every daemon except
+    sf-database itself reaches MariaDB across this boundary.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -6898,6 +6906,8 @@ class AgentOperationStaticData(_message.Message):
     INSTANCE_UUID_FIELD_NUMBER: _builtins.int
     COMMANDS_JSON_FIELD_NUMBER: _builtins.int
     VERSION_FIELD_NUMBER: _builtins.int
+    DEADLINE_FIELD_NUMBER: _builtins.int
+    PROGRESS_TIMEOUT_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """AgentOperation UUID"""
     namespace: _builtins.str
@@ -6908,6 +6918,10 @@ class AgentOperationStaticData(_message.Message):
     """JSON-encoded list of command dicts"""
     version: _builtins.int
     """Schema version"""
+    deadline: _builtins.float
+    """Absolute epoch seconds; absent = server default"""
+    progress_timeout: _builtins.float
+    """Seconds; absent = server default"""
     def __init__(
         self,
         *,
@@ -6916,12 +6930,21 @@ class AgentOperationStaticData(_message.Message):
         instance_uuid: _builtins.str = ...,
         commands_json: _builtins.str = ...,
         version: _builtins.int = ...,
+        deadline: _builtins.float | None = ...,
+        progress_timeout: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_deadline", b"_deadline", "_progress_timeout", b"_progress_timeout", "deadline", b"deadline", "progress_timeout", b"progress_timeout"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["commands_json", b"commands_json", "instance_uuid", b"instance_uuid", "namespace", b"namespace", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_deadline", b"_deadline", "_progress_timeout", b"_progress_timeout", "commands_json", b"commands_json", "deadline", b"deadline", "instance_uuid", b"instance_uuid", "namespace", b"namespace", "progress_timeout", b"progress_timeout", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType__deadline: _TypeAlias = _typing.Literal["deadline"]  # noqa: Y015
+    _WhichOneofArgType__deadline: _TypeAlias = _typing.Literal["_deadline", b"_deadline"]  # noqa: Y015
+    _WhichOneofReturnType__progress_timeout: _TypeAlias = _typing.Literal["progress_timeout"]  # noqa: Y015
+    _WhichOneofArgType__progress_timeout: _TypeAlias = _typing.Literal["_progress_timeout", b"_progress_timeout"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__deadline) -> _WhichOneofReturnType__deadline | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__progress_timeout) -> _WhichOneofReturnType__progress_timeout | None: ...
 
 Global___AgentOperationStaticData: _TypeAlias = AgentOperationStaticData  # noqa: Y015
 
@@ -7011,27 +7034,42 @@ class AgentOperationAttributesProto(_message.Message):
     """AgentOperation Attributes Operations (MariaDB)
     These store mutable AgentOperation attributes (results from executed
     commands).
+
+    last_progress uses proto3 field presence for the same reason as the
+    static values above: absent means SQL NULL, which here means no
+    forward progress has been observed yet. attempts is not optional
+    because the column is not nullable.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
     UUID_FIELD_NUMBER: _builtins.int
     RESULTS_JSON_FIELD_NUMBER: _builtins.int
+    LAST_PROGRESS_FIELD_NUMBER: _builtins.int
+    ATTEMPTS_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """References agent_operations.uuid"""
     results_json: _builtins.str
     """JSON-encoded {index: result_dict}"""
+    last_progress: _builtins.float
+    """Epoch seconds; absent = none observed"""
+    attempts: _builtins.int
+    """Dispatch counter for the retry bound"""
     def __init__(
         self,
         *,
         uuid: _builtins.str = ...,
         results_json: _builtins.str = ...,
+        last_progress: _builtins.float | None = ...,
+        attempts: _builtins.int = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress", "last_progress", b"last_progress"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress", "attempts", b"attempts", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType__last_progress: _TypeAlias = _typing.Literal["last_progress"]  # noqa: Y015
+    _WhichOneofArgType__last_progress: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__last_progress) -> _WhichOneofReturnType__last_progress | None: ...
 
 Global___AgentOperationAttributesProto: _TypeAlias = AgentOperationAttributesProto  # noqa: Y015
 

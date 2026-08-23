@@ -667,6 +667,7 @@ following operations via the agent:
 
     ```json
     {
+        "attempts": 0,
         "commands": [
             {
                 "block-for-result": true,
@@ -674,9 +675,12 @@ following operations via the agent:
                 "commandline": "cat /etc/os-release"
             }
         ],
+        "deadline": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+        "last_progress": null,
         "metadata": {},
         "namespace": "vdi",
+        "progress_timeout": null,
         "results": {
             "0": {
                 "command-line": "cat /etc/os-release",
@@ -788,6 +792,7 @@ Additionally, you can list the agent operations for a given instance.
     ```json
     [
         {
+            "attempts": 0,
             "commands": [
                 {
                     "blob_uuid": "09306f15-b1b3-4850-afb4-f4179559fa7f",
@@ -800,9 +805,12 @@ Additionally, you can list the agent operations for a given instance.
                     "path": "/tmp/README.md"
                 }
             ],
+            "deadline": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+            "last_progress": null,
             "metadata": {},
             "namespace": "vdi",
+            "progress_timeout": null,
             "results": {
                 "0": {
                     "path": "/tmp/README.md"
@@ -816,6 +824,7 @@ Additionally, you can list the agent operations for a given instance.
             "version": 1
         },
         {
+            "attempts": 0,
             "commands": [
                 {
                     "block-for-result": true,
@@ -823,9 +832,12 @@ Additionally, you can list the agent operations for a given instance.
                     "commandline": "cat /tmp/README.md"
                 }
             ],
+            "deadline": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+            "last_progress": null,
             "metadata": {},
             "namespace": "vdi",
+            "progress_timeout": null,
             "results": {
                 "0": {
                     "command-line": "cat /tmp/README.md",

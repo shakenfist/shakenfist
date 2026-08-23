@@ -13,6 +13,7 @@ from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist.config import SFConfig
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_types import ObjectType
@@ -837,6 +838,142 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             str(op2.uuid), str(self.inst.agent_operation_next().uuid))
         self.assertEqual([str(op2.uuid)], self._queue())
+
+
+class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
+    """The deadline and progress bookkeeping an operation carries.
+
+    Nothing reads these values yet -- phase 4 of the agent operation
+    deadlines plan enforces them -- so these tests are about storage
+    and retrieval, and about what each of the three possible values
+    means. None means no client intent was recorded, so the server
+    default applies; an explicit 0.0 means the caller asked for none.
+    Collapsing those two is the failure this schema exists to avoid.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
+
+    def _make_agentop(self, **kwargs):
+        return AgentOperation.new(
+            str(uuid.uuid4()), 'unittest', self.instance_uuid,
+            [{'command': 'execute', 'commandline': 'true'}], **kwargs)
+
+    def test_defaults_are_unset(self):
+        # An operation created the way today's three API endpoints
+        # create one records no timing intent at all.
+        op = self._make_agentop()
+        self.assertIsNone(op.deadline)
+        self.assertIsNone(op.progress_timeout)
+
+    def test_values_round_trip_through_the_database(self):
+        op = self._make_agentop(deadline=1787427490.5, progress_timeout=30.0)
+        reread = AgentOperation.from_db(op.uuid)
+        self.assertEqual(1787427490.5, reread.deadline)
+        self.assertEqual(30.0, reread.progress_timeout)
+
+    def test_zero_is_not_none(self):
+        # 0.0 is the sentinel for "the caller asked for no deadline",
+        # and must survive as something other than "unset". A real
+        # deadline is an absolute timestamp, so zero is unambiguous.
+        op = self._make_agentop(deadline=0.0, progress_timeout=0.0)
+        reread = AgentOperation.from_db(op.uuid)
+        self.assertIsNotNone(reread.deadline)
+        self.assertEqual(0.0, reread.deadline)
+        self.assertEqual(0.0, reread.progress_timeout)
+
+    def test_attribute_defaults(self):
+        op = self._make_agentop()
+        self.assertIsNone(op.last_progress)
+        self.assertEqual(0, op.attempts)
+
+    def test_add_result_does_not_clobber_progress_attributes(self):
+        # add_result() builds a fresh attributes object whose
+        # last_progress and attempts carry model defaults, so without
+        # its field mask it would push those defaults over whatever a
+        # concurrent progress writer had committed. This is the
+        # cross-attribute lost update the mask exists to prevent, and
+        # it only became a real hazard once these columns existed.
+        op = self._make_agentop()
+        attrs = mariadb.get_agent_operation_attributes(uuid.UUID(str(op.uuid)))
+        attrs.last_progress = 1787427490.5
+        attrs.attempts = 2
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['last_progress', 'attempts'])
+
+        op.add_result(0, {'status': 0})
+
+        self.assertEqual({'0': {'status': 0}}, op.results)
+        self.assertEqual(1787427490.5, op.last_progress)
+        self.assertEqual(2, op.attempts)
+
+    def _view(self, op):
+        # The reference grouping in external_view() reads the caller's
+        # namespace out of a JWT, so it needs a request context this
+        # test has no interest in standing up. It predates this work.
+        with mock.patch(
+                'shakenfist.operations.agentoperation.'
+                'references_to_grouped_dict', return_value={}):
+            return op.external_view()
+
+    def test_external_view_carries_every_value(self):
+        op = self._make_agentop(deadline=1787427490.5, progress_timeout=30.0)
+        view = self._view(op)
+        self.assertEqual(1787427490.5, view['deadline'])
+        self.assertEqual(30.0, view['progress_timeout'])
+        self.assertIsNone(view['last_progress'])
+        self.assertEqual(0, view['attempts'])
+        self.assertEqual({}, view['results'])
+
+    def test_attributes_survive_a_lost_get_or_create_race(self):
+        # _attributes() is a get-or-create, so it has to cope with
+        # losing the create to another thread. It re-reads, but the row
+        # can be gone again by then -- the operation was deleted
+        # between the two calls. Returning None there would raise
+        # AttributeError in every caller, including external_view() on
+        # a user-facing path, so the fallback is the defaults.
+        op = self._make_agentop()
+        with mock.patch('shakenfist.mariadb.get_agent_operation_attributes',
+                        return_value=None), \
+            mock.patch(
+                'shakenfist.mariadb.create_agent_operation_attributes',
+                return_value=False):
+            self.assertEqual({}, op.results)
+            self.assertIsNone(op.last_progress)
+            self.assertEqual(0, op.attempts)
+
+    def test_external_view_reads_attributes_once(self):
+        # The three attribute values are taken from a single read
+        # rather than through their properties, which would each cost
+        # a round trip. If this ever regresses the view silently
+        # triples its database load.
+        op = self._make_agentop()
+        with mock.patch(
+                'shakenfist.mariadb.get_agent_operation_attributes',
+                side_effect=mariadb.get_agent_operation_attributes) as m:
+            self._view(op)
+        self.assertEqual(1, m.call_count)
 
 
 class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):

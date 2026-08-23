@@ -3,6 +3,14 @@
 Since v0.7, when an instance is running the Shaken Fist agent, you can queue agent
 operations to run on that instance. These operations consist of a series of commands
 which are executed in return, with results for each being gathered as they execute.
+
+An operation also carries timing fields: `deadline` and `progress_timeout` are the
+caller's intent, and `last_progress` and `attempts` are the server's bookkeeping.
+All four read as `null` (or `0` for `attempts`) in the examples below, because no
+client can set them and nothing enforces them yet. Their meaning, including why
+`null` means "the server default applies" rather than "no deadline", is described
+in [the database operator guide](/operator_guide/database/).
+
 In general the API for agent operations is instance-centric -- you lookup the
 agent operations an instance has seen, and then can request further information
 about the agent operation directly. There is currently no way to search for an
@@ -32,6 +40,7 @@ agent operations for a given instance, refer to the [instances API documentation
 
     ```json
     {
+        "attempts": 0,
         "commands": [
             {
                 "block-for-result": true,
@@ -39,9 +48,12 @@ agent operations for a given instance, refer to the [instances API documentation
                 "commandline": "cat /tmp/README.md"
             }
         ],
+        "deadline": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+        "last_progress": null,
         "metadata": {},
         "namespace": "vdi",
+        "progress_timeout": null,
         "results": {
             "0": {
                 "command-line": "cat /tmp/README.md",

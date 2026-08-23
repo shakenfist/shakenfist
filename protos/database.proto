@@ -2105,12 +2105,21 @@ message DeleteMappingRuleAttributesRequest {
 // in-guest agent tasks (execute, get-file, put-blob, chmod) queued
 // against an Instance.
 
+// deadline and progress_timeout use proto3 field presence: absent
+// means SQL NULL, which for both of them means "no client intent was
+// recorded, so the server default applies". An explicit 0 is
+// different and means the client asked for none -- no wall-clock
+// deadline, or the progress timeout disabled. Without presence the
+// wire cannot tell those two apart, and every daemon except
+// sf-database itself reaches MariaDB across this boundary.
 message AgentOperationStaticData {
-  string uuid = 1;            // AgentOperation UUID
-  string namespace = 2;       // Namespace
-  string instance_uuid = 3;   // Instance this operation targets
-  string commands_json = 4;   // JSON-encoded list of command dicts
-  int32 version = 5;          // Schema version
+  string uuid = 1;                     // AgentOperation UUID
+  string namespace = 2;                // Namespace
+  string instance_uuid = 3;            // Instance this operation targets
+  string commands_json = 4;            // JSON-encoded list of command dicts
+  int32 version = 5;                   // Schema version
+  optional double deadline = 6;        // Absolute epoch seconds; absent = server default
+  optional double progress_timeout = 7; // Seconds; absent = server default
 }
 
 message CreateAgentOperationRequest {
@@ -2134,9 +2143,15 @@ message DeleteAgentOperationRequest {
 // These store mutable AgentOperation attributes (results from executed
 // commands).
 
+// last_progress uses proto3 field presence for the same reason as the
+// static values above: absent means SQL NULL, which here means no
+// forward progress has been observed yet. attempts is not optional
+// because the column is not nullable.
 message AgentOperationAttributesProto {
-  string uuid = 1;            // References agent_operations.uuid
-  string results_json = 2;    // JSON-encoded {index: result_dict}
+  string uuid = 1;                  // References agent_operations.uuid
+  string results_json = 2;          // JSON-encoded {index: result_dict}
+  optional double last_progress = 3; // Epoch seconds; absent = none observed
+  int64 attempts = 4;               // Dispatch counter for the retry bound
 }
 
 message CreateAgentOperationAttributesRequest {

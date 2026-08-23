@@ -348,8 +348,8 @@ NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
-AGENT_OPERATIONS_VERSION = 2
-AGENT_OPERATION_ATTRIBUTES_VERSION = 2
+AGENT_OPERATIONS_VERSION = 3
+AGENT_OPERATION_ATTRIBUTES_VERSION = 3
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 3
@@ -18498,6 +18498,41 @@ def _ensure_agent_operations_schema(
         current_ver = AGENT_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver < AGENT_OPERATIONS_VERSION:
+        # Add the agent operation deadline columns. Both are nullable
+        # with no backfill, because NULL is a meaningful value here
+        # rather than a gap: it means no client intent was recorded,
+        # so the server default applies. An explicit 0.0 is what
+        # "the client asked for none" looks like. Safe to run
+        # repeatedly -- ADD COLUMN IF NOT EXISTS is a no-op when the
+        # column already exists, which is the case on a new deployment
+        # where create_all() included it.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{AGENT_OPERATIONS_VERSION} (add deadline columns)')
+        #
+        # A failure here is deliberately not caught. IF NOT EXISTS
+        # already makes "the column is there" a no-op, so anything
+        # this could swallow is a genuine failure -- a metadata lock
+        # timeout against a busy table, a privilege problem, disk
+        # full. Swallowing it and bumping the version anyway would
+        # leave a schema which reports itself healthy to
+        # verify_schema_versions() (it compares versions, not
+        # columns) while every insert fails on an unknown column,
+        # and which ensure-mariadb-schema can no longer repair
+        # because the `current_ver < VERSION` guard would now be
+        # false. Failing loudly keeps the migration re-runnable.
+        with engine.connect() as conn:
+            for column in ('deadline DOUBLE NULL',
+                           'progress_timeout DOUBLE NULL'):
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} '
+                    f'ADD COLUMN IF NOT EXISTS {column}'))
+                conn.commit()
+
+        current_ver = AGENT_OPERATIONS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -18535,6 +18570,40 @@ def _ensure_agent_operation_attributes_schema(
         current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION:
+        # Add the progress and retry bookkeeping columns.
+        # last_progress is nullable (NULL means no progress observed
+        # yet); attempts is not, and carries an explicit DEFAULT 0.
+        # MariaDB would fill existing rows with the implicit type
+        # default anyway, so the DEFAULT is not rescuing a failing
+        # ALTER -- it is there so the value backfilled into existing
+        # rows is deterministic rather than a function of sql_mode.
+        # It is a deliberate divergence from what create_all()
+        # produces on a fresh database, since
+        # pydantic_to_sqlalchemy_table has no server-default support,
+        # and it is harmless because every insert supplies the value.
+        # Safe to run repeatedly.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
+            '(add progress and attempt columns)')
+        #
+        # As in _ensure_agent_operations_schema, a failing ALTER is
+        # allowed to propagate rather than being logged and stepped
+        # over: bumping the version past a column which was never
+        # added produces a schema that passes verify_schema_versions()
+        # and can never be repaired by re-running the migration.
+        with engine.connect() as conn:
+            for column in ('last_progress DOUBLE NULL',
+                           'attempts BIGINT NOT NULL DEFAULT 0'):
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} '
+                    f'ADD COLUMN IF NOT EXISTS {column}'))
+                conn.commit()
+
+        current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -18568,6 +18637,8 @@ def _direct_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace,
                 instance_uuid=data.instance_uuid,
                 commands=_json_dumps(data.commands),
+                deadline=data.deadline,
+                progress_timeout=data.progress_timeout,
                 version=data.version
             )
             conn.execute(stmt)
@@ -18614,6 +18685,8 @@ def _direct_get_agent_operation(
                 namespace=result.namespace,
                 instance_uuid=result.instance_uuid,
                 commands=commands if commands else [],
+                deadline=result.deadline,
+                progress_timeout=result.progress_timeout,
                 version=result.version
             )
     except OperationalError as e:
@@ -18659,7 +18732,9 @@ def _direct_create_agent_operation_attributes(
         with engine.connect() as conn:
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
-                results=_json_dumps(data.results))
+                results=_json_dumps(data.results),
+                last_progress=data.last_progress,
+                attempts=data.attempts)
             conn.execute(stmt)
             conn.commit()
             return True
@@ -18696,6 +18771,8 @@ def _direct_get_agent_operation_attributes(
             return AgentOperationAttributesData(
                 uuid=result.uuid,
                 results=results if results else {},
+                last_progress=result.last_progress,
+                attempts=result.attempts,
             )
     except OperationalError as e:
         LOG.warning(
@@ -18716,6 +18793,8 @@ def _agent_operation_attributes_column_values(
     """
     all_values: Dict[str, Any] = {
         'results': _json_dumps(data.results),
+        'last_progress': data.last_progress,
+        'attempts': data.attempts,
     }
     if not fields:
         return all_values
@@ -18789,6 +18868,8 @@ def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace or '',
                 instance_uuid=str(data.instance_uuid),
                 commands_json=_json_dumps(data.commands),
+                deadline=data.deadline,
+                progress_timeout=data.progress_timeout,
                 version=data.version
             )
         )
@@ -18818,6 +18899,9 @@ def _grpc_get_agent_operation(
             namespace=d.namespace or '',
             instance_uuid=d.instance_uuid,
             commands=commands,
+            deadline=d.deadline if d.HasField('deadline') else None,
+            progress_timeout=(d.progress_timeout
+                              if d.HasField('progress_timeout') else None),
             version=d.version
         )
     except grpc.RpcError as e:
@@ -18850,7 +18934,9 @@ def _grpc_create_agent_operation_attributes(
         request = database_pb2.CreateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=_json_dumps(data.results)))
+                results_json=_json_dumps(data.results),
+                last_progress=data.last_progress,
+                attempts=data.attempts))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -18876,6 +18962,9 @@ def _grpc_get_agent_operation_attributes(
         return AgentOperationAttributesData(
             uuid=d.uuid,
             results=results,
+            last_progress=(d.last_progress
+                           if d.HasField('last_progress') else None),
+            attempts=d.attempts,
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -18897,7 +18986,9 @@ def _grpc_update_agent_operation_attributes(
         request = database_pb2.UpdateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=_json_dumps(data.results)),
+                results_json=_json_dumps(data.results),
+                last_progress=data.last_progress,
+                attempts=data.attempts),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)

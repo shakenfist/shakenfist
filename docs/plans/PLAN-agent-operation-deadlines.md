@@ -119,16 +119,42 @@ not open questions:
 
 ### Object model and schema
 
-`AgentOperation` (version bump 3 -> 4) gains two new static values,
-stored as nullable columns on the `agent_operations` table:
+`AgentOperation` gains two new static values, stored as nullable
+columns on the `agent_operations` table:
 
 - `deadline` — absolute unix timestamp (float) after which the
   operation must not be dispatched and must not continue executing.
-  NULL means no wall-clock deadline (the client passed the 0
-  sentinel). Computed by the API server at request receipt as
-  `time.time() + deadline_seconds`.
-- `progress_timeout` — float seconds; NULL means "use the server
-  default for progress-capable commands".
+  Computed by the API server at request receipt as
+  `time.time() + deadline_seconds`. NULL means no client intent was
+  recorded, so the server default applies; an explicit `0.0` means
+  the client asked for no wall-clock deadline at all (it passed the
+  0 sentinel).
+- `progress_timeout` — float seconds. NULL means the same thing it
+  means for `deadline`: no client intent recorded, so the server
+  default for progress-capable commands applies. An explicit `0.0`
+  disables the progress timeout.
+
+The NULL semantics were corrected during phase 2 planning. This
+section previously said a NULL `deadline` meant "no deadline", which
+made the same absence mean opposite things in two adjacent columns
+and — because NULL is what every legacy row and every row written by
+a not-yet-upgraded API node contains — would have left exactly those
+operations unbounded at the moment phase 4 deletes the 900-second
+constant. `0.0` is an unambiguous sentinel because a real deadline is
+an absolute timestamp of order 1.7e9.
+
+There is **no object version bump**: `AgentOperation.current_version`
+stays at 3. `baseobject.upgrade()` cannot read a row whose version is
+higher than the reader's — it looks up `_upgrade_step_4_to_5` with a
+`getattr` that has no default and raises `AttributeError` — and an
+agent operation is created on an API node and read on the
+hypervisor's `sf-sidechannel`, so a bump would break agent operations
+on every not-yet-rolled node for the length of a rolling upgrade.
+There is also nothing to migrate, since NULL is a meaningful value
+rather than a gap. "Does this database have the columns?" is answered
+by the *table* schema version, which `sf-database` refuses to start
+against if it is behind. See
+`PLAN-agent-operation-deadlines-phase-02-schema.md` decision 2.
 
 Static values are immutable, which fits: the client's intent is fixed
 at submission time.
@@ -152,8 +178,10 @@ update the rule exists to prevent). Schema migration runs via
 `sf-ctl ensure-mariadb-schema` as usual; migrations must be
 idempotent.
 
-Both values appear in `external_view()` so clients (and CI diagnostics)
-can see them.
+All four values appear in `external_view()` so clients (and CI
+diagnostics) can see them. The view already reads the attributes row
+once for `results`, so `last_progress` and `attempts` come along for
+no extra database round trip.
 
 ### API surface
 
@@ -206,6 +234,16 @@ increasing order of reach:
 Because only the sidechannel daemon on the instance's placement node
 dispatches executors, the reaper has no cross-node race: reaping and
 dispatching are serialised in one process.
+
+All three read a NULL `deadline` as "apply
+`AGENT_OPERATION_DEFAULT_DEADLINE`" rather than as "no deadline" (see
+the object model section). Since such a row carries no receipt
+timestamp to anchor the default against — it was written by an API
+node that predates this work — the fallback anchor is dispatch time,
+which is a node-local number the executor and the reaper both already
+have. This path exists only for legacy rows and for the window of a
+rolling upgrade; a deadline-aware API server always writes an
+absolute timestamp or the explicit `0.0` sentinel.
 
 Clock skew note: the absolute deadline is computed on the API node and
 enforced on the hypervisor node. Shaken Fist already assumes
@@ -496,7 +534,7 @@ the slot at all.
 |-------|------|--------|---------|
 | 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Complete | Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan |
 | 1 | [PLAN-agent-operation-deadlines-phase-01-groundwork.md](PLAN-agent-operation-deadlines-phase-01-groundwork.md) | Complete | Field mask for `update_agent_operation_attributes`; per-command handler classes replacing the dispatch if/elif chain, declaring `reports_progress` and `retryable` for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises `GetException` rather than `AttributeError` |
-| 2 | | Not started | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, object version bump, migration |
+| 2 | [PLAN-agent-operation-deadlines-phase-02-schema.md](PLAN-agent-operation-deadlines-phase-02-schema.md) | Complete | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, both table versions 2 -> 3, additive migrations, and a live-MariaDB test that they migrate. Survey corrections applied at source: NULL means "server default" rather than "no deadline", and there is deliberately no object version bump |
 | 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
 | 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check) |
 | 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
