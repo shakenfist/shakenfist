@@ -65,7 +65,7 @@ batching](api-query-batching-roadmap.md) and [attribute field
 masks](PLAN-attribute-field-masks.md) carry their phases as headings.
 Two more publish no arithmetic because their tables are placeholders: [owning more of the
 QEMU stack](PLAN-qemu-futures.md) names three phases and then an ellipsis, and [artifact UX
-rework](PLAN-artifact-ux-rework.md) a decisions pass and "(later phases)". These six are the
+rework](PLAN-artifact-ux-rework.md) a decisions pass and "(later phases)". These five are the
 checker's blind spot, and the only numbers here it cannot recompute.
 
 | Date | Plan | Intent | Status | Phases |

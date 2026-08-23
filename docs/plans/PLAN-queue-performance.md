@@ -137,9 +137,12 @@ each was excluded on evidence rather than on argument:
 * **`user_waiting`, p50 15.78 s** (`node_inst_netdesc_op`). Entirely
   deferral: restricted to operations which never deferred, the same
   p50 is 0.77 s, and 962 of 1013 samples had deferred at least once.
-  A dependency wait re-enqueues an operation a flat 15 seconds into
-  the future. This is the largest user-visible latency in the whole
-  sample and it has nothing to do with queue order. Filed as #3863.
+  On the queues `sf-queues` drains, a dependency wait re-enqueues an
+  operation a flat 15 seconds into the future (`sf-net` instead backs
+  off from 0.1 s to a 15 s cap, so this cost is specific to the
+  dispatcher rather than general). This is the largest user-visible
+  latency in the whole sample and it has nothing to do with queue
+  order. Filed as #3863.
 * **`background_high_io`, p90 403 s** (`node_blob_op`), with a defer
   count of zero, which is the shape starvation would have. It is not:
   during each of the eight worst waits, the *same queue* executed

@@ -514,9 +514,18 @@ itself):
       terminal state write).
     * `wait_seconds` — time between when the op was first inserted
       into `cluster_operations` and when the dispatcher claimed it.
-      Large values (>10 s) mean the queue was backed up; very
-      large values point at either worker saturation or a stuck
-      op blocking the worker.
+      This is not queueing alone: it also counts deliberate
+      deferral while an op waits on a dependency, and the seconds a
+      `*_high_io` background op spends gated off while the local
+      disk is busy. Both are designed behaviour, and each is large
+      enough to be the whole of a tail on its own -- the worst
+      operation type measured for the queue-performance plan had a
+      15.78 s median wait which fell to 0.77 s once deferred ops
+      were excluded. So read a large value against `defer_count`
+      and against the node's disk busy metric before calling it a
+      backup; only once those are excluded does it point at worker
+      saturation or a stuck op blocking the worker. See "Reading
+      these events back" below.
     * `defer_count` — how many times this op was re-enqueued via
       `defer()` / `defer_with_backoff()` before finally running. A
       first-time pickup is `0`; non-zero values indicate dependency
@@ -574,11 +583,17 @@ are orphaned rows which the daily prune sweep then deletes. The
 never come into it -- they bound how long an event may live, not how
 long the object it describes does. This is issue #3864.
 
-What does persist is the log stream. Every event is echoed as an
-`Added event` log line carrying the whole `extra` dict, unless
-`LOG_EVENTS_TO_LOKI` has been turned off, so wherever the cluster's
-logs are shipped is where an operation's history can still be read
-after the fact.
+What does persist is the log stream. Every event is echoed as a log
+line carrying the whole `extra` dict, unless `LOG_EVENTS_TO_LOKI` has
+been turned off, so wherever the cluster's logs are shipped is where
+an operation's history can still be read after the fact.
+
+Do not grep that stream for `Added event`. That is the message the
+echo is written with, but the logger merges the caller's fields over
+the record last and one of those fields is the event's own `message`,
+so the string never reaches the shipped JSON. Filter on the event's
+message instead -- `execution duration` for the events above -- which
+is what the record's `message` field actually holds.
 
 `tools/queue-wait-report.py` in the source repository summarises the
 `execution duration` events from such a stream: give it Shaken Fist

@@ -170,10 +170,22 @@ live inside it.
    that cap. It is not queueing and it is not unfairness; a verdict
    that treats a p90 of 1.8 s as a latency problem has measured the
    poll interval.
-2. **Dependency deferral (15 s per defer, flat).** `defer()` takes
-   `delay=15` by default (`shakenfist/operations/baseoperation.py:393`)
-   and the dependency-wait path in both dispatchers calls it with no
-   argument. `node_inst_netdesc_op` runs on the `user_waiting` queue
+2. **Dependency deferral (15 s per defer on the queues that matter
+   here).** `defer()` takes `delay=15` by default
+   (`shakenfist/operations/baseoperation.py:393`) and `sf-queues`'
+   dependency-wait path calls it with no argument
+   (`shakenfist/daemons/queues/workitem.py:152`), so a defer there is a
+   flat fifteen seconds. `sf-net` is *not* the same: it passes an
+   explicit delay which starts at `INITIAL_DEFER_DELAY` (0.1 s) and
+   doubles to a `MAX_DEFER_DELAY` cap of 15 s
+   (`shakenfist/daemons/network/workitem.py:95-101`), so three defers
+   there cost about 0.7 s rather than 45 s. Which schedule applies
+   follows the dispatcher, and the dispatcher follows the queue:
+   `sf-net` drains the `<uuid>-network-*` queues and, on the elected
+   network node, the cluster-wide `networknode-clusteroperation-*` ones
+   (`shakenfist/daemons/network/workitem.py:174-176`); everything else
+   is `sf-queues` via `Daemon.dequeue_job`.
+   `node_inst_netdesc_op` runs on the `user_waiting` queue
    with a median `defer_count` of 1 and a median wait of 15.74 s
    against a median execution time of 1.71 s — one dependency wait is a
    flat 15 second tax on the most latency-sensitive queue there is. Its
@@ -230,9 +242,9 @@ the tree accurately.
    `defer_count == 0` only. Without that split, `node_inst_netdesc_op`'s
    15 second dependency tax reads as a queueing problem, and the
    fairness question gets answered wrongly. The report also groups by
-   queue *class* (`networknode`, per-node, per-network) and priority
-   lane, not by raw queue name, since raw names embed uuids and never
-   aggregate.
+   queue *class* (`networknode`, `any-node`, and the two per-node
+   classes) and priority lane, not by raw queue name, since raw names
+   embed uuids and never aggregate.
 
 4. **A p90 at or below `IDLE_POLL_MAX_SECONDS` is "no wait".** The
    verdict must state the floor it is measuring against, and the tool
@@ -272,7 +284,7 @@ the tree accurately.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 7a | medium | sonnet | none | Write `tools/queue-wait-report.py`: reads newline-delimited JSON on stdin, ignores non-JSON lines, and keeps objects whose `message` is `execution duration` and whose `extra` contains `wait_seconds`. For each, derive: `wait_seconds`, `extra.seconds`, `extra.defer_count`, `extra.queue_name`, `program`, and the operation type, which is the object key ending in `_op` (e.g. `node_inst_op`) — that key's value is the op uuid. Classify `queue_name` by splitting on `-clusteroperation-` (and on `-network-`, which the per-network queues use): a target of literally `networknode` is class `networknode`, a 36-character uuid target is class `per-node` or `per-network` depending on the separator, and the suffix is the priority lane. Print three tables — by (queue class, lane), by operation type, and by lane alone — each with n, p50, p90, p99, max for `wait_seconds`, the same percentiles restricted to `defer_count == 0`, the median and p90 of `extra.seconds`, and the count with `defer_count > 0`. Print the sample window (min and max `ts`) and print the line `Idle poll floor: p90 at or below 2.0s is the dispatcher poll cap (IDLE_POLL_MAX_SECONDS), not queue wait.` Follow the repo style: copyright header, single quotes, 120 columns, `argparse`, no third-party dependencies beyond the standard library. Add `shakenfist/tests/test_queue_wait_report.py` with a handful of synthetic lines covering: a `networknode` queue, a per-node queue, a per-network queue, a deferred op, a malformed line, and a line that is not an `execution duration` event. |
+| 7a | medium | sonnet | none | Write `tools/queue-wait-report.py`: reads newline-delimited JSON on stdin, ignores non-JSON lines, and keeps objects whose `message` is `execution duration` and whose `extra` contains `wait_seconds`. For each, derive: `wait_seconds`, `extra.seconds`, `extra.defer_count`, `extra.queue_name`, `program`, and the operation type, which is the object key ending in `_op` (e.g. `node_inst_op`) — that key's value is the op uuid. Classify `queue_name` by splitting on `-clusteroperation-` and on `-network-`: a target of literally `networknode` is class `networknode`, and a uuid target is a per-node class named for the separator, since both families are keyed by node uuid (there is no per-network queue) and the separator is what says which dispatcher drains it. The suffix is the priority lane. Print three tables — by (queue class, lane), by operation type, and by lane alone — each with n, p50, p90, p99, max for `wait_seconds`, the same percentiles restricted to `defer_count == 0`, the median and p90 of `extra.seconds`, and the count with `defer_count > 0`. Print the sample window (min and max `ts`) and print the line `Idle poll floor: p90 at or below 2.0s is the dispatcher poll cap (IDLE_POLL_MAX_SECONDS), not queue wait.` Follow the repo style: copyright header, single quotes, 120 columns, `argparse`, no third-party dependencies beyond the standard library. Add `shakenfist/tests/test_queue_wait_report.py` with a handful of synthetic lines covering: a `networknode` queue, a per-node cluster operation queue, a per-node network queue, a deferred op, a malformed line, and a line that is not an `execution duration` event. |
 | 7b | high | opus | none | Capture at least 24 hours of `execution duration` events from `sfcbr` and produce the verdict. The operator's `loki-query` helper reaches them: `loki-query '{job="shakenfist"} \|= "execution duration"' --tenant sfcbr --since 24h --limit 20000`. Note that the limit truncates from the *oldest* end, so check the printed window actually spans 24 hours and re-run with a larger limit if it does not. Feed the capture to `tools/queue-wait-report.py`. Then answer, in writing, with numbers: (a) is the `net_op` tail gone; (b) is any lower-priority lane starved — for each candidate, exclude the two non-fairness explanations first, using `defer_count == 0` percentiles for deferral and, for any `*_high_io` background tail, the node's `DISK_BUSY_PER_SECOND_METRIC` over the same window (available from the Grafana `shakenfist` dashboard on maui, or from `mariadb.get_node_metrics`); (c) what the largest remaining user-visible latency actually is. The expected shape of the answer from the planning survey is "the tail is gone, fairness is not needed, the remaining cost is a flat 15 s dependency defer" — treat that as a hypothesis to falsify, not a conclusion to confirm, and say so if the 24 hour window disagrees with the 9 hour one. |
 | 7c | medium | sonnet | none | Run the same report against a cluster CI run and compare. Take the most recent successful `functional-tests.yml` cluster-CI run (see the `ci-status` helper), download its `bundle.zip` artifact, and find the Shaken Fist daemon logs inside it — note that the Loki dumps in these bundles have repeatedly been empty, so fall back to the per-node journals, which carry the same JSON lines. Feed them to `tools/queue-wait-report.py` and report the same three tables. State the sample size honestly: a CI cluster runs for well under an hour and the numbers are a burst, not a steady state. The comparison that matters is `net_op` at the site where the >60 s waits were originally observed. |
 | 7d | medium | sonnet | none | Write the outcome up. In `docs/plans/PLAN-queue-performance.md`: replace step 7 with what was measured and decided, including the tables from 7b and 7c, set the Status section to Complete, and set the step 7 row of the Execution table. In `docs/plans/index.md`: set the plan's status and phase arithmetic. In `docs/operator_guide/networking/overview.md`, fix the retention paragraph at line 563 — the `execution duration` event is unreachable from its operation roughly 30 seconds after the operation completes, because cluster operations are hard-deleted then and `hard_delete()` takes their `event_objects` rows with them; the orphaned `events` row is removed by the daily prune. Say where an operator should look instead (the log stream), and mention `tools/queue-wait-report.py`. Do not restate the numbers in more than one place. |
@@ -357,10 +369,46 @@ neither `networknode` nor a uuid. The first version of
 `any` queue appeared in the `sfcbr` window, so only the CI numbers
 were ever affected, and only by being filed under the wrong row.
 
+Review found a second thing, after the measurement: this plan's
+survey said the dependency-wait path in *both* dispatchers takes
+`defer()`'s flat 15 second default. Only `sf-queues` does. `sf-net`
+has backed off from 0.1 s to a 15 s cap since commit c961fe98a, so a
+`net_op` or `node_net_op` with a `defer_count` of 3 waited under a
+second on purpose, not 45. The verdict is untouched --
+`node_inst_netdesc_op`, the tail this turns on, runs on a `sf-queues`
+queue where the flat 15 s is real -- but the corrected survey text is
+above, and `tools/queue-wait-report.py` now prints the schedule for
+each queue class rather than asserting fifteen seconds for all of
+them. The capture corroborates the correction from the other side:
+all 980 deferred samples in 26 hours are on queues `sf-queues`
+drains, and every `sf-net` lane records a defer count of zero, so no
+measured number in this phase was ever attributed to the wrong
+schedule.
+
+The tool also labelled the `<uuid>-network-*` queues `per-network`.
+They are per-*node*: `get_node_network_queues()` takes a node uuid,
+and the split between the two per-node classes is which dispatcher
+drains them, not what the work is about. Renamed to
+`per-node (cluster op)` and `per-node (network)`. No measured number
+changes -- the grouping was always by the same key -- but the earlier
+label asserted a queue family the cluster does not have.
+
 Everything else the survey asserted held, including the parts it was
 least sure of: the events really are unreachable 30 seconds after an
 operation completes, and the `~1.8 s` p90 floor really is the idle
 poll cap and appears on every quiet queue in both windows.
+
+One further finding, from the same review pass:
+`get_node_background_node_queues()` lists `f'{node_uuid}-background'`
+alongside its two `-clusteroperation-` siblings
+(`shakenfist/operations/baseoperation.py:70`). Nothing can enqueue to
+it -- every enqueue builds `f'{target}-{family}-{priority}'`
+(`shakenfist/schema/operations/util.py:53`), which always has three
+segments -- so it is carried in every background dequeue's `IN` list
+and `ORDER BY FIELD()` on every node, matching nothing. Zero of the
+19,184 measured samples had a queue name which failed to parse, which
+is the corroboration. Filed as #3867 rather than fixed here; it is a
+production change and this is a measurement phase.
 
 ### Deviations from the plan
 

@@ -39,7 +39,7 @@ repos:
         description: Run flake8 style checks on changes since HEAD~
         entry: tox -e flake8
         language: system
-        files: ^shakenfist/
+        files: ^(shakenfist|tools)/
         pass_filenames: false
         types: [python]
 
@@ -52,7 +52,7 @@ repos:
         description: Run Python 3 unit tests with stestr
         entry: tox -e py3
         language: system
-        files: ^shakenfist/
+        files: ^(shakenfist|tools)/
         pass_filenames: false
         types: [python]
 

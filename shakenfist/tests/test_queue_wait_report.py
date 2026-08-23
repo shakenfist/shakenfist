@@ -7,17 +7,19 @@ or is it something the system did on purpose -- and the way it gets that
 question wrong is by conflating the three delays which all land in
 ``wait_seconds``. So the coverage that matters here is not the arithmetic,
 it is the classification: that a deferred operation is excluded from the
-undeferred columns, that a per-node queue is not counted as a per-network
-one, and that the parser tolerates every kind of line the three capture
-paths (Loki, a journal, a CI bundle) put in front of it. A parser that
-raises on a plain text log line produces no report at all from a real
-capture, and a classifier that reads uuids as distinct queues produces a
-table with three hundred rows of one sample each.
+undeferred columns, that the two per-node queue families are told apart
+(they carry different defer schedules, so mislabelling one is how a reader
+mis-attributes its wait), and that the parser tolerates every kind of line
+the three capture paths (Loki, a journal, a CI bundle) put in front of it.
+A parser that raises on a plain text log line produces no report at all
+from a real capture, and a classifier that reads uuids as distinct queues
+produces a table with three hundred rows of one sample each.
 """
 
 import importlib.util
 import io
 import os
+import sys
 
 from shakenfist.tests import base
 
@@ -53,7 +55,7 @@ PER_NODE = (
     '"node_inst_op": "f3613565-9644-4724-9442-45d6cee49cf5", '
     '"program": "sf-queues"}')
 
-PER_NETWORK = (
+PER_NODE_NETWORK = (
     '{"message": "execution duration", "event_type": "usage", '
     '"extra": {"seconds": 0.3, "wait_seconds": 1.5, "defer_count": 0, '
     '"queue_name": "963d4df9-2a67-4abc-ae8e-96f5c29ab5b2-network-background"}, '
@@ -70,6 +72,18 @@ DEFERRED = (
 # A journal line: the JSON is preceded by a syslog style prefix.
 JOURNAL_PREFIXED = (
     'Aug 23 17:49:41 sf-3 sf-queues[1903915]: ' + PER_NODE)
+
+# A logcli line: the stream's label set is printed ahead of the record, so
+# the first '{' in the line opens the labels rather than the JSON.
+LOGCLI_PREFIXED = (
+    '2026-08-23T17:49:41Z {job="shakenfist", host="sf-3"} ' + PER_NODE)
+
+# A dispatcher event with no operation object attached, which the report
+# attributes to 'unknown' rather than dropping.
+NO_OPERATION_KEY = (
+    '{"message": "execution duration", "event_type": "usage", '
+    '"extra": {"seconds": 0.5, "wait_seconds": 0.75, "defer_count": 0, '
+    '"queue_name": "any-clusteroperation-background"}, "program": "sf-net"}')
 
 MALFORMED = '{"message": "execution duration", "extra": {"wait'
 
@@ -103,7 +117,16 @@ class QueueWaitParseTestCase(base.ShakenFistTestCase):
     def test_tolerates_a_journal_prefix(self):
         sample = report.parse_line(JOURNAL_PREFIXED)
         self.assertIsNotNone(sample)
-        self.assertEqual('per-node', sample.queue_class)
+        self.assertEqual('per-node (cluster op)', sample.queue_class)
+        self.assertEqual('node_inst_op', sample.operation_type)
+
+    def test_tolerates_a_loki_label_set_before_the_json(self):
+        # Grafana's logcli prints the stream's label set ahead of the line,
+        # so the first '{' opens something which is not the record. Giving
+        # up there loses every line of such a capture rather than one.
+        sample = report.parse_line(LOGCLI_PREFIXED)
+        self.assertIsNotNone(sample)
+        self.assertEqual('per-node (cluster op)', sample.queue_class)
         self.assertEqual('node_inst_op', sample.operation_type)
 
     def test_ignores_lines_which_are_not_samples(self):
@@ -121,18 +144,36 @@ class QueueWaitParseTestCase(base.ShakenFistTestCase):
 
 class QueueClassifyTestCase(base.ShakenFistTestCase):
     def test_classifies_each_queue_family(self):
+        # Both families are keyed by *node* uuid; there is no per-network
+        # queue. See get_node_network_queues() in
+        # shakenfist/operations/baseoperation.py, whose only argument is a
+        # node uuid, and which sf-net drains for its own node.
         self.assertEqual(
             ('networknode', 'user_facing'),
             report.classify_queue('networknode-clusteroperation-user_facing'))
         self.assertEqual(
-            ('per-node', 'background_high_io'),
+            ('per-node (cluster op)', 'background_high_io'),
             report.classify_queue(
                 '7ce66641-caa2-44ee-bb9b-6a02a21c66d5-clusteroperation-'
                 'background_high_io'))
         self.assertEqual(
-            ('per-network', 'background'),
+            ('per-node (network)', 'background'),
             report.classify_queue(
                 '963d4df9-2a67-4abc-ae8e-96f5c29ab5b2-network-background'))
+
+    def test_every_queue_class_has_a_defer_schedule(self):
+        # A row whose class is missing from DEFER_SCHEDULES prints without
+        # the one number needed to read its defers column, so adding a
+        # class without a schedule should fail here rather than in a report.
+        classes = {
+            report.classify_queue(name)[0]
+            for name in (
+                'networknode-clusteroperation-user_facing',
+                'any-clusteroperation-user_facing',
+                '7ce66641-caa2-44ee-bb9b-6a02a21c66d5-clusteroperation-'
+                'background',
+                '963d4df9-2a67-4abc-ae8e-96f5c29ab5b2-network-background')}
+        self.assertEqual(classes, set(report.DEFER_SCHEDULES))
 
     def test_classifies_the_any_node_queue(self):
         # An artifact fetch which any node may claim is targeted at the
@@ -159,7 +200,9 @@ class QueueWaitPercentileTestCase(base.ShakenFistTestCase):
 
     def test_percentiles_are_observed_values(self):
         values = list(range(1, 101))
-        # Nearest rank, so every answer is a value which was measured.
+        # Never interpolated, so every answer is a value which was
+        # measured. The index is the nearest to fraction * (n - 1), which
+        # is within one rank of the textbook nearest-rank definition.
         self.assertEqual(51, report.percentile(values, 0.5))
         self.assertEqual(90, report.percentile(values, 0.9))
         self.assertEqual(99, report.percentile(values, 0.99))
@@ -169,7 +212,7 @@ class QueueWaitPercentileTestCase(base.ShakenFistTestCase):
 class QueueWaitGroupTestCase(base.ShakenFistTestCase):
     def _samples(self):
         return report.read_samples(io.StringIO('\n'.join([
-            NETWORKNODE, PER_NODE, PER_NETWORK, DEFERRED,
+            NETWORKNODE, PER_NODE, PER_NODE_NETWORK, DEFERRED,
             MALFORMED, NOT_AN_EVENT, PLAIN_TEXT])))
 
     def test_reads_only_the_samples(self):
@@ -195,9 +238,112 @@ class QueueWaitGroupTestCase(base.ShakenFistTestCase):
         self.assertEqual('-', row[7])       # p50 over those, of which none
 
     def test_groups_are_ordered_by_sample_count(self):
-        lines = '\n'.join([PER_NODE, PER_NODE, PER_NETWORK])
+        lines = '\n'.join([PER_NODE, PER_NODE, PER_NODE_NETWORK])
         groups = report.grouped(
             report.read_samples(io.StringIO(lines)),
             lambda s: s.queue_class)
-        self.assertEqual(['per-node', 'per-network'],
+        self.assertEqual(['per-node (cluster op)', 'per-node (network)'],
                          [g.label for g in groups])
+
+    def test_a_group_reports_both_populations(self):
+        # A group holding both deferred and undeferred samples is the only
+        # one where the two halves of a row can disagree, and disagreeing
+        # is the whole reason the second half is printed.
+        lines = '\n'.join([PER_NODE, DEFERRED])
+        groups = report.grouped(
+            report.read_samples(io.StringIO(lines)), lambda s: s.lane)
+        merged = report.Group('merged')
+        for group in groups:
+            for sample in group.samples:
+                merged.add(sample)
+
+        row = merged.row()
+        self.assertEqual('2', row[1])       # n over all samples
+        self.assertEqual('15.70', row[5])   # max over all samples
+        self.assertEqual('1', row[6])       # n with defer_count == 0
+        self.assertEqual('1.00', row[10])   # max over those
+        self.assertEqual('1', row[13])      # how many deferred
+
+
+class QueueWaitOperationTypeTestCase(base.ShakenFistTestCase):
+    def test_an_event_with_no_operation_is_attributed_to_unknown(self):
+        # Dropping these would silently shrink the sample count rather than
+        # showing an operator that something is emitting the event without
+        # naming its operation.
+        sample = report.parse_line(NO_OPERATION_KEY)
+        self.assertIsNotNone(sample)
+        self.assertEqual('unknown', sample.operation_type)
+        self.assertEqual('any-node', sample.queue_class)
+
+
+class QueueWaitReportTestCase(base.ShakenFistTestCase):
+    """End to end runs of the program, which is what an operator invokes."""
+
+    def _run(self, lines, argv=None):
+        stream = io.StringIO('\n'.join(lines))
+        captured = io.StringIO()
+        stdout = sys.stdout
+        sys.stdout = captured
+        try:
+            code = report.main(argv=argv or [], stream=stream)
+        finally:
+            sys.stdout = stdout
+        return code, captured.getvalue()
+
+    def test_empty_input_is_not_a_traceback(self):
+        # A capture which matched nothing is the most likely first run, and
+        # it has to say so rather than failing.
+        code, out = self._run([])
+        self.assertEqual(0, code)
+        self.assertIn('No queue-wait samples found on stdin.', out)
+
+    def test_renders_all_three_tables(self):
+        code, out = self._run(
+            [NETWORKNODE, PER_NODE, PER_NODE_NETWORK, DEFERRED, PLAIN_TEXT])
+        self.assertEqual(0, code)
+        self.assertIn('Samples: 4', out)
+        self.assertIn('By queue class and priority lane', out)
+        self.assertIn('By operation type', out)
+        self.assertIn('By priority lane', out)
+        self.assertIn('networknode / user_facing', out)
+        self.assertIn('per-node (network) / background', out)
+        # The defer schedules are what make a defers column readable, so
+        # they are printed with the report rather than left to the docs.
+        self.assertIn('drained by sf-net', out)
+        self.assertIn('drained by sf-queues', out)
+
+    def test_columns_line_up_under_their_banners(self):
+        # A banner label wider than the columns it spans used to push every
+        # banner to its right off its own columns, which silently mislabels
+        # the undeferred half of every row.
+        _, out = self._run([NETWORKNODE, PER_NODE])
+        lines = out.splitlines()
+        index = lines.index('By operation type')
+        banner, header = lines[index + 2], lines[index + 3]
+        for label, _span in report.BANNERS:
+            if not label:
+                continue
+            self.assertIn(label, banner)
+        self.assertGreaterEqual(len(header), len(banner))
+        self.assertEqual(banner, banner.rstrip())
+        self.assertEqual(header.count('defers'), 1)
+        self.assertEqual(
+            banner.index('exec (all)') + len('exec (all)') <= len(header),
+            True)
+
+    def test_min_samples_says_what_it_dropped(self):
+        # Silently dropping rows would hide exactly the rare, starved queue
+        # a reader raising this flag did not mean to hide.
+        _, out = self._run(
+            [NETWORKNODE, PER_NODE, PER_NODE, PER_NODE_NETWORK],
+            argv=['--min-samples', '2'])
+        self.assertIn('per-node (cluster op) / user_facing', out)
+        self.assertNotIn('networknode / user_facing', out)
+        self.assertIn(
+            '(2 rows with fewer than 2 samples omitted, 2 in total)', out)
+
+    def test_min_samples_can_empty_a_table_without_hiding_that_it_did(self):
+        _, out = self._run([NETWORKNODE], argv=['--min-samples', '5'])
+        self.assertIn('(no samples)', out)
+        self.assertIn(
+            '(1 row with fewer than 5 samples omitted, 1 in total)', out)
