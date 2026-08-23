@@ -405,6 +405,7 @@ Provisional. Phase 0 may re-cut the phase table.
 | 4. Stand up `sf-net-privexec` with a typed network API; net-worker becomes its only client | PLAN-replace-exec-with-netlink-phase-04-net-privexec.md | Not started |
 | 5. Drop `CAP_NET_ADMIN` from `sf-privexec`; remove the network RPCs from its surface | PLAN-replace-exec-with-netlink-phase-05-privexec-shrink.md | Not started |
 | 6. Close out the `sf-net` direct-exec sites and the remaining narrow corners (sysctl, arping) | PLAN-replace-exec-with-netlink-phase-06-cleanup.md | Not started |
+| 7. Push audit | PLAN-replace-exec-with-netlink-phase-07-push-audit.md | Not started |
 
 Notes on sequencing:
 
@@ -458,6 +459,13 @@ Notes on sequencing:
   explicitly documented as "intentionally still exec'd
   because…" — for example, an in-process ARP-frame send
   might be deemed not worth the complexity for one site.
+- **Phase 7 is the push audit.** It runs `PUSH-AUDIT.md`
+  over the accumulated diff of every phase in this plan
+  against `develop`, not the last phase's diff alone.
+  Findings land as their own pull request, and the plan
+  is not complete until each is resolved or declined in
+  writing here. If the audit finds nothing, that is
+  recorded in one sentence.
 
 ## Dependencies on other plans
 

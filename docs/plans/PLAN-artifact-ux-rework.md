@@ -252,6 +252,14 @@ before any implementation phase is cut:
 | 0. Decisions pass | _to be created_ | Not started |
 | (later phases) | _to be created_ | Not started |
 
+### Push audit
+
+However the later phases are cut, the last one is the push audit. It runs
+`PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as their own pull
+request, and this plan is not complete until each is resolved or declined in
+writing here. If the audit finds nothing, that is recorded in one sentence.
+
 ## Agent guidance
 
 This plan follows the standard Shaken Fist planning workflow described in

@@ -98,6 +98,15 @@ class Blob(DatabaseBackedObject):
         ]
 ```
 
+### Phase 4: Push audit
+
+Run the checks in `PUSH-AUDIT.md` over the accumulated diff of every phase in
+this roadmap against `develop`, not the last phase's diff alone -- what the
+phases did to each other is only visible in the whole. Findings land as their
+own pull request, and this roadmap is not complete until each is resolved or
+declined in writing here. If the audit finds nothing, that is recorded in one
+sentence.
+
 ## Alternative Approaches Considered
 
 ### Denormalized Cache Tables

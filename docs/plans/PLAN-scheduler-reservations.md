@@ -359,6 +359,7 @@ table entirely (decision D8).
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
+| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
 
 ### Phase status notes
 
@@ -547,6 +548,13 @@ reads the new events.
 capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.
+
+**Phase 9 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## Dependencies on other plans
 

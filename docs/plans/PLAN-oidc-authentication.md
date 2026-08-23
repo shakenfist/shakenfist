@@ -1021,6 +1021,7 @@ not land anywhere else.
 | 7. Interactive CLI flows and token cache | client-python | TBD | Not started |
 | 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started |
 | 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started |
+| 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started |
 
 **Phase 0 — research and decisions.** Settles open question
 13, direct-bearer versus exchange-based human sessions, and
@@ -1141,6 +1142,13 @@ validation and no use at all for testing a flow. This phase
 stands up a real IdP in a container and drives a login
 through it headlessly, which is also the only honest test of
 phase 3's discovery and of phase 8's worked examples.
+
+**Phase 10 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## Agent guidance
 

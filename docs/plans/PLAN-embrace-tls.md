@@ -183,6 +183,7 @@ decisions document.
 | 5. Optional TLS for sf-api; document operator-LB story | PLAN-embrace-tls-phase-05-api-tls.md | Not started |
 | 6. Cert-expiry monitoring (event log + prometheus) | PLAN-embrace-tls-phase-06-expiry-monitoring.md | Not started |
 | 7. Repurpose `pki_internal_ca` as dev/test convenience | PLAN-embrace-tls-phase-07-dev-ca.md | Not started |
+| 8. Push audit | PLAN-embrace-tls-phase-08-push-audit.md | Not started |
 
 Notes on sequencing:
 
@@ -203,6 +204,13 @@ Notes on sequencing:
 - **Phases 3-5 are parallel-eligible** once phase 2's
   pattern is established, but probably better sequenced
   serially to keep CI green.
+- **Phase 8 is the push audit.** It runs `PUSH-AUDIT.md`
+  over the accumulated diff of every phase in this plan
+  against `develop`, not the last phase's diff alone.
+  Findings land as their own pull request, and the plan
+  is not complete until each is resolved or declined in
+  writing here. If the audit finds nothing, that is
+  recorded in one sentence.
 
 ## Dependencies on other plans
 

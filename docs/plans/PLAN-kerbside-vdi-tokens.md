@@ -381,6 +381,7 @@ Recommendations are recorded inline.
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
 | 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
+| 10. Push audit | all | PLAN-kerbside-vdi-tokens-phase-10-push-audit.md | Not started |
 
 ### Phase 0: Decisions and token format
 
@@ -566,6 +567,15 @@ static or hand-seeded console) is required.
   mint attempt.
 - The SF mint path (phase 7's `test_vdi_tokens.py`) activates
   here too, once `KERBSIDE_URL` is provisioned.
+
+### Phase 10: Push audit
+
+Runs `PUSH-AUDIT.md` over the accumulated diff of every phase
+in this plan against each repository's default branch, not the
+last phase's diff alone. Findings land as their own pull
+request, and the plan is not complete until each is resolved
+or declined in writing here. If the audit finds nothing, that
+is recorded in one sentence.
 
 ## Dependencies on other plans
 

@@ -238,6 +238,7 @@ trustworthy first.
 | 3. The general mechanism for genuinely unbounded reads (`GetObjectEvents`, `GetObjectsByState`, the `Get*Uuids` family) | PLAN-grpc-bounded-replies-phase-03-mechanism.md | Not started |
 | 4. Enforcement: CI fails when a new unbounded `repeated` reply field appears unregistered | PLAN-grpc-bounded-replies-phase-04-enforcement.md | Not started |
 | 5. Lower the client cap, retire the stopgaps, document the contract | PLAN-grpc-bounded-replies-phase-05-closeout.md | Not started |
+| 6. Push audit | PLAN-grpc-bounded-replies-phase-06-push-audit.md | Not started |
 
 Named for phase 1's audit scope, so they are not rediscovered one
 review round at a time: `_direct_get_expired_blob_uuids()` and
@@ -281,6 +282,11 @@ Sequencing constraints:
   the trap.
 - Phase 5 lands last and only once the operator cluster has run on the
   new shape long enough for the histogram to show the tail flattening.
+- Phase 6 is the push audit. It runs `PUSH-AUDIT.md` over the accumulated
+  diff of every phase in this plan against `develop`, not the last
+  phase's diff alone. Findings land as their own pull request, and the
+  plan is not complete until each is resolved or declined in writing
+  here. If the audit finds nothing, that is recorded in one sentence.
 
 ## Dependencies on other plans
 

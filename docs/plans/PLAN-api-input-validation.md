@@ -298,6 +298,7 @@ declarations are good enough to compile.
 | 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the hand-authored `get_args` schemas into the compiled path |
 | 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
+| 7: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
 ### Where the tracked issues stand
 

@@ -127,3 +127,12 @@ frozen.
   would replace the apply-side of those operations.
 * `PLAN-remove-syslog-forwarding.md` — the syslog direction that a
   per-network syslog listener would eventually serve.
+
+### Push audit
+
+When this thoughtbubble is promoted to a real plan and phases are cut, the
+last of them is the push audit. It runs `PUSH-AUDIT.md` over the accumulated
+diff of every phase in the plan against `develop`, not the last phase's diff
+alone. Findings land as their own pull request, and the plan is not complete
+until each is resolved or declined in writing here. If the audit finds
+nothing, that is recorded in one sentence.

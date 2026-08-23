@@ -234,6 +234,14 @@ Provisional, to be re-cut after phase 0.
 | 4. Reaper and reconciler | PLAN-network-service-ports-phase-04-reaper.md | Not started |
 | 5. Validation surface (smoke-test caller or first real caller) | PLAN-network-service-ports-phase-05-validate.md | Not started |
 | 6. Operator and developer documentation | PLAN-network-service-ports-phase-06-docs.md | Not started |
+| 7. Push audit | PLAN-network-service-ports-phase-07-push-audit.md | Not started |
+
+**Phase 7 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## Dependencies on other plans
 
