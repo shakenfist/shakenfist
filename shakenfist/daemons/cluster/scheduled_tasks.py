@@ -715,12 +715,21 @@ def prune_events() -> None:
     sure only one node calls this per day. The actual prune work
     runs inside the sf-database direct path; this function just
     triggers it and logs the result.
+
+    mariadb.prune_events() raises on failure (issue 3849), so the
+    success line below always means the sweep actually ran. A failure
+    is swallowed with a warning so a transient database problem does
+    not kill the maintainer; there is no sooner retry than the next
+    daily fire (retry cadence and pause-after-repeated-failure
+    semantics belong to PLAN-recurring-operations).
     """
     try:
         rows = mariadb.prune_events()
         LOG.info(f'Events prune sweep removed {rows} rows.')
     except Exception as e:
-        LOG.warning(f'Events prune sweep failed: {e}')
+        LOG.warning(
+            'Events prune sweep failed and will not retry until the '
+            f'next daily sweep: {e}')
 
 
 def _deleted_object_delay(objtype):

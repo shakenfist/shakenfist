@@ -458,6 +458,27 @@ class ClusterPruneEventsScheduledTaskTestCase(base.ShakenFistTestCase):
         warn_msg = str(mock_log_warn.call_args[0][0])
         self.assertIn('failed', warn_msg.lower())
 
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.prune_events',
+                side_effect=DatabaseUnavailable(
+                    'gRPC PruneEvents failed after 300.1s of its 300s '
+                    'deadline'))
+    def test_prune_events_timeout_is_a_failure_not_a_noop(self, mock_prune):
+        """A timed-out prune must not produce the success line (issue 3849).
+
+        mariadb.prune_events() raises DatabaseUnavailable when the RPC
+        deadline expires; the shim must log the failure branch, with
+        the cause, and never the "removed N rows" success line.
+        """
+        with mock.patch.object(st.LOG, 'info') as mock_log_info, \
+                mock.patch.object(st.LOG, 'warning') as mock_log_warn:
+            st.prune_events()
+
+        mock_log_info.assert_not_called()
+        mock_log_warn.assert_called_once()
+        warn_msg = str(mock_log_warn.call_args[0][0])
+        self.assertIn('300s deadline', warn_msg)
+        self.assertIn('next daily sweep', warn_msg)
+
 
 class FakeNamespaceKey:
     """Minimal fake NamespaceKey for the expiry sweep tests."""

@@ -5921,27 +5921,44 @@ def record_event_batch(events: list[EventRecord]) -> bool:
     return _direct_record_event_batch(events)
 
 
+PRUNE_EVENTS_RPC_TIMEOUT = 300.0
+
+
 def _grpc_prune_events() -> int:
     """Trigger the daily events prune sweep via the database microservice.
 
     The prune is a once-a-day call that may legitimately take minutes,
     so we bypass the standard ``_grpc_call`` retry helper (which uses
     the short ``GRPC_TIMEOUT``) and invoke the stub directly with a
-    generous 5-minute timeout. The cluster maintainer's scheduled
-    task tolerates a no-op return; on RPC failure we log and return
-    zero so the scheduler keeps running.
+    generous 5-minute timeout.
+
+    A failure raises rather than returning zero: a return value from
+    this function always means the sweep ran, so the caller can tell
+    "pruned nothing" from "did not prune" (issue 3849, the same shape
+    as issue 3373's unreachable-database rule).
+
+    Raises:
+        exceptions.DatabaseUnavailable: the RPC failed or exceeded
+            its deadline.
+        exceptions.WriteException: sf-database answered but reported
+            the sweep failed server-side.
     """
+    stub = _get_database_stub()
+    request = database_pb2.PruneEventsRequest()
+    start_time = time.time()
     try:
-        stub = _get_database_stub()
-        request = database_pb2.PruneEventsRequest()
-        reply = stub.PruneEvents(request, timeout=300.0)
-        if not reply.success:
-            LOG.warning(f'gRPC PruneEvents failed: {reply.error}')
-            return int(reply.rows_pruned)
-        return int(reply.rows_pruned)
+        reply = stub.PruneEvents(request, timeout=PRUNE_EVENTS_RPC_TIMEOUT)
     except grpc.RpcError as e:
-        LOG.error(f'gRPC PruneEvents failed: {e}')
-        return 0
+        elapsed = time.time() - start_time
+        msg = (f'gRPC PruneEvents failed after {elapsed:.1f}s of its '
+               f'{PRUNE_EVENTS_RPC_TIMEOUT:.0f}s deadline: {e}')
+        LOG.error(msg)
+        raise exceptions.DatabaseUnavailable(msg) from e
+    if not reply.success:
+        raise exceptions.WriteException(
+            f'gRPC PruneEvents reported a server-side failure: '
+            f'{reply.error}')
+    return int(reply.rows_pruned)
 
 
 def prune_events() -> int:
@@ -5951,7 +5968,9 @@ def prune_events() -> int:
     the direct path, on every other daemon dispatches via the
     database gRPC channel. Returns the total number of rows pruned
     (``event_objects`` rows from stages A and B plus ``events`` rows
-    from stage C).
+    from stage C). The gRPC path raises DatabaseUnavailable or
+    WriteException if the sweep did not run, so a return of zero
+    always means there was nothing to prune.
     """
     if _use_database_service():
         return _grpc_prune_events()

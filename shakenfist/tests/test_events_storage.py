@@ -13,6 +13,7 @@ from unittest import mock
 import grpc
 from sqlalchemy.exc import OperationalError
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.schema.event import EventRecord
@@ -1037,6 +1038,52 @@ class PruneEventsRoutingTestCase(base.ShakenFistTestCase):
         result = mariadb.prune_events()
         self.assertEqual(99, result)
         mock_direct.assert_called_once()
+
+
+class GrpcPruneEventsTestCase(base.ShakenFistTestCase):
+    """_grpc_prune_events must raise on failure, never return zero.
+
+    Issue 3849: a DEADLINE_EXCEEDED prune returned 0, so the cluster
+    maintainer logged the success line "removed 0 rows" for a sweep
+    that never ran. A return value from _grpc_prune_events now always
+    means the sweep ran.
+    """
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_success_returns_rows_pruned(self, mock_stub):
+        mock_stub.return_value.PruneEvents.return_value = mock.Mock(
+            success=True, error='', rows_pruned=42)
+
+        self.assertEqual(42, mariadb._grpc_prune_events())
+        _, kwargs = mock_stub.return_value.PruneEvents.call_args
+        self.assertEqual(
+            mariadb.PRUNE_EVENTS_RPC_TIMEOUT, kwargs['timeout'])
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_rpc_error_raises_database_unavailable(
+            self, mock_stub, mock_log):
+        mock_stub.return_value.PruneEvents.side_effect = grpc.RpcError()
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, mariadb._grpc_prune_events)
+
+        # The failure line must carry the elapsed time and the RPC
+        # deadline so an operator can see a timeout for what it is.
+        mock_log.error.assert_called_once()
+        logged = mock_log.error.call_args[0][0]
+        self.assertIn('after', logged)
+        self.assertIn(
+            f'{mariadb.PRUNE_EVENTS_RPC_TIMEOUT:.0f}s deadline', logged)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_server_side_failure_raises_write_exception(self, mock_stub):
+        mock_stub.return_value.PruneEvents.return_value = mock.Mock(
+            success=False, error='mid-sweep explosion', rows_pruned=0)
+
+        exc = self.assertRaises(
+            exceptions.WriteException, mariadb._grpc_prune_events)
+        self.assertIn('mid-sweep explosion', str(exc))
 
 
 # ---------------------------------------------------------------------------
