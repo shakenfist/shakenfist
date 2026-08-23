@@ -10,6 +10,7 @@
 # 2. A typed data transfer object for AgentOperation static values
 
 from typing import Annotated
+from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -35,6 +36,16 @@ class AgentOperationData(BaseModel):
         instance_uuid: The UUID of the Instance this operation
             targets.
         commands: List of command dicts (stored as JSON).
+        deadline: Absolute unix timestamp after which the operation
+            must not be dispatched and must not continue executing.
+            NULL means no client intent was recorded, so the server
+            default applies; an explicit 0.0 means the client asked
+            for no wall-clock deadline at all.
+        progress_timeout: Seconds without forward progress which are
+            fatal to the operation. NULL means no client intent was
+            recorded, so the server default for progress-capable
+            commands applies; an explicit 0.0 disables the progress
+            timeout.
         version: Object version number for schema migrations.
     """
 
@@ -52,6 +63,25 @@ class AgentOperationData(BaseModel):
 
     # List of command dicts (variable-length, stored as JSON)
     commands: list[dict]
+
+    # The absolute unix timestamp after which this operation must not
+    # be dispatched and must not continue executing. Computed by the
+    # API server at request receipt as time.time() + deadline_seconds.
+    #
+    # NULL means no client intent was recorded -- either the row
+    # predates deadlines entirely, or it was written by an API node
+    # which had not yet been upgraded -- and the server default
+    # applies. An explicit 0.0 means the client asked for no
+    # wall-clock deadline at all. 0.0 is an unambiguous sentinel
+    # because a real deadline is an absolute timestamp of order 1.7e9.
+    deadline: Optional[float] = None
+
+    # Seconds without forward progress which are fatal to this
+    # operation. NULL means the same thing it means for deadline: no
+    # client intent was recorded, so the server default for
+    # progress-capable commands applies. An explicit 0.0 disables the
+    # progress timeout.
+    progress_timeout: Optional[float] = None
 
     # Object version number for schema migrations
     version: int

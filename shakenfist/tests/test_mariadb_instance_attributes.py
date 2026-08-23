@@ -139,17 +139,35 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
         super().setUp()
         self.data = AgentOperationAttributesData(
             uuid=uuid.uuid4(),
-            results={'0': {'status': 0}})
+            results={'0': {'status': 0}},
+            last_progress=1234.5,
+            attempts=2)
 
     def test_no_mask_returns_every_column(self):
         values = mariadb._agent_operation_attributes_column_values(self.data)
-        self.assertEqual({'results'}, set(values))
+        self.assertEqual(
+            {'results', 'last_progress', 'attempts'}, set(values))
 
     def test_mask_limits_columns(self):
         values = mariadb._agent_operation_attributes_column_values(
             self.data, ['results'])
         self.assertEqual({'results'}, set(values))
         self.assertEqual('{"0": {"status": 0}}', values['results'])
+
+    def test_mask_limits_columns_for_progress_fields(self):
+        # The point of the mask is that a writer of one attribute
+        # cannot push a stale snapshot of the others over a concurrent
+        # writer's committed change. Now that three columns exist,
+        # that is a real hazard rather than a theoretical one.
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['last_progress'])
+        self.assertEqual({'last_progress'}, set(values))
+        self.assertEqual(1234.5, values['last_progress'])
+
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['attempts'])
+        self.assertEqual({'attempts'}, set(values))
+        self.assertEqual(2, values['attempts'])
 
     def test_unknown_field_rejected(self):
         self.assertRaises(

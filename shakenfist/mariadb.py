@@ -348,8 +348,8 @@ NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
-AGENT_OPERATIONS_VERSION = 2
-AGENT_OPERATION_ATTRIBUTES_VERSION = 2
+AGENT_OPERATIONS_VERSION = 3
+AGENT_OPERATION_ATTRIBUTES_VERSION = 3
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 3
@@ -18479,6 +18479,34 @@ def _ensure_agent_operations_schema(
         current_ver = AGENT_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver < AGENT_OPERATIONS_VERSION:
+        # Add the agent operation deadline columns. Both are nullable
+        # with no backfill, because NULL is a meaningful value here
+        # rather than a gap: it means no client intent was recorded,
+        # so the server default applies. An explicit 0.0 is what
+        # "the client asked for none" looks like. Safe to run
+        # repeatedly -- ADD COLUMN IF NOT EXISTS is a no-op when the
+        # column already exists, which is the case on a new deployment
+        # where create_all() included it.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{AGENT_OPERATIONS_VERSION} (add deadline columns)')
+        with engine.connect() as conn:
+            for column in ('deadline DOUBLE NULL',
+                           'progress_timeout DOUBLE NULL'):
+                try:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} '
+                        f'ADD COLUMN IF NOT EXISTS {column}'))
+                    conn.commit()
+                except (IntegrityError, OperationalError) as e:
+                    LOG.debug(
+                        f'Column {column} could not be added to '
+                        f'{table_name}: {e}')
+
+        current_ver = AGENT_OPERATIONS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -18516,6 +18544,36 @@ def _ensure_agent_operation_attributes_schema(
         current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION:
+        # Add the progress and retry bookkeeping columns.
+        # last_progress is nullable (NULL means no progress observed
+        # yet), attempts is not, so it needs a DEFAULT for the rows
+        # which already exist -- without one the ALTER fails outright
+        # on a non-empty table. That DEFAULT is a deliberate
+        # divergence from what create_all() produces on a fresh
+        # database, since pydantic_to_sqlalchemy_table has no
+        # server-default support; it is harmless because every insert
+        # supplies the value. Safe to run repeatedly.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
+            '(add progress and attempt columns)')
+        with engine.connect() as conn:
+            for column in ('last_progress DOUBLE NULL',
+                           'attempts BIGINT NOT NULL DEFAULT 0'):
+                try:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} '
+                        f'ADD COLUMN IF NOT EXISTS {column}'))
+                    conn.commit()
+                except (IntegrityError, OperationalError) as e:
+                    LOG.debug(
+                        f'Column {column} could not be added to '
+                        f'{table_name}: {e}')
+
+        current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -18549,6 +18607,8 @@ def _direct_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace,
                 instance_uuid=data.instance_uuid,
                 commands=_json_dumps(data.commands),
+                deadline=data.deadline,
+                progress_timeout=data.progress_timeout,
                 version=data.version
             )
             conn.execute(stmt)
@@ -18595,6 +18655,8 @@ def _direct_get_agent_operation(
                 namespace=result.namespace,
                 instance_uuid=result.instance_uuid,
                 commands=commands if commands else [],
+                deadline=result.deadline,
+                progress_timeout=result.progress_timeout,
                 version=result.version
             )
     except OperationalError as e:
@@ -18640,7 +18702,9 @@ def _direct_create_agent_operation_attributes(
         with engine.connect() as conn:
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
-                results=_json_dumps(data.results))
+                results=_json_dumps(data.results),
+                last_progress=data.last_progress,
+                attempts=data.attempts)
             conn.execute(stmt)
             conn.commit()
             return True
@@ -18677,6 +18741,8 @@ def _direct_get_agent_operation_attributes(
             return AgentOperationAttributesData(
                 uuid=result.uuid,
                 results=results if results else {},
+                last_progress=result.last_progress,
+                attempts=result.attempts,
             )
     except OperationalError as e:
         LOG.warning(
@@ -18697,6 +18763,8 @@ def _agent_operation_attributes_column_values(
     """
     all_values: Dict[str, Any] = {
         'results': _json_dumps(data.results),
+        'last_progress': data.last_progress,
+        'attempts': data.attempts,
     }
     if not fields:
         return all_values
