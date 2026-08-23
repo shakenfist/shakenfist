@@ -12224,24 +12224,55 @@ YAML.</p>
   confirm at least one reaches a PR — this is the plan's own
   outstanding success criterion, and the only thing that exercises the
   workflow end to end. It needs the fix on <code>develop</code> first, because
-  the workflow checks out <code>develop</code>.</li>
+  the workflow checks out <code>develop</code>. That fix is on <code>develop</code> as of
+  2026-08-20, and six scheduled runs have since completed with every
+  step after <code>Find eligible issue</code> skipped: both issues are blocked by
+  their own <code>autofix-failed</code> label, and the third open
+  <code>security-audit</code> issue (#483) is hand-written prose that the JSON
+  gate correctly rejects. Nothing is broken; there is no input. A
+  <code>workflow_dispatch</code> with an explicit <code>issue_number</code> bypasses the
+  label check, which is how phase 1 proves the loop.</li>
 <li>Refresh the hardcoded <code>Co-Authored-By: Claude Opus 4.6 (1M context)</code>
   trailer in the Create PR step, which no longer names the model that
-  runs. Deliberately left: the workflow cannot introspect which model
-  the <code>claude</code> CLI resolves to, so any name hardcoded here goes stale
-  the same way. Deciding between a generic trailer and dropping the
-  line is a call for a human.</li>
-<li><code>tools/address-comments-with-claude.sh</code> has the same defect this
+  runs. This was previously recorded here as a call for a human on the
+  grounds that the workflow cannot introspect which model the <code>claude</code>
+  CLI resolves to. <strong>That is no longer true</strong>, and phase 1's survey
+  measured it: <code>claude -p --output-format json</code> reports <code>.modelUsage</code>
+  keyed by the resolved model with its <code>contextWindow</code>, so the trailer
+  can be derived per run and cannot go stale again. The same defect
+  exists in <code>.github/workflows/test-drift-fix.yml</code> and
+  <code>tools/address-comments-with-claude.sh</code>, which carry a <em>different</em>
+  stale name; phase 1 fixes all three behind one tested helper.</li>
+<li><code>tools/address-comments-with-claude.sh</code> had the same defect this
   plan diagnosed, in the review-comment loop rather than the fuzz loop
-  (issue #510): it instructs Claude to stage, then reports an unstaged
-  fix as a skipped review item. PR #511 fixes it, reusing the stager
-  in <code>--tracked-only</code> mode; it lands after this one, because the
-  address-comments workflow checks its trusted tools out of the
-  default branch. It was not the one-line change it looked like: the
-  loop's Claude-failed and disagreement branches do not reset the
-  tree, so staging on Claude's behalf would attribute one item's
-  leftovers to the next item's commit.</li>
+  (issue #510): it instructed Claude to stage, then reported an
+  unstaged fix as a skipped review item. <strong>Done</strong> — PR #511 merged as
+  <code>7b1afe4</code>, reusing the stager in <code>--tracked-only</code> mode. It was not
+  the one-line change it looked like: the loop's Claude-failed and
+  disagreement branches do not reset the tree, so staging on Claude's
+  behalf would attribute one item's leftovers to the next item's
+  commit.</li>
 </ul>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>The workflow, and the staging fix that made it able to open a pull
+request, predate this table and were tracked inline in the sections
+above. Phase 1 is the remaining close-out.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Derived trailers and an end-to-end proof</td>
+<td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">PLAN-fuzz-autofix-phase-01-closeout.md</a></td>
+<td>In progress</td>
+</tr>
+</tbody>
+</table>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
