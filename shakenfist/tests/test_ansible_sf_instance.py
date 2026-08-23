@@ -1,5 +1,6 @@
 # Copyright 2019 Michael Still and contributors
 import importlib.util
+import itertools
 import os
 import sys
 import types
@@ -411,6 +412,70 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
                       'create will wait and what it spends is deducted from '
                       'the await budget instead',
                       module.exit_json.call_args[1]['log'])
+
+
+class SfInstanceDeleteBoundTestCase(base.ShakenFistTestCase):
+    """_delete_and_wait() must hold its advertised 180 second bound.
+
+    Issue 3851: the client is built with ASYNC_BLOCK, so a plain
+    delete_instance() ran its own poll loop for up to 3600 seconds inside
+    the first iteration. The 180 was never a deadline, only a "do not
+    start another attempt after this" check evaluated between iterations,
+    so a stuck instance held the task for an hour -- with no budget at
+    all around it on the state=absent path.
+    """
+
+    def _run(self, get_results):
+        log = []
+        client = mock.MagicMock()
+        client.get_instance.side_effect = get_results
+        # One simulated second per clock read, and sleeping costs
+        # nothing, so a stuck instance runs the loop to its bound in
+        # milliseconds of real time.
+        clock = itertools.count()
+        with mock.patch.object(
+                sf_instance.time, 'monotonic',
+                side_effect=lambda: next(clock)), \
+                mock.patch.object(sf_instance.time, 'sleep'):
+            result = sf_instance._delete_and_wait(
+                client, log, 'notreallyauuid', 'ns')
+        return result, client, next(clock)
+
+    def test_the_delete_is_asked_not_to_wait(self):
+        # async_request=True is what makes the client return after the
+        # DELETE is accepted instead of polling against its own hour long
+        # ASYNC_BLOCK deadline; it returns {} rather than the instance,
+        # which this function never reads.
+        result, client, _ = self._run([{'state': 'deleted'}])
+        self.assertIsNone(result)
+        client.delete_instance.assert_called_once_with(
+            'notreallyauuid', namespace='ns', async_request=True)
+
+    def test_polling_observes_the_deletion(self):
+        result, client, _ = self._run(
+            [{'state': 'created'}, {'state': 'created'},
+             {'state': 'deleted'}])
+        self.assertIsNone(result)
+        self.assertEqual(3, client.get_instance.call_count)
+
+    def test_a_vanished_instance_is_a_successful_deletion(self):
+        result, _, _ = self._run(
+            sf_instance.apiclient.ResourceNotFoundException())
+        self.assertIsNone(result)
+
+    def test_a_stuck_instance_returns_within_the_stated_bound(self):
+        stuck = {'state': 'created'}
+        result, client, elapsed = self._run(itertools.repeat(stuck))
+
+        # Control returned with the instance still there, inside the
+        # bound the function advertises rather than an hour after it.
+        self.assertEqual(stuck, result)
+        self.assertLess(elapsed, 200)
+
+        # And the DELETE was enqueued once, not once per second: 180
+        # deletion operations against an instance that is already stuck
+        # is the failure mode a non-blocking retrying loop would have.
+        self.assertEqual(1, client.delete_instance.call_count)
 
 
 class SfInstanceCreateTimeoutDetectionTestCase(base.ShakenFistTestCase):
