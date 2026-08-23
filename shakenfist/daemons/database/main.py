@@ -4300,6 +4300,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             namespace=d.namespace or '',
             instance_uuid=UUID(d.instance_uuid),
             commands=commands,
+            deadline=d.deadline if d.HasField('deadline') else None,
+            progress_timeout=(d.progress_timeout
+                              if d.HasField('progress_timeout') else None),
             version=d.version
         )
 
@@ -4313,6 +4316,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             namespace=data.namespace or '',
             instance_uuid=str(data.instance_uuid),
             commands_json=json.dumps(data.commands),
+            deadline=data.deadline,
+            progress_timeout=data.progress_timeout,
             version=data.version
         )
 
@@ -4426,6 +4431,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         return AgentOperationAttributesData(
             uuid=UUID(d.uuid),
             results=results,
+            last_progress=(d.last_progress
+                           if d.HasField('last_progress') else None),
+            attempts=d.attempts,
         )
 
     def _agentop_attrs_to_proto(
@@ -4435,7 +4443,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Convert AgentOperationAttributesData to proto."""
         return database_pb2.AgentOperationAttributesProto(
             uuid=str(data.uuid),
-            results_json=json.dumps(data.results))
+            results_json=json.dumps(data.results),
+            last_progress=data.last_progress,
+            attempts=data.attempts)
 
     # Artifact Operations (MariaDB)
     def CreateArtifact(

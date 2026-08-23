@@ -18838,6 +18838,8 @@ def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace or '',
                 instance_uuid=str(data.instance_uuid),
                 commands_json=_json_dumps(data.commands),
+                deadline=data.deadline,
+                progress_timeout=data.progress_timeout,
                 version=data.version
             )
         )
@@ -18867,6 +18869,9 @@ def _grpc_get_agent_operation(
             namespace=d.namespace or '',
             instance_uuid=d.instance_uuid,
             commands=commands,
+            deadline=d.deadline if d.HasField('deadline') else None,
+            progress_timeout=(d.progress_timeout
+                              if d.HasField('progress_timeout') else None),
             version=d.version
         )
     except grpc.RpcError as e:
@@ -18899,7 +18904,9 @@ def _grpc_create_agent_operation_attributes(
         request = database_pb2.CreateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=_json_dumps(data.results)))
+                results_json=_json_dumps(data.results),
+                last_progress=data.last_progress,
+                attempts=data.attempts))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -18925,6 +18932,9 @@ def _grpc_get_agent_operation_attributes(
         return AgentOperationAttributesData(
             uuid=d.uuid,
             results=results,
+            last_progress=(d.last_progress
+                           if d.HasField('last_progress') else None),
+            attempts=d.attempts,
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -18946,7 +18956,9 @@ def _grpc_update_agent_operation_attributes(
         request = database_pb2.UpdateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=_json_dumps(data.results)),
+                results_json=_json_dumps(data.results),
+                last_progress=data.last_progress,
+                attempts=data.attempts),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)
