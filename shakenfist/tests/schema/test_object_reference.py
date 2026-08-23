@@ -427,3 +427,95 @@ class ObjectReferenceSerializationTestCase(base.ShakenFistTestCase):
             self.assertIn('nvram_template', result)
             self.assertEqual(len(result['disk']), 1)
             self.assertEqual(len(result['nvram_template']), 1)
+
+    def test_references_to_grouped_dict_namespaced_requester(self):
+        """Test that a namespaced requester sees non-Node references."""
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='testns'):
+            ref1 = ObjectReference(
+                source_object_type=ObjectType.INSTANCE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.DISK,
+                relationship_value='0',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            ref2 = ObjectReference(
+                source_object_type=ObjectType.ARTIFACT,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.ARTIFACT_INDEX,
+                relationship_value='000000000001',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            result = references_to_grouped_dict([ref1, ref2])
+
+            self.assertEqual(len(result), 2)
+            self.assertIn('disk', result)
+            self.assertIn('artifact_index', result)
+
+    def test_references_to_grouped_dict_namespaced_requester_node_refs(self):
+        """Test that a namespaced requester does not see Node references."""
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='testns'):
+            ref1 = ObjectReference(
+                source_object_type=ObjectType.NODE,
+                source_uuid='sf-1',
+                relationship=RelationshipType.BLOB_LOCATION,
+                relationship_value=None,
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            ref2 = ObjectReference(
+                source_object_type=ObjectType.NODE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.INSTANCE_LOCATION,
+                relationship_value=None,
+                target_object_type=ObjectType.INSTANCE,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            ref3 = ObjectReference(
+                source_object_type=ObjectType.ARTIFACT,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.ARTIFACT_INDEX,
+                relationship_value='000000000001',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            result = references_to_grouped_dict([ref1, ref2, ref3])
+
+            self.assertNotIn('blob_location', result)
+            self.assertNotIn('instance_location', result)
+            self.assertIn('artifact_index', result)
+
+    def test_references_to_grouped_dict_system_requester_node_refs(self):
+        """Test that the system requester sees Node references."""
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='system'):
+            ref = ObjectReference(
+                source_object_type=ObjectType.NODE,
+                source_uuid='sf-1',
+                relationship=RelationshipType.BLOB_LOCATION,
+                relationship_value=None,
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            result = references_to_grouped_dict([ref])
+
+            self.assertIn('blob_location', result)
+            self.assertEqual(len(result['blob_location']), 1)
