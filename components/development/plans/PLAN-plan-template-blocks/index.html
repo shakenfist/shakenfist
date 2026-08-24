@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/development/plans/PLAN-plan-template-blocks/">
       
       
-        <link rel="prev" href="../PLAN-llm-doc-structure/">
+        <link rel="prev" href="../PLAN-push-audit-phase/">
       
       
         <link rel="next" href="../PLAN-stestr-testtools/">
@@ -2549,6 +2549,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-push-audit-phase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: give the pre-push audit a trigger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2646,10 +2674,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-seven-shared-blocks-templatesshared-blocks" class="md-nav__link">
+  <a href="#1-nine-shared-blocks-templatesshared-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Seven shared blocks -- templates/shared-blocks/
+        1. Nine shared blocks -- templates/shared-blocks/
       
     </span>
   </a>
@@ -13239,10 +13267,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-seven-shared-blocks-templatesshared-blocks" class="md-nav__link">
+  <a href="#1-nine-shared-blocks-templatesshared-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Seven shared blocks -- templates/shared-blocks/
+        1. Nine shared blocks -- templates/shared-blocks/
       
     </span>
   </a>
@@ -13404,7 +13432,7 @@ maintenance</code> (project-specific) sits between <code>### Bugs fixed during
 this work</code> and <code>### Back brief</code>, so the close-out sections are not
 even contiguous.</p>
 <h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
-<h3 id="1-seven-shared-blocks-templatesshared-blocks">1. Seven shared blocks -- <code>templates/shared-blocks/</code><a class="headerlink" href="#1-seven-shared-blocks-templatesshared-blocks" title="Permanent link">&para;</a></h3>
+<h3 id="1-nine-shared-blocks-templatesshared-blocks">1. Nine shared blocks -- <code>templates/shared-blocks/</code><a class="headerlink" href="#1-nine-shared-blocks-templatesshared-blocks" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -13417,6 +13445,11 @@ even contiguous.</p>
 <tr>
 <td><code>plan-file-conventions</code></td>
 <td>where plans live, phase file naming, the phase tracking table, one commit per logical change</td>
+<td>rare</td>
+</tr>
+<tr>
+<td><code>plan-status-vocabulary</code></td>
+<td>the fixed set of terms a status cell may hold</td>
 <td>rare</td>
 </tr>
 <tr>
@@ -13449,8 +13482,20 @@ even contiguous.</p>
 <td>Future work, Bugs fixed, Back brief -- headings included</td>
 <td>rare</td>
 </tr>
+<tr>
+<td><code>plan-push-audit-phase</code></td>
+<td>every master plan ends with a phase running <code>PUSH-AUDIT.md</code> over the whole plan's work</td>
+<td>rare</td>
+</tr>
 </tbody>
 </table>
+<p>This started as seven. <code>plan-status-vocabulary</code> was added when the
+<code>plan-index</code> audit needed the same wording on both sides, and
+<code>plan-push-audit-phase</code> by <code>PLAN-push-audit-phase.md</code>, which needed
+somewhere to put the pre-push audit's trigger and found that this
+plan's migration was the only pass that would carry it into eight
+templates without editing them twice. The migration below covers
+all nine.</p>
 <p><code>subagent-model-roster</code> is separate from <code>subagent-step-guidance</code>
 on purpose. It churns whenever a model ships or retires while the
 effort ladder sits still for months, and separating them means the
@@ -13474,7 +13519,7 @@ bug tracker".</p>
 <h3 id="2-automated-check-scriptsaudit-checkpy">2. Automated check -- <code>scripts/audit-check.py</code><a class="headerlink" href="#2-automated-check-scriptsaudit-checkpy" title="Permanent link">&para;</a></h3>
 <p><code>check_plan_template</code> mirrors <code>check_push_audit</code>: repositories with
 no <code>PLAN-TEMPLATE.md</code> are <code>not_applicable</code>; those that have one must
-carry all seven blocks, current and verbatim. Registered in
+carry all nine blocks, current and verbatim. Registered in
 <code>CHECK_NAMES</code>, in the check list, and in <code>audit_common.py</code>
 (<code>AUDIT_METADATA</code> and its names table).</p>
 <p>Whether every repository should have a plan template is deliberately
@@ -13487,7 +13532,11 @@ worse than none.</p>
 roster is separate, and what stays project-specific. Registered in
 <code>audits/README.md</code> and <code>PROJECT-CONSISTENCY-AUDITS.md</code>.</p>
 <h2 id="migration-separate-commits-one-per-repository">Migration (separate commits, one per repository)<a class="headerlink" href="#migration-separate-commits-one-per-repository" title="Permanent link">&para;</a></h2>
-<p>Not started. For each of the eight repositories, in its own branch:</p>
+<p>Landed in four of the eight repositories: instar, kerbside, ryll
+and shakenfist are <code>compliant</code> on the <code>plan-template</code> check.
+Outstanding for client-python-k3s, divergulent and occystrap
+(sfui has no template and is N/A). For each remaining repository,
+in its own branch:</p>
 <ol>
 <li>Restructure <code>PLAN-TEMPLATE.md</code> so no section mixes generic and
    project-specific text. In practice: move the project-specific
@@ -13498,7 +13547,7 @@ roster is separate, and what stays project-specific. Registered in
    <code>### Documentation index maintenance</code> up next to
    <code>### Success criteria</code> so the close-out sections become
    contiguous.</li>
-<li>Embed the seven blocks verbatim.</li>
+<li>Embed the nine blocks verbatim.</li>
 <li>Confirm <code>audit-check.py</code> reports <code>plan-template</code> as pass.</li>
 </ol>
 <p>occystrap and client-python-k3s have no <code>## Agent guidance</code> section
@@ -13513,7 +13562,9 @@ review before eight copies of it exist.</p>
   template) and <code>fail</code> with per-block detail for shakenfist
   (template present, no blocks yet). Confirmed.</li>
 <li>A restructured shakenfist template carrying all seven blocks
-  returns <code>pass</code>. Confirmed against a scratch copy.</li>
+  returns <code>pass</code>. Confirmed against a scratch copy -- at seven,
+  before <code>plan-status-vocabulary</code> and <code>plan-push-audit-phase</code> were
+  added. Re-confirm at nine as part of the migration.</li>
 <li>Bumping a block version marks the embedding repository stale, and
   names the block that moved. Confirmed.</li>
 </ul>

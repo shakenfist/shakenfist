@@ -2149,6 +2149,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#why-the-reference-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the reference is checked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#shared-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2640,6 +2651,34 @@
     
   
     Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-push-audit-phase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: give the pre-push audit a trigger
   
 
     
@@ -13184,6 +13223,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#why-the-reference-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the reference is checked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#shared-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13271,13 +13321,39 @@
   code-quality review section;</li>
 <li>embed the current <strong><code>plan-phase-references</code> shared block</strong> in its
   documentation-review section (see the <code>plan-phase-references</code>
-  audit for the policy it enforces); and</li>
+  audit for the policy it enforces);</li>
 <li>keep every embedded shared block verbatim and at the current
-  version.</li>
+  version; and</li>
+<li>be <strong>referenced from <code>AGENTS.md</code></strong>, so a session has some way of
+  discovering it.</li>
 </ul>
 <p>Repositories with no pre-push audit file at all are reported as N/A:
 whether every project should have one is a separate decision, not
 smuggled in here.</p>
+<h3 id="why-the-reference-is-checked">Why the reference is checked<a class="headerlink" href="#why-the-reference-is-checked" title="Permanent link">&para;</a></h3>
+<p>Checking only the file's contents is how the runbook went
+untriggered. In August 2026 the audit was current and correct in
+eight repositories while three <code>AGENTS.md</code> files mentioned it at
+all, and exactly one of those said <em>when</em> to run it -- the other
+two were passive index entries. No <code>CLAUDE.md</code>, no
+<code>PLAN-TEMPLATE.md</code>, no git hook and no CI job pointed at it either,
+so the audit ran when the operator remembered it and not otherwise.</p>
+<p>Mention is what this check measures, so three is the number it
+moves; one is the number that had a trigger. The check closes the
+discoverability half of that gap, not the trigger half.</p>
+<p><code>AGENTS.md</code> is the surface checked because it is loaded into every
+session, which makes it the one place a reference is certain to be
+read. The check is deliberately shallow -- it looks for the
+filename, not for particular wording -- because the reference that
+matters is the one a repository writes for itself. A repository
+still on the legacy <code>PUSH-TEMPLATE.md</code> name is checked against that
+name, so it is told to rename the file once rather than told twice
+about a file it does not have.</p>
+<p>The reference is necessary but not sufficient: discoverable is not
+the same as run. What makes it run is the <code>plan-push-audit-phase</code>
+shared block, which puts a push-audit phase at the end of every
+master plan; that block lives in <code>PLAN-TEMPLATE.md</code> and is enforced
+by the <code>plan-template</code> audit rather than by this one.</p>
 <h3 id="shared-blocks">Shared blocks<a class="headerlink" href="#shared-blocks" title="Permanent link">&para;</a></h3>
 <p>A shared block is canonical wording embedded verbatim across
 repositories, delimited by versioned markers:</p>
@@ -13325,12 +13401,16 @@ contradicts, paste
 brief for the code-quality review agent, and paste
 <code>templates/shared-blocks/plan-phase-references.md</code> verbatim into the
 documentation-review section.</p>
+<p>To fix a missing reference: add a line to <code>AGENTS.md</code> naming
+<code>PUSH-AUDIT.md</code> and saying when it is run. Where the repository
+indexes its runbooks, that index is the natural home; the check only
+requires the filename to appear.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
 <p><em>This table is regenerated daily by the consistency audit
 workflow from <code>scripts/audit-check.py</code> results; do not edit
 it by hand.</em></p>
-<p>Last regenerated: 2026-08-23T06:45:38.740880+00:00</p>
+<p>Last regenerated: 2026-08-24T07:04:16.593679+00:00</p>
 <table>
 <thead>
 <tr>
