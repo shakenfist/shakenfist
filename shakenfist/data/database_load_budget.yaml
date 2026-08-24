@@ -1,0 +1,786 @@
+# Expected sf-database load, as a model rather than a number.
+#
+# Shaken Fist's database load is dominated by polling whose rate is set
+# by how many things exist rather than by any work performed, so an
+# absolute "expect under N queries per second" tells a deployer nothing
+# about their own cluster. This file expresses the expectation as a
+# decomposition instead:
+#
+#   expected_qps = per_node_base_qps   x nodes
+#                + cluster_base_qps                 (once per cluster)
+#                + per_instance_qps   x standing_instances
+#
+# and every consumer -- the functional CI check, the generated
+# Prometheus rules, `sf-ctl database-load`, and our own nightly report
+# -- reads this file rather than carrying its own copy. See
+# docs/operator_guide/database.md for the operator's view and
+# docs/plans/PLAN-database-load-reduction-phase-07-regression-detection.md
+# for how the numbers were derived.
+#
+# DO NOT hand-edit levels to make a check pass. A budget that tracks
+# whatever the code currently does is not a budget. If load has moved,
+# either it is a regression worth fixing or the model has changed and
+# the change belongs in a commit that says so.
+
+version: 1
+
+_doc:
+  derived_from: sfcbr
+  window: 2026-08-21T00:00:00Z/2026-08-24T18:00:00Z
+  samples: 181 points at 1800s, each a 30m rate
+  cluster_shape:
+    nodes: 6
+    roles: 6 hypervisors, of which 1 also network and 2 also database
+    standing_instances: 8 minimum, 47 peak, 18.2 mean
+  method: >-
+    Per (operation, caller_daemon) pair, an ordinary least squares fit of
+    the pair's rate against the cluster's standing instance count over
+    the window. The fitted slope becomes per_instance_qps where it is
+    significant (r-squared at least 0.30 and contributing at least
+    0.15/s at 40 instances); the intercept becomes the base term.
+  base_term_caveat: >-
+    The split of the base between per_node_base_qps and cluster_base_qps
+    is assigned from what the loop does, not fitted: sfcbr's node count
+    did not vary across the window, so the data cannot separate the two.
+    Work done by the elected cluster daemon is cluster_base_qps; work
+    done by a daemon on every node is per_node_base_qps. A cluster with
+    a different role mix -- a node that runs no hypervisor, say -- will
+    read low against the per-node terms, and that is a modelling limit
+    rather than a fault in the cluster.
+  coverage_caveat: >-
+    Only figures taken after 2026-08-11 are usable. Until #3708,
+    database_requests_total was incremented by a gRPC server interceptor
+    that could not see daemons co-located with MariaDB, which on sfcbr
+    was two nodes of six and the whole cluster daemon whenever the
+    maintenance lock sat on one of them. Coefficients from before that
+    date undercount, and phase 6 spent a fortnight discovering it.
+  coverage_of_total: >-
+    These 73 pairs are the pairs averaging at least 0.30/s. They carry
+    93% of measured load; the remaining 328 pairs together average
+    9.8/s and none individually exceeds 0.29/s. An unbudgeted pair
+    sustaining more than defaults.unbudgeted_fixed_rate_qps is treated
+    as a new poll and fails the CI check.
+  rederive: >-
+    tools/derive-database-load-budget.py, pointed at a Prometheus that
+    has scraped an sf-database tier for several days across a range of
+    instance counts. Re-derive after any change that removes a polling
+    loop, and never from a window shorter than the slowest loop.
+
+defaults:
+  # A pair is over budget when it exceeds
+  #   modelled x tolerance_multiplier + tolerance_floor_qps
+  # The multiplier is deliberately generous: these detectors exist to
+  # catch a new fixed-rate poll or a loop that lost its bulk read, not
+  # to police a 10% drift on shared CI hardware.
+  tolerance_multiplier: 2.0
+  tolerance_floor_qps: 0.5
+  # An (operation, caller_daemon) pair with no entry here is expected to
+  # be activity-driven and near zero at idle. Sustaining more than this
+  # on an idle cluster means something new is polling.
+  unbudgeted_fixed_rate_qps: 0.25
+
+entries:
+  - operation: GetObjectState
+    caller_daemon: net
+    per_node_base_qps: 1.106
+    per_instance_qps: 0.432
+    measured:
+      mean_qps: 14.514
+      r2: 0.776
+    note: >-
+      State reads over network objects and interfaces. The per-
+      instance term is interfaces: an instance brings at least one.
+  - operation: GetReferencesFrom
+    caller_daemon: api
+    per_node_base_qps: 0.057
+    per_instance_qps: 0.544
+    activity_coupled: true
+    provisional:
+      issue: 3876
+      reason: >-
+        unpaired reference reads in the blob and artifact external
+        views
+    measured:
+      mean_qps: 10.266
+      r2: 0.729
+    note: >-
+      Blob and artifact external views. This pair is a known defect,
+      not a floor: Blob.external_view() issues three
+      get_references_from() calls where one filtered read would serve,
+      and Artifact.external_view() issues one per blob version. It
+      runs at about 11x its paired GetReferencesTo/api, which no
+      paired view can produce.
+  - operation: GetInstanceAttributes
+    caller_daemon: net
+    per_node_base_qps: 0.039
+    per_instance_qps: 0.356
+    measured:
+      mean_qps: 6.733
+      r2: 0.765
+    note: >-
+      Instance attribute reads while building network state.
+  - operation: GetInstanceAttributes
+    caller_daemon: api
+    per_node_base_qps: 0.174
+    per_instance_qps: 0.31
+    activity_coupled: true
+    measured:
+      mean_qps: 6.701
+      r2: 0.743
+    note: >-
+      Instance external views served to API callers.
+  - operation: GetAddressesInUse
+    caller_daemon: net
+    per_node_base_qps: 0.503
+    per_instance_qps: 0.114
+    measured:
+      mean_qps: 5.1
+      r2: 0.457
+    note: >-
+      The floating network maintenance sweep. This is the loop #3655
+      reduced from one read per address to one bulk read per pass.
+  - operation: GetNetworkInterfaceAttributes
+    caller_daemon: net
+    per_instance_qps: 0.313
+    measured:
+      mean_qps: 5.044
+      r2: 0.758
+    note: >-
+      Interface attribute reads, one family per standing interface.
+  - operation: Dequeue
+    caller_daemon: queues
+    per_node_base_qps: 0.512
+    per_instance_qps: 0.008
+    measured:
+      mean_qps: 3.215
+      r2: 0.343
+    note: >-
+      The queues daemon dequeue loop, one per node.
+  - operation: Dequeue
+    caller_daemon: net
+    per_node_base_qps: 0.496
+    per_instance_qps: 0.007
+    measured:
+      mean_qps: 3.108
+      r2: 0.49
+    note: >-
+      The network daemon dequeue loop, one per node.
+  - operation: GetBlobTransfersForNode
+    caller_daemon: transfers
+    per_node_base_qps: 0.509
+    measured:
+      mean_qps: 3.062
+      r2: 0.001
+    note: >-
+      The transfers daemon polls for work addressed to its own node.
+  - operation: FindNetworkInterfaces
+    caller_daemon: net
+    per_node_base_qps: 0.108
+    per_instance_qps: 0.132
+    measured:
+      mean_qps: 3.048
+      r2: 0.732
+    note: >-
+      Interface enumeration during network maintenance.
+  - operation: GetNodeDaemonState
+    caller_daemon: transfers
+    per_node_base_qps: 0.498
+    measured:
+      mean_qps: 2.987
+      r2: 0.01
+    note: >-
+      Every daemon polls its own node_daemon_states row from
+      Daemon.check_daemon_state(), called on each 0.2s idle() tick and
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+  - operation: GetNodeDaemonState
+    caller_daemon: sidechannel
+    per_node_base_qps: 0.497
+    measured:
+      mean_qps: 2.982
+      r2: 0.009
+    note: >-
+      Every daemon polls its own node_daemon_states row from
+      Daemon.check_daemon_state(), called on each 0.2s idle() tick and
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+  - operation: GetNodeDaemonState
+    caller_daemon: resources
+    per_node_base_qps: 0.497
+    measured:
+      mean_qps: 2.981
+      r2: 0.017
+    note: >-
+      Every daemon polls its own node_daemon_states row from
+      Daemon.check_daemon_state(), called on each 0.2s idle() tick and
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+  - operation: GetNodeDaemonState
+    caller_daemon: net
+    per_node_base_qps: 0.497
+    measured:
+      mean_qps: 2.979
+      r2: 0.003
+    note: >-
+      Every daemon polls its own node_daemon_states row from
+      Daemon.check_daemon_state(), called on each 0.2s idle() tick and
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+  - operation: GetNodeDaemonState
+    caller_daemon: queues
+    per_node_base_qps: 0.496
+    measured:
+      mean_qps: 2.968
+      r2: 0.013
+    note: >-
+      Every daemon polls its own node_daemon_states row from
+      Daemon.check_daemon_state(), called on each 0.2s idle() tick and
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+  - operation: GetInstanceAttributes
+    caller_daemon: sidechannel
+    per_node_base_qps: 0.075
+    per_instance_qps: 0.134
+    measured:
+      mean_qps: 2.905
+      r2: 0.725
+    note: >-
+      The side channel daemon tracking agent state per instance.
+  - operation: GetNodeDaemonState
+    caller_daemon: cleaner
+    per_node_base_qps: 0.488
+    measured:
+      mean_qps: 2.896
+      r2: 0.125
+    note: >-
+      Every daemon polls its own node_daemon_states row from
+      Daemon.check_daemon_state(), called on each 0.2s idle() tick and
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+  - operation: GetObjectState
+    caller_daemon: api
+    per_node_base_qps: 0.155
+    per_instance_qps: 0.09
+    activity_coupled: true
+    measured:
+      mean_qps: 2.578
+      r2: 0.516
+    note: >-
+      State reads behind API object lookups.
+  - operation: GetObjectState
+    caller_daemon: cleaner
+    per_node_base_qps: 0.403
+    measured:
+      mean_qps: 2.572
+      r2: 0.162
+    note: >-
+      The cleaner daemon walking objects on its own node.
+  - operation: GetNodeDaemonState
+    caller_daemon: cluster
+    per_node_base_qps: 0.5
+    cluster_base_qps: -0.3
+    measured:
+      mean_qps: 2.49
+      r2: 0.01
+    note: >-
+      As for every other daemon, except on the one node holding the
+      cluster maintenance lock: the elected loop sleeps
+      lock.lost_event.wait(5) rather than idle(), so it polls once per
+      5s instead of once per 2s. That is the -0.3 constant. These
+      two terms are arithmetic about the code, not a fit: the
+      measured mean above was taken from a cluster which had not yet
+      deployed #3874, where the elected daemon did not poll at all
+      and this pair read exactly 5/6 of its siblings.
+      tools/derive-database-load-budget.py carries the override in
+      CODE_DERIVED_TERMS so a re-derivation does not revert it.
+  - operation: GetObjectState
+    caller_daemon: cluster
+    cluster_base_qps: 1.986
+    per_instance_qps: 0.016
+    measured:
+      mean_qps: 2.27
+      r2: 0.492
+    note: >-
+      The cluster maintenance sweep. #3814 cut this from ~14.8/s to
+      ~2.2/s by reading state in bulk rather than per object.
+  - operation: GetObjectMetadata
+    caller_daemon: api
+    per_node_base_qps: 0.099
+    per_instance_qps: 0.078
+    activity_coupled: true
+    measured:
+      mean_qps: 2.02
+      r2: 0.639
+    note: >-
+      Metadata reads behind API object views.
+  - operation: GetQueueLength
+    caller_daemon: net
+    per_node_base_qps: 0.293
+    measured:
+      mean_qps: 1.753
+      r2: 0.136
+    note: >-
+      Queue depth gauge published by the network daemon.
+  - operation: CountReferencesTo
+    caller_daemon: cluster
+    cluster_base_qps: 1.586
+    measured:
+      mean_qps: 1.625
+      r2: 0.013
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetNetworkAttributes
+    caller_daemon: net
+    per_node_base_qps: 0.06
+    per_instance_qps: 0.068
+    measured:
+      mean_qps: 1.605
+      r2: 0.593
+    note: >-
+      Network attribute reads during maintenance.
+  - operation: GetReferencesTo
+    caller_daemon: cluster
+    cluster_base_qps: 1.378
+    measured:
+      mean_qps: 1.413
+      r2: 0.014
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetObjectState
+    caller_daemon: queues
+    per_node_base_qps: 0.113
+    per_instance_qps: 0.04
+    measured:
+      mean_qps: 1.408
+      r2: 0.512
+    note: >-
+      State reads while processing queued work.
+  - operation: GetQueueLength
+    caller_daemon: resources
+    per_node_base_qps: 0.229
+    measured:
+      mean_qps: 1.375
+      r2: 0.004
+    note: >-
+      Queue depth gauge published by the resources daemon.
+  - operation: GetBlobAttributes
+    caller_daemon: cluster
+    cluster_base_qps: 1.333
+    measured:
+      mean_qps: 1.374
+      r2: 0.015
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetBlob
+    caller_daemon: cluster
+    cluster_base_qps: 1.319
+    measured:
+      mean_qps: 1.358
+      r2: 0.019
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetAllNodeMetrics
+    caller_daemon: net
+    per_node_base_qps: 0.199
+    measured:
+      mean_qps: 1.192
+      r2: 0.006
+    note: >-
+      The network daemon reads cluster metrics once per node per 5s.
+  - operation: GetNode
+    caller_daemon: net
+    per_node_base_qps: 0.199
+    measured:
+      mean_qps: 1.189
+      r2: 0.03
+    note: >-
+      The network daemon re-reads its own node row once per 5s.
+  - operation: GetBlobTransfersForBlob
+    caller_daemon: cluster
+    cluster_base_qps: 1.096
+    measured:
+      mean_qps: 1.117
+      r2: 0.016
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetLatestClusterOperationTarget
+    caller_daemon: api
+    per_node_base_qps: 0.105
+    per_instance_qps: 0.025
+    activity_coupled: true
+    measured:
+      mean_qps: 1.087
+      r2: 0.476
+    note: >-
+      Cluster operation history read behind API object views.
+  - operation: AcquireLock
+    caller_daemon: cluster
+    cluster_base_qps: 1.071
+    measured:
+      mean_qps: 1.086
+      r2: 0.017
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetAllArtifactIndexes
+    caller_daemon: api
+    per_node_base_qps: 0.159
+    activity_coupled: true
+    measured:
+      mean_qps: 0.979
+      r2: 0.014
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: UpdateBlobLastUsed
+    caller_daemon: cluster
+    cluster_base_qps: 0.973
+    measured:
+      mean_qps: 0.976
+      r2: 0.003
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetInstance
+    caller_daemon: cleaner
+    per_node_base_qps: 0.15
+    measured:
+      mean_qps: 0.965
+      r2: 0.008
+    note: >-
+      The cleaner's update_power_states job, scheduled once a minute
+      on every node, which walks the libvirt domains on that node.
+  - operation: GetBlob
+    caller_daemon: cleaner
+    per_node_base_qps: 0.158
+    measured:
+      mean_qps: 0.907
+      r2: 0.051
+    note: >-
+      observe_local_blobs(), scheduled every five minutes on every
+      node: one Blob.observe() per blob file in local storage.
+  - operation: GetAllArtifactIndexes
+    caller_daemon: cluster
+    cluster_base_qps: 0.951
+    measured:
+      mean_qps: 0.889
+      r2: 0.042
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetReferencesTo
+    caller_daemon: api
+    per_node_base_qps: 0.084
+    per_instance_qps: 0.021
+    activity_coupled: true
+    measured:
+      mean_qps: 0.888
+      r2: 0.482
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetBlob
+    caller_daemon: api
+    per_node_base_qps: 0.14
+    activity_coupled: true
+    measured:
+      mean_qps: 0.874
+      r2: 0.019
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetBlobAttributes
+    caller_daemon: api
+    per_node_base_qps: 0.138
+    activity_coupled: true
+    measured:
+      mean_qps: 0.851
+      r2: 0.008
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: CountReferencesTo
+    caller_daemon: api
+    per_node_base_qps: 0.138
+    activity_coupled: true
+    measured:
+      mean_qps: 0.851
+      r2: 0.007
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: RecordRelationship
+    caller_daemon: cleaner
+    per_node_base_qps: 0.149
+    measured:
+      mean_qps: 0.85
+      r2: 0.054
+    note: >-
+      observe_local_blobs() refreshing the BLOB_LOCATION reference for
+      each blob file on the node.
+  - operation: GetBlobAttributes
+    caller_daemon: cleaner
+    per_node_base_qps: 0.149
+    measured:
+      mean_qps: 0.85
+      r2: 0.054
+    note: >-
+      observe_local_blobs(), one read per local blob file every five
+      minutes. Tracks blobs stored on the node, not cluster size.
+  - operation: UpdateBlobLastUsed
+    caller_daemon: cleaner
+    per_node_base_qps: 0.148
+    measured:
+      mean_qps: 0.85
+      r2: 0.051
+    note: >-
+      observe_local_blobs() stamping last_active on each local blob.
+  - operation: RecordEventBatch
+    caller_daemon: api
+    per_node_base_qps: 0.047
+    per_instance_qps: 0.027
+    activity_coupled: true
+    measured:
+      mean_qps: 0.783
+      r2: 0.385
+    note: >-
+      Event logging from the API.
+  - operation: GetInstanceAttributes
+    caller_daemon: cluster
+    per_instance_qps: 0.042
+    measured:
+      mean_qps: 0.77
+      r2: 0.746
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: HasPendingClusterOperationTarget
+    caller_daemon: net
+    per_node_base_qps: 0.01
+    per_instance_qps: 0.038
+    measured:
+      mean_qps: 0.744
+      r2: 0.747
+    note: >-
+      The cluster operation gate, consulted before network changes.
+  - operation: GetNetworkInterfaceAttributes
+    caller_daemon: api
+    per_instance_qps: 0.04
+    activity_coupled: true
+    measured:
+      mean_qps: 0.712
+      r2: 0.655
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetInstanceAttributes
+    caller_daemon: cleaner
+    per_node_base_qps: 0.021
+    per_instance_qps: 0.027
+    measured:
+      mean_qps: 0.625
+      r2: 0.73
+    note: >-
+      The cleaner's update_power_states job: one attribute read per
+      instance running on that node, once a minute.
+  - operation: GetReservationsForIPAM
+    caller_daemon: net
+    per_node_base_qps: 0.1
+    measured:
+      mean_qps: 0.596
+      r2: 0.143
+    note: >-
+      The bulk read that replaced the per-address sweep in #3655. It
+      is meant to be flat in instance count; a slope here is a
+      regression.
+  - operation: GetAllNodeDaemonStates
+    caller_daemon: queues
+    per_node_base_qps: 0.099
+    measured:
+      mean_qps: 0.591
+      r2: 0.024
+    note: >-
+      The queues daemon reading the whole cluster daemon state table.
+  - operation: SetNodeDaemonState
+    caller_daemon: queues
+    per_node_base_qps: 0.099
+    measured:
+      mean_qps: 0.591
+      r2: 0.017
+    note: >-
+      The queues daemon writing its own liveness row.
+  - operation: AcquireLock
+    caller_daemon: cleaner
+    per_node_base_qps: 0.017
+    per_instance_qps: 0.026
+    measured:
+      mean_qps: 0.582
+      r2: 0.759
+    note: >-
+      The cleaner's update_power_states job takes a per-instance lock,
+      so this tracks instances per node rather than nodes.
+  - operation: ReleaseLock
+    caller_daemon: cleaner
+    per_node_base_qps: 0.017
+    per_instance_qps: 0.026
+    measured:
+      mean_qps: 0.582
+      r2: 0.759
+    note: >-
+      The release half of the update_power_states per-instance lock.
+  - operation: FindNetworkInterfaces
+    caller_daemon: api
+    per_node_base_qps: 0.034
+    per_instance_qps: 0.02
+    activity_coupled: true
+    measured:
+      mean_qps: 0.565
+      r2: 0.502
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetInstanceAttributes
+    caller_daemon: queues
+    per_instance_qps: 0.026
+    measured:
+      mean_qps: 0.451
+      r2: 0.525
+    note: >-
+      Queue workers reading instance attributes while processing work.
+  - operation: GetArtifactAttributes
+    caller_daemon: cluster
+    cluster_base_qps: 0.476
+    measured:
+      mean_qps: 0.445
+      r2: 0.042
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetNamespaceKeyByName
+    caller_daemon: api
+    per_node_base_qps: 0.03
+    per_instance_qps: 0.014
+    activity_coupled: true
+    measured:
+      mean_qps: 0.439
+      r2: 0.315
+    note: >-
+      Authentication. #3815 is open against the volume of POST /auth:
+      clients re-authenticate per process invocation rather than
+      caching a token, so this tracks CI process count, not cluster
+      size.
+  - operation: FindNetworks
+    caller_daemon: net
+    per_node_base_qps: 0.072
+    measured:
+      mean_qps: 0.431
+      r2: 0.147
+    note: >-
+      Network enumeration during network daemon maintenance.
+  - operation: GetReferencesFrom
+    caller_daemon: cluster
+    per_instance_qps: 0.026
+    measured:
+      mean_qps: 0.42
+      r2: 0.73
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetNamespace
+    caller_daemon: api
+    per_node_base_qps: 0.042
+    per_instance_qps: 0.008
+    activity_coupled: true
+    measured:
+      mean_qps: 0.4
+      r2: 0.316
+    note: >-
+      Authentication and namespace scoping on API requests. See #3815.
+  - operation: GetNodeAttributes
+    caller_daemon: sentinel-last
+    per_node_base_qps: 0.066
+    measured:
+      mean_qps: 0.398
+      r2: 0.015
+    note: >-
+      The startup and shutdown sentinels reading their node row.
+  - operation: GetNodeAttributes
+    caller_daemon: sentinel-first
+    per_node_base_qps: 0.066
+    measured:
+      mean_qps: 0.398
+      r2: 0.015
+    note: >-
+      The startup and shutdown sentinels reading their node row.
+  - operation: UpdateNodeAttributes
+    caller_daemon: sentinel-first
+    per_node_base_qps: 0.066
+    measured:
+      mean_qps: 0.398
+      r2: 0.014
+    note: >-
+      The startup and shutdown sentinels writing their node row.
+  - operation: UpdateNodeAttributes
+    caller_daemon: sentinel-last
+    per_node_base_qps: 0.066
+    measured:
+      mean_qps: 0.398
+      r2: 0.02
+    note: >-
+      The startup and shutdown sentinels writing their node row.
+  - operation: GetArtifactAttributes
+    caller_daemon: api
+    per_node_base_qps: 0.063
+    activity_coupled: true
+    measured:
+      mean_qps: 0.393
+      r2: 0.03
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetInstance
+    caller_daemon: net
+    per_node_base_qps: 0.008
+    per_instance_qps: 0.019
+    measured:
+      mean_qps: 0.387
+      r2: 0.798
+    note: >-
+      Instance lookups while the network daemon reconciles interfaces.
+  - operation: FindInstances
+    caller_daemon: api
+    per_node_base_qps: 0.058
+    activity_coupled: true
+    measured:
+      mean_qps: 0.361
+      r2: 0.012
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: RecordEventBatch
+    caller_daemon: queues
+    per_node_base_qps: 0.01
+    per_instance_qps: 0.016
+    measured:
+      mean_qps: 0.349
+      r2: 0.405
+    note: >-
+      Event logging from queue workers.
+  - operation: GetInstanceAttributes
+    caller_daemon: resources
+    per_node_base_qps: 0.008
+    per_instance_qps: 0.014
+    measured:
+      mean_qps: 0.307
+      r2: 0.773
+    note: >-
+      The resources daemon measuring per-instance usage for node
+      metrics.
