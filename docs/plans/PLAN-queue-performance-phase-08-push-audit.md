@@ -302,25 +302,80 @@ and the routing invariant.
 
 | # | Finding | Grade | Disposition |
 |---|---------|-------|-------------|
-| 1 | Coalescing joins undashed to dashed uuids; steps 4 and 5 inert | Blocking | Filed #3878, not fixed here -- see below |
-| 2 | No test executes the coalescing SQL; no functional coverage | Blocking | Filed #3879 |
-| 3 | `claim_coalescible_siblings` docstring describes a mechanism it does not use | Advisory | Fix alongside #3878 |
+| 1 | Coalescing join never matches, on two independent axes; steps 4 and 5 inert | Blocking | Fixed here, #3878 |
+| 2 | No test executes the coalescing SQL; no functional coverage | Blocking | Unit half fixed here; functional half filed as #3879 |
+| 3 | `claim_coalescible_siblings` docstring describes a mechanism it does not use | Advisory | Fixed here |
 | 4 | Decision 2's file list omitted `shakenfist/tests/` | Advisory | Recorded above; no action |
+| 5 | The fix adds two `# type: ignore[call-arg]` | Advisory | Accepted; see below |
 
-Finding 1 is blocking and decision 5 says blocking findings are fixed
-in this phase. It is not fixed here, and the reason is the escape
-clause in the same decision. The repair is two lines. Landing it is a
-behavioural change to a live cluster: it activates a concurrency path
-that has never executed in production, in which one worker marks
-another's operations complete, with no functional coverage and no
-production evidence that the surrounding invariant holds under a fold
-that actually fires. Shipping that inside a documentation phase's pull
-request, unverified, would be worse engineering than filing it with
-the proof attached. #3878 carries the proof, the reproduction and the
-list of what the fix needs alongside it.
+Finding 5 is the audit's own mechanical sweep applied to the audit's
+own change. `ObjectType` defines `__new__(cls, string, proto_id)`, so
+mypy reads the by-value lookup `ObjectType('net_op')` as a constructor
+call missing an argument, even though Enum resolves it by value at
+runtime. The repository already carries exactly this suppression at
+`shakenfist/node_health.py:204` and three places in `mariadb.py`, so
+these match an established convention rather than introducing one.
+Advisory, not blocking: the alternative is a helper on `ObjectType`,
+which is a change to a widely used schema type and does not belong in
+this phase.
 
-**This plan therefore stays In progress.** It is not complete while
-two of its seven implemented steps do nothing.
+### What the fix turned out to be
+
+The audit reported finding 1 as a one-axis defect and estimated the
+repair at two lines. Writing a test that executes the query against a
+real database showed it was two independent mismatches in the same
+`ON` clause, either of which alone is fatal:
+
+1. **Uuid form.** `cluster_operations.uuid` is `sa.Uuid`, undashed
+   CHAR(32); `object_states.object_uuid` is the dashed 36 character
+   form. Fixed by routing through `_dashed_uuid_expr`, the helper the
+   repository already had for this join.
+2. **Enum form.** `object_states.object_type` is `sa.Enum(ObjectType)`
+   and stores the enum *name*, `'NET_OP'`;
+   `cluster_operations.operation_type` is a plain string holding the
+   enum *value*, `'net_op'`. The join compared those two columns
+   directly. A *bound* value would have been coerced by SQLAlchemy's
+   Enum bind processor, which is why every other `object_states` query
+   in `mariadb.py` gets away with passing a string -- but a
+   column-to-column comparison has no processor to do the coercing.
+   Fixed by binding `ObjectType(operation_type)`.
+
+The estimate being wrong is the finding worth keeping: the original
+audit reasoned from reading the code and got the count of defects
+wrong, and only executing the query corrected it. That is the same
+argument as finding 2, arriving from the other direction.
+
+One thing the audit got wrong in the other direction, caught by
+mutation-testing the new tests rather than by review: an intermediate
+version of this fix also changed the `UPDATE` in
+`claim_coalescible_siblings`, on the theory that it had the same enum
+defect and would report siblings folded without actually folding them.
+Reverting that change did not fail any test, which prompted a check of
+the bind processor -- and the `UPDATE` binds a value, so it was always
+correct. The change is kept for consistency with the `SELECT` and the
+comment now says so rather than claiming a defect that never existed.
+
+### On decision 5
+
+Decision 5 says blocking findings are fixed in this phase, and the
+audit initially declined to fix finding 1, on the grounds that
+activating dormant coalescing is a behavioural change to a live
+cluster. That reasoning still holds, and it is why the fix ships with
+`shakenfist/tests/test_mariadb_coalescing.py`: eight tests which
+execute the real statements against a real database, each one
+mutation-tested against the defect it exists to catch. Two of them
+fail if either half of the join regresses.
+
+What that still does not give is functional coverage -- an assertion
+that `coalesced sibling ops` fires in a running cluster. #3879 tracks
+it, and until it exists the first production exercise of the fold will
+be the first time the routing invariant at
+`shakenfist/daemons/network/workitem.py:60-77` is tested with a fold
+that actually fires. That is stated plainly rather than buried: this
+change turns on a code path which has never run.
+
+**The plan is complete.** Steps 4 and 5 now do what the plan said they
+did, and the coverage gap that hid the defect is filed.
 
 ## Back brief
 

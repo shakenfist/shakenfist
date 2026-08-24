@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress.
+Complete.
 
 Steps 1-6 merged to `develop` as PR #3194 on 2026-05-26. Step 7
 measured the result and decided against explicit fairness; the
@@ -10,17 +10,19 @@ measurement, the exclusions it rests on and the decision are in
 [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
 and summarised under "What step 7 measured" below.
 
-Step 8 ran a `PUSH-AUDIT.md` audit over everything the plan
-changed, and found that **coalescing has never worked**. Steps 4 and
-5 -- the enqueue-side dedup and the worker-side fold -- join
-`cluster_operations` to `object_states` on an undashed uuid against a
-dashed one, so both primitives have always returned "nothing found".
-The `coalesced sibling ops` event has fired zero times in seven days
-on `sfcbr`. Filed as #3878, with #3879 for the missing functional
-coverage which let it sit unnoticed since 2026-05-26. Neither is
-fixed yet, so this plan is not complete: two of its seven implemented
-steps currently do nothing. The full audit, including the three
-headings which found nothing, is in
+Step 8 ran a `PUSH-AUDIT.md` audit over everything the plan changed,
+and found that **coalescing had never worked**. Steps 4 and 5 -- the
+enqueue-side dedup and the worker-side fold -- joined
+`cluster_operations` to `object_states` on two columns which could
+never match: an undashed uuid against a dashed one, and an enum value
+against an enum name. Both primitives therefore always returned
+"nothing found", and the `coalesced sibling ops` event had fired zero
+times in seven days on `sfcbr`. Fixed here as #3878, with eight tests
+which execute the real statements against a real database; #3879
+tracks the missing functional coverage that let the defect sit
+unnoticed since 2026-05-26. Note that this change activates a code
+path which has never run in production. The full audit, including the
+three headings which found nothing, is in
 [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md).
 
 ## Execution

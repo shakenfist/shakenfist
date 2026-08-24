@@ -22436,9 +22436,28 @@ def _direct_find_existing_coalescible_op(
     dispatcher's ``claim_coalescible_siblings`` (step 4) catches the
     duplicate on the way out -- at most one extra row gets inserted
     per race window, never an unbounded fan-out.
+
+    The join to ``object_states`` goes through ``_dashed_uuid_expr``
+    because the two tables store uuids in different forms; see the
+    note on ``_direct_claim_coalescible_siblings`` and issue #3878.
     """
     if target_column not in {
             'network_uuid', 'instance_uuid', 'node_uuid'}:
+        return None
+
+    # object_states.object_type is an Enum(ObjectType) column, which
+    # SQLAlchemy stores by enum *name* ('NET_OP'), while
+    # cluster_operations.operation_type is a plain string column holding
+    # the enum *value* ('net_op'). A bound value would be coerced by the
+    # Enum bind processor, but a column-to-column comparison has nothing
+    # to coerce it, so joining the two columns directly matches nothing.
+    # Bind the enum instead, as every other object_states query in this
+    # module does. This was half of issue #3878; the other half was the
+    # uuid form.
+    try:
+        state_object_type = ObjectType(  # type: ignore[call-arg]
+            operation_type)
+    except ValueError:
         return None
 
     # cluster_operations' *_uuid columns are SQLAlchemy Uuid columns,
@@ -22471,10 +22490,9 @@ def _direct_find_existing_coalescible_op(
                     cluster_ops_table.join(
                         states_table,
                         sa.and_(
-                            states_table.c.object_uuid == sa.cast(
-                                cluster_ops_table.c.uuid, sa.String(36)),
-                            states_table.c.object_type
-                            == cluster_ops_table.c.operation_type,
+                            states_table.c.object_uuid
+                            == _dashed_uuid_expr(cluster_ops_table.c.uuid),
+                            states_table.c.object_type == state_object_type,
                         )))
                 .where(cluster_ops_table.c.operation_type == operation_type)
                 .where(target_col == target_uuid_val)
@@ -22534,14 +22552,34 @@ def _direct_claim_coalescible_siblings(
     * Task name must be in the caller-supplied ``task_names``, which
       callers pre-filter to ``op_class.coalescible_tasks``.
 
-    ``target_column`` is restricted to a small whitelist
-    (``network_uuid``, ``instance_uuid``, ``node_uuid``) so it can
-    be interpolated into the ORDER BY safely; SQLAlchemy's
-    ``getattr(table.c, ...)`` does the column lookup and refuses
-    unknown columns with ``AttributeError``.
+    ``target_column`` names a column rather than a bind value, so it
+    cannot be parameterised. It is restricted to a small whitelist
+    (``network_uuid``, ``instance_uuid``, ``node_uuid``) before being
+    resolved with ``getattr(table.c, ...)``, which is a lookup on the
+    table metadata rather than string interpolation and refuses an
+    unknown column with ``AttributeError``. Every other value in the
+    statement is bound by SQLAlchemy.
+
+    The join to ``object_states`` goes through ``_dashed_uuid_expr``
+    because the two tables store uuids in different forms:
+    ``cluster_operations.uuid`` is a ``sa.Uuid`` column, which is
+    undashed CHAR(32) on MariaDB, while ``object_states.object_uuid``
+    is the dashed 36 character form. Comparing them without that
+    transformation matches nothing at all -- which is exactly what
+    happened between 2026-05-26 and issue #3878, disabling coalescing
+    entirely and silently.
     """
     if not task_names or target_column not in {
             'network_uuid', 'instance_uuid', 'node_uuid'}:
+        return []
+
+    # See the note in _direct_find_existing_coalescible_op: object_type
+    # is stored by enum name and operation_type by enum value, so the
+    # two columns can never be compared directly (issue #3878).
+    try:
+        state_object_type = ObjectType(  # type: ignore[call-arg]
+            operation_type)
+    except ValueError:
         return []
 
     # cluster_operations.uuid and its *_uuid columns are SQLAlchemy Uuid
@@ -22574,10 +22612,9 @@ def _direct_claim_coalescible_siblings(
                     cluster_ops_table.join(
                         states_table,
                         sa.and_(
-                            states_table.c.object_uuid == sa.cast(
-                                cluster_ops_table.c.uuid, sa.String(36)),
-                            states_table.c.object_type
-                            == cluster_ops_table.c.operation_type,
+                            states_table.c.object_uuid
+                            == _dashed_uuid_expr(cluster_ops_table.c.uuid),
+                            states_table.c.object_type == state_object_type,
                         )))
                 .where(cluster_ops_table.c.operation_type == operation_type)
                 .where(target_col == target_uuid_val)
@@ -22601,7 +22638,14 @@ def _direct_claim_coalescible_siblings(
             folded_uuids = [str(r.uuid) for r in rows]
             update_stmt = (
                 sa.update(states_table)
-                .where(states_table.c.object_type == operation_type)
+                # The bound enum rather than the raw string, for
+                # consistency with the SELECT above. Passing the string
+                # would also work here -- a bound value goes through the
+                # Enum bind processor, which coerces 'net_op' to the
+                # stored 'NET_OP'. It is only the column-to-column
+                # comparison in the SELECT's join that had no processor
+                # to do that, which is half of why #3878 matched nothing.
+                .where(states_table.c.object_type == state_object_type)
                 .where(states_table.c.object_uuid.in_(folded_uuids))
                 .values(
                     state_value='complete',
