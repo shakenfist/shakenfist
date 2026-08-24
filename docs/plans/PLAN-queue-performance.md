@@ -10,11 +10,18 @@ measurement, the exclusions it rests on and the decision are in
 [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
 and summarised under "What step 7 measured" below.
 
-Step 8 runs a `PUSH-AUDIT.md` audit over everything the plan
-changed. The work is already on `develop`, so this is a
-retrospective audit rather than a pre-push gate, and the plan is
-not complete until each finding is resolved or declined in
-writing.
+Step 8 ran a `PUSH-AUDIT.md` audit over everything the plan
+changed, and found that **coalescing has never worked**. Steps 4 and
+5 -- the enqueue-side dedup and the worker-side fold -- join
+`cluster_operations` to `object_states` on an undashed uuid against a
+dashed one, so both primitives have always returned "nothing found".
+The `coalesced sibling ops` event has fired zero times in seven days
+on `sfcbr`. Filed as #3878, with #3879 for the missing functional
+coverage which let it sit unnoticed since 2026-05-26. Neither is
+fixed yet, so this plan is not complete: two of its seven implemented
+steps currently do nothing. The full audit, including the three
+headings which found nothing, is in
+[PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md).
 
 ## Execution
 
@@ -27,7 +34,7 @@ writing.
 | 5. Enqueue-side dedup | (in PR #3194) | Complete |
 | 6. Caller-site audit | (in PR #3194) | Complete |
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
-| 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | In progress |
+| 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
 
 ## Problem
 

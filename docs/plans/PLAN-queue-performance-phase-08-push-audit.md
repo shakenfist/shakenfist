@@ -144,7 +144,183 @@ leave on `develop`.
 
 ## Findings
 
-*(written by step 8g)*
+The audit found one blocking defect: **cluster operation coalescing
+has never worked**. Steps 4 and 5 of this plan -- the coalescing half
+of a plan called "Queue performance and coalescing" -- have been inert
+since PR #3194 merged on 2026-05-26. Filed as #3878, with #3879 for
+the coverage gap that hid it.
+
+### Wave 1
+
+| Check | Result |
+|-------|--------|
+| `pre-commit run --all-files` | Pass |
+| `tox` | Pass (py3, flake8, cover; 177s) |
+| `tox -e genprotos` then `git diff --exit-code shakenfist/protos` | Pass, stubs fresh |
+| Style greps, range A (steps 1-6) | Clean on all four |
+| Style greps, range B (step 7) | Clean; see below |
+
+Range B's raw grep output is not clean, and both hits are false
+positives worth recording so the next run does not re-investigate
+them. The fifteen "over 120 characters" hits are all markdown table
+rows in plan files; restricted to `*.py` the count is zero. The
+twenty-three `print(` hits are all in `tools/queue-wait-report.py`,
+which is a report generator whose output is stdout. The grep exists
+to catch debug prints left in daemon code and there are none.
+
+Wave 1 was run against the working tree, which is `develop` plus this
+phase's documentation, so per decision 4 a failure would have been a
+pre-existing `develop` failure. There were none.
+
+### Wave 2 mechanical sweep
+
+Zero `TODO`/`FIXME`/`HACK`/`XXX` in either range. One `# noqa: E402`
+in range A, on a deferred `eventlog_drainer` import, which is the
+documented circular-import exemption. Zero `subprocess`/`os.system`/
+`shell=True` in either range. Range B adds 22 test functions; range A
+adds none *within the decision-2 file list*, which is an artefact of
+that list excluding `shakenfist/tests/` -- PR #3194 in fact added
+8,141 lines of tests. The file list should have named the test modules
+explicitly; corrected in the reading, not in decision 2, so the
+scoping error is visible.
+
+### 2a. Code quality
+
+Examined: `_direct_work_queue_dequeue_batch`,
+`_direct_find_existing_coalescible_op`,
+`_direct_claim_coalescible_siblings`, their gRPC and public wrappers,
+`Daemon.dequeue_job`, and the queue-name helpers in
+`shakenfist/operations/baseoperation.py`.
+
+* **Three-layer pattern: satisfied.** `dequeue_work_items` at first
+  looks like a public wrapper with no `_direct_`/`_grpc_` pair, but
+  the pair is named for the `work_queue` family
+  (`_direct_work_queue_dequeue_batch`), consistent with its siblings
+  `resolve_work_item` and `restart_work_queue`. Both coalescing
+  functions have the full trio and both gRPC handlers are registered
+  in `shakenfist/daemons/database/main.py`.
+* **SQL pushdown: no violations.** Zero new `mariadb.get_all_*(` call
+  sites in either range. The dequeue does its ordering and filtering
+  in SQL, which is the rule working as intended.
+* **Cached FK list: no violations.** No new `list[str]` /
+  `list[UUID4]` field on any `schema/*_attributes.py` model.
+* **Advisory:** `_direct_claim_coalescible_siblings`'s docstring says
+  `target_column` "can be interpolated into the ORDER BY safely".
+  There is no `ORDER BY` in that function, and the column is not
+  interpolated -- it is a `getattr(table.c, ...)` lookup used in a
+  `WHERE`. The whitelist is real and correct; the sentence describing
+  it points at the wrong mechanism, which is the kind of comment that
+  misleads a reader about where the injection risk is. Not filed;
+  small enough to fix alongside #3878, which touches the same
+  function.
+
+### 2b. Test review
+
+Examined: `shakenfist/tests/operations/test_baseoperation.py`,
+`shakenfist/tests/test_mariadb_work_queue.py`,
+`shakenfist/tests/test_daemon_dequeue_job.py`,
+`shakenfist/tests/test_daemon_worker_pool_high_io.py`, and
+`shakenfist/deploy/shakenfist_ci/`.
+
+* **Blocking, and the cause of #3878 going unnoticed for three
+  months: coalescing has no test that executes its SQL.** The ten
+  coalescing tests in `test_baseoperation.py` mock
+  `mariadb.claim_coalescible_siblings`, so they assert the dispatcher
+  decides to call the primitive. `ClaimCoalescibleSiblingsTestCase`
+  mocks `_get_engine` and feeds canned rows to `fetchall`; its own
+  docstring concedes it covers "the SQL-shape assertions", meaning it
+  asserts the statement's shape and never that it matches a row. No
+  functional coverage exists: `grep -rln coalesc
+  shakenfist/deploy/shakenfist_ci/` returns nothing. Filed as #3879.
+* The unit coverage that does exist is otherwise good, and notably
+  covers the adversarial cases: empty task names, an invalid
+  `target_column`, a malformed uuid, a dispatcher batch of one, an
+  unset queue name, and dedup skipped when `depends_on` is present.
+  Every one of those returns before the query runs, which is why they
+  pass while the query itself is broken.
+* Step 7's own tests are DB-free by construction and were reviewed
+  under PR #3865; 22 tests, mutation-tested there.
+
+### 2c. Documentation review
+
+Examined: `docs/operator_guide/networking/overview.md`,
+`docs/developer_guide/network_dispatcher.md`,
+`docs/operator_guide/database.md`, `ARCHITECTURE.md`, `AGENTS.md`,
+and the plan files.
+
+* **No README, AGENTS.md or ARCHITECTURE.md growth** in either range
+  that belongs in `docs/`. The shared-block disciplines are met.
+* **No plan-phase references** leaked into `docs/` outside
+  `docs/plans/`.
+* **Worth recording as a positive:** the operator guide already names
+  the exact diagnostic for #3878 -- "A *complete absence* of these
+  during a CI run that's known to be enqueueing duplicate work would
+  point at a bug in either the enqueue-side dedup ... or the
+  worker-side fold". The documentation was right and predictive; what
+  was missing was anything watching it. That is the argument for
+  #3879 in one sentence.
+* The documentation describes coalescing as working. It is accurate
+  about intent and wrong about effect. Deliberately not corrected
+  here: the fix for #3878 makes it true again, and editing the docs to
+  say "this does not work" would be the wrong repair.
+
+### 2d. Security review
+
+Examined the same three SQL functions, the dispatcher event payloads,
+and the routing invariant.
+
+* **SQL injection: none.** Every filter value is bound through
+  SQLAlchemy. The one dynamic identifier, `target_column`, is checked
+  against the literal set `{network_uuid, instance_uuid, node_uuid}`
+  before a `getattr(table.c, ...)` lookup which itself raises on an
+  unknown column, and there is a test asserting a
+  `malicious_column` argument returns before any query runs. The
+  variable-length `FIELD(queue_name, ...)` ordering -- the obvious
+  place to interpolate -- uses `sa.func.field(col, *queue_names)`,
+  which parameterises.
+* **Resource exhaustion: guarded.** `MAX_DEQUEUE_BATCH = 256` clamps
+  `limit`, with a comment naming the gRPC handler as the trust
+  boundary and noting production callers never reach it. That is the
+  right reasoning for the right reason.
+* **Credential handling: clean.** The wait event's `extra` carries
+  only `wait_seconds`, `defer_count`, `queue_name` and `seconds`. No
+  secret, namespace key or user-controlled string reaches the
+  broadly-readable event log.
+* **Concurrency: dormant rather than safe.** The fold transitions
+  *other* operations to `complete` from one worker, and its safety
+  rests on the routing invariant documented at
+  `shakenfist/daemons/network/workitem.py:60-77` -- operations sharing
+  a target always land on the same worker -- plus a `FOR UPDATE` and a
+  `state_value = 'queued'` guard. The guards are present and correctly
+  reasoned. They have also never run, because of #3878. This is
+  recorded as informational rather than a finding: there is no live
+  risk today, and the risk arrives the moment #3878 is fixed. It is
+  the reason #3878 asks for functional coverage alongside the
+  two-line repair rather than after it.
+
+### Disposition
+
+| # | Finding | Grade | Disposition |
+|---|---------|-------|-------------|
+| 1 | Coalescing joins undashed to dashed uuids; steps 4 and 5 inert | Blocking | Filed #3878, not fixed here -- see below |
+| 2 | No test executes the coalescing SQL; no functional coverage | Blocking | Filed #3879 |
+| 3 | `claim_coalescible_siblings` docstring describes a mechanism it does not use | Advisory | Fix alongside #3878 |
+| 4 | Decision 2's file list omitted `shakenfist/tests/` | Advisory | Recorded above; no action |
+
+Finding 1 is blocking and decision 5 says blocking findings are fixed
+in this phase. It is not fixed here, and the reason is the escape
+clause in the same decision. The repair is two lines. Landing it is a
+behavioural change to a live cluster: it activates a concurrency path
+that has never executed in production, in which one worker marks
+another's operations complete, with no functional coverage and no
+production evidence that the surrounding invariant holds under a fold
+that actually fires. Shipping that inside a documentation phase's pull
+request, unverified, would be worse engineering than filing it with
+the proof attached. #3878 carries the proof, the reproduction and the
+list of what the fix needs alongside it.
+
+**This plan therefore stays In progress.** It is not complete while
+two of its seven implemented steps do nothing.
 
 ## Back brief
 
