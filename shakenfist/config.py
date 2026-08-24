@@ -237,6 +237,39 @@ class SFConfig(BaseSettings):
             'docs/developer_guide/writing_an_endpoint.md.'
         )
     )
+    AGENT_OPERATION_DEFAULT_DEADLINE: int = Field(
+        600,
+        description=(
+            'The wall-clock budget in seconds applied to an agent operation '
+            'whose creator did not ask for one. The API server converts it '
+            'to an absolute timestamp at request receipt, so queue time and '
+            'preflight time both count against it. A client may pass an '
+            'explicit deadline_seconds of 0 to ask for no wall-clock '
+            'deadline at all. This replaces the hardcoded 900 second '
+            'AGENT_OPERATION_EXECUTION_TIMEOUT in '
+            'shakenfist/daemons/sidechannel/main.py, but does not yet: '
+            'nothing enforces either value until phase 4 of '
+            'PLAN-agent-operation-deadlines, which is what deletes that '
+            'constant. Until then both exist and only the constant bites.'
+        )
+    )
+    AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT: int = Field(
+        30,
+        description=(
+            'Seconds without forward progress which are fatal to an agent '
+            'operation, applied to operations containing a progress-capable '
+            'command when the creator did not ask for one. A client may '
+            'pass an explicit progress_timeout_seconds of 0 to disable it. '
+            'The value comes from the phase 0 measurement in '
+            'PLAN-agent-operation-deadlines-phase-00-decisions.md: across 50 '
+            'transfers in five merge-queue CI runs the worst complete '
+            'transfer was 625 MB in 2.83 s and 48 of 50 finished in under '
+            '0.44 s, so 30 seconds is roughly ten times the worst total '
+            'duration -- let alone any gap within one -- while detecting the '
+            '#3516 sidechannel wedge thirty times faster than the 900 '
+            'second constant it will replace. Enforcement lands in phase 4.'
+        )
+    )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(
         16384,
         description=(
