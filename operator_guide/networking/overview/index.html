@@ -12993,6 +12993,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Dispatcher diagnostic events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-these-events-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading these events back
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -13301,6 +13318,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Dispatcher diagnostic events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-these-events-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading these events back
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -13781,9 +13815,18 @@ itself):</p>
   terminal state write).</li>
 <li><code>wait_seconds</code> — time between when the op was first inserted
   into <code>cluster_operations</code> and when the dispatcher claimed it.
-  Large values (&gt;10 s) mean the queue was backed up; very
-  large values point at either worker saturation or a stuck
-  op blocking the worker.</li>
+  This is not queueing alone: it also counts deliberate
+  deferral while an op waits on a dependency, and the seconds a
+  <code>*_high_io</code> background op spends gated off while the local
+  disk is busy. Both are designed behaviour, and each is large
+  enough to be the whole of a tail on its own -- the worst
+  operation type measured for the queue-performance plan had a
+  15.78 s median wait which fell to 0.77 s once deferred ops
+  were excluded. So read a large value against <code>defer_count</code>
+  and against the node's disk busy metric before calling it a
+  backup; only once those are excluded does it point at worker
+  saturation or a stuck op blocking the worker. See "Reading
+  these events back" below.</li>
 <li><code>defer_count</code> — how many times this op was re-enqueued via
   <code>defer()</code> / <code>defer_with_backoff()</code> before finally running. A
   first-time pickup is <code>0</code>; non-zero values indicate dependency
@@ -13829,9 +13872,37 @@ itself):</p>
   dequeue will be folded on the next dispatcher cycle, not this
   one, so a moderate gap between sibling-arriving and
   <code>coalesced sibling ops</code> firing is expected.</p>
-<p>The <code>execution duration</code> event is retained for
-<code>MAX_USAGE_EVENT_AGE</code> (default 30 days); the <code>coalesced sibling
-ops</code> event for <code>MAX_STATUS_EVENT_AGE</code> (default 7 days).</p>
+<h3 id="reading-these-events-back">Reading these events back<a class="headerlink" href="#reading-these-events-back" title="Permanent link">&para;</a></h3>
+<p>Neither event survives its operation for long, so plan to read them
+from the log stream rather than from the database.</p>
+<p>A cluster operation is hard deleted 30 seconds after it reaches a
+final state, and hard deleting an object removes the rows which join
+its events to it. Roughly half a minute after an operation completes
+there is nothing left to query: the operation is gone, and its events
+are orphaned rows which the daily prune sweep then deletes. The
+<code>MAX_USAGE_EVENT_AGE</code> and <code>MAX_STATUS_EVENT_AGE</code> retention settings
+never come into it -- they bound how long an event may live, not how
+long the object it describes does. This is issue #3864.</p>
+<p>What does persist is the log stream. Every event is echoed as a log
+line carrying the whole <code>extra</code> dict, unless <code>LOG_EVENTS_TO_LOKI</code> has
+been turned off, so wherever the cluster's logs are shipped is where
+an operation's history can still be read after the fact.</p>
+<p>Do not grep that stream for <code>Added event</code>. That is the message the
+echo is written with, but the logger merges the caller's fields over
+the record last and one of those fields is the event's own <code>message</code>,
+so the string never reaches the shipped JSON. Filter on the event's
+message instead -- <code>execution duration</code> for the events above -- which
+is what the record's <code>message</code> field actually holds.</p>
+<p><code>tools/queue-wait-report.py</code> in the source repository summarises the
+<code>execution duration</code> events from such a stream: give it Shaken Fist
+JSON log lines on standard input -- from Loki, from
+<code>journalctl -u 'sf-*.service' -o cat</code>, or from a CI log bundle -- and
+it reports the queue-wait distribution by queue class, priority lane
+and operation type. It prints the two caveats needed to read those
+numbers: that a p90 at or below two seconds is the dispatcher's idle
+poll interval rather than queueing, and that <code>wait_seconds</code> includes
+deliberate deferral, which is why every percentile is also reported
+over just the operations which never deferred.</p>
 
 
 
