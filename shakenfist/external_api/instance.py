@@ -73,6 +73,26 @@ daemon.set_log_level(LOG, 'api')
 SCHEDULER = None
 
 
+# Published verbatim in five parameter declarations across the three
+# endpoints which create agent operations. They name an operator
+# settable default, so a copy left behind would publish a number the
+# server no longer uses.
+DEADLINE_SECONDS_DESCRIPTION = (
+    'How many seconds after this request is received the operation '
+    'may continue to be dispatched or execute. Queue time and any '
+    'preflight work count against it. 0 means no wall-clock '
+    'deadline at all. Omitting this applies the server default, '
+    'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
+    'the operator has changed it.')
+
+PROGRESS_TIMEOUT_SECONDS_DESCRIPTION = (
+    'How many seconds without forward progress are fatal to this '
+    'operation. 0 disables the progress timeout. Omitting this '
+    'applies the server default, '
+    'AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 seconds '
+    'unless the operator has changed it.')
+
+
 instance_get_example = """{
     "agent_start_time": null,
     "agent_state": null,
@@ -1658,21 +1678,13 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             ('mode', 'body', 'string',
              'The mode of the file once written, in symbolic or numeric form.', True),
             ('deadline_seconds', 'body', 'number',
-             'How many seconds after this request is received the operation '
-             'may continue to be dispatched or execute. Queue time and any '
-             'preflight work count against it. 0 means no wall-clock '
-             'deadline at all. Omitting this applies the server default, '
-             'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
-             'the operator has changed it.', False, {'minimum': 0}),
+             DEADLINE_SECONDS_DESCRIPTION, False, {'minimum': 0}),
             ('progress_timeout_seconds', 'body', 'number',
-             'How many seconds without forward progress are fatal to this '
-             'operation. 0 disables the progress timeout. Omitting this '
-             'applies the server default, '
-             'AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 seconds '
-             'unless the operator has changed it.', False, {'minimum': 0})
+             PROGRESS_TIMEOUT_SECONDS_DESCRIPTION, False,
+             {'minimum': 0})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance.', None),
+         (400, 'No agent connection to instance, or an invalid timing parameter.', None),
          (404, 'Instance or blob not found.', None),
          (406, 'Invalid mode specified', None)]))
     @api_base.arg_is_instance_ref
@@ -1747,21 +1759,13 @@ class InstanceAgentGetEndpoint(api_base.Resource):
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True),
             ('deadline_seconds', 'body', 'number',
-             'How many seconds after this request is received the operation '
-             'may continue to be dispatched or execute. Queue time and any '
-             'preflight work count against it. 0 means no wall-clock '
-             'deadline at all. Omitting this applies the server default, '
-             'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
-             'the operator has changed it.', False, {'minimum': 0}),
+             DEADLINE_SECONDS_DESCRIPTION, False, {'minimum': 0}),
             ('progress_timeout_seconds', 'body', 'number',
-             'How many seconds without forward progress are fatal to this '
-             'operation. 0 disables the progress timeout. Omitting this '
-             'applies the server default, '
-             'AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 seconds '
-             'unless the operator has changed it.', False, {'minimum': 0})
+             PROGRESS_TIMEOUT_SECONDS_DESCRIPTION, False,
+             {'minimum': 0})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance.', None),
+         (400, 'No agent connection to instance, or an invalid timing parameter.', None),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1814,15 +1818,11 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
-             'How many seconds after this request is received the operation '
-             'may continue to be dispatched or execute. Queue time and any '
-             'preflight work count against it. 0 means no wall-clock '
-             'deadline at all. Omitting this applies the server default, '
-             'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
-             'the operator has changed it.', False, {'minimum': 0})
+             DEADLINE_SECONDS_DESCRIPTION, False, {'minimum': 0})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance.', None),
+         (400, 'No agent connection to instance, an invalid timing parameter, or a '
+          'progress_timeout_seconds, which this call does not accept.', None),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

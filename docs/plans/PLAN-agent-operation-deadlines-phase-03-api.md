@@ -239,6 +239,55 @@ planning, is consistent with all of the above and is left alone.
   server does not produce, and `agentoperations.md` said in prose that
   "no client can set them". All of it corrected; the examples show an
   absolute timestamp, `0` for execute and `30` for a transfer.
+- **Infinity reached the stored value.** `_timing_seconds()` refused
+  NaN, negatives and booleans, but `float('inf')` is non-negative and
+  passed. Both `"inf"` as a JSON string and the bare `Infinity`
+  literal (which `json.loads` accepts by default, so flask hands it
+  through) reach it, and the result is an infinite absolute deadline:
+  the same effect as the explicit `0` sentinel while not looking like
+  it, in a `DOUBLE` column which cannot store it. The guard is now
+  `math.isfinite()` first and `seconds < 0` second, which also makes
+  the NaN case explicit rather than a side effect of NaN failing every
+  comparison. Raised by the automated reviewer on PR #3883.
+- **The published response examples were a third documentation
+  surface.** Decision 7's reversal corrected the mkdocs pages, but
+  `agentoperation_get_example` and `agentoperation_instance_example`
+  in `external_api/agentoperation.py` are what openapi.shakenfist.com
+  renders, and they still lacked all four timing fields. Both now
+  carry them with the same values the mkdocs pages show. Their
+  `"version": 1` was stale too — `AgentOperation.current_version` has
+  been 3 for some time — and was corrected on both surfaces while
+  there. Raised by the automated reviewer on PR #3883.
+- **The endpoint tests froze the process clock.** `base.py` does
+  `import time`, so `mock.patch('...base.time.time')` patched the
+  attribute on the shared module object: for the duration of a real
+  Flask request every module in the process, including the auth layer,
+  saw a timestamp two days in the past. It worked only because PyJWT
+  reads `datetime.now()` rather than `time.time()`. The requests are
+  now bracketed with the real clock and the deadline assertions are
+  ranges (`assertDeadlineIsSecondsFromNow`); exact-value assertions
+  stay in `test_agent_operation_timing.py`, which calls the helper
+  directly and can freeze time locally and safely. Raised by the
+  automated reviewer on PR #3883.
+- **`agent/put` had no success-path coverage, so its
+  `progress_capable=True` was unpinned.** The three handlers call the
+  helper with near-identical code, so a `False` copied across from
+  `execute` would have given the one endpoint whose transfer most
+  needs a progress window none at all, with every test still passing.
+  `test_put_applies_the_progress_default_when_omitted` now pins it
+  (verified by mutation: flipping the argument fails that test and
+  only that test). Raised by the automated reviewer on PR #3883.
+- **The five parameter descriptions are now two module constants.**
+  `DEADLINE_SECONDS_DESCRIPTION` and
+  `PROGRESS_TIMEOUT_SECONDS_DESCRIPTION` in `external_api/instance.py`.
+  They are published verbatim and name an operator-settable default,
+  so five hand-maintained copies were exactly the drift decision 5
+  rejected for the conversion logic. The declared 400 response
+  descriptions were broadened at the same time: a malformed timing
+  parameter is a 400 on all three endpoints, and a
+  `progress_timeout_seconds` sent to `agent/execute` is a 400 too,
+  neither of which "No agent connection to instance." covered. Raised
+  by the automated reviewer on PR #3883.
 
 ## Risks and mitigations
 
@@ -356,8 +405,16 @@ By inspection, each falsifiable:
   config option description — no page says something a different page
   contradicts.
 - `docs/developer_guide/api_reference/instances.md` documents the
-  request parameters and its response examples are unchanged from
-  phase 2.
+  request parameters, and its response examples show what the server
+  now produces rather than the phase 2 `null`s. (This bullet
+  originally asserted the examples were unchanged, which decision 7's
+  reversal made false; see Departures.)
+- The response examples agree across both published surfaces. The
+  mkdocs pages and the `agentoperation_get_example` /
+  `agentoperation_instance_example` strings in
+  `external_api/agentoperation.py`, which is what
+  openapi.shakenfist.com renders, carry the same four timing fields
+  with the same values and the same object version.
 
 ## Future work
 
@@ -369,6 +426,15 @@ By inspection, each falsifiable:
   6 must decide whether the client probes, version-gates, or retries
   without the parameter on a 400. Recorded here so phase 6 inherits
   the constraint rather than discovering it in CI.
+- **No release note entry yet, deliberately.**
+  `docs/release_notes/v07-v08.md` lists client-visible REST API
+  changes, and this phase adds two body parameters and two config
+  options. It is not noted there yet because a note written now would
+  either describe half the feature or say "accepted but not enforced"
+  and go stale the moment phase 4 lands. Phase 7 owns the
+  documentation sweep and writes it once, accurately; the phase 7 row
+  in the master plan now says so explicitly. Raised by the automated
+  reviewer on PR #3883.
 - **`execute` has no progress signal at all.** Decision 4 stores
   `0.0`, which is true today. If `execute` ever streams output,
   `ExecuteCommand.reports_progress` becomes `True` and

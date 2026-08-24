@@ -741,7 +741,7 @@ is meaningful.
         },
         "state": "complete",
         "uuid": "93fb538c-84f5-4ff8-83ba-2be5f5f92954",
-        "version": 1
+        "version": 3
     }
     ```
 
@@ -870,7 +870,7 @@ Additionally, you can list the agent operations for a given instance.
             },
             "state": "complete",
             "uuid": "343049d7-da2a-46f2-bb5c-edb783ec1fb9",
-            "version": 1
+            "version": 3
         },
         {
             "attempts": 0,
@@ -898,7 +898,7 @@ Additionally, you can list the agent operations for a given instance.
             },
             "state": "complete",
             "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-            "version": 1
+            "version": 3
         }
     ]
     ```

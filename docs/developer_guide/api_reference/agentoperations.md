@@ -70,7 +70,7 @@ agent operations for a given instance, refer to the [instances API documentation
         },
         "state": "complete",
         "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-        "version": 1
+        "version": 3
     }
     ```
 

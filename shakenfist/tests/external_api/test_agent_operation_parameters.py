@@ -12,6 +12,7 @@
 # seconds the caller sent.
 
 import json
+import time
 from unittest import mock
 from uuid import uuid4
 
@@ -22,9 +23,6 @@ from shakenfist.external_api import app as external_api
 from shakenfist.instance import Instance
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
-
-
-NOW = 1787427490.5
 
 
 class AgentOperationParametersTestCase(base.ShakenFistTestCase):
@@ -57,7 +55,8 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         agent_state = mock.patch.object(
             Instance, 'agent_state',
             new_callable=mock.PropertyMock,
-            return_value=baseobject.State(value='ready', update_time=NOW))
+            return_value=baseobject.State(
+                value='ready', update_time=time.time()))
         agent_state.start()
         self.addCleanup(agent_state.stop)
 
@@ -72,20 +71,39 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         config.NODE_UUID = self.saved_node_uuid
 
     def _post(self, body, path='agent/execute'):
+        # The clock is deliberately not frozen here. base.py does
+        # "import time", so patching base.time.time patches the
+        # attribute on the shared module object and every module in the
+        # process -- event logging, locks, the auth layer -- sees the
+        # fake time for the duration of a real Flask request. Instead
+        # the request is bracketed and the deadline assertions are
+        # ranges; the exact-value assertions live in
+        # test_agent_operation_timing.py, which calls the helper
+        # directly and can freeze time locally and safely.
+        #
         # AgentOperation.new() is stubbed because what it was called
         # with is the question, and because the real one would enqueue
         # work this harness has no executor for.
         with mock.patch('shakenfist.external_api.instance.AgentOperation',
-                        autospec=True) as agentop, \
-            mock.patch('shakenfist.external_api.base.time.time',
-                       return_value=NOW):
+                        autospec=True) as agentop:
             agentop.new.return_value.external_view.return_value = {}
+            # put enqueues a preflight task naming this uuid, and the
+            # task's pydantic model will not take a MagicMock.
+            agentop.new.return_value.uuid = str(uuid4())
             agentop.STATE_QUEUED = 'queued'
             agentop.STATE_PREFLIGHT = 'preflight'
+            self.before = time.time()
             resp = self.client.post(
                 '/instances/%s/%s' % (self.instance_uuid, path),
                 headers=self.auth, data=json.dumps(body))
+            self.after = time.time()
         return resp, agentop.new
+
+    def assertDeadlineIsSecondsFromNow(self, new, seconds):
+        """Assert the stored deadline is `seconds` from the request."""
+        deadline = new.call_args.kwargs['deadline']
+        self.assertGreaterEqual(deadline, self.before + seconds)
+        self.assertLessEqual(deadline, self.after + seconds)
 
     def _execute(self, **extra):
         body = {'command_line': 'id'}
@@ -96,9 +114,8 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         resp, new = self._execute()
         self.assertEqual(200, resp.status_code, resp.get_json())
         new.assert_called_once()
-        self.assertEqual(
-            NOW + config.AGENT_OPERATION_DEFAULT_DEADLINE,
-            new.call_args.kwargs['deadline'])
+        self.assertDeadlineIsSecondsFromNow(
+            new, config.AGENT_OPERATION_DEFAULT_DEADLINE)
 
     def test_omitted_does_not_store_null(self):
         # The tempting alternative -- write NULL and let the
@@ -112,7 +129,7 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
     def test_a_value_arrives_as_an_absolute_timestamp(self):
         resp, new = self._execute(deadline_seconds=90)
         self.assertEqual(200, resp.status_code, resp.get_json())
-        self.assertEqual(NOW + 90, new.call_args.kwargs['deadline'])
+        self.assertDeadlineIsSecondsFromNow(new, 90)
 
     def test_an_explicit_zero_arrives_as_zero(self):
         resp, new = self._execute(deadline_seconds=0)
@@ -156,7 +173,7 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
              'progress_timeout_seconds': 5},
             path='agent/get')
         self.assertEqual(200, resp.status_code, resp.get_json())
-        self.assertEqual(NOW + 30, new.call_args.kwargs['deadline'])
+        self.assertDeadlineIsSecondsFromNow(new, 30)
         self.assertEqual(5.0, new.call_args.kwargs['progress_timeout'])
 
     def test_get_refuses_a_negative_progress_timeout(self):
@@ -182,6 +199,44 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, resp.status_code, resp.get_json())
         self.assertIn('deadline_seconds', resp.get_json()['error'])
         new.assert_not_called()
+
+    def _put(self, **extra):
+        # Unlike execute and get, put reaches a blob lookup on its way
+        # to AgentOperation.new(), so the success path needs one to
+        # exist. mode is numeric to skip the symbolic parse.
+        body = {'blob_uuid': str(uuid4()), 'path': '/tmp/README.md',
+                'mode': '33188'}
+        body.update(extra)
+        with mock.patch('shakenfist.external_api.instance.Blob.from_db',
+                        return_value=mock.MagicMock()):
+            return self._post(body, path='agent/put')
+
+    def test_put_accepts_both_parameters(self):
+        resp, new = self._put(deadline_seconds=45,
+                              progress_timeout_seconds=15)
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertDeadlineIsSecondsFromNow(new, 45)
+        self.assertEqual(15.0, new.call_args.kwargs['progress_timeout'])
+
+    def test_put_applies_the_progress_default_when_omitted(self):
+        # This is what pins put's progress_capable argument. The three
+        # handlers call the helper separately with near-identical code,
+        # so a False copied across from execute would silently give the
+        # one endpoint whose transfer most needs a progress window no
+        # progress window at all, and every other test here would still
+        # pass.
+        resp, new = self._put()
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            float(config.AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT),
+            new.call_args.kwargs['progress_timeout'])
+        self.assertNotEqual(0.0, new.call_args.kwargs['progress_timeout'])
+
+    def test_put_applies_the_default_deadline_when_omitted(self):
+        resp, new = self._put()
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertDeadlineIsSecondsFromNow(
+            new, config.AGENT_OPERATION_DEFAULT_DEADLINE)
 
     def test_get_applies_the_progress_default_when_omitted(self):
         resp, new = self._post({'path': '/etc/hostname'}, path='agent/get')

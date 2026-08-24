@@ -51,6 +51,7 @@ def requires_operation_ownership(func):
 
 
 agentoperation_get_example = """{
+    "attempts": 0,
     "commands": [
         {
             "block-for-result": true,
@@ -58,9 +59,12 @@ agentoperation_get_example = """{
             "commandline": "cat /tmp/README.md"
         }
     ],
+    "deadline": 1787428090.5,
     "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+    "last_progress": null,
     "metadata": {},
     "namespace": "vdi",
+    "progress_timeout": 0.0,
     "results": {
         "0": {
             "command-line": "cat /tmp/README.md",
@@ -72,7 +76,7 @@ agentoperation_get_example = """{
     },
     "state": "complete",
     "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-    "version": 1,
+    "version": 3,
     "references_to": {},
     "references_from": {
         "agent_output": [
@@ -124,6 +128,7 @@ class AgentOperationEndpoint(api_base.Resource):
 
 agentoperation_instance_example = """[
     {
+        "attempts": 0,
         "commands": [
             {
                 "blob_uuid": "09306f15-b1b3-4850-afb4-f4179559fa7f",
@@ -136,9 +141,12 @@ agentoperation_instance_example = """[
                 "path": "/tmp/README.md"
             }
         ],
+        "deadline": 1787428090.5,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+        "last_progress": null,
         "metadata": {},
         "namespace": "vdi",
+        "progress_timeout": 30.0,
         "results": {
             "0": {
                 "path": "/tmp/README.md"
@@ -149,9 +157,10 @@ agentoperation_instance_example = """[
         },
         "state": "complete",
         "uuid": "343049d7-da2a-46f2-bb5c-edb783ec1fb9",
-        "version": 1
+        "version": 3
     },
     {
+        "attempts": 0,
         "commands": [
             {
                 "block-for-result": true,
@@ -159,9 +168,12 @@ agentoperation_instance_example = """[
                 "commandline": "cat /tmp/README.md"
             }
         ],
+        "deadline": 1787428090.5,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+        "last_progress": null,
         "metadata": {},
         "namespace": "vdi",
+        "progress_timeout": 0.0,
         "results": {
             "0": {
                 "command-line": "cat /tmp/README.md",
@@ -173,7 +185,7 @@ agentoperation_instance_example = """[
         },
         "state": "complete",
         "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-        "version": 1
+        "version": 3
     }
 ]"""
 

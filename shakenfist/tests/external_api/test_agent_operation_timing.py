@@ -152,7 +152,29 @@ class AgentOperationTimingTestCase(base.ShakenFistTestCase):
         # nothing can ever be later than.
         values, error = self._timing(deadline_seconds=math.nan)
         self.assertIsNone(values)
-        self.assertIn('negative', self._error(error))
+        self.assertIn('finite', self._error(error))
+
+    def test_infinity_is_refused(self):
+        # Infinity is non-negative, so it passes a negativity test.
+        # An infinite deadline means the same thing as the 0 sentinel
+        # while looking like a duration, and the DOUBLE column it
+        # would be written to cannot represent it.
+        values, error = self._timing(deadline_seconds=math.inf)
+        self.assertIsNone(values)
+        self.assertIn('finite', self._error(error))
+
+    def test_infinity_as_a_string_is_refused(self):
+        # This is the vector that reaches a running server: "inf" is
+        # an ordinary JSON string which float() happily converts, and
+        # json.loads() accepts the bare Infinity literal as well.
+        values, error = self._timing(deadline_seconds='inf')
+        self.assertIsNone(values)
+        self.assertIn('finite', self._error(error))
+
+    def test_a_negative_infinity_is_refused(self):
+        values, error = self._timing(progress_timeout_seconds=-math.inf)
+        self.assertIsNone(values)
+        self.assertIn('finite', self._error(error))
 
     def test_the_first_bad_parameter_is_reported(self):
         # Both are wrong; the message must name one of them rather than

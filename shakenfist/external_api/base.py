@@ -1,6 +1,7 @@
 import copy
 import functools
 import json
+import math
 import re
 import sys
 import time
@@ -305,10 +306,20 @@ def _timing_seconds(name, value):
         return None, sf_api.error(
             400, '%s must be a number of seconds' % name)
 
-    # NaN fails every comparison including this one, so it would slip
-    # past a bare "< 0" test and be stored as a deadline nothing can
-    # ever be later than.
-    if not seconds >= 0:
+    # Neither infinity nor NaN is a duration, and both arrive easily:
+    # the JSON string "inf" converts, and json.loads() accepts the
+    # bare Infinity and NaN literals by default, so flask hands them
+    # straight through. Refuse both here rather than downstream. NaN
+    # in particular would slip past a bare "< 0" test, because it
+    # fails every comparison including that one, and infinity would
+    # produce an infinite absolute deadline -- which has the same
+    # effect as the 0 sentinel but does not look like it, and which
+    # the DOUBLE column cannot store anyway.
+    if not math.isfinite(seconds):
+        return None, sf_api.error(
+            400, '%s must be a finite number of seconds' % name)
+
+    if seconds < 0:
         return None, sf_api.error(
             400, '%s must not be negative' % name)
 
