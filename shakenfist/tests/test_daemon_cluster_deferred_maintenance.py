@@ -22,6 +22,7 @@ class ClusterDeferredMaintenanceTestCase(base.ShakenFistTestCase):
         m.is_elected = True
         m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
         m.pet_watchdog = mock.MagicMock()
+        m.check_daemon_state = mock.MagicMock()
         m._await_election = mock.MagicMock()
         m._run_due_scheduled_jobs = mock.MagicMock()
         m._cluster_wide_cleanup = mock.MagicMock()

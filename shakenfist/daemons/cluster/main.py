@@ -631,8 +631,15 @@ class Monitor(daemon.Daemon):
                 # This elected loop sleeps via lock.lost_event.wait() rather
                 # than idle(), so it must pet the systemd watchdog itself
                 # (rate-limited internally) to stay alive between maintenance
-                # passes and during the cleanup below.
+                # passes and during the cleanup below. For the same reason it
+                # must poll its own daemon state row (also rate-limited
+                # internally): an externally written stop request -- sf-ctl
+                # stop cluster -- is only noticed by check_daemon_state(),
+                # and without this call the elected node ignored it until it
+                # lost election (issue 3874). The wait(5) below bounds the
+                # added stop latency at 5s, inside TimeoutStopSec=30s.
                 self.pet_watchdog()
+                self.check_daemon_state()
 
                 # An unstable cluster (mixed object versions during an
                 # upgrade, or no fresh node metrics at all just after a
