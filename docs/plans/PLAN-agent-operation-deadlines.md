@@ -186,17 +186,34 @@ no extra database round trip.
 ### API surface
 
 The three creating endpoints (`.../agent/execute`, `.../agent/get`,
-`.../agent/put`) gain two optional body parameters:
+`.../agent/put`) gain optional body parameters:
 
-- `deadline_seconds` — number, minimum 0. 0 means "no deadline".
-  Omitted means the server default (600).
-- `progress_timeout_seconds` — number, minimum 0. 0 means "disabled".
-  Omitted means the server default for progress-capable commands.
+- `deadline_seconds` — number, minimum 0, on all three. 0 means "no
+  deadline". Omitted means the server default (600).
+- `progress_timeout_seconds` — number, minimum 0, on `.../agent/get`
+  and `.../agent/put` only. 0 means "disabled". Omitted means the
+  server default.
 
-Both are declared per the parameter declaration rules (body location,
-`number` type token, constraints dict with `minimum`), and both get
-`STRUCTURED_PARAMETERS` entries describing what the handler actually
-accepts. New config options:
+`.../agent/execute` deliberately does **not** publish
+`progress_timeout_seconds`, and stores an explicit `0.0`. No command
+that endpoint builds can report progress — `ExecuteCommand.reports_progress`
+is `False`, against `True` for `PutBlobCommand` and `GetFileCommand` —
+so the parameter would accept input the enforcement phase can never
+consult. Corrected during phase 3 planning; this section previously
+gave all three endpoints both parameters. See
+`PLAN-agent-operation-deadlines-phase-03-api.md` decision 4.
+
+The API server writes a value on every create: an omitted
+`deadline_seconds` is stored as `time.time() + the default`, not as
+NULL. NULL remains the signature of a row written by an API node
+which predates this work, which is the only case the dispatch-time
+fallback below exists for.
+
+All of them are declared per the parameter declaration rules (body
+location, `number` type token, constraints dict with `minimum`), the
+published `minimum` is backed by a handler guard answering 400 rather
+than by coercion, and each gets a `STRUCTURED_PARAMETERS` entry
+describing what the handler actually accepts. New config options:
 
 - `AGENT_OPERATION_DEFAULT_DEADLINE` = 600
 - `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` = 30 (see decisions)
@@ -535,7 +552,7 @@ the slot at all.
 | 0 | [PLAN-agent-operation-deadlines-phase-00-decisions.md](PLAN-agent-operation-deadlines-phase-00-decisions.md) | Complete | Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan |
 | 1 | [PLAN-agent-operation-deadlines-phase-01-groundwork.md](PLAN-agent-operation-deadlines-phase-01-groundwork.md) | Complete | Field mask for `update_agent_operation_attributes`; per-command handler classes replacing the dispatch if/elif chain, declaring `reports_progress` and `retryable` for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises `GetException` rather than `AttributeError` |
 | 2 | [PLAN-agent-operation-deadlines-phase-02-schema.md](PLAN-agent-operation-deadlines-phase-02-schema.md) | Complete | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, both table versions 2 -> 3, additive migrations, and a live-MariaDB test that they migrate. Survey corrections applied at source: NULL means "server default" rather than "no deadline", and there is deliberately no object version bump |
-| 3 | | Not started | API: new body parameters, declarations, `STRUCTURED_PARAMETERS` entries, config defaults |
+| 3 | [PLAN-agent-operation-deadlines-phase-03-api.md](PLAN-agent-operation-deadlines-phase-03-api.md) | In progress | API: `deadline_seconds` on all three creating endpoints and `progress_timeout_seconds` on get/put only, their declarations and `STRUCTURED_PARAMETERS` entries, a 400 guard backing the published bound, and the two config defaults. Survey correction applied at source: `execute` does not publish a progress timeout it can never honour, and the API writes a computed deadline rather than NULL |
 | 4 | | Not started | Enforcement: dequeue expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check) |
 | 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
 | 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast) |
