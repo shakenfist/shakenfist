@@ -911,6 +911,13 @@ groups:
               * on() group_left() sf_database:standing_instances,
             0)
 
+      # The cluster total, measured against modelled. This pair is what
+      # the "Database tier load" panel in examples/grafana-dashboard.json
+      # draws, and is the quickest way to see whether load has moved for
+      # a reason the model already knows about.
+      - record: sf_database:modelled_rate:total
+        expr: sum(sf_database:modelled_rate)
+
       # The ceiling is deliberately generous. These rules exist to catch a
       # new polling loop or one which lost its bulk read, not to police a
       # ten percent drift.

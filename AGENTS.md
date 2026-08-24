@@ -56,6 +56,18 @@ metrics. The headlines:
 
 ## Things that will bite you
 
+- **The database load budget is not a knob.** `shakenfist/data/
+  database_load_budget.yaml` is what functional CI, the shipped
+  Prometheus rules and `sf-ctl database-load` all measure against.
+  Raising a number in it to make a check pass defeats every one of them
+  at once; if load moved, either fix it or change the model in a commit
+  that says so. It is generated —
+  `tools/derive-database-load-budget.py` re-derives it and
+  `tools/generate-database-load-rules.py` re-renders
+  `examples/prometheus-database-load-rules.yaml` from it, and a test
+  fails if either is edited alone. See
+  [docs/operator_guide/database.md](docs/operator_guide/database.md#understanding-database-load).
+
 - **Attribute updates use field masks.** Read
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md)
   before writing an attribute update; a whole-object write races.

@@ -316,6 +316,88 @@ PascalCase RPC name, e.g. `GetNode`, so it reads as the CamelCase form of the
 counter suffix). The `caller-node` metadata is also sent but not yet a label;
 it is reserved for the mTLS peer-identity cross-check.
 
+### Understanding database load
+
+"Is this much database load normal?" has no useful absolute answer,
+because Shaken Fist's load is mostly polling and polling rates are set by
+how many things exist rather than by how much work anybody is doing. A
+number that is right for a six node cluster running eight instances is
+wrong for everybody else. So what ships instead of a number is a model,
+in `shakenfist/data/database_load_budget.yaml`:
+
+```
+expected_qps = per_node_base_qps x nodes
+             + cluster_base_qps                (once for the whole cluster)
+             + per_instance_qps x standing_instances
+```
+
+with one entry per `(operation, caller_daemon)` pair, each carrying a note
+naming the loop that produces it. There are three terms because there are
+three kinds of load. Most of it is a loop running on every node, so it
+scales with cluster size. Some is the elected cluster daemon's maintenance
+sweep, which runs once cluster-wide however many nodes you have. The rest
+scales with standing instances, because it is work done per instance,
+interface or blob.
+
+What the model is for is telling apart the two reasons load goes up: you
+grew, or something broke. An absolute ceiling cannot do that, and it is
+why the first thing to check when the tier looks busy is the cluster's
+shape rather than the queries per second.
+
+#### Checking your cluster
+
+```bash
+sf-ctl database-load
+```
+
+Scrapes every gateway in `MARIADB_GATEWAY_HOSTS` twice over a minute and
+prints what the tier is serving next to what the model predicts for your
+cluster, sorted by how far over budget each pair is. Add `--all-pairs` to
+see everything rather than only what is flagged, and `--json` for
+something to attach to a bug report.
+
+Two flags in that output mean "expected, do not report":
+
+* `provisional:#NNNN` -- the level is a known defect with an open issue
+  rather than a floor worth defending. When the issue is fixed the entry
+  is re-measured and the flag goes.
+* `activity` -- the level is set by what you and your tooling do rather
+  than by one of our loops, so only you can say whether it is reasonable.
+
+If a gateway does not answer, the command says which and reports on the
+rest. It never quietly reports part of the tier as the whole of it,
+because a total missing a gateway reads as load having fallen.
+
+#### Standing monitoring
+
+[`examples/prometheus-database-load-rules.yaml`](https://github.com/shakenfist/shakenfist/blob/develop/examples/prometheus-database-load-rules.yaml)
+is a drop-in Prometheus rule file, generated from the same budget, with
+installation instructions in its comments. It records the model as
+`sf_database:modelled_rate` and the measurement as
+`sf_database:request_rate`, and carries three alerts: a budgeted pair
+well above its model, a pair nobody budgeted for polling steadily, and
+one for the model going blind because `instances_active` is not being
+scraped. That last one matters: without `sf-resources` scraped the
+modelled series are empty and neither of the other two can ever fire,
+which looks exactly like a healthy cluster.
+
+[`examples/grafana-dashboard.json`](https://github.com/shakenfist/shakenfist/blob/develop/examples/grafana-dashboard.json)
+has matching panels for load by caller, measured against modelled, and
+the count of pairs over budget.
+
+#### When a pair is over budget
+
+Please report it, with the output of `sf-ctl database-load --json`
+attached, at
+[the issue tracker](https://github.com/shakenfist/shakenfist/issues). A
+pair well above its model is usually one of two things: a loop of ours
+that has stopped batching a read it used to batch, or a workload shape the
+model does not describe. Both are worth knowing about, and the second is
+how the shipped coefficients get better for clusters that are not ours.
+
+Do not edit the budget to make an alert stop. A budget that tracks
+whatever the code currently does is not a budget.
+
 ### Monitoring sf-database with grpc-health-probe
 
 `sf-database` reports live MariaDB reachability through the standard
