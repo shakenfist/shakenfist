@@ -1,3 +1,4 @@
+import glob
 import math
 import os
 import platform
@@ -126,6 +127,82 @@ def _compute_reservations(cpu_cores, cpu_threads, cpu_reservation_threads,
         'cpu_cores_schedulable': max(1, cpu_cores - cpu_cores_reserved),
         'memory_reserved_mb': memory_reserved_mb,
     }
+
+
+def _safe_metric_name(name):
+    name = name.lower()
+    return re.sub(r'[^a-z0-9_]', '_', name)
+
+
+# Every Shaken Fist daemon runs as its own systemd unit named sf-*.service
+# (grouped under sf.target), so the set of Shaken Fist processes is the set of
+# processes in those units' cgroups. The first glob is the cgroup v2 unified
+# hierarchy, the second the cgroup v1 systemd named hierarchy.
+SF_UNIT_CGROUP_GLOBS = [
+    '/sys/fs/cgroup/system.slice/sf-*.service/cgroup.procs',
+    '/sys/fs/cgroup/systemd/system.slice/sf-*.service/cgroup.procs'
+]
+
+
+def _sf_daemon_pids():
+    """Return the pids of every process in a sf-*.service systemd unit."""
+    pids = set()
+    for pattern in SF_UNIT_CGROUP_GLOBS:
+        for path in glob.glob(pattern):
+            try:
+                with open(path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            pids.add(int(line))
+            except OSError:
+                # The unit stopped between the glob and the read.
+                continue
+    return sorted(pids)
+
+
+def _emit_process_metrics(p, n):
+    if time.time() - p.create_time() < 60:
+        # Ignore new processes
+        return {}
+
+    if p.name().startswith('sf-queues'):
+        # Ignore queue workers
+        return {}
+
+    smn = _safe_metric_name(p.name())
+    out = {}
+    times = p.cpu_times()
+    usage = (times.user + times.system)
+    age = round(time.time() - p.create_time(), 2)
+    out['process_cpu_time_%s' % smn] = usage
+    out['process_age_%s' % smn] = age
+
+    fraction = usage / age
+    out['process_cpu_fraction_%s' % smn] = fraction
+    if fraction > 0.25:
+        n.add_event(EVENT_TYPE_STATUS, 'process %s is a CPU hog' % smn,
+                    extra={'fraction': fraction})
+    return out
+
+
+def _collect_process_metrics(n):
+    """How much CPU time have the Shaken Fist components consumed?
+
+    We enumerate the sf-*.service cgroups rather than walking process
+    parentage: each daemon is its own systemd unit, so our parent is systemd
+    itself and its children are every service on the node -- including the
+    guest VMs under libvirtd (issue 3860).
+    """
+    process_metrics = {}
+    for pid in _sf_daemon_pids():
+        try:
+            p = psutil.Process(pid)
+            with p.oneshot():
+                process_metrics.update(_emit_process_metrics(p, n))
+        except (psutil.NoSuchProcess, FileNotFoundError):
+            ...
+    return process_metrics
 
 
 class Monitor(daemon.Daemon):
@@ -339,11 +416,6 @@ class Monitor(daemon.Daemon):
                     # The domain has likely been deleted.
                     pass
 
-            # Metric name helper
-            def _safe_metric_name(name):
-                name = name.lower()
-                return re.sub(r'[^a-z0-9_]', '_', name)
-
             # Queue health statistics
             node_queue_waiting = 0
             node_queue_processing = 0
@@ -452,51 +524,9 @@ class Monitor(daemon.Daemon):
                 retval['object_version_%s' % obj] = \
                     get_object_class(obj).current_version
 
-            # How much CPU time have the various SF components consumed since restart?
-            # We only traverse two layers here, so its not worth doing something
-            # recursive.
-            def _emit_process_metrics(p):
-                if time.time() - p.create_time() < 60:
-                    # Ignore new processes
-                    return {}
-
-                if p.name().startswith('sf-queues'):
-                    # Ignore queue workers
-                    return {}
-
-                smn = _safe_metric_name(p.name())
-                out = {}
-                times = p.cpu_times()
-                usage = (times.user + times.system)
-                age = round(time.time() - p.create_time(), 2)
-                out['process_cpu_time_%s' % smn] = usage
-                out['process_age_%s' % smn] = age
-
-                fraction = usage / age
-                out['process_cpu_fraction_%s' % smn] = fraction
-                if fraction > 0.25:
-                    n.add_event(EVENT_TYPE_STATUS, 'process %s is a CPU hog' % smn,
-                                extra={'fraction': fraction})
-                return out
-
             if time.time() - self.last_logged_resources > 300:
                 # Record SF process metrics
-                process_metrics = {}
-                me = psutil.Process(os.getpid())
-                shim = me.parent()
-                for child in shim.children():
-                    try:
-                        with child.oneshot():
-                            process_metrics.update(
-                                _emit_process_metrics(child))
-
-                            for subchild in child.children():
-                                with subchild.oneshot():
-                                    process_metrics.update(
-                                        _emit_process_metrics(subchild))
-                    except (psutil.NoSuchProcess, FileNotFoundError):
-                        ...
-                n.process_metrics = process_metrics
+                n.process_metrics = _collect_process_metrics(n)
 
                 # What package versions do we have? Debian package versions are
                 # a mess and this will need tweaking if other host distributions

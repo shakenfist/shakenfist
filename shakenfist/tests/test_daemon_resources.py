@@ -1,7 +1,10 @@
 import os
 import shutil
 import tempfile
+import time
 from unittest import mock
+
+import psutil
 
 from shakenfist.daemons.resources import main as resources_main
 from shakenfist.node_health import NodeHealthResult
@@ -286,3 +289,111 @@ class HealthGaugeTestCase(base.ShakenFistTestCase):
                                   side_effect=[True, False, False]):
             m._run_health_checks(checks=[], types_by_identity={})
         self.assertEqual(1, mock_ignore.call_count)
+
+
+class SfDaemonPidsTestCase(base.ShakenFistTestCase):
+    """Process metrics must be scoped to Shaken Fist's own systemd units.
+
+    Since each daemon became its own systemd unit, walking our parent's
+    children walked every service on the node -- including the guest VMs
+    under libvirtd (issue 3860). The pid enumeration instead reads the
+    sf-*.service cgroups."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def _write_cgroup_procs(self, hierarchy, unit, pids):
+        unit_dir = os.path.join(self.tempdir, hierarchy, unit)
+        os.makedirs(unit_dir)
+        with open(os.path.join(unit_dir, 'cgroup.procs'), 'w') as f:
+            for pid in pids:
+                f.write('%s\n' % pid)
+
+    def _patched_globs(self):
+        return [
+            os.path.join(self.tempdir, 'v2/sf-*.service/cgroup.procs'),
+            os.path.join(self.tempdir, 'v1/sf-*.service/cgroup.procs'),
+        ]
+
+    def test_pids_collected_from_sf_units_only(self):
+        self._write_cgroup_procs('v2', 'sf-database.service', [101, 102])
+        self._write_cgroup_procs('v2', 'sf-resources.service', [204])
+        self._write_cgroup_procs('v2', 'libvirtd.service', [666])
+        with mock.patch.object(resources_main, 'SF_UNIT_CGROUP_GLOBS',
+                               self._patched_globs()):
+            self.assertEqual([101, 102, 204], resources_main._sf_daemon_pids())
+
+    def test_pids_deduplicated_across_hierarchies(self):
+        self._write_cgroup_procs('v2', 'sf-database.service', [101])
+        self._write_cgroup_procs('v1', 'sf-database.service', [101])
+        with mock.patch.object(resources_main, 'SF_UNIT_CGROUP_GLOBS',
+                               self._patched_globs()):
+            self.assertEqual([101], resources_main._sf_daemon_pids())
+
+    def test_blank_lines_and_missing_hierarchy_ignored(self):
+        unit_dir = os.path.join(self.tempdir, 'v2/sf-api.service')
+        os.makedirs(unit_dir)
+        with open(os.path.join(unit_dir, 'cgroup.procs'), 'w') as f:
+            f.write('42\n\n')
+        with mock.patch.object(resources_main, 'SF_UNIT_CGROUP_GLOBS',
+                               self._patched_globs()):
+            self.assertEqual([42], resources_main._sf_daemon_pids())
+
+    def test_no_units_present(self):
+        with mock.patch.object(resources_main, 'SF_UNIT_CGROUP_GLOBS',
+                               self._patched_globs()):
+            self.assertEqual([], resources_main._sf_daemon_pids())
+
+
+class CollectProcessMetricsTestCase(base.ShakenFistTestCase):
+    def _fake_process(self, name, age, cpu_seconds):
+        p = mock.MagicMock()
+        p.name.return_value = name
+        p.create_time.return_value = time.time() - age
+        p.cpu_times.return_value = mock.Mock(user=cpu_seconds, system=0.0)
+        return p
+
+    def test_metrics_scoped_to_enumerated_pids(self):
+        procs = {
+            100: self._fake_process('sf-database', 1000, 10.0),
+            200: self._fake_process('sf-cleaner', 30, 1.0),
+            300: self._fake_process('sf-queues', 1000, 10.0),
+        }
+
+        def _process(pid):
+            if pid == 400:
+                raise psutil.NoSuchProcess(pid)
+            return procs[pid]
+
+        n = mock.MagicMock()
+        with mock.patch.object(resources_main, '_sf_daemon_pids',
+                               return_value=[100, 200, 300, 400]), \
+                mock.patch.object(resources_main.psutil, 'Process',
+                                  side_effect=_process):
+            metrics = resources_main._collect_process_metrics(n)
+
+        # The long-running daemon is measured, the young process and the
+        # queue workers are not, and a pid which exited between enumeration
+        # and measurement is skipped.
+        self.assertIn('process_cpu_time_sf_database', metrics)
+        self.assertIn('process_age_sf_database', metrics)
+        self.assertIn('process_cpu_fraction_sf_database', metrics)
+        self.assertEqual(3, len(metrics))
+        self.assertAlmostEqual(
+            0.01, metrics['process_cpu_fraction_sf_database'], places=3)
+        n.add_event.assert_not_called()
+
+    def test_cpu_hog_emits_event(self):
+        hog = self._fake_process('sf-net', 100, 50.0)
+        n = mock.MagicMock()
+        with mock.patch.object(resources_main, '_sf_daemon_pids',
+                               return_value=[100]), \
+                mock.patch.object(resources_main.psutil, 'Process',
+                                  return_value=hog):
+            metrics = resources_main._collect_process_metrics(n)
+
+        self.assertGreater(metrics['process_cpu_fraction_sf_net'], 0.25)
+        self.assertEqual(1, n.add_event.call_count)
+        self.assertIn('sf_net is a CPU hog', n.add_event.call_args[0][1])
