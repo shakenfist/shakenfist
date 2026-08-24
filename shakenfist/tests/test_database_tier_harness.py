@@ -169,3 +169,18 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         steady = harness.fixed_rate([{('Sweep', 'cluster'): 1.0 / per_window},
                                      {('Sweep', 'cluster'): 2.0 / per_window}])
         self.assertIn(('Sweep', 'cluster'), steady)
+
+    def test_parser_matches_the_server_side_parser(self):
+        # shakenfist/util/metrics_scrape.py is the same parser for
+        # sf-ctl database-load. The CI suite carries its own copy because
+        # it imports nothing from the server package; a copy which parses
+        # differently would make the two disagree about what the tier is
+        # serving, which is the whole thing this budget work is trying to
+        # prevent.
+        from shakenfist.util import metrics_scrape
+
+        with mock.patch.object(harness.requests, 'get',
+                               return_value=FakeResponse(METRICS)):
+            ci_pairs = harness.scrape_request_pairs('10.0.0.1')
+        self.assertEqual(metrics_scrape.parse_request_pairs(METRICS),
+                         ci_pairs)

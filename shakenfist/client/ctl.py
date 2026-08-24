@@ -3,6 +3,7 @@ import importlib
 import json
 import logging
 import os
+import time
 import uuid as uuid_module
 from dataclasses import dataclass
 from dataclasses import field
@@ -129,11 +130,15 @@ config = sf_config.config
 # These imports _must_ occur after the extra config setup has run.
 from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
+from shakenfist import node                                # noqa
 from shakenfist.constants import EVENT_TYPE_AUDIT          # noqa
+from shakenfist.baseobject import DatabaseBackedObject as dbo  # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
 from shakenfist.schema.object_types import ObjectType      # noqa
+from shakenfist.schema import database_load_budget         # noqa
+from shakenfist.util import metrics_scrape                 # noqa
 from shakenfist.util.grpc_channel import make_database_channel  # noqa
 from shakenfist.util import vdi_tokens                     # noqa
 
@@ -469,6 +474,214 @@ def gateway_health(host: Optional[str], timeout: int) -> None:
     click.echo(f'gateway {host} is SERVING')
 
 
+def _gather_database_load(window: int, timeout: int) -> dict[str, Any]:
+    """Scrape the tier twice and turn the difference into rates.
+
+    Returns the rates, plus which gateways answered, because a partial
+    measurement reported as a whole one is worse than no measurement: it
+    reads as load having fallen.
+    """
+    hosts = list(config.MARIADB_GATEWAY_HOSTS)
+    if not hosts:
+        raise click.ClickException(
+            'MARIADB_GATEWAY_HOSTS is empty, so there is no database tier '
+            'to measure.')
+    port = config.MARIADB_GATEWAY_METRICS_PORT
+
+    def _sample() -> tuple[
+            dict[str, dict[tuple[str, str], float]], dict[str, str]]:
+        reached: dict[str, dict[tuple[str, str], float]] = {}
+        failed: dict[str, str] = {}
+        for host in hosts:
+            try:
+                reached[host] = metrics_scrape.scrape_request_pairs(
+                    host, port, timeout=timeout)
+            except Exception as e:
+                failed[host] = str(e)
+        return reached, failed
+
+    first, first_failed = _sample()
+    if not first:
+        raise click.ClickException(
+            'No sf-database gateway answered on port %d. Tried: %s'
+            % (port, ', '.join('%s (%s)' % (h, e)
+                               for h, e in sorted(first_failed.items()))))
+
+    time.sleep(window)
+    second, second_failed = _sample()
+
+    # Only gateways which answered both times can contribute a rate. One
+    # which answered once would otherwise look like a counter which reset.
+    usable = sorted(set(first) & set(second))
+    unreachable = sorted(set(hosts) - set(usable))
+
+    rates: dict[tuple[str, str], float] = {}
+    for host in usable:
+        before = first[host]
+        after = second[host]
+        for key, value in after.items():
+            delta = value - before.get(key, 0.0)
+            if delta < 0:
+                # sf-database restarted inside the window, so its counters
+                # began again from zero. Its share of this pair is unknown
+                # rather than negative.
+                continue
+            rates[key] = rates.get(key, 0.0) + delta / window
+
+    return {
+        'rates': rates,
+        'gateways_measured': usable,
+        'gateways_unreachable': unreachable,
+        'gateway_errors': {h: second_failed.get(h, first_failed.get(h, ''))
+                           for h in unreachable},
+    }
+
+
+def _cluster_shape() -> tuple[int, int]:
+    """How many nodes, and how many instances are standing."""
+    nodes = len(list(node.Nodes([], prefilter='active')))
+    instances = len(mariadb.get_objects_by_state(
+        ObjectType.INSTANCE, [dbo.STATE_CREATED]) or [])
+    return nodes, instances
+
+
+@click.command(name='database-load')
+@click.option('--window', default=60, type=int,
+              help='Seconds to measure over. Shorter is noisier.')
+@click.option('--timeout', default=5, type=int,
+              help='Per-gateway scrape timeout, in seconds.')
+@click.option('--all-pairs', is_flag=True, default=False,
+              help='Include pairs which are within budget.')
+@click.option('--json', 'as_json', is_flag=True, default=False,
+              help='Emit JSON rather than a table.')
+def database_load(window: int, timeout: int, all_pairs: bool,
+                  as_json: bool) -> None:
+    """Compare this cluster's database load against what it should be.
+
+    Scrapes every sf-database gateway twice, and reports per caller what
+    the tier is actually serving next to what Shaken Fist's shipped load
+    model predicts for a cluster of this size. Sorted by how far over
+    budget each is, because that is what matters -- the busiest pair on
+    any cluster is usually a poll doing exactly what it should.
+
+    Load here is mostly polling, and polling rates are set by how many
+    things exist rather than by how much work anybody is doing, so the
+    model is a per-node base plus a per-standing-instance coefficient
+    rather than a flat number. If a pair is well over its budget, please
+    report it with "--json" output attached.
+
+    Two kinds of entry are printed but never counted as over budget.
+    "provisional" means Shaken Fist has an open bug about that pair and
+    its current level is not a floor worth defending. "activity" means
+    the level is set by what you and your tooling do rather than by one
+    of our loops, so only you can say whether it is reasonable.
+    """
+    budget = database_load_budget.load_budget()
+    defaults = budget.defaults
+
+    measurement = _gather_database_load(window, timeout)
+    nodes, instances = _cluster_shape()
+    rates = measurement['rates']
+
+    rows = []
+    for (operation, caller), measured in rates.items():
+        entry = budget.get(operation, caller)
+        if entry is None:
+            modelled = None
+            ceiling = defaults.unbudgeted_fixed_rate_qps
+            flags = ['unbudgeted']
+        else:
+            modelled = entry.expected_qps(nodes, instances)
+            ceiling = entry.ceiling_qps(nodes, instances,
+                                        defaults.tolerance_multiplier,
+                                        defaults.tolerance_floor_qps)
+            flags = []
+            if entry.provisional:
+                flags.append('provisional:#%d' % entry.provisional.issue)
+            if entry.activity_coupled:
+                flags.append('activity')
+        rows.append({
+            'operation': operation,
+            'caller_daemon': caller,
+            'measured_qps': round(measured, 3),
+            'modelled_qps': None if modelled is None else round(modelled, 3),
+            'ceiling_qps': round(ceiling, 3),
+            'excess_qps': round(measured - ceiling, 3),
+            'over_budget': measured > ceiling and (
+                entry is not None and entry.enforced),
+            'flags': flags,
+        })
+
+    rows.sort(key=lambda r: -r['excess_qps'])
+    shown = rows if all_pairs else [r for r in rows
+                                    if r['excess_qps'] > 0 or r['flags']]
+
+    report = {
+        'window_seconds': window,
+        'cluster': {'nodes': nodes, 'standing_instances': instances},
+        'gateways_measured': measurement['gateways_measured'],
+        'gateways_unreachable': measurement['gateways_unreachable'],
+        'gateway_errors': measurement['gateway_errors'],
+        'total_measured_qps': round(sum(rates.values()), 3),
+        'total_modelled_qps': round(
+            budget.expected_total_qps(nodes, instances), 3),
+        'pairs': shown,
+        'pairs_seen': len(rows),
+        'pairs_over_budget': sum(1 for r in rows if r['over_budget']),
+    }
+
+    if as_json:
+        click.echo(json.dumps(report, indent=4, sort_keys=True))
+        return
+
+    if measurement['gateways_unreachable']:
+        click.echo(
+            'WARNING: %d of %d gateways did not answer, so these numbers '
+            'are the tier minus those gateways, not the whole tier:'
+            % (len(measurement['gateways_unreachable']),
+               len(measurement['gateways_unreachable'])
+               + len(measurement['gateways_measured'])))
+        for host in measurement['gateways_unreachable']:
+            click.echo('  %s: %s' % (host, measurement['gateway_errors'][host]))
+        click.echo('')
+
+    click.echo('%d nodes, %d standing instances, measured over %ds across '
+               '%d gateway(s).'
+               % (nodes, instances, window,
+                  len(measurement['gateways_measured'])))
+    click.echo('Total %.1f/s measured against %.1f/s modelled.'
+               % (report['total_measured_qps'],
+                  report['total_modelled_qps']))
+    click.echo('')
+
+    if not shown:
+        click.echo('Every pair is inside its budget.')
+        return
+
+    click.echo('%-34s %-13s %9s %9s %9s  %s'
+               % ('OPERATION', 'CALLER', 'MEASURED', 'MODELLED', 'EXCESS',
+                  'NOTES'))
+    for row in shown:
+        modelled_text = ('        -' if row['modelled_qps'] is None
+                         else '%9.2f' % row['modelled_qps'])
+        click.echo('%-34s %-13s %9.2f %s %9.2f  %s'
+                   % (row['operation'], row['caller_daemon'],
+                      row['measured_qps'], modelled_text,
+                      row['excess_qps'],
+                      ','.join(row['flags'])))
+
+    click.echo('')
+    if report['pairs_over_budget']:
+        click.echo(
+            '%d pair(s) are over budget. Please report this at '
+            'https://github.com/shakenfist/shakenfist/issues with the '
+            'output of "sf-ctl database-load --json" attached.'
+            % report['pairs_over_budget'])
+    else:
+        click.echo('Nothing is over budget; the rows above are flagged '
+                   'rather than excessive.')
+
+
 # All object types that have state stored in etcd. This includes both regular
 # objects (instances, networks, etc.) and cluster operations (node_blob_op, etc.)
 OBJECT_TYPES_WITH_STATE = [
@@ -516,3 +729,4 @@ cli.add_command(deregister_daemon)
 cli.add_command(clear_node_error)
 cli.add_command(stop)
 cli.add_command(gateway_health)
+cli.add_command(database_load)
