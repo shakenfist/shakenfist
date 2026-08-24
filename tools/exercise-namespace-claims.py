@@ -49,6 +49,16 @@ import urllib.request
 RECONCILE_SWEEP_TIMEOUT = 12 * 60
 RECONCILE_POLL_INTERVAL = 10
 
+# How long cleanup waits for an asynchronously deleted object to actually
+# disappear before giving up and telling the operator to finish by hand.
+CLEANUP_TIMEOUT = 180
+CLEANUP_POLL_INTERVAL = 5
+
+# Network creation is asynchronous too: an instance cannot attach to a
+# network until the network daemon has moved it out of 'initial'.
+NETWORK_READY_TIMEOUT = 180
+NETWORK_POLL_INTERVAL = 5
+
 # The TTL given to the claim used for the expiry test. Short enough that
 # the wait is dominated by the sweep interval rather than by the TTL.
 EXPIRY_CLAIM_TTL = 30
@@ -137,7 +147,12 @@ class Runner:
         self.passed += 1
         print('  ok    %s%s' % (
             description, '  [%s]' % detail if detail else ''))
-        return detail
+        # Callers use the return value as a "did this pass?" guard for
+        # dependent checks, so a passing check must never return a falsy
+        # value. Checks that have no detail to report return None, and
+        # returning that here silently skipped their dependents rather
+        # than running them.
+        return detail if detail else True
 
     def skip(self, description, why):
         self.skipped.append((self.section, description, why))
@@ -193,6 +208,35 @@ def load_credentials(args):
     return url, namespace, key
 
 
+def wait_until_gone(client, path):
+    """Poll an object until it 404s or reaches the deleted state."""
+    deadline = time.time() + CLEANUP_TIMEOUT
+    while time.time() < deadline:
+        status, body = client.request('GET', path)
+        if status == 404:
+            return True
+        if isinstance(body, dict) and body.get('state') == 'deleted':
+            return True
+        time.sleep(CLEANUP_POLL_INTERVAL)
+    return False
+
+
+def delete_namespace(client, namespace):
+    """Delete a namespace, retrying while it still owns resources.
+
+    A namespace delete is refused with a 400 while anything in it is
+    still being torn down. The objects we made are already waited for,
+    but their teardown can leave briefly-lingering dependents, so retry
+    rather than declaring the cleanup failed on the first refusal.
+    """
+    deadline = time.time() + CLEANUP_TIMEOUT
+    while True:
+        status, _ = client.request('DELETE', '/auth/namespaces/%s' % namespace)
+        if status == 200 or time.time() >= deadline:
+            return status
+        time.sleep(CLEANUP_POLL_INTERVAL)
+
+
 def cluster_capacity(client):
     """Total cluster capacity per dimension, or None if unavailable."""
     status, body = client.request('GET', '/admin/resources')
@@ -218,9 +262,13 @@ def main():
                         help='do not clean up, for post-mortem inspection')
     parser.add_argument('--insecure', action='store_true',
                         help='do not verify TLS certificates')
-    parser.add_argument('--image', default='sf://upload/system/debian-12',
-                        help='disk base for the drawdown instances; must '
-                             'already exist on the cluster')
+    parser.add_argument('--image', default='cirros',
+                        help='disk base for the drawdown instances. The '
+                             'default is resolved by the cirros image '
+                             'resolver, so it needs no pre-existing '
+                             'artifact. A sf://label/... reference works '
+                             'too, but only if the label is in this '
+                             'namespace or is shared')
     parser.add_argument('--instance-cpus', type=int, default=1)
     parser.add_argument('--instance-memory', type=int, default=1024)
     parser.add_argument('--instance-disk', type=int, default=8)
@@ -237,7 +285,8 @@ def main():
     print('cluster    : %s' % url)
     print('admin as   : %s' % namespace)
     print('namespace  : %s  (created and deleted by this script)' % soak_ns)
-    print('instances  : %s' % ('skipped' if args.no_instances else 'yes'))
+    print('instances  : %s' % ('skipped' if args.no_instances else
+                               'yes, from %s' % args.image))
     print('expiry     : %s' % ('skipped' if args.no_expiry else
                                'yes, up to %d min of waiting'
                                % (RECONCILE_SWEEP_TIMEOUT // 60)))
@@ -449,6 +498,32 @@ def main():
             have_network = r.check('create a network for the instances',
                                    _network)
 
+            if have_network:
+                def _network_ready():
+                    # Network creation is asynchronous: the API returns a
+                    # network in the 'initial' state and the network
+                    # daemon brings it up. Attaching an instance before
+                    # then is refused with a 406, so wait for 'created'.
+                    net_url = '/networks/%s' % state['network']
+                    deadline = time.time() + NETWORK_READY_TIMEOUT
+                    seen = None
+                    while time.time() < deadline:
+                        status, body = client.request('GET', net_url)
+                        if status == 200:
+                            seen = body.get('state')
+                            if seen == 'created':
+                                return 'ready'
+                            if seen in ('error', 'deleted'):
+                                raise Failure(
+                                    'network reached %s instead of created'
+                                    % seen)
+                        time.sleep(NETWORK_POLL_INTERVAL)
+                    raise Failure(
+                        'network was still %s after %ds'
+                        % (seen, NETWORK_READY_TIMEOUT))
+                have_network = r.check('the network becomes ready',
+                                       _network_ready)
+
             def _instance():
                 status, body = client.request(
                     'POST', '/instances',
@@ -602,21 +677,33 @@ def main():
             for uuid in instances:
                 status, _ = client.request('DELETE', '/instances/%s' % uuid)
                 print('  instance %s: HTTP %s' % (uuid, status))
-            if instances:
-                # Give the delete a moment to release placement before
-                # the namespace goes, so the namespace delete is not
-                # refused for still owning resources.
-                time.sleep(15)
+            for uuid in instances:
+                if wait_until_gone(client, '/instances/%s' % uuid):
+                    print('  instance %s: gone' % uuid)
+                else:
+                    print('  instance %s: still present after %ds'
+                          % (uuid, CLEANUP_TIMEOUT))
             if state.get('network'):
-                status, _ = client.request(
-                    'DELETE', '/networks/%s' % state['network'])
-                print('  network %s: HTTP %s' % (state['network'], status))
-            status, _ = client.request(
-                'DELETE', '/auth/namespaces/%s' % soak_ns)
+                net = state['network']
+                status, _ = client.request('DELETE', '/networks/%s' % net)
+                print('  network %s: HTTP %s' % (net, status))
+                # Network deletion is asynchronous (HTTP 202): the API
+                # returns before the network object reaches the deleted
+                # state. Deleting the namespace while it still owns a
+                # network is refused with a 400, so wait for the object
+                # to actually go away rather than sleeping and hoping.
+                if wait_until_gone(client, '/networks/%s' % net):
+                    print('  network %s: gone' % net)
+                else:
+                    print('  network %s: still present after %ds'
+                          % (net, CLEANUP_TIMEOUT))
+            status = delete_namespace(client, soak_ns)
             print('  namespace %s: HTTP %s' % (soak_ns, status))
             if status != 200:
                 print('  NOTE: the namespace was not removed. Inspect and '
-                      'clean up by hand.')
+                      'clean up by hand:')
+                print('    sf-client --namespace %s namespace delete %s'
+                      % (soak_ns, soak_ns))
 
     return r.report()
 

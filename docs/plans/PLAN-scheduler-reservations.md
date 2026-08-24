@@ -353,8 +353,8 @@ table entirely (decision D8).
 | 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete |
 | 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
-| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | In progress |
-| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | In progress |
+| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
+| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
@@ -377,12 +377,14 @@ is here.
   been soaking cleanly on sfcbr since, on 5-minute passes with no
   drift.
 - **Phase 3** merged as PR #3754 on 2026-08-16. Its D13 demand clause
-  shipped the #3813 defect, fixed by phase 4a; its step 9 sfcbr soak
-  has still not been run and rides with phase 4a's step 5, which is
-  one soak covering phases 3, 4 and 4a (its decision E6).
-- **Phase 4**'s steps 1-9 have landed, management review included;
-  the operator review and the sfcbr soak are still outstanding, and
-  ride with phase 4a's step 5. `NamespaceClaim`
+  shipped the #3813 defect, fixed by phase 4a. Its step 9 sfcbr soak
+  was discharged by phase 4a's step 5, one soak covering phases 3, 4
+  and 4a (its decision E6); see that plan's *Soak observations*.
+- **Phase 4** has landed in full, management and operator review
+  included. Its claim soak was discharged by phase 4a's step 5, by
+  deliberate exercise rather than by waiting: nothing on sfcbr creates
+  claims on its own, so `tools/exercise-namespace-claims.py` walks the
+  pathway end to end, drawdown and expiry included. `NamespaceClaim`
   is a first-class object with admin-only REST CRUD at
   `/auth/namespaces/<namespace>/claims`, and creation migrates the
   namespace's existing drawdown out of the cluster's unclaimed sums and
@@ -392,9 +394,10 @@ is here.
   phase plan).
 - **Phase 4a** was inserted on 2026-08-22, between phases 4 and 5,
   because #3813 was a live defect in phase 3's shipped admission code
-  and phase 5 makes that code the sole gate on placement. Its code
-  steps have landed; what remains is the sfcbr soak. Its survey
-  found that the D13 seed constant was transcribed from the wrong row
+  and phase 5 makes that code the sole gate on placement. It completed
+  on 2026-08-24. The soak measured the fix: demand-only refusals fell
+  from 100% of all refusals to a residue, and the P9 waiver rate from
+  62% to 4.1%. Its survey found that the D13 seed constant was transcribed from the wrong row
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's *What the
   survey found*.

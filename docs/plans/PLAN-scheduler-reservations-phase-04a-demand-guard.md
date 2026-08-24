@@ -394,8 +394,8 @@ one dimension.
 | 2 | medium | opus | worktree | Live coverage, in `tests/test_mariadb_capacity_admission_live.py` beside `test_the_demand_clause_refuses_on_measured_load` (`:416`) and `test_the_demand_clause_passes_on_null_metrics` (`:436`). Two tests against a real server: a node with `cpu_schedulable = 1` and zero load admits an 8-vCPU instance (the #3813 case at the smallest supported size), and a node whose `expected_demand` already exceeds `target_load x cpu_schedulable` refuses, with the reply's demand dimension reporting `exceeded` true and the allocation dimensions all false so `demand_only` is true. Follow the file's existing fixture pattern for seeding `node_metrics` and `scheduler_node_capacity` rows; note the suite reports the server regime it ran under, and issue #3759 means CI does not exercise MariaDB 11 here. Commit subject: `tests: live coverage for the demand guard.` | Complete -- two existing live tests needed their premises restated, and the sweep landed here |
 | 3 | low | sonnet | worktree | The post-fix half of the plan corrections; the provenance corrections already landed in the planning commit and must not be redone (see *What the survey found*). In `PLAN-scheduler-reservations.md`, move the #3813 Future work entry -- including its 2026-08-22 correction -- into "Bugs fixed during this work", condensed to what a reader needs after the fact: the units error, the fix, and the phase that made it. Clear the "carries an outstanding defect" clause from the phase 3 status note now that it is false. Check the master plan's success criterion for D13 (`The D13 demand clause admits placements on a node that has real room for them, at every node size this project supports`) reads true against what shipped, and say so rather than deleting it. Commit subject: `docs: record the demand guard defect as fixed.` | Complete |
 | 4 | low | sonnet | worktree | Operator and developer documentation. In `docs/operator_guide/scheduler.md`, state what the demand term now does in one paragraph: it spreads correlated bursts by refusing nodes already at or above `SCHEDULER_TARGET_LOAD` per schedulable thread, it never refuses a node with real allocation room, and when every node is over target the waiver admits anyway rather than failing the create. Give the two constants and their measured provenance. In `docs/developer_guide/subsystem_internals.md`, update the admission-transaction description beside the placement one to carry the new clause and the `exceeded` divergence from step 1. Check `CLAUDE.md`'s scheduler capacity paragraph for anything the change falsifies and correct it if so; `ARCHITECTURE.md` and `AGENTS.md` only if the component inventory or a convention actually changed, which it should not have. Commit subject: `docs: the demand guard is a spreader, not a bound.` | Complete |
-| 5 | n/a | management session | none | Deploy to sfcbr and soak, discharging three outstanding obligations at once (E6): phase 3's step 9 soak, phase 4's step 10 operator review and soak with a real claim on a real namespace, and this phase's own validation. Run a CI burst and record, in this plan's Soak observations section: whether the demand clause now passes for some candidates and refuses others (read the `'schedule candidate refused by capacity guard'` audit events and check `enforce_demand` is true on refusals that were then admitted elsewhere); how often the P9 waiver event fires, which under E3 should be rare and only under genuine saturation; whether a burst spreads across hypervisors rather than piling on the top-ranked node; and that the reconciler reports zero drift across the burst. Then the phase 4 claim soak proper: create a claim for a namespace, run instances in it, confirm the drawdown and that `/admin/resources` and the tables agree. Phase 00a's own post-deploy question -- whether the network+database node still takes a disproportionate share -- can be observed from the same burst; record it in phase 00a's plan, not this one. | Not started -- operator |
-| 6 | low | sonnet | worktree | Close-out, after step 5 has been recorded. Set the phase 3, phase 4 and phase 4a rows to `Complete` in the master plan Execution table, remove the phase status notes that describe the soaks as outstanding, and confirm `docs/plans/index.md`'s row arithmetic is right for the new phase count (the phases column is arithmetic over the Execution table; adding 4a changes the denominator). Close #3813 with a comment naming the fix and the soak observation. Commit subject: `scheduler: close out phases 3, 4 and 4a.` | Not started -- gated on step 5 |
+| 5 | n/a | management session | none | Deploy to sfcbr and soak, discharging three outstanding obligations at once (E6): phase 3's step 9 soak, phase 4's step 10 operator review and soak with a real claim on a real namespace, and this phase's own validation. Run a CI burst and record, in this plan's Soak observations section: whether the demand clause now passes for some candidates and refuses others (read the `'schedule candidate refused by capacity guard'` audit events and check `enforce_demand` is true on refusals that were then admitted elsewhere); how often the P9 waiver event fires, which under E3 should be rare and only under genuine saturation; whether a burst spreads across hypervisors rather than piling on the top-ranked node; and that the reconciler reports zero drift across the burst. Then the phase 4 claim soak proper: create a claim for a namespace, run instances in it, confirm the drawdown and that `/admin/resources` and the tables agree. Phase 00a's own post-deploy question -- whether the network+database node still takes a disproportionate share -- can be observed from the same burst; record it in phase 00a's plan, not this one. | Complete -- deployed and soaked 2026-08-22 to 2026-08-24; the claim half needed a deliberate exercise, see the step notes |
+| 6 | low | sonnet | worktree | Close-out, after step 5 has been recorded. Set the phase 3, phase 4 and phase 4a rows to `Complete` in the master plan Execution table, remove the phase status notes that describe the soaks as outstanding, and confirm `docs/plans/index.md`'s row arithmetic is right for the new phase count (the phases column is arithmetic over the Execution table; adding 4a changes the denominator). Close #3813 with a comment naming the fix and the soak observation. Commit subject: `scheduler: close out phases 3, 4 and 4a.` | Complete |
 
 ### Step notes
 
@@ -428,6 +428,15 @@ one dimension.
   exactly 54 of the 80 cells against the pre-fix clause and seed, which
   is the figure computed from the arithmetic before any code was
   written.
+* **Step 5** could only half happen by waiting. The demand-guard
+  observations came from a 48-hour sfcbr window, as planned, and are
+  recorded in *Soak observations*. The phase 4 claim half could not:
+  nothing on sfcbr creates a namespace capacity claim on its own, so
+  the window produced zero claim requests, zero over-limit audit
+  events and zero expiries -- an absence, not a result. The pathway
+  was exercised deliberately instead, with
+  `tools/exercise-namespace-claims.py`. Waiting longer would not have
+  helped, and the plan should have said so when it wrote the step.
 * **Review round 1 (2026-08-22)** raised ten items, of which five
   changed the code. The mock database's demand comparison still
   implemented the pre-fix arithmetic, so the caller-side P9 waiver
@@ -756,15 +765,46 @@ follow-up issue should be filed to have the reconcile pass log the
 magnitude of any correction it makes**, because the phase 3 exit
 criterion cannot actually be checked from logs as things stand.
 
-**Observation 5 -- phase 4 claim drawdown: NOT DONE.** No namespace
-capacity claim was created during the soak. There were zero requests to
-`/auth/namespaces/<namespace>/claims`, zero `placement admitted over
-namespace capacity claim` audit events, and `claims_expired` was zero
-in all 299 reconcile passes. The phase 4 operator soak is therefore
-still outstanding and phase 4 cannot be closed on this window. It needs
-a deliberate exercise rather than more waiting: create a claim on a real
-namespace, run instances in it, and confirm the drawdown against
-`/admin/resources` and the tables.
+**Observation 5 -- phase 4 claim drawdown: done deliberately, not by
+waiting.** The 48h window produced no claim activity at all: zero
+requests to `/auth/namespaces/<namespace>/claims`, zero `placement
+admitted over namespace capacity claim` audit events, and
+`claims_expired` zero in all 299 reconcile passes. That is not a soak
+result, it is an absence of one, and no amount of further waiting would
+have changed it -- nothing on sfcbr creates claims on its own. The
+pathway was therefore exercised on purpose, with
+`tools/exercise-namespace-claims.py` against sfcbr on 2026-08-24: 33
+checks, all passing, covering request validation, create, duplicate
+refusal, the capacity refusal for an impossible claim, read and
+cross-namespace non-disclosure, field-masked update, re-dating,
+shrink-to-zero-and-back, drawdown against a real instance
+(`used_cpus=1 used_memory_mb=1024 used_disk_gb=8` after placement),
+the `below_usage` shrink refusal, expiry, and delete.
+
+The expiry result is the one worth recording, because it is the only
+one that could not be reasoned out from the code. `coverage_state` is a
+stored column swept by the reconciler rather than computed on read, so
+a claim stays `active` past its own `expires_at` until a pass runs. The
+observed sweep latency was 210s, 280s and 321s across three runs
+against a five-minute reconcile interval -- the interval behaving as
+designed rather than a stall, and the spread is simply where in the
+cycle the claim happened to expire. Through that window the claim reads
+`state: created` while refusing a grow with 409 `not_active` -- D2's
+two-facts distinction visible from the outside, which is what the phase
+4 soak was for.
+
+Four bugs surfaced, all in the exercise script, none in the claims
+code. Three were assumptions about asynchronous object lifecycle: a
+non-existent default image, an instance created before its network left
+`initial`, and a namespace deleted before its network had finished
+going away. The fourth is worth recording as a testing lesson rather
+than a defect: the harness returned each check's detail string as its
+result, and callers used that as a "did this pass?" guard, so two
+checks whose implementation had no detail to report were silently
+skipped instead of run. They were never reported as skipped and never
+failed -- the run was green because the assertions did not execute.
+A passing check now returns `True` when it has no detail. The claims
+assertions themselves passed on their first run.
 
 ## Future work
 
