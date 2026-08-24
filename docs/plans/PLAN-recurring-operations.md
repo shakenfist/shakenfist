@@ -260,6 +260,14 @@ look like:)
 | 5. Network-maintain-pass op + migrate `maintain.py` | TBD | Not started |
 | 6. REST API and user-facing template vocabulary | TBD | Not started |
 | 7. Documentation and tests | TBD | Not started |
+| 8. Push audit | PLAN-recurring-operations-phase-08-push-audit.md | Not started |
+
+**Phase 8 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 This plan is currently in stub form. It exists primarily
 to anchor a future-work reference in

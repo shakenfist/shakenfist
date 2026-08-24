@@ -315,6 +315,14 @@ Provisional, to be re-cut after phase 0.
 | 9. L2 / GARP advertisement mode | PLAN-network-carrier-model-phase-09-l2.md | Not started |
 | 10. Migration from singleton network node | PLAN-network-carrier-model-phase-10-migration.md | Not started |
 | 11. Operator documentation for VIP failover and pool sizing | PLAN-network-carrier-model-phase-11-docs.md | Not started |
+| 12. Push audit | PLAN-network-carrier-model-phase-12-push-audit.md | Not started |
+
+**Phase 12 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## Dependencies on other plans
 

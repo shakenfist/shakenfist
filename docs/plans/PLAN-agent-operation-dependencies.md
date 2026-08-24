@@ -192,3 +192,4 @@ report per-operation outcomes from the chain on failure.
 | 3 | Cross-instance edges and namespace enforcement |
 | 4 | client-python: chain submission helpers, await-the-chain UX, failure reporting |
 | 5 | Documentation: developer-guide agent operation model, worked examples; `client-python-k3s` adopts dependencies (rolling update via one submitted chain) as the first example application |
+| 6 | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |

@@ -222,6 +222,14 @@ Provisional, to be re-cut after phase 0.
 | 4. Port vsock CID allocator | PLAN-generic-allocator-phase-04-vsock.md | Not started |
 | 5. Port MAC allocator | PLAN-generic-allocator-phase-05-mac.md | Not started |
 | 6. Documentation and audit-log surface | PLAN-generic-allocator-phase-06-docs.md | Not started |
+| 7. Push audit | PLAN-generic-allocator-phase-07-push-audit.md | Not started |
+
+**Phase 7 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## Dependencies on other plans
 

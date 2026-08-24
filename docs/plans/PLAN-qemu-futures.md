@@ -1103,6 +1103,16 @@ QMP plumbing should not assume libvirt is the owner of the
 QEMU process, so that if SF ever takes over supervision the
 QMP layer above it doesn't have to change.
 
+### Push audit
+
+Whatever the phase table settles into, the last phase is the
+push audit. It runs `PUSH-AUDIT.md` over the accumulated diff
+of every phase in this plan against `develop`, not the last
+phase's diff alone. Findings land as their own pull request,
+and this plan is not complete until each is resolved or
+declined in writing here. If the audit finds nothing, that is
+recorded in one sentence.
+
 ## Agent guidance
 
 *(Placeholder — this plan is still exploratory. The

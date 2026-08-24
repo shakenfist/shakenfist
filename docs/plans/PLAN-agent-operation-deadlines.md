@@ -540,6 +540,7 @@ the slot at all.
 | 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
 | 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast) |
 | 7 | | Not started | Docs (state machine, operator + developer guides), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on `!= 'complete'`, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below) |
+| 8 | | Not started | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
 Each phase gets its own detailed plan file before implementation.
 Unit tests land with each phase; the functional test in phase 7

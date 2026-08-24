@@ -262,6 +262,7 @@ every consumer, so that:
 | 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started |
 | 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started |
 | 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started |
+| 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started |
 
 ### Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)
 
@@ -408,6 +409,15 @@ observational op does not change
   `ARCHITECTURE.md`/`AGENTS.md`/`CLAUDE.md` storage notes
   for the new column and field, `docs/plans/index.md`
   status updates.
+
+### Phase 6: Push audit
+
+Runs `PUSH-AUDIT.md` over the accumulated diff of every
+phase in this plan against `develop`, not the last phase's
+diff alone. Findings land as their own pull request, and
+the plan is not complete until each is resolved or declined
+in writing here. If the audit finds nothing, that is
+recorded in one sentence.
 
 ## Agent guidance
 

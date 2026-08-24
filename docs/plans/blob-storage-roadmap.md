@@ -196,6 +196,21 @@ Blob Y (composite) → [C1, C2, C5, C6, ...]  ←── Ubuntu 22.04 with custom
 
 ---
 
+### Phase 4: Push audit
+
+**Goal**: Run the checks in `PUSH-AUDIT.md` over the accumulated diff of every phase in this
+roadmap against `develop`, rather than the last phase's diff alone, so that what the phases did
+to each other is caught.
+
+**Status**: Not started
+
+**Prerequisites**: Phases 1-3
+
+Findings land as their own pull request, and this roadmap is not complete until each is resolved
+or declined in writing here. If the audit finds nothing, that is recorded in one sentence.
+
+---
+
 ## Design Decisions
 
 ### Why Composite Blobs Instead of a Separate ContentStore?

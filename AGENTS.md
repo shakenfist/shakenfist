@@ -33,6 +33,11 @@ pages, in reading order, is the `nav:` section of
 [mkdocs.yml](mkdocs.yml), rendered at
 [shakenfist.com](https://shakenfist.com/).
 
+[PUSH-AUDIT.md](PUSH-AUDIT.md) is the pre-push audit runbook — two waves
+of build, lint and test checks followed by parallel code-quality, test,
+documentation and security review — and it runs as the last phase of every
+master plan, over the accumulated diff of all of that plan's phases.
+
 ## The rules that exist because we broke something
 
 [docs/developer_guide/coding_rules.md](docs/developer_guide/coding_rules.md)

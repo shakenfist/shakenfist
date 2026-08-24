@@ -296,6 +296,7 @@ so the phase plans do not reopen them:
 | 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
 | 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Complete |
 | 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Not started |
+| 8. Push audit | PLAN-database-load-reduction-phase-08-push-audit.md | Not started |
 
 Phase summaries:
 
@@ -457,6 +458,13 @@ adds a new fixed-rate poll, drop-in Prometheus rules and an
 stack, and a public dashboard that is no longer worse than
 our private one. The private report then becomes one
 consumer of a public mechanism.
+
+**Phase 8 — push audit.** Runs `PUSH-AUDIT.md` over the
+accumulated diff of every phase in this plan against
+`develop`, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## Agent guidance
 
