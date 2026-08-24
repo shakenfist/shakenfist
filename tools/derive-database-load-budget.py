@@ -67,11 +67,14 @@ import urllib.request
 # reached it. See the module docstring.
 COVERAGE_EPOCH = '2026-08-11T21:00:00Z'
 
-# A pair is worth an entry if it averages at least this much. Below it, the
-# unbudgeted fixed-rate threshold in the budget's defaults is the check that
-# matters: anything new polling faster than that fails CI whether or not it
-# has an entry.
-DEFAULT_MIN_MEAN_QPS = 0.30
+# A pair is worth an entry if it averages at least this much. It has to sit
+# well below the budget's unbudgeted_fixed_rate_qps, because a pair which is
+# quiet in the measurement window and louder on a busier cluster would
+# otherwise read as brand new traffic. Deriving at 0.30 against a window
+# averaging 18 standing instances left five pairs which crossed 0.25/s once
+# the same cluster reached 32, and each of those was a standing false alarm
+# in the shipped Prometheus rules.
+DEFAULT_MIN_MEAN_QPS = 0.10
 
 # A fitted slope becomes a per_instance_qps term when it explains enough of
 # the variance and is big enough to matter at a plausible cluster size.

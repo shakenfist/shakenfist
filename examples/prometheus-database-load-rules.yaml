@@ -104,6 +104,10 @@ groups:
           or
           label_replace(label_replace(vector(0.058), "operation", "FindInstances", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.028), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "FindNamespaceKeys", "", ""), "caller_daemon", "api", "", "")
+          or
           label_replace(label_replace(vector(0.034), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.108), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
@@ -117,6 +121,8 @@ groups:
           label_replace(label_replace(vector(0.0), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.099), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.199), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
           or
@@ -136,9 +142,27 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.509), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.009), "operation", "GetClusterOperation", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.016), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.033), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.01), "operation", "GetIPAM", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.009), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.15), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -162,7 +186,11 @@ groups:
           or
           label_replace(label_replace(vector(0.042), "operation", "GetNamespace", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.036), "operation", "GetNamespaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
           label_replace(label_replace(vector(0.03), "operation", "GetNamespaceKeyByName", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.014), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.06), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
           or
@@ -172,9 +200,25 @@ groups:
           or
           label_replace(label_replace(vector(0.199), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
           or
+          label_replace(label_replace(vector(0.022), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.032), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.066), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(0.066), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.032), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.033), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
           or
           label_replace(label_replace(vector(0.488), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -190,6 +234,10 @@ groups:
           or
           label_replace(label_replace(vector(0.498), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.032), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.099), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.155), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
@@ -202,11 +250,17 @@ groups:
           or
           label_replace(label_replace(vector(0.113), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(0.293), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
           or
           label_replace(label_replace(vector(0.229), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
           or
           label_replace(label_replace(vector(0.057), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
           or
@@ -220,13 +274,23 @@ groups:
           or
           label_replace(label_replace(vector(0.047), "operation", "RecordEventBatch", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
           label_replace(label_replace(vector(0.01), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(0.149), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(0.017), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.099), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(0.148), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -256,6 +320,10 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNamespaceKeys", "", ""), "caller_daemon", "api", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
@@ -269,6 +337,8 @@ groups:
           label_replace(label_replace(vector(0.951), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.182), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
           or
@@ -288,9 +358,27 @@ groups:
           or
           label_replace(label_replace(vector(1.333), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
           or
+          label_replace(label_replace(vector(0.206), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(1.096), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.206), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetIPAM", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -314,7 +402,11 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNamespace", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNamespaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetNamespaceKeyByName", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
           or
@@ -324,9 +416,25 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -342,6 +450,10 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
           or
+          label_replace(label_replace(vector(0.102), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
@@ -354,11 +466,17 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.222), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
           or
@@ -372,13 +490,23 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.086), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -405,6 +533,10 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNamespaceKeys", "", ""), "caller_daemon", "api", "", "")
+          or
           label_replace(label_replace(vector(0.02), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.132), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
@@ -418,6 +550,8 @@ groups:
           label_replace(label_replace(vector(0.0), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
           or
@@ -437,9 +571,27 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.015), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.005), "operation", "GetIPAM", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.016), "operation", "GetInstance", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -463,7 +615,11 @@ groups:
           or
           label_replace(label_replace(vector(0.008), "operation", "GetNamespace", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNamespaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
           label_replace(label_replace(vector(0.014), "operation", "GetNamespaceKeyByName", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.004), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.068), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
           or
@@ -473,9 +629,25 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -491,6 +663,10 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.078), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.09), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
@@ -503,11 +679,17 @@ groups:
           or
           label_replace(label_replace(vector(0.04), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(0.005), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
           or
           label_replace(label_replace(vector(0.544), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(0.026), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
           or
@@ -521,13 +703,23 @@ groups:
           or
           label_replace(label_replace(vector(0.027), "operation", "RecordEventBatch", "", ""), "caller_daemon", "api", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
           label_replace(label_replace(vector(0.016), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(0.026), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
           or
+          label_replace(label_replace(vector(0.006), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.008), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.013), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -553,6 +745,8 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "Dequeue", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "FindNetworks", "", ""), "caller_daemon", "net", "", "")
@@ -562,6 +756,8 @@ groups:
           label_replace(label_replace(vector(1), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
           or
@@ -575,9 +771,21 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -601,9 +809,25 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
           or
@@ -619,6 +843,10 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "cluster", "", "")
@@ -627,9 +855,15 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
           or
@@ -639,13 +873,23 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "HasPendingClusterOperationTarget", "", ""), "caller_daemon", "net", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
           or
+          label_replace(label_replace(vector(1), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
           label_replace(label_replace(vector(1), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
           or

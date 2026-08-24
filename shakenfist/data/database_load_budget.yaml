@@ -55,11 +55,16 @@ _doc:
     maintenance lock sat on one of them. Coefficients from before that
     date undercount, and phase 6 spent a fortnight discovering it.
   coverage_of_total: >-
-    These 73 pairs are the pairs averaging at least 0.30/s. They carry
-    93% of measured load; the remaining 328 pairs together average
-    9.8/s and none individually exceeds 0.29/s. An unbudgeted pair
+    These 105 pairs are the pairs averaging at least 0.10/s. They carry
+    97.2% of measured load; the remaining 296 pairs together average
+    4.1/s and none individually exceeds 0.10/s. An unbudgeted pair
     sustaining more than defaults.unbudgeted_fixed_rate_qps is treated
-    as a new poll and fails the CI check.
+    as a new poll: it fails the CI check and fires
+    ShakenFistUnbudgetedDatabasePolling. The inclusion cut sits well
+    below that threshold on purpose. Deriving at 0.30 left five pairs
+    which were quiet across a window averaging 18 standing instances
+    and crossed 0.25/s once the same cluster reached 32, so each was a
+    standing false alarm on the cluster the budget came from.
   rederive: >-
     tools/derive-database-load-budget.py, pointed at a Prometheus that
     has scraped an sf-database tier for several days across a range of
@@ -280,13 +285,9 @@ entries:
       As for every other daemon, except on the one node holding the
       cluster maintenance lock: the elected loop sleeps
       lock.lost_event.wait(5) rather than idle(), so it polls once per
-      5s instead of once per 2s. That is the -0.3 constant. These
-      two terms are arithmetic about the code, not a fit: the
-      measured mean above was taken from a cluster which had not yet
-      deployed #3874, where the elected daemon did not poll at all
-      and this pair read exactly 5/6 of its siblings.
-      tools/derive-database-load-budget.py carries the override in
-      CODE_DERIVED_TERMS so a re-derivation does not revert it.
+      5s instead of once per 2s. That is the -0.3 constant. Before
+      #3874 the elected daemon did not poll at all and this pair read
+      5/6 of its siblings.
   - operation: GetObjectState
     caller_daemon: cluster
     cluster_base_qps: 1.986
@@ -784,3 +785,299 @@ entries:
     note: >-
       The resources daemon measuring per-instance usage for node
       metrics.
+  - operation: GetClusterOperation
+    caller_daemon: queues
+    per_instance_qps: 0.015
+    measured:
+      mean_qps: 0.293
+      r2: 0.371
+    note: >-
+      Cluster operation records read while dispatching and reporting
+      queued work; tracks operations in flight rather than cluster
+      size.
+  - operation: GetNamespaceAttributes
+    caller_daemon: api
+    per_node_base_qps: 0.036
+    activity_coupled: true
+    measured:
+      mean_qps: 0.28
+      r2: 0.28
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: SetObjectState
+    caller_daemon: queues
+    per_node_base_qps: 0.007
+    per_instance_qps: 0.013
+    measured:
+      mean_qps: 0.272
+      r2: 0.54
+    note: >-
+      State transitions written as objects move through their
+      lifecycle. This is work rather than polling, so it tracks churn.
+  - operation: GetObjectsByState
+    caller_daemon: cluster
+    cluster_base_qps: 0.222
+    measured:
+      mean_qps: 0.256
+      r2: 0.02
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetNodeMetrics
+    caller_daemon: queues
+    per_node_base_qps: 0.032
+    measured:
+      mean_qps: 0.233
+      r2: 0.484
+    note: >-
+      The queues daemon reading node metrics while scheduling work.
+  - operation: GetInstance
+    caller_daemon: api
+    per_instance_qps: 0.016
+    activity_coupled: true
+    measured:
+      mean_qps: 0.226
+      r2: 0.634
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetDnsMasq
+    caller_daemon: net
+    per_node_base_qps: 0.016
+    per_instance_qps: 0.007
+    measured:
+      mean_qps: 0.22
+      r2: 0.38
+    note: >-
+      DHCP configuration reads during network maintenance.
+  - operation: GetClusterOperation
+    caller_daemon: api
+    per_node_base_qps: 0.009
+    activity_coupled: true
+    measured:
+      mean_qps: 0.217
+      r2: 0.121
+    note: >-
+      Cluster operation records read while dispatching and reporting
+      queued work; tracks operations in flight rather than cluster
+      size.
+  - operation: GetNodeByFqdn
+    caller_daemon: queues
+    per_node_base_qps: 0.032
+    measured:
+      mean_qps: 0.208
+      r2: 0.511
+    note: >-
+      Resolving this node's own name to its record. Every daemon does
+      it at startup, and several re-resolve during their loops.
+  - operation: GetNodeAttributes
+    caller_daemon: queues
+    per_node_base_qps: 0.032
+    measured:
+      mean_qps: 0.208
+      r2: 0.517
+    note: >-
+      The startup and shutdown sentinels reading their node row.
+  - operation: GetClusterOperationTargetsForObject
+    caller_daemon: cluster
+    cluster_base_qps: 0.206
+    measured:
+      mean_qps: 0.203
+      r2: 0.007
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetBlobHashes
+    caller_daemon: cluster
+    cluster_base_qps: 0.206
+    measured:
+      mean_qps: 0.203
+      r2: 0.007
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetNodeByFqdn
+    caller_daemon: resources
+    per_node_base_qps: 0.033
+    measured:
+      mean_qps: 0.199
+      r2: 0.0
+    note: >-
+      Resolving this node's own name to its record. Every daemon does
+      it at startup, and several re-resolve during their loops.
+  - operation: GetExistingLocks
+    caller_daemon: queues
+    per_node_base_qps: 0.033
+    measured:
+      mean_qps: 0.196
+      r2: 0.038
+    note: >-
+      Lock inspection while the queues daemon claims work.
+  - operation: GetIPAM
+    caller_daemon: net
+    per_node_base_qps: 0.009
+    per_instance_qps: 0.007
+    measured:
+      mean_qps: 0.179
+      r2: 0.639
+    note: >-
+      IPAM reads during network maintenance. This pair used to be far
+      larger: in-memory-only IPAMs were writing real state rows, and
+      issue 3532 was ~3,400 leaked rows driving an uncacheable read.
+  - operation: GetAllNodeMetrics
+    caller_daemon: cluster
+    cluster_base_qps: 0.182
+    measured:
+      mean_qps: 0.179
+      r2: 0.041
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: FindInstances
+    caller_daemon: net
+    per_node_base_qps: 0.028
+    measured:
+      mean_qps: 0.165
+      r2: 0.154
+    note: >-
+      Instance enumeration while the network daemon reconciles state.
+  - operation: GetNetworkAttributes
+    caller_daemon: api
+    per_node_base_qps: 0.014
+    per_instance_qps: 0.004
+    activity_coupled: true
+    measured:
+      mean_qps: 0.165
+      r2: 0.31
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetIPAM
+    caller_daemon: api
+    per_node_base_qps: 0.01
+    per_instance_qps: 0.005
+    activity_coupled: true
+    measured:
+      mean_qps: 0.146
+      r2: 0.369
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: FindNamespaceKeys
+    caller_daemon: api
+    per_node_base_qps: 0.02
+    activity_coupled: true
+    measured:
+      mean_qps: 0.141
+      r2: 0.203
+    note: >-
+      API traffic rather than a poll. On the cluster this was measured
+      from, that traffic is CI, so treat the level as workload-
+      specific and the shape as the useful part.
+  - operation: GetNodeByFqdn
+    caller_daemon: sentinel-last
+    per_node_base_qps: 0.022
+    measured:
+      mean_qps: 0.133
+      r2: 0.014
+    note: >-
+      Resolving this node's own name to its record. Every daemon does
+      it at startup, and several re-resolve during their loops.
+  - operation: GetNodeByFqdn
+    caller_daemon: sentinel-first
+    per_node_base_qps: 0.022
+    measured:
+      mean_qps: 0.133
+      r2: 0.012
+    note: >-
+      Resolving this node's own name to its record. Every daemon does
+      it at startup, and several re-resolve during their loops.
+  - operation: GetNode
+    caller_daemon: sentinel-first
+    per_node_base_qps: 0.022
+    measured:
+      mean_qps: 0.133
+      r2: 0.014
+    note: >-
+      The startup sentinel reading its node row.
+  - operation: GetNode
+    caller_daemon: sentinel-last
+    per_node_base_qps: 0.022
+    measured:
+      mean_qps: 0.133
+      r2: 0.026
+    note: >-
+      The shutdown sentinel reading its node row.
+  - operation: RecordEventBatch
+    caller_daemon: net
+    per_instance_qps: 0.007
+    measured:
+      mean_qps: 0.131
+      r2: 0.387
+    note: >-
+      Event logging from the network daemon.
+  - operation: SetObjectState
+    caller_daemon: net
+    per_instance_qps: 0.008
+    measured:
+      mean_qps: 0.128
+      r2: 0.506
+    note: >-
+      State transitions written as objects move through their
+      lifecycle. This is work rather than polling, so it tracks churn.
+  - operation: RecordEventBatch
+    caller_daemon: cluster
+    cluster_base_qps: 0.086
+    measured:
+      mean_qps: 0.127
+      r2: 0.332
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.
+  - operation: GetObjectState
+    caller_daemon: resources
+    per_instance_qps: 0.005
+    measured:
+      mean_qps: 0.125
+      r2: 0.648
+    note: >-
+      State reads while the resources daemon assembles node metrics.
+  - operation: Resolve
+    caller_daemon: queues
+    per_instance_qps: 0.006
+    measured:
+      mean_qps: 0.125
+      r2: 0.565
+    note: >-
+      Object reference resolution while processing queued work.
+  - operation: GetReferencesFrom
+    caller_daemon: cleaner
+    per_node_base_qps: 0.02
+    measured:
+      mean_qps: 0.124
+      r2: 0.032
+    note: >-
+      Reference reads while the cleaner decides what is still in use.
+  - operation: GetNodeByFqdn
+    caller_daemon: cleaner
+    per_node_base_qps: 0.02
+    measured:
+      mean_qps: 0.116
+      r2: 0.074
+    note: >-
+      Resolving this node's own name to its record. Every daemon does
+      it at startup, and several re-resolve during their loops.
+  - operation: GetNodeMetrics
+    caller_daemon: cluster
+    cluster_base_qps: 0.102
+    measured:
+      mean_qps: 0.104
+      r2: 0.001
+    note: >-
+      Part of the elected cluster maintenance sweep, which runs once
+      cluster-wide rather than once per node.

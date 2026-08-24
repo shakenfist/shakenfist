@@ -27,9 +27,16 @@ intersects their label sets and a pair missing from one term would
 otherwise vanish from the result entirely.
 """
 
+import os
 import sys
 
-from shakenfist.schema import database_load_budget
+# Run out of the checkout rather than whatever shakenfist happens to be
+# installed. Without this the generator silently renders the budget from
+# site-packages, which is how a first attempt at this produced rules for
+# the previous budget and the drift test caught it.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from shakenfist.schema import database_load_budget  # noqa: E402
 
 
 HEADER = '''# Prometheus rules for Shaken Fist database load.
