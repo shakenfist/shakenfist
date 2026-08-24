@@ -294,7 +294,7 @@ so the phase plans do not reopen them:
 | 3. Consolidate the gRPC client stacks | [PLAN-database-load-reduction-phase-03-client-consolidation.md](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete |
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
 | 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
-| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | In progress |
+| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Complete |
 | 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Not started |
 
 Phase summaries:
@@ -400,12 +400,14 @@ coefficients rather than absolute ceilings) and caught the
 real one that phase 6 exists to chase.
 
 **Phase 6 — the residual load and the regression.** Phase 5
-drove the cluster to 89-92/s on 2026-08-05 to 2026-08-07,
-below this plan's target, and it has since climbed back to
-~142/s at a *lower* standing instance count. Phase 6 has two
-jobs which must not be confused: find what *regressed* since
-2026-08-07, and reduce the residual floor that was always
-there. Its targets were the ~19/s of `GetObjectState` from
+appeared to drive the cluster to 89-92/s on 2026-08-05 to
+2026-08-07, below this plan's target, after which it climbed
+back to ~142/s at a *lower* standing instance count. Phase 6
+was created with two jobs which must not be confused: find
+what *regressed* since 2026-08-07, and reduce the residual
+floor that was always there. Its re-measurement step found
+that the first job was chasing a measurement artefact — see
+below — while doing it anyway turned up two real defects. Its targets were the ~19/s of `GetObjectState` from
 the cluster daemon (#3814), the floating-IP maintenance
 path's per-address reservation sweeps (#3655, ~10/s),
 `GetReferencesFrom`/api above its per-instance ceiling, the
@@ -413,21 +415,33 @@ path's per-address reservation sweeps (#3655, ~10/s),
 tail spread across ~361 low-rate pairs no baseline watches.
 It also resolves Open question 5.
 
-Steps 6a-6f have landed (PR #3818); 6g, the re-measurement
-that closes the phase, waits on a full 24h window after the
-changes reach sfcbr. Two claims made above before the work
-started turned out to be wrong, and are corrected here
-rather than left to mislead. The ~19/s was **not**
-`_cluster_wide_cleanup()`'s 60s duty-cycle gate: the raw
-counter series showed ~15,200 calls arriving in a burst
-every 16 minutes, which is a `schedule.every(15).minutes`
-job, and the cost was `reap_expired_namespace_keys()`
-reading `key.state` once per key. And the climb from 89/s to
-~142/s is not one regression: roughly +19/s was that defect,
-but roughly +12/s was simply the cluster growing from four
-nodes to six on 2026-08-12, which is not a regression at all
-and exposes that these baselines carry no per-node term. See
-the phase plan's Findings section.
+The phase is complete: 6a-6f landed in PR #3818 and 6g
+re-measured three clean days afterwards. Three claims made
+above before the work started turned out to be wrong, and
+are corrected here rather than left to mislead.
+
+The ~19/s was **not** `_cluster_wide_cleanup()`'s 60s
+duty-cycle gate: the raw counter series showed ~15,200 calls
+arriving in a burst every 16 minutes, which is a
+`schedule.every(15).minutes` job, and the cost was
+`reap_expired_namespace_keys()` reading `key.state` once per
+key. That fix and #3655 together removed a measured ~21/s,
+confirmed on three separate days against a nine-day
+regression fit.
+
+The other two corrections are the same mistake seen twice.
+The cluster did **not** grow from four nodes to six on
+2026-08-12; `sfcbr` has been `sf-1` through `sf-6` throughout.
+`database_requests_total` is incremented by a gRPC server
+interceptor, and until #3708 landed every daemon co-located
+with MariaDB bypassed the tier, so the counter could see four
+of six nodes — and, whenever the cluster maintenance lock sat
+on one of those two nodes, none of the cluster daemon at all.
+2026-08-05 to 2026-08-07 are precisely such a window, so
+**the target was never actually met** and the "regression"
+was in substantial part the measurement widening. Only
+figures taken after 2026-08-11 are comparable with each
+other. See the phase plan's Findings and 6g sections.
 
 **Phase 7 — deployer-visible regression detection.** The
 only thing standing between us and a silent repeat of this
@@ -521,15 +535,34 @@ to skip past.
 We will know when this plan has been successfully implemented
 because the following statements will be true:
 
-* Steady-state sf-database load on the sfcbr cluster is
-  below 100 operations per second, measured over a quiet
-  ten minute window from the `database_*_total` counters.
-  *(Met 2026-08-05 to 2026-08-07 at 89-92/s; lost since,
-  ~142/s on 2026-08-18. Regaining and then defending it is
-  the subject of further phases. Note the measurement has since
-  been superseded in practice by a 24h window over the
-  phase 4 per-caller counter -- a ten minute window is too
-  short to distinguish a bursty operation from a floor.)*
+* Steady-state sf-database load on a quiet sfcbr cluster is
+  at or below 100 operations per second, measured over a
+  window of at least thirty minutes from the phase 4
+  per-caller counter; and cluster load overall is described
+  by a model carrying a per-node term as well as a
+  per-standing-instance one, rather than by a single number.
+  *(Restated in phase 6's re-measurement, 2026-08-24.
+  **Not met, narrowly**: a quiet sfcbr -- six nodes, its
+  floor of eight standing instances -- measures 102.4/s,
+  against 134.0/s for the same measurement before phase 6.
+  The model is `QPS ~= 32 + 4.9 x nodes + 4.65 x
+  standing_instances`, which predicts 163.4 and 138.5
+  against 163.1 and 138.9 measured on 2026-08-22 and
+  2026-08-23.*
+  *Three things changed about this criterion and all three
+  are corrections rather than concessions. The earlier
+  reading of "met at 89-92/s on 2026-08-05 to 2026-08-07"
+  is **withdrawn**: before #3708 the counter could not see
+  daemons co-located with MariaDB, and on those three days
+  it could not see the cluster daemon at all, so only
+  measurements taken after 2026-08-11 are comparable with
+  each other or with this criterion. The window grew from
+  ten to thirty minutes because ten minutes cannot separate
+  a bursty operation from a floor. And "quiet" is now
+  explicit, because the 24h mean that superseded it in
+  practice folds in CI workload and therefore answers a
+  different question -- which the per-instance term now
+  answers properly. The number stays at 100.)*
 * `get_node` no longer appears at all on the idle path, and
   `get_node_daemon_state` is at or under the arithmetic floor
   implied by `DAEMON_STATE_POLL_INTERVAL` and the cluster's
@@ -539,7 +572,12 @@ because the following statements will be true:
   phase 1's own fix makes unreachable. Met as at 2026-08-18:
   `get_node` is absent from the idle path, and
   `get_node_daemon_state` measures ~0.5/s per daemon process,
-  which is exactly one read per 2s interval.)*
+  which is exactly one read per 2s interval. Re-confirmed
+  2026-08-24 against the whole cluster: 20.29/s for seven
+  polling daemon types across six nodes, less the one
+  elected cluster daemon, which sleeps on its lock rather
+  than in `idle()` and so never polls -- 41 processes at one
+  read per 2s is 20.5/s.)*
 * Daemon shutdown latency remains within the systemd stop
   timeout, verified by a rolling restart of a compute node.
 * Mutable data (object states, attributes, metadata, daemon
@@ -604,16 +642,30 @@ because the following statements will be true:
   address reservation three times per 30s cycle, and
   **#3814** `reap_expired_namespace_keys()` reading
   `key.state` once per key every 15 minutes -- both fixed in
-  phase 6. #3814 was the larger half of the climb back to
-  ~142/s, and the diagnosis recorded against it when it was
-  filed was wrong; see the phase 6 plan's Findings section.
+  phase 6, together worth a measured ~21/s. Two caveats on
+  what was said about #3814 when it was filed: the diagnosis
+  was wrong (see the phase 6 plan's Findings), and it was
+  not, as claimed, the larger half of the climb back to
+  ~142/s -- most of that climb was the counter's coverage
+  widening rather than new load, which 6g establishes. The
+  defects and their cost are real regardless; they simply
+  were not new.
 
 Still open: **#3815** (`POST /auth` is ~37% of mutating API
 requests because the client caches its token on the `Client`
 object, so every process invocation re-authenticates). The
 fix most likely belongs in `client-python`, not here: the
 server already returns `expires_in`, so a cross-process
-cache needs no server change.
+cache needs no server change. Also **#3876**, split out of
+phase 6: `GetReferencesFrom`/api runs at 11.6x its paired
+`GetReferencesTo`, which localises it to two unpaired read
+sites -- `Blob.external_view()` fetching three reference
+lists where one would do, and `Artifact.external_view()`
+reading one per blob version. And **#3874**, found by 6g:
+the elected cluster daemon sleeps on its lock rather than in
+`idle()`, so it never calls `check_daemon_state()` and never
+notices an `sf-ctl stop`. Immaterial to load -- 0.5/s -- but
+a real shutdown-path gap.
 
 ### Documentation index maintenance
 
