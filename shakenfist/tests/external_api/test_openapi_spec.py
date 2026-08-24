@@ -127,6 +127,25 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
         ('/instances/{instance_ref}/snapshot', 'post', 'max_versions',
          {'type': 'integer', 'minimum': 0}),
+        # The agent operation timing parameters. Their minimum is 0
+        # because a duration cannot be negative, and 0 itself is a
+        # sentinel meaning "none" rather than a floor -- do not "tidy"
+        # the minimum to 1. agent/execute publishes deadline_seconds
+        # and deliberately no progress_timeout_seconds: no command it
+        # builds reports progress, so the enforcement phase could never
+        # consult one. api_base.agent_operation_timing() is what backs
+        # these bounds, answering 400, rather than the coercion the
+        # events limit cap above relies on.
+        ('/instances/{instance_ref}/agent/put', 'post', 'deadline_seconds',
+         {'type': 'number', 'minimum': 0}),
+        ('/instances/{instance_ref}/agent/put', 'post',
+         'progress_timeout_seconds', {'type': 'number', 'minimum': 0}),
+        ('/instances/{instance_ref}/agent/get', 'post', 'deadline_seconds',
+         {'type': 'number', 'minimum': 0}),
+        ('/instances/{instance_ref}/agent/get', 'post',
+         'progress_timeout_seconds', {'type': 'number', 'minimum': 0}),
+        ('/instances/{instance_ref}/agent/execute', 'post',
+         'deadline_seconds', {'type': 'number', 'minimum': 0}),
         ('/networks', 'post', 'netblock', {'type': 'string'}),
         ('/networks/{network_ref}/events', 'get', 'limit',
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),

@@ -210,6 +210,26 @@ planning, is consistent with all of the above and is left alone.
 | 3d | medium | sonnet | none | Register the five new declarations in `STRUCTURED_PARAMETERS` at `shakenfist/tests/external_api/test_openapi_spec.py:104`: `deadline_seconds` on `('/instances/{instance_ref}/agent/put', 'post', ...)`, `.../agent/get` and `.../agent/execute`, and `progress_timeout_seconds` on put and get only, each expecting `{'type': 'number', 'minimum': 0}`. The expected dict must describe the published shape **in full** — `test_structured_parameters_publish_their_real_shape` fails on a published constraint key the entry omits as well as on one it invents — so if a declaration ends up publishing a `maximum` the entry has to say so. Add a short comment above the group saying these are receipt-anchored second counts whose 0 is a sentinel rather than a floor, so a later reader does not "tidy" the minimum away. Then add `shakenfist/tests/external_api/test_agent_operation_parameters.py`, modelled closely on `test_snapshot_max_versions.py` (same `MockMariaDB` setup, same `config.NODE_UUID` placement trick, same `/auth` token dance), driving real requests at `/instances/<ref>/agent/execute` and asserting: a negative `deadline_seconds` is a 400; a non-numeric one is a 400; a valid one reaches `AgentOperation.new` with an absolute timestamp (assert against a patched `time.time`); an omitted one reaches it with the config default applied; an explicit `0` reaches it as `0.0`; and that `progress_timeout_seconds` on `/agent/execute` is a 400, because it is an undeclared parameter there. That last assertion is what pins decision 4 in code rather than in prose. Commit subject: `Test the agent operation timing parameters.` |
 | 3e | medium | sonnet | none | Documentation and closeout. In `docs/developer_guide/api_reference/instances.md`, document the new request parameters on the three agent routes — the file already links them at line 653; add the parameter semantics next to that, including the three-valued meaning (omitted applies the server default, 0 means none, a positive value is seconds from request receipt) and the two config option names. Do **not** touch the response examples: `external_view()` already returned all four values as of phase 2 and they are already documented (decision 7). Check `docs/developer_guide/api_reference/agentoperations.md` for any request-side statement that is now incomplete. If `docs/operator_guide/` documents agent operation timeouts anywhere, the 900 second constant is still accurate until phase 4, so say the new options exist and take effect at creation while enforcement lands in phase 4, rather than rewriting the timeout story now. Then set phase 3 to `Complete` in the master plan's phase table and link this file, and correct `docs/plans/index.md`'s `3 of 8` to `4 of 8`. Commit subject: `Document agent operation timing parameters.` |
 
+## Departures from the plan
+
+- **Steps 3c and 3d could not be separate commits.**
+  `test_every_published_structure_or_bound_is_registered`
+  (`test_openapi_spec.py:308`) derives what
+  `STRUCTURED_PARAMETERS` must contain from the published
+  specification, so the moment 3c publishes five bounded parameters
+  the unit suite fails until 3d registers them — and the unit suite
+  runs as a pre-commit hook, so 3c on its own could not be committed
+  at all. The registration moved into 3c, where it belongs anyway:
+  publishing a declaration and saying what shape it really has are one
+  act. Step 3d keeps the endpoint tests.
+- **A second pinned count needed re-counting.**
+  `test_documented_formats_do_not_become_validators`
+  (`test_validation_compiler.py:97`) asserts the total number of
+  bounded parameters in the whole API, deliberately, so a change in
+  either source of bounds has to be re-counted by hand. Five new ones
+  took it from 22 to 27. The plan did not anticipate it; the test is
+  working exactly as intended.
+
 ## Risks and mitigations
 
 - **The falsy-zero bug.** `if not deadline_seconds` treats the

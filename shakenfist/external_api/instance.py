@@ -1656,7 +1656,20 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             ('path', 'body', 'string',
              'The path to write the file at inside the instance.', True),
             ('mode', 'body', 'string',
-             'The mode of the file once written, in symbolic or numeric form.', True)
+             'The mode of the file once written, in symbolic or numeric form.', True),
+            ('deadline_seconds', 'body', 'number',
+             'How many seconds after this request is received the operation '
+             'may continue to be dispatched or execute. Queue time and any '
+             'preflight work count against it. 0 means no wall-clock '
+             'deadline at all. Omitting this applies the server default, '
+             'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
+             'the operator has changed it.', False, {'minimum': 0}),
+            ('progress_timeout_seconds', 'body', 'number',
+             'How many seconds without forward progress are fatal to this '
+             'operation. 0 disables the progress timeout. Omitting this '
+             'applies the server default, '
+             'AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 seconds '
+             'unless the operator has changed it.', False, {'minimum': 0})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance.', None),
@@ -1667,9 +1680,19 @@ class InstanceAgentPutEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     @api_base.log_token_use
     def post(self, instance_ref=None, blob_uuid=None, path=None, mode=None,
+             deadline_seconds=None, progress_timeout_seconds=None,
              instance_from_db=None):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
+
+        # Before any event or object is created: a refused request must
+        # leave nothing behind but the request log. put-blob reports
+        # progress, so this operation is progress capable.
+        timing, error = api_base.agent_operation_timing(
+            deadline_seconds, progress_timeout_seconds, True)
+        if error:
+            return error
+        deadline, progress_timeout = timing
 
         try:
             int(mode)
@@ -1699,7 +1722,9 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation put-blob request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
-                               str(instance_from_db.uuid), commands)
+                               str(instance_from_db.uuid), commands,
+                               deadline=deadline,
+                               progress_timeout=progress_timeout)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
@@ -1720,7 +1745,20 @@ class InstanceAgentGetEndpoint(api_base.Resource):
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
             ('path', 'body', 'string',
-             'The path to fetch the file from inside the instance.', True)
+             'The path to fetch the file from inside the instance.', True),
+            ('deadline_seconds', 'body', 'number',
+             'How many seconds after this request is received the operation '
+             'may continue to be dispatched or execute. Queue time and any '
+             'preflight work count against it. 0 means no wall-clock '
+             'deadline at all. Omitting this applies the server default, '
+             'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
+             'the operator has changed it.', False, {'minimum': 0}),
+            ('progress_timeout_seconds', 'body', 'number',
+             'How many seconds without forward progress are fatal to this '
+             'operation. 0 disables the progress timeout. Omitting this '
+             'applies the server default, '
+             'AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 seconds '
+             'unless the operator has changed it.', False, {'minimum': 0})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance.', None),
@@ -1729,9 +1767,18 @@ class InstanceAgentGetEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
     @api_base.log_token_use
-    def post(self, instance_ref=None, path=None, instance_from_db=None):
+    def post(self, instance_ref=None, path=None, deadline_seconds=None,
+             progress_timeout_seconds=None, instance_from_db=None):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
+
+        # get-file reports progress, so this operation is progress
+        # capable.
+        timing, error = api_base.agent_operation_timing(
+            deadline_seconds, progress_timeout_seconds, True)
+        if error:
+            return error
+        deadline, progress_timeout = timing
 
         commands = [
             {
@@ -1743,7 +1790,9 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation get-file request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
-                               str(instance_from_db.uuid), commands)
+                               str(instance_from_db.uuid), commands,
+                               deadline=deadline,
+                               progress_timeout=progress_timeout)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',
@@ -1763,7 +1812,14 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
-            ('command_line', 'body', 'string', 'The command to execute.', True)
+            ('command_line', 'body', 'string', 'The command to execute.', True),
+            ('deadline_seconds', 'body', 'number',
+             'How many seconds after this request is received the operation '
+             'may continue to be dispatched or execute. Queue time and any '
+             'preflight work count against it. 0 means no wall-clock '
+             'deadline at all. Omitting this applies the server default, '
+             'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
+             'the operator has changed it.', False, {'minimum': 0})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance.', None),
@@ -1772,9 +1828,20 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
     @api_base.log_token_use
-    def post(self, instance_ref=None, command_line=None, instance_from_db=None):
+    def post(self, instance_ref=None, command_line=None,
+             deadline_seconds=None, instance_from_db=None):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
+
+        # No command this endpoint builds reports progress, so it
+        # publishes no progress_timeout_seconds and records an explicit
+        # 0.0 -- which is true of the operation, and keeps NULL meaning
+        # only "written by an API node which predates deadlines".
+        timing, error = api_base.agent_operation_timing(
+            deadline_seconds, None, False)
+        if error:
+            return error
+        deadline, progress_timeout = timing
 
         commands = [
             {
@@ -1787,7 +1854,9 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation execute request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
-                               str(instance_from_db.uuid), commands)
+                               str(instance_from_db.uuid), commands,
+                               deadline=deadline,
+                               progress_timeout=progress_timeout)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',
