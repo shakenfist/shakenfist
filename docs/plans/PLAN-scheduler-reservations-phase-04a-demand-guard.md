@@ -662,11 +662,109 @@ be made by the first walk with `enforce_demand` true. Second, the node column he
 
 ### Post-deploy observations
 
-_(Filled by step 5, after the 2026-08-23 deploy. The five observations
-the Definition of done requires -- demand clause behaviour, P9 waiver
-frequency, burst distribution, reconciler drift, and the phase 4 claim
-drawdown -- are recorded separately below, each against its pre-fix row
-above where one exists.)_
+Deployed to sfcbr on 2026-08-23 between 06:19Z (last event showing the
+old arithmetic) and 16:56Z (first showing the new). Measurements below
+cover 16:00Z 2026-08-23 to 18:00Z 2026-08-24, about 26 hours and 438
+placements, against the 48-hour 1,052-placement baseline above.
+
+**The deploy is confirmed from the events, not from deploy records.**
+Refusals now charge 0.6 per requested vCPU (`requested` reads 0.6 for a
+1-vCPU request, 1.2 for 2, 2.4 for 4), and across all 88 refusals there
+is no case of `exceeded` being true while `used <= limit` -- the
+comparison is `used > limit`, the `charged=False` form. Under the old
+constant those same requests would have been charged 2.5, 5.0 and 10.0.
+
+**Observation 1 -- the demand clause discriminates.** It does, though
+the honest headline is a rate change rather than a composition change.
+All 88 refusals are still demand-only; no refusal in either window was
+caused by `cpus`, `memory_mb` or `disk_gb`, because sfcbr never
+approaches those bounds. What changed is how often the clause fires at
+all:
+
+| | pre-fix | post-fix |
+|---|---|---|
+| refusals | 3,904 | 88 |
+| placements | 1,052 | 438 |
+| **refusals per placement** | **3.71** | **0.20** |
+
+An 18-fold reduction. Every one of the 88 carries `enforce_demand:
+true`, so they are first-walk refusals, and only 18 of them escalated
+to a waiver -- the rest were refused on one candidate and admitted on
+another, which is exactly the discrimination the clause was supposed to
+provide and never did. Every node still refuses sometimes and admits
+most of the time, including the 18-vCPU node that the old clause could
+never satisfy.
+
+**Observation 2 -- the P9 waiver is now rare.** This is the clearest
+result:
+
+| | pre-fix | post-fix |
+|---|---|---|
+| waiver rate | 648/1,052 = **62%** | 18/438 = **4.1%** |
+| hourly range | 25% -- 86% | 0% in 17 of 20 hours |
+
+Fifteen of the eighteen waivers fell in a single hour (2026-08-24
+06:00Z, 49 placements, 29%), with the remainder in two hours at 6% and
+3%. The baseline's threefold hourly variance was the reason for
+insisting on a long sample, and it is what makes this readable: the
+post-fix distribution is not a quiet-hour artefact, because the busiest
+post-fix hours (50 placements at 19:00Z, 49 at 09:00Z) ran at 0% and
+6%, against a pre-fix busy hour of 72 placements at 82%. The waiver has
+gone back to being an exception under genuine burst pressure, which is
+what E3 kept it for.
+
+**Observation 3 -- burst distribution.** Placement moved off the
+top-ranked node and onto the smallest, which is the spreading the term
+exists to produce:
+
+| node | cpu limit | pre-fix | post-fix |
+|------|-----------|---------|----------|
+| `f6b7e913` | 66 | 28.8% | 30.6% |
+| `6046afdf` | 66 | 31.4% | **23.1%** |
+| `bed5996d` | 30 | 12.4% | 13.9% |
+| `963d4df9` | 30 | 11.9% | 14.6% |
+| `f4ba9b6c` | 24 | 9.7% | 8.7% |
+| `7ce66641` | 18 | 5.9% | **9.1%** |
+
+The top-ranked node shed 8.3 points and the smallest node gained 3.2,
+taking it from well under its capacity share to slightly over. Two
+honest qualifications. First, total absolute deviation from a
+capacity-proportional split actually rose, 7.5 to 13.5 points -- but
+capacity-proportional is not the target and never was. The clause
+spreads by measured load plus expected demand, so a node running hot is
+skipped whatever its size, and a deviation metric anchored on capacity
+will read that as a regression. Second, 438 placements across six nodes
+is a small sample and some of this spread is noise. The mechanism
+change is the durable finding; the distribution is corroborating, not
+load-bearing.
+
+**Observation 4 -- reconciler drift.** 299 reconcile passes over the
+window, every one seeing all six nodes, with `nodes_added`,
+`nodes_removed` and `claims_expired` all zero throughout and durations
+of 27ms/91ms/3787ms (min/median/max). No pass logged a correction.
+
+This is weaker evidence than the Definition of done implies, and the
+gap is in the instrumentation rather than the result.
+`reconcile_scheduler_capacity` recomputes the counters wholesale
+(`daemons/cluster/scheduled_tasks.py:1057-1063`) and logs membership
+and timing but no before/after delta, so a silent correction of a
+`used_*` counter would leave no trace in the log. Proving zero drift
+needs the Prometheus gauges, which were not reachable from the analysis
+host. What can be said is that the reconciler ran healthily every five
+minutes throughout, saw a stable cluster, and expired nothing. **A
+follow-up issue should be filed to have the reconcile pass log the
+magnitude of any correction it makes**, because the phase 3 exit
+criterion cannot actually be checked from logs as things stand.
+
+**Observation 5 -- phase 4 claim drawdown: NOT DONE.** No namespace
+capacity claim was created during the soak. There were zero requests to
+`/auth/namespaces/<namespace>/claims`, zero `placement admitted over
+namespace capacity claim` audit events, and `claims_expired` was zero
+in all 299 reconcile passes. The phase 4 operator soak is therefore
+still outstanding and phase 4 cannot be closed on this window. It needs
+a deliberate exercise rather than more waiting: create a claim on a real
+namespace, run instances in it, and confirm the drawdown against
+`/admin/resources` and the tables.
 
 ## Future work
 
