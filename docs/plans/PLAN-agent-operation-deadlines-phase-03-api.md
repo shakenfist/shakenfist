@@ -229,6 +229,16 @@ planning, is consistent with all of the above and is left alone.
   either source of bounds has to be re-counted by hand. Five new ones
   took it from 22 to 27. The plan did not anticipate it; the test is
   working exactly as intended.
+- **Decision 7 was wrong and was reversed during implementation.** It
+  said the API reference response examples were already correct and
+  must not be touched, on the premise that this phase writes nothing
+  clients can see. Decision 1 makes that false: from this phase every
+  new operation carries an absolute `deadline`, and one created through
+  `agent/execute` carries `progress_timeout: 0`. Four example bodies
+  across two pages showed `null` for both, which is now a shape the
+  server does not produce, and `agentoperations.md` said in prose that
+  "no client can set them". All of it corrected; the examples show an
+  absolute timestamp, `0` for execute and `30` for a transfer.
 
 ## Risks and mitigations
 
