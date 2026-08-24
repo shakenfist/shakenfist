@@ -3,6 +3,7 @@ import functools
 import json
 import re
 import sys
+import time
 import traceback
 from typing import Any
 from typing import NoReturn
@@ -220,6 +221,98 @@ def resolve_lookup_namespace(body_namespace, kind):
             return None, sf_api.error(404, f'{kind} not found')
         return body_namespace, None
     return caller_ns, None
+
+
+def agent_operation_timing(deadline_seconds, progress_timeout_seconds,
+                           progress_capable):
+    """Turn an agent operation request's timing parameters into stored values.
+
+    Returns ``((deadline, progress_timeout), None)``, or
+    ``(None, <400 response>)`` if the caller sent something which
+    cannot be honoured -- the same convention as
+    ``resolve_lookup_namespace()`` above.
+
+    Three values are possible for each parameter, and they are not the
+    same three:
+
+    * Omitted (``None``, never merely falsy) means the caller expressed
+      no intent, so the server default applies. It is applied *here*
+      rather than left as SQL NULL, because a deadline runs from the
+      moment this request was received and only this node knows when
+      that was. A NULL in the database means the row was written by an
+      API server which predates deadlines, and the enforcement phase
+      anchors those at dispatch time instead.
+    * An explicit ``0`` means the caller asked for none. Streaming a
+      very large file with no wall-clock deadline but a live progress
+      timeout is a first-class use case, so this has to survive the
+      API layer as ``0.0`` rather than being folded into "omitted".
+    * Anything else is a count of seconds.
+
+    ``progress_capable`` says whether any command in the operation can
+    report progress. When it cannot -- the execute endpoint -- an
+    omitted progress timeout stores ``0.0``, which is true of the
+    operation, rather than a default which could never fire.
+    """
+    deadline, error = _timing_seconds('deadline_seconds', deadline_seconds)
+    if error:
+        return None, error
+
+    progress_timeout, error = _timing_seconds(
+        'progress_timeout_seconds', progress_timeout_seconds)
+    if error:
+        return None, error
+
+    if deadline is None:
+        deadline = time.time() + config.AGENT_OPERATION_DEFAULT_DEADLINE
+    elif deadline > 0:
+        # A request deadline is relative to now; the stored one is
+        # absolute. The explicit zero sentinel is not a duration and
+        # must not be shifted onto the clock.
+        deadline = time.time() + deadline
+
+    if progress_timeout is None:
+        if progress_capable:
+            progress_timeout = float(
+                config.AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT)
+        else:
+            progress_timeout = 0.0
+
+    return (deadline, progress_timeout), None
+
+
+def _timing_seconds(name, value):
+    """Validate one timing parameter, returning (seconds_or_None, error).
+
+    None comes back for an omitted parameter and is the caller's
+    signal to apply a default. Every rejection is a 400: these are
+    durations, and silently reinterpreting one a caller got wrong is
+    how a timeout ends up meaning something nobody asked for.
+    """
+    if value is None:
+        return None, None
+
+    # isinstance(True, int) is true in Python, so a bool reaches
+    # float() happily and arrives as 1.0. JSON true is not a number of
+    # seconds, and accepting it as one second would be worse than
+    # refusing it.
+    if isinstance(value, bool):
+        return None, sf_api.error(
+            400, '%s must be a number of seconds, not a boolean' % name)
+
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return None, sf_api.error(
+            400, '%s must be a number of seconds' % name)
+
+    # NaN fails every comparison including this one, so it would slip
+    # past a bare "< 0" test and be stored as a deadline nothing can
+    # ever be later than.
+    if not seconds >= 0:
+        return None, sf_api.error(
+            400, '%s must not be negative' % name)
+
+    return seconds, None
 
 
 # The keys a declaration's optional sixth element may carry. All three
