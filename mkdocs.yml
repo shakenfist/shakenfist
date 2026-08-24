@@ -143,6 +143,7 @@ nav:
                 - "Plans index": components/development/plans/index.md
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
+                - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
                 - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md

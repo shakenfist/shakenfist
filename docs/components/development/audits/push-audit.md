@@ -18,13 +18,44 @@ Repositories that carry a pre-push audit runbook must:
   code-quality review section;
 * embed the current **`plan-phase-references` shared block** in its
   documentation-review section (see the `plan-phase-references`
-  audit for the policy it enforces); and
+  audit for the policy it enforces);
 * keep every embedded shared block verbatim and at the current
-  version.
+  version; and
+* be **referenced from `AGENTS.md`**, so a session has some way of
+  discovering it.
 
 Repositories with no pre-push audit file at all are reported as N/A:
 whether every project should have one is a separate decision, not
 smuggled in here.
+
+### Why the reference is checked
+
+Checking only the file's contents is how the runbook went
+untriggered. In August 2026 the audit was current and correct in
+eight repositories while three `AGENTS.md` files mentioned it at
+all, and exactly one of those said *when* to run it -- the other
+two were passive index entries. No `CLAUDE.md`, no
+`PLAN-TEMPLATE.md`, no git hook and no CI job pointed at it either,
+so the audit ran when the operator remembered it and not otherwise.
+
+Mention is what this check measures, so three is the number it
+moves; one is the number that had a trigger. The check closes the
+discoverability half of that gap, not the trigger half.
+
+`AGENTS.md` is the surface checked because it is loaded into every
+session, which makes it the one place a reference is certain to be
+read. The check is deliberately shallow -- it looks for the
+filename, not for particular wording -- because the reference that
+matters is the one a repository writes for itself. A repository
+still on the legacy `PUSH-TEMPLATE.md` name is checked against that
+name, so it is told to rename the file once rather than told twice
+about a file it does not have.
+
+The reference is necessary but not sufficient: discoverable is not
+the same as run. What makes it run is the `plan-push-audit-phase`
+shared block, which puts a push-audit phase at the end of every
+master plan; that block lives in `PLAN-TEMPLATE.md` and is enforced
+by the `plan-template` audit rather than by this one.
 
 ### Shared blocks
 
@@ -85,6 +116,11 @@ brief for the code-quality review agent, and paste
 `templates/shared-blocks/plan-phase-references.md` verbatim into the
 documentation-review section.
 
+To fix a missing reference: add a line to `AGENTS.md` naming
+`PUSH-AUDIT.md` and saying when it is run. Where the repository
+indexes its runbooks, that index is the natural home; the check only
+requires the filename to appear.
+
 ## Projects
 
 <!-- consistency-audit:begin -->
@@ -92,7 +128,7 @@ documentation-review section.
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-23T06:45:38.740880+00:00
+Last regenerated: 2026-08-24T07:04:16.593679+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|

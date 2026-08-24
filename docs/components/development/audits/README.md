@@ -160,8 +160,8 @@ release workflows, or a `develop` branch.
 | [plan-phase-references.md](/components/development/audits/plan-phase-references/) | Docs describe current behaviour, not plan phase history |
 | [plan-source-references.md](/components/development/audits/plan-source-references/) | Plan references in source and configuration still resolve |
 | [plan-index.md](/components/development/audits/plan-index/) | docs/plans/index.md layout, date ordering, plan coverage and the status vocabulary |
-| [push-audit.md](/components/development/audits/push-audit/) | PUSH-AUDIT.md naming and versioned shared blocks |
-| [plan-template.md](/components/development/audits/plan-template/) | PLAN-TEMPLATE.md shared blocks, including the sub-agent model roster |
+| [push-audit.md](/components/development/audits/push-audit/) | PUSH-AUDIT.md naming, versioned shared blocks, and an AGENTS.md reference to it |
+| [plan-template.md](/components/development/audits/plan-template/) | PLAN-TEMPLATE.md shared blocks, including the sub-agent model roster and the push-audit phase |
 | [test-coverage.md](/components/development/audits/test-coverage/) | Unit and functional test coverage |
 | [secret-handling.md](/components/development/audits/secret-handling/) | Secret scanner in CI, credentials kept out of logs |
 | [review-coverage.md](/components/development/audits/review-coverage/) | Human review backlog stays under threshold in repos with review tracking |

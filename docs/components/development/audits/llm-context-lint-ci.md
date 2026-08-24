@@ -69,7 +69,7 @@ Repositories that enable renovate's pre-commit manager will have the
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-23T06:45:38.740880+00:00
+Last regenerated: 2026-08-24T07:04:16.593679+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -83,7 +83,7 @@ Last regenerated: 2026-08-23T06:45:38.740880+00:00
 | divergulent | non-compliant | shakenfist/divergulent#71 |
 | instar | non-compliant | shakenfist/instar#514 |
 | kerbside | non-compliant | shakenfist/kerbside#359 |
-| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1605 |
+| kerbside-patches | compliant | - |
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#119 |
 | private-ci | N/A | - |
@@ -101,7 +101,6 @@ Details for non-compliant projects:
 - **divergulent** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **instar** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **kerbside** (Status): skillsaw does not run from a CI workflow
-- **kerbside-patches** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **occystrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **shakenfist** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow

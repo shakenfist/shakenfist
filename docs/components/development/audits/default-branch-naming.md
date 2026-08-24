@@ -30,7 +30,7 @@ git push origin --delete main
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-23T06:45:38.740880+00:00
+Last regenerated: 2026-08-24T07:04:16.593679+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -41,7 +41,7 @@ Last regenerated: 2026-08-23T06:45:38.740880+00:00
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
-| divergulent | non-compliant | shakenfist/divergulent#40 |
+| divergulent | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
@@ -51,8 +51,4 @@ Last regenerated: 2026-08-23T06:45:38.740880+00:00
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
-
-Details for non-compliant projects:
-
-- **divergulent** (Status): Default branch is "main", expected "develop"
 <!-- consistency-audit:end -->
