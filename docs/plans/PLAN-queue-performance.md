@@ -2,13 +2,19 @@
 
 ## Status
 
-Complete.
+In progress.
 
 Steps 1-6 merged to `develop` as PR #3194 on 2026-05-26. Step 7
 measured the result and decided against explicit fairness; the
 measurement, the exclusions it rests on and the decision are in
 [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
 and summarised under "What step 7 measured" below.
+
+Step 8 runs a `PUSH-AUDIT.md` audit over everything the plan
+changed. The work is already on `develop`, so this is a
+retrospective audit rather than a pre-push gate, and the plan is
+not complete until each finding is resolved or declined in
+writing.
 
 ## Execution
 
@@ -21,6 +27,7 @@ and summarised under "What step 7 measured" below.
 | 5. Enqueue-side dedup | (in PR #3194) | Complete |
 | 6. Caller-site audit | (in PR #3194) | Complete |
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
+| 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | In progress |
 
 ## Problem
 
@@ -42,7 +49,8 @@ the queue+state-machine overhead, and the work backed up.
 
 ## Approach
 
-Six discrete changes plus one measurement step:
+Six discrete changes, one measurement step, and a closing
+audit:
 
 1. **Visibility**: carry `wait_seconds`, `defer_count` and
    `queue_name` on the per-op event the dispatcher emits. The
@@ -103,6 +111,15 @@ Six discrete changes plus one measurement step:
    [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
    for the method, and `tools/queue-wait-report.py` for the tool
    which produced the numbers.
+
+8. **Push audit**: run `PUSH-AUDIT.md` over the accumulated diff
+   of every step in this plan, rather than over the last step's
+   diff alone. Because the work is already merged, the audit's
+   baseline is the plan's own commit range and not
+   `develop...HEAD`; the phase plan pins the exact range. Each
+   finding is resolved, or declined in writing, before this plan
+   is marked complete. If the audit finds nothing, that is
+   recorded in one sentence.
 
 ## What step 7 measured
 
