@@ -661,6 +661,21 @@ claims the exception.
 
 ## Future work
 
+* **Omission found at close-out (2026-08-24):** this phase
+  routed the claim endpoints but never advertised them in the
+  API capability list in `external_api/app.py`, so no client
+  could feature-detect claims. The phase 0 findings predicted
+  exactly this need -- "expect a capability string plus
+  `hasattr(client, 'reservation_create')` so an un-upgraded
+  client degrades to unclaimed behaviour"
+  (`PLAN-scheduler-reservations-phase-00-findings.md:538-542`)
+  -- and the phase plan then lost it, because D7 moved client
+  verbs out of scope and the capability string went with them
+  even though it is a server-side obligation. Fixed at
+  close-out as `auth: namespace-claims`. The lesson is that
+  moving a client-side item out of scope does not move the
+  server's advertisement of it; nothing in the Definition of
+  done would have caught this, and no test pins the list.
 * A cluster-wide claim listing endpoint for operator
   dashboards (deliberately not built here; `/admin/resources`
   covers the totals).

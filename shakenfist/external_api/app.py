@@ -288,8 +288,13 @@ class Root(api_base.Resource):
              # mapping-rules and federated-exchange are advertised
              # separately: a client can be told which rules exist
              # without the cluster necessarily accepting exchanges yet.
+             # namespace-claims advertises the claim CRUD surface. A
+             # client cannot feature-detect it any other way, and the
+             # conductor gates on check_capability() so that an
+             # un-upgraded client degrades to unclaimed behaviour.
              '<li>auth: trusted-issuers, generated-key-secrets, '
-             'scope-enforcement, mapping-rules, federated-exchange</li>'
+             'scope-enforcement, mapping-rules, federated-exchange, '
+             'namespace-claims</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
