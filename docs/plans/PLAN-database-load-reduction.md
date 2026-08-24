@@ -656,7 +656,12 @@ requests because the client caches its token on the `Client`
 object, so every process invocation re-authenticates). The
 fix most likely belongs in `client-python`, not here: the
 server already returns `expires_in`, so a cross-process
-cache needs no server change. Also **#3874**, found by 6g:
+cache needs no server change. Also **#3876**, split out of
+phase 6: `GetReferencesFrom`/api runs at 11.6x its paired
+`GetReferencesTo`, which localises it to two unpaired read
+sites -- `Blob.external_view()` fetching three reference
+lists where one would do, and `Artifact.external_view()`
+reading one per blob version. And **#3874**, found by 6g:
 the elected cluster daemon sleeps on its lock rather than in
 `idle()`, so it never calls `check_daemon_state()` and never
 notices an `sf-ctl stop`. Immaterial to load -- 0.5/s -- but

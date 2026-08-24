@@ -213,8 +213,13 @@ should resolve the criterion rather than chase the number.
 * The `GetObjectState`/`cluster` loop and the `POST /auth` volume are
   filed as issues with their measured numbers, whether or not they are
   fixed here.
-* `GetReferencesFrom`/`api` is either back under its per-instance ceiling
-  or its cause is documented as living outside this repository.
+* `GetReferencesFrom`/`api` is either back under its per-instance ceiling,
+  or its cause is documented as living outside this repository, or it is
+  split out as its own issue with its measured numbers. *(The third:
+  #3876. It is neither under its ceiling nor external -- 6g localised it
+  to two unpaired read sites in this repository, which is a fix rather
+  than a measurement and does not belong in a phase whose remaining work
+  was re-measurement.)*
 * Master plan success criterion 2 is restated and open question 5 closed.
 * `pre-commit run --all-files` green; functional CI green.
 * The 24h cluster total is recorded honestly against the under-100/s
@@ -545,12 +550,25 @@ the 0.32 ceiling the survey used:
 
 Scaling the pre-#3708 figure by the 1.5 the fixed-rate polls show gives
 0.42 per instance, so roughly half the apparent rise is the API on `sf-1`
-and `sf-2` entering the counter. The remaining ~40% is real and is
-**recorded here as unattributed**. It is not a duplicated read — 6e
-established that `Instance.external_view()` already issues exactly one
-`get_references_from` per view — so it is either request volume this
-phase has not explained or a coefficient that was always wrong for a
-six-node cluster and only looked right while two nodes were invisible.
+and `sf-2` entering the counter. The remaining ~40% is real, and 6g got far enough to say where it is not
+and where it probably is.
+
+It is not the instance view: 6e established that
+`Instance.external_view()` already issues exactly one
+`get_references_from` per view. What gives it away is the sibling
+counter. `GetReferencesFrom`/api runs at **11.6x** `GetReferencesTo`/api
+-- 9.75/s against 0.84/s -- and every paired external view reads both,
+so no paired workload can produce that ratio. Two unpaired sites can:
+`Blob.external_view()` issues three `get_references_from` where one
+would do, because `depends_on` and `transcoded` each fetch a filtered
+subset of the unfiltered list the same method already reads a few lines
+later; and `Artifact.external_view()` reads `b.depends_on` once per blob
+version inside its `get_all_indexes()` loop, so an artifact with N
+versions costs N+1 reads against one `get_references_to`.
+
+Both are real and which dominates is not established. Split out as
+**#3876** rather than fixed here: it is a code change, and what remained
+of this phase was re-measurement.
 
 Phase 7 should not carry 0.32 forward. Either number it re-derives will
 be defensible; this one is not, because it was measured across
