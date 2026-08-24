@@ -359,7 +359,8 @@ table entirely (decision D8).
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
-| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
+| 9. Client support for claims | PLAN-scheduler-reservations-phase-09-client.md | Not started |
+| 10. Push audit | PLAN-scheduler-reservations-phase-10-push-audit.md | Not started |
 
 ### Phase status notes
 
@@ -552,12 +553,94 @@ capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.
 
-**Phase 9 — push audit.** Runs `PUSH-AUDIT.md` over the
-accumulated diff of every phase in this plan against
-`develop`, not the last phase's diff alone. Findings land as
-their own pull request, and the plan is not complete until
-each is resolved or declined in writing here. If the audit
-finds nothing, that is recorded in one sentence.
+**Phase 9 — client support for claims.** Add `apiclient`
+verbs for the claims API in `shakenfist/client-python`,
+tracked as client-python#364, and then move this repository's
+functional coverage onto them.
+
+Phase 4's decision D7 put client verbs out of scope for a
+real reason: CI installs the released client from PyPI, so a
+test written against new `apiclient` methods cannot pass
+until a client release exists, and no server pull request can
+produce one. That reasoning was sound and is now spent --
+the API has shipped, so the release can happen.
+
+Two obligations fall out of it, and the phase is not done
+until both are met. The first is the verbs themselves, in the
+other repository; issue #364 already carries the full surface
+including the field-mask semantics of `PUT`, the status codes
+worth typed exceptions, and the `state` /
+`coverage_state` distinction a client view must not collapse.
+The second is here:
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`
+currently reaches past the public surface via
+`apiclient.Client._request_url()`, with a docstring saying
+not to "fix" it onto verbs until a release exists. Once one
+does, the test moves onto the verbs, because the verbs are
+then what an operator actually uses and so what is worth
+defending.
+
+The server-side prerequisite is met: the API advertises
+`auth: namespace-claims` in its capability list as of the
+phase 4a close-out, so a client can feature-detect claims and
+an un-upgraded one degrades rather than failing. Phase 4
+shipped without that string; it was found by a question at
+close-out rather than by any review, and the miss is recorded
+in phase 4's Future work.
+
+This phase depends on a client release, which is outside this
+repository's control. If that release has not happened when
+the rest of the plan is otherwise finished, the honest move
+is to leave this phase open and say so rather than to close
+the plan around it.
+
+**Phase 10 — push audit.** Run
+the repository's pre-push audit over everything this plan
+built, as a single body of work rather than one branch at a
+time.
+
+The audit template is written for a branch about to be
+pushed, and this plan does not fit that shape: its phases
+were pushed and merged one at a time over months, each
+audited only against its own diff. Two classes of problem
+survive that. The first is drift between phases -- a
+convention followed in phase 2 and quietly abandoned by
+phase 5, or documentation that was true when its phase
+landed and was falsified by a later one. The second is
+anything whose absence is only visible from the whole: the
+capability string that phase 4 never advertised was found by
+a passing question at close-out, not by any phase's own
+review, and nothing in a per-phase audit would have caught
+it. That defect is the reason this phase exists.
+
+So the diff under audit is the plan's cumulative diff, not
+`develop...HEAD`. Every wave-1 and wave-2 command in
+`PUSH-AUDIT.md` that names `develop...HEAD` is rewritten to
+`ea3c9bf63..develop` -- the commit immediately before phase
+0 merged (`87a58a81e^1`, 2026-07-30) -- restricted to the
+paths this plan touches, so the range does not drag in
+unrelated work merged over the same months. The phase plan
+pins the path list.
+
+Two adaptations follow from the range being months of merged
+history rather than a pending branch:
+
+* The management checklist's "commit history is clean" and
+  "branch is up to date" items do not apply and are struck
+  rather than ticked. Nothing here is rebaseable.
+* Findings cannot block a push that already happened. They
+  are triaged instead: anything security-critical or high is
+  fixed in this phase, anything else is filed as an issue or
+  recorded as Future work, and the phase records the triage
+  rather than silently absorbing it.
+
+Findings land as their own pull request, and the plan is not
+complete until each is resolved or declined in writing here.
+If the audit finds nothing, that is recorded in one sentence.
+
+Run this last, after phase 9, so the documentation the audit
+checks is the documentation the plan intended to ship and the
+client surface it reviews is the final one.
 
 ## Dependencies on other plans
 
