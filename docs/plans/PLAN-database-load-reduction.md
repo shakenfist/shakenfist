@@ -295,7 +295,7 @@ so the phase plans do not reopen them:
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
 | 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
 | 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Complete |
-| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Not started |
+| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | In progress |
 | 8. Push audit | PLAN-database-load-reduction-phase-08-push-audit.md | Not started |
 
 Phase summaries:
