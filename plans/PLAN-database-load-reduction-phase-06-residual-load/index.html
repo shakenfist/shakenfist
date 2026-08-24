@@ -13203,7 +13203,7 @@
 
 <h1 id="phase-6-the-residual-load-and-the-regression">Phase 6 — the residual load, and the regression<a class="headerlink" href="#phase-6-the-residual-load-and-the-regression" title="Permanent link">&para;</a></h1>
 <p>Master plan: <a href="../PLAN-database-load-reduction/">PLAN-database-load-reduction.md</a></p>
-<p><strong>Status: In progress.</strong> 6a, 6b, 6c, 6d, 6e and 6f are done; 6g (re-measurement after deploy) is outstanding and needs a full 24h window on <code>sfcbr</code>. What the work actually found is recorded in "Findings" below, which corrects this plan's own survey in two places.</p>
+<p><strong>Status: Complete.</strong> 6a through 6g are all done. What the work actually found is recorded in "Findings" below, which corrects this plan's own survey in two places, and in "6g -- the re-measurement" at the end, which corrects one of the Findings in turn.</p>
 <h2 id="why-this-phase-exists">Why this phase exists<a class="headerlink" href="#why-this-phase-exists" title="Permanent link">&para;</a></h2>
 <p>Phases 1-5 took steady-state sf-database load from ~527/s to 89-92/s,
 below this plan's "under 100 operations per second" success criterion,
@@ -13485,8 +13485,13 @@ should resolve the criterion rather than chase the number.</p>
 <li>The <code>GetObjectState</code>/<code>cluster</code> loop and the <code>POST /auth</code> volume are
   filed as issues with their measured numbers, whether or not they are
   fixed here.</li>
-<li><code>GetReferencesFrom</code>/<code>api</code> is either back under its per-instance ceiling
-  or its cause is documented as living outside this repository.</li>
+<li><code>GetReferencesFrom</code>/<code>api</code> is either back under its per-instance ceiling,
+  or its cause is documented as living outside this repository, or it is
+  split out as its own issue with its measured numbers. <em>(The third:
+  #3876. It is neither under its ceiling nor external -- 6g localised it
+  to two unpaired read sites in this repository, which is a fix rather
+  than a measurement and does not belong in a phase whose remaining work
+  was re-measurement.)</em></li>
 <li>Master plan success criterion 2 is restated and open question 5 closed.</li>
 <li><code>pre-commit run --all-files</code> green; functional CI green.</li>
 <li>The 24h cluster total is recorded honestly against the under-100/s
@@ -13505,13 +13510,17 @@ It decomposes:</p>
 <p><strong>~+19/s is a real defect</strong> — <code>GetObjectState</code>/<code>cluster</code> went from <em>below
 the top-40 cutoff</em> to 18.95/s. It is 38% of the whole regression in one
 pair. Diagnosis below.</p>
-<p><strong>~+12/s is node count, not regression.</strong> The per-node fixed-rate pairs
-all grew by almost exactly 50% on 2026-08-12: <code>Dequeue</code>/net 2.03 to 3.04,
-<code>GetBlobTransfersForNode</code>/transfers 2.03 to 3.04, and every one of the
-seven <code>GetNodeDaemonState</code> pairs 1.99 to 2.98. <code>GetNodeDaemonState</code> is
+<p><strong>~+12/s is a node count, not a regression.</strong> The per-node fixed-rate
+pairs all grew by almost exactly 50% on 2026-08-12: <code>Dequeue</code>/net 2.03 to
+3.04, <code>GetBlobTransfersForNode</code>/transfers 2.03 to 3.04, and every one of
+the seven <code>GetNodeDaemonState</code> pairs 1.99 to 2.98. <code>GetNodeDaemonState</code> is
 one read per <code>DAEMON_STATE_POLL_INTERVAL</code> per daemon per node, so its rate
 divided by the poll interval <em>is</em> a node count: it reads 3.9 nodes before
-2026-08-12 and 5.8 after. The cluster gained two nodes.</p>
+2026-08-12 and 5.8 after.</p>
+<p><em>Superseded by 6g.</em> The arithmetic is right and the conclusion drawn from
+it -- "the cluster gained two nodes" -- is wrong. The count that rose is
+the number of nodes the <strong>counter can see</strong>, not the number of nodes that
+exist. See "6g -- the re-measurement" below.</p>
 <p>That is the most important finding for phase 7, and it is a gap in the
 model rather than a bug in the code: <strong>the ratchet's baselines scale with
 standing instance count but not with node count</strong>, so growing the cluster
@@ -13568,8 +13577,11 @@ so it now falls through to the leak path rather than raising.</p>
 exactly one <code>get_references_from</code> per view, inside the <code>attribute_memo()</code>
 that #3654 added. There is no per-view duplication to remove.</p>
 <p>Per this step's brief, reporting rather than fixing: the growth is request
-volume, and it correlates with the same 2026-08-12 node-count change. Two
-more nodes means more concurrent CI, which means more API polling, and the
+volume, and it correlates with the same 2026-08-12 step. That step turned
+out to be a coverage change rather than two new nodes (see 6g), so the
+mechanism below is wrong in its cause while remaining right in its shape:
+two more <em>visible</em> nodes means two nodes' worth of API polling entering
+the counter for the first time, and the
 <code>/instances</code> list endpoint costs one reference read per instance returned —
 so its cost scales with instances <em>times</em> poll rate while the ratchet's
 coefficient captures only instances. Same model gap as above, seen through
@@ -13592,6 +13604,294 @@ matters (that the read count does not grow with address count). Both new
 guards were mutation tested: re-introducing the per-address read fails
 them, and the first version of the namespace-key guard did <em>not</em> fail and
 was rewritten until it did.</p>
+<h2 id="6g-the-re-measurement-2026-08-24">6g — the re-measurement (2026-08-24)<a class="headerlink" href="#6g-the-re-measurement-2026-08-24" title="Permanent link">&para;</a></h2>
+<p>The changes reached <code>sfcbr</code> at 22:30-22:40Z on 2026-08-20. The CI
+conductor was then broken from 09:46Z to 20:30Z on 2026-08-21, so this
+step waited for three clean days rather than the one the step brief
+asked for. That turned out to matter for a reason unrelated to the
+outage, described below.</p>
+<h3 id="both-fixes-landed-and-are-holding">Both fixes landed and are holding<a class="headerlink" href="#both-fixes-landed-and-are-holding" title="Permanent link">&para;</a></h3>
+<p>24h means from <code>database_requests_total</code>, against a 12h window ending
+2026-08-20 20:00Z (the last pre-deploy period):</p>
+<table>
+<thead>
+<tr>
+<th>Pair</th>
+<th>Pre-deploy</th>
+<th>2026-08-23</th>
+<th>Delta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GetObjectState</code> / <code>cluster</code> (#3814)</td>
+<td>14.76</td>
+<td>2.22</td>
+<td>-12.54</td>
+</tr>
+<tr>
+<td><code>GetReservation</code> / <code>net</code> (#3655)</td>
+<td>11.93</td>
+<td>0.00</td>
+<td>-11.93</td>
+</tr>
+<tr>
+<td><code>GetReservationsForIPAM</code> / <code>net</code> (its bulk replacement)</td>
+<td>0.20</td>
+<td>0.60</td>
+<td>+0.40</td>
+</tr>
+</tbody>
+</table>
+<p><code>GetReservation</code>/<code>net</code> reading exactly zero is the sweep conversion, not
+a renamed metric: the bulk accessor it now calls is the third row, and
+it is present at the rate one call per pass predicts.</p>
+<p>Cluster-wide the effect has to be read against standing instance count,
+which swings between 12.4 and 31.4 day to day — more than the effect
+being measured. Fitting the nine regression-era days (2026-08-12 to
+2026-08-20) gives</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>QPS = 82.50 + 4.648 x standing_instances     r2 = 0.974, n = 9
+</code></pre></div>
+<p>and every post-fix day sits below that line by the same amount:</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Standing instances</th>
+<th>Measured</th>
+<th>Fit predicts</th>
+<th>Residual</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-08-21</td>
+<td>13.12</td>
+<td>122.79</td>
+<td>143.48</td>
+<td>-20.69</td>
+</tr>
+<tr>
+<td>2026-08-22</td>
+<td>21.93</td>
+<td>163.10</td>
+<td>184.43</td>
+<td>-21.33</td>
+</tr>
+<tr>
+<td>2026-08-23</td>
+<td>16.65</td>
+<td>138.98</td>
+<td>159.89</td>
+<td>-20.91</td>
+</tr>
+</tbody>
+</table>
+<p>Three independent days agreeing within 0.6/s, against the ~24/s the two
+per-pair deltas above predict less the ~2.3/s <code>GetReferencesFrom</code>/api
+grew over the same window. The reductions are real and they are the size
+they were designed to be.</p>
+<h3 id="the-2026-08-12-step-is-a-measurement-change-not-two-new-nodes">The 2026-08-12 step is a measurement change, not two new nodes<a class="headerlink" href="#the-2026-08-12-step-is-a-measurement-change-not-two-new-nodes" title="Permanent link">&para;</a></h3>
+<p>6a attributed ~+12/s of the climb to the cluster growing from four nodes
+to six. It did not. <code>count(instances_active)</code> returns 6.00 on 2026-08-05
+and 6.00 on 2026-08-23, and the series is <code>sf-1</code> through <code>sf-6</code>
+throughout. What changed is what the counter could see.</p>
+<p><code>database_requests_total</code> is incremented by a server interceptor in
+<code>shakenfist/daemons/database/main.py</code>, so it counts <strong>gRPC</strong> calls only.
+Until <code>5a53ab353</code> ("Route non-database daemons via the gRPC tier",</p>
+<h1 id="3708-_use_database_service-treated-mariadb_host-as-a-per-process">3708), <code>_use_database_service()</code> treated <code>MARIADB_HOST</code> as a per-process<a class="headerlink" href="#3708-_use_database_service-treated-mariadb_host-as-a-per-process" title="Permanent link">&para;</a></h1>
+<p>signal, and <code>MARIADB_HOST</code> is rendered into the shared systemd
+<code>EnvironmentFile</code> — so on a database-tier node <em>every</em> daemon bypassed
+the tier and was invisible to the counter. <code>sfcbr</code> has two such nodes,
+<code>sf-1</code> (roles DHN) and <code>sf-2</code> (roles DH). Four of six nodes were being
+counted. The commit message says as much: it hides those daemons' load
+"from the tier's per-caller request metrics and connection accounting".</p>
+<p>Bisecting by hour puts the step at 2026-08-11 20:00-21:00Z, <code>sfcbr</code>'s
+deploy of that commit. Across a tight 4h window either side, the total
+goes 68.05/s to 145.74/s, and the shape is unmistakable:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>GetObjectState      / cluster    0.00 -&gt; 16.69
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>CountReferencesTo   / cluster    0.00 -&gt;  1.73
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>GetBlobAttributes   / cluster    0.00 -&gt;  1.50
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>GetBlob             / cluster    0.00 -&gt;  1.41
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>GetNodeDaemonState  / net        1.99 -&gt;  2.98   (x1.50 exactly)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>GetNodeDaemonState  / transfers  1.99 -&gt;  2.99   (x1.50)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>Dequeue             / queues     2.08 -&gt;  3.15   (x1.51)
+</code></pre></div>
+<p>Every per-node poll multiplies by exactly 1.5 — four visible nodes
+becoming six — and the entire cluster daemon appears from literal zero.</p>
+<h3 id="which-means-the-target-was-never-actually-met">Which means the target was never actually met<a class="headerlink" href="#which-means-the-target-was-never-actually-met" title="Permanent link">&para;</a></h3>
+<p>The cluster daemon is a single elected singleton, so whether its ~21/s
+was counted depended on which node happened to hold the maintenance
+lock. Tracking <code>caller_daemon="cluster"</code> back through the hunt shows it
+flapping:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>07-25  27.85   07-31   2.76   08-05   2.79   08-08  23.08   08-11   8.61
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>07-28   2.78   08-02  24.48   08-06   2.78   08-09   2.84
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                08-04  26.29   08-07   2.79   08-10  19.53
+</code></pre></div>
+<p>The ~2.8/s floor is the five non-elected candidates; the ~20-27/s peaks
+are windows where the leader sat on a node the counter could see.</p>
+<p><strong>2026-08-05, 2026-08-06 and 2026-08-07 are exactly the days it could
+not.</strong> Those are the three days recorded in the master plan as
+"89-92/s, target met". The load was there; the metric was not looking at
+it. Adding the cluster daemon's contribution back puts those days at
+roughly 110/s, and they were also missing <code>sf-1</code> and <code>sf-2</code>'s other
+daemons. <strong>The under-100/s criterion was never met, and the "regression"
+this phase was created to chase was in substantial part the leader
+moving back onto a visible node and then #3708 making it permanent.</strong></p>
+<p>That does not make the phase wasted. #3814 and #3655 were real defects
+costing a real ~24/s of real database work, and they had been costing it
+for as long as they had existed — invisibly, some of the time. Finding
+them by chasing a measurement artefact is luck, but the fixes are not.</p>
+<h3 id="the-verdict-against-the-criterion">The verdict against the criterion<a class="headerlink" href="#the-verdict-against-the-criterion" title="Permanent link">&para;</a></h3>
+<p>Measured the way the criterion actually specifies — a quiet window, not
+a 24h mean that folds in CI workload — on a 30 minute window at
+2026-08-23 02:10Z with <code>sfcbr</code> at its floor of 8 standing instances:</p>
+<p><strong>102.38 operations per second. Not met, by 2.4%.</strong></p>
+<p>The same measurement pre-fix (2026-08-17 02:00Z, 8.71 instances) reads
+133.97/s. The criterion has been restated in the master plan rather than
+declared met; the number stays at 100 because moving a target after
+missing it by 2.4% is not a re-derivation, it is an excuse.</p>
+<h3 id="the-model-which-is-the-durable-output">The model, which is the durable output<a class="headerlink" href="#the-model-which-is-the-durable-output" title="Permanent link">&para;</a></h3>
+<p>Splitting the load three ways survives contact with the data. The
+fixed-rate per-node polls (<code>GetNodeDaemonState</code>, <code>Dequeue</code>,
+<code>GetBlobTransfersForNode</code>) are flat against workload and flat across the
+fix:</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Poll subtotal</th>
+<th>Per node</th>
+<th>Standing instances</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-08-16</td>
+<td>28.60</td>
+<td>4.77</td>
+<td>13.77</td>
+</tr>
+<tr>
+<td>2026-08-18</td>
+<td>27.32</td>
+<td>4.55</td>
+<td>12.38</td>
+</tr>
+<tr>
+<td>2026-08-22</td>
+<td>29.90</td>
+<td>4.98</td>
+<td>21.93</td>
+</tr>
+<tr>
+<td>2026-08-23</td>
+<td>29.64</td>
+<td>4.94</td>
+<td>16.57</td>
+</tr>
+</tbody>
+</table>
+<p>which gives</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>QPS ~= 32 + 4.9 x nodes + 4.65 x standing_instances
+</code></pre></div>
+<p>At six nodes this predicts 163.4/s and 138.5/s for 2026-08-22 and
+2026-08-23 against 163.10 and 138.87 measured. It is the form phase 7
+needs and the evidence that a per-node term is not optional: on <code>sfcbr</code>
+the per-node term is 29.6/s, 29% of the quiet floor, and it would be
+59/s on a twelve node cluster with no change in behaviour whatsoever.</p>
+<p><code>GetNodeDaemonState</code> alone is 20.29/s of that, and it is exactly at its
+arithmetic floor: seven polling daemon types across six nodes is 42
+processes, less the one elected cluster daemon (below), at one read per
+2s = 20.5/s. Closing the remaining 2.4/s to the criterion most plausibly
+comes from here — <code>DAEMON_STATE_POLL_INTERVAL</code> at 4s rather than 2s
+halves it — but that trades against how quickly an externally written
+stop request is noticed, so it is a phase 7 decision with a stated cost,
+not a free win.</p>
+<h3 id="the-elected-cluster-daemon-does-not-poll-its-own-daemon-state">The elected cluster daemon does not poll its own daemon state<a class="headerlink" href="#the-elected-cluster-daemon-does-not-poll-its-own-daemon-state" title="Permanent link">&para;</a></h3>
+<p><code>GetNodeDaemonState</code>/<code>cluster</code> reads 2.48/s where every other daemon
+reads ~2.97/s — precisely five sixths. There is no missing node.
+<code>check_daemon_state()</code> is called from <code>idle()</code>, and the elected cluster
+daemon does not idle: <code>_await_election()</code> calls <code>self.idle(5)</code> then
+<code>self.check_daemon_state()</code> on each pass, but once elected the inner
+loop in <code>_run_inner()</code> sleeps on <code>self.lock.lost_event.wait(5)</code> and
+never calls it (<code>shakenfist/daemons/cluster/main.py</code>). Five candidates
+poll; the leader does not.</p>
+<p>The consequence is small but real: <code>sf-ctl stop cluster</code>
+(<code>shakenfist/client/ctl.py</code>) works by writing <code>DAEMON_STATE_STOPPING</code>
+for the daemon to notice, and on the elected node nothing is reading it,
+so the request is ignored until the node loses election. Local SIGTERM
+is unaffected — that goes through <code>exit_gracefully()</code> and the abort path,
+which the elected loop does check. Filed as #3874; out of scope here.</p>
+<h3 id="what-6g-leaves-unattributed">What 6g leaves unattributed<a class="headerlink" href="#what-6g-leaves-unattributed" title="Permanent link">&para;</a></h3>
+<p><code>GetReferencesFrom</code>/<code>api</code> is the one target this phase does not close.
+6e reported it as request volume driven by "two more nodes means more
+concurrent CI", which inherits the mistake above — there were no two
+more nodes. Re-reading it as a per-standing-instance coefficient, against
+the 0.32 ceiling the survey used:</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>QPS</th>
+<th>Standing instances</th>
+<th>Per instance</th>
+<th>Coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-08-09</td>
+<td>5.00</td>
+<td>17.81</td>
+<td>0.281</td>
+<td>4 of 6 nodes</td>
+</tr>
+<tr>
+<td>2026-08-18</td>
+<td>6.58</td>
+<td>12.38</td>
+<td>0.531</td>
+<td>6 of 6</td>
+</tr>
+<tr>
+<td>2026-08-22</td>
+<td>13.04</td>
+<td>21.93</td>
+<td>0.595</td>
+<td>6 of 6</td>
+</tr>
+<tr>
+<td>2026-08-23</td>
+<td>9.75</td>
+<td>16.57</td>
+<td>0.588</td>
+<td>6 of 6</td>
+</tr>
+</tbody>
+</table>
+<p>Scaling the pre-#3708 figure by the 1.5 the fixed-rate polls show gives
+0.42 per instance, so roughly half the apparent rise is the API on <code>sf-1</code>
+and <code>sf-2</code> entering the counter. The remaining ~40% is real, and 6g got far enough to say where it is not
+and where it probably is.</p>
+<p>It is not the instance view: 6e established that
+<code>Instance.external_view()</code> already issues exactly one
+<code>get_references_from</code> per view. What gives it away is the sibling
+counter. <code>GetReferencesFrom</code>/api runs at <strong>11.6x</strong> <code>GetReferencesTo</code>/api
+-- 9.75/s against 0.84/s -- and every paired external view reads both,
+so no paired workload can produce that ratio. Two unpaired sites can:
+<code>Blob.external_view()</code> issues three <code>get_references_from</code> where one
+would do, because <code>depends_on</code> and <code>transcoded</code> each fetch a filtered
+subset of the unfiltered list the same method already reads a few lines
+later; and <code>Artifact.external_view()</code> reads <code>b.depends_on</code> once per blob
+version inside its <code>get_all_indexes()</code> loop, so an artifact with N
+versions costs N+1 reads against one <code>get_references_to</code>.</p>
+<p>Both are real and which dominates is not established. Split out as
+<strong>#3876</strong> rather than fixed here: it is a code change, and what remained
+of this phase was re-measurement.</p>
+<p>Phase 7 should not carry 0.32 forward. Either number it re-derives will
+be defensible; this one is not, because it was measured across
+two thirds of the cluster.</p>
 
 
 
