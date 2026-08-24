@@ -20,7 +20,7 @@ See: `templates/export-repo-config/README.md`
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-23T06:45:38.740880+00:00
+Last regenerated: 2026-08-24T07:04:16.593679+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -34,7 +34,7 @@ Last regenerated: 2026-08-23T06:45:38.740880+00:00
 | divergulent | non-compliant | shakenfist/divergulent#39 |
 | instar | compliant | - |
 | kerbside | compliant | - |
-| kerbside-patches | non-compliant | shakenfist/kerbside-patches#951 |
+| kerbside-patches | compliant | - |
 | library-utilities | non-compliant | shakenfist/library-utilities#35 |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
@@ -46,6 +46,5 @@ Details for non-compliant projects:
 
 - **cloudgood** (Status): Missing .github/workflows/export-repo-config.yml
 - **divergulent** (Status): Missing .github/workflows/export-repo-config.yml
-- **kerbside-patches** (Status): Missing .github/workflows/export-repo-config.yml
 - **library-utilities** (Status): Missing .github/workflows/export-repo-config.yml
 <!-- consistency-audit:end -->

@@ -60,7 +60,7 @@ the template.
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-23T06:45:38.740880+00:00
+Last regenerated: 2026-08-24T07:04:16.593679+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -77,12 +77,8 @@ Last regenerated: 2026-08-23T06:45:38.740880+00:00
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | non-compliant | shakenfist/private-ci#9 |
+| private-ci | compliant | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
-
-Details for non-compliant projects:
-
-- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 <!-- consistency-audit:end -->

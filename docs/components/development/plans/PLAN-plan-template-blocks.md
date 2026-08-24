@@ -79,17 +79,27 @@ even contiguous.
 
 ## Implementation
 
-### 1. Seven shared blocks -- `templates/shared-blocks/`
+### 1. Nine shared blocks -- `templates/shared-blocks/`
 
 | Block | Covers | Churn driver |
 |-------|--------|--------------|
 | `plan-file-conventions` | where plans live, phase file naming, the phase tracking table, one commit per logical change | rare |
+| `plan-status-vocabulary` | the fixed set of terms a status cell may hold | rare |
 | `subagent-execution-model` | implementation happens in sub-agents; the plan/spawn/review/retry/commit loop; worktree isolation | rare |
 | `plan-planning-effort` | master plan at high effort; each phase states its planning effort | rare |
 | `subagent-step-guidance` | the step table, the effort ladder, what makes a good brief | rare |
 | `subagent-model-roster` | which models exist, what each is for, context windows, skew-heavier rule | every model launch |
 | `plan-review-checklist` | what the management session verifies after a sub-agent completes | rare |
 | `plan-closeout-sections` | Future work, Bugs fixed, Back brief -- headings included | rare |
+| `plan-push-audit-phase` | every master plan ends with a phase running `PUSH-AUDIT.md` over the whole plan's work | rare |
+
+This started as seven. `plan-status-vocabulary` was added when the
+`plan-index` audit needed the same wording on both sides, and
+`plan-push-audit-phase` by `PLAN-push-audit-phase.md`, which needed
+somewhere to put the pre-push audit's trigger and found that this
+plan's migration was the only pass that would carry it into eight
+templates without editing them twice. The migration below covers
+all nine.
 
 `subagent-model-roster` is separate from `subagent-step-guidance`
 on purpose. It churns whenever a model ships or retires while the
@@ -118,7 +128,7 @@ bug tracker".
 
 `check_plan_template` mirrors `check_push_audit`: repositories with
 no `PLAN-TEMPLATE.md` are `not_applicable`; those that have one must
-carry all seven blocks, current and verbatim. Registered in
+carry all nine blocks, current and verbatim. Registered in
 `CHECK_NAMES`, in the check list, and in `audit_common.py`
 (`AUDIT_METADATA` and its names table).
 
@@ -136,7 +146,11 @@ roster is separate, and what stays project-specific. Registered in
 
 ## Migration (separate commits, one per repository)
 
-Not started. For each of the eight repositories, in its own branch:
+Landed in four of the eight repositories: instar, kerbside, ryll
+and shakenfist are `compliant` on the `plan-template` check.
+Outstanding for client-python-k3s, divergulent and occystrap
+(sfui has no template and is N/A). For each remaining repository,
+in its own branch:
 
 1. Restructure `PLAN-TEMPLATE.md` so no section mixes generic and
    project-specific text. In practice: move the project-specific
@@ -147,7 +161,7 @@ Not started. For each of the eight repositories, in its own branch:
    `### Documentation index maintenance` up next to
    `### Success criteria` so the close-out sections become
    contiguous.
-2. Embed the seven blocks verbatim.
+2. Embed the nine blocks verbatim.
 3. Confirm `audit-check.py` reports `plan-template` as pass.
 
 occystrap and client-python-k3s have no `## Agent guidance` section
@@ -164,6 +178,8 @@ review before eight copies of it exist.
   template) and `fail` with per-block detail for shakenfist
   (template present, no blocks yet). Confirmed.
 * A restructured shakenfist template carrying all seven blocks
-  returns `pass`. Confirmed against a scratch copy.
+  returns `pass`. Confirmed against a scratch copy -- at seven,
+  before `plan-status-vocabulary` and `plan-push-audit-phase` were
+  added. Re-confirm at nine as part of the migration.
 * Bumping a block version marks the embedding repository stale, and
   names the block that moved. Confirmed.
