@@ -13347,7 +13347,8 @@ YAML.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <p>The workflow, and the staging fix that made it able to open a pull
 request, predate this table and were tracked inline in the sections
-above. Phase 1 is the remaining close-out.</p>
+above. Phase 1 is the remaining close-out; phase 2 is the push
+audit that ends every master plan.</p>
 <table>
 <thead>
 <tr>
@@ -13362,8 +13363,22 @@ above. Phase 1 is the remaining close-out.</p>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">PLAN-fuzz-autofix-phase-01-closeout.md</a></td>
 <td>In progress</td>
 </tr>
+<tr>
+<td>2. Push audit</td>
+<td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">PLAN-fuzz-autofix-phase-02-push-audit.md</a></td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
+<h3 id="2-push-audit">2. Push audit<a class="headerlink" href="#2-push-audit" title="Permanent link">&para;</a></h3>
+<p>This phase runs <code>PUSH-AUDIT.md</code> over this plan's accumulated
+diff against <code>develop</code> — every phase's work together, not phase 1's
+diff alone, because the workflow, the stager and its tests were built
+across separate branches and what they did to each other is only
+visible in the sum. Findings land as their own pull request against
+<code>develop</code>, and this plan is not complete until each one is fixed or
+declined in writing here, with the reason. If the audit finds nothing,
+that gets recorded in one sentence and the plan closes.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant

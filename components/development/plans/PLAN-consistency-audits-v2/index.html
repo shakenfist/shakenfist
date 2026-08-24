@@ -2738,6 +2738,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-5-push-audit-not-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Push audit -- NOT STARTED
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13570,6 +13581,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-5-push-audit-not-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Push audit -- NOT STARTED
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14104,6 +14126,21 @@ nothing in the chain reads a secret.</p>
    and a link -- which is what <code>llm-doc-structure</code> asks of them, and
    <code>AGENTS.md</code> is loaded into every session held here.</li>
 </ol>
+<h3 id="phase-5-push-audit-not-started">Phase 5: Push audit -- NOT STARTED<a class="headerlink" href="#phase-5-push-audit-not-started" title="Permanent link">&para;</a></h3>
+<p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
+this plan against <code>main</code>, not over the last phase's diff alone --
+the interactions between phases are most of what a whole-plan
+audit is for.</p>
+<p>Phases 1--4 are already on <code>main</code>, so <code>git diff main</code> for this plan
+is empty and would read as a clean audit. Derive the range instead:
+from the merge base of phase 1's first commit to <code>main</code>, restricted
+to the paths this plan touched, and name the commit range here when
+the phase runs.</p>
+<p>Findings land as their own pull request; the plan is not complete
+until each is resolved or declined in writing, with the reason
+recorded here. If the audit finds nothing, say so in one sentence:
+that is a real result, and a run of them is the evidence for making
+this phase conditional rather than mandatory.</p>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>We will know when this plan has been successfully implemented

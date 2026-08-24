@@ -2956,6 +2956,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-5-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13614,6 +13625,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-5-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14112,6 +14134,24 @@ becomes yet another thing the consistency audits check for:</p>
 <li>Roll out to further codebases as first passes are scheduled.</li>
 <li>Revisit the open questions above with real experience.</li>
 </ol>
+<h3 id="phase-5-push-audit">Phase 5: Push audit<a class="headerlink" href="#phase-5-push-audit" title="Permanent link">&para;</a></h3>
+<p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
+this plan against <code>main</code>, not over the last phase's diff alone --
+the interactions between phases are most of what a whole-plan
+audit is for.</p>
+<p>Phases 0--2 are already on <code>main</code>, so <code>git diff main</code> for this plan
+is empty and would read as a clean audit. Derive the range instead:
+from the merge base of phase 0's first commit to <code>main</code>, restricted
+to the paths this plan touched, and name the commit range here when
+the phase runs.</p>
+<p>Phase 4's rollout lands in other repositories, so each rollout pull
+request carries its own audit against that repository's default
+branch -- which is <code>develop</code>, not <code>main</code>, in shakenfist and ryll.</p>
+<p>Findings land as their own pull request; the plan is not complete
+until each is resolved or declined in writing, with the reason
+recorded here. If the audit finds nothing, say so in one sentence:
+that is a real result, and a run of them is the evidence for making
+this phase conditional rather than mandatory.</p>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>We will know this plan has been successfully implemented when:</p>

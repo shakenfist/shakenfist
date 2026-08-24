@@ -2733,6 +2733,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push audit
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13326,6 +13337,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push audit
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13568,6 +13590,27 @@ review before eight copies of it exist.</p>
 <li>Bumping a block version marks the embedding repository stale, and
   names the block that moved. Confirmed.</li>
 </ul>
+<h2 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h2>
+<p>This is the last phase of the plan and it is not optional. It comes
+after <em>Migration</em> and <em>Verification</em> because those are where the
+bulk of the work is: a push audit run at the end of <em>Implementation</em>
+would cover none of the eight repositories the migration touches.</p>
+<p>There are two obligations here and they are not the same one:</p>
+<ul>
+<li><strong>Each migration pull request</strong> runs its own repository's
+  <code>PUSH-AUDIT.md</code> over that pull request, against that repository's
+  default branch, as part of that pull request. That is a per-repo
+  obligation discharged eight times.</li>
+<li><strong>This plan's final phase</strong> runs this repository's
+  <code>PUSH-AUDIT.md</code> over the accumulated diff of the whole plan --
+  the shared blocks, <code>check_plan_template</code> and the audit spec --
+  against <code>main</code>, not over the last commit alone. It runs once the
+  migration is complete.</li>
+</ul>
+<p>Findings from either land as their own pull request; the plan is not
+complete until each is resolved or declined in writing, with the
+reason recorded here. If an audit finds nothing, say so in one
+sentence.</p>
 
 
 

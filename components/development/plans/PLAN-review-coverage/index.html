@@ -2784,6 +2784,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-6-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13354,6 +13365,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-6-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13712,6 +13734,15 @@ workflow and script below target develop.</p>
 <li>Confirm a normal review session still works end to end: pull
    (picking up bot prunes), review, stamp, signed commit, push.</li>
 </ol>
+<h3 id="phase-6-push-audit">Phase 6: Push audit<a class="headerlink" href="#phase-6-push-audit" title="Permanent link">&para;</a></h3>
+<p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
+this plan against <code>main</code>, not over the last phase's diff alone --
+the interactions between phases are most of what a whole-plan
+audit is for. This plan spans two repositories, so the audit runs
+once per pull request, each against its own default branch.
+Findings land as their own pull request; the plan is not complete
+until each is resolved or declined in writing, with the reason
+recorded here. If the audit finds nothing, say so in one sentence.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <p>One commit per logical change; the development-repo work is one
 PR on this branch, the ryll work a separate PR.</p>
@@ -13766,6 +13797,12 @@ PR on this branch, the ryll work a separate PR.</p>
 <td>both</td>
 <td>end-to-end verification (phase 5)</td>
 <td>Blocked on merge</td>
+</tr>
+<tr>
+<td>8</td>
+<td>both</td>
+<td>push audit over each PR (phase 6)</td>
+<td>Not started</td>
 </tr>
 </tbody>
 </table>
