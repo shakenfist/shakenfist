@@ -62,8 +62,21 @@ class Job(util_concurrency.Job):
         #      routing key is stable across defers and re-dequeues).
         #   3. The cross-op coalescing fold in BaseClusterOperation.execute()
         #      only claims sibling ops with the same target, which by (1)
-        #      route to the folding worker -- a fold can never mark an op
-        #      complete while another worker is executing it.
+        #      route to the same worker *within this process* -- so a fold
+        #      can never mark an op complete while another thread here is
+        #      executing it.
+        #
+        #      Note what (1) does NOT give you: routing is per-process, so
+        #      two ops with the same target on two different queues are
+        #      drained by two different daemons and (1) says nothing about
+        #      them. The fold's SQL cannot filter on queue either --
+        #      cluster_operations has no queue column. What actually makes
+        #      the fold safe is that every coalescible task is confined to
+        #      the cluster-wide networknode queue, enforced at enqueue time
+        #      by the InvalidCoalescibleEnqueue guard in
+        #      schema/operations/net_op.py. Do not weaken that guard on the
+        #      strength of this invariant; it is the guard that holds, not
+        #      this one.
         #
         # Additionally each queue is drained by exactly ONE dispatcher
         # process: per-node {node_uuid}-network-* queues only by that node's

@@ -20,10 +20,32 @@ against an enum name. Both primitives therefore always returned
 times in seven days on `sfcbr`. Fixed here as #3878, with eight tests
 which execute the real statements against a real database; #3879
 tracks the missing functional coverage that let the defect sit
-unnoticed since 2026-05-26. Note that this change activates a code
-path which has never run in production. The full audit, including the
-three headings which found nothing, is in
+unnoticed since 2026-05-26. The full audit, including the three
+headings which found nothing, is in
 [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md).
+
+Review of that fix found a second defect it would have activated:
+`network_ensure_mesh` was declared coalescible, but it does node-local
+work and the fold's key is the network alone, so the network node's
+survivor would have marked every *other* hypervisor's pending mesh op
+complete without doing their work. It is no longer coalescible, and an
+enqueue-time guard now enforces the invariant that made the
+queue-blind fold SQL safe in the first place. #3884 tracks the
+multi-column key that would let per-node tasks coalesce properly.
+
+Two things this plan changed are deliberately still unproven:
+
+* **Step 7's numbers characterise a cluster with coalescing inert.**
+  They were gathered on `sfcbr` while steps 4 and 5 were doing
+  nothing at all. That does not invalidate the conclusion -- if
+  anything "batched dequeue alone was enough" is the stronger reading
+  of it -- but the system measured is not the system now running.
+* **The fold's cost was never measured.**
+  `claim_coalescible_siblings` is recorded in `baseoperation.py` as
+  costing ~200 ms under load, and it now also takes `FOR UPDATE`
+  locks on `object_states` rows and issues an UPDATE against a hot
+  table. Re-measuring both is folded into #3879, alongside the
+  functional coverage.
 
 ## Execution
 
@@ -131,6 +153,12 @@ audit:
    recorded in one sentence.
 
 ## What step 7 measured
+
+Read these numbers knowing what step 8 later found: **both windows
+were captured with coalescing inert**, because the fold and the
+enqueue-side dedup never matched a row until #3878 was fixed. Whatever
+improvement is visible below was delivered by the batched dequeue
+alone, and the fold's own cost does not appear in it at all.
 
 Two windows, both through `tools/queue-wait-report.py`:
 

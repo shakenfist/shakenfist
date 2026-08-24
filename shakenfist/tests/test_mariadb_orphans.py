@@ -17,23 +17,17 @@ from shakenfist import constants
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
+from shakenfist.tests import dbfixture
 
 
-class OrphanQueryTestCase(base.ShakenFistTestCase):
+class OrphanQueryTestCase(
+        dbfixture.MariaDBTableFixture, base.ShakenFistTestCase):
     def _build_engine(self, tables):
-        for attr in (
-                '_object_states_table',
-                '_ipams_table',
-                '_artifacts_table',
-                '_artifact_attributes_table',
-                '_cluster_operations_table'):
-            setattr(mariadb, attr, None)
-        mariadb._metadata = None
-
-        engine = sa.create_engine('sqlite:///:memory:')
-        built = [getter() for getter in tables]
-        built[0].metadata.create_all(engine, tables=built)
-        return engine
+        # The fixture also restores mariadb's table caches and MetaData
+        # afterwards, which this module used to leave cleared -- a later
+        # test in the same worker which walked the full schema then saw
+        # only the handful of tables built here.
+        return self.build_engine(tables)
 
     def _insert_state(self, conn, states, object_uuid, object_type,
                       state_value='created', update_time=100.0):

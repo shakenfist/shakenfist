@@ -136,11 +136,15 @@ leave on `develop`.
   just summarised from the plan.
 * Every finding carries a grade (blocking or advisory) and a
   disposition (fixed here, filed as #NNNN, or declined with a reason).
-* No blocking finding is left unresolved.
+* No blocking finding is left unresolved. A finding is resolved when
+  the defect it names is fixed; a *related* gap which the fix reveals
+  but does not cause may be filed and tracked, provided the
+  disposition table says so explicitly and grades the filed remainder
+  advisory in its own right.
 * The master plan's Execution table and `docs/plans/index.md` agree
   with each other and with `tools/check-plan-status.py`.
 * The master plan's status is Complete only if no blocking finding
-  remains open.
+  remains open, under the definition above.
 
 ## Findings
 
@@ -303,10 +307,34 @@ and the routing invariant.
 | # | Finding | Grade | Disposition |
 |---|---------|-------|-------------|
 | 1 | Coalescing join never matches, on two independent axes; steps 4 and 5 inert | Blocking | Fixed here, #3878 |
-| 2 | No test executes the coalescing SQL; no functional coverage | Blocking | Unit half fixed here; functional half filed as #3879 |
+| 2 | No test executes the coalescing SQL | Blocking | Fixed here (`test_mariadb_coalescing.py`) |
+| 2b | No functional coverage of coalescing in a live cluster | Advisory | Filed as #3879 |
 | 3 | `claim_coalescible_siblings` docstring describes a mechanism it does not use | Advisory | Fixed here |
 | 4 | Decision 2's file list omitted `shakenfist/tests/` | Advisory | Recorded above; no action |
 | 5 | The fix adds two `# type: ignore[call-arg]` | Advisory | Accepted; see below |
+| 6 | `network_ensure_mesh` is coalescible but does node-local work, so the fix would have activated a cross-node fold | Blocking | Fixed in review; see below |
+| 7 | The fold's SQL cannot filter on queue, and nothing enforced the convention that made that safe | Blocking | Fixed in review; enqueue-time guard |
+| 8 | Step 7's numbers were measured with coalescing inert, and the plan did not say so | Advisory | Fixed here |
+| 9 | The enqueue-side dedup path emitted no event | Advisory | Fixed in review |
+| 10 | The `ObjectType` and target-column skips were silent | Advisory | Fixed in review; both now log |
+| 11 | The join and its preflight were duplicated verbatim in two functions | Advisory | Fixed in review; extracted |
+
+Findings 1 and 2 were split apart on review. They had been graded as
+one blocking item with a half-done disposition, which is not a state
+the definition of done admits. The unit-level coverage is what
+discharges the blocker -- it is the coverage whose absence let the
+defect ship. Functional coverage is a real gap and is tracked as
+#3879, but it is a standing gap in the suite rather than an unfixed
+part of this defect, so it is graded advisory in its own right rather
+than leaving a blocking row permanently open.
+
+Findings 6 through 11 came from the automated reviewer on PR #3880 and
+are recorded here because a push audit that does not record what the
+next reviewer found would be claiming a completeness it did not have.
+Finding 6 is the significant one, and it is a finding *about the
+audit*: the audit verified that the coalescing join was broken and
+that fixing it was correct, but did not ask what would happen once the
+folding actually ran. See below.
 
 Finding 5 is the audit's own mechanical sweep applied to the audit's
 own change. `ObjectType` defines `__new__(cls, string, proto_id)`, so
@@ -374,8 +402,68 @@ be the first time the routing invariant at
 that actually fires. That is stated plainly rather than buried: this
 change turns on a code path which has never run.
 
+### What review found, and what the audit should have asked
+
+The sentence above -- "this change turns on a code path which has
+never run" -- was written as a caveat. It should have been read as a
+question, and the automated reviewer on PR #3880 read it that way:
+*given that it now runs, what does it do?*
+
+The answer was a second defect (finding 6). `network_ensure_mesh` was
+in `COALESCIBLE_TASKS`, and it is the one NetOp task that does
+node-local work: `_apply_ensure_mesh` diffs *this* host's FDB. The
+coalescing key is `COALESCIBLE_TARGET_COLUMN`, the network alone,
+because `cluster_operations` has no queue column and NetOp's model has
+no `node_uuid` -- the queue `target` is routing, and is never
+persisted on the op row. So the fold could not tell hypervisor A's
+mesh op from hypervisor B's.
+
+Concretely: `network/network.py:316` and `external_api/instance.py:1091`
+enqueue `[network_apply_create_network_node, network_ensure_mesh]` to
+the cluster-wide `networknode` queue, while `network/network.py:980`
+and `daemons/network/maintain.py:673,728` fan single-task
+`network_ensure_mesh` ops out per hypervisor. Same op type, same
+network, single task, state `queued` -- so the network node's survivor
+matched them and marked them `complete`. Each of those nodes would
+then drop its work item at the terminal-state branch and never update
+its FDB.
+
+This is the failure the comment at `baseoperation.py:335-353` says
+broke `test_single_virtual_networks_work` on the network-facade
+branch. The guard added at the time inspects only the *survivor's*
+queue name, so it did not close it, and the invariant comment at
+`daemons/network/workitem.py:63-66` claimed a soundness it did not
+have: same-target routing is per-process, and two ops on two queues
+are drained by two daemons.
+
+The audit missed this because it asked whether the join was wrong --
+which it was, and the fix for which is correct -- and did not ask what
+the corrected join would then match. A dead code path has no
+behaviour to audit; the moment you revive one, its behaviour is new
+work, and reviewing the repair is not the same as reviewing what the
+repair switches on.
+
+Fixed in review, in three parts:
+
+* `network_ensure_mesh` is no longer coalescible, with the reasoning
+  recorded at the declaration.
+* An enqueue-time guard raises `InvalidCoalescibleEnqueue` when any
+  coalescible task is enqueued to a non-`networknode` target. The
+  fold's SQL is structurally unable to filter on queue, so the
+  convention that made it safe now has something enforcing it rather
+  than three comments describing it.
+* `shakenfist/tests/schema/test_net_op_coalescing.py` checks the guard
+  at runtime and walks every `net_create_and_enqueue` call site
+  statically, so a future per-node enqueue of a coalescible task fails
+  the suite whether or not a test executes that line.
+
+#3884 tracks the multi-column key -- and the `node_uuid` on the op row
+it needs -- that would let per-node tasks coalesce within a node
+properly, which is the optimisation this gives up.
+
 **The plan is complete.** Steps 4 and 5 now do what the plan said they
-did, and the coverage gap that hid the defect is filed.
+did, the invariant they rely on is enforced rather than assumed, and
+the coverage gap that hid the original defect is filed.
 
 ## Back brief
 

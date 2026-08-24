@@ -569,6 +569,35 @@ itself):
   one, so a moderate gap between sibling-arriving and
   `coalesced sibling ops` firing is expected.
 
+  This paragraph described the diagnostic before anything used it.
+  Between 2026-05-26 and 2026-08-24 the event never fired at all,
+  on any cluster, because both primitives joined
+  `cluster_operations` to `object_states` on columns that could
+  never match (issue #3878). If you are reading historical event
+  data from that window, its absence says nothing about the
+  workload.
+
+* **`enqueue-side dedup: reused pending op`** (`EVENT_TYPE_AUDIT`).
+  Emitted on the *existing* operation, and on the network, when a
+  new enqueue was answered with an already-pending op instead of a
+  new row. Carries `requested_task` and `existing_op_uuid` in
+  `extra`. This is the enqueue-side counterpart of
+  `coalesced sibling ops`; without it a deduped enqueue would leave
+  no trace on the network's event stream at all, since the op it
+  reuses was created by some earlier caller.
+
+  Only the cluster-wide `networknode` queue is ever deduped, in
+  either direction. Neither primitive can filter on which queue a
+  sibling is on -- `cluster_operations` has no queue column -- so a
+  coalescible task on a per-node queue would be folded across
+  nodes, and one hypervisor's work silently never applied. That is
+  enforced at enqueue time rather than left to convention: a
+  coalescible task enqueued to a per-node target raises
+  `InvalidCoalescibleEnqueue`. It is also why `network_ensure_mesh`
+  is *not* coalescible despite looking like the best candidate --
+  it updates the local host's FDB, so two mesh ops on one network
+  are the same work only if they are on the same node. See #3884.
+
 ### Reading these events back
 
 Neither event survives its operation for long, so plan to read them

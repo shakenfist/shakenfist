@@ -437,3 +437,43 @@ one only as long as the comparison stays fixed --
 `smoke_ci_tests/test_ci_harness.py` is what holds it there. When a
 helper's failure mode is to succeed quietly, the guard has to assert the
 effect on the cluster rather than that the helper returned.
+
+## A column-to-column comparison has no bind processor
+
+SQLAlchemy coerces a *bound* value through the column type on its way into
+the statement. It cannot do that for a comparison between two columns,
+because there is no Python value to coerce. Any join whose two sides store
+the same logical value in different physical forms therefore matches
+nothing, silently, and a query that returns no rows is
+indistinguishable from a feature with no work to do.
+
+Both of `object_states`' join columns have that problem:
+
+* `object_states.object_uuid` is `sa.String(36)` holding the dashed uuid
+  form, while the static tables use `sa.Uuid`, which is undashed CHAR(32)
+  on MariaDB. Join through `_dashed_uuid_expr()`, never a bare `sa.cast`.
+* `object_states.object_type` is `sa.Enum(ObjectType)`, which SQLAlchemy
+  stores by enum *name* (`'NET_OP'`), while the operation and object
+  tables carry the enum *value* (`'net_op'`). Bind an `ObjectType`
+  member; do not compare the two columns.
+
+The second is the subtler one, because binding a plain `'net_op'` string
+*does* work -- `ObjectType` subclasses `str`, so the member and its value
+hash identically in the Enum type's `_valid_lookup` -- which makes every
+other `object_states` query in `mariadb.py` correct by accident and makes
+the broken join look like all of them.
+
+The two coalescing primitives in `mariadb.py` had both defects in one
+`ON` clause, each individually fatal, and shipped that way for three
+months of green CI (issue #3878). Every test mocked either the primitive
+or the engine, so nothing ever ran the statement against a table. The
+operator-facing symptom was documented before the cause was: the
+`coalesced sibling ops` event simply never fired. Both queries now share
+`_coalescible_states_join()`, and `shakenfist/tests/test_mariadb_coalescing.py`
+runs them against a real database.
+
+The general rule: a query which can fail by matching nothing needs a test
+that proves it matches something. Asserting the statement's *shape*
+against a mocked engine cannot do that, and neither can a test that
+rewrites the query to suit sqlite -- register the missing SQL functions
+instead, so the statement under test is the statement that ships.
