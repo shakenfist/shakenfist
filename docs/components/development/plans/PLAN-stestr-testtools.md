@@ -65,6 +65,26 @@ stestr>=4.0.0
 and remove the explicit `python-subunit` pin entirely (let stestr
 pull it in as a transitive dependency).
 
+## Push audit
+
+This plan has no phases -- it is a pin and a watch on upstream --
+so there is no accumulated multi-phase diff to audit. The
+obligation still applies to the change that eventually lands: when
+the conditions above are met and the pins come out, the unpinning
+commit in each affected repository runs that repository's
+`PUSH-AUDIT.md` before it is pushed, against that repository's own
+default branch. Record here what each audit found, or that it found
+nothing.
+
+Both affected repositories carry a `PUSH-AUDIT.md` today, so there
+is nothing to rediscover when the pin finally comes out: shakenfist
+is in the consistency-audit matrix and `push-audit` reports it
+compliant, and imago has one but sits outside the matrix entirely,
+so its copy is not version-checked and may have drifted from the
+current shared blocks -- check it before relying on it. If either
+loses its runbook before the unpinning lands, the commit says so
+rather than skipping the step silently.
+
 ## Timeline
 
 - **2026-02-18**: Pin applied to imago.

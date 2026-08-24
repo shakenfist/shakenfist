@@ -314,6 +314,17 @@ After the ryll PR merges:
 4. Confirm a normal review session still works end to end: pull
    (picking up bot prunes), review, stamp, signed commit, push.
 
+### Phase 6: Push audit
+
+Run `PUSH-AUDIT.md` over the accumulated diff of every phase in
+this plan against `main`, not over the last phase's diff alone --
+the interactions between phases are most of what a whole-plan
+audit is for. This plan spans two repositories, so the audit runs
+once per pull request, each against its own default branch.
+Findings land as their own pull request; the plan is not complete
+until each is resolved or declined in writing, with the reason
+recorded here. If the audit finds nothing, say so in one sentence.
+
 ## Execution
 
 One commit per logical change; the development-repo work is one
@@ -328,6 +339,7 @@ PR on this branch, the ryll work a separate PR.
 | 5 | development | `docs/code-review-tracking.md` steady-state rewrite | Done |
 | 6 | ryll | prune workflow + `tools/ci-prune-reviews.sh` + docs | Done |
 | 7 | both | end-to-end verification (phase 5) | Blocked on merge |
+| 8 | both | push audit over each PR (phase 6) | Not started |
 
 `pre-commit run --all-files` must pass before each commit is
 proposed; the Python follows the house style (single quotes,

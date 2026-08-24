@@ -77,7 +77,7 @@ reference.
    The cost is that findings arrive after the phases have merged, so
    the fix is a new PR against the landed feature rather than a
    change to an unmerged branch. Measured (below) that exposure is
-   two plans fleet-wide, and a normal PR against merged work is a
+   six plans of thirty-six, and a normal PR against merged work is a
    cheaper shape than a rebase across live phase branches. Accepted,
    with decision 5 as the check on it.
 
@@ -107,8 +107,9 @@ reference.
    repository that defines the standard. It has 5,000 lines of audit
    script, 3,200 lines of tests, a pre-commit running five suites,
    and workflow templates shipped to the fleet. Wave 1 and the
-   documentation and security briefs all apply. Its five in-progress
-   plans get the phase like everyone else's.
+   documentation and security briefs all apply. Its own incomplete
+   plans get the phase like everyone else's -- six of them, counting
+   this one, which carries the phase it asks of every other plan.
 
    `PLAN-TEMPLATE.md` for `development` is deliberately *not* in
    scope: `PLAN-plan-template-blocks` already ruled that whether every
@@ -118,12 +119,12 @@ reference.
    Recorded in Future work rather than solved here.
 
 4. **The sweep covers every incomplete master plan, including the
-   not-started ones.** Twenty-one of the thirty-seven have no landed
+   not-started ones.** Nineteen of the thirty-six have no landed
    phases at all, so appending the phase costs nothing and shapes
    work that has not been written yet.
 
 5. **The mechanism gets a review point before it is trusted.**
-   Phase 3 exists because a mandatory phase written into thirty-seven
+   Phase 3 exists because a mandatory phase written into thirty-six
    plans, that turns out to find nothing, is worse than no phase at
    all -- it is a recurring cost that reads as diligence.
 
@@ -131,27 +132,97 @@ reference.
 
 The worry motivating decision 1 is landing several phases of a plan
 and then rewriting them all to satisfy an audit that runs at the end.
-Counted against the fleet on 2026-08-24, with 0 open PRs everywhere
-except shakenfist (two: a bot fix and queue performance step 7):
 
-**Thirty-seven incomplete master plans** -- shakenfist 22, ryll 6,
-development 5, kerbside 3, instar 1. occystrap, divergulent, sfui and
-client-python-k3s have none.
+Two counts sit behind the figures below and they are not the same
+event, which is what makes the correction dates read oddly until the
+distinction is drawn. The **planning estimate** was read from the
+local clones on this machine, several of which had not been fetched
+for some time -- one of them from before kerbside's
+`PLAN-demo-install` closed out on 2026-08-22. The **sweep count** was
+taken on 2026-08-24 in fresh worktrees off each default branch, with
+0 open PRs everywhere except shakenfist (two: a bot fix and queue
+performance step 7). Both happened on 2026-08-24; only the data
+behind the estimate was old.
+
+The estimate was thirty-seven. The sweep counted **thirty-six**:
+shakenfist 22, ryll 6, development 6 (five, plus this plan),
+kerbside 1, instar 1.
+
+Thirty-six is a count of the plans **in scope for the sweep** -- the
+incomplete master plans an `index.md` tracks in the five repositories
+phase 2 covered -- and not a count of every plan in the organisation.
+Four repositories contributed nothing, for three different reasons:
+
+* **client-python-k3s** has two planning documents and neither is a
+  master plan.
+* **occystrap** and **sfui** have master plans but no index a
+  scope list can be derived from: sfui has three plans and no
+  `docs/plans/index.md` at all, and occystrap's index is a bullet
+  list naming two of its seven master plans, with no status column.
+* **divergulent** has both, and was missed. See the fourth
+  correction below.
+
+Four of the planning figures were wrong, and the corrections are
+recorded here rather than quietly overwritten:
+
+* **kerbside is 1, not 3.** The estimate counted rows from
+  kerbside's *Standalone plans* table alongside its master plans,
+  and `PLAN-demo-install` closed out on 2026-08-22 -- after the
+  local clone's last fetch, so the estimate still saw it open.
+* **shakenfist has one root-level `PLAN-*.md`, not seventeen.** The
+  estimate was taken from a local clone well behind `develop`; at
+  `develop` HEAD only `PLAN-TEMPLATE.md` sits at the root, and
+  nothing at the root is tracked by `index.md`. The warning written
+  into the phase 2 brief was therefore unnecessary, though harmless.
+* **ryll's shared blocks are current.** The estimate had ryll
+  failing two blocks; that too was clone staleness. It passes
+  `push-audit` outright.
+* **divergulent has four incomplete master plans, not none.** The
+  estimate's repository list said it had none and the sweep
+  inherited that without rechecking. It has nine master plans in a
+  conforming `docs/plans/index.md` -- `PLAN-published-cache`,
+  `PLAN-release-1.0`, `PLAN-patch-classification` and
+  `PLAN-curation-cli-ergonomics` are the incomplete four -- and it
+  carries a `PUSH-AUDIT.md`, so it is exactly the shape the
+  mechanism is for. This is a gap in phase 2, not a scope
+  exclusion: phase 2's definition of done names five repositories,
+  while decision 4 says the sweep covers *every* incomplete master
+  plan. Phase 3 decides which of those two is right before the
+  count is quoted anywhere else.
 
 | Exposure | Plans | What the audit phase means there |
 |----------|-------|----------------------------------|
-| No phases landed (Not started / Proposed / Blocked) | 21 | Purely prospective; every phase is written knowing the audit is coming |
-| Early or middle (1 of 3, 4 of 11, 2 of 6, 3 of 7, 2 of 8, ...) | 14 | Most phases still ahead of the audit |
-| Near complete | 2 | shakenfist's Kerbside VDI tokens (9 of 10) and Queue performance (6 of 7) |
+| No phases landed (Not started / Proposed / Blocked) | 19 | Purely prospective; every phase is written knowing the audit is coming |
+| Early or middle | 11 | Most phases still ahead of the audit |
+| Near complete (70% or more of phases landed) | 6 | shakenfist's Kerbside VDI tokens (9 of 10), Queue performance (6 of 7) and Database load reduction (5 of 7); kerbside's proxy dev releases (5 of 5); development's Consistency audits v2 (4 of 4) and Review coverage (4 of 5) |
 
-The retrospective-rework scenario applies to two plans, not
-thirty-seven. Fifty-seven percent of incomplete plans have no landed
-work, so the mechanism mostly shapes future phases rather than
-reworking past ones.
+The unit is **phases landed out of the phases the plan carried
+before this sweep appended its audit phase**, counted from the
+plan's own phase list rather than from an execution table -- the two
+disagree for `PLAN-review-coverage`, whose table has eight rows
+because two phases split across repositories. Two of the six are at
+100% and still incomplete, which is the point of counting phases
+rather than statuses: kerbside's proxy dev releases has all five
+phases landed and an operator-driven Gerrit recheck outstanding, and
+Consistency audits v2 has all four landed with two of them recorded
+as `MOSTLY DONE`.
 
-The sweep itself -- 37 plan files, ~6 index files, one section and one
-table row each -- is a one-time mechanical migration with no rework in
-it. It is a large file count, not churn.
+**The near-complete bucket is 6, not the 2 first claimed.** That
+figure came from reading shakenfist's index alone and never counting
+development's or kerbside's own plans -- an error of scope, not of
+arithmetic. Six plans of thirty-six will meet their audit over work
+that has already merged.
+
+That is still a minority, and the conclusion in decision 1 survives:
+just over half the incomplete plans have no landed work at all, so
+the mechanism mostly shapes phases that have not been written yet.
+But six is enough that the review point in phase 3 is doing real
+work rather than confirming a foregone result.
+
+The sweep itself -- 36 plan files across five repositories, four
+index files, one section and one table row each -- was a one-time
+mechanical migration with no rework in it. It is a large file count,
+not churn.
 
 ## Implementation
 
@@ -166,8 +237,9 @@ this repository's convention.
 | Phase | Status |
 |-------|--------|
 | 1. Foundations | Complete |
-| 2. Fleet sweep | Not started |
+| 2. Fleet sweep | Complete |
 | 3. Review point | Not started |
+| 4. Push audit | Not started |
 
 ### 1. Foundations -- this repository
 
@@ -176,7 +248,13 @@ this repository's convention.
   `PUSH-AUDIT.md` against the accumulated diff of the whole plan
   rather than one phase's, that findings land as their own PR, and
   that a plan whose repository has no `PUSH-AUDIT.md` says so
-  explicitly rather than omitting the phase silently.
+  explicitly rather than omitting the phase silently, and how to
+  derive the range when the plan's phases have already merged and a
+  diff against the default branch would be empty. That last bullet
+  arrived from review during phase 2 and edits v1 in place rather
+  than bumping to v2: no `PLAN-TEMPLATE.md` embeds the block yet, so
+  there is no copy to mark stale and nothing a version bump would
+  tell anyone.
 * **`scripts/audit-check.py`** -- extend `check_push_audit` with the
   reference checks: `AGENTS.md` must mention `PUSH-AUDIT.md`, and
   where the repository has a `PLAN-TEMPLATE.md` it must carry the new
@@ -247,8 +325,12 @@ row.
 Per-repository variance the briefs must handle, rather than letting
 six agents invent six shapes:
 
-* shakenfist keeps 17 `PLAN-*.md` at the repository root as well as
-  129 in `docs/plans/`; the sweep covers what `index.md` tracks.
+* shakenfist was believed to keep 17 `PLAN-*.md` at the repository
+  root as well as 129 in `docs/plans/`. It does not: at `develop`
+  HEAD only `PLAN-TEMPLATE.md` sits at the root, and the figure came
+  from a stale clone (see *The churn question, measured*). The rule
+  the brief carried is still the right one -- the sweep covers what
+  `index.md` tracks -- it just had nothing to exclude.
 * Index formats differ: shakenfist is
   `Date|Plan|Intent|Status|Phases`, development is four columns,
   ryll lists phase files inline in the row.
@@ -257,18 +339,63 @@ six agents invent six shapes:
 * development's plans have no separate phase files -- phases are
   sections inside the master plan, so the phase is a section and a
   row in that plan's own Execution table.
-* sfui has no `docs/plans/index.md` and three plans; it is
-  out of scope for the sweep and recorded as such.
+* sfui has three plans and no `docs/plans/index.md`, so there is no
+  in-scope list to derive; it is out of scope for the sweep and
+  recorded as such rather than counted as having no plans.
+  occystrap is the same shape with a weaker index, and divergulent
+  should have been in scope and was not -- both recorded under *The
+  churn question, measured*.
 
 ### 3. Review point -- after the first real run
 
-Queue performance (shakenfist, 6 of 7, step 7 in flight) reaches its
-audit phase first, over six merged phases of database and queue work.
-Phase 3 reads what that audit actually found and decides one thing:
-whether the phase stays mandatory for every plan, becomes conditional
-on plan size, or is withdrawn. A mandatory phase that finds nothing
-is a recurring cost that reads as diligence, and this is the phase
-that catches that.
+Queue performance (shakenfist, 6 of 7 at the sweep count, step 7 in
+flight) reaches its audit phase first, over six merged phases of
+database and queue work.
+
+That premise moved while phase 2 was in review: step 7 landed and
+`index.md` on `develop` now reads `Complete | 7 of 7`, while the
+sweep that gives the plan its audit phase is still open as
+shakenfist#3873. So the first real run will be an audit of a plan
+that is already complete -- the merged-range case the shared block
+now describes, arrived at by accident rather than by design. It is
+still the right measurement, and it makes phase 3's decision 2 more
+pressing rather than less: nothing stopped a plan being marked
+complete without its audit.
+Phase 3 reads what that audit actually found and decides three
+things:
+
+1. Whether the phase stays mandatory for every plan, becomes
+   conditional on plan size, or is withdrawn. A mandatory phase that
+   finds nothing is a recurring cost that reads as diligence, and
+   this is the phase that catches that.
+2. Whether a passing verdict should be mechanically checkable per
+   plan -- a check that every master plan an `index.md` tracks
+   carries the phase -- or left to `PLAN-TEMPLATE.md` to deliver.
+   Nothing checks it today: `check_push_audit` looks at `AGENTS.md`,
+   `check_plan_template` looks at the template, and
+   `check_plan_index` checks columns, dates and status vocabulary.
+   The thirty-six plans this sweep edited are held in place by the
+   sweep alone. Building the check before decision 1 is settled
+   would be the same ceremony this plan is guarding against, which
+   is why it is a decision here and not a phase 1 deliverable.
+3. Whether the sweep's repository scope was right. Decision 4 says
+   the sweep covers every incomplete master plan; phase 2's
+   definition of done names five repositories and divergulent's four
+   are outside both. Either the scope widens and divergulent is
+   swept, or the plan says why an `index.md`-tracking repository
+   with a `PUSH-AUDIT.md` is excluded.
+
+### 4. Push audit
+
+Run `PUSH-AUDIT.md` over the accumulated diff of all three phases
+against `main`. This plan carries the phase it asks of every other
+plan, which is also the second real test of the mechanism after
+queue performance -- and the more interesting one, because the
+runbook it exercises is the one phase 1 wrote for this repository
+and nobody has run yet. Findings land as their own pull request;
+the plan is not complete until each is resolved or declined in
+writing, with the reason recorded here. If the audit finds nothing,
+say so in one sentence, and feed that into phase 3's decision.
 
 ## Risks and mitigations
 
@@ -276,10 +403,15 @@ that catches that.
   the real risk, and phase 3 is the mitigation -- with a named
   measurement (queue performance) rather than an intention to review
   later.
-* **Thirty-seven hand-edited plan files drift into thirty-seven
+* **Thirty-six hand-edited plan files drift into thirty-six
   wordings.** Mitigated by the shared block being the source and the
   sub-agent briefs quoting it, and by the management session
-  reviewing each repository's diff before its commit.
+  reviewing each repository's diff before its commit. Outcome: the
+  wording is consistent in substance and deliberately varied in
+  form, because each sub-agent matched its own repository's idiom --
+  bold-lead paragraphs in shakenfist, a bullet in ryll's per-phase
+  intent list, a table cell where the table's own column carries the
+  description. That was the right call and is worth keeping.
 * **Colliding with `PLAN-plan-template-blocks`.** Mitigated by
   decision 2: this plan adds the block and updates that plan's block
   list, and touches no repository's `PLAN-TEMPLATE.md` itself.
@@ -298,8 +430,21 @@ that catches that.
 * `development` has a `PUSH-AUDIT.md` that its own `push-audit` check
   passes, and it is no longer `N/A` in the compliance table.
 * Every incomplete master plan in shakenfist, ryll, kerbside, instar
-  and development ends with a push-audit phase, and its `index.md`
-  row reflects the new phase count.
+  and development ends with a push-audit phase and, in the
+  repositories whose index carries phase counts, its `index.md` row
+  reflects the new count. Done: 36 plans across the five
+  repositories and four of the five indexes, verified by re-deriving
+  the in-scope list from each repository's own `index.md` and
+  confirming every plan on it was touched. development is the fifth:
+  its index deliberately carries a one-line status and no phase
+  column, `check_plan_index` enforces that it has no arithmetic to
+  recompute, and it is correctly untouched here. shakenfist's
+  `pre-commit` carries a "plan statuses and index arithmetic agree"
+  hook, which independently confirmed its 18 recomputed counts --
+  18 rather than 22 because four of its incomplete plans carry an
+  em-dash in the phases column, having no phase list yet.
+  Divergulent's four, recorded under *The churn question, measured*,
+  are outside this criterion until phase 3 settles the scope.
 * `pre-commit run --all-files` passes in this repository.
 * Phase 3 records, in this plan, what queue performance's audit found
   and what was decided about the phase remaining mandatory.
@@ -338,4 +483,4 @@ that catches that.
 Before phase 2 begins, the management session confirms with Mikal:
 the canonical wording of the shared block, and `development`'s
 `PUSH-AUDIT.md`. Both are cheap to propose and expensive to redo
-across thirty-seven plan files and eight repositories.
+across thirty-six plan files and eight repositories.

@@ -458,6 +458,25 @@ nothing in the chain reads a secret.
    and a link -- which is what `llm-doc-structure` asks of them, and
    `AGENTS.md` is loaded into every session held here.
 
+### Phase 5: Push audit -- NOT STARTED
+
+Run `PUSH-AUDIT.md` over the accumulated diff of every phase in
+this plan against `main`, not over the last phase's diff alone --
+the interactions between phases are most of what a whole-plan
+audit is for.
+
+Phases 1--4 are already on `main`, so `git diff main` for this plan
+is empty and would read as a clean audit. Derive the range instead:
+from the merge base of phase 1's first commit to `main`, restricted
+to the paths this plan touched, and name the commit range here when
+the phase runs.
+
+Findings land as their own pull request; the plan is not complete
+until each is resolved or declined in writing, with the reason
+recorded here. If the audit finds nothing, say so in one sentence:
+that is a real result, and a run of them is the evidence for making
+this phase conditional rather than mandatory.
+
 ## Administration and logistics
 
 ### Success criteria

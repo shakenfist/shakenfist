@@ -183,3 +183,27 @@ review before eight copies of it exist.
   added. Re-confirm at nine as part of the migration.
 * Bumping a block version marks the embedding repository stale, and
   names the block that moved. Confirmed.
+
+## Push audit
+
+This is the last phase of the plan and it is not optional. It comes
+after *Migration* and *Verification* because those are where the
+bulk of the work is: a push audit run at the end of *Implementation*
+would cover none of the eight repositories the migration touches.
+
+There are two obligations here and they are not the same one:
+
+* **Each migration pull request** runs its own repository's
+  `PUSH-AUDIT.md` over that pull request, against that repository's
+  default branch, as part of that pull request. That is a per-repo
+  obligation discharged eight times.
+* **This plan's final phase** runs this repository's
+  `PUSH-AUDIT.md` over the accumulated diff of the whole plan --
+  the shared blocks, `check_plan_template` and the audit spec --
+  against `main`, not over the last commit alone. It runs once the
+  migration is complete.
+
+Findings from either land as their own pull request; the plan is not
+complete until each is resolved or declined in writing, with the
+reason recorded here. If an audit finds nothing, say so in one
+sentence.
